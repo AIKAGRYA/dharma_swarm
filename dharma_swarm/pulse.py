@@ -22,14 +22,17 @@ import asyncio
 import json
 import logging
 import os
-import re
-import shutil
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.api_keys import ANTHROPIC_API_KEY_ENV, env_has_value
+from dharma_swarm.claude_cli import (
+    resolve_claude_binary,
+    run_claude_headless as _run_claude_headless_impl,
+)
 from dharma_swarm.context import (
     read_agni_state,
     read_manifest,
@@ -42,11 +45,6 @@ from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
 from dharma_swarm.subconscious import SubconsciousStream
 from dharma_swarm.thread_manager import ThreadManager
 from dharma_swarm.telos_gates import check_with_reflective_reroute
-from dharma_swarm.claude_cli import (
-    resolve_claude_binary,
-    run_claude_headless as _run_claude_headless_impl,
-)
-from dharma_swarm.api_keys import ANTHROPIC_API_KEY_ENV, env_value
 from dharma_swarm.runtime_artifacts import append_pulse_log, freshest_pulse_log_path
 
 logger = logging.getLogger(__name__)
@@ -59,7 +57,6 @@ _DREAM_THRESHOLD = 50
 _DREAM_HYSTERESIS = 10
 _SHAKTI_INTERVAL_SECONDS = 900
 _SHAKTI_SALIENCE_THRESHOLD = 0.7
-_NON_LLM_PULSE_MODES = {"health", "health-only", "non-llm", "no-llm", "status"}
 
 
 def build_prompt(
@@ -136,7 +133,7 @@ def run_claude_headless(
     returns a SKIP message immediately to avoid blocking the daemon
     process in U state (uninterruptible sleep) on the failed subprocess.
     """
-    if bare and not env_value(ANTHROPIC_API_KEY_ENV):
+    if bare and not env_has_value(ANTHROPIC_API_KEY_ENV):
         return (
             "SKIP: ANTHROPIC_API_KEY not set — "
             "claude bare mode unavailable. Set ANTHROPIC_API_KEY in .env "
@@ -183,201 +180,6 @@ def _save_living_state(state: dict[str, Any]) -> None:
         _LIVING_STATE_PATH.write_text(json.dumps(state, indent=2))
     except Exception as e:
         logger.warning("Failed to persist living state: %s", e)
-
-
-def _non_llm_pulse_enabled() -> bool:
-    """Return whether this process should write health pulses without LLM calls."""
-    mode = os.getenv("DGC_PULSE_MODE", "").strip().lower()
-    flag = os.getenv("DGC_PULSE_NO_LLM", "").strip().lower()
-    return mode in _NON_LLM_PULSE_MODES or flag in {"1", "true", "yes", "on"}
-
-
-def _safe_count_entries(path: Path) -> int | None:
-    """Count one directory level without recursively walking large stores."""
-    try:
-        return sum(1 for _ in path.iterdir()) if path.exists() else 0
-    except Exception:
-        return None
-
-
-def _safe_count_matching(path: Path, pattern: str) -> int | None:
-    try:
-        return sum(1 for _ in path.glob(pattern)) if path.exists() else 0
-    except Exception:
-        return None
-
-
-def _safe_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _read_pid(path: Path) -> int | None:
-    try:
-        return int(path.read_text(encoding="utf-8").strip())
-    except Exception:
-        return None
-
-
-def _pid_alive(pid: int | None) -> bool:
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except Exception:
-        return False
-
-
-def _memory_snapshot() -> dict[str, Any]:
-    """Best-effort local memory facts without psutil or provider calls."""
-    total_bytes: int | None = None
-    try:
-        total_bytes = int(os.sysconf("SC_PHYS_PAGES")) * int(os.sysconf("SC_PAGE_SIZE"))
-    except Exception:
-        total_bytes = None
-    return {"total_bytes": total_bytes}
-
-
-def _disk_snapshot(path: Path) -> dict[str, Any]:
-    try:
-        usage = shutil.disk_usage(path)
-    except Exception:
-        return {}
-    return {
-        "path": str(path),
-        "total_bytes": usage.total,
-        "used_bytes": usage.used,
-        "free_bytes": usage.free,
-        "free_percent": round((usage.free / usage.total) * 100, 2) if usage.total else None,
-    }
-
-
-def _pulse_log_snapshot() -> dict[str, Any]:
-    path = freshest_pulse_log_path(STATE_DIR)
-    if path is None:
-        return {"exists": False}
-
-    latest_block = ""
-    try:
-        size = path.stat().st_size
-        with path.open("rb") as handle:
-            handle.seek(max(0, size - 16384))
-            tail = handle.read().decode("utf-8", errors="replace")
-        if "--- PULSE @" in tail:
-            latest_block = "--- PULSE @" + tail.rsplit("--- PULSE @", 1)[-1]
-    except Exception:
-        size = None
-
-    latest_at = None
-    latest_thread = None
-    header = latest_block.splitlines()[0] if latest_block else ""
-    match = re.search(r"--- PULSE @ ([^\s]+)(?: \[([^\]]+)\])?", header)
-    if match:
-        latest_at = match.group(1)
-        latest_thread = match.group(2)
-
-    excerpt = "\n".join(latest_block.splitlines()[1:4]).strip()
-    lowered = latest_block.lower()
-    return {
-        "exists": True,
-        "path": str(path),
-        "size_bytes": size,
-        "modified_at": datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(),
-        "latest_at": latest_at,
-        "latest_thread": latest_thread,
-        "latest_excerpt": excerpt[:500],
-        "credit_error_present": "credit balance" in lowered or "insufficient credit" in lowered,
-    }
-
-
-def _collect_non_llm_health(thread: str) -> dict[str, Any]:
-    """Collect a local-only health snapshot for credit-outage pulse mode."""
-    daemon_report = _safe_json(STATE_DIR / "ops" / "daemon_runtime_dispatch_self_report.json")
-    pid = _read_pid(STATE_DIR / "daemon.pid") or daemon_report.get("pid")
-    try:
-        pid_int = int(pid) if pid is not None else None
-    except (TypeError, ValueError):
-        pid_int = None
-
-    pulse_log = _pulse_log_snapshot()
-    credit_error_present = bool(pulse_log.get("credit_error_present"))
-    credit_status = {
-        "status": "provider_credit_exhausted" if credit_error_present else "not_observed_in_latest_pulse",
-        "likely_pool": (
-            "ANTHROPIC_API_KEY / Claude Code bare mode"
-            if credit_error_present
-            else None
-        ),
-        "basis": (
-            "dharma_swarm.pulse calls run_claude_headless(..., model='sonnet'); "
-            "claude_cli bare mode requires ANTHROPIC_API_KEY."
-        ),
-        "latest_excerpt": pulse_log.get("latest_excerpt"),
-    }
-
-    load_average = None
-    try:
-        load_average = os.getloadavg()
-    except Exception:
-        pass
-
-    return {
-        "schema": "dharma_swarm.pulse.health.v1",
-        "mode": "non_llm",
-        "collected_at": datetime.now(timezone.utc).isoformat(),
-        "thread": thread,
-        "daemon": {
-            "pid": pid_int,
-            "alive": _pid_alive(pid_int),
-            "pid_file": str(STATE_DIR / "daemon.pid"),
-            "runtime_dispatch": daemon_report.get("runtime_dispatch"),
-            "runtime_report_updated_at": daemon_report.get("updated_at"),
-        },
-        "system": {
-            "load_average": load_average,
-            "memory": _memory_snapshot(),
-            "disk": _disk_snapshot(STATE_DIR),
-        },
-        "runtime_counts": {
-            "sessions_top_level": _safe_count_entries(STATE_DIR / "sessions"),
-            "artifacts_top_level": _safe_count_entries(STATE_DIR / "artifacts"),
-            "agent_runs_top_level": _safe_count_entries(STATE_DIR / "agent_runs"),
-            "active_run_markers": _safe_count_matching(STATE_DIR / "agent_runs", "*_latest.json"),
-            "ledgers_top_level": _safe_count_entries(STATE_DIR / "ledgers"),
-            "agents_top_level": _safe_count_entries(STATE_DIR / "agents"),
-        },
-        "pulse_log": pulse_log,
-        "credit_status": credit_status,
-    }
-
-
-def _run_non_llm_pulse(thread: str) -> str:
-    snapshot = _collect_non_llm_health(thread)
-    entry = (
-        f"\n--- PULSE @ {snapshot['collected_at']} [health-non-llm] ---\n"
-        f"{json.dumps(snapshot, indent=2, sort_keys=True)}\n"
-    )
-    append_pulse_log(STATE_DIR, entry)
-
-    daemon = snapshot["daemon"]
-    credit = snapshot["credit_status"]
-    counts = snapshot["runtime_counts"]
-    return (
-        "HEALTH PULSE: "
-        f"daemon_alive={daemon['alive']} pid={daemon['pid']} "
-        f"credit_status={credit['status']} "
-        f"sessions={counts['sessions_top_level']} "
-        f"active_runs={counts['active_run_markers']} "
-        f"artifacts={counts['artifacts_top_level']}"
-    )
 
 
 async def _run_living_layers(thread: str, pulse_result: str) -> dict[str, Any]:
@@ -507,9 +309,6 @@ def pulse(config: DaemonConfig | None = None) -> str:
     if focus:
         tm._current_thread = focus
 
-    if _non_llm_pulse_enabled():
-        return _run_non_llm_pulse(tm.current_thread)
-
     inject = tm.check_inject_override(STATE_DIR)
 
     # Check quiet hours — run sleep cycle instead of skipping
@@ -606,26 +405,11 @@ def pulse(config: DaemonConfig | None = None) -> str:
     else:
         cfg.circuit_breaker.record_success()
 
-    # Store in memory (async — wrapped in try/except because asyncio.run
-    # can fail with "cannot be called from a running event loop" when the
-    # thread pool reuses a thread that already has an active event loop.)
-    try:
-        asyncio.run(_store_pulse_result(result, thread))
-    except RuntimeError as e:
-        if "running event loop" in str(e):
-            logger.debug("[pulse] Skipping async store: %s", e)
-        else:
-            raise
+    # Store in memory (async)
+    asyncio.run(_store_pulse_result(result, thread))
 
     # Living-layer heartbeat (subconscious + shakti)
-    try:
-        living_summary = asyncio.run(_run_living_layers(thread, result))
-    except RuntimeError as e:
-        if "running event loop" in str(e):
-            logger.debug("[pulse] Skipping living layers: %s", e)
-            living_summary = {}
-        else:
-            raise
+    living_summary = asyncio.run(_run_living_layers(thread, result))
     if living_summary:
         print(
             "[pulse] Living: density={density} dream={dream} assoc={assoc} "
@@ -811,7 +595,7 @@ def daemon_loop(config: DaemonConfig | None = None):
         try:
             print(f"\n[{now.isoformat()[:19]}] Pulsing... (#{daily_count + 1}/{max_daily})")
             result = pulse(cfg)
-            if not result.startswith(("PAUSED", "QUIET", "CIRCUIT", "HEALTH PULSE")):
+            if not result.startswith(("PAUSED", "QUIET", "CIRCUIT")):
                 daily_count += 1
             print(f"Result: {result[:200]}")
         except Exception as e:

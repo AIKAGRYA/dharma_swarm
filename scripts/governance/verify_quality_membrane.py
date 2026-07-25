@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -66,6 +67,20 @@ def run_quality_membrane(repo_root: Path) -> list[GateResult]:
         (
             "docops_integrity",
             [py, "scripts/docops/check_docops_integrity.py"],
+        ),
+        (
+            "hygiene_delta_ratchet",
+            [
+                py,
+                "scripts/governance/hygiene/delta_ratchet.py",
+                "--base-ref",
+                # Honors GITHUB_BASE_REF set by CI; falls back to origin/main locally.
+                # The script itself reads the env var if --base-ref is omitted; we
+                # pass it explicitly for visibility in the printed command line.
+                os.environ.get("GITHUB_BASE_REF", "origin/main"),
+                "--head-ref",
+                "HEAD",
+            ],
         ),
     ]
 

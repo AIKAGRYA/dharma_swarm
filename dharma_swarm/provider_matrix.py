@@ -6,13 +6,14 @@ import asyncio
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 import re
 import time
 from typing import Any, Mapping
 from uuid import uuid4
 
+from dharma_swarm import key_oracle as _key_oracle
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.model_hierarchy import (
     DEFAULT_MODELS,
     DELIBERATIVE_EXECUTION_PRIORITY,
@@ -100,12 +101,6 @@ class MatrixExecutionResult:
     repair_strategy: str | None = None
 
 
-def _env_value(env: Mapping[str, str] | None, key: str, default: str) -> str:
-    if env is None:
-        return os.environ.get(key, "").strip() or default
-    return str(env.get(key, "")).strip() or default
-
-
 def _default_artifact_dir(artifact_dir: str | Path | None) -> Path:
     if artifact_dir not in (None, ""):
         return Path(artifact_dir).expanduser()
@@ -122,6 +117,12 @@ def _classify_error(exc: Exception | str) -> str:
         return "missing_config"
     if "unauthorized" in text or "401" in text:
         return "auth_failed"
+    if "http error 429" in text or "too many requests" in text or "rate limit" in text:
+        return "rate_limited"
+    if "credit balance" in text or "billing hard limit" in text:
+        return "billing_exhausted"
+    if "insufficient_quota" in text or "exceeded your current quota" in text:
+        return "quota_exhausted"
     if "404" in text or "no endpoints found" in text:
         return "unknown_model"
     if "connection refused" in text or "all connection attempts failed" in text:
@@ -590,75 +591,183 @@ def _should_load_probe_snapshot(env: Mapping[str, str] | None) -> bool:
     return env is None or bool(env)
 
 
-def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType, str, LaneRole]]:
-    kimi_model = _env_value(env, "DGC_DIRECTOR_KIMI_MODEL", "moonshotai/kimi-k2.5")
-    glm_model = _env_value(env, "DGC_DIRECTOR_GLM_MODEL", "z-ai/glm-5")
-    minimax_model = _env_value(env, "DGC_DIRECTOR_MINIMAX_MODEL", "minimaxai/minimax-m2.5")
-    qwen_builder_model = _env_value(env, "DGC_DIRECTOR_QWEN_MODEL", "qwen/qwen3-coder")
-    codex_model = (
-        resolve_runtime_provider_config(ProviderType.CODEX, env=env).default_model
-        or "gpt-5.4"
-    )
-    claude_cli_model = (
-        resolve_runtime_provider_config(ProviderType.CLAUDE_CODE, env=env).default_model
-        or DEFAULT_MODELS[ProviderType.ANTHROPIC]
-    )
-    anthropic_model = (
-        resolve_runtime_provider_config(ProviderType.ANTHROPIC, env=env).default_model
-        or DEFAULT_MODELS[ProviderType.ANTHROPIC]
-    )
+# ── Blueprint specs — pool projections, not literals ──────────────────────
+# STEP 4 of the model-pool consolidation. Each blueprint row is a *request*
+# against the ONE pool, not a hardcoded model literal. A row is one of:
+#   - a ``str`` logical pool id  -> resolved to the route for the given provider
+#     (e.g. "kimi-k2.6" under OLLAMA -> Route(OLLAMA, "kimi-k2.6:cloud")).
+#   - a ``_RuntimeDefault`` marker -> the per-provider default model string,
+#     which itself projects from ``model_pool.default_for_provider`` (Step 3),
+#     used for the oauth/binary primary-driver lanes (Codex/Claude-Max) and the
+#     thin per-provider default lanes that have no roster pool route.
+# The concrete (provider, model_id, role) tuples are MATERIALISED by
+# :func:`_materialise_blueprint`, which projects each row through the pool and
+# then prunes any row whose provider is not live per the key oracle (FAIL-OPEN:
+# oracle ``None`` -> keep every row, never strand the fleet).
 
+
+@dataclass(frozen=True, slots=True)
+class _RuntimeDefault:
+    """A blueprint row that resolves to a provider's runtime default model.
+
+    The id string is the *fallback* used only when the runtime config exposes no
+    default — these fallbacks themselves come from the pool projection
+    (``DEFAULT_MODELS`` / ``model_pool.default_for_provider``), never new
+    literals invented here.
+    """
+
+    fallback: str = ""
+
+
+# A blueprint row: (provider, pool-id | runtime-default, lane-role).
+_BlueprintRow = tuple[ProviderType, "str | _RuntimeDefault", LaneRole]
+
+
+def _pool_model_id(pool_id: str, provider: ProviderType) -> str | None:
+    """Project a logical pool id to the provider-specific model string.
+
+    Returns the exact provider route model_id the pool holds for ``pool_id``
+    under ``provider``, or ``None`` if the pool has no such route (caller drops
+    the row rather than inventing a literal).
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:
+        return None
+    for route in entry.routes:
+        if route.provider is provider:
+            return route.model_id
+    return None
+
+
+def _resolve_runtime_default(
+    provider: ProviderType,
+    fallback: str,
+    env: Mapping[str, str] | None,
+) -> str:
+    config_default = resolve_runtime_provider_config(provider, env=env).default_model
+    if config_default:
+        return config_default
+    if fallback:
+        return fallback
+    # Last resort: the pool's per-provider default projection (Step 3).
+    return DEFAULT_MODELS.get(provider, "")
+
+
+def _materialise_blueprint(
+    spec: list[_BlueprintRow],
+    env: Mapping[str, str] | None,
+    live: set[str] | None,
+) -> list[tuple[ProviderType, str, LaneRole]]:
+    """Turn a blueprint spec into concrete (provider, model_id, role) tuples.
+
+    Projects each row through the pool, then filters by the live-key oracle.
+    FAIL-OPEN: ``live is None`` (oracle unknown/stale) keeps every row.
+    """
+    out: list[tuple[ProviderType, str, LaneRole]] = []
+    for provider, ref, role in spec:
+        if live is not None and provider.value not in live:
+            # Dead provider per the live oracle: the matrix shrinks here.
+            continue
+        if isinstance(ref, _RuntimeDefault):
+            model_id = _resolve_runtime_default(provider, ref.fallback, env)
+        else:
+            model_id = _pool_model_id(ref, provider)
+            if model_id is None:
+                # No pool route for this id under this provider: fall back to the
+                # provider's pool default projection rather than dropping the lane.
+                model_id = DEFAULT_MODELS.get(provider, "")
+        if not model_id:
+            continue
+        out.append((provider, model_id, role))
+    return out
+
+
+def _live25_spec() -> list[_BlueprintRow]:
     return [
-        (ProviderType.CODEX, codex_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.CLAUDE_CODE, claude_cli_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.ANTHROPIC, anthropic_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.OLLAMA, "glm-5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "deepseek-v3.2:cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "kimi-k2.5:cloud", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.CODEX, _RuntimeDefault("gpt-5.4"), LaneRole.PRIMARY_DRIVER),
+        (ProviderType.CLAUDE_CODE, _RuntimeDefault(), LaneRole.PRIMARY_DRIVER),
+        (ProviderType.ANTHROPIC, _RuntimeDefault(), LaneRole.PRIMARY_DRIVER),
+        (ProviderType.OLLAMA, "glm-5", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, "deepseek-v3.2", LaneRole.BULK_BUILDER),
+        (ProviderType.OLLAMA, "kimi-k2.5", LaneRole.RESEARCH_DELEGATE),
         (ProviderType.OLLAMA, "qwen3-coder:480b-cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "minimax-m2.7:cloud", LaneRole.CHALLENGER),
-        (ProviderType.NVIDIA_NIM, DEFAULT_MODELS[ProviderType.NVIDIA_NIM], LaneRole.VALIDATOR),
-        (ProviderType.NVIDIA_NIM, kimi_model, LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.NVIDIA_NIM, glm_model, LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.NVIDIA_NIM, minimax_model, LaneRole.CHALLENGER),
-        (ProviderType.OPENROUTER, kimi_model, LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OPENROUTER, glm_model, LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OPENROUTER, qwen_builder_model, LaneRole.BULK_BUILDER),
-        (ProviderType.OPENROUTER, "openai/gpt-5-codex", LaneRole.BULK_BUILDER),
-        (ProviderType.OPENROUTER, "deepseek/deepseek-r1", LaneRole.CHALLENGER),
-        (ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE], LaneRole.GENERAL_SUPPORT),
-        (ProviderType.GROQ, DEFAULT_MODELS[ProviderType.GROQ], LaneRole.VALIDATOR),
-        (ProviderType.CEREBRAS, DEFAULT_MODELS[ProviderType.CEREBRAS], LaneRole.BULK_BUILDER),
-        (ProviderType.SILICONFLOW, DEFAULT_MODELS[ProviderType.SILICONFLOW], LaneRole.BULK_BUILDER),
-        (ProviderType.TOGETHER, DEFAULT_MODELS[ProviderType.TOGETHER], LaneRole.BULK_BUILDER),
-        (ProviderType.FIREWORKS, DEFAULT_MODELS[ProviderType.FIREWORKS], LaneRole.BULK_BUILDER),
-        (ProviderType.GOOGLE_AI, DEFAULT_MODELS[ProviderType.GOOGLE_AI], LaneRole.GENERAL_SUPPORT),
-        (ProviderType.MISTRAL, DEFAULT_MODELS[ProviderType.MISTRAL], LaneRole.GENERAL_SUPPORT),
-        (ProviderType.OPENAI, DEFAULT_MODELS[ProviderType.OPENAI], LaneRole.GENERAL_SUPPORT),
+        (ProviderType.OLLAMA, "minimax-m2.7", LaneRole.CHALLENGER),
+        # Single NIM lane: the pool has only the llama-3.3-70b NIM route, so the
+        # old kimi/glm/minimax "NIM director" rows were phantom (OpenRouter ids
+        # handed to NVIDIA NIM, which has no such catalog id). The pool reveals
+        # the truth — one real NIM route — so those phantom rows are dropped.
+        (ProviderType.NVIDIA_NIM, _RuntimeDefault(), LaneRole.VALIDATOR),
+        (ProviderType.NVIDIA_NIM, "llama-3.1-nemotron-ultra-253b-v1", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OPENROUTER, "kimi-k2.6", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OPENROUTER, "glm-5", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OPENROUTER, "qwen3-235b-a22b", LaneRole.BULK_BUILDER),
+        (ProviderType.OPENROUTER, "gpt-5-codex", LaneRole.BULK_BUILDER),
+        (ProviderType.OPENROUTER, "deepseek-r1", LaneRole.CHALLENGER),
+        (ProviderType.OPENROUTER_FREE, _RuntimeDefault(), LaneRole.GENERAL_SUPPORT),
+        (ProviderType.GROQ, _RuntimeDefault(), LaneRole.VALIDATOR),
+        (ProviderType.CEREBRAS, _RuntimeDefault(), LaneRole.BULK_BUILDER),
+        (ProviderType.SILICONFLOW, _RuntimeDefault(), LaneRole.BULK_BUILDER),
+        (ProviderType.TOGETHER, _RuntimeDefault(), LaneRole.BULK_BUILDER),
+        (ProviderType.FIREWORKS, _RuntimeDefault(), LaneRole.BULK_BUILDER),
+        (ProviderType.GOOGLE_AI, _RuntimeDefault(), LaneRole.GENERAL_SUPPORT),
+        (ProviderType.MISTRAL, _RuntimeDefault(), LaneRole.GENERAL_SUPPORT),
+        (ProviderType.OPENAI, _RuntimeDefault(), LaneRole.GENERAL_SUPPORT),
     ]
 
 
-def _quick_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType, str, LaneRole]]:
-    codex_model = (
-        resolve_runtime_provider_config(ProviderType.CODEX, env=env).default_model
-        or "gpt-5.4"
-    )
-    claude_cli_model = (
-        resolve_runtime_provider_config(ProviderType.CLAUDE_CODE, env=env).default_model
-        or DEFAULT_MODELS[ProviderType.ANTHROPIC]
-    )
+def _quick_spec() -> list[_BlueprintRow]:
     return [
-        (ProviderType.CODEX, codex_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.CLAUDE_CODE, claude_cli_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.OLLAMA, "glm-5:cloud", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.CODEX, _RuntimeDefault("gpt-5.4"), LaneRole.PRIMARY_DRIVER),
+        (ProviderType.CLAUDE_CODE, _RuntimeDefault(), LaneRole.PRIMARY_DRIVER),
+        (ProviderType.OLLAMA, "glm-5", LaneRole.RESEARCH_DELEGATE),
         (ProviderType.OLLAMA, "qwen3-coder:480b-cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "kimi-k2.5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "minimax-m2.7:cloud", LaneRole.CHALLENGER),
-        (ProviderType.NVIDIA_NIM, DEFAULT_MODELS[ProviderType.NVIDIA_NIM], LaneRole.VALIDATOR),
-        (ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE], LaneRole.GENERAL_SUPPORT),
-        (ProviderType.GROQ, DEFAULT_MODELS[ProviderType.GROQ], LaneRole.VALIDATOR),
-        (ProviderType.CEREBRAS, DEFAULT_MODELS[ProviderType.CEREBRAS], LaneRole.BULK_BUILDER),
+        (ProviderType.OLLAMA, "kimi-k2.5", LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, "minimax-m2.7", LaneRole.CHALLENGER),
+        (ProviderType.NVIDIA_NIM, _RuntimeDefault(), LaneRole.VALIDATOR),
+        (ProviderType.OPENROUTER_FREE, _RuntimeDefault(), LaneRole.GENERAL_SUPPORT),
+        (ProviderType.GROQ, _RuntimeDefault(), LaneRole.VALIDATOR),
+        (ProviderType.CEREBRAS, _RuntimeDefault(), LaneRole.BULK_BUILDER),
     ]
+
+
+_UNSET = object()
+
+
+def _resolve_key_oracle(
+    key_oracle: set[str] | None | object,
+    env: Mapping[str, str] | None,
+) -> set[str] | None:
+    """Resolve the live-provider set for blueprint filtering.
+
+    ``key_oracle`` may be:
+      - an explicit ``set`` -> use as-is (test injection / caller override),
+      - ``None`` -> FAIL-OPEN, do not filter (return ``None``),
+      - the ``_UNSET`` sentinel (the default) -> read the live oracle now.
+    Any oracle read error degrades to ``None`` (fail-open) so the oracle can
+    never raise into routing or strand the fleet.
+    """
+    if isinstance(key_oracle, set):
+        return key_oracle
+    if key_oracle is None:
+        return None
+    try:
+        return _key_oracle.live_providers()
+    except Exception:  # pragma: no cover - oracle must never raise into routing
+        return None
+
+
+def _live25_blueprints(
+    env: Mapping[str, str] | None,
+    live: set[str] | None = None,
+) -> list[tuple[ProviderType, str, LaneRole]]:
+    return _materialise_blueprint(_live25_spec(), env, live)
+
+
+def _quick_blueprints(
+    env: Mapping[str, str] | None,
+    live: set[str] | None = None,
+) -> list[tuple[ProviderType, str, LaneRole]]:
+    return _materialise_blueprint(_quick_spec(), env, live)
 
 
 def build_default_matrix_targets(
@@ -668,11 +777,27 @@ def build_default_matrix_targets(
     env: Mapping[str, str] | None = None,
     working_dir: str | None = None,
     timeout_seconds: float | None = None,
+    key_oracle: set[str] | None | object = _UNSET,
 ) -> list[MatrixTargetSpec]:
+    """Project the provider matrix from the model pool, filtered by live keys.
+
+    ``key_oracle`` controls the live-key filter that shrinks the matrix for dead
+    providers (the STEP 4 cure):
+      - ``_UNSET`` (default): read the live oracle now (``keys_status.json``).
+      - an explicit ``set[str]``: use as the live-provider set (test injection).
+      - ``None``: FAIL-OPEN — no live filtering, every blueprint row is kept.
+
+    FAIL-OPEN is load-bearing: when the oracle is unknown/stale, the matrix keeps
+    today's full behaviour rather than stranding the fleet. When the oracle IS
+    known, dead-key provider lanes are pruned, so the matrix output is unchanged
+    for live providers and shrinks for dead ones.
+    """
     if profile not in PROFILE_CHOICES:
         raise ValueError(f"Unsupported provider-matrix profile: {profile}")
 
-    blueprints = _live25_blueprints(env) if profile == "live25" else _quick_blueprints(env)
+    live = _resolve_key_oracle(key_oracle, env)
+    spec = _live25_spec() if profile == "live25" else _quick_spec()
+    blueprints = _materialise_blueprint(spec, env, live)
 
     targets: list[MatrixTargetSpec] = []
     for provider, model, role in blueprints:
@@ -683,8 +808,20 @@ def build_default_matrix_targets(
             working_dir=working_dir,
             timeout_seconds=int(timeout_seconds) if timeout_seconds is not None else None,
         )
-        available = bool(config.available)
-        reason = "configured" if available else "unavailable"
+        # `available` blends the runtime config (binary/key presence) with the
+        # live oracle: a provider the oracle says is dead is never "available",
+        # even if a stale env var is set. Fail-open: oracle None -> config only.
+        config_available = bool(config.available)
+        if live is not None:
+            available = config_available and provider.value in live
+        else:
+            available = config_available
+        if not available and live is not None and provider.value not in live:
+            reason = "dead_key"
+        elif available:
+            reason = "configured"
+        else:
+            reason = "unavailable"
         target = MatrixTargetSpec(
             target_id=f"{provider.value}:{model}",
             provider=provider,

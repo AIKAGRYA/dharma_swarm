@@ -21,5 +21,5 @@ Non-goals:
 
 - No private Palantir tenant work.
 - No credentialed scraping.
-- No wholesale copying of docs/course content.
+- Full prose of robots-allowed public docs pages may be kept as local-only deep-cards (never committed, no redistribution); no copying of Learn/course/gated/private content.
 - No official affiliation claims.

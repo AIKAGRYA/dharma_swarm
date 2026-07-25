@@ -133,7 +133,19 @@ jobs:
           # Devin commits and opens PRs but does not post review receipts, so
           # requiring a devin receipt left the gate permanently unclearable.
           # Required receipts = the agents that actually review (see #559 pile).
-          REQUIRED_REVIEWERS: copilot,claude
+          #
+          # D2 (track merge-master-mike-d4): the always-on cloud quorum is
+          # codex,copilot — both have native reviewer Apps the gate can bridge.
+          # claude never posted a receipt in the cloud (no cloud reviewer), so it
+          # was a permanent blocker; it moves to the deep/backup lane. This is
+          # MORE real review than copilot,claude, not less.
+          REQUIRED_REVIEWERS: codex,copilot
+          # D1: count a trusted installed reviewer-App's native GitHub review
+          # (Codex App = codex, Copilot = copilot) as that agent's receipt when
+          # no local receipt file exists. Strictly additive — never waives CI,
+          # conflict, unresolved-thread, or CHANGES_REQUESTED checks — so the
+          # quorum can clear in the cloud with no operator machine.
+          DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"
           MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
@@ -256,7 +268,7 @@ jobs:
             fi
           else
             existing="$(gh pr view "${PR_NUMBER}" --json comments \
-              --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+              --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .url | split("issuecomment-")[-1]' \
               | head -1)"
             if [ -n "${existing}" ]; then
               gh api --method PATCH \

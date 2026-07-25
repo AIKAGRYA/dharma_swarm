@@ -1,4 +1,5 @@
 """Tests for signal_bus.py — inter-loop temporal coherence."""
+import threading
 import time
 import pytest
 from dharma_swarm.signal_bus import SignalBus
@@ -116,6 +117,49 @@ class TestSignalBus:
         assert len(received) == 1
         # Event still in deque
         assert bus.pending_count == 1
+
+    def test_subscriber_mutation_cannot_change_queued_event(self):
+        bus = SignalBus()
+        original = {"type": "AUDIT", "payload": {"value": 1}}
+
+        def mutate(event):
+            event["mutated_by_subscriber"] = True
+            event["payload"]["value"] = 99
+
+        bus.subscribe("AUDIT", mutate)
+        bus.emit(original)
+
+        assert bus.drain() == [{"type": "AUDIT", "payload": {"value": 1}}]
+        assert original == {"type": "AUDIT", "payload": {"value": 1}}
+
+    def test_emit_accepts_non_deepcopyable_opaque_payload(self):
+        bus = SignalBus()
+        lock = threading.Lock()
+        received: list[dict] = []
+        bus.subscribe("RUNTIME_HANDLE", received.append)
+
+        bus.emit({"type": "RUNTIME_HANDLE", "payload": {"lock": lock}})
+
+        assert received[0]["payload"]["lock"] is lock
+        assert bus.drain()[0]["payload"]["lock"] is lock
+
+    def test_peek_mutation_cannot_change_queued_event(self):
+        bus = SignalBus()
+        bus.emit({"type": "AUDIT", "payload": {"value": 1}})
+
+        peeked = bus.peek()
+        peeked[0]["payload"]["value"] = 99
+
+        assert bus.drain() == [{"type": "AUDIT", "payload": {"value": 1}}]
+
+    def test_fitness_view_mutation_cannot_change_queued_event(self):
+        bus = SignalBus()
+        bus.emit({"type": "AGENT_FITNESS", "agent": "fixture", "scores": [1]})
+
+        viewed = bus.get_agent_fitness("fixture")
+        viewed[0]["scores"].append(99)
+
+        assert bus.peek()[0]["scores"] == [1]
 
     def test_unsubscribe(self):
         bus = SignalBus()

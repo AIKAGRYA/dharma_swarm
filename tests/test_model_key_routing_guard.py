@@ -41,6 +41,28 @@ KEY_REGISTRY_FILES = {
     "dharma_swarm/runtime_provider.py",
 }
 
+SEMANTIC_COMMONS_FILES = (
+    "docs/ontology/SEMANTIC_COMMONS.md",
+    "docs/ontology/semantic_aliases.yaml",
+    "docs/ontology/semantic_objects.yaml",
+)
+
+BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD = "docs/ops/MODEL_ROUTING_SEMANTIC_COMMONS_GUARD.md"
+
+SEMANTIC_COMMONS_REQUIRED_TERMS = (
+    "ModelKeyRouting",
+    "DKeysKeyStore",
+    "RuntimeProvider",
+    "ModelHierarchy",
+    "ProviderPolicyRouter",
+    "ModelRouter",
+    "RoutingMemory",
+    "parallel model routing layer",
+    "project .env keys",
+    "direct provider factory",
+    "scattered model order",
+)
+
 MODEL_LITERAL_RE = re.compile(
     r"(?:"
     r"claude-(?:opus|sonnet|haiku)[\w.-]*|"
@@ -75,24 +97,10 @@ PROVIDER_KEY_ENV_RE = re.compile(
 
 KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
     {
-        ("dharma_swarm/agent_constitution.py", "claude-opus-4-20250514"): 4,
-        ("dharma_swarm/agent_constitution.py", "claude-sonnet-4-20250514"): 2,
         ("dharma_swarm/assurance/agents.py", "claude-opus-4-20250514"): 1,
         ("dharma_swarm/assurance/agents.py", "claude-sonnet-4-20250514"): 1,
-        ("dharma_swarm/autonomous_agent.py", "claude-sonnet-4-20250514"): 1,
-        ("dharma_swarm/autonomous_agent.py", "claude-sonnet-4-6"): 5,
         ("dharma_swarm/daemon_config.py", "anthropic/claude-sonnet-4"): 1,
         ("dharma_swarm/dharma_context_mcp.py", "meta-llama/llama-3.3-70b-instruct:free"): 1,
-        ("dharma_swarm/external_agent_registration.py", "moonshotai/kimi-k2.6"): 1,
-        ("dharma_swarm/ginko_agents.py", "deepseek/deepseek-chat-v3-0324"): 2,
-        ("dharma_swarm/ginko_agents.py", "deepseek/deepseek-r1"): 1,
-        ("dharma_swarm/ginko_agents.py", "moonshotai/kimi-k2.5"): 2,
-        ("dharma_swarm/ginko_agents.py", "nvidia/llama-3.1-nemotron-70b-instruct:free"): 1,
-        ("dharma_swarm/ginko_agents.py", "nvidia/nemotron-3-super-120b-a12b:free"): 1,
-        ("dharma_swarm/ginko_agents.py", "qwen/qwen3.5-397b-a17b"): 1,
-        ("dharma_swarm/ginko_agents.py", "qwen/qwen3.5-flash-02-23"): 1,
-        ("dharma_swarm/ginko_agents.py", "zhipuai/glm-5-plus"): 1,
-        ("dharma_swarm/ginko_evolution.py", "deepseek/deepseek-chat-v3-0324"): 1,
         ("dharma_swarm/llm_burn.py", "glm-5"): 1,
         ("dharma_swarm/llm_burn.py", "kimi-k2.5"): 1,
         ("dharma_swarm/llm_burn.py", "minimax-m2.7"): 1,
@@ -104,15 +112,6 @@ KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
         ("dharma_swarm/orchestrate_live.py", "qwen/qwen3-4b:free"): 1,
         ("dharma_swarm/orchestrate_live.py", "qwen/qwen3-coder:free"): 1,
         ("dharma_swarm/orchestrate_live.py", "qwen/qwen3-next-80b-a3b-instruct:free"): 1,
-        ("dharma_swarm/scout_framework.py", "glm-5:cloud"): 1,
-        ("dharma_swarm/startup_crew.py", "deepseek-v3.2:cloud"): 1,
-        ("dharma_swarm/startup_crew.py", "deepseek/deepseek-chat-v3-0324:free"): 1,
-        ("dharma_swarm/startup_crew.py", "glm-5:cloud"): 1,
-        ("dharma_swarm/startup_crew.py", "kimi-k2.5:cloud"): 1,
-        ("dharma_swarm/startup_crew.py", "meta-llama/llama-3.3-70b-instruct:free"): 1,
-        ("dharma_swarm/startup_crew.py", "mistralai/mistral-small-3.1-24b-instruct:free"): 1,
-        ("dharma_swarm/startup_crew.py", "qwen/qwen3-32b:free"): 1,
-        ("dharma_swarm/startup_crew.py", "qwen3-coder:480b-cloud"): 1,
         ("dharma_swarm/subconscious_hum.py", "claude-sonnet-4-20250514"): 1,
         ("dharma_swarm/terminal_adapters/claude.py", "claude-haiku-4-5"): 1,
         ("dharma_swarm/terminal_adapters/claude.py", "claude-opus-4"): 1,
@@ -123,10 +122,9 @@ KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-haiku-4-5"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-opus-4"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-opus-4-6"): 1,
-        ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-5"): 2,
+        ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-5"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-6"): 1,
-        ("dharma_swarm/tui/engine/adapters/codex.py", "gpt-5.4"): 2,
-        ("dharma_swarm/tui/engine/adapters/openrouter.py", "google/gemini-2.5-pro"): 1,
+        ("dharma_swarm/tui/engine/adapters/codex.py", "gpt-5.4"): 1,
         ("dharma_swarm/tui/engine/adapters/openrouter.py", "openai/gpt-5-codex"): 1,
         ("scripts/demos/demo_jikoku.py", "claude-opus-4"): 1,
         ("scripts/full_stack_smoke.py", "deepseek/deepseek-chat-v3-0324"): 1,
@@ -364,3 +362,21 @@ def test_provider_key_reads_do_not_escape_key_registry() -> None:
         actual,
         KNOWN_RAW_KEY_READ_DEBT,
     )
+
+
+def test_semantic_commons_is_registered_or_branch_local_guarded() -> None:
+    semantic_commons_paths = [REPO_ROOT / rel for rel in SEMANTIC_COMMONS_FILES]
+    if all(path.exists() for path in semantic_commons_paths):
+        contents = "\n".join(path.read_text(encoding="utf-8") for path in semantic_commons_paths)
+        missing_terms = [term for term in SEMANTIC_COMMONS_REQUIRED_TERMS if term not in contents]
+        assert not missing_terms, f"Semantic Commons missing routing terms: {missing_terms}"
+        return
+
+    guard_path = REPO_ROOT / BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD
+    assert guard_path.exists(), (
+        "Semantic Commons files are absent in this worktree; add the ontology files "
+        f"or maintain {BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD}."
+    )
+    guard = guard_path.read_text(encoding="utf-8")
+    missing_terms = [term for term in SEMANTIC_COMMONS_REQUIRED_TERMS if term not in guard]
+    assert not missing_terms, f"Branch-local Semantic Commons guard missing routing terms: {missing_terms}"

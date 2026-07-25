@@ -1,9 +1,7 @@
-"""The holon_system facade package must re-export the SAME objects as the
-canonical owners - never a second implementation.
+"""Import checks for the thin holon_system facade package.
 
-This test is the executable proof for deliverable #4 (target package skeleton).
-If a facade ever drifts into a real reimplementation, is-identity breaks and
-this test fails, which is exactly the anti-sprawl guarantee we want.
+The package must organize existing organs without redefining canonical runtime
+primitives such as load_holon or holon_wake_cycle.
 """
 
 from __future__ import annotations
@@ -11,132 +9,72 @@ from __future__ import annotations
 import importlib
 
 
-def test_identity_facade_reexports_canonical_symbols() -> None:
-    import dharma_swarm.agent_registry as reg
-    import dharma_swarm.holon_bridge as bridge
-    from dharma_swarm.holon_system import identity
-
-    assert identity.AgentRegistry is reg.AgentRegistry
-    assert identity.load_holon is bridge.load_holon
-    assert identity.RunningHolon is bridge.RunningHolon
-
-
-def test_runtime_bridge_facade_is_identity_not_copy() -> None:
-    import dharma_swarm.holon_bridge as bridge
-    from dharma_swarm.holon_system.runtime import bridge as facade
-
-    for name in (
-        "RunningHolon",
-        "build_request",
-        "get_holon_provider",
-        "guard_outcome_claim",
-        "holon_reply",
-        "load_holon",
-    ):
-        assert getattr(facade, name) is getattr(bridge, name), name
-
-
-def test_runtime_wake_facade_reexports_wake_cycle() -> None:
-    import dharma_swarm.holon_runtime as rt
-    from dharma_swarm.holon_system.runtime import wake
-
-    assert wake.holon_wake_cycle is rt.holon_wake_cycle
-    assert wake.run_holon_loop is rt.run_holon_loop
-
-
-def test_runtime_persistence_facade_reexports() -> None:
-    import dharma_swarm.holon_persistence as persist
-    from dharma_swarm.holon_system.runtime import persistence
-
-    assert persistence.save_cycle_record is persist.save_cycle_record
-    assert persistence.resume_point is persist.resume_point
-
-
-def test_runtime_provider_facade_reexports_frontier_resolver() -> None:
-    import dharma_swarm.runtime_provider as rp
-    from dharma_swarm.holon_system.runtime import provider
-
-    assert provider.resolve_top_available_at_wake is rp.resolve_top_available_at_wake
-    assert provider.resolve_runtime_provider_config is rp.resolve_runtime_provider_config
-    assert provider.RuntimeProviderConfig is rp.RuntimeProviderConfig
+FACADE_MODULES = [
+    "dharma_swarm.holon_system",
+    "dharma_swarm.holon_system.identity",
+    "dharma_swarm.holon_system.identity.registry",
+    "dharma_swarm.holon_system.identity.cards",
+    "dharma_swarm.holon_system.identity.canonical_names",
+    "dharma_swarm.holon_system.runtime",
+    "dharma_swarm.holon_system.runtime.bridge",
+    "dharma_swarm.holon_system.runtime.wake_cycle",
+    "dharma_swarm.holon_system.runtime.persistence",
+    "dharma_swarm.holon_system.runtime.health",
+    "dharma_swarm.holon_system.kernel",
+    "dharma_swarm.holon_system.kernel.living_kernel",
+    "dharma_swarm.holon_system.authority",
+    "dharma_swarm.holon_system.authority.execution_lease",
+    "dharma_swarm.holon_system.authority.reversibility_gate",
+    "dharma_swarm.holon_system.authority.permissions",
+    "dharma_swarm.holon_system.orchestration",
+    "dharma_swarm.holon_system.orchestration.fanout",
+    "dharma_swarm.holon_system.orchestration.agent_pool",
+    "dharma_swarm.holon_system.orchestration.intent",
+    "dharma_swarm.holon_system.transport",
+    "dharma_swarm.holon_system.transport.a2a_send",
+    "dharma_swarm.holon_system.transport.inbox_bridge",
+    "dharma_swarm.holon_system.transport.reply_capture",
+    "dharma_swarm.holon_system.transport.domain_reply",
+    "dharma_swarm.holon_system.responders",
+    "dharma_swarm.holon_system.responders.wake_profiles",
+    "dharma_swarm.holon_system.gateway",
+    "dharma_swarm.holon_system.gateway.base",
+    "dharma_swarm.holon_system.gateway.operator_brief",
+    "dharma_swarm.holon_system.observability",
+    "dharma_swarm.holon_system.observability.proof_gates",
+    "dharma_swarm.holon_system.observability.scoreboard",
+    "dharma_swarm.holon_system.cli",
+    "dharma_swarm.holon_system.cli.commands",
+    "dharma_swarm.holon_system.api",
+    "dharma_swarm.holon_system.api.routes",
+    "dharma_swarm.holon_system.sarathi",
+    "dharma_swarm.holon_system.sarathi.gateway",
+    "dharma_swarm.holon_system.sarathi.pulse",
+    "dharma_swarm.holon_system.sarathi.roster",
+    "dharma_swarm.holon_system.sarathi.brief",
+    "dharma_swarm.holon_system.sarathi.scoreboard",
+]
 
 
-def test_kernel_facade_reexports_living_agent_kernel() -> None:
-    import dharma_swarm.operator_core.living_agent_kernel as lak
-    from dharma_swarm.holon_system.kernel import living
-
-    assert living.LivingAgentKernel is lak.LivingAgentKernel
+def test_all_holon_system_facades_import() -> None:
+    for module_name in FACADE_MODULES:
+        assert importlib.import_module(module_name)
 
 
-def test_authority_leases_facade_reexports() -> None:
-    import dharma_swarm.operator_core.execution_lease as lease
-    from dharma_swarm.holon_system.authority import leases
+def test_runtime_facades_point_to_canonical_primitives() -> None:
+    from dharma_swarm import holon_bridge, holon_runtime
+    from dharma_swarm.holon_system.runtime import bridge, wake_cycle
 
-    assert leases.build_execution_lease is lease.build_execution_lease
-    assert leases.validate_execution_lease is lease.validate_execution_lease
-
-
-def test_authority_reversibility_facade_reexports_gate() -> None:
-    import dharma_swarm.operator_core.reversibility_gate as gate
-    from dharma_swarm.holon_system.authority import reversibility
-
-    assert reversibility.ReversibilityGate is gate.ReversibilityGate
-    assert reversibility.classify_action is gate.classify_action
-    assert reversibility.ActionClass is gate.ActionClass
+    assert bridge.load_holon is holon_bridge.load_holon
+    assert wake_cycle.holon_wake_cycle is holon_runtime.holon_wake_cycle
 
 
-def test_orchestration_facade_reexports() -> None:
-    import dharma_swarm.holon_orchestrate as orch
-    from dharma_swarm.holon_system.orchestration import holon_orchestrate as facade
+def test_sarathi_gateway_snapshot_is_honest_not_alive_claim() -> None:
+    from dharma_swarm.holon_system.sarathi.gateway import gateway_snapshot
 
-    assert facade.run_holon_orchestration is orch.run_holon_orchestration
-    assert facade.HolonOrchestrationConfig is orch.HolonOrchestrationConfig
+    snapshot = gateway_snapshot()
 
-
-def test_observability_facade_reexports() -> None:
-    import dharma_swarm.holon_canonical_state as canon
-    import dharma_swarm.holon_health as health
-    from dharma_swarm.holon_system import observability
-
-    assert observability.holon_status is health.holon_status
-    assert observability.project_canonical_holon_state is canon.project_canonical_holon_state
-
-
-def test_all_subpackages_import_cleanly() -> None:
-    # Every declared organ subpackage must import without error, including the
-    # "no library yet" pointers (transport/responders/gateway/cli/api) and the
-    # not-yet-implemented sarathi package.
-    for name in (
-        "dharma_swarm.holon_system",
-        "dharma_swarm.holon_system.identity",
-        "dharma_swarm.holon_system.runtime",
-        "dharma_swarm.holon_system.runtime.bridge",
-        "dharma_swarm.holon_system.runtime.wake",
-        "dharma_swarm.holon_system.runtime.persistence",
-        "dharma_swarm.holon_system.runtime.provider",
-        "dharma_swarm.holon_system.kernel",
-        "dharma_swarm.holon_system.kernel.living",
-        "dharma_swarm.holon_system.authority",
-        "dharma_swarm.holon_system.authority.leases",
-        "dharma_swarm.holon_system.authority.reversibility",
-        "dharma_swarm.holon_system.orchestration",
-        "dharma_swarm.holon_system.orchestration.holon_orchestrate",
-        "dharma_swarm.holon_system.observability",
-        "dharma_swarm.holon_system.transport",
-        "dharma_swarm.holon_system.responders",
-        "dharma_swarm.holon_system.gateway",
-        "dharma_swarm.holon_system.cli",
-        "dharma_swarm.holon_system.api",
-        "dharma_swarm.holon_system.sarathi",
-    ):
-        assert importlib.import_module(name) is not None, name
-
-
-def test_sarathi_package_is_specified_not_implemented() -> None:
-    # Guardrail: the apex package must stay honestly empty of behavior until the
-    # proof gates are met. If someone ships a stub gateway, flip IMPLEMENTED and
-    # this test forces them to prove it instead of silently claiming an apex.
-    from dharma_swarm.holon_system import sarathi
-
-    assert sarathi.IMPLEMENTED is False
-    assert sarathi.PLANNED_MODULES == ("gateway", "pulse", "roster", "brief", "scoreboard")
+    assert snapshot["schema_version"] == "dharma.sarathi.gateway_snapshot.v1"
+    assert snapshot["wake_loop_active"] is False
+    assert snapshot["alive_claim"] is False
+    assert "not alive" in snapshot["brief"]

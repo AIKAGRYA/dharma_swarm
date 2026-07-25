@@ -1,0 +1,244 @@
+# Signal Synthesis Desk track block — DRAFT, not active
+#
+# Source: claude-code, 2026-07-01, following a live research + 4-lens
+# adjudication trial run (reports/research/2026-07-01_signal_synthesis_live_run/
+# DIGEST.md) commissioned by the operator to test what a high-velocity,
+# multi-beat research-ingestion-and-elevation organ would actually look like
+# in this repo, "as if operating at warp speed."
+#
+# NAMING (corrected per the Strategist lens): the original working name
+# "Signal Council" COLLIDES with the existing dharma_swarm/council/council.py
+# Council class (arena trace-verification — a different job entirely). Per
+# CLAUDE.md's naming/identity SSOT axiom ("do not create parallel naming
+# schemes"), this proposal is named "Signal Synthesis Desk" instead.
+#
+# SPINE OBJECTIVE (corrected per the Strategist lens): this is NOT a
+# substrate-nativeness track. It is research/external-signal curation work.
+# The portfolio already runs 4 ACTIVE substrate-nativeness tracks (at the
+# warn_active=5 WIP threshold); `research-depth` and
+# `revenue-external-humans-served` both currently have ZERO active tracks.
+# This track serves research-depth: it deepens the swarm's live contact with
+# its own research niche (agentic engineering, model-building, DGM) plus
+# adjacent beats (investing, environmental welfare, venture-cell topics) —
+# NOT the runtime/spine substrate itself.
+#
+# WHAT THIS IS NOT (the scope correction the whole panel converged on): this
+# is explicitly NOT a fact-verification / memory-promotion gate. It never
+# writes MemoryKernel, canon, or any authority store, and it is a DIFFERENT
+# artifact class from dharma_swarm/knowledge_ops/zeitgeist_promotion.py (which
+# handles single-signal promotion proposals). This desk operates on CLUSTERS
+# of signals over a rolling window, produces a living research corpus, and its
+# only consequential output is a DRAFT proposed_tracks/*.yaml entry — never an
+# ACTIVE track, never a memory write. The operator remains the ONLY actor who
+# promotes a draft to ACTIVE (operator directive this track was scoped
+# against: "only when agents want to BUILD autonomously from that place
+# should I be brought in" — that boundary already exists in this repo as the
+# proposed_tracks/ draft mechanism; this track feeds it at scale, it does not
+# bypass it).
+#
+# WHAT SURVIVED THE ADVERSARIAL REVIEW (see DIGEST.md for full transcripts):
+#   - Theme clustering: mostly ALREADY BUILT (world_radar/analysis.py
+#     _movement_key/_movement_from_rows) — title-key based, not semantic yet.
+#     The real gap is a rolling-window persistence layer, not clustering from
+#     scratch.
+#   - Judge-panel debate scaffold: dharma_swarm/group_chat.py's GroupChat is
+#     real and reusable (pluggable ProviderFn).
+#   - Genuine model-family diversity: NOW BUILT this session
+#     (dharma_swarm/coordination/panel_diversity.py, 8/8 tests) — wires
+#     provider_policy.py's real 18-provider CANONICAL_SEED_ORDER per panel
+#     lens and fails closed if fewer than 2 distinct families were actually
+#     dispatched. This was the Diversity Auditor's and Skeptic's #1 objection
+#     (a same-model multi-persona panel is decorative, not decorrelated) and
+#     is a HARD PREREQUISITE for any later phase of this track, not optional
+#     polish.
+#   - Fail-closed action gate: the repo ALREADY has this pattern
+#     (telos_gates.py / DarwinEngine.gate_check) — do not invent a new
+#     "Faramesh"-style control plane; extend the existing one.
+#   - Quadratic voting: DROPPED from the design. Its only cited research
+#     grounding ("Mixture-of-Models: N-Way Self-Evaluating Deliberation")
+#     could not be verified and shows signs of being fabricated (see
+#     DIGEST.md Finding 1); separately, the Builder lens found it statistically
+#     thin and easy to fake-satisfy at panel sizes of 3-5. Vote aggregation
+#     should instead be a simple, defensible mechanism gated behind the
+#     provider-diversity floor (e.g. unweighted majority among confirmed-
+#     diverse judges, or a Brier/credibility-weighted vote per the
+#     "Adversary-Resistant... via Credibility Scoring" line of real,
+#     cross-verified research) — not a technique this repo cannot vouch for.
+#
+# Promotion preconditions (all four):
+#   (1) Operator ratifies research-depth as this track's spine objective
+#       (as opposed to opening this as a 5th substrate-nativeness track,
+#       or opening a revenue-external-humans-served track first instead —
+#       that portfolio-balance call is the operator's, not this proposal's).
+#   (2) panel_diversity.py's provider-diversity floor is a HARD gate on
+#       Phase 2+ (the judge panel) — no phase may ship a panel that can
+#       silently resolve every lens to one provider and still claim
+#       "converged consensus."
+#   (3) Naming stays disjoint from dharma_swarm/council/** (no "Council"
+#       anywhere in this track's surfaces) and integrates with (does not
+#       fork) the existing signal_bus.py / signal_map.py / ginko_signals.py /
+#       world_signal_ingestor_go ecosystem — Phase 1 must document exactly
+#       how, before Phase 2 code lands.
+#   (4) No phase auto-promotes a draft to ACTIVE; the operator gate at
+#       proposed_tracks/ -> ACTIVE_TRACK.yaml stays entirely manual, unchanged.
+
+- id: signal-synthesis-desk-2026-07
+  name: Signal Synthesis Desk — cross-signal thematic research at ingestion speed
+  status: DRAFT
+  opened_at: "2026-07-01"
+  verified_at: "2026-07-01"
+  ttl_days: 30
+  owner: "@AmitabhainArunachala"
+  serves: research-depth
+  complements:
+    - agentic-design-patterns-cognition-2026-07
+    - orchestration-arena-v1-2026-06
+
+  moves_vital_signs:
+    - eval_coverage
+    - tool_coverage
+
+  description: |
+    Moves the operator out of the "hand-paste a link, ask an agent to look
+    into it" loop for routine research triage, replacing it with a standing
+    desk: world_radar's existing ingestion (already wired to track the
+    agentic-design-patterns/agentic-engineering beat, see
+    agentic-design-patterns-cognition-2026-07 and the world_scout DefaultSources
+    change) clusters into themes over a rolling window, a genuinely
+    provider-diverse panel of lenses debates each theme's significance using
+    the existing group_chat.py scaffold, and — only when the diversity floor
+    (panel_diversity.py) and a fail-closed write-gate both pass — a DRAFT
+    proposed_tracks/*.yaml entry is written for the operator to review. The
+    operator is looped in exactly once: at the point an agent wants to
+    recommend the swarm actually BUILD something, never at the point of
+    reading/clustering/debating raw signal.
+
+    This is explicitly NOT a memory-promotion pathway (that is
+    zeitgeist_promotion.py's job, unchanged) and NOT a duplicate of the
+    arena's Council (that verifies orchestration traces against a scorer
+    oracle; this debates significance where no ground truth yet exists —
+    a Skeptic-lens finding that DPI's correctness-gated decorrelation math is
+    structurally inapplicable here, confirmed and respected by this design).
+
+    STATUS UPDATE (2026-07-01, later same day): the automated SWEEP side is
+    now real, tested, and wired -- tools/world_scout_go/beats.go (a capped
+    ~10-beat set, reusing the existing SourcesForQueries helper, no new fetch
+    logic), theme_window.py (rolling-window persistence), and
+    dharma_swarm/knowledge_ops/deep_sweep.py (a capped verification+synthesis
+    orchestrator, dispatching every LLM call through invoke_agent() -- the
+    spine's one blessed path, never a bespoke dispatch mechanism), wired to a
+    NEW, separate, lower-cadence (daily) cron job (signal_deep_sweep) that
+    defaults to disabled=false/fetch=false: turning on real, automated,
+    recurring LLM spend is a bigger decision than the free API scraping
+    world_scout already does, and stays an explicit operator action, not a
+    silent default. This is deliberately still short of the full desk: it
+    verifies and synthesizes a digest (written under the runtime state dir,
+    never git, per CLAUDE.md's "loop-generated artifacts never enter git"
+    rule) but does NOT yet run the panel_diversity-gated judge panel or write
+    a proposed_tracks draft -- Phase 3 (signal_synthesis_desk.py) below is
+    still the deliberately-deferred, higher-stakes piece.
+
+  owned_surfaces:
+    - dharma_swarm/coordination/panel_diversity.py
+    - dharma_swarm/world_radar/theme_window.py
+    - dharma_swarm/knowledge_ops/deep_sweep.py
+    - dharma_swarm/cron_signal_deep_sweep.py
+    - dharma_swarm/knowledge_ops/signal_synthesis_desk.py
+    - tools/world_scout_go/beats.go
+    - docs/architecture/SIGNAL_SYNTHESIS_DESK.md
+    - tests/test_panel_diversity.py
+    - tests/test_theme_window.py
+    - tests/test_deep_sweep.py
+    - tests/test_signal_synthesis_desk.py
+    - reports/research/**
+
+  completion_criteria:
+    - id: panel_diversity_gate_exists
+      kind: file_exists
+      file: dharma_swarm/coordination/panel_diversity.py
+    - id: panel_diversity_fails_closed_tested
+      kind: file_contains
+      file: tests/test_panel_diversity.py
+      pattern: "test_same_provider_every_lens_fails_closed"
+    - id: theme_window_rolling_state
+      kind: file_exists
+      file: dharma_swarm/world_radar/theme_window.py
+    - id: automated_capped_deep_sweep_exists
+      kind: file_exists
+      file: dharma_swarm/knowledge_ops/deep_sweep.py
+    - id: deep_sweep_dispatches_through_the_spine
+      kind: file_contains
+      file: dharma_swarm/knowledge_ops/deep_sweep.py
+      pattern: "invoke_agent"
+    - id: deep_sweep_cron_registered_disabled_by_default
+      kind: file_contains
+      file: cron_jobs.json
+      pattern: '"id": "signal_deep_sweep"'
+    - id: beats_are_capped_not_unbounded
+      kind: file_contains
+      file: tools/world_scout_go/scout_test.go
+      pattern: "TestDefaultBeatsAreWellFormedAndCapped"
+    - id: desk_never_writes_memory
+      kind: file_contains
+      file: dharma_swarm/knowledge_ops/signal_synthesis_desk.py
+      pattern: "no_canon_or_memory_writes"
+    - id: desk_gates_on_diversity_floor
+      kind: file_contains
+      file: dharma_swarm/knowledge_ops/signal_synthesis_desk.py
+      pattern: "safe_to_trust_consensus"
+    - id: no_council_naming_collision
+      kind: file_contains
+      file: docs/architecture/SIGNAL_SYNTHESIS_DESK.md
+      pattern: "does not extend or rename dharma_swarm/council"
+    - id: integration_with_existing_signal_infra_documented
+      kind: file_contains
+      file: docs/architecture/SIGNAL_SYNTHESIS_DESK.md
+      pattern: "signal_bus.py"
+    - id: desk_tested
+      kind: file_exists
+      file: tests/test_signal_synthesis_desk.py
+
+  non_goals:
+    - Do not implement quadratic voting or cite the paper "Mixture-of-Models
+      -- N-Way Self-Evaluating Deliberation" as design justification; that
+      source is unverifiable (see
+      reports/research/2026-07-01_signal_synthesis_live_run/DIGEST.md Finding
+      1). Use a simpler, defensible vote/aggregation mechanism instead.
+    - Do not name anything in this track "Council" or place it under
+      dharma_swarm/council/**; that surface belongs to orchestration-arena-v1
+      and does a structurally different job (trace verification against a
+      scorer oracle, never significance judgment on unverifiable claims).
+    - Do not let this track write MemoryKernel, canon, or any authority
+      store; zeitgeist_promotion.py remains the only (human-gated) path from
+      ingested signal to memory, unchanged.
+    - Do not auto-promote a written draft to ACTIVE_TRACK.yaml under any
+      condition; the operator promotion gate stays entirely manual.
+    - Do not instantiate a judge panel that can silently resolve every lens
+      to the same underlying provider and still label its output "converged
+      consensus" — panel_diversity.py's fail-closed gate is load-bearing, not
+      advisory.
+    - Do not fork signal_bus.py / signal_map.py / ginko_signals.py /
+      world_signal_ingestor_go; extend or call into them, and document the
+      integration before Phase 2 code lands.
+    - Do not reuse coordination/dpi.py's correctness-gated decorrelation_bonus
+      formula for thematic significance judgments; no ground truth exists at
+      this decision point, so that gate is structurally inapplicable (the
+      Skeptic lens's core, verified objection).
+
+  next_items:
+    - id: 1
+      what: "Phase 1 (docs-first): author docs/architecture/SIGNAL_SYNTHESIS_DESK.md — the integration doc explaining how this desk relates to (not duplicates) signal_bus.py/signal_map.py/ginko_signals.py/world_signal_ingestor_go, and confirming zero surface overlap with dharma_swarm/council/**."
+      kind: docs
+      blocker: true
+    - id: 2
+      what: "DONE (2026-07-01): dharma_swarm/world_radar/theme_window.py — rolling-window persistence over movements (keyed by the existing movement_id), 9/9 tests. Plus beyond original scope: tools/world_scout_go/beats.go (capped ~10-beat set) + dharma_swarm/knowledge_ops/deep_sweep.py (capped verification+synthesis via invoke_agent, 7/7 tests) + a new disabled-by-default daily cron job (signal_deep_sweep). This is the automated SWEEP; the judge-panel/draft-writer (Phase 3) is still deliberately not built."
+      kind: code
+      blocker: false
+    - id: 3
+      what: "Phase 3: dharma_swarm/knowledge_ops/signal_synthesis_desk.py — wire panel_diversity.assign_diverse_lenses + group_chat.GroupChat for the debate, gated by panel_diversity.check_panel_diversity().safe_to_trust_consensus before any draft-YAML write; extend telos_gates.py's fail-closed gate pattern (not a new 'Faramesh' control plane) for the write itself."
+      kind: code
+      blocker: false
+    - id: 4
+      what: "Phase 4: decide and document the vote-aggregation mechanism (simple majority among confirmed-diverse judges, or credibility-weighted) now that quadratic voting is dropped; benchmark against a human-skim baseline before claiming lift, per the arena's budget-parity doctrine."
+      kind: code
+      blocker: false

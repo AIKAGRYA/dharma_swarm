@@ -13,6 +13,9 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONTRACT_PATH = REPO_ROOT / "docs" / "governance" / "CI_TRUTH_CONTRACT.json"
+DEFAULT_PARITY_MANIFEST_PATH = (
+    REPO_ROOT / "scripts" / "governance" / "ci_parity_manifest.json"
+)
 BAD_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}
 PASS_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 
@@ -25,9 +28,27 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Fail closed on duplicate keys in any JSON object (WP-0F1, TIT-006).
+
+    Plain ``json.loads`` keeps the last duplicate silently, which once erased
+    the pytest and gitleaks classifications from this very contract; a
+    duplicate key is configuration corruption, never a merge strategy.
+    """
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CITruthError(f"duplicate JSON key {key!r} in CI truth configuration")
+        result[key] = value
+    return result
+
+
 def load_json(path: str | Path) -> Any:
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        return json.loads(
+            Path(path).read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
     except OSError as exc:
         raise CITruthError(f"could not read JSON file {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -49,7 +70,62 @@ def load_contract(path: str | Path = DEFAULT_CONTRACT_PATH) -> dict[str, Any]:
                 raise CITruthError(f"CI truth entry {entry.get('id')} missing names")
             if not entry.get("local_command"):
                 raise CITruthError(f"CI truth entry {entry.get('id')} missing local_command")
+    manifest_ref = contract.get("required_contexts_manifest")
+    if not manifest_ref:
+        raise CITruthError(
+            f"CI truth contract {path} missing required_contexts_manifest; "
+            "the parity binding to branch-protection SSOT is mandatory"
+        )
+    manifest_path = Path(str(manifest_ref))
+    if not manifest_path.is_absolute():
+        manifest_path = REPO_ROOT / manifest_path
+    validate_required_context_parity(contract, load_json(manifest_path))
     return contract
+
+
+def required_context_names(contract: dict[str, Any]) -> list[str]:
+    """Return the canonical merge-blocking context for each required entry.
+
+    ``names[0]`` is the live context; later names are transition aliases that
+    may match historical PR rollups but never expand branch-protection
+    authority.
+    """
+
+    names = [str(entry["names"][0]) for entry in contract.get("required", [])]
+    if len(names) != len(set(names)):
+        raise CITruthError("CI truth required contexts contain duplicates")
+    return names
+
+
+def manifest_required_context_names(manifest: dict[str, Any]) -> list[str]:
+    entries = manifest.get("required_contexts")
+    if not isinstance(entries, list) or not entries:
+        raise CITruthError("CI parity manifest required_contexts must be non-empty")
+    names: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not str(entry.get("context") or ""):
+            raise CITruthError("CI parity manifest required context is malformed")
+        names.append(str(entry["context"]))
+    if len(names) != len(set(names)):
+        raise CITruthError("CI parity manifest required contexts contain duplicates")
+    return names
+
+
+def validate_required_context_parity(
+    contract: dict[str, Any], manifest: dict[str, Any]
+) -> None:
+    """Fail closed unless Mike's required set equals branch-protection SSOT."""
+
+    contract_names = set(required_context_names(contract))
+    manifest_names = set(manifest_required_context_names(manifest))
+    if contract_names == manifest_names:
+        return
+    missing = sorted(manifest_names - contract_names)
+    unexpected = sorted(contract_names - manifest_names)
+    raise CITruthError(
+        "CI truth required contexts disagree with CI parity manifest: "
+        f"missing={missing}, unexpected={unexpected}"
+    )
 
 
 def _check_name(item: dict[str, Any]) -> str:

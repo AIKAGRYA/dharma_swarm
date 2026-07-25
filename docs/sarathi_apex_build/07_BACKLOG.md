@@ -1,53 +1,79 @@
-# 07 — Backlog (what can be safely changed, what must not be touched)
+# 07 — Sarathi Closure Backlog
 
-**Custody: VERIFIED 2026-07-06. Gate-ordered; cross-refs `06_PROOF_GATES.md`.**
+The organization/collapse lane is complete and landed through PR #821. The work
+remaining is integration and proof, not another map or runtime scaffold.
 
-## Safe to change now (low blast radius, this-goal scope)
+## Completed baseline
 
-- Front-door docs under `docs/sarathi_apex_build/` (this normalization).
-- `dharma_swarm/holon_system/` facades — additive, import-only, tested.
-- `docs/sarathi_apex_build/HOLON_SYSTEM_CODE_ORGANIZATION.md` — the prose organ map.
-- Adding proof-gate receipts as they are earned.
+- Canonical direct identity loader and wake-cycle body retained
+  (`dharma_swarm/holon_bridge.py:106`; `dharma_swarm/holon_runtime.py:53`).
+- Duplicate repo-root `holon/` package removed (`test ! -d holon`).
+- Deterministic reversibility primitive and caller seam landed
+  (`dharma_swarm/operator_core/reversibility_gate.py:223-239`;
+  `dharma_swarm/holon_runtime.py:99-118`).
+- Thin `holon_system` navigation facade and honest Sarathi projections landed
+  (`find dharma_swarm/holon_system -type f -name '*.py' -print0 | xargs -0 wc -l`;
+  `dharma_swarm/holon_system/sarathi/gateway.py:15-24`).
+- Sprawl guard is clean on current main.
 
-## Next build steps (ordered)
+Reproduce the completed merge/collapse baseline with:
 
-1. **Gate 4 — Fable standing daemon.** Prove one unattended `fable_composer`
-   semantic reply with a fresh heartbeat (lease-gated). Owner: wake shell + A2A.
-2. **`holon/` fork collapse (138 copies / ~3-4 distinct).** Follow
-   `12_LOAD_HOLON_COLLAPSE_PLAN.md`; make `sprawl_guard.py` reach exit 0.
-   Owner: consolidation pass on a clean branch off origin/main.
-3. **Gate 5-6 — Sarathi runtime surfaces + gateway module.** Create runtime
-   surfaces (with repo map entries) and `holon_system/sarathi/gateway.py`.
-4. **Gate 7-9 — pulse, brief, overnight durability.** Only then `wake_loop_active`.
-5. **Gate 10 — scoreboard.** Receipts-only Hermes-vs-Sarathi comparison.
+```bash
+git show -s --format='%H %cs %s' 0beef7584
+PYTHONPATH=$PWD /Users/dhyana/dharma_swarm/.venv/bin/python \
+  scripts/governance/sprawl_guard.py
+```
 
-## Must NOT be touched (constraints)
+The exact scoped test commands and dated results are kept once in the estate
+map's Section 9 rather than duplicated here.
 
-- Do NOT move runtime state (`~/.dharma/...`) into git (constraint #4).
-- Do NOT move source code into `~/.dharma` (constraint #5).
-- Do NOT bulk-move hundreds of files in one pass (constraint #6).
-- Do NOT revert unrelated in-flight work: `docs/agent_tasks/*`, `specs/naga_ir/`,
-  `telos_titanium/`, trust-forge scripts, the 3 modified governance reports
-  (constraint #7).
-- Do NOT create a parallel orchestrator, model router, task store, A2A bus, or
-  receipt spine (constraint #9).
-- Do NOT claim Sarathi alive / `wake_loop_active=true` / "beats Hermes" without
-  the gate 9 / gate 10 receipts (constraints #1-3).
-- Do NOT delete the tracked `holon/` fork casually — it has its own tests; it is
-  a deliberate collapse in step 4, not an incidental `rm`.
+## Packet 1 — governed effect and receipt
 
-## Known stale claims to correct when seen
+1. Introduce a typed action envelope containing execution identity, requested
+   authority, effect scope, reversibility class, cost cap, and verifier contract.
+2. Make the package-owned Sarathi runner pass the exact action through
+   reversibility classification, an `ExecutionLease`, live spend accounting, and
+   a bounded executor before any side effect.
+3. Fail closed on missing/expired lease, budget, persistence, verifier, or receipt.
+4. Bind the effect artifact, independent verifier, A2A task claim, transport
+   acknowledgement, and runtime receipt to the same execution identity.
 
-- "reversibility_gate.py is uncommitted" → committed in `f18fe8476`.
-- "`@frontier` / `resolve_top_available_at_wake` is unimplemented" → implemented
-  in `runtime_provider.resolve_top_available_at_wake()` and wired into
-  `holon_bridge.load_holon()`; on 2026-07-06 `load_holon("sarathi")` resolved to
-  `ollama/glm-5:cloud` on this machine.
-- "`sakana` defaults to `claude_code`" → corrected by modeling `sakana` as an
-  explicit external-only provider (`ProviderType.SAKANA`); this stops DGC from
-  silently reporting Fugu as a Claude route while still refusing fake local
-  Sakana provider instantiation.
-- "136 copies" of holon_bridge → current scan 138 copies / ~69 roots, only ~3-4
-  distinct contents (mostly worktree mirrors).
-- "Sarathi has no code seam to the gate" → `holon_wake_cycle(planned_action=...)`
-  seam exists and is tested.
+Done when one real bounded task reaches `ReceiptBound` and a denied task produces
+no effect.
+
+## Packet 2 — installed durable seat
+
+1. Move talk/run behavior under `dharma_swarm` or deliberately package it so
+   installed `dgc agent talk/run` works outside the repo checkout.
+2. Upgrade `/holon/{name}/chat` to the safe dialogue provider, bounded LivingDock
+   context, history handling, and normalized dialogue receipt path
+   (`api/routers/holon.py:43-89`; `dharma_swarm/holon_bridge.py:198-241,277-305`).
+3. Compose the direct holon entry with the existing Living Agent Kernel rather
+   than adding a supervisor.
+4. Emit build provenance and semantic-success heartbeats; test kill, restart,
+   JSONL/receipt recovery, and resume.
+5. Replace the two-boolean/tmux liveness promotion with the proposed typed proof
+   gate (`dharma_swarm/holon_system/observability/proof_gates.py:6-11`;
+   `scripts/runtime/codex_composer_wake_loop.py:1213-1257`).
+
+Done when Sarathi works from an installed current-main build, survives restart,
+and cannot report success without durable proof.
+
+## Packet 3 — ecosystem end-to-end and burn-in
+
+1. Converge `DHARMA_A2A`, `DHARMA_FLEET`, and `DS_TASKS`/`DS_DLQ` behind one
+   explicit tested production contract (reproduce the split with
+   `rg -n 'DS_TASKS|DS_DLQ|DHARMA_A2A|DHARMA_FLEET' dharma_swarm/a2a scripts/runtime scripts/governance`).
+2. Run one current-main semantic A2A task through dispatch, lease, bounded effect,
+   independent verification, reply, acknowledgement, receipt, and heartbeat.
+3. Burn the seat in unattended, exercise kill/restart/resume, and measure
+   consecutive semantic successes rather than process uptime.
+4. Promote Sarathi to `DurableServiceProven`; only then set liveness flags and
+   replicate the composition to other seats.
+
+## Separate cleanup lane
+
+Stale worktrees, old launch wrappers, agent-home code copies, and machine-local
+Hermes/Dharma sidecars should be inventoried and retired or promoted separately.
+Do not delete them as part of effect closure without confirming their active
+process owners.

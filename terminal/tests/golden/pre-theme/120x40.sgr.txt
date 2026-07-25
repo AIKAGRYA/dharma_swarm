@@ -1,0 +1,40 @@
+ [32mDharma Terminal[39m
+ [32mKeyboard-first operator shell. Backend bridged over stdio.[39m
+ [37mUse plain prompts or slash commands. Chat carries the conversation; the surrounding tabs expose runtime, tools, and [39m
+ [37msystem state.[39m
+[34m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[39m [90m> [37m [39m                                                                                                                  [34m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[39m [2mzen  ·  codex:gpt-5.4  ·  offline  ·  backend offline, retrying  ·  F2 cockpit · /tour[0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

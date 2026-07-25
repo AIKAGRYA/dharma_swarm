@@ -1,5 +1,5 @@
 {
-  "audit_sha": "a511aa684f9137747c7ad7c9b9b233278e4851e5",
+  "audit_sha": "9b67ed5baa8d707a0da02ca48d993efcdd02d8ed",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,224 +11,26 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "dirty",
-  "source_status_entries": [
-    " M Makefile",
-    " M api/main.py",
-    " M api/routers/control_surface.py",
-    " M dashboard/src/app/dashboard/control-surface/page.tsx",
-    " M dashboard/src/components/ui/ErrorBanner.tsx",
-    " M dashboard/src/hooks/useControlSurface.ts",
-    " M dashboard/src/lib/api.test.ts",
-    " M dashboard/src/lib/api.ts",
-    " M dashboard/src/lib/types.ts",
-    " M dharma_swarm/agent_runner.py",
-    " M dharma_swarm/archaeology_ingestion.py",
-    " M dharma_swarm/autonomous_agent.py",
-    " M dharma_swarm/board/adapters/__init__.py",
-    " M dharma_swarm/board/adapters/ds_goal_adapter.py",
-    " M dharma_swarm/ontology_hub.py",
-    " M dharma_swarm/operator_core/a2a_task_lifecycle.py",
-    " M dharma_swarm/operator_core/control_surface.py",
-    " M dharma_swarm/operator_core/control_surface_memory.py",
-    " M dharma_swarm/operator_core/nats_substrate_status.py",
-    " M dharma_swarm/operator_core/operating_facts.py",
-    " M dharma_swarm/operator_core/runtime_truth.py",
-    " M dharma_swarm/orchestrate_live.py",
-    " M dharma_swarm/orchestrator.py",
-    " M dharma_swarm/provider_policy.py",
-    " M dharma_swarm/providers.py",
-    " M dharma_swarm/runtime_state.py",
-    " M dharma_swarm/scout_framework.py",
-    " M dharma_swarm/spine/__init__.py",
-    " M dharma_swarm/spine/persistence.py",
-    " M dharma_swarm/terminal_commands/_status_helpers.py",
-    " M dharma_swarm/terminal_commands/semantic.py",
-    " M dharma_swarm/terminal_commands/status.py",
-    " M docs/docops/AUTO_INVENTORY.md",
-    " M docs/docops/assertions.yaml",
-    " M docs/governance/CANONICAL_DOC_STACK.md",
-    " M docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
-    " M docs/governance/SOVEREIGN_MANIFEST.md",
-    " M docs/ops/TMUX_AGENT_SUBSTRATE.md",
-    " M reports/governance/active_track_evidence.json",
-    " M reports/governance/active_track_evidence.md",
-    " M reports/governance/spine_adoption_metric.json",
-    " M reports/governance/track_portfolio.json",
-    " M scripts/governance/agent_onboard.py",
-    " M scripts/runtime/a2a_send.py",
-    " M scripts/runtime/autonomy_spine.py",
-    " M tests/test_a2a_send.py",
-    " M tests/test_autonomy_spine_cli.py",
-    " M tests/test_control_surface.py",
-    " M tests/test_ds_goal_board_adapter.py",
-    " M tests/test_ontology_hub.py",
-    " M tests/test_operating_facts.py",
-    " M tests/test_operator_core_contracts.py",
-    " M tests/test_spine_adoption_metric.py",
-    "?? QWEN.md",
-    "?? dashboard/src/components/cockpit/A2ASendCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/AgentOpsWorkPacketCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/DsGoalMissionCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/SemanticReceiptCardsPanel.tsx",
-    "?? dharma_swarm/board/adapters/a2a_send_adapter.py",
-    "?? dharma_swarm/board/adapters/agentops_adapter.py",
-    "?? dharma_swarm/board/adapters/semantic_receipt_adapter.py",
-    "?? dharma_swarm/operator_core/semantic_receipt.py",
-    "?? dharma_swarm/spine/warrant.py",
-    "?? docs/governance/REALITY_DEBT_LEDGER.md",
-    "?? docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
-    "?? docs/governance/SWARM_GENOME.md",
-    "?? reports/a2a/domain_reply_artifacts/20260611T091552Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T084959Z-hermes-m5-35b2bfe0cd9a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T085443Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081444Z-hermes-m5-5c240f25f123.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081514Z-hermes-m5-da875663532a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081532Z-hermes-m5-bbc6a4fa7685.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T082442Z-hermes-m5-35b2bfe0cd9a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T085421Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T093005Z-hermes-m5-38f66a7e393b.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T102926Z-hermes-m5-bb9b7e2470f8.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T140622Z-hermes-m5-2447b9f8573d.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T160543Z-hermes-m5-c2725729740e.json",
-    "?? reports/a2a/reply_receipts/20260611T083232Z-hermes-35b2bfe0cd9a.json",
-    "?? reports/a2a/reply_receipts/20260611T085445Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/reply_receipts/20260611T093026Z-hermes-38f66a7e393b.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-devin-cd12cf637177.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-fable_5_cursor-0a53b307f889.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-fable_composer-4263af62684b.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-devin-cf8618dc738c.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-fable_5_cursor-eb84b96dd201.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-fable_composer-a73376e259af.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-hermes-bb9b7e2470f8.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-devin-1bb40416ff29.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-fable_5_cursor-a63e2cc94491.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-fable_composer-63a05082bd85.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-hermes-m5-f428bec4c6f7.json",
-    "?? reports/a2a/send_receipts/20260611T064610Z-fable_5_cursor-41506f93b1f1.json",
-    "?? reports/a2a/send_receipts/20260611T075455Z-fable_5_cursor-09b036810cbc.json",
-    "?? reports/a2a/send_receipts/20260611T075533Z-fable_5_cursor-e269c7ca86be.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-devin-162d4825b1cb.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-fable_composer-3f8f5c489beb.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-hermes-m5-410b8033ebab.json",
-    "?? reports/a2a/send_receipts/20260611T080609Z-hermes-5c240f25f123.json",
-    "?? reports/a2a/send_receipts/20260611T081514Z-hermes-da875663532a.json",
-    "?? reports/a2a/send_receipts/20260611T081540Z-hermes-bbc6a4fa7685.json",
-    "?? reports/a2a/send_receipts/20260611T082450Z-hermes-35b2bfe0cd9a.json",
-    "?? reports/a2a/send_receipts/20260611T085429Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/send_receipts/20260611T093013Z-hermes-38f66a7e393b.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-devin-cd12cf637177.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-fable_5_cursor-0a53b307f889.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-fable_composer-4263af62684b.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-devin-cf8618dc738c.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-fable_5_cursor-eb84b96dd201.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-fable_composer-a73376e259af.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-hermes-bb9b7e2470f8.json",
-    "?? reports/a2a/send_receipts/20260611T140630Z-hermes-2447b9f8573d.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-devin-7fb13d7cacee.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-fable_5_cursor-ba48121f1060.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-fable_composer-f668f21708cc.json",
-    "?? reports/a2a/send_receipts/20260611T160551Z-hermes-c2725729740e.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-devin-1de47697c9fc.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-fable_5_cursor-64922c4ccd5d.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-fable_composer-2681004234fe.json",
-    "?? reports/agentops/build_announcements/20260611T140418Z-codex-semantic-receipt-runner-v7-build-start.md",
-    "?? reports/agentops/build_announcements/20260611T160525Z-codex-semantic-receipt-runner-v7-goal-run-start.md",
-    "?? reports/agentops/open_model_council/20260611T102512Z-deepseek_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-glm_ollama_cloud.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-glm_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-minimax_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-qwen_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-gemini_google_ai.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-nvidia_nim_llama.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_cerebras.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_groq.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_openrouter_free.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_siliconflow.json",
-    "?? reports/agentops/open_model_council/20260611T104000Z-qwen_deepseek_v4_pro_review.md",
-    "?? reports/agentops/open_model_council/20260611T104337Z-deepseek_v4_flash_direct.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-deepseek_v4_pro_direct.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-moonshot_auto.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-moonshot_kimi_k26.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_deepseek_v32.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_glm5.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_kimi_k25.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_minimax_m27.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_qwen3_coder_480b.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-moonshot-provider-quota-blocked.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-deepseek-v32.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-glm5.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-qwen3-coder-480b.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-qwen-code-deepseek-v4-pro.json",
-    "?? reports/agentops/open_model_council/council_probe_summary_20260611T102512Z.md",
-    "?? reports/agentops/open_model_council/council_probe_summary_20260611T102636Z.md",
-    "?? reports/agentops/open_model_council/council_synthesis_20260611T103030Z.md",
-    "?? reports/agentops/open_model_council/strong_council_synthesis_20260611T105200Z.md",
-    "?? reports/agentops/open_model_council/strong_model_council_summary_20260611T104337Z.md",
-    "?? reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json",
-    "?? reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json",
-    "?? reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json",
-    "?? reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
-    "?? reports/agentops/work_packets/codex-composer-agent-inbox-hot-contact-route.json",
-    "?? reports/agentops/work_packets/codex-composer-agent-owned-domain-reply-worker.json",
-    "?? reports/agentops/work_packets/codex-composer-holon-a2a-send-portability.json",
-    "?? reports/agentops/work_packets/codex-workhorse-semantic-review-a2a-gate.json",
-    "?? reports/agentops/workhorse_prompts/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
-    "?? reports/agentops/workhorse_prompts/open-model-council-a2a-missing-systems-20260611T102326Z.md",
-    "?? reports/agentops/workhorse_prompts/qwen-deepseek-semantic-receipt-council-20260611T104000Z.md",
-    "?? reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md",
-    "?? reports/governance/command_cutover_metric.json",
-    "?? reports/governance/runtime_truth_command_cutover_after_action_2026-06-12.md",
-    "?? reports/governance/runtime_truth_command_cutover_baseline_2026-06-12.md",
-    "?? scripts/governance/check_nats_substrate_contract.py",
-    "?? scripts/runtime/a2a_domain_reply_artifact.py",
-    "?? scripts/runtime/a2a_domain_reply_worker.py",
-    "?? scripts/runtime/a2a_inbox_bridge.py",
-    "?? scripts/runtime/a2a_reply_capture.py",
-    "?? scripts/runtime/model_critic_runner.py",
-    "?? scripts/start_a2a_inbox_bridge_tmux.sh",
-    "?? scripts/status_a2a_inbox_bridge_tmux.sh",
-    "?? scripts/stop_a2a_inbox_bridge_tmux.sh",
-    "?? tests/test_a2a_domain_reply_artifact.py",
-    "?? tests/test_a2a_domain_reply_worker.py",
-    "?? tests/test_a2a_inbox_bridge.py",
-    "?? tests/test_a2a_inbox_bridge_tmux_scripts.py",
-    "?? tests/test_a2a_reply_capture.py",
-    "?? tests/test_a2a_send_board_adapter.py",
-    "?? tests/test_agentops_board_adapter.py",
-    "?? tests/test_control_surface_a2a_cards.py",
-    "?? tests/test_control_surface_agentops_cards.py",
-    "?? tests/test_control_surface_ds_goal_cards.py",
-    "?? tests/test_control_surface_router_threadpool.py",
-    "?? tests/test_control_surface_semantic_receipt_cards.py",
-    "?? tests/test_model_critic_runner.py",
-    "?? tests/test_runtime_truth_command_cutover.py",
-    "?? tests/test_runtime_truth_projection_fields.py",
-    "?? tests/test_runtime_warrant.py",
-    "?? tests/test_semantic_receipt.py",
-    "?? tests/test_semantic_receipt_board_adapter.py"
-  ],
+  "source_status": "clean",
+  "source_status_entries": [],
   "summary": {
-    "adapter_ready_count": 3,
+    "adapter_ready_count": 2,
     "adoption_pct": 93.8,
-    "joined_count": 12,
+    "joined_count": 13,
     "joined_or_adapter_ready_count": 15,
     "joined_or_adapter_ready_percent": 93.8,
-    "joined_percent": 75.0,
+    "joined_percent": 81.2,
     "legacy_count": 1,
     "missing_count": 0,
     "non_joined_surface_ids": [
-      "tool_registry_dispatch",
       "self_modification_loop",
       "mcp_tool_access",
       "legacy_no_identity_escape_hatch"
     ],
     "quarantine_count": 0,
     "status_counts": {
-      "adapter-ready": 3,
-      "joined": 12,
+      "adapter-ready": 2,
+      "joined": 13,
       "legacy": 1,
       "missing": 0,
       "quarantine": 0
@@ -314,7 +116,7 @@
           "description": "runtime store symbol is present",
           "hits": [
             {
-              "line": 1062,
+              "line": 1197,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -334,7 +136,7 @@
           "description": "RuntimeStateStore type exists",
           "hits": [
             {
-              "line": 1062,
+              "line": 1197,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -347,7 +149,7 @@
           "description": "execution identity table is declared",
           "hits": [
             {
-              "line": 211,
+              "line": 229,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS execution_identities ("
             }
@@ -360,7 +162,7 @@
           "description": "runtime receipt table is declared",
           "hits": [
             {
-              "line": 234,
+              "line": 252,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS runtime_receipts ("
             }
@@ -373,7 +175,7 @@
           "description": "idempotency table is declared",
           "hits": [
             {
-              "line": 252,
+              "line": 270,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS idempotency_records ("
             }
@@ -386,7 +188,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3467,
+              "line": 3781,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -402,7 +204,7 @@
           "description": "legacy identity bypass flag is present",
           "hits": [
             {
-              "line": 907,
+              "line": 1042,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             }
@@ -426,7 +228,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 18,
+              "line": 16,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -446,7 +248,7 @@
           "description": "lifecycle can create/require identity",
           "hits": [
             {
-              "line": 76,
+              "line": 74,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "def ensure_execution_identity("
             }
@@ -459,7 +261,7 @@
           "description": "task claim lifecycle path exists",
           "hits": [
             {
-              "line": 206,
+              "line": 91,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_task_claim("
             }
@@ -472,7 +274,7 @@
           "description": "delegation run lifecycle path exists",
           "hits": [
             {
-              "line": 285,
+              "line": 213,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_delegation_run("
             }
@@ -485,7 +287,7 @@
           "description": "artifact lifecycle path exists",
           "hits": [
             {
-              "line": 394,
+              "line": 393,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_artifact("
             }
@@ -498,9 +300,9 @@
           "description": "runtime receipts are emitted",
           "hits": [
             {
-              "line": 14,
+              "line": 11,
               "path": "dharma_swarm/runtime_lifecycle.py",
-              "text": "RuntimeReceipt,"
+              "text": "from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeReceipt, TaskClaim"
             }
           ],
           "key": "runtime_receipt",
@@ -609,7 +411,7 @@
           "description": "orchestrator has lifecycle adapter seam",
           "hits": [
             {
-              "line": 116,
+              "line": 121,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle = RuntimeLifecycle(self._ledger)"
             }
@@ -629,7 +431,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2004,
+              "line": 2254,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -642,7 +444,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 1766,
+              "line": 2041,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -655,7 +457,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 1773,
+              "line": 2048,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -779,7 +581,7 @@
           "description": "A2A task model exists",
           "hits": [
             {
-              "line": 186,
+              "line": 254,
               "path": "dharma_swarm/a2a/a2a_server.py",
               "text": "class A2ATask:"
             }
@@ -825,7 +627,7 @@
           "description": "external A2A task ID maps into identity",
           "hits": [
             {
-              "line": 384,
+              "line": 508,
               "path": "dharma_swarm/a2a/a2a_server.py",
               "text": "\"external_a2a_task_id\": result.id,"
             }
@@ -838,7 +640,7 @@
           "description": "A2A handler is idempotency-gated",
           "hits": [
             {
-              "line": 345,
+              "line": 442,
               "path": "dharma_swarm/a2a/a2a_server.py",
               "text": "if not self._runtime_state.try_begin_idempotent_side_effect_sync("
             }
@@ -851,7 +653,7 @@
           "description": "A2A task receipt is recorded",
           "hits": [
             {
-              "line": 372,
+              "line": 496,
               "path": "dharma_swarm/a2a/a2a_server.py",
               "text": "receipt_type=\"a2a_task\","
             }
@@ -867,7 +669,7 @@
           "description": "A2A still keeps a process-local task map",
           "hits": [
             {
-              "line": 280,
+              "line": 348,
               "path": "dharma_swarm/a2a/a2a_server.py",
               "text": "self._tasks: dict[str, A2ATask] = {}"
             }
@@ -1002,7 +804,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 28,
+              "line": 29,
               "path": "dharma_swarm/tool_registry.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -1013,29 +815,23 @@
         },
         {
           "description": "tool intent receipt is recorded",
-          "hits": [
-            {
-              "line": 199,
-              "path": "dharma_swarm/tool_registry.py",
-              "text": "runtime_state.record_side_effect_intent_sync("
-            }
-          ],
+          "hits": [],
           "key": "intent_receipt",
-          "matched": true,
+          "matched": false,
           "regex": "record_side_effect_intent_sync"
         },
         {
           "description": "tool completion receipt is recorded",
           "hits": [
             {
-              "line": 220,
+              "line": 242,
               "path": "dharma_swarm/tool_registry.py",
-              "text": "runtime_state.record_side_effect_complete_sync("
+              "text": "runtime_state.complete_idempotent_side_effect_sync("
             }
           ],
           "key": "complete_receipt",
           "matched": true,
-          "regex": "record_side_effect_complete_sync"
+          "regex": "(record_side_effect_complete_sync|complete_idempotent_side_effect_sync)"
         }
       ],
       "category": "tool",
@@ -1048,7 +844,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 28,
+              "line": 29,
               "path": "dharma_swarm/tool_registry.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -1061,7 +857,7 @@
           "description": "required identity option exists",
           "hits": [
             {
-              "line": 73,
+              "line": 84,
               "path": "dharma_swarm/tool_registry.py",
               "text": "require_identity: bool = False,"
             }
@@ -1072,40 +868,40 @@
         },
         {
           "description": "tool side effects are idempotency-gated",
-          "hits": [],
+          "hits": [
+            {
+              "line": 215,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "idempotency_started = runtime_state.try_begin_idempotent_side_effect_sync("
+            }
+          ],
           "key": "begin_idempotent",
-          "matched": false,
+          "matched": true,
           "regex": "try_begin_idempotent_side_effect"
         },
         {
-          "description": "tool completion receipt is recorded",
+          "description": "tool idempotency completion is recorded",
           "hits": [
             {
-              "line": 220,
+              "line": 242,
               "path": "dharma_swarm/tool_registry.py",
-              "text": "runtime_state.record_side_effect_complete_sync("
+              "text": "runtime_state.complete_idempotent_side_effect_sync("
             }
           ],
-          "key": "complete_receipt",
+          "key": "complete_idempotent",
           "matched": true,
-          "regex": "record_side_effect_complete_sync"
+          "regex": "complete_idempotent_side_effect_sync"
         }
       ],
       "label": "ToolRegistry side-effect dispatch",
       "legacy_evidence": [],
-      "missing_joined_patterns": [
-        {
-          "description": "tool side effects are idempotency-gated",
-          "key": "begin_idempotent",
-          "regex": "try_begin_idempotent_side_effect"
-        }
-      ],
+      "missing_joined_patterns": [],
       "path_patterns": [
         "dharma_swarm/tool_registry.py"
       ],
       "priority": 5,
       "quarantine_evidence": [],
-      "status": "adapter-ready"
+      "status": "joined"
     },
     {
       "adapter_ready_evidence": [
@@ -1250,7 +1046,7 @@
           "description": "proposal model exists",
           "hits": [
             {
-              "line": 95,
+              "line": 96,
               "path": "dharma_swarm/evolution.py",
               "text": "class Proposal(BaseModel):"
             }
@@ -1263,9 +1059,9 @@
           "description": "gate phase exists",
           "hits": [
             {
-              "line": 1200,
+              "line": 147,
               "path": "dharma_swarm/evolution.py",
-              "text": "await self.gate_check(candidate)"
+              "text": "# as a hard REJECT (see DarwinEngine.gate_check) \u2014 a self-mod proposal must"
             }
           ],
           "key": "gate_check",
@@ -1276,12 +1072,12 @@
           "description": "apply/test phase exists",
           "hits": [
             {
-              "line": 345,
+              "line": 359,
               "path": "dharma_swarm/diff_applier.py",
               "text": "async def apply_and_test("
             },
             {
-              "line": 1218,
+              "line": 1270,
               "path": "dharma_swarm/evolution.py",
               "text": "candidate, test_results = await self.apply_diff_and_test("
             }
@@ -1299,12 +1095,12 @@
               "text": "\"\"\"Apply unified diffs to files with rollback and test integration."
             },
             {
-              "line": 1009,
+              "line": 1061,
               "path": "dharma_swarm/evolution.py",
               "text": "return (\"rollback\", \"rollback:apply_or_test\")"
             },
             {
-              "line": 435,
+              "line": 470,
               "path": "dharma_swarm/self_improve.py",
               "text": "await applier.rollback(apply_result)"
             }
@@ -1352,7 +1148,7 @@
           "description": "self-modification receipts are recorded",
           "hits": [
             {
-              "line": 252,
+              "line": 266,
               "path": "dharma_swarm/diff_applier.py",
               "text": "self._runtime_state.record_self_mod_receipt_sync("
             }
@@ -1393,11 +1189,6 @@
           "description": "workflow identity exists",
           "hits": [
             {
-              "line": 102,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "workflow_id: str,"
-            },
-            {
               "line": 96,
               "path": "dharma_swarm/workflow.py",
               "text": "workflow_id: str"
@@ -1417,8 +1208,8 @@
             },
             {
               "line": 1,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "\"\"\"Durable execution with crash-recovery checkpointing."
+              "path": "dharma_swarm/graph/checkpoint.py",
+              "text": "# spine: persists dispatch-shaped checkpoints, receipts via runtime_state (owner: runtime_state) \u2014 no new store"
             },
             {
               "line": 1,
@@ -1437,11 +1228,6 @@
               "line": 1,
               "path": "dharma_swarm/canonical_replay.py",
               "text": "\"\"\"Canonical Replay Harness \u2014 proves all mutations are replayable."
-            },
-            {
-              "line": 9,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "- Temporal/Durable Functions: deterministic replay from event log"
             }
           ],
           "key": "replay",
@@ -1453,7 +1239,7 @@
       "files": [
         "dharma_swarm/canonical_replay.py",
         "dharma_swarm/checkpoint.py",
-        "dharma_swarm/durable_execution.py",
+        "dharma_swarm/graph/checkpoint.py",
         "dharma_swarm/workflow.py"
       ],
       "id": "workflow_checkpoint_replay",
@@ -1462,9 +1248,9 @@
           "description": "workflow/checkpoint path receives execution identity",
           "hits": [
             {
-              "line": 29,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "from dharma_swarm.spine.identity import ExecutionIdentity"
+              "line": 7,
+              "path": "dharma_swarm/graph/checkpoint.py",
+              "text": "checkpoints to ``ExecutionIdentity``/``RuntimeReceipt``."
             }
           ],
           "key": "identity_import",
@@ -1475,8 +1261,8 @@
           "description": "workflow/checkpoint path writes to runtime ledger",
           "hits": [
             {
-              "line": 28,
-              "path": "dharma_swarm/durable_execution.py",
+              "line": 25,
+              "path": "dharma_swarm/graph/checkpoint.py",
               "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
             }
           ],
@@ -1488,9 +1274,9 @@
           "description": "workflow/checkpoint path is ledger-reconstructable",
           "hits": [
             {
-              "line": 254,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "self._record_runtime_receipt("
+              "line": 6,
+              "path": "dharma_swarm/graph/checkpoint.py",
+              "text": "full-state restore, and the ``_record_runtime_receipt`` spine hook that ties"
             }
           ],
           "key": "runtime_receipt",
@@ -1509,9 +1295,9 @@
               "text": "3. **CheckpointStore** \u2014 filesystem-backed store for checkpoint data."
             },
             {
-              "line": 233,
-              "path": "dharma_swarm/durable_execution.py",
-              "text": "target = self._persist_dir / \"state.json\""
+              "line": 28,
+              "path": "dharma_swarm/graph/checkpoint.py",
+              "text": "__all__ = [\"DispatchCheckpoint\", \"GraphCheckpointStore\"]"
             },
             {
               "line": 270,
@@ -1541,7 +1327,7 @@
       "path_patterns": [
         "dharma_swarm/workflow.py",
         "dharma_swarm/checkpoint.py",
-        "dharma_swarm/durable_execution.py",
+        "dharma_swarm/graph/checkpoint.py",
         "dharma_swarm/canonical_replay.py"
       ],
       "priority": 6,
@@ -1637,6 +1423,11 @@
             },
             {
               "line": 1,
+              "path": "dharma_swarm/a2a/nats_transport_support.py",
+              "text": "\"\"\"Wire-format helpers for the A2A NATS transport.\"\"\""
+            },
+            {
+              "line": 1,
               "path": "dharma_swarm/operator_core/nats_live_contact.py",
               "text": "\"\"\"Real JetStream live-contact verifier."
             },
@@ -1654,6 +1445,7 @@
       "category": "event",
       "files": [
         "dharma_swarm/a2a/nats_transport.py",
+        "dharma_swarm/a2a/nats_transport_support.py",
         "dharma_swarm/operator_core/nats_live_contact.py",
         "dharma_swarm/operator_core/nats_substrate_status.py"
       ],
@@ -1666,6 +1458,11 @@
               "line": 1,
               "path": "dharma_swarm/a2a/nats_transport.py",
               "text": "\"\"\"NATS/JetStream transport adapter for A2A runtime truth."
+            },
+            {
+              "line": 34,
+              "path": "dharma_swarm/a2a/nats_transport_support.py",
+              "text": "NATS_ENVELOPE_SCHEMA = \"dharma.nats.envelope.v1\""
             },
             {
               "line": 1,
@@ -1686,9 +1483,14 @@
           "description": "NATS events carry execution identity",
           "hits": [
             {
-              "line": 28,
+              "line": 39,
               "path": "dharma_swarm/a2a/nats_transport.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            },
+            {
+              "line": 20,
+              "path": "dharma_swarm/a2a/nats_transport_support.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity"
             }
           ],
           "key": "identity_import",
@@ -1699,9 +1501,9 @@
           "description": "NATS receiver is idempotency-gated",
           "hits": [
             {
-              "line": 158,
+              "line": 739,
               "path": "dharma_swarm/a2a/nats_transport.py",
-              "text": "if not await self.runtime_state.try_begin_idempotent_side_effect("
+              "text": "if await self.runtime_state.try_begin_idempotent_side_effect("
             }
           ],
           "key": "begin_idempotent",
@@ -1712,8 +1514,13 @@
           "description": "ack/nack contract is visible",
           "hits": [
             {
-              "line": 47,
+              "line": 58,
               "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "async def ack(self) -> Any:"
+            },
+            {
+              "line": 27,
+              "path": "dharma_swarm/a2a/nats_transport_support.py",
               "text": "async def ack(self) -> Any:"
             },
             {
@@ -1844,7 +1651,7 @@
           "description": "legacy bypass must stay explicit",
           "hits": [
             {
-              "line": 907,
+              "line": 1042,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             },
@@ -1883,22 +1690,6 @@
     }
   ],
   "top_saturation_targets": [
-    {
-      "category": "tool",
-      "files": [
-        "dharma_swarm/tool_registry.py"
-      ],
-      "id": "tool_registry_dispatch",
-      "label": "ToolRegistry side-effect dispatch",
-      "missing_joined_patterns": [
-        {
-          "description": "tool side effects are idempotency-gated",
-          "key": "begin_idempotent",
-          "regex": "try_begin_idempotent_side_effect"
-        }
-      ],
-      "status": "adapter-ready"
-    },
     {
       "category": "self-modification",
       "files": [
@@ -1956,5 +1747,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 3077
+  "tracked_file_count": 4890
 }

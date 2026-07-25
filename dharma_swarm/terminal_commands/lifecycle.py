@@ -166,7 +166,6 @@ def cmd_down() -> None:
 
 def cmd_orchestrate_live(background: bool = False) -> None:
     """Run all DGC systems concurrently (live orchestrator)."""
-    import asyncio
 
     pid_file = DHARMA_STATE / "daemon.pid"
     legacy_pid_file = DHARMA_STATE / "orchestrator.pid"

@@ -1051,3 +1051,74 @@ async def test_pool_remove_dead():
     await pool.remove_dead()
     agents = await pool.list_agents()
     assert len(agents) == 0
+
+
+# === BSP Vote-to-Halt and token budget gate (PR #1016) ===
+
+
+def _oversized_request(section_header: str):
+    from dharma_swarm.models import LLMRequest
+
+    filler = "pheromone trail observation " * 4000
+    content = (
+        "## Task: important work\n\nDo the thing.\n\n"
+        f"{section_header}\n{filler}"
+    )
+    return LLMRequest(model="mock", messages=[{"role": "user", "content": content}])
+
+
+def test_trim_context_to_budget_strips_stigmergy_recall():
+    """The injected header is '## Stigmergy Recall'; trimming must strip it."""
+    from dharma_swarm.agent_runner import _estimate_prompt_tokens, _trim_context_to_budget
+
+    request = _oversized_request("## Stigmergy Recall")
+    trimmed = _trim_context_to_budget(request, max_tokens=200)
+
+    content = trimmed.messages[0]["content"]
+    assert "## Stigmergy Recall" not in content
+    assert "## Task: important work" in content
+    assert _estimate_prompt_tokens(trimmed) <= 200
+
+
+@pytest.mark.asyncio
+async def test_post_task_lifecycle_empty_inbox_votes_inactive(config, tmp_path: Path):
+    bus = MessageBus(tmp_path / "messages.db")
+    await bus.init_db()
+    runner = AgentRunner(config, message_bus=bus)
+    await runner.start()
+
+    task = Task(title="t", description="d")
+    await runner._post_task_lifecycle(task)
+
+    assert runner.state.status == AgentStatus.INACTIVE
+
+
+@pytest.mark.asyncio
+async def test_post_task_lifecycle_pending_message_stays_idle(config, tmp_path: Path):
+    bus = MessageBus(tmp_path / "messages.db")
+    await bus.init_db()
+    runner = AgentRunner(config, message_bus=bus)
+    await runner.start()
+    from dharma_swarm.models import Message
+
+    await bus.send(Message(from_agent="peer", to_agent=runner.agent_id, subject="s", body="b"))
+
+    task = Task(title="t", description="d")
+    await runner._post_task_lifecycle(task)
+
+    assert runner.state.status == AgentStatus.IDLE
+
+
+@pytest.mark.asyncio
+async def test_post_task_lifecycle_bus_error_stays_idle(config, tmp_path: Path):
+    """A transient bus failure must not be read as an empty inbox (vote-to-halt)."""
+    bus = MessageBus(tmp_path / "messages.db")
+    await bus.init_db()
+    runner = AgentRunner(config, message_bus=bus)
+    await runner.start()
+    runner._message_bus.receive = AsyncMock(side_effect=RuntimeError("db locked"))
+
+    task = Task(title="t", description="d")
+    await runner._post_task_lifecycle(task)
+
+    assert runner.state.status == AgentStatus.IDLE

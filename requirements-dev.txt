@@ -3,3 +3,5 @@ pytest-asyncio>=0.21.0
 pytest-cov>=4.0.0
 hypothesis>=6.90.0
 hypothesis-jsonschema>=0.23.0
+mutmut>=3.5.0
+grimp>=3.9  # import graph analysis (substrate_audit.py, make substrate-tools)

@@ -42,7 +42,11 @@ jobs:
           fi
 
       - name: Run module-budget gate
+        # --grandfather-base-ref reads the GRANDFATHERED map from the merge-base
+        # of the base and head, so a PR cannot grandfather its own oversized
+        # module by editing the dict in the same diff.
         run: |
           python3 scripts/governance/check_module_budget.py \
             --base-ref "${{ steps.refs.outputs.base }}" \
-            --head-ref "${{ steps.refs.outputs.head }}"
+            --head-ref "${{ steps.refs.outputs.head }}" \
+            --grandfather-base-ref "${{ steps.refs.outputs.base }}"

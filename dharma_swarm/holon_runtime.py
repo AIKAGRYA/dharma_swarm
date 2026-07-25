@@ -103,7 +103,7 @@ async def holon_wake_cycle(
         )
         gate_decision = decision.to_dict()
         if not decision.may_execute_unattended:
-            result = {
+            result: dict[str, Any] = {
                 "status": "halted:reversibility_gate",
                 "planned_action": planned_action,
                 "reversibility_gate": gate_decision,
@@ -140,11 +140,7 @@ async def holon_wake_cycle(
                 summary_lines = []
                 for item in list(pack.items)[:6]:
                     src = getattr(item, "surface_id", "memory")
-                    txt = (
-                        getattr(item, "content_snippet", None)
-                        or getattr(item, "content", None)
-                        or ""
-                    )
+                    txt = getattr(item, "content", "") or ""
                     if txt:
                         summary_lines.append(f"<source:memory:{src}> {txt[:280]}")
                 if summary_lines:

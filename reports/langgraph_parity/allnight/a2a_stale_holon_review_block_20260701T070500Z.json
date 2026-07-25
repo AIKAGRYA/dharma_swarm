@@ -1,0 +1,95 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:holon-plan-review-opus-20260612:6df6cf1fe66b",
+      "age_hours": 459.305,
+      "deliverable_path": "/Users/dhyana/.dharma/a2a_bus/collab/convergence/HOLON_PLAN_REVIEW_opus_composer.md",
+      "plan_path": "/Users/dhyana/dharma_swarm/docs/sovereign_holons/08_PACKAGE_CONSOLIDATION_PLAN.md",
+      "reason": "stale_holon_target_review_without_source_plan_or_deliverable",
+      "row_index": 16,
+      "target_agent": "opus_composer",
+      "target_presence": {
+        "age_hours": 743.611,
+        "agent_uid": "opus_composer",
+        "callsign": "opus_composer",
+        "harness": "claude-code",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-05-31T07:28:21.642040+00:00",
+        "model": "anthropic/claude-opus-4-7",
+        "source_path": "/Users/dhyana/.dharma/agents/opus_composer/living_agent.json",
+        "status": "degraded"
+      },
+      "task_id": "holon-plan-review-opus-20260612",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:holon-plan-review-cursor-20260612:6df6cf1fe66b",
+      "age_hours": 459.305,
+      "deliverable_path": "/Users/dhyana/.dharma/a2a_bus/collab/convergence/HOLON_PLAN_REVIEW_fable_5_cursor.md",
+      "plan_path": "/Users/dhyana/dharma_swarm/docs/sovereign_holons/08_PACKAGE_CONSOLIDATION_PLAN.md",
+      "reason": "stale_holon_target_review_without_source_plan_or_deliverable",
+      "row_index": 17,
+      "target_agent": "fable_5_cursor",
+      "target_presence": {
+        "age_hours": 484.777,
+        "agent_uid": "fable_5_cursor",
+        "callsign": "fable-5-cursor",
+        "harness": "cursor_ide",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-11T02:18:24.328568+00:00",
+        "model": "anthropic/claude-fable-5",
+        "source_path": "/Users/dhyana/.dharma/agents/fable_5_cursor/living_agent.json",
+        "status": "starting"
+      },
+      "task_id": "holon-plan-review-cursor-20260612",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "agent_uid": "a2a_supervisor",
+  "applied": true,
+  "applied_count": 2,
+  "applied_rows": [
+    {
+      "receipt_id": "a2a-task-receipt:holon-plan-review-opus-20260612:6df6cf1fe66b",
+      "status": "blocked",
+      "target_agent": "opus_composer",
+      "task_id": "holon-plan-review-opus-20260612"
+    },
+    {
+      "receipt_id": "a2a-task-receipt:holon-plan-review-cursor-20260612:6df6cf1fe66b",
+      "status": "blocked",
+      "target_agent": "fable_5_cursor",
+      "task_id": "holon-plan-review-cursor-20260612"
+    }
+  ],
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-holon-review-block-20260701T070500Z.bak",
+  "candidate_count": 2,
+  "generated_at": "2026-07-01T07:05:00Z",
+  "heartbeat_stale_hours": 24.0,
+  "post_readiness": {
+    "open_tasks": 1,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": [],
+  "stale_after_hours": 24.0,
+  "task_ids": [
+    "holon-plan-review-cursor-20260612",
+    "holon-plan-review-opus-20260612"
+  ]
+}

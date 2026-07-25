@@ -699,7 +699,9 @@ def _begin_runtime_truth_for_dispatch(
         else _ds_goal_longrun_preflight_for_receipt(),
     }
     store = RuntimeStateStore(_runtime_db_path(args))
-    store.record_execution_identity_sync(identity, source="ds_goal.autonomy_spine", metadata=metadata)
+    existing_idempotency = store.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
+    if existing_idempotency is None:
+        store.record_execution_identity_sync(identity, source="ds_goal.autonomy_spine", metadata=metadata)
     inserted = store.try_begin_idempotent_side_effect_sync(
         identity,
         side_effect_key,

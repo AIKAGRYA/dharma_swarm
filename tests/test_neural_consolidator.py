@@ -503,6 +503,121 @@ class TestBackpropagation:
 
 
 # ---------------------------------------------------------------------------
+# Correction Dedup (idempotency key at emission)
+# ---------------------------------------------------------------------------
+
+
+def _telos_drift_correction(timestamp: str) -> BehavioralCorrection:
+    """The observed runtime duplicate: same content re-emitted every cycle."""
+    return BehavioralCorrection(
+        target_agent="*",
+        correction="Ensure all significant actions pass through telos gate checks",
+        evidence="50 tasks ran without gate evaluation or telos scoring",
+        confidence=0.8,
+        source="algorithmic",
+        timestamp=timestamp,
+    )
+
+
+class TestCorrectionDedup:
+    @pytest.mark.asyncio
+    async def test_exact_duplicate_reemission_dropped(
+        self, consolidator: NeuralConsolidator, tmp_dharma: Path,
+    ):
+        """Same content emitted in a later cycle (new timestamp) is dropped."""
+        first = await consolidator.backpropagate(
+            [_telos_drift_correction("2026-06-01T00:00:00+00:00")]
+        )
+        assert first["corrections_applied"] == 1
+        assert first["duplicates_dropped"] == 0
+
+        second = await consolidator.backpropagate(
+            [_telos_drift_correction("2026-06-02T00:00:00+00:00")]
+        )
+        assert second["corrections_applied"] == 0
+        assert second["duplicates_dropped"] == 1
+        assert second["agents_updated"] == []
+
+        global_path = tmp_dharma / "consolidation" / "corrections" / "_global.md"
+        content = global_path.read_text()
+        assert content.count("Ensure all significant actions pass through telos gate checks") == 1
+        assert "**Key**: " in content
+
+    @pytest.mark.asyncio
+    async def test_changed_content_still_appends(
+        self, consolidator: NeuralConsolidator, tmp_dharma: Path,
+    ):
+        """Non-exact duplicates (any content field differs) still append."""
+        base = _telos_drift_correction("2026-06-01T00:00:00+00:00")
+        await consolidator.backpropagate([base])
+
+        changed = _telos_drift_correction("2026-06-02T00:00:00+00:00")
+        changed.evidence = "12 tasks ran without gate evaluation or telos scoring"
+        result = await consolidator.backpropagate([changed])
+        assert result["corrections_applied"] == 1
+        assert result["duplicates_dropped"] == 0
+
+        global_path = tmp_dharma / "consolidation" / "corrections" / "_global.md"
+        content = global_path.read_text()
+        assert content.count("## Correction (") == 2
+
+    @pytest.mark.asyncio
+    async def test_legacy_unkeyed_duplicate_dropped(
+        self, consolidator: NeuralConsolidator, tmp_dharma: Path,
+    ):
+        """Entries written by the pre-key writer still dedup by body match."""
+        cdir = tmp_dharma / "consolidation" / "corrections"
+        cdir.mkdir(parents=True)
+        legacy_entry = (
+            "# Behavioral Corrections\n\n---\n"
+            "\n## Correction (2026-06-15T00:00:00+00:00)\n"
+            "**Source**: algorithmic | **Confidence**: 0.80\n"
+            "**Evidence**: 50 tasks ran without gate evaluation or telos scoring\n\n"
+            "Ensure all significant actions pass through telos gate checks\n"
+        )
+        (cdir / "_global.md").write_text(legacy_entry)
+
+        result = await consolidator.backpropagate(
+            [_telos_drift_correction("2026-07-03T00:00:00+00:00")]
+        )
+        assert result["corrections_applied"] == 0
+        assert result["duplicates_dropped"] == 1
+        content = (cdir / "_global.md").read_text()
+        assert content.count("Ensure all significant actions pass through telos gate checks") == 1
+
+    @pytest.mark.asyncio
+    async def test_same_content_different_targets_both_append(
+        self, consolidator: NeuralConsolidator, tmp_dharma: Path,
+    ):
+        """The key is content + target: same text may land in different files."""
+        for agent in ("operator", "archivist"):
+            correction = BehavioralCorrection(
+                target_agent=agent,
+                correction="Increase timeout or reduce task complexity",
+                evidence="Timeout occurred 4 times",
+                confidence=0.7,
+                source="algorithmic",
+                timestamp="2026-06-01T00:00:00+00:00",
+            )
+            result = await consolidator.backpropagate([correction])
+            assert result["corrections_applied"] == 1
+            assert result["duplicates_dropped"] == 0
+
+        cdir = tmp_dharma / "consolidation" / "corrections"
+        assert (cdir / "operator.md").exists()
+        assert (cdir / "archivist.md").exists()
+
+    def test_idempotency_key_stable_and_target_scoped(self):
+        c1 = _telos_drift_correction("2026-06-01T00:00:00+00:00")
+        c2 = _telos_drift_correction("2026-06-30T23:59:59+00:00")  # timestamp differs
+        key_a = NeuralConsolidator.correction_idempotency_key("_global", c1)
+        key_b = NeuralConsolidator.correction_idempotency_key("_global", c2)
+        assert key_a == key_b  # stable across cycles: timestamp is not identity
+        key_c = NeuralConsolidator.correction_idempotency_key("operator", c1)
+        assert key_c != key_a  # target-scoped
+
+
+# ---------------------------------------------------------------------------
 # Cell Division
 # ---------------------------------------------------------------------------
 

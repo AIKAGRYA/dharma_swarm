@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import time
 
 
 from dharma_swarm.terminal_commands._helpers import (
@@ -56,7 +55,6 @@ def cmd_evolve_apply(component: str, description: str) -> None:
             print("Engine not initialized")
             await swarm.shutdown()
             return
-        from dharma_swarm.evolution import Proposal
         proposal = await swarm._engine.propose(
             component=component, change_type="mutation", description=description,
         )
@@ -106,12 +104,11 @@ def cmd_evolve_rollback(entry_id: str, reason: str = "Manual rollback") -> None:
 def cmd_evolve_auto(
     files: list[str] | None, model: str, context: str,
     single_model: bool = False,
-    shadow: bool = False,
+    shadow: bool = True,
     token_budget: int = 0,
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
     async def _auto():
-        from pathlib import Path
         from dharma_swarm.models import ProviderType
 
         swarm = await _get_swarm()
@@ -185,7 +182,7 @@ def cmd_evolve_auto(
 def cmd_evolve_daemon(
     interval: float, threshold: float, model: str, cycles: int | None,
     single_model: bool = False,
-    shadow: bool = False,
+    shadow: bool = True,
     token_budget: int = 0,
 ) -> None:
     """Run continuous autonomous evolution daemon."""
@@ -227,6 +224,7 @@ def cmd_evolve_daemon(
                 fitness_threshold=threshold,
                 max_cycles=cycles,
                 router=swarm._router if use_router else None,
+                shadow=shadow,
             )
         except KeyboardInterrupt:
             pass

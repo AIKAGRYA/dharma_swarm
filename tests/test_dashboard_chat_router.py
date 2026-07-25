@@ -61,8 +61,10 @@ def test_chat_status_reports_runtime_settings(monkeypatch: pytest.MonkeyPatch) -
     assert glm["model"] == "z-ai/glm-5"
     assert glm["available"] is True
     kimi = next(profile for profile in body["profiles"] if profile["id"] == "kimi_k25_scout")
-    assert kimi["label"] == "Kimi K2.5 Scout"
-    assert kimi["model"] == "moonshotai/kimi-k2.5"
+    # K2.6 is the operator floor; the lane rides the floor pool entry, never the
+    # sub-floor K2.5 literal (model-routing consolidation 2026-06).
+    assert kimi["label"] == "Kimi K2.6 Scout"
+    assert kimi["model"] == "moonshotai/kimi-k2.6"
     assert kimi["availability_kind"] == "api_key"
     sonnet = next(profile for profile in body["profiles"] if profile["id"] == "sonnet46_operator")
     assert sonnet["label"] == "Claude Sonnet 4.6"

@@ -1,0 +1,44 @@
+{
+  "schema": "ci-parity-guard/v1",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "branch": "main",
+  "note": "Expected merge-blocking required-check set. Ground truth is the live branch protection; regenerate the actual side with: gh api repos/AmitabhainArunachala/dharma_swarm/branches/main/protection --jq .required_status_checks.contexts . When this set is changed in branch protection, update this manifest in the same change so the ci-parity gate stays green. regression_sensitive marks contexts a base change can regress after the PR run went green (they must run in the merge queue and must never swallow errors).",
+  "required_contexts": [
+    {
+      "context": "pytest (3.11)",
+      "workflow": "tests.yml",
+      "job": "pytest",
+      "regression_sensitive": true
+    },
+    {
+      "context": "pytest (3.12)",
+      "workflow": "tests.yml",
+      "job": "pytest",
+      "regression_sensitive": true
+    },
+    {
+      "context": "gitleaks",
+      "workflow": "gitleaks.yml",
+      "job": "gitleaks",
+      "regression_sensitive": false
+    },
+    {
+      "context": "DocOps integrity gate",
+      "workflow": "docops.yml",
+      "job": "docops-integrity",
+      "regression_sensitive": false
+    },
+    {
+      "context": "Coherence Delta PR body",
+      "workflow": "coherence-delta.yml",
+      "job": "coherence-delta",
+      "regression_sensitive": false
+    },
+    {
+      "context": "Onboarding admission parity",
+      "workflow": "active-track.yml",
+      "job": "onboarding-admission-parity-compat",
+      "regression_sensitive": true
+    }
+  ]
+}

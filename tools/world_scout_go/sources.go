@@ -26,6 +26,14 @@ func DefaultSources() []Source {
 		{Name: "github_advisories_ai", URL: "https://api.github.com/advisories?query=ai", Kind: "github_advisories"},
 		{Name: "arxiv_agents", URL: "https://export.arxiv.org/api/query?search_query=all:agentic%20AI&sortBy=submittedDate&sortOrder=descending&max_results=10", Kind: "arxiv"},
 		{Name: "arxiv_long_context", URL: "https://export.arxiv.org/api/query?search_query=all:long%20context%20agents&sortBy=submittedDate&sortOrder=descending&max_results=10", Kind: "arxiv"},
+		// Agentic design-patterns / agentic-engineering literature — added 2026-07-01
+		// so the hourly world_scout radar tracks this class of knowledge on a
+		// regular basis. Companion to docs/architecture/AGENTIC_PATTERNS_ATLAS.md;
+		// keeps that atlas refreshed as the field moves instead of frozen at one read.
+		{Name: "arxiv_agentic_design_patterns", URL: "https://export.arxiv.org/api/query?search_query=all:%22agentic%20design%20patterns%22&sortBy=submittedDate&sortOrder=descending&max_results=10", Kind: "arxiv"},
+		{Name: "arxiv_llm_agent_architecture", URL: "https://export.arxiv.org/api/query?search_query=all:LLM%20agent%20architecture&sortBy=submittedDate&sortOrder=descending&max_results=10", Kind: "arxiv"},
+		{Name: "hacker_news_agentic_engineering", URL: "https://hn.algolia.com/api/v1/search_by_date?query=agentic%20engineering", Kind: "hn_algolia"},
+		{Name: "github_agentic_design_patterns", URL: "https://api.github.com/search/repositories?q=agentic+design+patterns&sort=updated&order=desc", Kind: "github_repos"},
 	}
 }
 

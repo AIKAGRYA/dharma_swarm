@@ -59,11 +59,10 @@ Open:
 /dashboard/cockpit
 ```
 
-The route uses the existing control-surface API:
+The route uses the operator-coherence API:
 
 ```text
-/api/control-surface/summary
-/api/control-surface/rows
+/api/operator-coherence/report
 ```
 
 The cockpit highlights:

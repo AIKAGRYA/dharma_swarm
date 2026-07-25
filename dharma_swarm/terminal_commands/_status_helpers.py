@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone, tzinfo
 from pathlib import Path
 from typing import Any
 import inspect
 import json
 import os
-import re
 import subprocess
 import time
 
@@ -19,6 +18,7 @@ from dharma_swarm.terminal_commands._helpers import (
     _parse_iso_datetime,
     _runtime_pid_status,
 )
+from dharma_swarm.terminal_commands._status_readonly import read_memory_entry_count
 
 HOME = Path.home()
 DHARMA_STATE = dharma_state_dir()
@@ -143,7 +143,14 @@ def _witness_sort_key(path: Path, *, prefix: str, fmt: str) -> float:
             return 0.0
 
 
-def _latest_witness_count(directory: Path, *, pattern: str, prefix: str, fmt: str) -> int | None:
+def _latest_witness_count(
+    directory: Path,
+    *,
+    pattern: str,
+    prefix: str,
+    fmt: str,
+    local_date: date,
+) -> int | None:
     if not directory.exists():
         return None
 
@@ -153,6 +160,15 @@ def _latest_witness_count(directory: Path, *, pattern: str, prefix: str, fmt: st
         reverse=True,
     )
     for witness_file in candidates:
+        raw_stamp = (
+            witness_file.stem.removeprefix(prefix) if prefix else witness_file.stem
+        )
+        try:
+            witness_date = datetime.strptime(raw_stamp, fmt).date()
+        except ValueError:
+            continue
+        if witness_date != local_date:
+            continue
         try:
             with witness_file.open(encoding="utf-8") as handle:
                 return sum(1 for line in handle if line.strip())
@@ -161,12 +177,19 @@ def _latest_witness_count(directory: Path, *, pattern: str, prefix: str, fmt: st
     return None
 
 
-def _canonical_gate_count() -> int:
+def _canonical_gate_count(
+    *, now: datetime | None = None, local_timezone: tzinfo | None = None
+) -> int:
+    instant = now or datetime.now(timezone.utc)
+    if instant.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+    local_date = instant.astimezone(local_timezone).date()
     canonical_count = _latest_witness_count(
         DHARMA_STATE / "witness",
         pattern="witness_*.jsonl",
         prefix="witness_",
         fmt="%Y%m%d",
+        local_date=local_date,
     )
     if canonical_count is not None:
         return canonical_count
@@ -176,6 +199,7 @@ def _canonical_gate_count() -> int:
         pattern="*.jsonl",
         prefix="",
         fmt="%Y-%m-%d",
+        local_date=local_date,
     )
     if legacy_count is not None:
         return legacy_count
@@ -401,30 +425,11 @@ def _build_status_data() -> dict:
 
     data: dict[str, Any] = {}
 
-    # Memory
+    # Memory: status is observational and must never initialize runtime state.
     try:
-        from dharma_swarm.memory import StrangeLoopMemory
-        import asyncio
-
-        async def _mem_stats():
-            mem = StrangeLoopMemory(db_path=DHARMA_STATE / "db" / "memory.db")
-            await mem.init_db()
-            entries = await mem.recall(limit=5)
-            await mem.close()
-            return len(entries)
-
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        if loop and loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                data["memory_entries"] = pool.submit(
-                    asyncio.run, _mem_stats()
-                ).result(timeout=10)
-        else:
-            data["memory_entries"] = asyncio.run(_mem_stats())
+        data["memory_entries"] = read_memory_entry_count(
+            DHARMA_STATE / "db" / "memory.db"
+        )
     except Exception as exc:
         data["memory_error"] = str(exc)
 

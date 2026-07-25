@@ -44,9 +44,10 @@ def test_public_source_policy_blocks_learn_autonomous_scrape(tmp_path):
         manifest["source_policy"]["learn_palantir_status"]
         == "blocked_for_autonomous_scrape_until_allowed_access_is_confirmed"
     )
-    assert "full docs pages copied into the repo or wiki" in manifest["source_policy"][
-        "disallowed_storage"
-    ]
+    assert any(
+        "never committed" in entry
+        for entry in manifest["source_policy"]["disallowed_storage"]
+    )
 
 
 def test_source_family_summary_classifies_major_palantir_surfaces():
@@ -98,7 +99,7 @@ def test_markdown_report_contains_boundary_and_verifiers(tmp_path):
     assert "# Palantir Pilot" in text
     assert "No official Palantir affiliation" in text
     assert "learn_course_catalog" in text
-    assert "Do not mirror full pages" in text
+    assert "Do not mirror Learn/course bodies" in text
     assert "Playbook index" in text
     assert "Evaluation index" in text
     assert "Contribution index" in text
@@ -1472,3 +1473,9 @@ def test_answer_packet_preserves_learn_boundary(tmp_path):
 
     assert any("learn.palantir.com/page/course-catalog" in item for item in packet["limitations"])
     assert packet["source_boundary"].startswith("Public-source workspace synthesis")
+    # Integrity: once deep-ingest stores page prose, the boundary must NOT keep
+    # claiming "no full page/course body storage" — it must own the deep-card
+    # corpus (public prose) while still excluding Learn/course bodies.
+    assert "no full page/course body storage" not in packet["source_boundary"]
+    assert "deep-card prose" in packet["source_boundary"]
+    assert "Learn/course body" in packet["source_boundary"]

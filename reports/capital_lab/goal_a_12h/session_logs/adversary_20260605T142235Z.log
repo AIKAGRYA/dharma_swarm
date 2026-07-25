@@ -1,6 +1,0 @@
-[goal-a-adversary] started_at=2026-06-05T14:22:37Z
-[goal-a-adversary] prompt=/Users/dhyana/.dharma/autonomy_spine/20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h/artifacts/prompts/20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h-t03-adversary.prompt.md
-[goal-a-adversary] repo=/Users/dhyana/dharma_swarm
-hermes -z: timed out after 45s waiting for provider response.
-[goal-a-adversary] exited_at=2026-06-05T14:27:58Z
-[goal-a-adversary] rc=124

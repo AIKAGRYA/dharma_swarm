@@ -1,0 +1,27 @@
+{
+  "applied": [],
+  "candidate_count": 2,
+  "candidates": [
+    {
+      "agent_uid": "a2a_supervisor",
+      "needs_supervisor_block": true,
+      "original_status": "expired",
+      "reason": "valid_embedded_terminal_receipt_on_nonterminal_or_unverified_row",
+      "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:reviewer:opus_composer:771ca288848d",
+      "task_id": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+      "terminal_status": "blocked"
+    },
+    {
+      "agent_uid": "a2a_supervisor",
+      "needs_supervisor_block": false,
+      "original_status": "expired",
+      "reason": "valid_embedded_terminal_receipt_on_nonterminal_or_unverified_row",
+      "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222:a9dff9785543",
+      "task_id": "collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+      "terminal_status": "blocked"
+    }
+  ],
+  "mode": "dry_run",
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1
+}

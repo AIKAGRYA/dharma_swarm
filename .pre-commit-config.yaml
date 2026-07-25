@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: dharma-test-hygiene
         name: dharma test hygiene (rule 3 + 5)
-        entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        entry: scripts/governance/run_python_with_repo_env.sh scripts/governance/check_test_hygiene.py --warn-only
         language: system
         pass_filenames: false
         always_run: true
@@ -33,28 +33,35 @@ repos:
         stages: [pre-commit]
       - id: dharma-uplift-guards
         name: dharma uplift guards
-        entry: python3 scripts/uplift_guards/run_pre_commit.py
+        entry: scripts/governance/run_python_with_repo_env.sh scripts/uplift_guards/run_pre_commit.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: dharma-forge-bypass
+        name: dharma forge bypass guard
+        entry: python3 scripts/governance/check_forge_bypass.py
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-docops-integrity
         name: dharma docops integrity
-        entry: python3 scripts/docops/check_docops_integrity.py
+        entry: scripts/governance/run_python_with_repo_env.sh scripts/docops/check_docops_integrity.py --counts-advisory
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-hygiene-integrity
         name: dharma hygiene integrity
-        entry: python3 scripts/governance/hygiene/check_hygiene_integrity.py
+        entry: scripts/governance/run_python_with_repo_env.sh scripts/governance/hygiene/check_hygiene_integrity.py
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-manifest-check
         name: dharma manifest check (ACTIVE_SURFACE_MANIFEST ↔ repo reality)
-        entry: python3 tools/manifest_check.py
+        entry: scripts/governance/run_python_with_repo_env.sh tools/manifest_check.py
         language: system
         pass_filenames: false
         always_run: true
@@ -96,7 +103,9 @@ repos:
       - id: trailing-whitespace
         exclude: '\.md$'
       - id: end-of-file-fixer
-        exclude: '\.(md|svg|json)$'
+        # Terminal frame fixtures intentionally preserve trailing blank rows so
+        # byte-for-byte captures retain their exact 24/30/40-row geometry.
+        exclude: '(?:\.(md|svg|json)$|^terminal/tests/golden/)'
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ['--maxkb=2048']

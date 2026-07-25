@@ -1,918 +1,104 @@
-schema_version: semantic-commons-v0
-owner_track: agent-admission-semantic-commons-2026-06
-lifecycle_values:
-  - seed
-  - working
-  - preferred
-  - canonical
-  - deprecated
-  - forbidden
+schema_version: dharma.semantic_objects.v1
 objects:
-  - id: semobj.agent_admission
-    canonical_name: AgentAdmission
-    api_name: dharma.agent.AgentAdmission
-    lifecycle: working
-    owner_surface: docs/ops/AGENT_ADMISSION.md
-    authority_level: active_spec
-    source_path: docs/ops/AGENT_ADMISSION.md
-    object_kind: governance_contract
-    public_ontology: true
-    aliases:
-      - AgentAdmission
-      - agent-admission
-      - agent_admission
-      - agent admission
-      - agent-admit
-      - agent_admit
-    forbidden_aliases:
-      - admit-agent-without-receipt
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.registration_desk
-    canonical_name: RegistrationDesk
-    api_name: dharma.agent.RegistrationDesk
-    lifecycle: working
-    owner_surface: dharma_swarm/external_agent_registration.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/external_agent_registration.py
-    object_kind: runtime_surface
-    public_ontology: true
-    aliases:
-      - RegistrationDesk
-      - registration-desk
-      - registration_desk
-      - external-agent-registration
-      - external_agent_registration
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.agent_seed
-    canonical_name: AgentSeed
-    api_name: dharma.agent.AgentSeed
-    lifecycle: working
-    owner_surface: docs/agents/**
-    authority_level: active_spec
-    source_path: docs/agents
-    object_kind: agent_identity_record
-    public_ontology: true
-    aliases:
-      - AgentSeed
-      - agent-seed
-      - agent_seed
-      - agent.seed.yaml
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.living_dock
-    canonical_name: LivingDock
-    api_name: dharma.agent.LivingDock
-    lifecycle: working
-    owner_surface: dharma_swarm/operator_core/living_agent_kernel.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/operator_core/living_agent_kernel.py
-    object_kind: runtime_surface
-    public_ontology: true
-    aliases:
-      - LivingDock
-      - living-dock
-      - living_dock
-      - living agent dock
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.codex_composer
-    canonical_name: CodexComposer
-    api_name: dharma.agent.CodexComposer
-    lifecycle: working
-    owner_surface: docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
-    authority_level: active_spec
-    source_path: docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
-    object_kind: persistent_agent_orientation_shell
-    public_ontology: true
-    aliases:
-      - CodexComposer
-      - Codex Composer
-      - codex-composer
-      - codex_composer
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.sanctum
-    canonical_name: Sanctum
-    api_name: dharma.agent.Sanctum
-    lifecycle: working
-    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    authority_level: active_spec
-    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    object_kind: living_dock_subspace
-    public_ontology: true
-    aliases:
-      - Sanctum
-      - sanctum
-      - living-dock-sanctum
-      - living_dock_sanctum
-      - sanctum context
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.holocron
-    canonical_name: Holocron
-    api_name: dharma.agent.Holocron
-    lifecycle: working
-    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    authority_level: active_spec
-    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    object_kind: living_dock_subspace
-    public_ontology: true
-    aliases:
-      - Holocron
-      - holocron
-      - living-dock-holocron
-      - living_dock_holocron
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.holocron_nest
-    canonical_name: HolocronNest
-    api_name: dharma.agent.HolocronNest
-    lifecycle: working
-    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    authority_level: active_spec
-    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    object_kind: living_dock_subspace
-    public_ontology: true
-    aliases:
-      - HolocronNest
-      - Holocron Nest
-      - holocron-nest
-      - holocron_nest
-      - living-dock-holocron-nest
-      - living_dock_holocron_nest
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.aerie
-    canonical_name: Aerie
-    api_name: dharma.operator.Aerie
-    lifecycle: seed
-    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    authority_level: active_spec
-    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
-    object_kind: operator_fleet_projection_name
-    public_ontology: true
-    aliases:
-      - Aerie
-      - aerie
-      - fleet-aerie
-      - fleet_aerie
-    forbidden_aliases:
-      - Aaverie
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.sarathi
-    canonical_name: Sarathi
-    api_name: dharma.operator.Sarathi
-    lifecycle: seed
-    owner_surface: docs/agents/sarathi/SARATHI_CONTRACT.md
-    authority_level: active_spec
-    source_path: docs/agents/sarathi/SARATHI_CONTRACT.md
-    object_kind: apex_holon_command_intelligence
-    public_ontology: true
-    aliases:
-      - Sarathi
-      - sarathi
-      - APEX
-      - apex-holon
-      - apex_holon
-    forbidden_aliases:
-      - fable_5_cursor
-      - Fable 5
-      - Fable5
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.seat_sarathi
-
-  - id: semobj.operator_guide_cursor
-    canonical_name: OperatorGuideCursor
-    api_name: dharma.operator.OperatorGuideCursor
-    lifecycle: seed
-    owner_surface: docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
-    authority_level: active_spec
-    source_path: docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
-    object_kind: cursor_harness_operator_relay
-    public_ontology: true
-    aliases:
-      - OperatorGuideCursor
-      - operator-guide-cursor
-      - operator_guide_cursor
-      - operator-guide
-      - operator_guide
-      - cursor-guide
-      - cursor_guide
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.seat_operator_guide_cursor
-
-  - id: semobj.landing_dock
-    canonical_name: LandingDock
-    api_name: dharma.governance.LandingDock
-    lifecycle: seed
-    owner_surface: docs/ontology/session_orientation.yaml
-    authority_level: active_spec
-    source_path: docs/ontology/session_orientation.yaml
-    object_kind: onboarding_projection_name
-    public_ontology: true
-    aliases:
-      - LandingDock
-      - Landing Dock
-      - landing-dock
-      - landing_dock
-      - landing dock
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.factory_droid
-    canonical_name: FactoryDroid
-    api_name: dharma.agent.FactoryDroid
-    lifecycle: seed
-    owner_surface: docs/agents/factory_droid/FACTORY_DROID_CONTRACT.md
-    authority_level: active_spec
-    source_path: docs/agents/factory_droid/FACTORY_DROID_CONTRACT.md
-    object_kind: tooling_agent_seed
-    public_ontology: true
-    aliases:
-      - FactoryDroid
-      - Factory Droid
-      - factory-droid
-      - factory_droid
-      - DroidFactory
-      - Droid Factory
-      - droid-factory
-      - droid_factory
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.a2a_card
-    canonical_name: A2ACard
-    api_name: dharma.agent.A2ACard
-    lifecycle: working
-    owner_surface: dharma_swarm/a2a/agent_card.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/a2a/agent_card.py
-    object_kind: runtime_identity_card
-    public_ontology: true
-    aliases:
-      - A2ACard
-      - A2A card
-      - a2a-card
-      - a2a_card
-      - agent-card
-      - agent_card
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.name_drift_preflight
-    canonical_name: NameDriftPreflight
-    api_name: dharma.governance.NameDriftPreflight
-    lifecycle: working
-    owner_surface: scripts/governance/name_drift_preflight.py
-    authority_level: governance_check
-    source_path: scripts/governance/name_drift_preflight.py
-    object_kind: verifier
-    public_ontology: true
-    aliases:
-      - NameDriftPreflight
-      - name-drift-preflight
-      - name_drift_preflight
-      - name drift preflight
-      - bug-corral-scan
-      - bug_corral_scan
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.session_orientation
-    canonical_name: SessionOrientation
-    api_name: dharma.governance.SessionOrientation
-    lifecycle: working
-    owner_surface: docs/ontology/session_orientation.yaml
-    authority_level: active_spec
-    source_path: docs/ontology/session_orientation.yaml
-    object_kind: orientation_contract
-    public_ontology: true
-    aliases:
-      - SessionOrientation
-      - session-orientation
-      - session_orientation
-      - session loading
-      - context map
-      - orientation map
-    forbidden_aliases:
-      - ICM
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.orientation_layer
-    canonical_name: OrientationLayer
-    api_name: dharma.governance.OrientationLayer
-    lifecycle: working
-    owner_surface: docs/ontology/session_orientation.yaml
-    authority_level: active_spec
-    source_path: docs/ontology/session_orientation.yaml
-    object_kind: orientation_contract
-    public_ontology: true
-    aliases:
-      - OrientationLayer
-      - orientation-layer
-      - orientation_layer
-      - L0-L4 orientation layer
-      - L0-L5 orientation layer
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.orientation_route
-    canonical_name: OrientationRoute
-    api_name: dharma.governance.OrientationRoute
-    lifecycle: working
-    owner_surface: docs/ontology/session_orientation.yaml
-    authority_level: active_spec
-    source_path: docs/ontology/session_orientation.yaml
-    object_kind: orientation_contract
-    public_ontology: true
-    aliases:
-      - OrientationRoute
-      - orientation-route
-      - orientation_route
-      - route.semantic_commons_campaign
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.ontology_registry
-    canonical_name: OntologyRegistry
-    api_name: dharma.ontology.OntologyRegistry
-    lifecycle: working
-    owner_surface: docs/ontology/semantic_objects.yaml
-    authority_level: active_spec
-    source_path: docs/ontology/semantic_objects.yaml
-    object_kind: registry
-    public_ontology: true
-    aliases:
-      - OntologyRegistry
-      - ontology-registry
-      - ontology_registry
-      - semantic object registry
-      - semantic-objects
-      - semantic_objects
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.ontology_hub
-    canonical_name: OntologyHub
-    api_name: dharma.ontology.OntologyHub
-    lifecycle: working
-    owner_surface: docs/ontology/SEMANTIC_COMMONS.md
-    authority_level: active_spec
-    source_path: docs/ontology/SEMANTIC_COMMONS.md
-    object_kind: orientation_hub
-    public_ontology: true
-    aliases:
-      - OntologyHub
-      - ontology-hub
-      - ontology_hub
-      - Semantic Commons
-      - semantic-commons
-      - semantic_commons
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.runtime_receipt
-    canonical_name: RuntimeReceipt
-    api_name: dharma.runtime.RuntimeReceipt
-    lifecycle: working
-    owner_surface: dharma_swarm/runtime_state.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/runtime_state.py
-    object_kind: runtime_receipt
-    public_ontology: true
-    aliases:
-      - RuntimeReceipt
-      - runtime-receipt
-      - runtime_receipt
-      - runtime receipt
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.operator_idea_spark
-    canonical_name: OperatorIdeaSpark
-    api_name: dharma.ingest.OperatorIdeaSpark
-    lifecycle: working
-    owner_surface: dharma_swarm/idea_spark/
-    authority_level: projection
-    source_path: docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
-    object_kind: ingest_lifecycle
-    public_ontology: true
-    aliases:
-      - Operator Idea Spark
-      - operator idea spark
-      - idea spark
-      - idea-spark
-      - idea_spark
-      - IdeaSparkCandidate
-      - OperatorInputReceipt
-      - operator input receipt
-      - idea spark ingest
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.revenue_wedge_pipeline
-    canonical_name: RevenueWedgePipeline
-    api_name: dharma.revenue.RevenueWedgePipeline
-    lifecycle: working
-    owner_surface: dharma_swarm/revenue/wedge_pipeline.py
-    authority_level: projection
-    source_path: dharma_swarm/revenue/wedge_pipeline.py
-    object_kind: revenue_intelligence_loop
-    public_ontology: true
-    aliases:
-      - RevenueWedgePipeline
-      - Revenue Wedge Pipeline
-      - revenue wedge pipeline
-      - revenue-wedge-pipeline
-      - revenue_wedge_pipeline
-      - Revenue Wedge
-      - revenue wedge
-      - wedge pipeline
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.openclaw_integration
-    canonical_name: OpenClawIntegration
-    api_name: dharma.integration.OpenClawIntegration
-    lifecycle: seed
-    owner_surface: dharma_swarm/terminal_commands/_status_helpers.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/terminal_commands/_status_helpers.py
-    object_kind: integration
-    public_ontology: true
-    aliases:
-      - OpenClaw
-      - openclaw
-      - colima-openclaw
-      - colima_openclaw
-      - colima-openclaw-secure
-      - colima_openclaw_secure
-    forbidden_aliases:
-      - opencalw
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.glm_researcher_lane
-    canonical_name: GLMResearcherLane
-    api_name: dharma.agent.GLMResearcherLane
-    lifecycle: seed
-    owner_surface: dharma_swarm/certified_lanes.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/certified_lanes.py
-    object_kind: agent_lane
-    public_ontology: true
-    aliases:
-      - GLMResearcherLane
-      - glm-researcher
-      - glm_researcher
-      - glm5-researcher
-      - glm5_researcher
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.opus_forge_architect
-    canonical_name: OpusForgeArchitect
-    api_name: dharma.agent.OpusForgeArchitect
-    lifecycle: seed
-    owner_surface: AGENTS.md
-    authority_level: behavior_contract
-    source_path: AGENTS.md
-    object_kind: agent_role
-    public_ontology: true
-    aliases:
-      - OpusForgeArchitect
-      - opus-forge-architect
-      - opus_forge_architect
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.palantir_pilot
-    canonical_name: PalantirPilot
-    api_name: dharma.agent.PalantirPilot
-    lifecycle: working
-    owner_surface: docs/agents/palantir_pilot/agent.seed.yaml
-    authority_level: active_spec
-    source_path: docs/agents/palantir_pilot/agent.seed.yaml
-    object_kind: persistent_agent
-    public_ontology: true
-    aliases:
-      - PalantirPilot
-      - Palantir Pilot
-      - palantir-pilot
-      - palantir_pilot
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.cybernetics_codex
-    canonical_name: CyberneticsCodex
-    api_name: dharma.agent.CyberneticsCodex
-    lifecycle: working
-    owner_surface: docs/agents/cybernetics_codex/agent.seed.yaml
-    authority_level: active_spec
-    source_path: docs/agents/cybernetics_codex/agent.seed.yaml
-    object_kind: persistent_agent
-    public_ontology: true
-    aliases:
-      - CyberneticsCodex
-      - Cybernetics Codex
-      - cybernetics-codex
-      - cybernetics_codex
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.codex_telos
-    canonical_name: CodexTelos
-    api_name: dharma.agent.CodexTelos
-    lifecycle: seed
-    owner_surface: docs/agents/codex_telos/agent.seed.yaml
-    authority_level: active_spec
-    source_path: docs/agents/codex_telos/agent.seed.yaml
-    object_kind: persistent_agent
-    public_ontology: true
-    aliases:
-      - CodexTelos
-      - Codex TELOS Steward
-      - codex-telos
-      - codex_telos
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.livelihood_loom_ceo
-    canonical_name: LivelihoodLoomCEO
-    api_name: dharma.agent.LivelihoodLoomCEO
-    lifecycle: working
-    owner_surface: docs/agents/livelihood_loom_ceo/agent.seed.yaml
-    authority_level: active_spec
-    source_path: docs/agents/livelihood_loom_ceo/agent.seed.yaml
-    object_kind: persistent_agent
-    public_ontology: true
-    aliases:
-      - LivelihoodLoomCEO
-      - Livelihood Loom CEO
-      - livelihood-loom-ceo
-      - livelihood_loom_ceo
-    forbidden_aliases:
-      - autonomous livelihood lender
-      - informal economy alpha desk
-      - worker data monetization agent
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.seat_livelihood_loom_ceo
-
-  - id: semobj.model_key_routing
-    canonical_name: ModelKeyRouting
-    api_name: dharma.routing.ModelKeyRouting
-    lifecycle: working
-    owner_surface: docs/ops/MODEL_KEY_ROUTING.md
-    authority_level: active_spec
-    source_path: docs/ops/MODEL_KEY_ROUTING.md
-    object_kind: governance_contract
-    public_ontology: true
-    aliases:
-      - ModelKeyRouting
-      - model-key-routing
-      - model_key_routing
-      - model key routing
-      - MODEL_KEY_ROUTING
-      - the one way
-    forbidden_aliases:
-      - parallel model routing layer
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.dkeys_key_store
-    canonical_name: DKeysKeyStore
-    api_name: dharma.routing.DKeysKeyStore
-    lifecycle: working
-    owner_surface: docs/ops/MODEL_KEY_ROUTING.md
-    authority_level: active_spec
-    source_path: docs/ops/MODEL_KEY_ROUTING.md
-    object_kind: credential_management_contract
-    public_ontology: true
-    aliases:
-      - DKeysKeyStore
-      - dkeys-key-store
-      - dkeys_key_store
-      - dkeys
-      - agent-keys-env
-      - agent_keys_env
-      - agent_keys.env
-    forbidden_aliases:
-      - project .env keys
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.runtime_provider
-    canonical_name: RuntimeProvider
-    api_name: dharma.routing.RuntimeProvider
-    lifecycle: working
-    owner_surface: dharma_swarm/runtime_provider.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/runtime_provider.py
-    object_kind: runtime_provider_resolver
-    public_ontology: true
-    aliases:
-      - RuntimeProvider
-      - runtime-provider
-      - runtime_provider
-      - runtime provider door
-      - resolve-runtime-provider-config
-      - resolve_runtime_provider_config
-      - create-runtime-provider
-      - create_runtime_provider
-    forbidden_aliases:
-      - direct provider factory
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.model_hierarchy
-    canonical_name: ModelHierarchy
-    api_name: dharma.routing.ModelHierarchy
-    lifecycle: working
-    owner_surface: dharma_swarm/model_hierarchy.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/model_hierarchy.py
-    object_kind: provider_order_registry
-    public_ontology: true
-    aliases:
-      - ModelHierarchy
-      - model-hierarchy
-      - model_hierarchy
-      - canonical-seed-order
-      - canonical_seed_order
-      - provider seed order
-    forbidden_aliases:
-      - scattered model order
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.provider_policy_router
-    canonical_name: ProviderPolicyRouter
-    api_name: dharma.routing.ProviderPolicyRouter
-    lifecycle: working
-    owner_surface: dharma_swarm/provider_policy.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/provider_policy.py
-    object_kind: provider_policy_engine
-    public_ontology: true
-    aliases:
-      - ProviderPolicyRouter
-      - provider-policy-router
-      - provider_policy_router
-      - provider route policy
-      - ProviderRouteRequest
-      - ProviderRouteDecision
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.model_router
-    canonical_name: ModelRouter
-    api_name: dharma.routing.ModelRouter
-    lifecycle: working
-    owner_surface: dharma_swarm/providers.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/providers.py
-    object_kind: provider_execution_router
-    public_ontology: true
-    aliases:
-      - ModelRouter
-      - model-router
-      - model_router
-      - complete-for-task
-      - complete_for_task
-      - provider-chain
-      - provider_chain
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.routing_memory
-    canonical_name: RoutingMemory
-    api_name: dharma.routing.RoutingMemory
-    lifecycle: working
-    owner_surface: dharma_swarm/routing_memory.py
-    authority_level: runtime_owner
-    source_path: dharma_swarm/routing_memory.py
-    object_kind: provider_learning_store
-    public_ontology: true
-    aliases:
-      - RoutingMemory
-      - routing-memory
-      - routing_memory
-      - routing memory
-      - routing_memory.sqlite3
-    forbidden_aliases: []
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.agent_uid
-    canonical_name: AgentUID
-    api_name: dharma.agent.AgentUID
-    lifecycle: working
-    owner_surface: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-    authority_level: active_spec
-    source_path: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-    object_kind: durable_identifier
-    public_ontology: true
-    aliases:
-      - AgentUID
-      - agent-uid
+  A2ACard:
+    kind: runtime_object
+    owner: dharma_swarm.a2a.agent_card.AgentCard
+    description: Agent discovery and capability card.
+    required_fields:
+      - name
       - agent_uid
-      - agent uid
-      - stable agent UID
-    forbidden_aliases:
-      - human display name as durable id
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.nats_substrate
-    canonical_name: NATSSubstrate
-    api_name: dharma.transport.NATSSubstrate
-    lifecycle: working
-    owner_surface: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-    authority_level: active_spec
-    source_path: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-    object_kind: transport_contract
-    public_ontology: true
-    aliases:
-      - NATSSubstrate
-      - NATS substrate
-      - nats-substrate
-      - nats_substrate
-      - NATS_SUBSTRATE_MASTER_SPEC
-      - nats-substrate-master-spec
-      - nats_substrate_master_spec
-    forbidden_aliases:
-      - filesystem bus as live contact
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.a2a_inbox_route
-    canonical_name: A2AInboxRoute
-    api_name: dharma.transport.A2AInboxRoute
-    lifecycle: working
-    owner_surface: scripts/runtime/a2a_send.py
-    authority_level: runtime_owner
-    source_path: scripts/runtime/a2a_send.py
-    object_kind: transport_route
-    public_ontology: true
-    aliases:
-      - A2AInboxRoute
-      - A2A inbox route
-      - a2a-inbox-route
-      - a2a_inbox_route
-      - agent-inbox
-      - agent_inbox
-      - --route agent-inbox
-    forbidden_aliases:
-      - handler ack as semantic reply
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.a2a_consumer_liveness_projection
-    canonical_name: A2AConsumerLivenessProjection
-    api_name: dharma.transport.A2AConsumerLivenessProjection
-    lifecycle: working
-    owner_surface: scripts/governance/agent_onboard.py
-    authority_level: projection
-    source_path: reports/handoffs/HUB_INBOUND_2026-06-12.md
-    object_kind: transport_health_projection
-    public_ontology: true
-    aliases:
-      - A2AConsumerLivenessProjection
-      - A2A Consumer Liveness Projection
-      - a2a consumer liveness projection
-      - a2a-consumer-liveness-projection
-      - a2a_consumer_liveness_projection
-      - consumer-liveness projection
-      - consumer_liveness_projection
-      - write-only bus
-      - dark inboxes
-    forbidden_aliases:
-      - send receipt as delivery proof
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
-
-  - id: semobj.dharma_forge_proving_ground
-    canonical_name: DharmaForgeProvingGround
-    api_name: dharma.forge.DharmaForgeProvingGround
-    lifecycle: canonical
-    owner_surface: reports/forge/FORGE_CANONICAL_INDEX.md
-    authority_level: active_spec
-    source_path: reports/forge/FORGE_CANONICAL_INDEX.md
-    object_kind: external_swarm_evolution_contract
-    public_ontology: true
-    aliases:
-      - DharmaForgeProvingGround
-      - Dharma Forge Proving Ground
-      - dharma-forge-proving-ground
-      - dharma_forge_proving_ground
-      - Forge Proving Ground
-      - forge-proving-ground
-      - forge_proving_ground
-      - Forge Proving Ground external loop
-      - canonical Forge Proving Ground external loop
-      - Forge Proving Ground overnight loop
-      - Forge Proving Ground 100
-      - run the Dharma Forge Proving Ground
-      - run the Forge Proving Ground
-      - run canonical Forge Proving Ground
-      - run the canonical Forge Proving Ground external loop
-      - DharmaForge
-      - Dharma Forge
-      - dharma-forge
-      - dharma_forge
-      - Forge
-      - forge
-      - Forge Arena
-      - forge-arena
-      - forge_arena
-      - Forge external loop
-    forbidden_aliases:
-      - run the thing
-      - benchmark bragging rights
-      - swarm superiority proven
-      - Pudgala is Forge
-      - Forge Pudgala
-      - Pudgala Forge
-    supersedes: []
-    superseded_by: []
-    orientation_route: route.semantic_commons_campaign
+      - supported_interfaces
+    required_internal_route: A2AInboxRoute
+  AgentUID:
+    kind: identifier
+    description: Stable durable agent identifier used in internal NATS subjects.
+    subject_token_rules:
+      forbidden_chars:
+        - "."
+        - "*"
+        - ">"
+        - "/"
+        - "\\"
+      whitespace_allowed: false
+  NATSSubstrate:
+    kind: transport_substrate
+    description: Internal live fleet transport backed by NATS/JetStream.
+    external_edge: false
+  A2AInboxRoute:
+    kind: route_binding
+    alias: agent-inbox
+    substrate: NATSSubstrate
+    subject_template: dharma.agent.<agent_uid>.inbox
+    ack_subject_template: dharma.agent.<agent_uid>.inbox.ack.<packet_id>
+    reply_subject_template: dharma.agent.<agent_uid>.inbox.reply.<packet_id>
+    implemented_by:
+      sender: scripts/runtime/a2a_send.py
+      bridge: scripts/runtime/a2a_inbox_bridge.py
+      card_resolver: dharma_swarm/a2a/agent_card.py
+  ModelKeyRouting:
+    kind: governance_contract
+    owner: docs/ops/MODEL_KEY_ROUTING.md
+    description: Canonical contract for provider keys, runtime providers, model order, and routing memory.
+    canonical_components:
+      key_store: DKeysKeyStore
+      runtime_provider: RuntimeProvider
+      model_order: ModelHierarchy
+      provider_policy: ProviderPolicyRouter
+      router: ModelRouter
+      learning_state: RoutingMemory
+    deprecated_patterns:
+      - parallel model routing layer
+      - project .env keys
+      - direct provider factory
+      - scattered model order
+  DKeysKeyStore:
+    kind: key_store
+    owner: dharma_swarm/api_keys.py
+    description: The single approved path for provider key lookup, backed by dkeys and ~/.dharma/agent_keys.env.
+  RuntimeProvider:
+    kind: provider_factory
+    owner: dharma_swarm/runtime_provider.py
+    description: The single runtime provider resolution and creation door for model calls.
+  ModelHierarchy:
+    kind: routing_order
+    owner: dharma_swarm/model_hierarchy.py
+    description: Canonical most-powerful-first model and route ordering.
+  ProviderPolicyRouter:
+    kind: routing_policy
+    owner: dharma_swarm/provider_policy.py
+    description: Policy layer that selects and escalates provider families without bypassing ModelKeyRouting.
+  ModelRouter:
+    kind: runtime_router
+    owner: dharma_swarm/providers.py
+    description: Provider router that executes model calls under RuntimeProvider and ModelHierarchy constraints.
+  RoutingMemory:
+    kind: routing_telemetry
+    owner: dharma_swarm/routing_memory.py
+    description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.
+  IntelligenceSupplyChainRawReceipt:
+    kind: evidence_receipt
+    owner: dharma_swarm.world_radar.bronze
+    track: loop-closure-2026-06
+    description: Content-addressed Bronze receipt for a sanctioned external signal treated as untrusted data.
+    required_fields:
+      - schema_version
+      - receipt_id
+      - content_hash
+      - source_url
+      - fetch_method
+      - license
+      - prov
+      - instruction_policy
+  FrontierCouncilBoundarySignal:
+    kind: verifier_boundary
+    owner: dharma_swarm.world_radar.bronze
+    track: loop-closure-2026-06
+    description: Meet-point artifact handed to the decorrelated frontier council; not a verifier verdict or apply permission.
+    required_fields:
+      - schema_version
+      - boundary_id
+      - verifier_interface
+      - source_receipt_id
+      - content_hash
+      - guardrails
+      - not_applied

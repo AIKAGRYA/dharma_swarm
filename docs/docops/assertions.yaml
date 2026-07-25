@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-30",
+  "verified_at": "2026-07-25",
   "ttl_days": 14,
   "assertions": [
     {
@@ -16,6 +16,13 @@
       "regex": "Top-level \\(flat\\) modules \\| \\*\\*([\\d,]+)",
       "metric": "dharma_top_level_python_modules",
       "verify": "git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l"
+    },
+    {
+      "id": "manifest-python-loc",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Total Python LOC \\| \\*\\*([\\d,]+)\\*\\*",
+      "metric": "total_python_loc",
+      "verify": "git ls-files dharma_swarm | rg '\\.py$' | xargs wc -l | tail -1"
     },
     {
       "id": "manifest-test-files",
@@ -85,14 +92,14 @@
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Adapter files \\| \\*\\*([\\d,]+)",
       "metric": "adapter_files",
-      "verify": "git ls-files dharma_swarm | rg -i \"adapter\" | wc -l"
+      "verify": "find dharma_swarm -type f | rg -i \"adapter\" | wc -l"
     },
     {
       "id": "manifest-router-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Router files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "router_files",
-      "verify": "git ls-files dharma_swarm | rg -i \"rout\" | wc -l"
+      "verify": "find dharma_swarm -type f | rg -i \"rout\" | wc -l"
     }
   ],
   "path_guards": {
@@ -117,8 +124,12 @@
       "plugin://*",
       "file://*",
       "reports/docops/**",
+      "*reports/governance/active_track_evidence.*",
+      "*reports/governance/track_portfolio.json",
+      "*reports/governance/trust_gate_status.json",
       "foo.py",
-      "test_foo.py"
+      "test_foo.py",
+      "/AGENTS.md"
     ]
   },
   "canonical_guard": {
@@ -152,35 +163,39 @@
       "docs/plans/**",
       "docs/specs/**",
       "docs/sovereign_holons/**",
-      "dharma_swarm/chetana/claude_code_plugin/**"
+      "dharma_swarm/chetana/claude_code_plugin/**",
+      "docs/stop-the-slop/**"
     ],
-      "registered": [
-        "AGENTS.md",
-        "CLAUDE.md",
-        "DEVIN.md",
-        "README.md",
-        "docs/AGENTS.md",
-        "docs/README.md",
-        "docs/governance/README.md",
-        "docs/governance/ACTIVE_TRACK.yaml",
-        "docs/governance/ANTI_SLOP_RULES.md",
-        "docs/governance/hygiene/README.md",
-        "docs/governance/hygiene/LIFECYCLE.md",
-        "docs/governance/hygiene/AI_AGENT_GOVERNANCE.md",
-        "docs/governance/hygiene/CATALOGUE.md",
-        "docs/governance/hygiene/AUDIT_PROMPT.md",
-        "docs/governance/VIBE_CODE_HYGIENE.md",
-        "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
-        "docs/governance/SWARM_GENOME.md",
-        "docs/governance/REALITY_DEBT_LEDGER.md",
-        "docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
-        "docs/governance/COHERENCE_DELTA.md",
-        "docs/ops/PR_REVIEW_CONTROL.md",
-        "docs/governance/INTEGRATION_LANDING_ORDER.md",
-        "docs/governance/KAIZENOPS.md",
-        "docs/governance/MMM_CHARTER.md",
-        "docs/governance/README.md",
-        "docs/governance/SOVEREIGN_MANIFEST.md",
+    "registered": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "DEVIN.md",
+      "README.md",
+      "docs/AGENTS.md",
+      "docs/README.md",
+      "docs/governance/README.md",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "docs/governance/ANTI_SLOP_RULES.md",
+      "docs/governance/FORGE_NAMING_BOUNDARY.md",
+      "docs/governance/hygiene/README.md",
+      "docs/governance/hygiene/LIFECYCLE.md",
+      "docs/governance/hygiene/AI_AGENT_GOVERNANCE.md",
+      "docs/governance/hygiene/CATALOGUE.md",
+      "docs/governance/hygiene/AUDIT_PROMPT.md",
+      "docs/governance/VIBE_CODE_HYGIENE.md",
+      "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+      "docs/governance/SWARM_GENOME.md",
+      "docs/governance/REALITY_DEBT_LEDGER.md",
+      "docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
+      "docs/governance/COHERENCE_DELTA.md",
+      "docs/governance/CONTEXT_SUITE_MAP.md",
+      "docs/governance/CONTEXT_SUITE_LINE_LEDGER.md",
+      "docs/ops/PR_REVIEW_CONTROL.md",
+      "docs/governance/INTEGRATION_LANDING_ORDER.md",
+      "docs/governance/KAIZENOPS.md",
+      "docs/governance/MMM_CHARTER.md",
+      "docs/governance/README.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/architecture/SPINE_ADOPTION_NARRATIVE.md",
       "docs/missions/SAB_DHARMIC_AGORA_REMOTE_HANDOFF_2026-06-11.md",
       "docs/MEGAFILE_INDEX.md",
@@ -191,15 +206,22 @@
       "docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md",
       "docs/vision_maps/MASTER_2026-06-10_anatomy_altitude_integration.md",
       "docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md",
+      "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md",
       "INTERFACE_MISMATCH_MAP.md",
+      "CYBERNETIC_LOOP_MAP.md",
       "docs/state/LIVE_OPS_DASHBOARD.md",
       "docs/state/BROKEN_REGISTER.md",
       "docs/governance/CANONICAL_DOC_STACK.md",
       "docs/governance/REPO_GOVERNANCE_AUDIT.md",
       "docs/architecture/CONTROL_SURFACE.md",
       "docs/architecture/SWARM_BOARDSTORE_SPEC.md",
+      "docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md",
+      "docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md",
       "docs/architecture/README.md",
       "docs/architecture/NAVIGATION.md",
+      "docs/architecture/AGENT_HOLON_CODE_MAP.md",
+      "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
+      "docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md",
       "docs/architecture/MODEL_ROUTING_CANON.md",
       "docs/architecture/README.md",
       "docs/architecture/SWARM_BOARDSTORE_SPEC.md",
@@ -242,6 +264,7 @@
       "docs/agents/perplexity-computer/RECOGNITION_STANCE.md",
       "docs/agents/perplexity-computer/CAPABILITIES.md",
       "docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md",
+      "docs/agents/cybernetics_codex/PROTOCOLS.md",
       "docs/agent_tasks/devin_review_perplexity_computer_2026-05-30.md",
       "docs/agent_tasks/hermes_review_perplexity_computer_2026-05-30.md",
       "docs/agent_tasks/2026-06-11_swarm_genome_convergence_spec.md",
@@ -254,17 +277,31 @@
       "docs/research/RUNTIME_TRUTH_SPINE_COMPLETION_PLAN.md",
       "docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md",
       "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
+      "docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md",
+      "docs/langgraph_parity/OPERATOR_RUNBOOK.md",
+      "docs/langgraph_parity/TASK_GRAPH.md",
+      "docs/sarathi_apex_build/README.md",
+      "docs/sarathi_apex_build/00_START_HERE.md",
+      "docs/sarathi_apex_build/02_CODEBASE_RUNTIME_BOUNDARY.md",
+      "docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md",
+      "docs/sarathi_apex_build/07_BACKLOG.md",
+      "docs/sarathi_apex_build/90_ANTI_SPRAWL_HARNESS.md",
+      "docs/sarathi_apex_build/91_SPRAWL_HARNESS_RUNBOOK.md",
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
       "docs/ops/TMUX_AGENT_SUBSTRATE.md",
-      "spec-forge/living-agent-kernel/MASTER_SPEC.md"
+      "docs/ontology/SEMANTIC_COMMONS.md",
+      "spec-forge/living-agent-kernel/MASTER_SPEC.md",
+      "packages/telos-kernel/SECURITY.md",
+      "packages/titanium-verify/README.md",
+      "specs/TITANIUM_TELOS_GATES_SPEC_v3.md",
+      "specs/memos/nagini_graduation_memo.md"
     ]
   },
   "auto_sections": {
     "include": [
-      "docs/docops/AUTO_INVENTORY.md",
-      "docs/governance/SOVEREIGN_MANIFEST.md"
+      "docs/docops/AUTO_INVENTORY.md"
     ]
   },
   "change_review": {

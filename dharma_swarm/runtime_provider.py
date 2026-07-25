@@ -7,12 +7,13 @@ ModelRouter policy and provider implementations unchanged.
 from __future__ import annotations
 
 import asyncio
-import logging
+import hashlib
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
@@ -26,8 +27,12 @@ from dharma_swarm.api_keys import (
     GOOGLE_AI_BASE_URL_ENV,
     GROQ_API_KEY_ENV,
     GROQ_BASE_URL_ENV,
+    KIMI_API_KEY_ENV,
+    KIMI_BASE_URL_ENV,
     MISTRAL_API_KEY_ENV,
     MISTRAL_BASE_URL_ENV,
+    MOONSHOT_API_KEY_ENV,
+    MOONSHOT_BASE_URL_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     NVIDIA_NIM_BASE_URL_ENV,
     OLLAMA_API_KEY_ENV,
@@ -39,9 +44,14 @@ from dharma_swarm.api_keys import (
     SILICONFLOW_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
     TOGETHER_BASE_URL_ENV,
-    bootstrap_runtime_env,
+    ZHIPU_API_KEY_ENV,
+    ZHIPU_BASE_URL_ENV,
     env_value,
     normalize_env_aliases,
+)
+from dharma_swarm.model_hierarchy import (
+    CANONICAL_SEED_ORDER,
+    default_model,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.ollama_config import (
@@ -50,8 +60,6 @@ from dharma_swarm.ollama_config import (
     resolve_ollama_base_url,
     resolve_ollama_model,
 )
-
-logger = logging.getLogger(__name__)
 
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -65,11 +73,12 @@ GOOGLE_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1"
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 CHUTES_BASE_URL = "https://api.chutes.ai/v1"
-from dharma_swarm.model_hierarchy import (
-    CANONICAL_SEED_ORDER,
-    default_model,
-    get_live_order,
-)
+# z.ai / Zhipu coding-plan OpenAI-compatible endpoint. The generic Z.ai
+# endpoint can reject coding-plan keys as out of funds even when coding quota is
+# live, so this default is intentionally the coding endpoint.
+ZHIPU_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
+KIMI_BASE_URL = "https://api.kimi.com/coding/v1"
+MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
 
 # Default models — sourced from model_hierarchy.py (the single source of truth)
 DEFAULT_CLAUDE_MODEL = default_model(ProviderType.ANTHROPIC)
@@ -84,10 +93,24 @@ DEFAULT_NIM_MODEL = default_model(ProviderType.NVIDIA_NIM)
 DEFAULT_SAMBANOVA_MODEL = default_model(ProviderType.SAMBANOVA)
 DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
 DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
-DEFAULT_SAKANA_MODEL = default_model(ProviderType.SAKANA)
 DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
+DEFAULT_ZHIPU_MODEL = default_model(ProviderType.ZHIPU)
+DEFAULT_KIMI_CODE_MODEL = default_model(ProviderType.KIMI_CODE)
+DEFAULT_MOONSHOT_MODEL = default_model(ProviderType.MOONSHOT)
 DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
+
+
+def _ollama_runtime_available(*, base_url: str, token: str | None) -> bool:
+    """Return whether the resolved Ollama endpoint is configured for dispatch.
+
+    This resolver is used by no-network CI and hot routing paths, so it must not
+    perform an inline smoke. Actual liveness belongs to dkeys/provider-status
+    refresh and provider failure fallback.
+    """
+    if ollama_transport_mode(base_url=base_url, api_key=token) == "cloud_api":
+        return bool(token)
+    return bool(base_url)
 
 # Provider ordering sourced from model_hierarchy.py — the single source of truth.
 # All free providers first, then cheap, then paid.
@@ -106,6 +129,9 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.TOGETHER,        # FREE: Qwen3-Coder 480B
     ProviderType.FIREWORKS,       # FREE: Qwen3-Coder 480B
     ProviderType.OPENROUTER_FREE, # FREE: auto-discovered
+    ProviderType.KIMI_CODE,       # CHEAP: Kimi API Platform coding lane
+    ProviderType.MOONSHOT,        # CHEAP: Kimi API Platform / Moonshot global API
+    ProviderType.ZHIPU,           # CHEAP: Z.ai coding-plan GLM-5.2 direct API
     ProviderType.MISTRAL,         # CHEAP
     ProviderType.GOOGLE_AI,       # CHEAP
     ProviderType.CHUTES,          # CHEAP
@@ -121,6 +147,9 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = 
     ProviderType.OPENROUTER_FREE,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
+    ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
+    ProviderType.ZHIPU,
     ProviderType.OPENROUTER,      # PAID (moonshotai/kimi-k2.5)
     ProviderType.ANTHROPIC,
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
@@ -140,6 +169,140 @@ class RuntimeProviderConfig:
     available: bool = False
     source: str = "env"
     metadata: dict[str, Any] | None = None
+
+
+def _canonical_transport_base_url(base_url: str | None) -> str:
+    """Return a secret-free, path-sensitive network-endpoint identity.
+
+    URL paths can themselves carry credentials or opaque tenant identifiers, so
+    the identity never emits a raw path.  A full SHA-256 token preserves the
+    distinction between otherwise-identical endpoints without treating query
+    strings, fragments, or userinfo as transport identity.
+    """
+    raw_url = str(base_url or "").strip()
+    if not raw_url:
+        return ""
+
+    try:
+        parsed = urlsplit(
+            raw_url if "://" in raw_url or raw_url.startswith("//") else f"//{raw_url}"
+        )
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return ""
+    if not parsed.netloc or not hostname:
+        return ""
+
+    normalized_host = hostname.lower()
+    if ":" in normalized_host:
+        normalized_host = f"[{normalized_host}]"
+    scheme = parsed.scheme.lower()
+    if port is not None and not (
+        (scheme == "https" and port == 443)
+        or (scheme == "http" and port == 80)
+    ):
+        normalized_host = f"{normalized_host}:{port}"
+    normalized_path = parsed.path.rstrip("/")
+    path_digest = hashlib.sha256(normalized_path.encode("utf-8")).hexdigest()
+    path_token = f"/.path-sha256-{path_digest}"
+    return urlunsplit((scheme, normalized_host, path_token, "", ""))
+
+
+def runtime_provider_transport_identity(
+    config: RuntimeProviderConfig | None = None,
+    *,
+    logical_provider: ProviderType | None = None,
+    provider_instance: Any | None = None,
+) -> str:
+    """Return a secret-free identity for one physical dispatch transport.
+
+    Logical provider labels remain authoritative for policy and provenance.
+    This identity exists only to prevent a fallback chain from treating two
+    aliases of the same executable transport as independent attempts. Unknown
+    provider implementations fail open to their logical lane rather than being
+    collapsed speculatively.
+    """
+    runtime_config = config or getattr(provider_instance, "runtime_config", None)
+    provider = (
+        getattr(runtime_config, "provider", None)
+        or logical_provider
+    )
+    transport_mode = str(
+        getattr(runtime_config, "transport_mode", "") or ""
+    ).strip()
+    instance_command = str(
+        getattr(provider_instance, "_cli_command", "") or ""
+    ).strip()
+
+    command = ""
+    if transport_mode == "claude_code" or provider == ProviderType.CLAUDE_CODE:
+        command = "claude"
+    elif transport_mode == "codex" or provider == ProviderType.CODEX:
+        command = "codex"
+    elif instance_command:
+        command = instance_command
+
+    if command:
+        endpoint = str(
+            getattr(runtime_config, "binary_path", "")
+            or getattr(provider_instance, "_resolved_command", "")
+            or command
+        )
+        if Path(endpoint).is_absolute() or "/" in endpoint:
+            endpoint = str(Path(endpoint).expanduser().resolve())
+        return f"cli:{command}:{endpoint}"
+
+    base_url = _canonical_transport_base_url(
+        getattr(runtime_config, "base_url", None)
+    )
+    if base_url:
+        # A concrete endpoint is the authority for physical-transport
+        # independence.  Logical aliases that hit it are one attempt, even if
+        # they select different models or pricing labels.
+        return f"provider:{base_url}"
+    if provider is None:
+        return "provider:unknown"
+    # Missing endpoint information is insufficient evidence of shared
+    # transport, so fail open to the logical provider rather than collapsing.
+    return f"provider:{provider.value}"
+
+
+def deduplicate_runtime_provider_configs(
+    configs: Iterable[RuntimeProviderConfig],
+) -> list[RuntimeProviderConfig]:
+    """Keep the first logical lane for each physical transport.
+
+    When aliases collapse, the retained immutable config records all logical
+    labels plus the canonical transport identity in metadata. No credentials
+    participate in or are emitted by the identity.
+    """
+    deduplicated: list[RuntimeProviderConfig] = []
+    indices: dict[str, int] = {}
+    for config in configs:
+        identity = runtime_provider_transport_identity(config)
+        existing_index = indices.get(identity)
+        if existing_index is None:
+            indices[identity] = len(deduplicated)
+            deduplicated.append(config)
+            continue
+
+        retained = deduplicated[existing_index]
+        metadata = dict(retained.metadata or {})
+        aliases = list(
+            metadata.get("logical_provider_aliases")
+            or [retained.provider.value]
+        )
+        if config.provider.value not in aliases:
+            aliases.append(config.provider.value)
+        metadata.update(
+            {
+                "physical_transport_identity": identity,
+                "logical_provider_aliases": aliases,
+            }
+        )
+        deduplicated[existing_index] = replace(retained, metadata=metadata)
+    return deduplicated
 
 
 def _env_value(env: Mapping[str, str], key: str) -> str | None:
@@ -174,7 +337,7 @@ def resolve_runtime_provider_config(
     """Resolve runtime config for a provider from args + environment."""
 
     if env is None:
-        bootstrap_runtime_env()
+        normalize_env_aliases()
         env_map: Mapping[str, str] = os.environ
     else:
         copied_env = dict(env)
@@ -183,27 +346,27 @@ def resolve_runtime_provider_config(
     timeout = int(timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS)
     cwd = str(Path(working_dir or os.getcwd()))
 
-    # Route Anthropic/Claude to the Max subscription (claude_code CLI), not the
-    # metered API. The Max plan is flat-fee + effectively unlimited; the API key is
-    # last-resort. Escape hatch: DHARMA_FORCE_ANTHROPIC_API=1 forces the raw API.
-    # (operator: "anthropic needs to route to max plans", 2026-06-06)
-    if provider == ProviderType.ANTHROPIC and not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
-        provider = ProviderType.CLAUDE_CODE
-
-    # Legacy configs may still say "local"; the canonical local runtime lane is
-    # Ollama. Force the local API default rather than accidentally selecting
-    # Ollama Cloud when an OLLAMA_API_KEY is present.
-    if provider == ProviderType.LOCAL:
-        provider = ProviderType.OLLAMA
-        base_url = base_url or "http://localhost:11434"
-
     if provider == ProviderType.ANTHROPIC:
+        # Preserve the requested logical provider identity even when the
+        # default transport is the flat-fee Claude Code CLI.  Callers can now
+        # distinguish two logical lanes while the factory selects transport.
+        if not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
+            binary = _resolve_cli_binary("claude")
+            return RuntimeProviderConfig(
+                provider=provider,
+                default_model=model or DEFAULT_CLAUDE_MODEL,
+                transport_mode="claude_code",
+                working_dir=cwd,
+                timeout_seconds=timeout,
+                binary_path=binary,
+                available=bool(binary),
+                source="binary",
+            )
         token = api_key or _env_value(env_map, ANTHROPIC_API_KEY_ENV)
         return RuntimeProviderConfig(
             provider=provider,
             api_key=token,
             default_model=model or DEFAULT_CLAUDE_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -214,7 +377,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENAI_BASE_URL).rstrip("/"),
             default_model=model or DEFAULT_OPENAI_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -225,7 +387,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENROUTER_BASE_URL).rstrip("/"),
             default_model=model or DEFAULT_OPENROUTER_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -236,7 +397,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENROUTER_BASE_URL).rstrip("/"),
             default_model=model,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -252,7 +412,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_NIM_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -268,7 +427,10 @@ def resolve_runtime_provider_config(
             base_url=resolved_base,
             api_key=token,
         )
-        available = bool(resolved_base)
+        available = bool(resolved_base) and _ollama_runtime_available(
+            base_url=resolved_base,
+            token=token,
+        )
         metadata: dict[str, Any] = {}
         try:
             metadata["headers"] = build_ollama_headers(
@@ -283,7 +445,6 @@ def resolve_runtime_provider_config(
             base_url=resolved_base,
             default_model=resolved_model,
             transport_mode=transport_mode,
-            timeout_seconds=timeout,
             available=available,
             metadata=metadata,
         )
@@ -324,7 +485,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_GROQ_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -340,7 +500,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_CEREBRAS_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -356,7 +515,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_SILICONFLOW_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -372,7 +530,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_TOGETHER_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -388,7 +545,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_FIREWORKS_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -404,7 +560,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_GOOGLE_AI_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -420,7 +575,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_SAMBANOVA_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -436,7 +590,6 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_MISTRAL_MODEL,
-            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -452,56 +605,60 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_CHUTES_MODEL,
+            available=bool(token),
+        )
+
+    if provider == ProviderType.ZHIPU:
+        token = api_key or _env_value(env_map, ZHIPU_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, ZHIPU_BASE_URL_ENV)
+            or ZHIPU_BASE_URL
+        ).rstrip("/")
+        return RuntimeProviderConfig(
+            provider=provider,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_ZHIPU_MODEL,
             timeout_seconds=timeout,
             available=bool(token),
         )
 
-    if provider == ProviderType.SAKANA:
+    if provider == ProviderType.KIMI_CODE:
+        # Kimi Code subscription keys and Moonshot Platform keys are distinct
+        # authorities. Never silently send a Moonshot key to the coding API.
+        token = api_key or _env_value(env_map, KIMI_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, KIMI_BASE_URL_ENV)
+            or KIMI_BASE_URL
+        ).rstrip("/")
         return RuntimeProviderConfig(
             provider=provider,
-            default_model=model or DEFAULT_SAKANA_MODEL,
-            working_dir=cwd,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_KIMI_CODE_MODEL,
             timeout_seconds=timeout,
-            available=False,
-            source="external_only",
-            metadata={
-                "external_only": True,
-                "reason": (
-                    "Sakana/Fugu runs through its own external responder or approved "
-                    "wrapper; dharma_swarm has no local Provider adapter yet."
-                ),
-            },
+            available=bool(token),
+        )
+
+    if provider == ProviderType.MOONSHOT:
+        token = api_key or _env_value(env_map, MOONSHOT_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, MOONSHOT_BASE_URL_ENV)
+            or MOONSHOT_BASE_URL
+        ).rstrip("/")
+        return RuntimeProviderConfig(
+            provider=provider,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_MOONSHOT_MODEL,
+            timeout_seconds=timeout,
+            available=bool(token),
         )
 
     raise ValueError(f"Unsupported runtime provider: {provider.value}")
-
-
-def _attach_runtime_provider_metadata(provider: Any, config: RuntimeProviderConfig) -> Any:
-    try:
-        setattr(provider, "runtime_provider_type", config.provider.value)
-        setattr(provider, "runtime_default_model", config.default_model or "")
-        setattr(provider, "runtime_available", config.available)
-        setattr(provider, "available", config.available)
-    except Exception:
-        pass
-    return provider
-
-
-def _stamp_response_provider(response: LLMResponse, provider: ProviderType) -> LLMResponse:
-    if str(response.provider or "").strip():
-        return response
-    return response.model_copy(update={"provider": provider.value})
-
-
-def _api_key_base_url_kwargs(config: RuntimeProviderConfig) -> dict[str, Any]:
-    kwargs: dict[str, Any] = {}
-    if config.api_key is not None:
-        kwargs["api_key"] = config.api_key
-    if config.base_url is not None:
-        kwargs["base_url"] = config.base_url
-    if config.timeout_seconds is not None:
-        kwargs["timeout_seconds"] = config.timeout_seconds
-    return kwargs
 
 
 def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
@@ -516,6 +673,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         FireworksProvider,
         GoogleAIProvider,
         GroqProvider,
+        KimiCodeProvider,
         MistralProvider,
         NVIDIANIMProvider,
         OllamaProvider,
@@ -525,33 +683,44 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         SambaNovaProvider,
         SiliconFlowProvider,
         TogetherProvider,
+        ZhipuProvider,
     )
+    from dharma_swarm.moonshot_provider import MoonshotProvider
 
     if config.provider == ProviderType.ANTHROPIC:
+        if config.transport_mode == "claude_code":
+            kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
+            if config.working_dir is not None:
+                kwargs["working_dir"] = config.working_dir
+            return ClaudeCodeProvider(**kwargs)
         kwargs: dict[str, Any] = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return _attach_runtime_provider_metadata(AnthropicProvider(**kwargs), config)
+        return AnthropicProvider(**kwargs)
     if config.provider == ProviderType.OPENAI:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(OpenAIProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return OpenAIProvider(**kwargs)
     if config.provider == ProviderType.OPENROUTER:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(OpenRouterProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return OpenRouterProvider(**kwargs)
     if config.provider == ProviderType.OPENROUTER_FREE:
-        kwargs = _api_key_base_url_kwargs(config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
         if config.default_model is not None:
             kwargs["model"] = config.default_model
-        return _attach_runtime_provider_metadata(OpenRouterFreeProvider(**kwargs), config)
+        return OpenRouterFreeProvider(**kwargs)
     if config.provider == ProviderType.NVIDIA_NIM:
         kwargs = {"default_model": config.default_model or DEFAULT_NIM_MODEL}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         if config.base_url is not None:
             kwargs["base_url"] = config.base_url
-        if config.timeout_seconds is not None:
-            kwargs["timeout_seconds"] = config.timeout_seconds
-        return _attach_runtime_provider_metadata(NVIDIANIMProvider(**kwargs), config)
+        return NVIDIANIMProvider(**kwargs)
     if config.provider == ProviderType.OLLAMA:
         kwargs = {}
         if config.base_url is not None:
@@ -560,51 +729,94 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["model"] = config.default_model
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        if config.timeout_seconds is not None:
-            kwargs["timeout_seconds"] = config.timeout_seconds
-        return _attach_runtime_provider_metadata(OllamaProvider(**kwargs), config)
+        return OllamaProvider(**kwargs)
     if config.provider == ProviderType.CLAUDE_CODE:
         kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
         if config.working_dir is not None:
             kwargs["working_dir"] = config.working_dir
-        return _attach_runtime_provider_metadata(ClaudeCodeProvider(**kwargs), config)
+        return ClaudeCodeProvider(**kwargs)
     if config.provider == ProviderType.CODEX:
         kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
         if config.working_dir is not None:
             kwargs["working_dir"] = config.working_dir
-        return _attach_runtime_provider_metadata(CodexProvider(**kwargs), config)
+        return CodexProvider(**kwargs)
     if config.provider == ProviderType.GROQ:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(GroqProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return GroqProvider(**kwargs)
     if config.provider == ProviderType.CEREBRAS:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(CerebrasProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return CerebrasProvider(**kwargs)
     if config.provider == ProviderType.SILICONFLOW:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(SiliconFlowProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return SiliconFlowProvider(**kwargs)
     if config.provider == ProviderType.TOGETHER:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(TogetherProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return TogetherProvider(**kwargs)
     if config.provider == ProviderType.FIREWORKS:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(FireworksProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return FireworksProvider(**kwargs)
     if config.provider == ProviderType.GOOGLE_AI:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(GoogleAIProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return GoogleAIProvider(**kwargs)
     if config.provider == ProviderType.SAMBANOVA:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(SambaNovaProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return SambaNovaProvider(**kwargs)
     if config.provider == ProviderType.MISTRAL:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(MistralProvider(**kwargs), config)
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return MistralProvider(**kwargs)
     if config.provider == ProviderType.CHUTES:
-        kwargs = _api_key_base_url_kwargs(config)
-        return _attach_runtime_provider_metadata(ChutesProvider(**kwargs), config)
-    if config.provider == ProviderType.SAKANA:
-        raise ValueError(
-            "Sakana/Fugu is registered as an external-only provider; use the approved "
-            "Fugu responder/wrapper, not create_runtime_provider()"
-        )
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        return ChutesProvider(**kwargs)
+    if config.provider == ProviderType.ZHIPU:
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_ZHIPU_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return ZhipuProvider(**kwargs)
+    if config.provider == ProviderType.KIMI_CODE:
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_KIMI_CODE_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return KimiCodeProvider(**kwargs)
+    if config.provider == ProviderType.MOONSHOT:
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_MOONSHOT_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return MoonshotProvider(**kwargs)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
@@ -624,7 +836,10 @@ def create_default_provider_map(
             timeout_seconds=timeout_seconds,
             env=env,
         )
-        providers[provider] = create_runtime_provider(cfg)
+        provider_instance = create_runtime_provider(cfg)
+        setattr(provider_instance, "available", cfg.available)
+        setattr(provider_instance, "runtime_config", cfg)
+        providers[provider] = provider_instance
     return providers
 
 
@@ -656,82 +871,7 @@ def preferred_runtime_provider_configs(
         )
         if cfg.available:
             configs.append(cfg)
-    return configs
-
-
-def resolve_top_available_at_wake(
-    *,
-    provider_order: tuple[ProviderType, ...] | None = None,
-    fallback_provider: ProviderType | None = None,
-    fallback_model: str | None = None,
-    working_dir: str | None = None,
-    timeout_seconds: int | None = None,
-    env: Mapping[str, str] | None = None,
-) -> RuntimeProviderConfig:
-    """Resolve the best currently available provider/model for model-agnostic wakes.
-
-    This is the code owner for the ``@frontier`` / ``resolve_top_available_at_wake``
-    policy used by Sarathi-style identities. It is deliberately a resolver over
-    the existing model hierarchy + runtime provider config path; it does not add
-    a second router or provider store.
-
-    ``available`` here means the provider has the local prerequisite that the
-    existing runtime resolver can check deterministically (key, configured base
-    URL, or local CLI binary). It does not make a network/model call. If no
-    candidate is available, the function returns an explicitly marked fallback
-    config when a fallback is supplied, and logs that the fallback is not live.
-    """
-
-    order = provider_order or tuple(get_live_order())
-    checked: list[str] = []
-    for provider in order:
-        cfg = resolve_runtime_provider_config(
-            provider,
-            working_dir=working_dir,
-            timeout_seconds=timeout_seconds,
-            env=env,
-        )
-        checked.append(f"{cfg.provider.value}:{cfg.default_model or ''}")
-        if cfg.available:
-            return cfg
-
-    if fallback_provider is not None:
-        fallback_cfg = resolve_runtime_provider_config(
-            fallback_provider,
-            model=fallback_model,
-            working_dir=working_dir,
-            timeout_seconds=timeout_seconds,
-            env=env,
-        )
-        metadata = dict(fallback_cfg.metadata or {})
-        metadata["frontier_resolution"] = {
-            "status": "fallback_unavailable",
-            "reason": "no candidate provider reported available",
-            "checked": checked,
-        }
-        logger.warning(
-            "No @frontier provider was available; falling back to %s/%s (available=%s)",
-            fallback_cfg.provider.value,
-            fallback_cfg.default_model,
-            fallback_cfg.available,
-        )
-        return RuntimeProviderConfig(
-            provider=fallback_cfg.provider,
-            api_key=fallback_cfg.api_key,
-            base_url=fallback_cfg.base_url,
-            default_model=fallback_cfg.default_model,
-            transport_mode=fallback_cfg.transport_mode,
-            working_dir=fallback_cfg.working_dir,
-            timeout_seconds=fallback_cfg.timeout_seconds,
-            binary_path=fallback_cfg.binary_path,
-            available=fallback_cfg.available,
-            source=fallback_cfg.source,
-            metadata=metadata,
-        )
-
-    raise RuntimeError(
-        "No @frontier provider available and no fallback_provider/fallback_model supplied"
-    )
+    return deduplicate_runtime_provider_configs(configs)
 
 
 async def complete_via_preferred_runtime_providers(
@@ -765,7 +905,10 @@ async def complete_via_preferred_runtime_providers(
     )
     if not configs:
         raise RuntimeError(
-            "No preferred providers available; configure Ollama, NVIDIA NIM, OpenRouter, or Anthropic"
+            "No dispatchable provider in the preferred chain. Dispatch is normally "
+            "keyless via claude_code when headless `claude -p` smokes green — "
+            "check key_oracle.dispatchable_now(); add Ollama/NVIDIA NIM/OpenRouter "
+            "keys only to widen the roster."
         )
 
     last_exc: Exception | None = None
@@ -786,7 +929,7 @@ async def complete_via_preferred_runtime_providers(
                 )
             else:
                 response = await provider.complete(request)
-            return _stamp_response_provider(response, config.provider), config
+            return response, config
         except Exception as exc:
             last_exc = exc
         finally:
@@ -803,30 +946,36 @@ __all__ = [
     "CEREBRAS_BASE_URL",
     "DEFAULT_CLAUDE_MODEL",
     "DEFAULT_GROQ_MODEL",
+    "DEFAULT_KIMI_CODE_MODEL",
+    "DEFAULT_MOONSHOT_MODEL",
     "DEFAULT_FIREWORKS_MODEL",
     "DEFAULT_NIM_MODEL",
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENROUTER_MODEL",
     "DEFAULT_PROVIDER_TIMEOUT_SECONDS",
     "DEFAULT_RUNTIME_PROVIDERS",
-    "DEFAULT_SAKANA_MODEL",
     "DEFAULT_SILICONFLOW_MODEL",
     "DEFAULT_TOGETHER_MODEL",
+    "DEFAULT_ZHIPU_MODEL",
     "FIREWORKS_BASE_URL",
     "GOOGLE_AI_BASE_URL",
     "GROQ_BASE_URL",
+    "KIMI_BASE_URL",
+    "MOONSHOT_BASE_URL",
     "NVIDIA_NIM_BASE_URL",
     "OPENAI_BASE_URL",
     "OPENROUTER_BASE_URL",
     "PREFERRED_LOW_COST_RUNTIME_PROVIDERS",
     "PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS",
     "RuntimeProviderConfig",
+    "deduplicate_runtime_provider_configs",
     "SILICONFLOW_BASE_URL",
     "TOGETHER_BASE_URL",
+    "ZHIPU_BASE_URL",
     "complete_via_preferred_runtime_providers",
     "create_default_provider_map",
     "create_runtime_provider",
     "preferred_runtime_provider_configs",
-    "resolve_top_available_at_wake",
     "resolve_runtime_provider_config",
+    "runtime_provider_transport_identity",
 ]

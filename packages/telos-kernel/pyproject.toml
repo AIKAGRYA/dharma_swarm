@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telos-kernel"
+version = "0.1.0"
+description = "Titanium Telos Gates v3 — hardened safety-kernel substrate for dharma_swarm"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "John Shrader", email = "dhyana@example.com" }]
+
+# TCB dependency allow-list. Phase 0 slice only. Later phases add:
+#   Phase 2 (U4):  y0>=0.2.10, dowhy>=0.11, networkx>=3
+#   Phase 3 (U7):  scipy>=1.11 (already in), no new dep (LP uses scipy.optimize.linprog)
+#   Phase 4 (U8): ripser>=0.6.4, persim>=0.3, gudhi>=3.12.0
+#   Phase 6 (U10/U11 v1): discopy>=1.0 (U11 v1 has no crypto-lib dep, pure Python Fiat-Shamir)
+#
+# Any addition to this list requires a K=3/N=5 quorum-signed manifest edit (see kernel/manifest.yaml).
+dependencies = [
+    "pydantic>=2.0",
+    "cryptography>=42.0",
+    "pyyaml>=6.0",
+    "icontract>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "hypothesis>=6.100",
+    # Crosshair is installed by CI; tests skip cleanly if unavailable so local
+    # dev remains ergonomic.
+    "crosshair-tool>=0.0.50",
+]
+
+[tool.setuptools.packages.find]
+include = ["telos_kernel*"]
+
+[tool.pytest.ini_options]
+testpaths = ["telos_kernel/tests"]
+timeout = 120

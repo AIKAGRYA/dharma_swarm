@@ -21,17 +21,15 @@ from __future__ import annotations
 
 import ast
 import logging
-import re
 from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
+from dharma_swarm.metrics import MetricsAnalyzer
 from dharma_swarm.models import GateResult
 from dharma_swarm.semantic_gravity import (
     AngleVerdict,
     ConceptGraph,
-    ConceptNode,
     FileClusterSpec,
     HardeningAngle,
     HardeningReport,

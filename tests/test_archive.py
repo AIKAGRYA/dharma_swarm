@@ -332,6 +332,24 @@ async def test_update_status_persists(archive_path):
 
 
 @pytest.mark.asyncio
+async def test_update_status_rebuilds_grid_when_entry_stops_bearing_fitness(archive_path):
+    archive = EvolutionArchive(path=archive_path)
+    await archive.load()
+    entry = _make_entry(
+        description="fitness-bearing entry",
+        fitness=FitnessScore(correctness=0.8, elegance=0.7),
+        status="applied",
+    )
+    eid = await archive.add_entry(entry)
+    assert archive.grid.occupied_bins == 1
+
+    await archive.update_status(eid, "proposed")
+
+    assert archive.grid.occupied_bins == 0
+    assert await archive.get_diverse(n=3) == []
+
+
+@pytest.mark.asyncio
 async def test_update_status_with_reason(archive):
     entry = _make_entry(description="will rollback")
     eid = await archive.add_entry(entry)
@@ -555,6 +573,57 @@ def test_diverse_selection_from_grid():
         tuple(sorted(e.feature_coords.items())) for e in diverse
     ]
     assert len(set(coord_sets)) == 3  # all unique
+
+
+def _entry(da: float, el: float, diff: str = "", correctness: float = 0.5):
+    return ArchiveEntry(
+        fitness=FitnessScore(
+            dharmic_alignment=da,
+            elegance=el,
+            correctness=correctness,
+            safety=1.0,
+        ),
+        diff=diff,
+        status="applied",
+    )
+
+
+def test_map_elites_sample_diverse_empty_grid():
+    """sample_diverse on an empty grid returns an empty list."""
+    grid = MAPElitesGrid()
+    assert grid.sample_diverse(3) == []
+
+
+def test_map_elites_sample_diverse_seeds_with_fittest():
+    """sample_diverse starts from the fittest occupied cell."""
+    grid = MAPElitesGrid()
+    grid.try_insert(_entry(0.1, 0.1, correctness=0.2))
+    grid.try_insert(_entry(0.5, 0.5, correctness=0.95))
+    grid.try_insert(_entry(0.9, 0.9, correctness=0.5))
+    result = grid.sample_diverse(3)
+    assert result
+    fittest = max(grid._grid.values(), key=lambda e: e.fitness.weighted())
+    assert result[0].fitness.weighted() == fittest.fitness.weighted()
+
+
+def test_map_elites_sample_diverse_maximizes_spread():
+    """Farthest-point selection covers the corners of the feature grid."""
+    grid = MAPElitesGrid()
+    # Three well-separated bins plus a near-duplicate of the middle one.
+    grid.try_insert(_entry(0.0, 0.0))
+    grid.try_insert(_entry(0.9, 0.9, correctness=0.95))
+    grid.try_insert(_entry(0.0, 0.9))
+    result = grid.sample_diverse(3)
+    assert len(result) == 3
+    coords = {tuple(sorted(e.feature_coords.items())) for e in result}
+    assert len(coords) == 3  # all from distinct bins
+
+
+def test_map_elites_sample_diverse_caps_at_available():
+    """Requesting more than the grid holds returns only what exists."""
+    grid = MAPElitesGrid()
+    grid.try_insert(_entry(0.5, 0.5))
+    assert len(grid.sample_diverse(10)) == 1
 
 
 @pytest.mark.asyncio

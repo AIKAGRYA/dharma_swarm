@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import os
 import subprocess
@@ -308,7 +309,8 @@ def test_cmd_status_uses_canonical_dharma_state(monkeypatch, tmp_path, capsys):
         "\n--- PULSE @ 2026-03-26T01:23:45+00:00 [architectural] ---\nPulse complete.\n",
         encoding="utf-8",
     )
-    witness_file = witness_dir / "witness_20260326.jsonl"
+    local_stamp = datetime.now().astimezone().strftime("%Y%m%d")
+    witness_file = witness_dir / f"witness_{local_stamp}.jsonl"
     witness_file.write_text('{"gate":"a"}\n{"gate":"b"}\n', encoding="utf-8")
 
     monkeypatch.setattr(dgc_cli, "HOME", tmp_path)
@@ -875,6 +877,70 @@ def test_dgc_cli_memory_schedule_command():
                 top_k=8,
                 as_json=False,
             )
+
+
+def test_dgc_cli_spine_tail_command_dispatch():
+    """main() dispatches 'spine tail' to cmd_spine_tail with limit/follow forwarded."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "spine", "tail", "--limit", "5", "--follow"]):
+        with patch("dharma_swarm.operator_core.spine_tail.cmd_spine_tail", return_value=0) as mock:
+            main()
+            mock.assert_called_once()
+            assert mock.call_args.kwargs["limit"] == 5
+            assert mock.call_args.kwargs["follow"] is True
+
+
+def test_dgc_cli_spine_tail_default_limit_no_follow():
+    """`dgc spine tail` defaults to limit=20 and follow disabled."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "spine", "tail"]):
+        with patch("dharma_swarm.operator_core.spine_tail.cmd_spine_tail", return_value=0) as mock:
+            main()
+            mock.assert_called_once()
+            assert mock.call_args.kwargs["limit"] == 20
+            assert mock.call_args.kwargs["follow"] is False
+
+
+def test_cmd_spine_tail_prints_receipts_and_graceful_absence(tmp_path, capsys):
+    """cmd_spine_tail prints one line per receipt; missing DB is graceful, rc 0."""
+    import sqlite3
+
+    from dharma_swarm.operator_core.spine_tail import cmd_spine_tail
+
+    # Absent DB -> graceful message, no exception, rc 0.
+    missing = tmp_path / "nope.db"
+    assert cmd_spine_tail(db_path=missing) == 0
+    assert "spine not live on this host" in capsys.readouterr().out
+
+    # Populated DB -> receipt line rendered.
+    db = tmp_path / "runtime.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "CREATE TABLE delegation_runs ("
+            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
+            "started_at TEXT, trace_id TEXT DEFAULT '', receipt_json TEXT)"
+        )
+        receipt = json.dumps(
+            {
+                "trace_id": "abc123def456ghi",
+                "provider": "anthropic",
+                "model": "opus-4",
+                "status": "ok",
+                "started_at": "2026-07-02T12:00:00+00:00",
+            }
+        )
+        conn.execute(
+            "INSERT INTO delegation_runs VALUES (?, ?, ?, ?, ?, ?)",
+            ("run-1", "task-1", "completed", "2026-07-02T12:00:00+00:00", "abc123def456ghi", receipt),
+        )
+
+    assert cmd_spine_tail(db_path=db, limit=10) == 0
+    out = capsys.readouterr().out
+    assert "anthropic" in out
+    assert "opus-4" in out
+    assert "abc123def456" in out  # trace short (12 chars)
 
 
 def test_build_chat_context_snapshot_includes_latent_gold(monkeypatch, tmp_path):
@@ -2664,8 +2730,8 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
         raising=True,
     )
     monkeypatch.setattr(
-        "dharma_swarm.master_prompt_engineer._days_to_colm",
-        lambda: (14, 19),
+        "dharma_swarm.research_deadlines.deadline_line",
+        lambda *a, **k: "TestVenue — abstract in 14d, paper in 19d",
         raising=True,
     )
     monkeypatch.setattr(
@@ -2700,6 +2766,44 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
 # ---------------------------------------------------------------------------
 
 
+def _status_tree_snapshot(root: Path) -> dict[str, tuple[str, str]]:
+    snapshot: dict[str, tuple[str, str]] = {}
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot[rel] = ("symlink", os.readlink(path))
+        elif path.is_dir():
+            snapshot[rel] = ("dir", "")
+        else:
+            snapshot[rel] = ("file", hashlib.sha256(path.read_bytes()).hexdigest())
+    return snapshot
+
+
+def _run_public_status(home: Path, dharma_root: Path) -> dict:
+    env = os.environ.copy()
+    env.update(
+        {
+            "HOME": str(home),
+            "DHARMA_ROOT": str(dharma_root),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "TZ": "UTC",
+        }
+    )
+    env.pop("PYTEST_CURRENT_TEST", None)
+    env.pop("DGC_TEST_ENABLE_ENV_BOOTSTRAP", None)
+    result = subprocess.run(
+        [sys.executable, "-m", "dharma_swarm.dgc_cli", "status", "--json"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
 def test_cmd_status_json_emits_valid_json(monkeypatch, tmp_path, capsys):
     """status --json should emit parseable JSON with expected keys."""
     import dharma_swarm.dgc_cli as cli
@@ -2712,6 +2816,118 @@ def test_cmd_status_json_emits_valid_json(monkeypatch, tmp_path, capsys):
     data = json.loads(out)
     assert "pulse" in data
     assert "gates_today" in data
+
+
+def test_status_empty_state_is_filesystem_read_only(monkeypatch, tmp_path):
+    from dharma_swarm.terminal_commands import _status_helpers as status
+
+    state_dir = tmp_path / ".dharma"
+    monkeypatch.setattr(status, "DHARMA_STATE", state_dir)
+    monkeypatch.setattr(status, "HOME", tmp_path)
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "test", ""),
+    )
+
+    data = status._build_status_data()
+
+    assert data["memory_entries"] == 0
+    assert not state_dir.exists()
+
+
+def test_public_status_empty_roots_are_byte_for_byte_read_only(tmp_path):
+    home = tmp_path / "home"
+    dharma_root = tmp_path / "dharma-root"
+    home.mkdir()
+    dharma_root.mkdir()
+    before = {
+        "home": _status_tree_snapshot(home),
+        "dharma_root": _status_tree_snapshot(dharma_root),
+    }
+
+    data = _run_public_status(home, dharma_root)
+
+    assert {"pulse", "gates_today"} <= data.keys()
+    assert {
+        "home": _status_tree_snapshot(home),
+        "dharma_root": _status_tree_snapshot(dharma_root),
+    } == before
+
+
+def test_public_status_existing_wal_is_no_write_snapshot(tmp_path):
+    import sqlite3
+
+    home = tmp_path / "home"
+    dharma_root = tmp_path / "dharma-root"
+    db_path = home / ".dharma" / "db" / "memory.db"
+    db_path.parent.mkdir(parents=True)
+    dharma_root.mkdir()
+    writer = sqlite3.connect(db_path)
+    try:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        writer.execute("CREATE TABLE memories (timestamp TEXT NOT NULL)")
+        writer.commit()
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        writer.execute("INSERT INTO memories VALUES ('2026-07-16T00:00:00Z')")
+        writer.commit()  # deliberately remains only in the live WAL
+        assert db_path.with_name("memory.db-wal").exists()
+        before = {
+            "home": _status_tree_snapshot(home),
+            "dharma_root": _status_tree_snapshot(dharma_root),
+        }
+
+        data = _run_public_status(home, dharma_root)
+
+        # immutable=1 reports the main-db snapshot and never creates/touches
+        # SQLite sidecars; live WAL rows become visible after checkpoint.
+        assert data["memory_entries"] == 0
+        assert {
+            "home": _status_tree_snapshot(home),
+            "dharma_root": _status_tree_snapshot(dharma_root),
+        } == before
+    finally:
+        writer.close()
+
+
+def test_public_status_ignores_stale_gate_witness(tmp_path):
+    home = tmp_path / "home"
+    dharma_root = tmp_path / "dharma-root"
+    witness_dir = home / ".dharma" / "witness"
+    witness_dir.mkdir(parents=True)
+    dharma_root.mkdir()
+    (witness_dir / "witness_20000101.jsonl").write_text(
+        '{"stale": true}\n', encoding="utf-8"
+    )
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    (witness_dir / f"witness_{today}.jsonl").write_text(
+        '{"current": 1}\n{"current": 2}\n', encoding="utf-8"
+    )
+    before = _status_tree_snapshot(home)
+
+    data = _run_public_status(home, dharma_root)
+
+    assert data["gates_today"] == 2
+    assert _status_tree_snapshot(home) == before
+
+
+def test_gate_count_uses_injected_local_date_and_timezone(monkeypatch, tmp_path):
+    from dharma_swarm.terminal_commands import _status_helpers as status
+
+    witness_dir = tmp_path / ".dharma" / "witness"
+    witness_dir.mkdir(parents=True)
+    (witness_dir / "witness_20000101.jsonl").write_text('{"stale": true}\n')
+    (witness_dir / "witness_20260714.jsonl").write_text('{"utc": true}\n')
+    (witness_dir / "witness_20260715.jsonl").write_text(
+        '{"jst": 1}\n{"jst": 2}\n'
+    )
+    monkeypatch.setattr(status, "DHARMA_STATE", tmp_path / ".dharma")
+    instant = datetime(2026, 7, 14, 16, tzinfo=timezone.utc)
+
+    assert status._canonical_gate_count(
+        now=instant, local_timezone=timezone(timedelta(hours=9))
+    ) == 2
+    assert status._canonical_gate_count(now=instant, local_timezone=timezone.utc) == 1
 
 
 def test_cmd_health_json_emits_valid_json(capsys):

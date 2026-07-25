@@ -54,6 +54,7 @@ def test_cli_status_runs_against_empty_home(cli_home: Path):
     assert "staged    : 0" in proc.stdout
     assert "trusted   : 0" in proc.stdout
     assert "quarantine: 0" in proc.stdout
+    assert str(cli_home) not in proc.stdout
 
 
 def test_cli_help_shows_all_subcommands(cli_home: Path):
@@ -90,6 +91,7 @@ def test_cli_ingest_then_status(cli_home: Path):
 
     proc2 = _run(["status"], home=cli_home)
     assert "staged    : 1" in proc2.stdout
+    assert str(cli_home) not in proc2.stdout
 
 
 def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
@@ -127,6 +129,12 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
     p3 = _run(["status"], home=cli_home)
     assert "trusted   : 1" in p3.stdout
     assert "staged    : 0" in p3.stdout
+    assert str(cli_home) not in p3.stdout
+
+    verify = _run(["verify", "--show", "1"], home=cli_home)
+    assert verify.returncode == 0, verify.stderr
+    assert str(cli_home) not in verify.stdout
+    assert trusted_paths[0].name not in verify.stdout
 
     # 4. DECAY (no stale yet → 0 stale, no quarantine)
     p4 = _run(["decay"], home=cli_home)

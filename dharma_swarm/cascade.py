@@ -12,7 +12,6 @@ where the system's configuration is a candidate for its own optimization.
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import inspect
 import logging

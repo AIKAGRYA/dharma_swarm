@@ -1,51 +1,274 @@
 #!/usr/bin/env bash
-# Capture the current terminal shell into the tracked golden corpus.
+# Golden-frame capture (F-016): boots one hermetic tmux session per size
+# (80x24, 100x30, 120x40), walks every golden-stable offline surface, and
+# captures plain text frames (tmux capture-pane -p) into
+# <out>/<size>/<surface>.txt.
 #
-# This is intentionally small and hermetic for the active-track closeout:
-# it captures the boot chat surface at 120x40 with an invalid bridge Python,
-# so the frame is not coupled to live daemon, provider, or key state.
+# Surface inventory (offline golden corpus) = 12 static tabs + 2 overlays = 14:
+#   tabs: chat mission repo commands models ontology runtime sessions
+#         approvals control agents evolution           (mockContent.ts)
+#   overlays: modelPicker (^P), paneSwitcher (^K)      (app.tsx)
+# The bridge tabs thinking/tools/timeline DO exist offline (ensureRuntimeTabs
+# appends them at boot) but are deliberately NOT inventoried: their lines
+# project the execution-event log, which accumulates timestamped offline
+# probe errors every SNAPSHOT_REFRESH_INTERVAL_MS — never byte-stable, so
+# never golden material.
+#
+# Determinism law: every frame is captured only when it shows the steady
+# "backend offline" status AND two consecutive captures are byte-identical.
+# Transient status text ("pane switcher ready") is reset to the steady
+# offline line by the 15s reconnect probe, so settled frames are
+# reproducible run-to-run.
+#
+# Arrival detection uses pane-body content markers, not the TabBar active
+# marker: tall panes (repo/runtime/control) overflow short frames and push
+# the TabBar off the top of the visible screen, while pane bodies sit
+# bottom-anchored and stay visible at every size.
+#
+# Output root override: GOLDEN_OUT_DIR=<dir> (default tests/golden) so the
+# F-018 diff checker can capture into a temp dir without dirtying the corpus.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERMINAL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUT_ROOT="${GOLDEN_OUT_DIR:-${TERMINAL_DIR}/tests/golden}"
-SIZE="${GOLDEN_SIZE:-120x40}"
-WIDTH="${SIZE%x*}"
-HEIGHT="${SIZE#*x}"
-OUT_DIR="${OUT_ROOT}/${SIZE}"
-OUT_FILE="${OUT_DIR}/chat.txt"
-SESSION_NAME="${GOLDEN_SESSION_NAME:-dharma_terminal_golden_$$}"
-STATE_DIR="$(mktemp -d)"
 
-cleanup() {
-  tmux kill-session -t "${SESSION_NAME}" >/dev/null 2>&1 || true
-  rm -rf "${STATE_DIR}"
-}
-trap cleanup EXIT
-
-mkdir -p "${OUT_DIR}"
-
-tmux new-session -d -s "${SESSION_NAME}" -x "${WIDTH}" -y "${HEIGHT}" \
-  "cd '${TERMINAL_DIR}' && DHARMA_PYTHON=/nonexistent/dharma-terminal-golden-python DHARMA_TERMINAL_STATE_DIR='${STATE_DIR}' DHARMA_TERMINAL_SUPERVISOR_STATE_DIR='${STATE_DIR}' COLUMNS='${WIDTH}' LINES='${HEIGHT}' bun run start"
-
-deadline=$(( $(date +%s) + 12 ))
-while [ "$(date +%s)" -lt "${deadline}" ]; do
-  if ! tmux has-session -t "${SESSION_NAME}" >/dev/null 2>&1; then
-    echo "golden_capture: terminal exited before capture" >&2
-    exit 1
+SIZES="80x24 100x30 120x40"
+if [[ -n "${GOLDEN_SIZE:-}" ]]; then
+  if [[ ! "${GOLDEN_SIZE}" =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]]; then
+    echo "golden_capture: invalid GOLDEN_SIZE '${GOLDEN_SIZE}' (expected WIDTHxHEIGHT)" >&2
+    exit 2
   fi
-  frame="$(tmux capture-pane -t "${SESSION_NAME}" -p 2>/dev/null || true)"
-  if printf "%s" "${frame}" | grep -q "Operator Prompt" \
-    && printf "%s" "${frame}" | grep -q "backend offline, retrying" \
-    && printf "%s" "${frame}" | grep -q "route" \
-    && printf "%s" "${frame}" | grep -q "keys"; then
-    printf "%s\n" "${frame}" > "${OUT_FILE}"
-    echo "golden_capture: wrote ${OUT_FILE}"
-    exit 0
-  fi
-  sleep 0.3
+  SIZES="${GOLDEN_SIZE}"
+fi
+
+if ! TMUX_BIN="$(command -v tmux)"; then
+  echo "golden_capture: tmux is required" >&2
+  exit 127
+fi
+if ! BUN_BIN="$(command -v bun)"; then
+  echo "golden_capture: bun is required" >&2
+  exit 127
+fi
+if [[ -n "${GOLDEN_SESSION_NAME:-}" && ! "${GOLDEN_SESSION_NAME}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "golden_capture: invalid GOLDEN_SESSION_NAME '${GOLDEN_SESSION_NAME}'" >&2
+  exit 2
+fi
+
+TAB_IDS="chat mission repo commands models ontology runtime sessions approvals control agents evolution"
+OVERLAY_IDS="modelPicker paneSwitcher"
+EXPECTED_PER_SIZE=14
+EXPECTED_TOTAL=0
+for _size in ${SIZES}; do
+  EXPECTED_TOTAL=$((EXPECTED_TOTAL + EXPECTED_PER_SIZE))
 done
 
-echo "golden_capture: shell did not settle at ${SIZE}" >&2
-tmux capture-pane -t "${SESSION_NAME}" -p 2>/dev/null | head -80 >&2 || true
-exit 1
+BOOT_TIMEOUT=${GOLDEN_BOOT_TIMEOUT:-20}
+NAV_TIMEOUT=${GOLDEN_NAV_TIMEOUT:-10}
+# Overlay settles may wait out one full 15s reconnect probe (transient
+# status text -> steady offline line), so their deadline is longer.
+OVERLAY_TIMEOUT=${GOLDEN_OVERLAY_TIMEOUT:-25}
+
+# Unique, bottom-anchored pane-body text per surface (verified against live
+# 80x24 frames; mock content from mockContent.ts and pane components).
+marker_for() {
+  case $1 in
+    chat) printf 'F2 opens the cockpit' ;;  # FACE-1 zen welcome line 2 (mockContent.ts)
+    mission) printf 'One state model. One bridge.' ;;
+    repo) printf 'Workspace snapshot loading' ;;
+    commands) printf 'Command graph loading' ;;
+    models) printf 'Model policy loading' ;;
+    ontology) printf 'Ontology snapshot loading' ;;
+    runtime) printf 'selected runtime card' ;;  # F-163 clamp: 'Frontend runtime: Bun' sits below the 80x24 clip line now
+    sessions) printf 'No selected session.' ;;
+    approvals) printf 'No selected approval.' ;;
+    control) printf 'Control-plane snapshot loading' ;;
+    agents) printf 'No selected route.' ;;
+    evolution) printf 'Cascade and self-improvement surface loading' ;;
+    modelPicker) printf 'No model targets loaded.' ;;
+    paneSwitcher) printf '1. Chat' ;;  # F-163 clamp: deep list rows clip at 80x24; switcher needs selection-windowing (logged)
+    *) return 1 ;;
+  esac
+}
+
+SESS=""
+STATEDIR=""
+SESSION_STARTED=false
+
+cleanup_session() {
+  if [[ "${SESSION_STARTED}" == true && -n "${SESS}" ]]; then
+    "${TMUX_BIN}" kill-session -t "=${SESS}" >/dev/null 2>&1 || true
+    SESSION_STARTED=false
+    SESS=""
+  fi
+  if [[ -n "${STATEDIR}" ]]; then
+    rm -r -- "${STATEDIR}" >/dev/null 2>&1 || true
+    STATEDIR=""
+  fi
+}
+trap cleanup_session EXIT
+
+fail() {
+  echo "golden_capture: FAIL — $1" >&2
+  if [[ "${SESSION_STARTED}" == true && -n "${SESS}" ]]; then
+    echo "golden_capture: last frame head:" >&2
+    "${TMUX_BIN}" capture-pane -t "=${SESS}:0.0" -p 2>/dev/null | head -c 400 >&2 || true
+    echo >&2
+  fi
+  exit 1
+}
+
+frame() {
+  "${TMUX_BIN}" capture-pane -t "=${SESS}:0.0" -p 2>/dev/null || true
+}
+
+# Poll until the frame contains marker $1 (literal) AND the steady
+# "offline" status (zen status token on chat, "backend offline" in cockpit
+# footers — FACE-1) AND two consecutive captures are byte-identical;
+# echoes the settled frame. Deadline seconds in $2.
+wait_settled() {
+  local marker=$1 timeout=$2 prev="" cur="" deadline
+  deadline=$(( $(date +%s) + timeout ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    cur=$(frame)
+    if [[ -n "${cur}" && "${cur}" == *"${marker}"* && "${cur}" == *offline* ]]; then
+      if [ "$cur" = "$prev" ]; then
+        printf '%s\n' "$cur"
+        return 0
+      fi
+      prev=$cur
+    else
+      prev=""
+    fi
+    sleep 0.3
+  done
+  return 1
+}
+
+# Poll until marker $1 no longer renders (overlay closed).
+wait_gone() {
+  local marker=$1 deadline cur
+  deadline=$(( $(date +%s) + NAV_TIMEOUT ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    cur="$(frame)"
+    if [[ "${cur}" != *"${marker}"* ]]; then
+      return 0
+    fi
+    sleep 0.3
+  done
+  return 1
+}
+
+capture_to() {
+  local id=$1 out=$2 timeout=$3 marker settled
+  marker=$(marker_for "$id") || fail "no marker registered for surface $id"
+  settled=$(wait_settled "$marker" "$timeout") || fail "surface $id never settled with marker '$marker' (${timeout}s)"
+  printf '%s\n' "$settled" > "$out"
+  [ -s "$out" ] || fail "captured frame $out is empty"
+}
+
+for size in $SIZES; do
+  width=${size%x*}
+  height=${size#*x}
+  SESS="${GOLDEN_SESSION_NAME:-helm-golden-$$-$RANDOM}"
+  if "${TMUX_BIN}" has-session -t "=${SESS}" >/dev/null 2>&1; then
+    echo "golden_capture: tmux session '${SESS}' already exists" >&2
+    exit 2
+  fi
+  STATEDIR="$(mktemp -d)"
+  printf -v START_COMMAND \
+    'env COLORTERM=truecolor DHARMA_PYTHON=%q DHARMA_TERMINAL_STATE_DIR=%q DHARMA_TERMINAL_SUPERVISOR_STATE_DIR=%q COLUMNS=%q LINES=%q %q run start' \
+    "/nonexistent/dharma-terminal-golden-python" "${STATEDIR}" "${STATEDIR}" "${width}" "${height}" "${BUN_BIN}"
+  "${TMUX_BIN}" new-session -d -s "${SESS}" -x "${width}" -y "${height}" -c "${TERMINAL_DIR}" \
+    "${START_COMMAND}" || fail "could not create tmux session at $size"
+  SESSION_STARTED=true
+
+  actual_size="$("${TMUX_BIN}" display-message -p -t "=${SESS}:0.0" '#{pane_width}x#{pane_height}')"
+  [[ "${actual_size}" == "${size}" ]] || fail "tmux geometry is ${actual_size}, expected ${size}"
+
+  # Do not mutate the output corpus until this process has proved it owns
+  # the exact tmux session and the requested geometry.
+  outdir="${OUT_ROOT}/${size}"
+  mkdir -p "${outdir}"
+  find "${outdir}" -maxdepth 1 -name '*.txt' -delete
+
+  # Boot: wait for the offline degradation to render (boot_smoke.sh pattern)
+  # so every captured frame shares the settled offline status.
+  booted=0
+  deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    "${TMUX_BIN}" has-session -t "=${SESS}" 2>/dev/null || fail "app died during boot at $size"
+    current_frame="$(frame)"
+    if [[ "${current_frame}" == *offline* ]]; then
+      booted=1
+      break
+    fi
+    sleep 0.5
+  done
+  [ "$booted" -eq 1 ] || fail "no 'offline' degradation within ${BOOT_TIMEOUT}s at $size"
+
+  # Capture boot Chat in Zen, then enter Cockpit explicitly before walking
+  # the remaining static panes. Tab does not navigate while Zen owns input.
+  first=1
+  for id in $TAB_IDS; do
+    if [ "$first" -eq 1 ]; then
+      first=0
+    else
+      if [[ "${id}" == mission ]]; then
+        "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" F2
+        wait_settled "loop unknown" "${NAV_TIMEOUT}" >/dev/null \
+          || fail "did not enter cockpit at ${size}"
+        # Keyboard ownership is explicit: Cockpit keeps the composer focused
+        # until Escape hands control to navigation. Without this boundary the
+        # following Tab is correctly consumed by the composer and the walk
+        # never leaves Chat.
+        "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Escape
+      fi
+      "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Tab
+    fi
+    capture_to "$id" "$outdir/$id.txt" "$NAV_TIMEOUT"
+  done
+
+  # Return to chat via ^G (direct tab.activate — Tab-count independent: the
+  # cycle also holds the non-inventoried bridge tabs) so both overlays sit
+  # on the same deterministic background tab.
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" C-g
+  wait_settled "$(marker_for chat)" "$NAV_TIMEOUT" > /dev/null || fail "did not return to chat at $size"
+
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" C-p
+  capture_to "modelPicker" "$outdir/modelPicker.txt" "$OVERLAY_TIMEOUT"
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Escape
+  wait_gone "$(marker_for modelPicker)" || fail "modelPicker did not close on Esc at $size"
+
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" C-k
+  capture_to "paneSwitcher" "$outdir/paneSwitcher.txt" "$OVERLAY_TIMEOUT"
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Escape
+  wait_gone "$(marker_for paneSwitcher)" || fail "paneSwitcher did not close on Esc at $size"
+
+  # Clean shutdown (best effort): Ctrl-C, brief poll, then hard cleanup.
+  "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" C-c
+  deadline=$(( $(date +%s) + 5 ))
+  while "${TMUX_BIN}" has-session -t "=${SESS}" 2>/dev/null; do
+    [ "$(date +%s)" -lt "$deadline" ] || break
+    sleep 0.5
+  done
+  cleanup_session
+
+  # Mechanical inventory check: every inventoried surface present, non-empty,
+  # and nothing extra.
+  count=$(find "$outdir" -maxdepth 1 -name '*.txt' | wc -l | tr -d ' ')
+  [ "$count" -eq "$EXPECTED_PER_SIZE" ] || fail "$outdir holds $count frames, inventory expects $EXPECTED_PER_SIZE"
+  for id in $TAB_IDS $OVERLAY_IDS; do
+    [ -s "$outdir/$id.txt" ] || fail "missing or empty frame $outdir/$id.txt"
+  done
+  echo "golden_capture: $size OK ($count frames)"
+done
+
+total=0
+for size in $SIZES; do
+  n=$(find "$OUT_ROOT/$size" -maxdepth 1 -name '*.txt' | wc -l | tr -d ' ')
+  total=$(( total + n ))
+done
+[ "$total" -eq "$EXPECTED_TOTAL" ] || fail "corpus totals $total frames, inventory expects $EXPECTED_TOTAL"
+echo "golden_capture: OK ($total frames in $OUT_ROOT)"
+exit 0

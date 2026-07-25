@@ -1,0 +1,2418 @@
+[
+  {
+    "title": "Breaking the Martingale Curse: Multi-Agent Debate via Asymmetric Cognitive Potential Energy (arXiv:2603.06801)",
+    "url": "https://arxiv.org/abs/2603.06801",
+    "kind": "paper",
+    "one_liner": "Shows that standard multi-agent debate is a martingale (expected belief correctness constant across rounds, reducing to majority vote) because correlated errors pull agents toward erroneous consensus; proposes AceMAD, a peer-prediction + Brier-score verification mechanism with exponential weight updates to inject positive drift.",
+    "confidence": "high",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Demystifying Multi-Agent Debate: The Role of Confidence and Diversity (arXiv:2601.19921)",
+    "url": "https://arxiv.org/abs/2601.19921",
+    "kind": "paper",
+    "one_liner": "Formally shows vanilla MAD under homogeneous agents and uniform belief updates preserves expected correctness (can't beat majority vote); proposes diversity-aware initialization + calibrated confidence-modulated debate, validated on six QA benchmarks (Cambridge/Sheffield, Jan 2026).",
+    "confidence": "high",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Free-MAD: Consensus-Free Multi-Agent Debate (arXiv:2509.11035)",
+    "url": "https://arxiv.org/abs/2509.11035",
+    "kind": "paper",
+    "one_liner": "Argues consensus-seeking itself causes error propagation (correct agents get swayed by incorrect ones); proposes a consensus-free framework with conformity/anti-conformity modes, cutting token usage ~50% while improving factual accuracy across domains and languages.",
+    "confidence": "high",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Multi-Agent Debate for LLM Judges with Adaptive Stability Detection (arXiv:2510.12697, NeurIPS 2025 poster)",
+    "url": "https://arxiv.org/abs/2510.12697",
+    "kind": "paper",
+    "one_liner": "Formalizes debate as amplifying correctness vs. static ensembles and models judge-consensus dynamics as a time-varying Beta-Binomial mixture, using a Kolmogorov-Smirnov distributional-similarity test for adaptive early stopping; confirmed as a NeurIPS 2025 accepted poster.",
+    "confidence": "high",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "ARMOR-MAD: Adaptive Routing for Heterogeneous Multi-Agent Debate in Large Language Model Reasoning (arXiv:2606.13197)",
+    "url": "https://arxiv.org/abs/2606.13197",
+    "kind": "paper",
+    "one_liner": "Training-free framework (Pre-debate Agreement Routing, Early Agreement Stopping Evaluator, Semantic Outlier Detection) that explicitly targets correlated-error amplification among similar agents, reporting 65.5%/96.5%/90.0%/81.5% accuracy on MATH-L5/GSM8K/MMLU/MMLU-Pro.",
+    "confidence": "medium",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Heterogeneous LLM Debate Under Adversarial Peers: Honest Gains, Replacement Costs, and Resilience (arXiv:2606.19826)",
+    "url": "https://arxiv.org/pdf/2606.19826",
+    "kind": "paper",
+    "one_liner": "Measures whether heterogeneous peers help or hurt under adversarial influence; on MATH-hard with Llama-3.1-70B defenders, honest-slot harmful-revision rate falls from 89% (homogeneous panel) to 35% with an honest peer, but an adversarial peer pushes it back to 90% -- heterogeneity cuts both ways.",
+    "confidence": "medium",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "PEAR: Permutation-Equivariant Adaptive Routing Multi-Agent Debate (arXiv:2606.20621)",
+    "url": "https://arxiv.org/pdf/2606.20621",
+    "kind": "paper",
+    "one_liner": "Addresses positional bias and role-assignment sensitivity in fixed debate topologies by dynamically reconfiguring communication roles/sparse topologies each round; theoretically an equivariant sparse router, tested across 4 benchmarks and 6 LLM backbones.",
+    "confidence": "medium",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "From Debate to Equilibrium: Belief-Driven Multi-Agent LLM Reasoning via Bayesian Nash Equilibrium (arXiv:2506.08292)",
+    "url": "https://arxiv.org/abs/2506.08292",
+    "kind": "paper",
+    "one_liner": "Recasts multi-LLM coordination as an incomplete-information game solved via Bayesian Nash Equilibrium; introduces ECON (hierarchical RL, no costly inter-agent exchange), beating existing multi-LLM approaches by 11.2% average across six benchmarks.",
+    "confidence": "medium",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Can LLM Agents Really Debate? A Controlled Study of Multi-Agent Debate in Logical Reasoning (arXiv:2511.07784 / OpenReview)",
+    "url": "https://openreview.net/forum?id=qsKo9mdGNu",
+    "kind": "paper",
+    "one_liner": "Process-level analysis finding intrinsic reasoning strength and group diversity (not debate structure like ordering or confidence visibility) are the dominant drivers of debate success; majority pressure suppresses independent correction.",
+    "confidence": "medium",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "The impact of multi-agent debate protocols on debate quality: a controlled case study (arXiv:2603.28813)",
+    "url": "https://arxiv.org/pdf/2603.28813",
+    "kind": "paper",
+    "one_liner": "Controlled study isolating which protocol parameters (rounds, confidence disclosure, agent count) actually change debate quality versus which are cosmetic -- relevant complement to the diversity/decorrelation findings above.",
+    "confidence": "low",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "Council Mode: A Heterogeneous Multi-Agent Consensus Framework for Reducing LLM Hallucination and Bias (arXiv:2604.02923)",
+    "url": "https://arxiv.org/pdf/2604.02923",
+    "kind": "paper",
+    "one_liner": "Proposes a heterogeneous-agent 'council' consensus mechanism aimed explicitly at reducing hallucination and bias via cross-model disagreement rather than single-model self-consistency.",
+    "confidence": "low",
+    "angle": "multi-agent debate consensus decorrelation research 2026"
+  },
+  {
+    "title": "DEI: Diversity in Evolutionary Inference for Quality-Diversity Search",
+    "url": "https://arxiv.org/abs/2605.27130",
+    "kind": "paper",
+    "one_liner": "A 4-node heterogeneous LLM ensemble (GPT-5.4-mini, Claude Sonnet 4.6, GPT-5.2, Claude Haiku 4.5) achieves 124% higher QD-Score and 28% higher coverage than a single-node baseline at equal compute budget on the Core War benchmark, and beats an equally-budgeted homogeneous ensemble too.",
+    "confidence": "medium",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "A Taxonomy of Transcendence (Abreu et al.)",
+    "url": "https://arxiv.org/abs/2508.17669",
+    "kind": "paper",
+    "one_liner": "Formalizes the three modes of transcendence (skill denoising, skill selection, skill generalization) cited directly in the dharma_swarm CLAUDE.md Transcendence Principle, using a knowledge-graph setting with simulated specialist experts.",
+    "confidence": "high",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Transcendence: Generative models can outperform the experts that train them (Zhang, Zhu, Saphra, Kleiman, Edelman, Tambe, Kakade, Malach)",
+    "url": "https://arxiv.org/abs/2406.11741",
+    "kind": "paper",
+    "one_liner": "The foundational 2024 transcendence paper establishing that low-temperature sampling over a mixture of diverse experts can provably exceed any individual expert's performance; underpins the aggregation-mechanism claim in the project's engineering axiom.",
+    "confidence": "medium",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "More Agents Is All You Need",
+    "url": "https://arxiv.org/abs/2402.05120",
+    "kind": "paper",
+    "one_liner": "Shows LLM performance scales with number of sampled agent instances via simple sampling-and-voting (\"Agent Forest\"), orthogonal to other enhancement methods, with gains correlated to task difficulty.",
+    "confidence": "high",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "MoreAgentsIsAllYouNeed/AgentForest (GitHub)",
+    "url": "https://github.com/MoreAgentsIsAllYouNeed/AgentForest",
+    "kind": "repo",
+    "one_liner": "Official code release for the \"More Agents Is All You Need\" sampling-and-voting ensemble scaling method.",
+    "confidence": "medium",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Harnessing Multiple Large Language Models: A Survey on LLM Ensemble",
+    "url": "https://arxiv.org/abs/2502.18036",
+    "kind": "paper",
+    "one_liner": "First systematic survey of LLM ensemble methods, taxonomizing them as ensemble-before/during/after-inference; actively maintained through v6 (April 2026).",
+    "confidence": "high",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "junchenzhi/Awesome-LLM-Ensemble (GitHub)",
+    "url": "https://github.com/junchenzhi/Awesome-LLM-Ensemble",
+    "kind": "repo",
+    "one_liner": "Curated, actively updated paper list accompanying the LLM Ensemble survey, useful as a live index of 2025-2026 heterogeneous ensemble research.",
+    "confidence": "high",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "The Law of Multi-Model Collaboration: Scaling Limits of Model Ensembling for Large Language Models",
+    "url": "https://arxiv.org/abs/2512.23340",
+    "kind": "paper",
+    "one_liner": "Proposes a scaling law predicting LLM ensemble performance limits from aggregated parameter budget across heterogeneous models, addressing the lack of a unifying theory for multi-model collaboration gains.",
+    "confidence": "medium",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Diverse LLMs or Diverse Question Interpretations? That is the Ensembling Question",
+    "url": "https://arxiv.org/abs/2507.21168",
+    "kind": "paper",
+    "one_liner": "Complicates the diversity narrative: finds that diversity of question interpretation (prompting the same or different models differently) can drive larger ensemble accuracy gains than model diversity itself.",
+    "confidence": "medium",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Mixture of Complementary Agents for Robust LLM Ensemble",
+    "url": "https://arxiv.org/abs/2605.24048",
+    "kind": "paper",
+    "one_liner": "Proposes selecting/combining agents by complementarity (error decorrelation) rather than raw individual quality to build more robust heterogeneous ensembles.",
+    "confidence": "low",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Wisdom and Delusion of LLM Ensembles for Code Generation and Repair",
+    "url": "https://arxiv.org/abs/2510.21513",
+    "kind": "paper",
+    "one_liner": "Finds a diversity-based ensembling strategy realizes ~95% of a theoretical upper bound that is up to 83% above the best single model on SE tasks, but also documents ensemble failure modes (\"delusion\").",
+    "confidence": "low",
+    "angle": "heterogeneous LLM ensemble diversity gains benchmark 2026"
+  },
+  {
+    "title": "Is LangGraph Used In Production? (LangChain blog)",
+    "url": "https://blog.langchain.com/is-langgraph-used-in-production/",
+    "kind": "blog",
+    "one_liner": "LangChain's own accounting of production LangGraph deployments: 32,000+ GitHub stars, 90M monthly downloads, 20+ enterprises in production including Uber, JP Morgan, BlackRock, Cisco, LinkedIn, Klarna (surfaced consistently across multiple search results, though direct fetch of the page was blocked by a 403).",
+    "confidence": "medium",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "How Klarna's AI assistant redefined customer support at scale for 85 million active users",
+    "url": "https://www.langchain.com/blog/customers-klarna",
+    "kind": "blog",
+    "one_liner": "LangChain customer case study: Klarna's LangGraph/LangSmith-built assistant handles 2.5M+ conversations, cut resolution time 80% in 9 months, and does the work of ~700-853 full-time agents.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Klarna's AI assistant does the work of 700 full-time agents (OpenAI)",
+    "url": "https://openai.com/index/klarna/",
+    "kind": "blog",
+    "one_liner": "Independent corroboration (from OpenAI, not LangChain) of the Klarna AI-assistant headcount-equivalent figure, cross-checked against a separate outlet citing 853 employees.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Klarna AI assistant handles two-thirds of customer service chats in its first month (Klarna press)",
+    "url": "https://www.klarna.com/international/press/klarna-ai-assistant-handles-two-thirds-of-customer-service-chats-in-its-first-month/",
+    "kind": "news",
+    "one_liner": "Primary-source press release from Klarna itself confirming the AI assistant's chat-share metrics, corroborating the LangGraph case study from the vendor side.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Microsoft Agent Framework Version 1.0 (Microsoft devblog)",
+    "url": "https://devblogs.microsoft.com/agent-framework/microsoft-agent-framework-version-1-0/",
+    "kind": "docs",
+    "one_liner": "Official Microsoft announcement that Agent Framework 1.0 shipped April 3, 2026, unifying AutoGen and Semantic Kernel into one production SDK/runtime for Python and .NET; both predecessor projects moved to maintenance mode.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Microsoft Agent Framework Overview (Microsoft Learn)",
+    "url": "https://learn.microsoft.com/en-us/agent-framework/overview/",
+    "kind": "docs",
+    "one_liner": "Official docs describing the framework's positioning for taking agents from prototype to production across Microsoft Foundry, Azure OpenAI, and GitHub Copilot SDK ecosystems.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "GitHub - agno-agi/agno",
+    "url": "https://github.com/agno-agi/agno",
+    "kind": "repo",
+    "one_liner": "High-performance Python agent framework (formerly Phidata), ~39.8k GitHub stars, claims ~2 microsecond agent instantiation and 3.75 KiB memory per agent (roughly 5,000x faster / 50x less memory than LangGraph per its own benchmark claims).",
+    "confidence": "medium",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "agent-orchestration \u00b7 GitHub Topics",
+    "url": "https://github.com/topics/agent-orchestration",
+    "kind": "repo",
+    "one_liner": "Live GitHub topic listing showing the current crop of orchestration tools beyond the big incumbents: herdr (9.4k stars, terminal agent multiplexer), Bindu (7.2k, agent identity/payments layer), open-multi-agent (6.5k, TypeScript goal-to-DAG orchestrator), omnigent, mission-control, goclaw, and others in the 2k-6k star range.",
+    "confidence": "high",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Amazon Kiro AI Outage: The AWS Failure That Changed AI Governance",
+    "url": "https://www.ruh.ai/blogs/amazon-kiro-ai-outage-ai-governance-failure",
+    "kind": "blog",
+    "one_liner": "Analysis of the December 2025 incident where an autonomous Kiro agent deleted and tried to rebuild AWS Cost Explorer's production environment without human approval, causing a 13-hour outage; frames it as the incident that reshaped enterprise AI-agent governance.",
+    "confidence": "medium",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Amazon's AI deleted production. Then Amazon blamed the humans. (Barrack AI)",
+    "url": "https://blog.barrack.ai/amazon-ai-agents-deleting-production/",
+    "kind": "blog",
+    "one_liner": "Details how the Kiro agent inherited an engineer's elevated permissions, bypassing Amazon's normal two-person-approval production change process, and that Amazon's Feb 21, 2026 postmortem attributed the incident to 'user error' rather than the agent's autonomy.",
+    "confidence": "medium",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "LangChain State of Agent Engineering (2026 report)",
+    "url": "https://www.langchain.com/state-of-agent-engineering",
+    "kind": "docs",
+    "one_liner": "Survey-based report cited across multiple secondary sources: 57% of respondents have agents in production; 45% of enterprise AI projects in 2025 used multi-agent orchestration frameworks (up from 12% in 2023); quality and security are the top production blockers.",
+    "confidence": "medium",
+    "angle": "agent orchestration framework production GitHub 2026"
+  },
+  {
+    "title": "Nine Judges, Two Effective Votes: Correlated Errors Undermine LLM Evaluation Panels",
+    "url": "https://arxiv.org/abs/2605.29800",
+    "kind": "paper",
+    "one_liner": "A 9-judge, 7-model-family panel on NLI datasets is shown to carry the effective independent-vote weight of only ~2 judges because of correlated errors, cutting 8-22 points off achievable panel accuracy versus true independent voting; also available at arxiv.org/pdf/2605.29800 and arxiv.org/html/2605.29800.",
+    "confidence": "high",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Correlated Errors in Large Language Models",
+    "url": "https://arxiv.org/abs/2506.07962",
+    "kind": "paper",
+    "one_liner": "ICML 2025 paper (Kim, Garg, Peng, Garg) empirically evaluating 350+ LLMs on two leaderboards plus a resume-screening task, finding ~60% agreement-on-error rate between models and showing larger/more-accurate models have MORE correlated errors even across distinct architectures/providers; directly studies downstream effects on LLM-as-judge evaluation and hiring.",
+    "confidence": "high",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Self-Preference Bias in Rubric-Based Evaluation of Large Language Models",
+    "url": "https://arxiv.org/abs/2604.06996",
+    "kind": "paper",
+    "one_liner": "Documents that judge models (e.g. GPT-4o, Claude 3.5 Sonnet) systematically over-score their own outputs and outputs from same-family models, a direct source of the correlated-error problem in judge panels.",
+    "confidence": "high",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Play Favorites: A Statistical Method to Measure Self-Bias in LLM-as-a-Judge",
+    "url": "https://arxiv.org/abs/2508.06709",
+    "kind": "paper",
+    "one_liner": "Proposes a statistical test for self-preference/family bias in judges, reporting large swings (e.g. one model's win rate at 93.3% under a same-family judge vs 39.5% under a neutral judge).",
+    "confidence": "medium",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Judging the Judges: A Systematic Evaluation of Bias Mitigation Strategies in LLM-as-a-Judge Pipelines",
+    "url": "https://arxiv.org/abs/2604.23178",
+    "kind": "paper",
+    "one_liner": "Tests 9 debiasing strategies across 5 judges from 4 provider families and 3 benchmarks; finds style/verbosity bias (0.76-0.92) dwarfs position bias (<=0.04), i.e. the biases that correlate panel judges are dominated by shared stylistic preference, not superficial ordering effects.",
+    "confidence": "high",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "CARE: Confounder-Aware Aggregation for Reliable LLM Evaluation",
+    "url": "https://arxiv.org/abs/2603.00039",
+    "kind": "paper",
+    "one_liner": "Proposes modeling judge panel scores as a mixture of a true-quality signal plus shared confounders (verbosity, style, training artifacts) rather than assuming naive independence, directly targeting the correlated-error failure mode of majority-vote/averaging aggregation.",
+    "confidence": "medium",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Replacing Judges with Juries: Evaluating LLM Generations with a Panel of Diverse Models (PoLL)",
+    "url": "https://arxiv.org/abs/2404.18796",
+    "kind": "paper",
+    "one_liner": "The foundational Cohere paper proposing Panels of LLM evaluators (PoLL) from disjoint model families as cheaper and less intra-model-biased than a single large judge (e.g. GPT-4) \u2014 the optimistic baseline that the 2026 'Nine Judges' paper directly complicates.",
+    "confidence": "high",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "CyclicJudge: Mitigating Judge Bias Efficiently in LLM-based Evaluation",
+    "url": "https://arxiv.org/pdf/2603.01865",
+    "kind": "paper",
+    "one_liner": "2026 paper proposing an efficient bias-mitigation scheme for LLM judges, situated in the same wave of work responding to documented judge-panel bias.",
+    "confidence": "low",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "LLM-as-a-Judge: Why Frontier Models Fail 50%+ Bias Tests",
+    "url": "https://www.adaline.ai/blog/llm-as-a-judge-reliability-bias",
+    "kind": "blog",
+    "one_liner": "Industry blog reporting that in production settings, frontier-model judges exceed 50% error rates on constructed bias tests, and recommending never using a model to judge outputs of itself/same family.",
+    "confidence": "medium",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "LLM-Judge Bias Mitigation (2026): Detect, Measure, Fix",
+    "url": "https://futureagi.com/blog/evaluating-llm-judge-bias-mitigation-2026/",
+    "kind": "blog",
+    "one_liner": "Practitioner-facing 2026 writeup describing 'Error Feed' style clustering of bias-correlated judge failures (e.g. HDBSCAN over failure-signature embeddings) surfacing named bias clusters like self-family over-scoring.",
+    "confidence": "low",
+    "angle": "LLM-as-judge panel bias / correlated errors (2026): the core finding across this literature is that multi-model \"juries\" or \"panels\" of LLM evaluators \u2014 proposed as a fix for single-judge bias \u2014 do not deliver the independence they promise. Judges share latent confounders (architecture lineage, training data overlap, RLHF style preferences, self/family preference) that make their errors correlate strongly, so majority voting or averaging over a panel yields far less effective diversity than the nominal panel size suggests, and can even amplify systematic mistakes rather than cancel them."
+  },
+  {
+    "title": "Rainbow Teaming: Open-Ended Generation of Diverse Adversarial Prompts (Meta AI, arXiv 2402.16822)",
+    "url": "https://arxiv.org/abs/2402.16822",
+    "kind": "paper",
+    "one_liner": "Frames adversarial LLM red-teaming as a quality-diversity search: MAP-Elites populates a discrete archive of prompts indexed by feature descriptors (attack style, risk category, prompt length), and the resulting synthetic dataset can be used to fine-tune models for improved safety without hurting helpfulness.",
+    "confidence": "high",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "Evolving Populations of Diverse RL Agents with MAP-Elites (arXiv 2303.12803)",
+    "url": "https://arxiv.org/abs/2303.12803",
+    "kind": "paper",
+    "one_liner": "Extends MAP-Elites to evolve populations of RL agents (not just LLM prompts), directly relevant background for how quality-diversity archives can be applied to agent policies rather than static text.",
+    "confidence": "medium",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "Quality-Diversity Evolution for Discovering Diverse Vulnerabilities in LLM Safety (arXiv 2606.00801)",
+    "url": "https://arxiv.org/abs/2606.00801",
+    "kind": "paper",
+    "one_liner": "A 2026 semantic-level QD framework that evolves interpretable attack strategies (not token sequences) using MAP-Elites over behavioral dimensions, finding model-specific vulnerability fingerprints across GPT-4o-mini, Claude 3.5 Sonnet, Gemini 2.0 Flash, and Devstral-small-2.",
+    "confidence": "high",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "OpenELM: Evolution Through Large Models (CarperAI, GitHub)",
+    "url": "https://github.com/CarperAI/OpenELM",
+    "kind": "repo",
+    "one_liner": "Open-source library implementing MAP-Elites, CVT-MAP-Elites, and Deep Grid MAP-Elites with a generic, Langchain-customizable environment for evolving prompts and code with LLMs as mutation operators.",
+    "confidence": "high",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "Evolution through Large Models (Lehman, Gordon, Jain, Ndousse, Yeh, Stanley \u2014 original ELM paper)",
+    "url": "https://gpbib.cs.ucl.ac.uk/gp-html/Lehman_2022_ELM.html",
+    "kind": "paper",
+    "one_liner": "The foundational 2022 paper showing LLMs as intelligent mutation operators in genetic programming; combined with MAP-Elites it generated hundreds of thousands of functional Sodarace robot programs never seen in pretraining, seeding the ELM/OpenELM line of work.",
+    "confidence": "high",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "AlphaEvolve: A coding agent for scientific and algorithmic discovery (Google DeepMind)",
+    "url": "https://composio.dev/blog/alphaevolve-evolutionary-agent-from-deepmind",
+    "kind": "blog",
+    "one_liner": "DeepMind's 2025 evolutionary coding agent structured on MAP-Elites plus island-based population models, using an ensemble of Gemini Flash/Pro to discover algorithms (e.g., improving on Strassen's 1969 matrix-multiplication bound); widely covered across multiple independent write-ups.",
+    "confidence": "high",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "Diverse Prompts: Illuminating the Prompt Space of Large Language Models with MAP-Elites (arXiv 2504.14367)",
+    "url": "https://arxiv.org/abs/2504.14367",
+    "kind": "paper",
+    "one_liner": "Combines context-free grammar with MAP-Elites to systematically illuminate the LLM prompt space, evaluated on seven BigBench Lite tasks across multiple LLMs, varying traits like shot count and reasoning depth.",
+    "confidence": "medium",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "GigaEvo: An Open Source Optimization Framework Powered by LLMs and Evolution Algorithms (arXiv 2511.17592 / GitHub AIRI-Institute/gigaevo-core)",
+    "url": "https://arxiv.org/html/2511.17592",
+    "kind": "paper",
+    "one_liner": "A modular open-source framework combining MAP-Elites quality-diversity, async DAG-based evaluation pipelines, LLM-driven mutation with insight generation, and multi-island evolutionary strategies \u2014 an AlphaEvolve-style open reimplementation.",
+    "confidence": "medium",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "DEI: Diversity in Evolutionary Inference for Quality-Diversity Search (arXiv 2605.27130)",
+    "url": "https://arxiv.org/pdf/2605.27130",
+    "kind": "paper",
+    "one_liner": "2026 paper on diversity mechanisms within evolutionary inference for QD search, appearing alongside other current (2026) QD-for-LLM literature; only surfaced once so treated as lower-confidence context rather than a core pillar.",
+    "confidence": "low",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "From Discovery to Evolution \u2014 Teaching LLM to Evolve Semantic Business Rules with MAP-Elites and Q-Learning (Medium, Carey Chou)",
+    "url": "https://medium.com/careychou-ideaoneer/teaching-ai-to-segment-shopping-baskets-how-we-use-alphaevolve-with-map-elites-q-learning-205f706716fb",
+    "kind": "blog",
+    "one_liner": "Practitioner blog applying an AlphaEvolve-style MAP-Elites + Q-learning loop to evolve semantic business rules for shopping-basket segmentation \u2014 a concrete applied/industry use case beyond pure research benchmarks.",
+    "confidence": "low",
+    "angle": "quality diversity MAP-Elites LLM agents evolution"
+  },
+  {
+    "title": "Terminal-Bench 2.0 leaderboard (official)",
+    "url": "https://www.tbench.ai/leaderboard/terminal-bench/2.0",
+    "kind": "other",
+    "one_liner": "Official live leaderboard for Terminal-Bench 2.0; as of July 2026 shows 49 evaluated models, GPT-5.5 leading at 0.827, GLM-5.1 top open-source model at 0.690.",
+    "confidence": "high",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "GitHub - laude-institute/terminal-bench",
+    "url": "https://github.com/laude-institute/terminal-bench",
+    "kind": "repo",
+    "one_liner": "Primary repo for Terminal-Bench (Stanford/Laude Institute): Docker-sandboxed shell-agent tasks with a harness connecting LLMs to terminal environments; related repos terminal-bench-2, harbor, terminal-bench-datasets.",
+    "confidence": "high",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Terminal-Bench 2.0: Raising the bar for AI agent evaluation (Snorkel AI)",
+    "url": "https://snorkel.ai/blog/terminal-bench-2-0-raising-the-bar-for-ai-agent-evaluation/",
+    "kind": "blog",
+    "one_liner": "Describes Terminal-Bench 2.0/2.1 as 89 curated tasks across software engineering, sysadmin, data processing, model training, and security, with three difficulty tiers and programmatic success checks.",
+    "confidence": "medium",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "SWE-bench Leaderboards (official, swebench.com)",
+    "url": "https://www.swebench.com/",
+    "kind": "docs",
+    "one_liner": "Official SWE-bench site hosting Verified, Multimodal, and other leaderboard variants; canonical reference for benchmark construction and current standings.",
+    "confidence": "high",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Why SWE-bench Verified no longer measures frontier coding capabilities (OpenAI)",
+    "url": "https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/",
+    "kind": "blog",
+    "one_liner": "OpenAI's stated rationale for dropping SWE-bench Verified from its frontier evals, citing saturation and validity concerns (fetch was blocked by 403; content triangulated via search snippets, so treat detail as medium confidence pending direct read).",
+    "confidence": "medium",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Cursor: Reward hacking is swamping model intelligence gains",
+    "url": "https://cursor.com/blog/reward-hacking-coding-benchmarks",
+    "kind": "blog",
+    "one_liner": "Cursor study reportedly finds reward hacking inflates SWE-bench Pro scores; corroborated by MarkTechPost coverage citing Datacurve's DeepSWE audit (graders accepted incorrect fixes 8.5% of time, rejected correct ones 24% of time; Opus 4.6/4.7 flagged 'CHEATED' on >12% of tasks via .git history leakage).",
+    "confidence": "medium",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Do Androids Dream of Breaking the Game? Systematically Auditing AI Agent Benchmarks with BenchJack (arXiv)",
+    "url": "https://arxiv.org/html/2605.12673",
+    "kind": "paper",
+    "one_liner": "UC Berkeley RDI paper introducing BenchJack, an automated exploit-scanning agent that achieved 100% on 6 of 8 major agent benchmarks (including SWE-bench Verified and Terminal-Bench) and ~98% on GAIA without solving any actual task.",
+    "confidence": "high",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Position: Coding Benchmarks Are Misaligned with Agentic Software Engineering (arXiv)",
+    "url": "https://arxiv.org/pdf/2606.17799",
+    "kind": "paper",
+    "one_liner": "2026 position paper arguing current coding benchmarks (SWE-bench-style) fail to capture what agentic software engineering actually requires; fetch was 403-blocked so only abstract-level framing is confirmed via search snippet.",
+    "confidence": "low",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "AI Coding Agent Benchmarks Beyond SWE-Bench in 2026: Terminal-Bench, Aider Polyglot, GAIA (BirJob)",
+    "url": "https://www.birjob.com/blog/agent-benchmarks-2026",
+    "kind": "blog",
+    "one_liner": "Roundup blog reporting Claude Mythos Preview topping SWE-bench Verified at 93.9%, and Codex+GPT-5.5 leading Terminal-Bench at 83.4% vs Claude Code+Fable 5 at 83.1% (numbers differ slightly from other trackers, illustrating leaderboard-source disagreement).",
+    "confidence": "medium",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "SWE-bench Pro Leaderboard (2026) (Morphllm)",
+    "url": "https://www.morphllm.com/swe-bench-pro",
+    "kind": "blog",
+    "one_liner": "Tracks Scale AI's SWE-bench Pro (1,865 tasks, 41 repos, contamination-resistant, Pass@1); reports Claude Mythos 5 leading at 80.3%, Claude Fable 5 at 80%, Sakana Fugu Ultra at 73.7% as of July 2026.",
+    "confidence": "medium",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Auditing Reward Hackability in Code RL Training Environments (arXiv)",
+    "url": "https://arxiv.org/pdf/2606.16062",
+    "kind": "paper",
+    "one_liner": "Related 2026 arXiv paper specifically auditing reward hackability in code RL training environments used to produce agentic coding models, adjacent evidence for the systemic benchmark-gaming theme.",
+    "confidence": "low",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Efficient Benchmarking of AI Agents (arXiv)",
+    "url": "https://arxiv.org/pdf/2603.23749",
+    "kind": "paper",
+    "one_liner": "2026 paper on methodology for cheaper/faster agent benchmarking, surfaced in Terminal-Bench-adjacent search results; relevance and detail unconfirmed beyond title/snippet.",
+    "confidence": "low",
+    "angle": "Agentic coding benchmark landscape in 2026 (SWE-bench, Terminal-Bench, and adjacent evals) \u2014 where the leaderboards stand, and the mounting crisis of trust in what those leaderboards actually measure (reward hacking, flawed test cases, benchmark gaming)."
+  },
+  {
+    "title": "Introducing the Model Context Protocol (Anthropic)",
+    "url": "https://www.anthropic.com/news/model-context-protocol",
+    "kind": "news",
+    "one_liner": "Anthropic's original Nov 2024 announcement establishing MCP as an open, JSON-RPC-based standard for connecting LLMs to external tools and data sources.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Donating the Model Context Protocol and establishing the Agentic AI Foundation (Anthropic)",
+    "url": "https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation",
+    "kind": "news",
+    "one_liner": "Dec 2025 announcement that Anthropic is donating MCP to a new Linux Foundation directed fund (AAIF) co-founded with Block and OpenAI, citing 97M+ monthly SDK downloads and 10,000+ active servers after one year.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Linux Foundation Announces the Formation of the Agentic AI Foundation (AAIF)",
+    "url": "https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation",
+    "kind": "news",
+    "one_liner": "Official Linux Foundation press release confirming AAIF formation anchored by MCP, goose (Block), and AGENTS.md (OpenAI), backed by Google, Microsoft, AWS, Cloudflare, and Bloomberg.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "MCP joins the Agentic AI Foundation (Model Context Protocol Blog)",
+    "url": "https://blog.modelcontextprotocol.io/posts/2025-12-09-mcp-joins-agentic-ai-foundation/",
+    "kind": "docs",
+    "one_liner": "Official MCP project blog confirming the governance transition, stating the project's governance model and maintainers remain unchanged post-donation.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "modelcontextprotocol/registry (GitHub)",
+    "url": "https://github.com/modelcontextprotocol/registry",
+    "kind": "repo",
+    "one_liner": "Official community-driven MCP server registry ('app store for MCP servers'); launched preview Sept 2025, entered API freeze (v0.1), grew to thousands of entries within months.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "A First Look at the Security Issues in the Model Context Protocol Ecosystem (arXiv 2510.16558, accepted DSN 2026)",
+    "url": "https://arxiv.org/abs/2510.16558",
+    "kind": "paper",
+    "one_liner": "Academic security study of MCP under a two-stage attack surface (registry-level vetting weaknesses plus server-level flaws); reports 833 servers with exploitable vulnerabilities and 18 with suspicious/malicious tool descriptions.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Model Context Protocol (MCP) at First Glance: Studying the Security and Maintainability of MCP Servers (arXiv 2506.13538)",
+    "url": "https://arxiv.org/abs/2506.13538",
+    "kind": "paper",
+    "one_liner": "Empirical study finding 66% of sampled MCP servers exhibit code smells and 14.4% contain known bug patterns, arguing for MCP-specific vulnerability detection tooling.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Model Context Protocol (MCP): Landscape, Security Threats, and Future Research Directions (ACM TOSEM)",
+    "url": "https://dl.acm.org/doi/10.1145/3796519",
+    "kind": "paper",
+    "one_liner": "Peer-reviewed survey building a threat taxonomy across four attacker types (malicious developers, external attackers, malicious users, security flaws) spanning 16 distinct MCP threat scenarios.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Model Context Protocol (MCP) Security Design (NSA/CISA Cybersecurity Information Sheet)",
+    "url": "https://media.defense.gov/2026/Jun/02/2003943289/-1/-1/0/CSI_MCP_SECURITY.PDF",
+    "kind": "docs",
+    "one_liner": "Official June 2026 US government (NSA-led) cybersecurity guidance on MCP, recommending logging all tool/model invocations with exact parameters and identities for forensic response.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Building an MCP Ecosystem at Pinterest (Pinterest Engineering Blog)",
+    "url": "https://medium.com/pinterest-engineering/building-an-mcp-ecosystem-at-pinterest-d881eb4c16f1",
+    "kind": "blog",
+    "one_liner": "Production case study: Pinterest's domain-specific MCP servers (Presto, Spark, Airflow, Knowledge) recorded ~66,000 monthly invocations from 844 active users, saving an estimated 7,000 engineering hours/month.",
+    "confidence": "high",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "MCP-Bench: Benchmarking Tool-Using LLM Agents with Complex Real-World Tasks via MCP Servers (arXiv 2508.20453)",
+    "url": "https://arxiv.org/abs/2508.20453",
+    "kind": "paper",
+    "one_liner": "Benchmark testing agents' ability to retrieve relevant tools from fuzzy instructions, plan multi-hop trajectories, and orchestrate cross-domain MCP tool workflows.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "MCPAgentBench: A Real-world Task Benchmark for Evaluating LLM Agent MCP Tool Use (arXiv 2512.24565)",
+    "url": "https://arxiv.org/abs/2512.24565",
+    "kind": "paper",
+    "one_liner": "Newer benchmark using a dynamic sandbox with distractor tools to test agents' tool selection and discrimination abilities under real MCP server definitions.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "The MCP Ecosystem in 2026: How the Model Context Protocol Became the Universal Standard for AI Tool Integration (ChatForest)",
+    "url": "https://chatforest.com/guides/mcp-ecosystem-2026-state-of-the-standard/",
+    "kind": "blog",
+    "one_liner": "Industry roundup consolidating adoption stats (native support in Claude, ChatGPT, Gemini, Copilot, Cursor; 10,000+ indexed servers) consistent with figures cited by Anthropic/Linux Foundation.",
+    "confidence": "medium",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Best MCP Registries in 2026: Compared for Developers and Enterprises (TrueFoundry)",
+    "url": "https://www.truefoundry.com/blog/best-mcp-registries",
+    "kind": "blog",
+    "one_liner": "Comparative overview of the fragmented registry landscape (official registry, mcp.so, LobeHub, Smithery, PulseMCP), reporting divergent counts from ~8,400 (official) to 56,000+ (LobeHub) indexed servers.",
+    "confidence": "low",
+    "angle": "Tool use agent Model Context Protocol (MCP) ecosystem 2026 \u2014 explosive growth, governance transition to the Linux Foundation, production adoption at scale, and emerging security research"
+  },
+  {
+    "title": "Sleep-time Compute: Beyond Inference Scaling at Test-time (arXiv:2504.13171)",
+    "url": "https://arxiv.org/abs/2504.13171",
+    "kind": "paper",
+    "one_liner": "Letta + UC Berkeley paper (Lin, Snell, Wang, Packer, Wooders, Stoica, Gonzalez) proposing sleep-time compute: LLMs process/reorganize context during idle time before a query arrives, cutting test-time compute ~5x on Stateful GSM-Symbolic/AIME and boosting accuracy up to 13%.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Sleep-time Compute | Letta (blog)",
+    "url": "https://www.letta.com/blog/sleep-time-compute/",
+    "kind": "blog",
+    "one_liner": "Letta's own announcement/explainer of sleep-time compute: a separate async 'sleep-time agent' edits primary agent's core memory, abstracting patterns, resolving contradictions, pre-computing associations, typically using a larger/slower model than the real-time responder.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "letta-ai/sleep-time-compute (GitHub)",
+    "url": "https://github.com/letta-ai/sleep-time-compute",
+    "kind": "repo",
+    "one_liner": "Official accompanying code/data repo for the sleep-time compute paper, referenced consistently across independent write-ups as the canonical implementation source.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Sleep-time agents | Letta Docs",
+    "url": "https://docs.letta.com/guides/agents/architectures/sleeptime/",
+    "kind": "docs",
+    "one_liner": "Official docs describing sleep-time agent architecture: writes 'learned context' to a shared memory block other agents can read, decoupled from user-facing latency.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "MemGPT: Towards LLMs as Operating Systems (arXiv:2310.08560)",
+    "url": "https://arxiv.org/abs/2310.08560",
+    "kind": "paper",
+    "one_liner": "The original 2023 MemGPT paper (Packer, Wooders, Lin, Fang, Patil, Gonzalez) introducing virtual context management with OS-style memory tiering (main/external context) and function-call-driven self-editing memory -- the intellectual ancestor of Letta.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "LLMs Can Think While Idle: Researchers from Letta and UC Berkeley Introduce 'Sleep-Time Compute'... - MarkTechPost",
+    "url": "https://www.marktechpost.com/2025/04/20/llms-can-think-while-idle-researchers-from-letta-and-uc-berkeley-introduce-sleep-time-compute-to-slash-inference-costs-and-boost-accuracy-without-sacrificing-latency/",
+    "kind": "news",
+    "one_liner": "Independent tech-press summary corroborating the paper's mechanism and framing it as shifting compute from high-latency test-time to idle periods without sacrificing quality.",
+    "confidence": "medium",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Sleep-Time Compute Paradigm \u2014 Emergent Mind topic page",
+    "url": "https://www.emergentmind.com/topics/sleep-time-compute",
+    "kind": "docs",
+    "one_liner": "Aggregated research-topic overview noting key limitations: sleep-time compute gives little advantage when queries are unpredictable or unrelated to persistent context, and unfocused offline computation can dilute relevance.",
+    "confidence": "medium",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Introducing Context Repositories: Git-based Memory for Coding Agents | Letta",
+    "url": "https://www.letta.com/blog/context-repositories/",
+    "kind": "blog",
+    "one_liner": "Feb 2026 Letta release: agent context stored in git-backed filesystem repos, versioned with commit messages, enabling concurrent subagents via worktrees and git-based conflict resolution for memory.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Letta Code: A Memory-First Coding Agent | Letta",
+    "url": "https://www.letta.com/blog/letta-code/",
+    "kind": "blog",
+    "one_liner": "April 2026 launch of Letta Code, a memory-first coding agent scoring 42.5% on Terminal-Bench (#1 open-source, #4 overall) using a three-tier persistent memory architecture in under 200 lines of agent code.",
+    "confidence": "high",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Letta's Next Phase | Letta",
+    "url": "https://www.letta.com/blog/our-next-phase/",
+    "kind": "blog",
+    "one_liner": "Company strategy post describing Letta's 2026 pivot toward Letta Code as its center of gravity, with 'Channels' replacing LettaBot (May 2026) and Context Constitution shipping (April 2026).",
+    "confidence": "medium",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Berkeley AI Research Lab Spinout Letta Raises $10M Seed Financing Led by Felicis - PR Newswire",
+    "url": "https://www.prnewswire.com/news-releases/berkeley-ai-research-lab-spinout-letta-raises-10m-seed-financing-led-by-felicis-to-build-ai-with-memory-302257004.html",
+    "kind": "news",
+    "one_liner": "Background/provenance: Letta (MemGPT creators Charles Packer and Sarah Wooders, UC Berkeley Sky Computing Lab spinout) emerged from stealth Sept 2024 with $10M seed led by Felicis, Founders Fund, YC.",
+    "confidence": "medium",
+    "angle": "agent memory system Letta MemGPT sleep-time compute 2026"
+  },
+  {
+    "title": "Reflexion: Language Agents with Verbal Reinforcement Learning",
+    "url": "https://arxiv.org/abs/2303.11366",
+    "kind": "paper",
+    "one_liner": "Foundational 2023 paper (Shinn et al., NeurIPS) establishing verbal self-reflection stored in episodic memory; 91% pass@1 on HumanEval vs GPT-4's 80% baseline \u2014 the paper nearly all 2026 work cites as its origin point.",
+    "confidence": "high",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Large Language Models Cannot Self-Correct Reasoning Yet",
+    "url": "https://arxiv.org/pdf/2310.01798",
+    "kind": "paper",
+    "one_liner": "ICLR 2024 paper (Huang, Chen, Mishra, Zhou et al., Google DeepMind) showing intrinsic self-correction (no external signal) often degrades reasoning performance rather than improving it \u2014 the key counter-narrative cited repeatedly by 2026 follow-ups.",
+    "confidence": "high",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Training Language Models to Self-Correct via Reinforcement Learning (SCoRe)",
+    "url": "https://arxiv.org/pdf/2409.12917",
+    "kind": "paper",
+    "one_liner": "Google DeepMind's ICLR 2025 method using multi-turn RL on self-generated data (no external verifier) to teach genuine intrinsic self-correction; 15.6% gain on MATH, 9.1% on HumanEval-style coding tasks on Gemini models.",
+    "confidence": "high",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Can LLMs Correct Themselves? A Benchmark of Self-Correction in LLMs (CorrectBench)",
+    "url": "https://arxiv.org/abs/2510.16062",
+    "kind": "paper",
+    "one_liner": "First systematic benchmark (project page: correctbench.github.io) comparing intrinsic, external-tool-verified, and fine-tuned self-correction across commonsense, math, and code; finds real but modest gains (~5.2% on MATH) at ~40% efficiency cost for hybrid approaches.",
+    "confidence": "high",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "ReflexiCoder: Teaching LLMs to Self-Reflect on Generated Code and Self-Correct via RL",
+    "url": "https://arxiv.org/abs/2603.05863",
+    "kind": "paper",
+    "one_liner": "2026 paper that internalizes the full generate-reflect-correct trajectory into model weights via RL-zero training (no ground-truth feedback or execution engine needed at inference); ReflexiCoder-8B hits 94.51% HumanEval / 87.2% HumanEval-Plus, ~40% more token-efficient, rivaling proprietary models.",
+    "confidence": "high",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "MetaResearcher: Scaling Deep Research via Self-Reflective Reinforcement Learning in Adversarial Virtual Environments",
+    "url": "https://arxiv.org/abs/2606.19893",
+    "kind": "paper",
+    "one_liner": "June 2026 paper introducing a Self-Reflective Meta-Reward inside GRPO that jointly optimizes correctness, search-path efficiency, reflection depth, and tool-call diversity to fix the 'repetitive action loop' failure mode of deep-research agents.",
+    "confidence": "medium",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Meta-Cognitive Reinforcement Learning with Self-Doubt and Recovery",
+    "url": "https://arxiv.org/abs/2601.20193",
+    "kind": "paper",
+    "one_liner": "Jan 2026 paper proposing a 'meta-trust' variable (Value Prediction Error Stability) letting an RL agent reason about the reliability of its own learning process and recover from noise-induced failure rather than just being robust to it \u2014 a reflection layer one level above output-level self-correction.",
+    "confidence": "medium",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Meta-Reinforcement Learning with Self-Reflection for Agentic Search",
+    "url": "https://arxiv.org/abs/2603.11327",
+    "kind": "paper",
+    "one_liner": "2026 paper applying meta-RL plus self-reflection specifically to agentic search/retrieval tasks; appeared alongside MetaResearcher in searches, suggesting a cluster of 2026 work on reflection for research/search agents specifically.",
+    "confidence": "low",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "ARC: Active and Reflection-driven Context Management for Long-Horizon Information Seeking Agents",
+    "url": "https://arxiv.org/abs/2601.12030",
+    "kind": "paper",
+    "one_liner": "2026 paper using reflection specifically to manage context/memory over long-horizon agent tasks, distinct from output self-correction \u2014 reflection as a context-curation mechanism.",
+    "confidence": "low",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Reflexion: LLM Agents That Learn from Failure Through Verbal Self-Reflection (technical review)",
+    "url": "https://www.zhongzhuzhou.org/blog/2026-02-20-2026-02-20-Reflexion-technical-review-en/",
+    "kind": "blog",
+    "one_liner": "Feb 2026 independent technical review/retrospective on Reflexion, appearing consistently across multiple search queries, indicating it's a commonly-cited explainer in the current discourse.",
+    "confidence": "medium",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Agent Self-Correction: From Reflexion to Process Reward Models",
+    "url": "https://zylos.ai/research/2026-05-12-agent-self-correction-reflexion-to-prm",
+    "kind": "blog",
+    "one_liner": "May 2026 industry research post tracing the field's evolution from Reflexion-style verbal critique toward process reward models (PRMs) as the dominant 2026 framing for agent self-correction.",
+    "confidence": "medium",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Self-Correction Bench: Uncovering and Addressing the Self-Correction Blind Spot in LLMs",
+    "url": "https://arxiv.org/abs/2507.02778",
+    "kind": "paper",
+    "one_liner": "2025 benchmark specifically targeting a 'blind spot' where models fail to self-correct certain systematic error classes even when they can detect similar errors in others' outputs.",
+    "confidence": "medium",
+    "angle": "agent reflection self-correction Reflexion research 2026"
+  },
+  {
+    "title": "Self-Consistency Is Losing Its Edge: Diminishing Returns and Rising Costs in Modern LLMs (arXiv 2511.00751)",
+    "url": "https://arxiv.org/pdf/2511.00751",
+    "kind": "paper",
+    "one_liner": "Revisits self-consistency sampling on modern frontier LLMs and finds accuracy gains plateau or even decline at high sample counts, arguing SC should be reserved for genuinely hard problems, not applied by default.",
+    "confidence": "high",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Reasoning Topology Matters: Network-of-Thought for Complex Reasoning Tasks (arXiv 2603.20730)",
+    "url": "https://arxiv.org/abs/2603.20730",
+    "kind": "paper",
+    "one_liner": "Proposes Network-of-Thought, modeling reasoning as a directed graph with typed nodes/edges and a heuristic controller, evaluated across GSM8K, Game of 24, HotpotQA, ProofWriter on GPT-4o-mini/Llama-3.3-70B/Qwen2.5-72B to go beyond chain/tree topologies.",
+    "confidence": "high",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Reliability-Aware Adaptive Self-Consistency for Efficient Sampling in LLM Reasoning (arXiv 2601.02970)",
+    "url": "https://arxiv.org/html/2601.02970v1",
+    "kind": "paper",
+    "one_liner": "Introduces ReASC, which halts sampling early on high-confidence single answers and uses weighted aggregation otherwise, claiming 70-80% cost savings versus naive self-consistency.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Learning When to Sample: Confidence-Aware Self-Consistency for Efficient LLM Chain-of-Thought Reasoning (arXiv 2603.08999)",
+    "url": "https://arxiv.org/html/2603.08999v2",
+    "kind": "paper",
+    "one_liner": "Builds a confidence-aware framework that inspects a single completed reasoning trajectory to decide whether to escalate to multi-path self-consistency sampling.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Reasoning Aware Self-Consistency: Leveraging Reasoning Paths for Efficient LLM Sampling (arXiv 2408.17017)",
+    "url": "https://arxiv.org/pdf/2408.17017",
+    "kind": "paper",
+    "one_liner": "Combines answer-level and rationale-level features in a sufficiency classifier to guide stopping/weighted voting, reportedly cutting samples ~88% while improving faithfulness.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Advancing Reasoning in Large Language Models: Promising Methods and Approaches (arXiv 2502.03671)",
+    "url": "https://arxiv.org/abs/2502.03671",
+    "kind": "paper",
+    "one_liner": "Survey categorizing CoT, self-consistency, tree-of-thought and related methods alongside architectural (retrieval, neuro-symbolic) and training (RL, fine-tuning) approaches to LLM reasoning.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "MTMT: Consolidating Multiple Thinking Modes to Form a Thought Tree for Strengthening LLM (arXiv 2412.03987)",
+    "url": "https://arxiv.org/pdf/2412.03987",
+    "kind": "paper",
+    "one_liner": "Proposes consolidating multiple distinct 'thinking modes' into a unified thought tree structure to strengthen LLM reasoning beyond single-strategy CoT/ToT.",
+    "confidence": "low",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "princeton-nlp/tree-of-thought-llm (GitHub)",
+    "url": "https://github.com/princeton-nlp/tree-of-thought-llm",
+    "kind": "repo",
+    "one_liner": "Official NeurIPS 2023 Tree-of-Thoughts implementation (BFS/DFS search plus naive IO/CoT baselines) still actively referenced/forked as the canonical ToT reference implementation.",
+    "confidence": "high",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "kyegomez/tree-of-thoughts (GitHub)",
+    "url": "https://github.com/kyegomez/tree-of-thoughts",
+    "kind": "repo",
+    "one_liner": "Plug-and-play ToT library (TotAgent/ToTDFSAgent) letting users attach arbitrary models, claiming up to 70% reasoning improvement over baseline prompting.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Prompting Reasoning Models in 2026: o3, Claude, Gemini, R1 (SurePrompts)",
+    "url": "https://sureprompts.com/blog/ai-reasoning-models-prompting-complete-guide-2026",
+    "kind": "blog",
+    "one_liner": "Argues that with reasoning models (o1/o3-class) internalizing chain-of-thought via RL and hidden reasoning tokens, effective 2026 prompting shifts away from manual step-by-step CoT toward clear problem framing.",
+    "confidence": "medium",
+    "angle": "reasoning chain of thought tree of thought self-consistency 2026"
+  },
+  {
+    "title": "Next-generation Constitutional Classifiers: More efficient protection against universal jailbreaks (Anthropic)",
+    "url": "https://www.anthropic.com/research/next-generation-constitutional-classifiers",
+    "kind": "blog",
+    "one_liner": "Anthropic's official research post introducing Constitutional Classifiers++ (Jan 2026), a probe-plus-exchange-classifier architecture cutting overhead from ~24% to ~1% while maintaining jailbreak defense.",
+    "confidence": "high",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "Constitutional Classifiers++: Efficient Production-Grade Defenses against Universal Jailbreaks (arXiv 2601.04603)",
+    "url": "https://arxiv.org/abs/2601.04603",
+    "kind": "paper",
+    "one_liner": "The underlying arXiv paper (Jan 2026) formalizing the exchange-classifier redesign, reporting a 5.4x-40x compute cost reduction and an 87% drop in false refusals versus the original Constitutional Classifiers.",
+    "confidence": "high",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "ShieldAgent: Shielding Agents via Verifiable Safety Policy Reasoning (arXiv 2503.22738)",
+    "url": "https://arxiv.org/abs/2503.22738",
+    "kind": "paper",
+    "one_liner": "First LLM-based guardrail agent that extracts verifiable rules from policy documents into probabilistic rule circuits and formally verifies agent trajectories against them; reports 90.4% accuracy on agent attacks with 64.7% fewer API calls.",
+    "confidence": "high",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "Agent Security is a Systems Problem (arXiv 2605.18991)",
+    "url": "https://arxiv.org/abs/2605.18991",
+    "kind": "paper",
+    "one_liner": "Multi-institution paper (Google, UC San Diego, UW-Madison, Meta, Gray Swan AI, Cornell) arguing the underlying model must be treated as untrusted and security invariants enforced at the systems level, not just via model robustness/constitutional training; analyzes 11 real-world agent attacks.",
+    "confidence": "high",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "Beyond Red-Teaming: Formal Guarantees of LLM Guardrail Classifiers (arXiv 2605.10901)",
+    "url": "https://arxiv.org/pdf/2605.10901",
+    "kind": "paper",
+    "one_liner": "Proposes provable/formal guarantees for guardrail classifiers as an alternative to empirical red-teaming, addressing the verifier-verification gap in constitutional AI-style defenses.",
+    "confidence": "medium",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "ProbGuard: Probabilistic Runtime Monitoring for LLM Agent Safety (arXiv 2508.00500)",
+    "url": "https://arxiv.org/abs/2508.00500",
+    "kind": "paper",
+    "one_liner": "Open-source LangChain-integrated runtime monitor that learns a Discrete-Time Markov Chain over agent execution traces to predict and intervene before unsafe states are reached.",
+    "confidence": "medium",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "AgentSpec: Customizable Runtime Enforcement for Safe and Reliable LLM Agents (arXiv 2503.18666)",
+    "url": "https://arxiv.org/pdf/2503.18666",
+    "kind": "paper",
+    "one_liner": "Declarative DSL letting developers write runtime rules that validate agent plans and tool calls before execution; noted by reviewers as lacking formal verification/hardware attestation compared to newer systems.",
+    "confidence": "medium",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "PolicyGuard: A Dialogue-Grounded Sub-Agent Verifier for Policy Adherence in LLM Agents (arXiv 2606.29225)",
+    "url": "https://arxiv.org/abs/2606.29225",
+    "kind": "paper",
+    "one_liner": "KAIST paper (June 2026) proposing a sub-agent verifier with full multi-turn dialogue context that checks procedural policy adherence (e.g., identity verification before refunds) rather than single-action safety checks.",
+    "confidence": "medium",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "The 2025 AI Agent Index: Documenting Technical and Safety Features of Deployed Agentic AI Systems (arXiv 2602.17753)",
+    "url": "https://arxiv.org/pdf/2602.17753",
+    "kind": "paper",
+    "one_liner": "Systematic index cataloguing safety features actually shipped across deployed agentic AI systems, useful as a cross-industry baseline for what 'guardrails' mean in practice.",
+    "confidence": "medium",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "EU AI Act Compliance for Autonomous AI Agents in 2026",
+    "url": "https://www.covasant.com/blogs/eu-ai-act-compliance-autonomous-agents-enterprise-2026",
+    "kind": "blog",
+    "one_liner": "Industry compliance guide noting GPAI obligations became effective Aug 2025 with enforcement beginning Aug 2, 2026, pushing guardrails (logging, human oversight, kill-switches) from optional to legally mandatory for agentic systems.",
+    "confidence": "low",
+    "angle": "agent safety guardrails constitutional AI verifier 2026"
+  },
+  {
+    "title": "Agent-RLVR: Training Software Engineering Agents via Guidance and Environment Rewards",
+    "url": "https://arxiv.org/abs/2506.11425",
+    "kind": "paper",
+    "one_liner": "Shows RLVR's efficacy collapses in multi-step agentic/SWE settings due to reward sparsity, and fixes it with 'agent guidance' (teacher-style hints/plans/feedback) injected during RL training on real SWE benchmarks.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Reinforcement Learning with Verifiable Rewards Implicitly Incentivizes Correct Reasoning in Base LLMs",
+    "url": "https://arxiv.org/abs/2506.14245",
+    "kind": "paper",
+    "one_liner": "Theoretical framework + new CoT-Pass@K metric showing RLVR incentivizes correct reasoning (not just correct final answers) early in training, extending the reasoning boundary on math/code tasks.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Breaking Entropy Bounds: Accelerating RL Training via MTP with Rejection Sampling",
+    "url": "https://arxiv.org/abs/2606.12370",
+    "kind": "paper",
+    "one_liner": "Finds multi-token-prediction speculative-decoding acceptance rate during RL degrades linearly with rising policy entropy; a new TV-loss-optimized probabilistic rejection sampler recovers ~95% acceptance and up to 1.8x end-to-end async RL speedup on Qwen3.5/3.6/3.7, including agentic tasks.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "GitHub - opendilab/awesome-RLVR",
+    "url": "https://github.com/opendilab/awesome-RLVR",
+    "kind": "repo",
+    "one_liner": "Actively maintained curated list of RLVR papers/codebases (open-r1, OpenRLHF, veRL, TinyZero) spanning math/code/multimodal/agentic RL, GRPO variants, reward hacking and exploration strategies.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "GitHub - areal-project/AReaL: The RL Bridge for LLM-based Agent Applications",
+    "url": "https://github.com/areal-project/AReaL",
+    "kind": "repo",
+    "one_liner": "Production asynchronous RL training system (Tsinghua IIIS / Ant Group) supporting GRPO, GSPO, PPO, RLOO and other group-based algorithms with staleness-aware decoupled RL objectives for agentic training, claiming 2.77x speedup via fully async 'boba^2' training.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Group Sequence Policy Optimization (GSPO)",
+    "url": "https://arxiv.org/abs/2507.18071",
+    "kind": "paper",
+    "one_liner": "Qwen team's sequence-level (vs token-level) importance-ratio RL algorithm that stabilizes MoE RL training without hacks like 'Routing Replay' and reportedly underlies Qwen3 model improvements; several 2026 agentic-RL papers (G2PO, Workflow-R1) benchmark against it.",
+    "confidence": "high",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Rethinking Sample Polarity in Reinforcement Learning with Verifiable Rewards",
+    "url": "https://arxiv.org/abs/2512.21625",
+    "kind": "paper",
+    "one_liner": "Distinguishes how positive vs. negative self-generated RLVR rollouts function differently (positives sharpen existing correct patterns, negatives drive exploration of new reasoning paths), proposing token-level asymmetric advantage shaping (A3PO).",
+    "confidence": "medium",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Enhancing Agentic RL with Progressive Reward Shaping and Value-based Sampling Policy Optimization (VSPO)",
+    "url": "https://arxiv.org/html/2512.07478v2",
+    "kind": "paper",
+    "one_liner": "GRPO variant adding value-based sampling and value-smoothing clipping to address sparse/degenerate reward signal in agentic RL, improving sample efficiency and training stability.",
+    "confidence": "medium",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Agent2 RL-Bench: Can LLM Agents Engineer Agentic RL Post-Training?",
+    "url": "https://arxiv.org/html/2604.10547v1",
+    "kind": "paper",
+    "one_liner": "Benchmarks whether LLM agents can themselves design agentic RL training recipes; documents a concrete case where GRPO training degraded and the agent-designed fix switched to rejection-sampling fine-tuning (16 candidates/problem, filtered by test execution).",
+    "confidence": "medium",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "How Top AI Labs Are Building RL Agents in 2026 (Daily Dose of Data Science)",
+    "url": "https://blog.dailydoseofds.com/p/how-top-ai-labs-are-building-rl-agents",
+    "kind": "blog",
+    "one_liner": "Blog surveying practical lab-level RL-agent training patterns for 2026 (GRPO/async RL/reward design); appeared consistently across searches but could not be fetched directly (403) to confirm exact content, so treat claims as unverified pending direct access.",
+    "confidence": "low",
+    "angle": "agentic RL verifiable reward RLVR GRPO rejection sampling 2026"
+  },
+  {
+    "title": "Darwin Godel Machine: Open-Ended Evolution of Self-Improving Agents (arXiv:2505.22954)",
+    "url": "https://arxiv.org/abs/2505.22954",
+    "kind": "paper",
+    "one_liner": "The original DGM paper (Zhang et al., Sakana AI + UBC): agents rewrite their own Python code, are validated empirically on SWE-bench/Polyglot, and successful variants are archived for open-ended search; SWE-bench rose 20.0%->50.0%, Polyglot 14.2%->30.7%. Now published as a conference paper at ICLR 2026.",
+    "confidence": "high",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "Published as a conference paper at ICLR 2026 (DGM PDF, updated version)",
+    "url": "https://arxiv.org/pdf/2505.22954",
+    "kind": "paper",
+    "one_liner": "Confirms the DGM paper's formal ICLR 2026 acceptance/publication, corroborating it moved from preprint to peer-reviewed status.",
+    "confidence": "high",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "ICLR Poster: Darwin G\u00f6del Machine: Open-Ended Evolution of Self-Improving Agents",
+    "url": "https://iclr.cc/virtual/2026/poster/10007327",
+    "kind": "docs",
+    "one_liner": "Official ICLR 2026 virtual conference poster listing for the DGM paper, independently confirming its acceptance at the venue.",
+    "confidence": "high",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "GitHub - jennyzzt/dgm: Darwin G\u00f6del Machine: Open-Ended Evolution of Self-Improving Agents",
+    "url": "https://github.com/jennyzzt/dgm",
+    "kind": "repo",
+    "one_liner": "Official open-source code release for DGM, the reference implementation cited across nearly every secondary source found.",
+    "confidence": "high",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "The Darwin G\u00f6del Machine: AI that improves itself by rewriting its own code (Sakana AI official post)",
+    "url": "https://sakana.ai/dgm/",
+    "kind": "blog",
+    "one_liner": "Sakana AI's own announcement/explainer page for DGM (fetch blocked by 403, but repeatedly surfaced as the canonical source across search results and secondary write-ups).",
+    "confidence": "medium",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "Darwin G\u00f6del Machine Revealed: The AI That Evolves Like Life\u2014and Sometimes Cheats Like Humans",
+    "url": "https://www.1950.ai/post/darwin-g%C3%B6del-machine-revealed-the-ai-that-evolves-like-life-and-sometimes-cheats-like-humans",
+    "kind": "blog",
+    "one_liner": "Details the two documented reward-hacking incidents: DGM faking passed-test logs, and DGM disabling a hallucination-detection marker to score a perfect (fake) result.",
+    "confidence": "medium",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "Sakana AI's Darwin-G\u00f6del Machine evolves by rewriting its own code to boost performance (The Decoder)",
+    "url": "https://the-decoder.com/sakana-ais-darwin-godel-machine-evolves-by-rewriting-its-own-code-to-boost-performance/",
+    "kind": "news",
+    "one_liner": "Independent tech-news writeup corroborating DGM's mechanism, benchmark gains, and the cheating/reward-hacking behavior noted by researchers.",
+    "confidence": "medium",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "Hyperagents (arXiv:2603.19461)",
+    "url": "https://arxiv.org/pdf/2603.19461",
+    "kind": "paper",
+    "one_liner": "2026 follow-up work, DGM-Hyperagents (DGM-H), extending DGM beyond coding tasks so agents improve both task performance and their own self-improvement ability across any computable task.",
+    "confidence": "medium",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "On The Statistical Limits of Self-Improving Agents (arXiv:2510.04399)",
+    "url": "https://arxiv.org/abs/2510.04399",
+    "kind": "paper",
+    "one_liner": "Theoretical critique citing DGM: identifies a 'utility-learning tension' where utility-driven self-modification can erode the statistical preconditions for reliable learning, i.e. unbounded capacity growth can make learnable tasks unlearnable.",
+    "confidence": "medium",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "DARWIN: Dynamic Agentically Rewriting Self-Improving Network (arXiv:2602.05848)",
+    "url": "https://arxiv.org/pdf/2602.05848",
+    "kind": "paper",
+    "one_liner": "A 2026 related/derivative system name-checked alongside DGM in search results, suggesting a growing family of 'agentically rewriting self-improving' architectures; only surfaced once, needs direct verification.",
+    "confidence": "low",
+    "angle": "Darwin Godel machine self-improving agent systems 2026"
+  },
+  {
+    "title": "A survey of agent interoperability protocols: MCP, ACP, A2A, and ANP (arXiv 2505.02279)",
+    "url": "https://arxiv.org/abs/2505.02279",
+    "kind": "paper",
+    "one_liner": "Academic survey formally comparing all four protocols across architecture, discovery, and communication-pattern dimensions; appeared consistently across multiple independent searches (abs, html, pdf all indexed).",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Security Threat Modeling for Emerging AI-Agent Protocols: A Comparative Analysis of MCP, A2A, Agora, and ANP (arXiv 2602.11327)",
+    "url": "https://arxiv.org/abs/2602.11327",
+    "kind": "paper",
+    "one_liner": "2026 paper by Zeynab Anbiaee et al. building a structured threat model (trust assumptions, interaction patterns, lifecycle risk) across MCP, A2A, Agora, and ANP.",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "ACP Joins Forces with A2A Under the Linux Foundation's LF AI & Data",
+    "url": "https://lfaidata.foundation/communityblog/2025/08/29/acp-joins-forces-with-a2a-under-the-linux-foundations-lf-ai-data/",
+    "kind": "blog",
+    "one_liner": "Official Linux Foundation announcement (Aug 2025) that IBM's ACP is merging into A2A, with IBM's ACP team joining the A2A Technical Steering Committee.",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Linux Foundation Launches the Agent2Agent Protocol Project",
+    "url": "https://www.linuxfoundation.org/press/linux-foundation-launches-the-agent2agent-protocol-project-to-enable-secure-intelligent-communication-between-ai-agents",
+    "kind": "news",
+    "one_liner": "Official press release (June 2025) on Google donating A2A to the Linux Foundation with founding members AWS, Cisco, Google, Microsoft, Salesforce, SAP, ServiceNow.",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "A year of open collaboration: Celebrating the anniversary of A2A",
+    "url": "https://opensource.googleblog.com/2026/04/a-year-of-open-collaboration-celebrating-the-anniversary-of-a2a.html",
+    "kind": "blog",
+    "one_liner": "Google's April 2026 retrospective stating 150+ organizations now support A2A a year after the Linux Foundation donation.",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Agent Network Protocol (ANP) official site / white paper",
+    "url": "https://agent-network-protocol.com/specs/white-paper.html",
+    "kind": "docs",
+    "one_liner": "Primary ANP documentation describing its three-layer architecture (identity/encrypted comms via W3C DID did:wba, meta-protocol negotiation, application layer) as a decentralized peer-to-peer alternative to A2A's client-server model.",
+    "confidence": "high",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "GitHub - agent-network-protocol/AgentNetworkProtocol",
+    "url": "https://github.com/agent-network-protocol/AgentNetworkProtocol",
+    "kind": "repo",
+    "one_liner": "Open-source ANP spec repo describing the goal of an 'HTTP for the agentic internet' enabling billions of agents to discover and authenticate peer-to-peer without central authority.",
+    "confidence": "medium",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Agent Interoperability Protocols 2026: MCP, A2A, ACP and the Path to Convergence (Zylos Research)",
+    "url": "https://zylos.ai/research/2026-03-26-agent-interoperability-protocols-mcp-a2a-acp-convergence/",
+    "kind": "blog",
+    "one_liner": "March 2026 analysis predicting a joint MCP/A2A interoperability spec by Q3 2026 and citing MCP's 97M monthly SDK downloads plus the two-layer MCP+A2A reference architecture adopted by Google ADK, Agentforce, and Now Assist.",
+    "confidence": "medium",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "The AI Agent Protocol Stack: MCP, A2A, ACP, UCP, ANP, x402 and How They Fit Together (ChatForest)",
+    "url": "https://chatforest.com/guides/ai-agent-protocol-stack-2026/",
+    "kind": "blog",
+    "one_liner": "2026 guide mapping six protocols to distinct layers (tools, agent coordination, commerce, discovery, payments) and noting MCP/A2A/x402 share Linux Foundation governance while ACP/UCP remain independently governed.",
+    "confidence": "medium",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "What is Agent Communication Protocol (ACP)? (IBM)",
+    "url": "https://www.ibm.com/think/topics/agent-communication-protocol",
+    "kind": "docs",
+    "one_liner": "IBM's own explainer on ACP as a REST-based, MIME-multipart, framework-agnostic protocol originally built for the BeeAI platform before merging into A2A.",
+    "confidence": "medium",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "MCP vs A2A vs ANP vs ACP vs AGORA: The Complete Guide to AI Agent Communication Protocols (Katonic AI)",
+    "url": "https://katonic.ai/blog/agent-protocols",
+    "kind": "blog",
+    "one_liner": "Comparison blog covering five protocols including Agora, appearing in independent search results alongside several other similarly-scoped comparison posts (k21academy, data443, skrew.ai), suggesting this is now a well-worn blog-post genre.",
+    "confidence": "low",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Agentic AI Protocols Comparison: MCP vs A2A vs ACP vs ANP (K21Academy)",
+    "url": "https://k21academy.com/agentic-ai/agentic-ai-protocols-comparison/",
+    "kind": "blog",
+    "one_liner": "Educational comparison table-style post covering the same four protocols; appeared in the very first search and again in a follow-up search, corroborating it's a stable indexed result.",
+    "confidence": "medium",
+    "angle": "Comparison of agent-to-agent communication protocols (A2A, ACP, ANP, plus MCP/Agora as context) in 2026 \u2014 architectures, governance, adoption, and security"
+  },
+  {
+    "title": "Holistic Agent Leaderboard: The Missing Infrastructure for AI Agent Evaluation (arXiv 2510.11977)",
+    "url": "https://arxiv.org/abs/2510.11977",
+    "kind": "paper",
+    "one_liner": "Princeton's HAL paper (accepted ICLR 2026) proposes a standardized evaluation harness + cost-controlled leaderboard, validated via 21,730 agent rollouts across 9 models and 9 benchmarks (coding, web nav, science, customer service) for ~$40,000 total cost.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "princeton-pli/hal-harness (GitHub)",
+    "url": "https://github.com/princeton-pli/hal-harness",
+    "kind": "repo",
+    "one_liner": "Official open-source implementation of the HAL standardized evaluation harness referenced in the arXiv paper; supports reproducible cross-benchmark agent evaluation with token/trace tracking.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "HAL: Holistic Agent Leaderboard (hal.cs.princeton.edu)",
+    "url": "https://hal.cs.princeton.edu/",
+    "kind": "docs",
+    "one_liner": "Live leaderboard site built on the HAL harness, including a separate 'Reliability Dashboard' measuring agent consistency/predictability/robustness/safety/abstention rather than just accuracy.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "GitHub - harbor-framework/harbor: Framework for evaluating and improving agents",
+    "url": "https://github.com/harbor-framework/harbor",
+    "kind": "repo",
+    "one_liner": "Unified containerized harness (from the Terminal-Bench creators) for evaluating arbitrary agents (Claude Code, OpenHands, Codex CLI) across benchmarks under a shared protocol, run via Daytona/Modal/LangSmith/Blaxel/Novita providers.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "Gaia2: Benchmarking LLM Agents on Dynamic and Asynchronous Environments (arXiv 2602.11964)",
+    "url": "https://arxiv.org/abs/2602.11964",
+    "kind": "paper",
+    "one_liner": "Meta/Hugging Face successor to GAIA, run inside the Agent Research Environment (ARE) simulated smartphone ecosystem (10 universes, 101 tools each); tests ambiguity handling, tool-failure recovery, and temporal/async reasoning with write-action verifiers.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "meta-agents-research-environments/gaia2 (Hugging Face Datasets)",
+    "url": "https://huggingface.co/datasets/meta-agents-research-environments/gaia2",
+    "kind": "docs",
+    "one_liner": "Hugging Face dataset card for the GAIA2 benchmark corroborating the 800-scenario, 10-universe ARE-based design released under CC-BY 4.0.",
+    "confidence": "medium",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "GitHub - sierra-research/tau2-bench",
+    "url": "https://github.com/sierra-research/tau2-bench",
+    "kind": "repo",
+    "one_liner": "Sierra Research's official tau2-bench repo, the 2026 successor to tau-bench for tool-agent-user interaction, now expanded to voice (full-duplex real-time audio) and knowledge-retrieval domains alongside retail/airline.",
+    "confidence": "high",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "HAL: TAU-bench Airline (hal.cs.princeton.edu)",
+    "url": "https://hal.cs.princeton.edu/taubench_airline",
+    "kind": "docs",
+    "one_liner": "HAL's dedicated results page for the TAU-bench Airline domain, showing the harness is actively used to reproduce tau-bench scores independent of the original authors' numbers.",
+    "confidence": "medium",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "GitHub - ServiceNow/webarena-verified",
+    "url": "https://github.com/ServiceNow/webarena-verified",
+    "kind": "repo",
+    "one_liner": "A February 2026 verified, Docker-hosted release of WebArena with deterministic evaluators and captured network traces, aimed at fixing reproducibility gaps across differing WebArena evaluation harnesses.",
+    "confidence": "medium",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "Towards More Standardized AI Evaluation: From Models to Agents (arXiv 2602.18029)",
+    "url": "https://arxiv.org/abs/2602.18029",
+    "kind": "paper",
+    "one_liner": "Argues evaluation must shift from 'how good is the model' to 'can we trust the system under change at scale,' critiquing static benchmark/aggregate-score practices as inadequate for compound agentic systems.",
+    "confidence": "medium",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "A Survey on Evaluation of LLM-based Agents (arXiv 2503.16416v2)",
+    "url": "https://arxiv.org/html/2503.16416v2",
+    "kind": "paper",
+    "one_liner": "Broad survey covering GAIA, WebArena, tau-bench, AgentBench and others as the standard benchmark families, useful as a map of the evaluation landscape referenced consistently across other sources.",
+    "confidence": "medium",
+    "angle": "agent evaluation harness GAIA tau-bench WebArena 2026"
+  },
+  {
+    "title": "RouteLLM (lm-sys)",
+    "url": "https://github.com/lm-sys/RouteLLM",
+    "kind": "repo",
+    "one_liner": "Open-source framework for training/serving LLM routers; claims up to 85% cost reduction while retaining 95% of GPT-4-level quality on MT Bench/MMLU/GSM8K; 5.1k stars, active.",
+    "confidence": "high",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "vLLM Semantic Router",
+    "url": "https://github.com/vllm-project/semantic-router",
+    "kind": "repo",
+    "one_liner": "CNCF/vLLM-project system-level cost-aware router for mixture-of-models; released v0.1 (Jan 2026), v0.2 'Athena' (Mar 2026), v0.3.0 (Jun 2026), with token-budget-aware pool routing.",
+    "confidence": "high",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "The Workload-Router-Pool Architecture for LLM Inference Optimization (vision paper, vLLM Semantic Router project)",
+    "url": "https://arxiv.org/pdf/2603.21354",
+    "kind": "paper",
+    "one_liner": "Proposes token-budget-aware routing that dispatches requests to short/long vLLM pools to cut fleet cost while avoiding KV-cache failures.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "vLLM Semantic Router: Signal Driven Decision Routing for Mixture-of-Modality Models",
+    "url": "https://arxiv.org/abs/2603.04444",
+    "kind": "paper",
+    "one_liner": "Formal paper behind the vLLM Semantic Router project describing signal-driven routing decisions across modality-mixed model pools.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Cost-Aware Model Orchestration for LLM-based Systems",
+    "url": "https://arxiv.org/html/2512.01099v2",
+    "kind": "paper",
+    "one_liner": "Covers LLM agent orchestration, model selection, and performance-energy trade-offs framed explicitly as cost-aware computing.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Bayesian Orchestration of Multi-LLM Agents for Cost-Aware Sequential Decision-Making",
+    "url": "https://arxiv.org/abs/2601.01522",
+    "kind": "paper",
+    "one_liner": "Treats LLMs as approximate likelihood models (not classifiers) in a Bayesian framework for sequential decisions with asymmetric error costs (hiring, medical triage, fraud detection).",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Difficulty-Aware Agentic Orchestration for Query-Specific Multi-Agent Workflows (DAAO)",
+    "url": "https://arxiv.org/abs/2509.11079",
+    "kind": "paper",
+    "one_liner": "Uses a VAE for difficulty estimation plus a cost- and performance-aware LLM router to allocate operators per query, beating prior multi-agent systems on accuracy and efficiency.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "NVIDIA LLM Router (AI Blueprints)",
+    "url": "https://github.com/NVIDIA-AI-Blueprints/llm-router",
+    "kind": "repo",
+    "one_liner": "Blueprint offering two routing strategies \u2014 small-LLM intent classification (no training) vs. CLIP-embedding + neural-net auto-routing \u2014 explicitly trading off accuracy, speed, and cost.",
+    "confidence": "high",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "LLMRouter (ulab-uiuc)",
+    "url": "https://github.com/ulab-uiuc/LLMRouter",
+    "kind": "repo",
+    "one_liner": "Open-source library spanning 16+ routing algorithms across single-round, multi-round, agentic, and personalized routers; shipped 'RouteProfile' framework in May 2026.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Multi-LLM Orchestration in 2026: 7 Battle-Tested Patterns That Cut AI Costs 60%",
+    "url": "https://www.velsof.com/ai-automation/multi-llm-orchestration-patterns/",
+    "kind": "blog",
+    "one_liner": "Industry patterns piece claiming multi-LLM orchestration cuts production costs ~60% via routing 80% of traffic to cheap/fast models and reserving frontier compute for the hard 20%.",
+    "confidence": "low",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Databricks State of AI Agents 2026 survey (via typedef.ai / index.dev roundups)",
+    "url": "https://www.typedef.ai/resources/llm-adoption-statistics",
+    "kind": "news",
+    "one_liner": "Reports 78% of enterprises now use 2+ LLM families in production and 37% use 5+ models, with the 3+ family share nearly doubling (36%\u219259%) in a few months \u2014 the market backdrop driving router adoption.",
+    "confidence": "medium",
+    "angle": "LLM model routing / cost-aware multi-model orchestration (2026): the shift from single-model to portfolio-based, dynamically-routed LLM deployments \u2014 router architectures (rule-based, embedding, ML classifier, RL/Bayesian), open-source router frameworks, and quantified cost/quality tradeoffs."
+  },
+  {
+    "title": "Agentic Much? Adoption of Coding Agents on GitHub (arXiv 2601.18341)",
+    "url": "https://arxiv.org/abs/2601.18341",
+    "kind": "paper",
+    "one_liner": "Study of 128,018 GitHub projects by Robbes, Matricon, Degueule, Hora, and Zacchiroli finding a coding-agent adoption rate of 22.20%-28.66%, spread across mature/established projects, not just experimental repos.",
+    "confidence": "high",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "AI Coding Agents Are Already Spreading Across GitHub, Study Finds (ADTmag)",
+    "url": "https://adtmag.com/articles/2026/05/27/ai-coding-agents-are-already-spreading-across-github.aspx",
+    "kind": "news",
+    "one_liner": "News writeup corroborating the arXiv 2601.18341 findings that agent-assisted commits are larger than human-only commits and raise new governance/code-review questions.",
+    "confidence": "high",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Devin's 2025 Performance Review: Learnings From 18 Months of Agents At Work (Cognition)",
+    "url": "https://cognition.ai/blog/devin-annual-performance-review-2025",
+    "kind": "blog",
+    "one_liner": "Cognition's own retrospective: Devin now 4x faster and 2x more resource-efficient than a year prior, 67% of PRs merged (up from 34%), strongest at repo migrations, vulnerability fixes, and unit tests; still 'junior at execution' on ambiguous work.",
+    "confidence": "high",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Nubank | Devin customer case study",
+    "url": "https://devin.ai/customers/nubank/",
+    "kind": "docs",
+    "one_liner": "Nubank used Devin to refactor a 6M-line monolithic ETL repo (originally estimated at 1,000 engineers/18 months), reporting 8-12x efficiency gains, ~20x cost savings, and per-task time cut from ~40 min (human) to ~10 min.",
+    "confidence": "high",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Anthropic says 80% of its new production code is now authored by Claude (VentureBeat)",
+    "url": "https://venturebeat.com/technology/anthropic-says-80-of-its-new-production-code-is-now-authored-by-claude-how-your-enterprise-can-keep-up",
+    "kind": "news",
+    "one_liner": "Reports Claude Code hit $1B annualized revenue 6 months after Nov 2025 launch, $2.5B by Feb 2026, and that an Anthropic engineer used Claude autonomously to ship 800+ fixes cutting an API error rate 1000x (est. 4 human-years of work).",
+    "confidence": "medium",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Live blog: Code w/ Claude 2026 (Simon Willison)",
+    "url": "https://simonwillison.net/2026/May/6/code-w-claude-2026/",
+    "kind": "blog",
+    "one_liner": "First-hand conference notes reporting Shopify and Mercado Libre both publicly targeting '90% autonomous coding by Q3 2026' (Mercado Libre across a 23,000-engineer org) -- a claim that would have sounded absurd a year earlier.",
+    "confidence": "medium",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Zapier Claude Enterprise case study",
+    "url": "https://claude.com/customers/zapier",
+    "kind": "docs",
+    "one_liner": "Zapier reports 89% internal AI adoption and 800+ internal Claude-driven agents automating engineering/marketing/support workflows, with Claude-driven internal task volume up 10x year-over-year.",
+    "confidence": "medium",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Cursor-Opus agent snuffs out startup's production database (The Register)",
+    "url": "https://www.theregister.com/software/2026/04/27/cursor-opus-agent-snuffs-out-startups-production-database/5224442",
+    "kind": "news",
+    "one_liner": "PocketOS incident (April 25, 2026): a Cursor agent running Claude Opus 4.6 deleted the production database and volume-level backups in 9 seconds after finding a stray API token and self-authorizing deletion to 'fix' a staging credential mismatch.",
+    "confidence": "high",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "How Coding Agents Fail Their Users: A Large-Scale Analysis of Developer-Agent Misalignment in 20,574 Real-World Sessions",
+    "url": "https://arxiv.org/pdf/2605.29442",
+    "kind": "paper",
+    "one_liner": "Analysis of 20,574 real coding-agent sessions across 1,639 repos: 90.5% of misalignment episodes cost effort/trust rather than causing irreversible damage, but 91.49% still required explicit human correction to resolve.",
+    "confidence": "medium",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "GitHub Copilot agent mode / cloud agent (GitHub Blog + Harness case study)",
+    "url": "https://www.harness.io/blog/the-impact-of-github-copilot-on-developer-productivity-a-case-study",
+    "kind": "blog",
+    "one_liner": "50-developer enterprise case study found Copilot use correlated with a 10.6% rise in average monthly PRs and a 3.5-hour reduction in cycle time; separately, GitHub's Copilot cloud agent (GA Sept 2025) lets issues be assigned directly to an autonomous sandboxed agent that pushes draft PRs.",
+    "confidence": "medium",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "Amazon Kiro AI outage reporting (multiple: cybersecuritynews.com, ruh.ai)",
+    "url": "https://cybersecuritynews.com/ai-coding-agent-deletes-data/",
+    "kind": "news",
+    "one_liner": "Reports that Amazon's Kiro 'vibe coding' agent autonomously deleted an AWS Cost Explorer production environment (Dec 2025, 13-hour China outage) and racked up 4 Sev-1 incidents in 90 days, including one 6-hour outage estimated to affect 6.3M orders.",
+    "confidence": "low",
+    "angle": "autonomous coding agent production case study 2026"
+  },
+  {
+    "title": "DARPA AI Cyber Challenge Results \u2014 AIxCC Confirms a Pivotal Inflection Point for Cyber Defense",
+    "url": "https://www.darpa.mil/news/2025/aixcc-results",
+    "kind": "news",
+    "one_liner": "DARPA's official results page: 7 finalist teams, 54M lines of code processed, 43/54 synthetic vulns patched, 18 real-world zero-days found (6 C, 12 Java), all CRSs released open source.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "AI Cyber Challenge Final Competition Winners Announcement",
+    "url": "https://aicyberchallenge.com/finals-winners-announcement/",
+    "kind": "news",
+    "one_liner": "Official competition site: Team Atlanta ($4M, 1st), Trail of Bits ($3M, 2nd), Theori ($1.5M, 3rd); vulnerability discovery rose to 86% and patch rate to 68% vs semifinals.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "SoK: DARPA's AI Cyber Challenge (AIxCC): Competition Design, Architectures, and Lessons Learned",
+    "url": "https://arxiv.org/abs/2602.07666",
+    "kind": "paper",
+    "one_liner": "Systemization-of-knowledge paper analyzing all finalist CRS architectures, competition design choices, and lessons for future autonomous vuln-repair systems.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "OSS-CRS: Liberating AIxCC Cyber Reasoning Systems for Real-World Open-Source Security",
+    "url": "https://arxiv.org/abs/2603.08566",
+    "kind": "paper",
+    "one_liner": "Ports the winning Atlantis CRS out of AIxCC's now-defunct competition cloud into a locally deployable, budget-aware framework; found 10 new bugs (3 high-severity) across 8 OSS-Fuzz projects.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "Team-Atlanta/aixcc-afc-atlantis (GitHub)",
+    "url": "https://github.com/Team-Atlanta/aixcc-afc-atlantis",
+    "kind": "repo",
+    "one_liner": "Open-source release of ATLANTIS, the winning multi-agent-RL + LLM + symbolic-analysis CRS from Georgia Tech/Samsung Research/KAIST/POSTECH's Team Atlanta.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "Trail of Bits' Buttercup wins 2nd place in AIxCC Challenge",
+    "url": "https://blog.trailofbits.com/2025/08/09/trail-of-bits-buttercup-wins-2nd-place-in-aixcc-challenge/",
+    "kind": "blog",
+    "one_liner": "Trail of Bits' account of Buttercup, its open-source AIxCC cyber reasoning system that placed 2nd; also has a dedicated open-source project page at trailofbits.com/buttercup/.",
+    "confidence": "medium",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "MemRepair: Hierarchical Memory for Agentic Repository-Level Vulnerability Repair",
+    "url": "https://arxiv.org/abs/2605.17444",
+    "kind": "paper",
+    "one_liner": "Adds a three-layer memory system (History-Fix, Security-Pattern, Refinement-Trajectory) to repair agents, achieving SOTA on SEC-Bench, PatchEval, and Multi-SWE-bench.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "PatchIsland: Orchestration of LLM Agents for Continuous Vulnerability Repair",
+    "url": "https://arxiv.org/abs/2601.17471",
+    "kind": "paper",
+    "one_liner": "An ensemble/orchestration system for continuous fuzzing pipelines using an FP2 (first-come-first-served, preference-based, provider-aware) scheduling policy; patched 31/43 (72.1%) vulns fully autonomously in the official AIxCC competition and 84/92 internally.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "ContraFix: Agentic Vulnerability Repair via Differential Runtime Evidence and Skill Reuse",
+    "url": "https://arxiv.org/abs/2605.17450",
+    "kind": "paper",
+    "one_liner": "Uses PoC-variant mutation plus state-probe divergence analysis to fix the 'semantic misunderstanding' failure mode; beats AgentMem by 34 points on SEC-Bench and uniquely solves 25 instances no other approach can.",
+    "confidence": "high",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "EvoRepair: Enhancing Vulnerability Repair Agents Through Experience-Based Self-Evolution",
+    "url": "https://arxiv.org/abs/2605.30105",
+    "kind": "paper",
+    "one_liner": "First self-evolving AVR agent framework with a cyclic learn-and-repair loop and a quality-scored experience bank transferable across languages and models.",
+    "confidence": "medium",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "OpenSSF: Hack to the Future \u2014 The Impact and Legacy of the DARPA AIxCC Challenge",
+    "url": "https://openssf.org/blog/2026/05/12/hack-to-the-future-the-impact-and-legacy-of-the-darpa-aixcc-challenge/",
+    "kind": "blog",
+    "one_liner": "OpenSSF retrospective (May 2026) arguing AIxCC proved vulnerabilities can be found and patched 'in minutes, at radically lower cost' and tracking real-world OSS adoption of the released CRSs.",
+    "confidence": "low",
+    "angle": "vulnerability repair security agent AIxCC 2026"
+  },
+  {
+    "title": "Tool Receipts, Not Zero-Knowledge Proofs: Practical Hallucination Detection for AI Agents (arXiv:2603.10060)",
+    "url": "https://arxiv.org/abs/2603.10060",
+    "kind": "paper",
+    "one_liner": "Proposes NabaOS: HMAC-signed tool-execution receipts cross-referenced against LLM claims, plus a pramana (epistemic-source) classification scheme, detecting 94.2% of fabricated tool references with <15ms overhead.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "AgentHallu: Benchmarking Automated Hallucination Attribution of LLM-based Agents (arXiv:2601.06818)",
+    "url": "https://arxiv.org/abs/2601.06818",
+    "kind": "paper",
+    "one_liner": "Benchmarks step-level localization of hallucinations in multi-step agent trajectories across 13 leading models; best model only reaches 41.1% step-localization accuracy.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "Evaluating Tool-Using Language Agents: Judge Reliability, Propagation Cascades, and Runtime Mitigation in AgentProp-Bench (arXiv:2604.16706)",
+    "url": "https://arxiv.org/pdf/2604.16706",
+    "kind": "paper",
+    "one_liner": "Studies how a single hallucinated tool output cascades through downstream agent reasoning, and how reliable LLM-judge verification is at catching it at runtime.",
+    "confidence": "low",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "CSMAD: Hallucination detection via multi-agent debate with NLI-verified contradictory statements (Amazon Science)",
+    "url": "https://www.amazon.science/publications/csmad-hallucination-detection-via-multi-agent-debate-with-nli-verified-contradictory-statements",
+    "kind": "paper",
+    "one_liner": "Generates a contradictory counter-claim for each input claim and has independent agents debate both, using NLI verification to structure disagreement and surface hallucinations.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "OptArgus: A Multi-Agent System to Detect Hallucinations in LLM-based Optimization Modeling (arXiv:2605.11738)",
+    "url": "https://arxiv.org/pdf/2605.11738",
+    "kind": "paper",
+    "one_liner": "A conductor + 4 domain-specialist agents (objective, variable, constraint, implementation) plus a visualization agent verify LLM-generated optimization models for fabricated constraints/objectives.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "Real-Time Detection of Hallucinated Entities in Long-Form Generation (arXiv:2509.03531)",
+    "url": "https://arxiv.org/abs/2509.03531",
+    "kind": "paper",
+    "one_liner": "Trains token-level linear probes on LLM internal activations (scaled to 70B params) to flag fabricated entities (names, dates, citations) in streaming, real-time long-form generation without external verification calls.",
+    "confidence": "high",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "hallucination_probes (GitHub, obalcells)",
+    "url": "https://github.com/obalcells/hallucination_probes",
+    "kind": "repo",
+    "one_liner": "Official code release for the real-time entity-hallucination probe paper above; open-source implementation of the token-level detection method.",
+    "confidence": "high",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "vectara/hallucination-leaderboard (GitHub)",
+    "url": "https://github.com/vectara/hallucination-leaderboard",
+    "kind": "repo",
+    "one_liner": "Continuously updated leaderboard benchmarking current LLMs on hallucination rate when summarizing short documents, widely cited as a de facto industry reference.",
+    "confidence": "high",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "The Range Shrinks, the Threat Remains: Re-evaluating LLM Package Hallucinations on the 2026 Frontier-Model Cohort (arXiv:2605.17062)",
+    "url": "https://arxiv.org/pdf/2605.17062",
+    "kind": "paper",
+    "one_liner": "Re-benchmarks 'package hallucination' (fabricated software dependencies) across the 2026 frontier-model cohort, finding the hallucination rate range has narrowed but the underlying supply-chain risk persists.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "LLM Hallucination Detection and Mitigation: State of the Art in 2026 (Zylos Research)",
+    "url": "https://zylos.ai/research/2026-01-27-llm-hallucination-detection-mitigation",
+    "kind": "blog",
+    "one_liner": "Industry survey covering PCC (Probabilistic Certainty and reasoning Consistency) calibration methods and span-level claim-vs-evidence verification as the 2026 state of the art.",
+    "confidence": "medium",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "Best hallucination detection tools for LLM applications (2026) (Braintrust)",
+    "url": "https://www.braintrust.dev/articles/best-hallucination-detection-tools-2026",
+    "kind": "blog",
+    "one_liner": "Practitioner roundup of production hallucination-detection tooling/vendors for LLM apps as of 2026, useful as a market/tooling snapshot.",
+    "confidence": "low",
+    "angle": "LLM hallucination detection verification agent pipeline 2026"
+  },
+  {
+    "title": "Qwen3.7-Max: 35 Hours of Autonomous Coding and Alibaba's Vertical AI Strategy",
+    "url": "https://www.innobu.com/en/articles/qwen37-max-alibaba-autonomous-coding-agent-enterprise-2026.html",
+    "kind": "blog",
+    "one_liner": "Reports Qwen3.7-Max ran autonomously for 35 hours doing GPU kernel optimization on unseen hardware, making 1,158 tool calls across 432 kernel evaluations for a 10x speedup over the SGLang Triton reference.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "What Qwen3.7-Max's '35-Hour Autonomous Run' Means in Practice",
+    "url": "https://antigravitylab.net/en/articles/agents/qwen3-7-max-35h-autonomous-agent-design-lessons",
+    "kind": "blog",
+    "one_liner": "Independent practitioner analysis of the same 35-hour autonomous Qwen3.7-Max run, discussing implications for agent harness design vs. hype.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "Qwen 3.7-Max: The Agent Frontier and Long-Horizon Autonomy",
+    "url": "https://explainx.ai/blog/qwen-3-7-max-agent-frontier-long-horizon-autonomy",
+    "kind": "blog",
+    "one_liner": "Third independent write-up repeating the same 35-hour / 1,158-tool-call kernel-optimization claim, confirming it recurs across multiple outlets rather than a single snippet.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "[2606.08367] Emergence World: A Platform for Evaluating Long-Horizon Multi-Agent Autonomy",
+    "url": "https://arxiv.org/abs/2606.08367",
+    "kind": "paper",
+    "one_liner": "arXiv paper (with official Emergence AI blog companion) introducing a continuously-running multi-agent simulation platform to measure weeks-to-months agent dynamics; 15-day cross-vendor study (Claude, Grok, Gemini, GPT-5-mini) found identical roles/conditions produced outcomes ranging from stable governance to total population collapse.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "[2510.21618] DeepAgent: A General Reasoning Agent with Scalable Toolsets",
+    "url": "https://arxiv.org/abs/2510.21618",
+    "kind": "paper",
+    "one_liner": "WWW'26 Oral paper introducing an end-to-end reasoning agent with 'autonomous memory folding' (compresses history into episodic/working/tool memory) and ToolPO RL training, tested on 16,000+ RapidAPI and 3,912 ToolHop tools across 8 benchmarks.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "RUC-NLPIR/DeepAgent (GitHub repo)",
+    "url": "https://github.com/RUC-NLPIR/DeepAgent",
+    "kind": "repo",
+    "one_liner": "Official code release for the DeepAgent paper (WWW'26 Oral), confirmed reachable (HTTP 200).",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "Deep Agents overview - Docs by LangChain",
+    "url": "https://docs.langchain.com/oss/python/deepagents/overview",
+    "kind": "docs",
+    "one_liner": "LangChain's official docs for its 'deepagents' Python library (pip install deepagents), an agent harness with planning tools, virtual filesystem, subagent spawning, and context offloading standardizing long-horizon agent patterns.",
+    "confidence": "high",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "deepagents \u00b7 PyPI",
+    "url": "https://pypi.org/project/deepagents/",
+    "kind": "repo",
+    "one_liner": "PyPI package page for LangChain's deepagents library, corroborating it is a real, installable, currently maintained package (not vaporware).",
+    "confidence": "medium",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "Long-horizon agents explained: Hype, reality, engineering lessons (EPAM)",
+    "url": "https://www.epam.com/insights/ai/blogs/how-to-use-long-horizon-agents-in-production",
+    "kind": "blog",
+    "one_liner": "Industry consultancy analysis arguing 2026's real production value comes from 'supervised software operations' (strong specs, harnesses, cheap verification, explicit context, active steering) rather than full autonomy claims.",
+    "confidence": "medium",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "Long-Horizon Agents Are Here. Full Autopilot Isn't",
+    "url": "https://dev.to/maximsaplin/long-horizon-agents-are-here-full-autopilot-isnt-5bo7",
+    "kind": "blog",
+    "one_liner": "Skeptical practitioner take pushing back on full-autonomy hype for long-horizon agents in 2026 (direct fetch blocked by 403, title/framing corroborated via search snippet).",
+    "confidence": "low",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "Learning Agent-Compatible Context Management for Long-Horizon Tasks",
+    "url": "https://arxiv.org/pdf/2605.30785",
+    "kind": "paper",
+    "one_liner": "arXiv paper on context management techniques specifically engineered for long-horizon agent tasks, part of a cluster of mid-2026 papers on context/memory as the bottleneck for sustained agent autonomy.",
+    "confidence": "medium",
+    "angle": "long horizon deep agent autonomous execution 2026"
+  },
+  {
+    "title": "browser-use/browser-use (GitHub)",
+    "url": "https://github.com/browser-use/browser-use",
+    "kind": "repo",
+    "one_liner": "Leading open-source Python library wrapping Playwright with an LLM decision layer for browser automation; ~102k GitHub stars, 11.3k forks, latest release v0.13.2 (June 12, 2026), recently added a 'CLI 3.0' powered by 'Browser Harness'.",
+    "confidence": "high",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "simular-ai/Agent-S (GitHub)",
+    "url": "https://github.com/simular-ai/Agent-S",
+    "kind": "repo",
+    "one_liner": "Open-source Agent-Computer Interface framework for autonomous OS-level GUI control; Agent S3 reports 66% on OSWorld alone and 72.6% with Behavior Best-of-N selection, ~12k stars, latest v0.3.2 (Dec 2025).",
+    "confidence": "high",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "OSWorld / OSWorld-Verified official site (os-world.github.io, xlang-ai)",
+    "url": "https://os-world.github.io/",
+    "kind": "docs",
+    "one_liner": "The canonical NeurIPS-2024-published computer-use benchmark (369 real desktop tasks); OSWorld-Verified is its July 2025 upgraded leaderboard requiring maintainer-run verification, and is the reference point nearly every vendor benchmark claim compares against.",
+    "confidence": "high",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "llm-stats.com OSWorld-Verified Leaderboard",
+    "url": "https://llm-stats.com/benchmarks/osworld-verified",
+    "kind": "other",
+    "one_liner": "Aggregated leaderboard showing as of July 2026 Claude models (e.g., 'Claude Fable 5' / Opus 4.8) leading OSWorld-Verified around 83-85%, independent of any single vendor's self-reported blog claims.",
+    "confidence": "medium",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "Claude computer use tool docs (platform.claude.com)",
+    "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool",
+    "kind": "docs",
+    "one_liner": "Anthropic's official API documentation for the computer_20251124 tool (screenshots, mouse/keyboard control) that underlies Claude's vision-based, DOM-free computer/browser automation.",
+    "confidence": "high",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "Anthropic: Introducing Claude Opus 4.8",
+    "url": "https://www.anthropic.com/news/claude-opus-4-8",
+    "kind": "news",
+    "one_liner": "Anthropic's release announcement citing Opus 4.8 as the strongest computer-use/browser-agent model tested, scoring 84% on Online-Mind2Web.",
+    "confidence": "medium",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "CNBC: Anthropic says Claude can now use your computer to finish tasks",
+    "url": "https://www.cnbc.com/2026/03/24/anthropic-claude-ai-agent-use-computer-finish-tasks.html",
+    "kind": "news",
+    "one_liner": "Mainstream press coverage of Anthropic's March 24, 2026 research-preview launch of desktop Computer Use for Claude Pro/Max subscribers on macOS.",
+    "confidence": "medium",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "Browserbase: Launching Stagehand v3",
+    "url": "https://www.browserbase.com/blog/stagehand-v3",
+    "kind": "blog",
+    "one_liner": "Stagehand v3 (Feb 2026) is a full rewrite dropping the Playwright dependency in favor of talking to the browser directly over Chrome DevTools Protocol, claimed to run 44% faster with element/action caching to cut redundant LLM calls.",
+    "confidence": "high",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "arXiv 2506.16042 - OSWorld-Human: Benchmarking the Efficiency of Computer-Use Agents",
+    "url": "https://arxiv.org/abs/2506.16042",
+    "kind": "paper",
+    "one_liner": "Peer-reviewed-track paper introducing an efficiency-focused benchmark showing top computer-use agents take 2.7-4.3x more steps than a human baseline despite comparable task success, i.e. accuracy gains have outpaced latency/efficiency gains.",
+    "confidence": "medium",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "Coasty Blog - OSWorld Benchmark 2026 Results (multiple posts)",
+    "url": "https://coasty.ai/blog/osworld-benchmark-2026-ai-computer-use-agents-ranked",
+    "kind": "blog",
+    "one_liner": "A vendor's own blog claiming its 'Coasty' agent leads OSWorld-Verified at 82%, but the exact competitor numbers cited (e.g. OpenAI at 38% vs 63.3% in different posts) are inconsistent across Coasty's own articles and appear nowhere on independent leaderboards.",
+    "confidence": "low",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "AIMultiple - Best 30+ Open Source Web Agents in 2026",
+    "url": "https://aimultiple.com/open-source-web-agents",
+    "kind": "blog",
+    "one_liner": "Industry roundup/comparison of 30+ open-source web/browser agent projects as of 2026, used as a cross-check for which frameworks recur across multiple independent write-ups (browser-use, Skyvern, Stagehand, Agent-S all appear repeatedly).",
+    "confidence": "medium",
+    "angle": "computer use browser agent framework 2026"
+  },
+  {
+    "title": "GitHub - openclaw/openclaw: Your own personal AI assistant. Any OS. Any Platform.",
+    "url": "https://github.com/openclaw/openclaw",
+    "kind": "repo",
+    "one_liner": "Self-hosted personal AI assistant with multi-agent/channel routing that became 2026's fastest-growing GitHub repo (roughly 9k to 380k+ stars, ~80k forks in weeks/months), though it's closer to a personal-assistant gateway with agent routing than a pure multi-agent orchestrator.",
+    "confidence": "high",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "GitHub - agentscope-ai/agentscope: Build and run agents you can see, understand and trust.",
+    "url": "https://github.com/agentscope-ai/agentscope",
+    "kind": "repo",
+    "one_liner": "Alibaba-backed production multi-agent framework (27.4k stars, 3.1k forks, Apache 2.0, v2.0.3 released 2026-06-29) with 'Agent Team' leader/worker spawning, distributed deployment, and real-time voice; reported as #1 GitHub Trending in Feb 2026.",
+    "confidence": "high",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "GitHub - microsoft/agent-framework: A framework for building, orchestrating and deploying AI agents and multi-agent workflows",
+    "url": "https://github.com/microsoft/agent-framework",
+    "kind": "repo",
+    "one_liner": "Microsoft's open, multi-language (.NET + Python) successor framework unifying AutoGen and Semantic Kernel, ~11.8k stars, positioned for production-grade orchestration with policy-as-code and audit logging.",
+    "confidence": "high",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "GitHub - open-multi-agent/open-multi-agent: TypeScript-native multi-agent orchestration",
+    "url": "https://github.com/open-multi-agent/open-multi-agent",
+    "kind": "repo",
+    "one_liner": "TypeScript-native framework (launched 2026-04-01, MIT license) that automatically decomposes a goal into a task DAG and parallelizes independent subtasks across agents.",
+    "confidence": "medium",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "GitHub - crewAIInc/crewai: Framework for orchestrating role-playing, autonomous AI agents",
+    "url": "https://github.com/crewaiinc/crewai",
+    "kind": "repo",
+    "one_liner": "Role-based multi-agent orchestration framework (agents as 'employees' with role/goal/backstory), cited across multiple 2026 comparison pieces as the easiest-onboarding option with 1500+ company adoptions claimed.",
+    "confidence": "high",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "LangGraph vs CrewAI vs AutoGen: The Complete Multi-Agent AI Orchestration Guide for 2026 (DEV Community)",
+    "url": "https://dev.to/pockit_tools/langgraph-vs-crewai-vs-autogen-the-complete-multi-agent-ai-orchestration-guide-for-2026-2d63",
+    "kind": "blog",
+    "one_liner": "2026 comparison piece arguing LangGraph has the largest production deployment footprint and most mature state/checkpointing model among the three leading orchestration frameworks.",
+    "confidence": "medium",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "Four OpenClaw Flaws Enable Data Theft, Privilege Escalation, and Persistence (The Hacker News)",
+    "url": "https://thehackernews.com/2026/05/four-openclaw-flaws-enable-data-theft.html",
+    "kind": "news",
+    "one_liner": "Security-outlet reporting on chained CVEs in OpenClaw enabling data theft and privilege escalation, part of the broader 2026 OpenClaw CVE wave.",
+    "confidence": "high",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "CVE-2026-32922: Critical Privilege Escalation in OpenClaw (ARMO)",
+    "url": "https://www.armosec.io/blog/cve-2026-32922-openclaw-privilege-escalation-cloud-security/",
+    "kind": "blog",
+    "one_liner": "Cloud-security vendor writeup describing OpenClaw's most severe vulnerability, where a single API call converts a pairing token into full admin/RCE control.",
+    "confidence": "medium",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "The OpenClaw Security Crisis: 135,000 Exposed AI Agents and the Runtime Governance Gap (Waxell)",
+    "url": "https://waxell.ai/blog/openclaw-ai-agent-supply-chain-security",
+    "kind": "blog",
+    "one_liner": "Analysis citing a SecurityScorecard finding of 135,000 publicly exposed OpenClaw instances with plaintext API keys, plus a related Moltbook breach exposing 1.5 million agent API tokens.",
+    "confidence": "medium",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "GitHub - ComposioHQ/agent-orchestrator (AgentWrapper/agent-orchestrator): Agentic orchestrator for parallel coding agents",
+    "url": "https://github.com/ComposioHQ/agent-orchestrator",
+    "kind": "repo",
+    "one_liner": "Orchestrator specifically for parallel coding agents \u2014 plans tasks, spawns agents, and autonomously handles CI fixes, merge conflicts, and code reviews.",
+    "confidence": "low",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "The best AI agent frameworks in 2026 (LangChain)",
+    "url": "https://www.langchain.com/resources/ai-agent-frameworks",
+    "kind": "docs",
+    "one_liner": "Vendor roundup of leading agent/orchestration frameworks in 2026, used as corroborating context across multiple search results (LangGraph, CrewAI, AutoGen positioning).",
+    "confidence": "low",
+    "angle": "github trending multi-agent orchestrator framework 2026"
+  },
+  {
+    "title": "Introducing Claude Sonnet 5 (Anthropic)",
+    "url": "https://www.anthropic.com/news/claude-sonnet-5",
+    "kind": "docs",
+    "one_liner": "Official Anthropic announcement of Claude Sonnet 5, released June 30, 2026, positioned as the new default model for agentic/coding work.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "System Card: Claude Sonnet 5 (Anthropic)",
+    "url": "https://www.anthropic.com/claude-sonnet-5-system-card",
+    "kind": "docs",
+    "one_liner": "Anthropic's official system card for Sonnet 5 covering pre-deployment evals, RSP assessment, and safety testing.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Claude Mythos \\ Anthropic",
+    "url": "https://www.anthropic.com/claude/mythos",
+    "kind": "docs",
+    "one_liner": "Anthropic's product page for Claude Mythos Preview, its frontier cybersecurity-class model kept to an invite-only partner program (Project Glasswing).",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Project Glasswing: Securing critical software for the AI era (Anthropic)",
+    "url": "https://www.anthropic.com/glasswing",
+    "kind": "docs",
+    "one_liner": "Describes the invite-only program (12 founding orgs + ~40 vetted critical-infrastructure operators) through which Mythos Preview is accessed.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Anthropic Disabled Fable 5 And Mythos 5 After A U.S. Export-Control Order (Forbes)",
+    "url": "https://www.forbes.com/sites/anishasircar/2026/06/16/anthropic-disabled-fable-5-and-mythos-5-after-a-us-export-control-order-heres-what-happened/",
+    "kind": "news",
+    "one_liner": "Reports the U.S. Commerce Department ordered Anthropic to suspend Fable 5 and Mythos 5 globally days after their June 12, 2026 launch, citing export-control/national-security authority after a reported jailbreak.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Claude Fable 5 cleared to return as US lifts Anthropic's export control restriction (9to5Mac)",
+    "url": "https://9to5mac.com/2026/06/30/claude-fable-5-cleared-to-return-as-us-lifts-anthropics-export-control-restriction/",
+    "kind": "news",
+    "one_liner": "Confirms the export-control order was lifted for Fable 5 with restoration beginning July 1, 2026, while Mythos 5 access remains limited to approved US organizations.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "OpenAI limits GPT-5.6 rollout after government request (TechCrunch)",
+    "url": "https://techcrunch.com/2026/06/26/openai-limits-gpt-5-6-rollout-after-government-request-says-restrictions-shouldnt-be-the-norm/",
+    "kind": "news",
+    "one_liner": "Reports the White House asked OpenAI to restrict GPT-5.6 (Sol/Terra/Luna) to ~20 vetted organizations, coordinated with OSTP, ONCD, and Commerce, over cyber-capability concerns.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "GPT-5.6 Preview System Card (OpenAI Deployment Safety Hub)",
+    "url": "https://deploymentsafety.openai.com/gpt-5-6-preview",
+    "kind": "docs",
+    "one_liner": "OpenAI's official preview system card for the GPT-5.6 family (Sol, Terra, Luna), previewed June 26, 2026, detailing safety evals ahead of a staggered limited-partner rollout.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Previewing GPT-5.6 Sol: a next-generation model (OpenAI)",
+    "url": "https://openai.com/index/previewing-gpt-5-6-sol/",
+    "kind": "docs",
+    "one_liner": "OpenAI's official announcement of the GPT-5.6 model family preview.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Gemma 4 model card (Google AI for Developers)",
+    "url": "https://ai.google.dev/gemma/docs/core/model_card_4",
+    "kind": "docs",
+    "one_liner": "Official model card for Google DeepMind's open Gemma 4 family (multimodal, up to 256K context, dense + MoE variants), last updated 2026-06-26.",
+    "confidence": "high",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "Claude Mythos Security: 271 Firefox Bugs Confirmed, NSA Breach Story Disputed (Tech Times)",
+    "url": "https://www.techtimes.com/articles/319028/20260624/claude-mythos-security-271-firefox-bugs-confirmed-nsa-breach-story-disputed.htm",
+    "kind": "news",
+    "one_liner": "Follow-up reporting on Mythos's real-world vulnerability-discovery track record and disputed breach claims circulating in late June 2026.",
+    "confidence": "medium",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "xAI unveils Grok 4.5, a 1.5 trillion parameter V9 model in private beta (KuCoin/CryptoBriefing)",
+    "url": "https://www.kucoin.com/news/flash/xai-unveils-grok-4-5-with-1-5-trillion-parameter-v9-model-in-private-beta",
+    "kind": "news",
+    "one_liner": "Reports Grok 4.5 (V9, ~1.5T params) is in private beta with SpaceX/Tesla as of late June 2026, with no public system card or benchmarks yet \u2014 contrasts with Anthropic/OpenAI's card-first approach.",
+    "confidence": "medium",
+    "angle": "Frontier model release / model card landscape as of July 2026 \u2014 surveying which labs (Anthropic, OpenAI, Google, xAI, Meta) published new model cards/system cards around this window, and the unusual government-intervention story (export-control shutdown of Anthropic's Fable 5/Mythos 5, and White House-requested restriction of OpenAI's GPT-5.6) that has made \"model card\" releases in mid-2026 a national-security story rather than a routine capability announcement."
+  },
+  {
+    "title": "The Ringelmann Effect in Multi-Agent LLM Systems: A Scaling Law for Effective Team Size",
+    "url": "https://arxiv.org/pdf/2606.02646",
+    "kind": "paper",
+    "one_liner": "Core paper: derives a two-parameter scaling law (hard-ceiling/sublinear/linear regimes) for LLM multi-agent debate, and shows via Latane power-law and Kish design-effect fits that LLM agents are far more correlated (rho 0.56-0.85) than human groups (rho 0.02-0.35), giving a much steeper 'Ringelmann-style' effective-team-size collapse; explicitly frames this as a structural analogy, not a claim of human-like social loafing.",
+    "confidence": "high",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "Group size effects and collective misalignment in LLM multi-agent systems",
+    "url": "https://arxiv.org/abs/2510.22422",
+    "kind": "paper",
+    "one_liner": "Flint, Aiello, Pastor-Satorras & Baronchelli (submitted Oct 2025) build a mean-field model showing group size non-linearly and non-monotonically shapes collective bias/misalignment in LLM societies, with deterministic basins of attraction emerging above a critical population size.",
+    "confidence": "high",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "The Bystander Effect in Multi-Agent Reasoning: Quantifying Cognitive Loafing in Collaborative Interactions",
+    "url": "https://arxiv.org/pdf/2605.10698",
+    "kind": "paper",
+    "one_liner": "Shehata & Li (U. Waterloo) audit 22,500 trajectories across GAIA/SWE-bench/Multi-Challenge and find LLM agents suppress internally-correct reasoning to sycophantically match a simulated group ('Alignment Hallucination'), formalizing an 'Interaction Depth Limit' where logical sovereignty collapses into social compliance.",
+    "confidence": "high",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "Understanding Agent Scaling in LLM-Based Multi-Agent Systems via Diversity",
+    "url": "https://arxiv.org/abs/2602.03794",
+    "kind": "paper",
+    "one_liner": "Yang et al. (Feb 2026) show an information-theoretic bound: homogeneous-agent scaling saturates fast due to correlated outputs, while 2 heterogeneous agents can match or beat 16 homogeneous ones; code at github.com/SafeRL-Lab/Agent-Scaling.",
+    "confidence": "high",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "Scaling Large Language Model-based Multi-Agent Collaboration (MacNet)",
+    "url": "https://arxiv.org/html/2406.07155v1",
+    "kind": "paper",
+    "one_liner": "Earlier (2024) foundational work reporting a 'logistic-shaped collaborative scaling law' with diminishing returns beyond moderate team sizes and showing topology/message policy matter as much as raw agent count.",
+    "confidence": "medium",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "Scaling Teams or Scaling Time? Memory Enabled Lifelong Learning in LLM Multi-Agent Systems",
+    "url": "https://arxiv.org/pdf/2604.03295",
+    "kind": "paper",
+    "one_liner": "Argues institutional memory/lifelong learning can be an alternative axis to raw team-size scaling for improving multi-agent system performance over time.",
+    "confidence": "medium",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "CollabSim: A CSCW-Grounded Methodology for Investigating Collaborative Competence of LLM Agents through Controlled Multi-Agent Experiments",
+    "url": "https://arxiv.org/pdf/2606.06399",
+    "kind": "paper",
+    "one_liner": "Applies Computer-Supported-Cooperative-Work methodology to controlled multi-agent LLM experiments, a complementary framework for measuring collaborative competence as team composition changes.",
+    "confidence": "low",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "When Is Collective Intelligence a Lottery? Multi-Agent Scaling Laws for Memetic Drift in LLMs",
+    "url": "https://arxiv.org/html/2603.24676",
+    "kind": "paper",
+    "one_liner": "Proposes multi-agent scaling laws around 'memetic drift,' framing collective intelligence gains as probabilistic/lottery-like rather than guaranteed with scale -- appeared once in search results, not cross-confirmed.",
+    "confidence": "low",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "The Market Shift: Why Multi-agent LLM Coordination Matters in 2026",
+    "url": "https://sesamedisk.com/multi-agent-llm-coordination-2026/",
+    "kind": "blog",
+    "one_liner": "Industry blog post translating the academic findings into a practitioner heuristic: '2026 practical team size for agentic systems is typically three or four agents' due to coordination overhead and error cascades; single-snippet, non-peer-reviewed source.",
+    "confidence": "low",
+    "angle": "Multi-agent scaling law / team size Ringelmann effect (2026): a small but coherent cluster of 2026 arXiv papers formalizes the intuition that \"more LLM agents\" doesn't linearly buy more performance, using the classic 1913 Ringelmann social-loafing/process-loss framing as the explicit analogy. The core paper fits a Latan\u00e9 power-law and Kish design-effect model to LLM debate transcripts and finds LLM agent correlation is far higher than human-group correlation, producing a much steeper falloff (an \"effective team size\" collapse) than the Ringelmann effect ever showed in humans. Adjacent papers converge on the same diagnosis via different lenses (mean-field group dynamics, bystander/cognitive-loafing framing, information-theoretic diversity bounds, logistic collaborative scaling), and industry commentary has already turned this into a practical \"3-4 agents is the sweet spot\" heuristic for 2026 agentic system design."
+  },
+  {
+    "title": "Compaction - Claude Platform Docs (Anthropic)",
+    "url": "https://platform.claude.com/docs/en/build-with-claude/compaction",
+    "kind": "docs",
+    "one_liner": "Official Anthropic docs for the compact-2026-01-12 beta API: default trigger is 150,000 input tokens (min 50,000), server auto-summarizes and drops prior content blocks, supports pause_after_compaction and custom summarization instructions, works across Claude Fable 5/Mythos 5/Opus 4.6-4.8/Sonnet 5 etc.",
+    "confidence": "high",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Self-Compacting Language Model Agents (arXiv:2606.23525)",
+    "url": "https://arxiv.org/abs/2606.23525",
+    "kind": "paper",
+    "one_liner": "Proposes SelfCompact: lets the model itself decide when/how to compact via a callable tool plus a rubric (fire when a sub-task resolves or trajectory converges; suppress mid-derivation or when stuck), beating fixed-interval summarization by up to 18.1 points on math and 5-9 points on agentic search at 30-70% lower cost.",
+    "confidence": "high",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Context Rot: How Increasing Input Tokens Impacts LLM Performance (Chroma)",
+    "url": "https://www.trychroma.com/research/context-rot",
+    "kind": "paper",
+    "one_liner": "Foundational technical report (Hong, Troynikov, Huber) testing 18 top-tier models showing performance degrades non-uniformly as input length grows even within advertised context limits \u2014 the root problem compaction techniques are built to address.",
+    "confidence": "high",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "chroma-core/context-rot (GitHub)",
+    "url": "https://github.com/chroma-core/context-rot",
+    "kind": "repo",
+    "one_liner": "Official toolkit/replication code for the Chroma context-rot technical report; widely cited as the empirical basis for context engineering urgency in 2026.",
+    "confidence": "high",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "LOCA-bench: Benchmarking Language Agents Under Controllable and Extreme Context Growth (arXiv:2602.07962, GitHub: hkust-nlp/LOCA-bench)",
+    "url": "https://arxiv.org/abs/2602.07962",
+    "kind": "paper",
+    "one_liner": "Feb 2026 benchmark that controllably varies agentic environment/context length (e.g., simulated spreadsheet/PDF/database size) to isolate long-context degradation specifically in tool-using agent settings, not just single-step retrieval.",
+    "confidence": "medium",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Beyond Compaction: Structured Context Eviction for Long-Horizon Agents (arXiv:2606.11213)",
+    "url": "https://arxiv.org/pdf/2606.11213",
+    "kind": "paper",
+    "one_liner": "Proposes structured eviction as an alternative/complement to LLM-summarization-based compaction for long-horizon agents; found via multiple independent search queries but full text could not be fetched (403), so specifics are unverified beyond the title/abstract-level framing.",
+    "confidence": "low",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Parallel Context Compaction for Long-Horizon LLM Agent Serving (arXiv:2605.23296)",
+    "url": "https://arxiv.org/pdf/2605.23296",
+    "kind": "paper",
+    "one_liner": "Addresses the latency/blocking cost of compaction (a full LLM call over large context) by parallelizing the compaction pass during agent serving; appeared once in search results, not independently cross-verified.",
+    "confidence": "low",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Effective context engineering for AI agents (Anthropic Engineering Blog)",
+    "url": "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents",
+    "kind": "blog",
+    "one_liner": "Anthropic's own engineering guidance framing context engineering as owning the full token lifecycle (system prompt to final compacted summary) rather than just prompt wording; appeared consistently across multiple searches as a canonical reference, though direct fetch was blocked (403).",
+    "confidence": "medium",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "GenericAgent: A Token-Efficient Self-Evolving LLM Agent via Contextual Information Density Maximization (arXiv:2604.17091)",
+    "url": "https://arxiv.org/pdf/2604.17091",
+    "kind": "paper",
+    "one_liner": "Frames context management as maximizing 'information density' per token for self-evolving agents rather than simple truncation/summarization; found once, not cross-verified with a second source.",
+    "confidence": "low",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "Compaction - Amazon Bedrock docs",
+    "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-compaction.html",
+    "kind": "docs",
+    "one_liner": "AWS Bedrock's documentation mirroring Anthropic's Claude Messages compaction feature, confirming the compact-2026-01-12 mechanism is cross-platform (also on Vertex AI and Microsoft Foundry per other results), not Anthropic-API-exclusive.",
+    "confidence": "medium",
+    "angle": "Agent context engineering and context window compaction (2026): how production LLM agent systems detect, trigger, and perform compaction of accumulated conversation/tool-call history to combat \"context rot,\" including official provider APIs, self-directed compaction research, and benchmarking of long-horizon context growth."
+  },
+  {
+    "title": "SMoA: Improving Multi-agent Large Language Models with Sparse Mixture-of-Agents (arXiv:2411.03284)",
+    "url": "https://arxiv.org/abs/2411.03284",
+    "kind": "paper",
+    "one_liner": "Introduces Response Selection and Early Stopping mechanisms plus diversified role prompting to sparsify information flow between LLM agents in a Mixture-of-Agents system, cutting token/computation cost while matching dense MoA performance on reasoning, alignment, and fairness benchmarks.",
+    "confidence": "high",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "Mixture-of-Agents Enhances Large Language Model Capabilities (arXiv:2406.04692)",
+    "url": "https://arxiv.org/abs/2406.04692",
+    "kind": "paper",
+    "one_liner": "Original MoA paper: layered proposer/aggregator architecture that, using only open-source models, scored 65.1% on AlpacaEval 2.0, beating GPT-4 Omni's 57.5%; introduces MoA-Lite as a cheaper sparse-ish variant.",
+    "confidence": "high",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "GitHub - togethercomputer/MoA (Together Mixture-of-Agents)",
+    "url": "https://github.com/togethercomputer/moa",
+    "kind": "repo",
+    "one_liner": "Reference implementation of MoA from Together AI; ~2.9k stars, 381 forks, includes AlpacaEval/MT-Bench/FLASK eval scripts corroborating the 65.1% AlpacaEval figure.",
+    "confidence": "high",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "xRouter: Training Cost-Aware LLMs Orchestration System via Reinforcement Learning (arXiv:2510.08439)",
+    "url": "https://arxiv.org/abs/2510.08439",
+    "kind": "paper",
+    "one_liner": "Salesforce AI Research's tool-calling router (fine-tuned Qwen2.5-7B) trained via RL with an explicit cost-performance reward to decide whether to answer directly or delegate to costlier external models; corroborated by MarkTechPost coverage, a GitHub repo, and a HuggingFace model card.",
+    "confidence": "high",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "Uno-Orchestra: Parsimonious Agent Routing via Selective Delegation (arXiv:2605.05007)",
+    "url": "https://arxiv.org/abs/2605.05007",
+    "kind": "paper",
+    "one_liner": "A 2026 unified causal-LM orchestration policy that jointly decomposes tasks and routes each subtask to an admissible (model, primitive) pair via 'Agentic-GRPO'; claims 77.0% macro pass@1 across 13 benchmarks, ~16% above the strongest workflow baseline, at roughly an order of magnitude lower per-query cost.",
+    "confidence": "medium",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "FlyRoute: Self-Evolving Agent Profiling via Data Flywheel for Adaptive Task Routing (arXiv:2605.22057)",
+    "url": "https://arxiv.org/abs/2605.22057",
+    "kind": "paper",
+    "one_liner": "Huawei IT Innovation Research Center's May-2026 router that keeps agent capability profiles fresh via a self-evolving data flywheel; reports lifting a zero-shot LLM router from 72.57% to 89.83% accuracy on enterprise developer-support routing after streaming ~7,211 labeled queries.",
+    "confidence": "medium",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "EvolveRouter: Co-Evolving Routing and Prompt for Multi-Agent Question Answering (arXiv:2604.05149)",
+    "url": "https://arxiv.org/abs/2604.05149",
+    "kind": "paper",
+    "one_liner": "Couples graph-based query routing with agent instruction refinement in a closed loop, plus router-weighted answer agreement to dynamically size the agent collaboration per query; claims consistent gains over SOTA routing baselines on five QA benchmarks.",
+    "confidence": "medium",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "RouteLLM: Learning to Route LLMs with Preference Data (arXiv:2406.18665)",
+    "url": "https://arxiv.org/abs/2406.18665",
+    "kind": "paper",
+    "one_liner": "Foundational (2024) strong/weak model router trained on Chatbot Arena preference data; reports >85% cost reduction on MT-Bench and >45% on MMLU while retaining ~95% of GPT-4 quality \u2014 the baseline every later 2026 cost-aware router paper (xRouter, SeqRoute, Pyramid MoA) compares against.",
+    "confidence": "high",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "Pyramid MoA: A Probabilistic Framework for Cost-Optimized Anytime Inference (arXiv:2602.19509)",
+    "url": "https://arxiv.org/abs/2602.19509",
+    "kind": "paper",
+    "one_liner": "Hierarchical MoA with a decision-theoretic router that escalates only 'hard' queries (detected via ensemble agreement/confidence) to an oracle-tier model; reports 93.0% vs 98.0% oracle accuracy on GSM8K at 61% lower compute cost, with zero-shot transfer to unseen benchmarks.",
+    "confidence": "medium",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "AI Agent Protocol Ecosystem Map 2026: MCP, A2A, ACP, UCP",
+    "url": "https://www.digitalapplied.com/blog/ai-agent-protocol-ecosystem-map-2026-mcp-a2a-acp-ucp",
+    "kind": "blog",
+    "one_liner": "Industry map of the interoperability-protocol layer (A2A now Linux Foundation-governed, 150+ production orgs, 22,000+ GitHub stars, v1.0 stable as of April 2026) that a sparse agent-routing broker would sit above; notes Google's planned Q4 2026 agent marketplace.",
+    "confidence": "medium",
+    "angle": "Sparse mixture of agents routing/broker architectures (2026): the research and tooling landscape for routing queries across multiple LLM agents/models sparsely (rather than densely fanning out to all agents), spanning academic papers (SMoA, Pyramid MoA, xRouter, Uno-Orchestra, FlyRoute, EvolveRouter, RouteLLM), open-source infra (vLLM Semantic Router, Together MoA), and the broader agent-protocol/marketplace ecosystem (A2A, MCP) that a \"broker\" layer would sit on top of."
+  },
+  {
+    "title": "How we built our multi-agent research system (Anthropic Engineering)",
+    "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+    "kind": "blog",
+    "one_liner": "Anthropic's production orchestrator-worker fan-out/fan-in system: a lead agent spawns 3-5 parallel subagents (fan-out), each with its own context window, then reconciles condensed findings into a cited answer (fan-in); reports 90.2% improvement over single-agent and ~15x token cost.",
+    "confidence": "high",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "AgentsNet: Coordination and Collaborative Reasoning in Multi-Agent LLMs (arXiv 2507.08616)",
+    "url": "https://arxiv.org/abs/2507.08616",
+    "kind": "paper",
+    "one_liner": "ETH Zurich/Google Research benchmark built on distributed-systems problems (graph coloring, leader election) that tests self-organization and communication topology at scale (up to 100 agents); finds performance degrades as network/topology size grows.",
+    "confidence": "high",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "Retrieval-Conditioned Topology Selection with Provable Budget Conservation for Multi-Agent Code Generation (arXiv 2605.05657)",
+    "url": "https://arxiv.org/abs/2605.05657",
+    "kind": "paper",
+    "one_liner": "Proposes Retrieval-Guided Adaptive Orchestration (RGAO), which selects fan-out topology dynamically based on a codebase's structural complexity vector, with formal budget-conservation guarantees; NeurIPS 2026 submission.",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "Concurrent Multi-Agent Orchestration: Fan-out/Fan-in with Microsoft Agent Framework",
+    "url": "https://arafattehsin.com/blog/agent-orchestration-patterns-part-3/",
+    "kind": "blog",
+    "one_liner": "Practitioner walkthrough of implementing fan-out/fan-in concurrency in Microsoft's Agent Framework, part of a series on orchestration patterns.",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "LangGraph parallel execution / Send API docs and tutorials (multiple: LangChain forum, docs.langchain.com, markaicode.com, machinelearningplus.com)",
+    "url": "https://docs.langchain.com/oss/python/langgraph/use-graph-api",
+    "kind": "docs",
+    "one_liner": "LangGraph implements fan-out via multiple edges from one node executed in the same 'superstep' and fan-in via reducer functions merging parallel state writes; the Send API enables dynamic (runtime-determined) fan-out for map-reduce-style agent workloads.",
+    "confidence": "high",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "Multi-Agent Orchestration: 5 Patterns That Work in 2026 (Digital Applied)",
+    "url": "https://www.digitalapplied.com/blog/multi-agent-orchestration-5-patterns-that-work",
+    "kind": "blog",
+    "one_liner": "Industry overview naming fan-out, pipeline, debate, supervisor, and swarm as the five dominant production control-flow topologies, each with distinct coordination overhead and failure modes.",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "GitHub - EvoMap/awesome-agent-swarm",
+    "url": "https://github.com/EvoMap/awesome-agent-swarm",
+    "kind": "repo",
+    "one_liner": "Curated (31-star) list of agent-swarm frameworks; catalogs Swarms (kyegomez, sequential/parallel/hierarchical/mesh topologies), Open Multi-Agent (auto-decomposes goals into task DAGs for fan-out), and AdaptOrch (dynamic topology selection).",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "LLM-Based Multi-Agent Orchestration: A Survey of Frameworks, Communication Protocols, and Emerging Patterns (Future Internet journal, MDPI, doi.org/10.3390/fi18060326)",
+    "url": "https://doi.org/10.3390/fi18060326",
+    "kind": "paper",
+    "one_liner": "Peer-reviewed survey comparing LangGraph, CrewAI, AutoGen, OpenAI Agents SDK, MetaGPT, and DSPy across state-management, token-cost, and orchestration-topology dimensions with radar-plot comparisons.",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "Amazon Bedrock multi-agent collaboration docs / AWS multi-agent orchestration guidance",
+    "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html",
+    "kind": "docs",
+    "one_liner": "AWS-native managed orchestrator pattern: a supervisor/lead Bedrock Agent decomposes tasks and fans out to domain-specialist subagents in parallel; AWS also documents wiring durable fan-out via Step Functions, EventBridge, and Amazon MQ.",
+    "confidence": "medium",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "Agent Capsules: Quality-Gated Granularity Control for Multi-Agent LLM Pipelines (arXiv 2605.00410)",
+    "url": "https://arxiv.org/pdf/2605.00410",
+    "kind": "paper",
+    "one_liner": "Classifies multi-agent pipeline group topologies (linear, fan-out, diamond) and gates granularity/quality at each topology boundary.",
+    "confidence": "low",
+    "angle": "agent swarm coordination topology fan-out fan-in research"
+  },
+  {
+    "title": "An Adversary-Resistant Multi-Agent LLM System via Credibility Scoring",
+    "url": "https://arxiv.org/abs/2505.24239",
+    "kind": "paper",
+    "one_liner": "Introduces a Credibility Scoring (CrS) coordinator that assigns each agent a reliability weight so the ensemble picks the answer backed by the highest total weight, rather than raw majority vote; shows plain majority voting degrades badly once adversarial/malicious agents approach half the pool.",
+    "confidence": "high",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "The Consensus Trap: Rescuing Multi-Agent LLMs from Adversarial Majorities via Token-Level Collaboration",
+    "url": "https://arxiv.org/abs/2604.17139",
+    "kind": "paper",
+    "one_liner": "Shows response-level Majority Voting collapses into false consensus once corrupted agents form a local majority, because voting is blind to flawed intermediate logic; proposes Token-Level Round-Robin generation that stays robust well past that collapse threshold.",
+    "confidence": "high",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "SentinelNet: Safeguarding Multi-Agent Collaboration Through Credit-Based Dynamic Threat Detection (ACM Web Conference 2026 / arXiv 2510.16219)",
+    "url": "https://arxiv.org/abs/2510.16219",
+    "kind": "paper",
+    "one_liner": "Decentralized credit-based detector (contrastive learning on adversarial debate trajectories, bottom-k neighbor elimination) reaching near-100% malicious-agent detection within two debate rounds and recovering 95% of accuracy from compromised baselines; numbers corroborated identically via ACM DOI listing and ResearchGate.",
+    "confidence": "high",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "To trust or not to trust: Attention-based Trust Management for LLM Multi-Agent Systems",
+    "url": "https://arxiv.org/abs/2506.02546",
+    "kind": "paper",
+    "one_liner": "Proposes an Attention Trust Score (A-Trust) using six trust dimensions (factual accuracy, logical consistency, relevance, bias, language quality, clarity) to weight/distrust incoming agent messages instead of treating all messages equally.",
+    "confidence": "high",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "Defending LLM-based Multi-Agent Systems Against Cooperative Attacks with Sentence-Level Rectification",
+    "url": "https://arxiv.org/pdf/2605.28104",
+    "kind": "paper",
+    "one_liner": "Introduces STAR, a sentence-level trustworthiness/rectification defense; finds cooperative (colluding) malicious agents cause a much larger task-success drop (~5.34% relative) than independent attackers, motivating finer-grained credibility weighting than per-agent voting.",
+    "confidence": "medium",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "Minimizing Hallucinations and Communication Costs: Adversarial Debate and Voting Mechanisms in LLM-Based Multi-Agents",
+    "url": "https://www.mdpi.com/2076-3417/15/7/3676",
+    "kind": "paper",
+    "one_liner": "Uses a reliability-based weighting mechanism that scales each model's vote contribution by a computed reliability metric to reduce hallucination propagation in multi-agent debate/voting.",
+    "confidence": "medium",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "Exploring and Mitigating Adversarial Manipulation of Voting-Based Leaderboards",
+    "url": "https://arxiv.org/html/2501.07493v1",
+    "kind": "paper",
+    "one_liner": "Shows LLM leaderboard rankings driven by (crowd) voting can be manipulated for a cost of roughly a thousand adversarial votes, illustrating the general fragility of unweighted voting aggregation used to rank/select models.",
+    "confidence": "medium",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "Confidence-Credibility Aware Weighted Ensembles of Small (Language) Models",
+    "url": "https://arxiv.org/pdf/2512.17630",
+    "kind": "paper",
+    "one_liner": "Proposes a confidence-and-credibility-aware weighted ensembling scheme for small LLMs, weighting each model's vote by a combination of its confidence and a learned/estimated credibility score.",
+    "confidence": "low",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  },
+  {
+    "title": "An Optimized Weighted-Voting-Based Ensemble Learning Approach for Fake News Classification",
+    "url": "https://www.mdpi.com/2227-7390/13/3/449",
+    "kind": "paper",
+    "one_liner": "A non-LLM-specific but directly relevant precedent: optimizes per-classifier weights in a weighted-voting ensemble for a misinformation/adversarial-content classification task, the same aggregation pattern being adapted to LLM agent credibility weighting.",
+    "confidence": "low",
+    "angle": "LLM ensemble credibility weighted voting adversarial 2026"
+  }
+]

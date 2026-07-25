@@ -34,8 +34,6 @@ HOLON_DIALOGUE_PROVIDER_ENV = "DHARMA_HOLON_DIALOGUE_PROVIDER"
 HOLON_DIALOGUE_MODEL_ENV = "DHARMA_HOLON_DIALOGUE_MODEL"
 UNSAFE_DIALOGUE_PROVIDER_TYPES = {"claude_code", "codex"}
 LIVINGDOCK_CONTEXT_MAX_CHARS = 12_000
-FRONTIER_MODEL_SENTINEL = "@frontier"
-FRONTIER_MODEL_POLICY = "resolve_top_available_at_wake"
 
 # Provider string -> canonical ProviderType *value* (lowercase, matching the enum). Per
 # MODEL_KEY_ROUTING "THE ONE WAY", Anthropic/Claude routes to the Max plan (claude_code).
@@ -102,75 +100,6 @@ def _coerce_provider(raw: str | None) -> str:
     return candidate
 
 
-def _provider_type_from_value(value: str):
-    from dharma_swarm.runtime_provider import ProviderType
-
-    return ProviderType(value)
-
-
-def _is_frontier_policy(identity: dict[str, Any], model: str | None) -> bool:
-    policy = str(identity.get("model_policy") or "").strip()
-    if policy == FRONTIER_MODEL_POLICY:
-        return True
-    if str(model or "").strip() == FRONTIER_MODEL_SENTINEL:
-        return True
-    route = identity.get("model_route") if isinstance(identity.get("model_route"), dict) else {}
-    return str(route.get("resolver") or "").strip() in {
-        FRONTIER_MODEL_POLICY,
-        "model_hierarchy.order_providers",
-        "model_hierarchy.get_live_order",
-    }
-
-
-def _resolve_identity_model_and_provider(identity: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
-    """Resolve model/provider for a holon identity without mutating runtime state."""
-
-    raw_model = identity.get("model")
-    model = str(raw_model or "").strip()
-    provider_type = _coerce_provider(identity.get("provider"))
-    if not _is_frontier_policy(identity, model):
-        return model, provider_type, identity
-
-    from dharma_swarm.runtime_provider import resolve_top_available_at_wake
-
-    route = identity.get("model_route") if isinstance(identity.get("model_route"), dict) else {}
-    fallback_model = (
-        str(identity.get("fallback_model") or "").strip()
-        or (model if model and model != FRONTIER_MODEL_SENTINEL else "")
-        or str(route.get("fallback_model") or "").strip()
-        or None
-    )
-    fallback_provider = _provider_type_from_value(provider_type)
-    resolved = resolve_top_available_at_wake(
-        fallback_provider=fallback_provider,
-        fallback_model=fallback_model,
-    )
-    resolved_model = resolved.default_model or fallback_model
-    if not resolved_model:
-        raise ValueError("frontier resolver returned no model and no fallback_model is set")
-
-    resolved_identity = dict(identity)
-    resolved_identity["_runtime_model_resolution"] = {
-        "policy": FRONTIER_MODEL_POLICY,
-        "provider": resolved.provider.value,
-        "model": resolved_model,
-        "available": resolved.available,
-        "source": resolved.source,
-    }
-    if resolved.metadata and "frontier_resolution" in resolved.metadata:
-        resolved_identity["_runtime_model_resolution"]["frontier_resolution"] = (
-            resolved.metadata["frontier_resolution"]
-        )
-    logger.info(
-        "[holon] %s/%s resolved via %s (available=%s)",
-        resolved.provider.value,
-        resolved_model,
-        FRONTIER_MODEL_POLICY,
-        resolved.available,
-    )
-    return resolved_model, resolved.provider.value, resolved_identity
-
-
 _AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-.]{0,63}$")
 
 
@@ -207,7 +136,7 @@ def load_holon(name: str, agents_root: Path | None = None) -> RunningHolon:
             len(system_prompt),
         )
 
-    model, provider_type, identity = _resolve_identity_model_and_provider(identity)
+    model = identity.get("model")
     if not model:
         raise ValueError(f"agent {name} identity.json has no 'model'")
 
@@ -215,7 +144,7 @@ def load_holon(name: str, agents_root: Path | None = None) -> RunningHolon:
         name=name,
         model=model,
         system_prompt=system_prompt,
-        provider_type=provider_type,
+        provider_type=_coerce_provider(identity.get("provider")),
         identity=identity,
     )
 
@@ -266,6 +195,18 @@ def _provider_metadata(provider: Any) -> dict[str, str]:
     }
 
 
+def _unsafe_dialogue_runtime(config: Any) -> str:
+    """Return the unsafe logical provider or physical transport, if present."""
+    provider = getattr(config, "provider", "")
+    provider_name = str(getattr(provider, "value", provider) or "")
+    transport = str(getattr(config, "transport_mode", "") or "")
+    if provider_name in UNSAFE_DIALOGUE_PROVIDER_TYPES:
+        return provider_name
+    if transport in UNSAFE_DIALOGUE_PROVIDER_TYPES:
+        return transport
+    return ""
+
+
 def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None = None) -> Any:
     """Resolve a provider for direct read-only HOLON dialogue.
 
@@ -290,22 +231,32 @@ def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None 
             )
         ptype = ProviderType(provider_type)
         config = resolve_runtime_provider_config(ptype, model=model or None, env=env)
+        unsafe_runtime = _unsafe_dialogue_runtime(config)
+        if unsafe_runtime:
+            raise HolonDialogueProviderError(
+                f"resolved dialogue transport {unsafe_runtime} is unsafe for read-only dialogue"
+            )
         if not config.available:
             raise HolonDialogueProviderError(
                 f"dialogue provider {ptype.value} is not available"
             )
         provider = create_runtime_provider(config)
-        try:
+        if hasattr(provider, "__dict__"):
             setattr(provider, "holon_dialogue_provider_override", True)
-        except Exception:
-            pass
         return provider
 
     if holon.provider_type in UNSAFE_DIALOGUE_PROVIDER_TYPES:
         raise HolonDialogueProviderError(
             f"holon provider {holon.provider_type} is agentic and unsafe for read-only dialogue"
         )
-    provider = get_holon_provider(holon, env=env)
+    ptype = ProviderType(holon.provider_type)
+    config = resolve_runtime_provider_config(ptype, model=holon.model, env=env)
+    unsafe_runtime = _unsafe_dialogue_runtime(config)
+    if unsafe_runtime:
+        raise HolonDialogueProviderError(
+            f"resolved dialogue transport {unsafe_runtime} is unsafe for read-only dialogue"
+        )
+    provider = create_runtime_provider(config)
     metadata = _provider_metadata(provider)
     if metadata["provider"] in UNSAFE_DIALOGUE_PROVIDER_TYPES:
         raise HolonDialogueProviderError(

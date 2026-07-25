@@ -1,7 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { fetchChatStatus, fetchHealth } from "@/lib/api";
+import {
+  fetchChatStatus,
+  fetchHealth,
+  fetchRuntimeAssistants,
+  fetchRuntimeBackgroundJobs,
+  fetchRuntimeGraph,
+  fetchRuntimeInterrupts,
+} from "@/lib/api";
 import {
   buildRuntimeControlPlaneSnapshot,
   normalizeRuntimeControlPlaneResponses,
@@ -11,11 +18,29 @@ import {
 const DEFAULT_REFRESH_INTERVAL_MS = 30_000;
 
 async function loadRuntimeControlPlane(): Promise<RuntimeControlPlaneData> {
-  const [chatResponse, healthResponse] = await Promise.all([
+  const [
+    chatResponse,
+    healthResponse,
+    runtimeGraphResponse,
+    runtimeInterruptResponse,
+    runtimeAssistantsResponse,
+    runtimeBackgroundJobsResponse,
+  ] = await Promise.all([
     fetchChatStatus(),
-    fetchHealth({ runtimeTruth: true }),
+    fetchHealth(),
+    fetchRuntimeGraph({ limit: 20, receipt_limit: 50 }),
+    fetchRuntimeInterrupts({ limit: 20 }),
+    fetchRuntimeAssistants({ limit: 20 }),
+    fetchRuntimeBackgroundJobs({ limit: 20 }),
   ]);
-  return normalizeRuntimeControlPlaneResponses(chatResponse, healthResponse);
+  return normalizeRuntimeControlPlaneResponses(
+    chatResponse,
+    healthResponse,
+    runtimeGraphResponse,
+    runtimeInterruptResponse,
+    runtimeAssistantsResponse,
+    runtimeBackgroundJobsResponse,
+  );
 }
 
 export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
@@ -28,8 +53,16 @@ export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
   const data = query.data ?? {
     chatStatus: null,
     health: null,
+    runtimeGraph: null,
+    runtimeInterrupts: null,
+    runtimeAssistants: null,
+    runtimeBackgroundJobs: null,
     chatError: null,
     healthError: null,
+    runtimeGraphError: null,
+    runtimeInterruptError: null,
+    runtimeAssistantsError: null,
+    runtimeBackgroundJobsError: null,
     error: null,
   };
   const error =
@@ -40,12 +73,28 @@ export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
     ...query,
     chatStatus: data.chatStatus,
     health: data.health,
+    runtimeGraph: data.runtimeGraph,
+    runtimeInterrupts: data.runtimeInterrupts,
+    runtimeAssistants: data.runtimeAssistants,
+    runtimeBackgroundJobs: data.runtimeBackgroundJobs,
+    runtimeGraphError: data.runtimeGraphError,
+    runtimeInterruptError: data.runtimeInterruptError,
+    runtimeAssistantsError: data.runtimeAssistantsError,
+    runtimeBackgroundJobsError: data.runtimeBackgroundJobsError,
     error,
     snapshot: buildRuntimeControlPlaneSnapshot({
       chatStatus: data.chatStatus,
       health: data.health,
+      runtimeGraph: data.runtimeGraph,
+      runtimeInterrupts: data.runtimeInterrupts,
+      runtimeAssistants: data.runtimeAssistants,
+      runtimeBackgroundJobs: data.runtimeBackgroundJobs,
       chatError: data.chatError,
       healthError: data.healthError,
+      runtimeGraphError: data.runtimeGraphError,
+      runtimeInterruptError: data.runtimeInterruptError,
+      runtimeAssistantsError: data.runtimeAssistantsError,
+      runtimeBackgroundJobsError: data.runtimeBackgroundJobsError,
       error,
     }),
     refresh: query.refetch,

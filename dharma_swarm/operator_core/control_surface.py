@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,28 +30,33 @@ from dharma_swarm.operator_core.control_surface_go import (  # noqa: F401
     _go_world_receipt_summary_rows,
 )
 from dharma_swarm.operator_core.control_surface_memory import memory_kernel_control_rows
+from dharma_swarm.operator_core.control_surface_spine import (  # noqa: F401
+    _spine_pulse_row,
+)
 from dharma_swarm.operator_core.control_surface_live_ops import (  # noqa: F401
     _live_ops_census_rows,
     _rows_from_live_ops_census,
 )
 from dharma_swarm.operator_core.control_surface_models import (
-    AUTHORITY_ROLES,
+    AUTHORITY_ROLES,  # noqa: F401  (re-export)
     COHERENCE_STATES,
     PRIORITIES,
-    ROW_KINDS,
+    ROW_KINDS,  # noqa: F401  (re-export)
     AgentHandoffPrompt,  # noqa: F401
     ControlSurfaceEnvelope,  # noqa: F401
     ControlSurfaceRow,
     DisplayHints,  # noqa: F401
     EvidenceItem,  # noqa: F401
-    HumanDecisionContext,
+    HumanDecisionContext,  # noqa: F401  (re-export)
     SourceError,  # noqa: F401
     SourceRef,  # noqa: F401
     VerificationEvent,  # noqa: F401
     _build_human_decision_context,
     _compute_display_hints,
-    _needs_human_decision,
-    _utc_now_iso,
+    _needs_human_decision,  # noqa: F401  (re-export)
+)
+from dharma_swarm.operator_core.onboarding.broken_register import (
+    parse_broken_register,
 )
 
 logger = logging.getLogger(__name__)
@@ -603,12 +607,9 @@ def _operating_facts_rows() -> list[ControlSurfaceRow]:
     rows: list[ControlSurfaceRow] = []
     try:
         from dharma_swarm.operator_core.operating_facts import (
-            ORGAN_BOUNDARIES,
-            OrganStateFact,
             organ_state_facts,
         )
         facts = organ_state_facts()
-        now = _utc_now_iso()
         for fact in facts:
             rid = f"organ.{fact.name}"
             row = ControlSurfaceRow(
@@ -682,95 +683,53 @@ def _module_truth_rows() -> list[ControlSurfaceRow]:
 # J) Broken Register adapter
 # ---------------------------------------------------------------------------
 
-_BR_PATTERN = re.compile(
-    r"^###\s+(BR-\d+)\s*[—–-]\s*(.+)$",
-    re.MULTILINE,
-)
-_BR_FIELD = re.compile(r"^-\s+\*\*(\w[\w_]*)\*?\*?:\*?\*?\s*(.+)$", re.MULTILINE)
-
-
 def _broken_register_rows(repo_root: Path | None = None) -> list[ControlSurfaceRow]:
     root = repo_root or _repo_root()
     br_path = root / "docs" / "state" / "BROKEN_REGISTER.md"
-    if not br_path.exists():
-        return []
-    text = br_path.read_text(errors="ignore")
+    result = parse_broken_register(br_path)
     rows: list[ControlSurfaceRow] = []
-
-    in_open_section = False
-    for line in text.splitlines():
-        if line.startswith("## OPEN ITEMS") or line.startswith("## OPEN"):
-            in_open_section = True
-            continue
-        if line.startswith("## CLOSED"):
-            in_open_section = False
-            continue
-
-    chunks = _BR_PATTERN.split(text)
-    i = 1
-    while i + 1 < len(chunks):
-        br_id = chunks[i]
-        title = chunks[i + 1].strip()
-        body_start = text.find(f"### {br_id}")
-        if body_start < 0:
-            i += 3
-            continue
-        next_heading = text.find("\n### BR-", body_start + 1)
-        next_closed = text.find("\n## CLOSED", body_start + 1)
-        end = len(text)
-        if next_heading > 0:
-            end = min(end, next_heading)
-        if next_closed > 0:
-            end = min(end, next_closed)
-        body = text[body_start:end]
-
-        fields: dict[str, str] = {}
-        for fm in _BR_FIELD.finditer(body):
-            fields[fm.group(1).lower()] = fm.group(2).strip()
-
-        status_text = fields.get("status", "OPEN")
+    for entry in result.open_entries:
+        fields = entry.fields
+        status_text = entry.raw_status or entry.status
         severity = fields.get("severity", "UNKNOWN")
         domain = fields.get("domain", "")
-
-        is_closed = "CLOSED" in text[max(0, body_start - 200):body_start].upper()
-        if is_closed or "FIXED" in status_text.upper():
-            i += 3
-            continue
-
         row = ControlSurfaceRow(
-            id=f"br.{br_id.lower().replace('-', '_')}",
+            id=f"br.{entry.id.lower().replace('-', '_')}",
             kind="broken_register",
-            label=f"{br_id}: {title}",
+            label=f"{entry.id}: {entry.title}",
             authority_role="evidence",
             declared_state=status_text,
             desired_state="FIXED",
             observed_state=status_text,
-            coherence_state="drifted" if "OPEN" in status_text.upper() else "partial",
+            coherence_state="drifted" if entry.status == "OPEN" else "partial",
             priority="p0" if severity == "BLOCKER" else "p1" if severity == "DEGRADED" else "p2",
             owner_module=domain,
             truth_owner="BROKEN_REGISTER.md",
             gap_codes=[f"severity:{severity}"],
-            next_action=f"close {br_id}",
+            next_action=f"close {entry.id}",
             freshness=fields.get("last_verified", ""),
+            raw={
+                "status": entry.status,
+                "is_open_like": entry.is_open_like,
+                "is_closed_like": entry.is_closed_like,
+            },
         )
         ev_text = fields.get("evidence", "")
         if ev_text:
             row.add_evidence(
                 "broken_register", ev_text,
                 status="present",
-                provenance_chain=["BROKEN_REGISTER.md", br_id],
+                provenance_chain=["BROKEN_REGISTER.md", entry.id],
             )
         rc_text = fields.get("root_cause", "")
         if rc_text:
             row.add_evidence(
                 "broken_register", rc_text,
                 status="present",
-                provenance_chain=["BROKEN_REGISTER.md", br_id, "root_cause"],
+                provenance_chain=["BROKEN_REGISTER.md", entry.id, "root_cause"],
             )
         row.add_source_ref("file", "docs/state/BROKEN_REGISTER.md", exists=True)
         rows.append(row)
-        i += 3
-
     return rows
 
 
@@ -984,6 +943,9 @@ def build_control_surface_rows(
 
     # N) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
+
+    # O) Spine pulse (read-only cockpit projection over the receipt stream)
+    rows.append(_spine_pulse_row(root, runtime_db=runtime_db))
 
     # Apply human-decision policy with structured context
     for row in rows:

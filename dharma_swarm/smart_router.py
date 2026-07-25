@@ -17,10 +17,10 @@ import json
 import logging
 import os
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from dharma_swarm.models import LLMRequest, ProviderType
 
@@ -51,7 +51,7 @@ _DECISION_LOG = _DECISION_LOG_DIR / "decisions.jsonl"
 
 class CostTier(str, Enum):
     """Provider cost tiers, ordered cheapest to most expensive."""
-    FREE = "free"           # $0 — Ollama Cloud, NVIDIA NIM
+    FREE = "free"           # $0 — Ollama Cloud, Cerebras
     CHEAP = "cheap"         # ~$0 — OpenRouter free models, Groq, SiliconFlow
     MID = "mid"             # Low paid — OpenRouter paid cheap (Haiku, etc.)
     PREMIUM = "premium"     # Frontier — Opus, GPT-5, Sonnet
@@ -70,8 +70,8 @@ from dharma_swarm.model_hierarchy import (
 )
 
 _TIER_PROVIDERS: dict[CostTier, list[ProviderType]] = {
-    CostTier.FREE: list(_H_FREE[:2]),   # Ollama, NIM
-    CostTier.CHEAP: list(_H_FREE[2:]) + list(_H_CHEAP),  # Groq..Fireworks + Mistral..OR_FREE
+    CostTier.FREE: list(_H_FREE[:2]),   # Ollama, Groq
+    CostTier.CHEAP: list(_H_FREE[2:]) + list(_H_CHEAP),  # Cerebras..NIM + GoogleAI..OR_FREE
     CostTier.MID: [
         ProviderType.OPENROUTER,
         ProviderType.GOOGLE_AI,

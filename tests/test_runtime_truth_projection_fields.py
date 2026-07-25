@@ -54,6 +54,7 @@ def test_runtime_truth_projects_delegation_current_artifact_id(tmp_path):
     ]
     assert "artifact_refs" not in latest.missing_machine_fields
     assert latest.mission_id == "mission-current-artifact"
+    assert latest.proof_grade == "MISSING"
     assert "idempotency_record" in latest.missing_machine_fields
 
     summary = summarize_runtime_truth_packets(packets)

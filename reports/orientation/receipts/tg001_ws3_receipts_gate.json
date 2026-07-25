@@ -1,0 +1,19 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS3 adds a receipt-shaped A2A gate and receipted inbox reader that quarantines non-receipted messages before adapter handling.",
+  "evidence": [
+    {"kind": "path", "value": "dharma_swarm/a2a/task_receipt.py"},
+    {"kind": "path", "value": "tests/test_a2a_gate.py"},
+    {"kind": "command", "value": "pytest -q tests/test_a2a_gate.py"}
+  ],
+  "verdict": "verified",
+  "next_action": "Wire read_receipted_inbox into protected bridge/transport surfaces only in their owner lane.",
+  "files_changed": [
+    "dharma_swarm/a2a/task_receipt.py",
+    "dharma_swarm/a2a/__init__.py",
+    "tests/test_a2a_gate.py",
+    "reports/orientation/receipts/tg001_ws3_receipts_gate.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS3"
+}

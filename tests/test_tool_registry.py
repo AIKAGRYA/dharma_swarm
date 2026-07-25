@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.tool_registry import ToolRegistry, registry
+
+
+def _identity(**overrides: str) -> ExecutionIdentity:
+    payload = {
+        "task_id": "task-tool-registry",
+        "agent_id": "agent-tool-registry",
+        "session_id": "session-tool-registry",
+        "trace_id": "trace-tool-registry",
+        "correlation_id": "corr-tool-registry",
+        "run_id": "run-tool-registry",
+        "claim_id": "claim-tool-registry",
+        "idempotency_key": "idem-tool-registry",
+    }
+    payload.update(overrides)
+    return ExecutionIdentity.new(**payload)
 
 
 class TestToolRegistration:
@@ -124,6 +142,106 @@ class TestToolDispatch:
         result = json.loads(reg.dispatch("bad", {}))
         assert "error" in result
         assert "boom" in result["error"]
+
+    def test_dispatch_records_idempotent_side_effect_receipts(self, tmp_path):
+        calls: list[str] = []
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity()
+        reg = ToolRegistry(runtime_state=runtime, require_identity=True)
+        reg.register(
+            name="mutate",
+            toolset="core",
+            schema={"name": "mutate"},
+            handler=lambda args, **kw: calls.append(args["value"]) or json.dumps({"ok": True}),
+        )
+
+        result = json.loads(
+            reg.dispatch("mutate", {"value": "first"}, execution_identity=identity)
+        )
+
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        receipt_types = [receipt.receipt_type for receipt in ledger["receipts"]]
+        consumed_statuses = [
+            receipt.status
+            for receipt in ledger["receipts"]
+            if receipt.receipt_type == "idempotency_consumed"
+        ]
+
+        assert result == {"ok": True}
+        assert calls == ["first"]
+        assert receipt_types.count("side_effect_intent") == 1
+        assert receipt_types.count("side_effect_complete") == 1
+        assert consumed_statuses == ["accepted"]
+
+    def test_dispatch_suppresses_duplicate_side_effects(self, tmp_path):
+        calls: list[str] = []
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity()
+        reg = ToolRegistry(runtime_state=runtime, require_identity=True)
+        reg.register(
+            name="mutate",
+            toolset="core",
+            schema={"name": "mutate"},
+            handler=lambda args, **kw: calls.append(args["value"]) or json.dumps({"ok": True}),
+        )
+
+        first = json.loads(
+            reg.dispatch("mutate", {"value": "first"}, execution_identity=identity)
+        )
+        duplicate = json.loads(
+            reg.dispatch("mutate", {"value": "first"}, execution_identity=identity)
+        )
+
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        receipt_types = [receipt.receipt_type for receipt in ledger["receipts"]]
+        consumed_statuses = [
+            receipt.status
+            for receipt in ledger["receipts"]
+            if receipt.receipt_type == "idempotency_consumed"
+        ]
+
+        assert first == {"ok": True}
+        assert duplicate == {
+            "duplicate": True,
+            "tool_name": "mutate",
+            "side_effect_key": "tool_registry.dispatch:mutate:task-tool-registry",
+        }
+        assert calls == ["first"]
+        assert receipt_types.count("side_effect_intent") == 1
+        assert receipt_types.count("side_effect_complete") == 1
+        assert consumed_statuses == ["accepted", "duplicate"]
+
+    def test_dispatch_conflicting_duplicate_args_fail_before_handler(self, tmp_path):
+        calls: list[str] = []
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity()
+        reg = ToolRegistry(runtime_state=runtime, require_identity=True)
+        reg.register(
+            name="mutate",
+            toolset="core",
+            schema={"name": "mutate"},
+            handler=lambda args, **kw: calls.append(args["value"]) or json.dumps({"ok": True}),
+        )
+
+        first = json.loads(
+            reg.dispatch("mutate", {"value": "first"}, execution_identity=identity)
+        )
+        conflict = json.loads(
+            reg.dispatch("mutate", {"value": "second"}, execution_identity=identity)
+        )
+
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        consumed_statuses = [
+            receipt.status
+            for receipt in ledger["receipts"]
+            if receipt.receipt_type == "idempotency_consumed"
+        ]
+
+        assert first == {"ok": True}
+        assert "error" in conflict
+        assert "operation_hash conflict" in conflict["error"]
+        assert calls == ["first"]
+        assert consumed_statuses == ["accepted", "conflict"]
 
 
 class TestToolsetAvailability:

@@ -1,0 +1,105 @@
+{
+  "$schema": "dharma_external_agent_registration_manifest.v1",
+  "schema_version": "dharma_external_agent_registration_manifest.v1",
+  "agent_uid": "fable_composer",
+  "callsign": "fable_composer",
+  "display_name": "Fable 5 (Composer)",
+  "harness": "composer_runtime_mac",
+  "model_identity": "anthropic/claude-fable-5",
+  "department": "coordination",
+  "role": "composer_runtime_seat",
+  "squad_id": "hub",
+  "team_id": "dharma_swarm",
+  "endpoint": "composer://fable_composer/mac",
+  "mailbox": "nats://dharma.a2a.fable_composer",
+  "authority": "external_worker_evidence_only",
+  "autonomy_policy": {
+    "mode": "supervised_build_and_coordination",
+    "requires_approval": true,
+    "can_approve_prs": false,
+    "can_write_source": true,
+    "can_mutate_meta_dharma": false,
+    "can_mutate_telos": false,
+    "can_mutate_dharma_kernel": false,
+    "can_mutate_dgm_protected": false,
+    "can_author_context_bundles": false,
+    "explicit_task_assignment_required": true
+  },
+  "workspace_policy": {
+    "sandbox_root": "~/.dharma/external_agents/fable_composer",
+    "repo_writes_allowed": true,
+    "canonical_dharma_dir_writes_allowed": false
+  },
+  "memory_namespace": "agent:fable_composer",
+  "trace_identity": "trace:fable_composer",
+  "status": "registered",
+  "notes": "Persistent identity for the Fable 5 model holding the Mac composer runtime seat. Predates this card: active in fleet correspondence by 2026-06-12 (co-sign referenced in inter_agent/codex/inbound/2026-06-12T0215Z-fable-5-cursor-build-a-crossbuild-review-reply.md), runtime home ~/.dharma/agents/fable_composer/, roster uid in dharma_swarm/a2a/agent_presence.py REGISTERED_AGENT_UIDS. Until 2026-07-14 the seat existed only as runtime state + roster uid with no repo-canonical card; the git dock inter_agent/fable_composer/inbound/ accumulated three undrained packets (2026-07-02 x2, 2026-07-09 wiring check). This card was authored 2026-07-14 during an operator-directed seat wake executed from a Claude Code cloud session ('instantiate as fable composer'); that wake drained the dock and answered the pending packets. Honest boundary: a cloud-session wake has NO access to the Mac runtime state under ~/.dharma/agents/fable_composer/ — Mac-local questions (composer convergence dir, hill-climb state) can only be answered from an operator-Mac session. Distinct from fable_5_cursor (same model, Cursor IDE hub seat) and fable_claude_code (same model, Claude Code cloud seat). Proposed seat seam (2026-07-02 contact request, pending operator ratification): fable_composer owns Mac-local composition/convergence; fable_claude_code owns cloud branch-builds and PR pre-review; handoffs via packets. This file is the canonical source of truth for the seat's A2A card and address. Schema class: manifest-convention card (dharma_external_agent_registration_manifest.v1), like most cards in this directory — intentionally NOT a Stage-1 ExternalRoamingWorker (dharma_swarm/external_agent_registration.py): the seat really does write source (can_write_source stays true, matching the fable_claude_code sibling card), and no card-loading path instantiates that stricter model (verified 2026-07-14 — cybernetics_codex_registration.py:38 builds its worker in code; scripts/runtime/a2a_doctor.py and scripts/governance/a2a_agent_onboard.py read cards as JSON manifests, and the latter lists this card as canonical, not GHOST). The external-worker sandbox is ~/.dharma/external_agents/fable_composer per fleet convention; the Mac living-agent dock ~/.dharma/agents/fable_composer/ is a separate surface and stays documented here in notes/metadata, not as sandbox_root. Callsign deliberately equals the uid so the mailbox gateway's legacy drain dharma.a2a.<callsign> (dharma_swarm/a2a/mailbox_gateway.py _own_subjects) lands on the canonical subject dharma.a2a.fable_composer (scripts/runtime/a2a_doctor.py:67) with no hyphen/underscore split.",
+  "registration_source": "operator_request_2026_07_14_instantiate_fable_composer",
+  "capabilities": [
+    "composition_convergence",
+    "cross_lane_synthesis",
+    "a2a_correspondence",
+    "packet_generation",
+    "code_review",
+    "evidence_synthesis"
+  ],
+  "metadata": {
+    "operator": "AmitabhainArunachala/Dhyana",
+    "title": "@FABLE_COMPOSER",
+    "operating_title": "Fable 5 (Composer)",
+    "operator_requested_name": "fable composer",
+    "surface": "Composer runtime on the operator Mac (~/.dharma/agents/fable_composer/); operator-directed wakes may execute from other Fable 5 harnesses and must say so in their packets",
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "coordination_peers": [
+      "fable_claude_code",
+      "fable_5_cursor",
+      "codex_composer",
+      "hermes-m5",
+      "devin-roaming-2987d222",
+      "merge_master_mike"
+    ],
+    "transport_preference": "git_seat",
+    "canonical_transport_subject": "dharma.a2a.fable_composer",
+    "transport_subjects": {
+      "inbound": "dharma.a2a.fable_composer",
+      "replies_acks_wildcard": "dharma.a2a.fable_composer.>",
+      "fleet_cc": "dharma.a2a.fleet"
+    },
+    "inbox_dock": "~/.dharma/a2a_bus/inboxes/fable_composer",
+    "git_seat": "inter_agent/fable_composer/",
+    "transport_fallback_order": [
+      "git seat inter_agent/fable_composer/{inbound,outbound} (the only lane verified to drain, 2026-07-14)",
+      "nats_jetstream dharma.a2a.fable_composer (subject registered in scripts/runtime/a2a_doctor.py; no verified drain receipt yet)"
+    ],
+    "required_first_reads": [
+      "make onboard output",
+      "CLAUDE.md",
+      "docs/ops/A2A_AGENT_ONBOARDING.md",
+      "docs/ops/A2A_QUICKSTART.md",
+      "docs/ops/FLEET_FIELD_REGISTRY.yaml"
+    ],
+    "operational_route": "docs/ops/A2A_AGENT_ONBOARDING.md",
+    "summon_phrase": "@FABLE_COMPOSER",
+    "summon_aliases": [
+      "@fable_composer",
+      "@fable-composer"
+    ],
+    "summon_alias_note": "@fable remains claimed by fable_5_cursor and @fable_cc/@fable_fire by fable_claude_code; do not reuse either here.",
+    "summon_contract": "Assume the fable_composer identity, run make onboard, drain inter_agent/fable_composer/inbound/, answer every pending packet with worded replies (citation-or-silence applies), keep the FLEET_FIELD_REGISTRY entry true, and state explicitly which harness the wake is executing from. Do not merge, approve PRs, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
+    "automatic_authority_inheritance": false,
+    "llm_provider": "anthropic",
+    "llm_model_policy": "Fable 5 (claude-fable-5); verify per session"
+  },
+  "registration_desk": {
+    "require_own_system_interpretation": true,
+    "require_action_log": true,
+    "require_wake_receipts": false,
+    "ops_hooks": {
+      "canonical_onboarding": true,
+      "kaizen_ops_event": true,
+      "stigmergy_mark": true,
+      "agentops_contract": true
+    }
+  }
+}

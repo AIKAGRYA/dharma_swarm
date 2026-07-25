@@ -38,8 +38,20 @@ jobs:
           set -euo pipefail
           mkdir -p reports/docops
 
+          # Generated counts (SOVEREIGN_MANIFEST assertions + AUTO_INVENTORY
+          # auto-sections) are advisory on PRs: PRs no longer hand-commit them,
+          # and docops-reconcile-main.yml reconciles them after each merge
+          # (direct push with the bypass token, else a rolling bot PR). Every
+          # other DocOps check (path guards, canonical guard, TTL staleness,
+          # auto-section config, doc review) stays strict everywhere.
+          #
+          # The weekly schedule / manual dispatch run against main is STRICT on
+          # counts: it is the floor that catches a rotted reconcile loop. (The
+          # pre-2026-07-03 all-advisory version let main's counts stay stale for
+          # weeks while the reconcile push was silently rejected 102 times.)
           args=(--report-json reports/docops/check.json)
           if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            args+=(--counts-advisory)
             git fetch origin "${GITHUB_BASE_REF}" --depth=1
             args+=(--changed-from "origin/${GITHUB_BASE_REF}")
           fi

@@ -1,0 +1,96 @@
+{
+  "act_evidence": {
+    "inserted_memory_ids": [
+      "11420b44dce14ec3",
+      "0be95ee89c944f23",
+      "057ff41a76694df8",
+      "c1bd24a7ccba4803"
+    ],
+    "memory_db": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/db/memory.db",
+    "memory_rows_after": 5
+  },
+  "adapt_evidence": {
+    "meta_after": 1,
+    "meta_before": 0,
+    "meta_entry_id": "5747db9cf2444ee4"
+  },
+  "adapt_proof": {
+    "after": 1,
+    "before": 0,
+    "fed_forward": true,
+    "field": "StrangeLoopMemory META consolidation count, then later memory/context readers",
+    "memory_rows_after": 5,
+    "memory_rows_before": 0,
+    "meta_entry_id": "5747db9cf2444ee4"
+  },
+  "constrain_evidence": {
+    "admitted_to_memory": true,
+    "artifacts_hashed": true,
+    "evidence_path_exists": true,
+    "provider_truth_claimed": false,
+    "required_status": "completed"
+  },
+  "cycle_detail": [
+    {
+      "admitted": true,
+      "cycle": 1,
+      "development_rows_inserted": 1,
+      "memory_after": 5,
+      "memory_before": 0,
+      "meta_after": 1,
+      "meta_before": 0,
+      "sensed_work_id": "loop4_10_memory_context_closure_replay_v1",
+      "witness_rows_inserted": 3
+    },
+    {
+      "cycle": 2,
+      "later_cycle_read": true,
+      "memory_get_context_contains_marker": true,
+      "read_recent_memories_contains_marker": true
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "contains_work_id": true,
+    "interpreted_summary": "loop410memorycontextclosure completed work loop4_10_memory_context_closure_replay_v1 -> durable memory candidate"
+  },
+  "later_cycle_read_evidence": {
+    "memory_get_context_contains_marker": true,
+    "memory_get_context_snippet": "## Strange Loop Memory Context ### Recent Developments - [2026-07-01] DEVELOPMENT: loop410memorycontextclosure completed work consolidated into durable memory EVIDENCE: file path scripts/loop4_10_memory_context_closure_run.py; witness_rows=3 ### Witness Layer - [W] loop410memorycontextclosure completed work loop4_10_memory_context_closure_replay_v1",
+    "read_recent_memories_contains_marker": true,
+    "recent_memories_snippet": "## Recent Session Memories [2026-07-01T15:16:39] (meta) PATTERN: Recurring themes in witness layer: loop410memorycontextclosure(3), completed(3), loop4_10_memory_context_closure_replay_v1(3), witness(3), sample(3). Based on 3 recent observations. [2026-07-01T15:16:39] (development) DEVELOPMENT: loop410memorycontextclosure completed work consolidated into durable me"
+  },
+  "loop": 4,
+  "loop_id": "consolidation_memory",
+  "observed_at": "2026-07-01T15:16:39.133413Z",
+  "real_data": true,
+  "sense_evidence": {
+    "artifacts": [
+      {
+        "bytes": 20796,
+        "exists": true,
+        "path": "scripts/loop4_10_memory_context_closure_run.py",
+        "sha256": "4740d42e377121a42ee1361f9bc5bf125a49d37eac07993e4e5faebc0267fe8a"
+      },
+      {
+        "bytes": 3950,
+        "exists": true,
+        "path": "tests/test_loop4_10_memory_context_closure_run.py",
+        "sha256": "afcc1e637f55a734daa92dae0625d2aaec522e90875d0f31c79a0e75b168ecdc"
+      }
+    ],
+    "evidence_exists": true,
+    "evidence_path": "scripts/loop4_10_memory_context_closure_run.py",
+    "marker": "loop410memorycontextclosure",
+    "status": "completed",
+    "work_id": "loop4_10_memory_context_closure_replay_v1"
+  },
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  }
+}

@@ -1,9 +1,9 @@
-import React, {useEffect, useMemo, useReducer, useRef} from "react";
-import {Box, useApp, useInput} from "ink";
+import React, {useEffect, useMemo, useReducer, useRef, useState} from "react";
+import {Box, Text, useApp, useInput, useStdin} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, localStatusExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -22,16 +22,40 @@ import {ModelPicker} from "./components/ModelPicker.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
 import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
+import {NavigatorRail} from "./components/NavigatorRail.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
 import {SessionsPane} from "./components/SessionsPane.tsx";
+import {TourOverlay} from "./components/TourOverlay.tsx";
 import {ShellHeader} from "./components/ShellHeader.tsx";
 import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
+import {closestCommand, helmDirectiveToIntent, matchUiIntent, parseHelmDirectives, tourLines, type HelmDirective, type UiIntent} from "./uiIntents.ts";
+import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
-import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
-import {focusModeFor, footerHintFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
+import {routeLabel, routePolicyFromValue, routePolicyWithSuccessfulReceipt, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {THEME} from "./theme.ts";
+import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
+import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
+import {
+  continuityStateFromSession,
+  messagesForNextTurn,
+  sessionResumeEligibility,
+} from "./sessionContinuity.ts";
+import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
+import {
+  SESSION_CATALOG_LIMIT,
+  authoritativeResyncComplete,
+  authoritativeResyncStatus,
+  markAuthoritativeSurface,
+  requestAuthoritativeResync,
+  requestLiveSnapshots,
+  requestMissingAuthoritativeSurfaces,
+  requestPermissionHistory,
+  requestSessionCatalog,
+  sendBackgroundRequest,
+} from "./surfaceAuthority.ts";
 import {
   buildVerificationSummaryRows,
   isGenericVerificationLabel,
@@ -56,6 +80,8 @@ import {
   isWorkspaceSnapshotContent,
   modelPolicyToLines,
   modelPolicyToPreview,
+  handshakeRouteConfigFromEvent,
+  providerRouteReceiptFromEvent,
   permissionDecisionFromEvent,
   permissionHistoryFromEvent,
   permissionOutcomeFromEvent,
@@ -73,7 +99,7 @@ import {
   runtimeSnapshotToLines,
   runtimeSnapshotToPreview,
   sessionCatalogFromEvent,
-  sessionDetailFromEvent,
+  sessionDetailResultFromEvent,
   sessionPaneToLines,
   sessionPaneToPreview,
   sessionBootstrapToLines,
@@ -83,13 +109,27 @@ import {
   workspaceSnapshotPayloadFromEvent,
   workspaceSnapshotToPreview,
 } from "./protocol.ts";
+import {
+  nextSessionPaneAfterCatalog,
+  nextSessionPaneAfterDetailResult,
+} from "./sessionPaneState.ts";
 import {initialState, reduceApp} from "./state.ts";
-import type {AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionCatalogPayload, SessionDetailPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+
+export {continuityStateFromSession} from "./sessionContinuity.ts";
+export {
+  authoritativeResyncComplete,
+  authoritativeResyncStatus,
+  markAuthoritativeSurface,
+  missingAuthoritativeSurfaces,
+  requestMissingAuthoritativeSurfaces,
+} from "./surfaceAuthority.ts";
 
 const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
-const SESSION_CATALOG_LIMIT = 12;
 const SESSION_TRANSCRIPT_LIMIT = 40;
-const MIN_SCROLL_WINDOW_SIZE = 8;
+// F-021: floor lowered 8 -> 5 so the 80x24 budget (24 - 17 chrome rows = 7)
+// is not forced past the terminal height by the old floor.
+const MIN_SCROLL_WINDOW_SIZE = 5;
 
 type ModelChoice = RouteTarget;
 
@@ -98,6 +138,25 @@ type PendingCommandStream = {
   tabId: string;
   lastCompletedText?: string;
 };
+
+export type TurnCancellationDecision =
+  | {kind: "idle"}
+  | {kind: "request"; requestId: string}
+  | {kind: "already_requested"; requestId: string; cancelRequestId: string};
+
+export function decideTurnCancellation(activeTurn: ActiveTurnState): TurnCancellationDecision {
+  if (activeTurn.phase === "idle") {
+    return {kind: "idle"};
+  }
+  if (activeTurn.phase === "cancelling") {
+    return {
+      kind: "already_requested",
+      requestId: activeTurn.requestId,
+      cancelRequestId: activeTurn.cancelRequestId,
+    };
+  }
+  return {kind: "request", requestId: activeTurn.requestId};
+}
 
 const shellControlOptions = {
   sessionCatalogLimit: SESSION_CATALOG_LIMIT,
@@ -116,14 +175,6 @@ function ensureRuntimeTabs(stateTabs: TabSpec[]): TabSpec[] {
   const existingIds = new Set(stateTabs.map((tab) => tab.id));
   const missing = buildBridgeTabs().filter((tab) => !existingIds.has(tab.id));
   return [...stateTabs, ...missing];
-}
-
-function requestLiveSnapshots(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("workspace.snapshot");
-  bridge.send("runtime.snapshot");
-  bridge.send("model.policy", {provider, model, strategy});
-  bridge.send("agent.routes");
-  bridge.send("evolution.surface");
 }
 
 function queueAppActions(dispatch: React.Dispatch<AppAction>, actions: AppAction[]): void {
@@ -392,34 +443,51 @@ function preservePreviewFields(
 }
 
 function rawWorkspacePayloadRecord(event: Record<string, unknown>): Record<string, unknown> | undefined {
-  const directRecord =
-    typeof event.domain === "string" && event.domain === "workspace_snapshot" ? event : undefined;
-  if (directRecord) {
-    return directRecord;
+  const pending: unknown[] = [event, event.workspace_payload];
+  const visited = new Set<object>();
+  while (pending.length > 0) {
+    const candidate = pending.shift();
+    if (typeof candidate !== "object" || candidate === null || visited.has(candidate)) {
+      continue;
+    }
+    visited.add(candidate);
+    const record = candidate as Record<string, unknown>;
+    if (record.version === "v1" && record.domain === "workspace_snapshot") {
+      return record;
+    }
+    pending.push(record.payload, record.result, record.workspace_payload);
   }
-  const payload = event.payload;
-  if (typeof payload !== "object" || payload === null) {
-    return undefined;
-  }
-  return typeof (payload as {domain?: unknown}).domain === "string" &&
-    String((payload as {domain?: unknown}).domain) === "workspace_snapshot"
-    ? (payload as Record<string, unknown>)
-    : undefined;
+  return undefined;
 }
 
 function workspaceEventHasAuthoritativeTopology(event: Record<string, unknown>): boolean {
   const rawPayload = rawWorkspacePayloadRecord(event);
-  if (rawPayload) {
-    return Object.hasOwn(rawPayload, "topology");
-  }
-  const content = String(event.content ?? "");
-  return /^##\s+Topology\b/m.test(content);
+  return Boolean(workspaceSnapshotPayloadFromEvent(event) && rawPayload && Object.hasOwn(rawPayload, "topology"));
 }
 
 function workspaceEventHasAuthoritativeHotspotDetail(event: Record<string, unknown>): boolean {
   const rawPayload = rawWorkspacePayloadRecord(event);
-  if (rawPayload) {
-    return Object.hasOwn(rawPayload, "largest_python_files") || Object.hasOwn(rawPayload, "most_imported_modules");
+  return Boolean(
+    workspaceSnapshotPayloadFromEvent(event) &&
+      rawPayload &&
+      (Object.hasOwn(rawPayload, "largest_python_files") || Object.hasOwn(rawPayload, "most_imported_modules")),
+  );
+}
+
+function workspaceEventHasAuthoritativeRepoSignal(event: Record<string, unknown>): boolean {
+  return workspaceEventHasAuthoritativeTopology(event) && workspaceEventHasAuthoritativeHotspotDetail(event);
+}
+
+function workspaceEventHasTopologyDisplaySignal(event: Record<string, unknown>): boolean {
+  if (workspaceEventHasAuthoritativeTopology(event)) {
+    return true;
+  }
+  return /^##\s+Topology\b/m.test(String(event.content ?? ""));
+}
+
+function workspaceEventHasHotspotDisplaySignal(event: Record<string, unknown>): boolean {
+  if (workspaceEventHasAuthoritativeHotspotDetail(event)) {
+    return true;
   }
   const content = String(event.content ?? "");
   const hasHotspotSummary = /^Git hotspots:\s*(?!none\b).+/im.test(content);
@@ -430,16 +498,12 @@ function workspaceEventHasAuthoritativeHotspotDetail(event: Record<string, unkno
   return hasHotspotSummary && hasChangedPathDetail && hasHotspotDetailSection;
 }
 
-function workspaceEventHasAuthoritativeRepoSignal(event: Record<string, unknown>): boolean {
-  return workspaceEventHasAuthoritativeTopology(event) && workspaceEventHasAuthoritativeHotspotDetail(event);
-}
-
 function preserveDeferredRepoPreview(nextPreview: TabPreview, livePreview: TabPreview | undefined, event: Record<string, unknown>): TabPreview {
   let mergedPreview = nextPreview;
-  if (!workspaceEventHasAuthoritativeTopology(event)) {
+  if (!workspaceEventHasTopologyDisplaySignal(event)) {
     mergedPreview = preservePreviewFields(mergedPreview, livePreview, DEFERRED_REPO_TOPOLOGY_PREVIEW_FIELDS);
   }
-  if (!workspaceEventHasAuthoritativeHotspotDetail(event)) {
+  if (!workspaceEventHasHotspotDisplaySignal(event)) {
     mergedPreview = preservePreviewFields(mergedPreview, livePreview, DEFERRED_REPO_HOTSPOT_PREVIEW_FIELDS);
   }
   return mergedPreview;
@@ -596,73 +660,20 @@ function operatorSummaryPreview(state: AppState): TabPreview | undefined {
 export function buildOperatorSummaryItems(state: AppState): Array<{label: string; value: string; tone?: "live" | "warn" | "critical" | "neutral"}> {
   const pendingApprovals = state.approvalPane.order.filter((actionId) => state.approvalPane.entriesByActionId[actionId]?.pending).length;
   const sessionCount = state.sessionPane.catalog?.count ?? state.sessionPane.catalog?.sessions.length ?? 0;
-  const route = routeLabel(state.routePolicy);
   const preview = operatorSummaryPreview(state);
   const loop = operatorLoopSummary(preview);
   const verification = operatorVerificationSummary(preview);
   const runtime = operatorRuntimeSummary(preview, sessionCount);
   const approvalsTone = pendingApprovals > 0 ? "warn" : "live";
-  const bridgeTone =
-    state.bridgeStatus === "connected" ? "live" : state.bridgeStatus === "degraded" ? "warn" : "critical";
+  // F-164 status single-source: bridge/route/strategy live EXCLUSIVELY in the
+  // bottom status row — the summary band carries operational data only.
   return [
-    {label: "bridge", value: state.bridgeStatus, tone: bridgeTone},
-    {label: "route", value: `${route} (${state.routePolicy.routeState})`, tone: "neutral"},
-    {label: "strategy", value: state.routePolicy.strategy, tone: "neutral"},
     {label: "loop", value: loop.value, tone: loop.tone},
     {label: "verify", value: verification.value, tone: verification.tone},
     {label: "runtime", value: runtime.value, tone: runtime.tone},
     {label: "approvals", value: pendingApprovals === 0 ? "clear" : `${pendingApprovals} pending`, tone: approvalsTone},
     {label: "sessions", value: `${sessionCount}`, tone: sessionCount > 0 ? "live" : "neutral"},
   ];
-}
-
-type ConversationMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-const MAX_CONVERSATION_MESSAGES = 24;
-
-function normalizeConversationLine(line: TranscriptLine): ConversationMessage | undefined {
-  if (line.kind === "user") {
-    const content = line.text.replace(/^>\s*/, "").trim();
-    return content ? {role: "user", content} : undefined;
-  }
-  if (line.kind === "assistant") {
-    const content = line.text.trim();
-    return content ? {role: "assistant", content} : undefined;
-  }
-  return undefined;
-}
-
-function buildConversationMessages(chatLines: TranscriptLine[], submittedPrompt: string): ConversationMessage[] {
-  const firstUserIndex = chatLines.findIndex((line) => line.kind === "user");
-  const relevantLines = firstUserIndex >= 0 ? chatLines.slice(firstUserIndex) : [];
-  const collapsed: ConversationMessage[] = [];
-
-  for (const line of relevantLines) {
-    const normalized = normalizeConversationLine(line);
-    if (!normalized) {
-      continue;
-    }
-    const previous = collapsed[collapsed.length - 1];
-    if (previous && previous.role === normalized.role) {
-      previous.content = `${previous.content}\n${normalized.content}`.trim();
-    } else {
-      collapsed.push({...normalized});
-    }
-  }
-
-  const prompt = submittedPrompt.trim();
-  if (prompt) {
-    const previous = collapsed[collapsed.length - 1];
-    if (previous?.role === "user" && previous.content === prompt) {
-      return collapsed.slice(-MAX_CONVERSATION_MESSAGES);
-    }
-    collapsed.push({role: "user", content: prompt});
-  }
-
-  return collapsed.slice(-MAX_CONVERSATION_MESSAGES);
 }
 
 function isDuplicateCompletedAssistantPatch(state: AppState, event: Record<string, unknown>): boolean {
@@ -687,48 +698,6 @@ function isDuplicateCompletedAssistantPatch(state: AppState, event: Record<strin
   return false;
 }
 
-function boundedContinuityMessages(state: AppState, submittedPrompt: string): Array<{role: "user" | "assistant" | "system"; content: string}> {
-  const selectedSessionId = state.sessionPane.selectedSessionId;
-  const selectedDetail = selectedSessionId ? state.sessionPane.detailsBySessionId[selectedSessionId] : undefined;
-
-  if (selectedDetail) {
-    const history: Array<{role: "user" | "assistant" | "system"; content: string}> = [];
-    for (const envelope of selectedDetail.recent_events) {
-      const payload = envelope.payload ?? {};
-      if (envelope.event_type === "text_complete" || envelope.event_type === "text_delta") {
-        const content = String(payload.content ?? "").trim();
-        if (content) {
-          history.push({role: "assistant", content});
-        }
-        continue;
-      }
-      if (envelope.event_type === "session_start") {
-        const content = String(payload.prompt ?? "").trim();
-        if (content) {
-          history.push({role: "user", content});
-        }
-      }
-    }
-    const prompt = submittedPrompt.trim();
-    if (prompt) {
-      history.push({role: "user", content: prompt});
-    }
-    return history.slice(-MAX_CONVERSATION_MESSAGES);
-  }
-
-  const chatLines = state.tabs.find((tab) => tab.id === "chat")?.lines ?? [];
-  return buildConversationMessages(chatLines, submittedPrompt);
-}
-
-function providerResumeSessionId(detail: SessionDetailPayload | undefined): string | undefined {
-  const metadata = detail?.session.metadata;
-  if (!metadata || typeof metadata !== "object") {
-    return undefined;
-  }
-  const value = (metadata as Record<string, unknown>).provider_session_id;
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
 function displayedTranscriptLinesForTab(activeTab: TabSpec | undefined, state: AppState): TranscriptLine[] {
   if (activeTab?.kind !== "chat") {
     return activeTab?.lines ?? [];
@@ -738,159 +707,21 @@ function displayedTranscriptLinesForTab(activeTab: TabSpec | undefined, state: A
   return [...chatPreludeLines, ...state.chatTraceLines];
 }
 
-export function continuityStateFromSession(state: AppState, detail: SessionDetailPayload | undefined): AppState["sessionContinuity"] {
-  if (!detail) {
-    return {
-      ...state.sessionContinuity,
-      activeSessionId: undefined,
-      resumeSessionId: undefined,
-      activeRouteId: state.routePolicy.routeId,
-      continuityMode: "fresh",
-      boundedHistory: [],
-      compactionPolicy: {
-        eventCount: 0,
-        compactableRatio: 0,
-        protectedEventTypes: [],
-        recentEventTypes: [],
-      },
-      compactedSummary: undefined,
-    };
-  }
-
-  const boundedHistory = boundedContinuityMessages(state, "").slice(-state.sessionContinuity.historyLimit).map((entry) => ({
-    ...entry,
-    source: "session_detail" as const,
-  }));
-  const resumableProviderSessionId = providerResumeSessionId(detail);
-  const sameProviderAsActiveRoute = detail.session.provider_id === state.routePolicy.provider;
-  const canResumeProviderSession = detail.replay_ok && sameProviderAsActiveRoute && Boolean(resumableProviderSessionId);
-
-  return {
-    ...state.sessionContinuity,
-    activeSessionId: detail.session.session_id,
-    resumeSessionId: canResumeProviderSession ? resumableProviderSessionId : undefined,
-    activeRouteId: `${detail.session.provider_id}:${detail.session.model_id}`,
-    continuityMode: canResumeProviderSession ? "resume" : "fresh",
-    boundedHistory,
-    compactionPolicy: {
-      eventCount: detail.compaction_preview.event_count,
-      compactableRatio: detail.compaction_preview.compactable_ratio,
-      protectedEventTypes: detail.compaction_preview.protected_event_types,
-      recentEventTypes: detail.compaction_preview.recent_event_types,
-    },
-    compactedSummary: detail.session.summary ?? undefined,
-  };
-}
-
-export function missingAuthoritativeSurfaces(authoritative: SurfaceAuthorityState): Array<keyof SurfaceAuthorityState> {
-  return (Object.entries(authoritative) as Array<[keyof SurfaceAuthorityState, boolean]>)
-    .filter(([, ready]) => !ready)
-    .map(([surface]) => surface);
-}
-
-export function authoritativeResyncComplete(authoritative: SurfaceAuthorityState): boolean {
-  return missingAuthoritativeSurfaces(authoritative).length === 0;
-}
-
-export function markAuthoritativeSurface(
-  authoritative: SurfaceAuthorityState,
-  surface: keyof SurfaceAuthorityState,
-): SurfaceAuthorityState {
-  return {
-    ...authoritative,
-    [surface]: true,
-  };
-}
-
-export function authoritativeResyncStatus(authoritative: SurfaceAuthorityState): string {
-  const remaining = missingAuthoritativeSurfaces(authoritative).length;
-  if (remaining === 0) {
-    return "operator state live";
-  }
-  return `resyncing ${remaining} surface${remaining === 1 ? "" : "s"}`;
-}
-
-function requestAuthoritativeResync(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("status");
-  bridge.send("command.graph");
-  bridge.send("command.registry");
-  bridge.send("ontology.snapshot");
-  requestSessionCatalog(bridge);
-  requestPermissionHistory(bridge);
-  requestLiveSnapshots(bridge, provider, model, strategy);
-}
-
-export function requestMissingAuthoritativeSurfaces(
+function requestSessionDetail(
   bridge: DharmaBridge,
-  provider: string,
-  model: string,
-  strategy: string,
-  authoritative: SurfaceAuthorityState,
-): void {
-  for (const surface of missingAuthoritativeSurfaces(authoritative)) {
-    if (surface === "repo") {
-      bridge.send("workspace.snapshot");
-      continue;
-    }
-    if (surface === "control") {
-      bridge.send("runtime.snapshot");
-      continue;
-    }
-    if (surface === "sessions") {
-      requestSessionCatalog(bridge);
-      continue;
-    }
-    if (surface === "approvals") {
-      requestPermissionHistory(bridge);
-      continue;
-    }
-    if (surface === "models") {
-      bridge.send("model.policy", {provider, model, strategy});
-      continue;
-    }
-    if (surface === "agents") {
-      bridge.send("agent.routes");
-    }
-  }
-}
-
-function requestSessionCatalog(bridge: DharmaBridge): void {
-  bridge.send("session.catalog", {limit: SESSION_CATALOG_LIMIT});
-}
-
-function requestPermissionHistory(bridge: DharmaBridge): void {
-  bridge.send("permission.history", {limit: 50});
-}
-
-function requestSessionDetail(bridge: DharmaBridge, sessionId: string | undefined): void {
+  dispatch: React.Dispatch<AppAction>,
+  sessionId: string | undefined,
+  background = false,
+): string | undefined {
   if (!sessionId) {
-    return;
+    return undefined;
   }
-  bridge.send("session.detail", {session_id: sessionId, transcript_limit: SESSION_TRANSCRIPT_LIMIT});
-}
-
-function nextSessionPaneAfterCatalog(current: SessionPaneState, catalog: SessionCatalogPayload): SessionPaneState {
-  const selectedSessionId =
-    current.selectedSessionId && catalog.sessions.some((entry) => entry.session.session_id === current.selectedSessionId)
-      ? current.selectedSessionId
-      : catalog.sessions[0]?.session.session_id;
-  return {
-    catalog,
-    selectedSessionId,
-    detailsBySessionId: current.detailsBySessionId,
-  };
-}
-
-function nextSessionPaneAfterDetail(current: SessionPaneState, detail: SessionDetailPayload): SessionPaneState {
-  const catalog = current.catalog;
-  return {
-    catalog,
-    selectedSessionId: detail.session.session_id,
-    detailsBySessionId: {
-      ...current.detailsBySessionId,
-      [detail.session.session_id]: detail,
-    },
-  };
+  const payload = {session_id: sessionId, transcript_limit: SESSION_TRANSCRIPT_LIMIT};
+  const requestId = background
+    ? sendBackgroundRequest(bridge, "session.detail", payload)
+    : bridge.send("session.detail", payload);
+  dispatch({type: "session.detail.requested", requestId, sessionId});
+  return requestId;
 }
 
 function nextApprovalPaneAfterDecision(
@@ -1022,11 +853,20 @@ function approvalResolveAction(entry: ApprovalQueueEntry, resolution: CanonicalP
   };
 }
 
+type PendingBootstrap = {
+  prompt: string;
+  provider: string;
+  model: string;
+  messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
+  resumeSessionId?: string;
+  cancelled?: boolean;
+};
+
 type BridgeHandlerDeps = {
   dispatch: React.Dispatch<AppAction>;
   getState: () => AppState;
   bridge: DharmaBridge;
-  pendingBootstraps: React.MutableRefObject<Record<string, {prompt: string; provider: string; model: string; messages: Array<{role: "user" | "assistant" | "system"; content: string}>; resumeSessionId?: string}>>;
+  pendingBootstraps: React.MutableRefObject<Record<string, PendingBootstrap>>;
   pendingCommandStream?: React.MutableRefObject<PendingCommandStream | null>;
   requestHandshake?: (reason: "initial" | "reconnect" | "probe") => void;
   resetHandshakeBackoff?: () => void;
@@ -1585,6 +1425,58 @@ function enrichSparseCommandResultEvent(
   };
 }
 
+// Execute an agent-emitted ⟦helm:…⟧ directive: the same reducer dispatches as
+// the operator's own plain language, but narration goes to the rail head-band
+// (the agent already narrated in its reply text) — never a duplicate respond.
+// The agent REQUESTS; this is the single point where the TS reducer EXECUTES.
+// Only VIEW/toggle verbs resolve; operator-gated actions never reach here.
+function executeAgentDirective(
+  directive: HelmDirective,
+  state: AppState,
+  dispatch: React.Dispatch<AppAction>,
+  bridge: DharmaBridge,
+): void {
+  const panes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
+  const intent = helmDirectiveToIntent(directive, panes, selectableRouteTargets(state.routePolicy));
+  if (!intent) {
+    dispatch({type: "navigator.narrate", line: `couldn't act on "${directive.verb} ${directive.arg}".`});
+    return;
+  }
+  if (intent.kind === "layout") {
+    dispatch({type: "layout.mode.set", mode: intent.mode});
+    dispatch({type: "navigator.narrate", line: `switched to the ${intent.mode} view`});
+    dispatch({type: "status.set", value: `navigator -> ${intent.mode}`});
+    return;
+  }
+  if (intent.kind === "pane") {
+    dispatch({type: "tab.activate", tabId: intent.tabId});
+    dispatch({type: "navigator.narrate", line: `opened ${intent.title}`});
+    dispatch({type: "status.set", value: `navigator -> ${intent.title}`});
+    return;
+  }
+  if (intent.kind === "rail") {
+    const on = intent.on === "toggle" ? !state.uiMode.railVisible : intent.on;
+    if (on && state.uiMode.layoutMode !== "cockpit") {
+      dispatch({type: "layout.mode.set", mode: "cockpit"});
+    }
+    dispatch({type: "rail.set", visible: on});
+    dispatch({type: "navigator.narrate", line: on ? "docked the chat rail" : "undocked the rail"});
+    return;
+  }
+  if (intent.kind === "model") {
+    if (state.bridgeStatus === "connected") {
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: intent.target.provider,
+        model: intent.target.model,
+        strategy: state.routePolicy.strategy,
+      });
+    }
+    dispatch({type: "navigator.narrate", line: `switching route to ${intent.target.provider}:${intent.target.model}`});
+    return;
+  }
+}
+
 export function createBridgeEventHandler({
   dispatch,
   getState,
@@ -1600,12 +1492,18 @@ export function createBridgeEventHandler({
   const reconnectingCodes = new Set(["bridge_exit", "bridge_spawn_error", "bridge_send_failed", "bridge_stdin_unavailable"]);
   let malformedBridgeEvents = 0;
   const apply = (actions: AppAction[]): void => queueAppActions(dispatch, actions);
+  const startSession = (payload: Record<string, unknown>): string => {
+    const requestId = bridge.send("session.start", payload);
+    apply([{type: "turn.start", requestId}]);
+    return requestId;
+  };
 
   function requestReconnect(status: string, offline = false): void {
     awaitingAuthoritativeResync = true;
     resyncPending = false;
     apply([
       {type: "surface.truth.reset"},
+      {type: "turn.reset"},
       {type: "bridge.status", status: offline ? "offline" : "degraded"},
       {type: "status.set", value: status},
     ]);
@@ -1638,6 +1536,56 @@ export function createBridgeEventHandler({
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
     }
+    if (eventType === "session.ack") {
+      const requestId = String(typed.request_id ?? "");
+      if (requestId) {
+        apply([{
+          type: "turn.ack",
+          requestId,
+          sessionId: String(typed.session_id ?? "") || undefined,
+        }]);
+      }
+    }
+    if (eventType === "session.cancelled") {
+      const cancelRequestId = String(typed.request_id ?? "");
+      const targetRequestId = String(typed.target_request_id ?? "");
+      const cancelled = typed.cancelled === true;
+      const reason = String(typed.reason ?? (cancelled ? "cancel_requested" : "rejected"));
+      const actions: AppAction[] = [{
+        type: "status.set",
+        value: cancelled ? "cancellation accepted" : `cancellation rejected: ${reason}`,
+      }];
+      if (!cancelled && cancelRequestId && targetRequestId) {
+        actions.unshift({
+          type: "turn.cancel.rejected",
+          requestId: targetRequestId,
+          cancelRequestId,
+        });
+      }
+      apply(actions);
+    }
+    if (eventType === "session_end") {
+      const requestId = String(typed.request_id ?? "");
+      if (requestId) apply([{type: "turn.finish", requestId}]);
+    }
+    if (eventType === "route.receipt") {
+      const receipt = providerRouteReceiptFromEvent(typed), routePolicy = getState().routePolicy;
+      if (receipt) apply([{type: "route.policy.set", policy: routePolicyWithSuccessfulReceipt(routePolicy, receipt)}]);
+    }
+    // Agent-action channel: the chat agent drives the Helm by emitting
+    // ⟦helm:…⟧ directives in its reply. Parse them off the completed assistant
+    // text and execute each (the sentinel itself is stripped from the display).
+    const assistantText =
+      eventType === "text_complete"
+        ? String(typed.content ?? "")
+        : eventType === "assistant"
+          ? String(typed.message ?? "")
+          : "";
+    if (assistantText.includes("⟦")) {
+      for (const directive of parseHelmDirectives(assistantText)) {
+        executeAgentDirective(directive, state, dispatch, bridge);
+      }
+    }
     if (eventType !== "bridge.error" && eventType !== "error") {
       malformedBridgeEvents = 0;
     }
@@ -1647,9 +1595,15 @@ export function createBridgeEventHandler({
         {type: "status.set", value: "bridge ready"},
       ]);
     }
-    if (eventType === "bridge.error" || eventType === "error") {
+    if (eventType === "bridge.error") {
       const code = String(typed.code ?? "");
       const message = String(typed.message ?? typed.code ?? "bridge error");
+      if (code === "session_detail_failed") {
+        const requestId = String(typed.request_id ?? "").trim();
+        if (requestId) {
+          apply([{type: "session.detail.failed", requestId}]);
+        }
+      }
       if (reconnectingCodes.has(code)) {
         malformedBridgeEvents = 0;
         requestReconnect(code === "bridge_exit" ? "bridge exited, reconnecting" : "backend offline, retrying", code !== "bridge_exit");
@@ -1671,26 +1625,21 @@ export function createBridgeEventHandler({
         ]);
       }
     }
+    if (eventType === "error") {
+      const code = String(typed.code ?? "provider_error");
+      const message = String(typed.message ?? typed.code ?? "provider error");
+      apply([{type: "status.set", value: `${code}: ${message}`}]);
+    }
     if (eventType === "handshake.result") {
-      const providers = Array.isArray(typed.providers) ? typed.providers : [];
-      const defaultProviderId = String(typed.default_provider ?? "").trim();
-      const selectedProvider = providers.find(
-        (entry) =>
-          typeof entry === "object" &&
-          entry !== null &&
-          String((entry as {provider_id?: string}).provider_id ?? "") === defaultProviderId,
-      ) as {provider_id?: string; default_model?: string} | undefined;
-      const fallbackProvider = providers.find((entry) => typeof entry === "object" && entry !== null) as
-        | {provider_id?: string; default_model?: string}
-        | undefined;
-      const provider = selectedProvider?.provider_id ?? fallbackProvider?.provider_id ?? "codex";
-      const model = selectedProvider?.default_model ?? fallbackProvider?.default_model ?? "gpt-5.4";
+      const {provider, model, policy} = handshakeRouteConfigFromEvent(typed, state.routePolicy);
       apply([{
         type: "bridge.config",
         provider,
         model,
         strategy: state.routePolicy.strategy,
-      }]);
+      }, ...(policy
+        ? [{type: "route.policy.set", policy} as const]
+        : [])]);
       malformedBridgeEvents = 0;
       reconnectRequested = false;
       resetHandshakeBackoff?.();
@@ -1833,42 +1782,76 @@ export function createBridgeEventHandler({
           resyncPending = !authoritativeResyncComplete(nextAuthority);
         }
         const nextSessionPane = nextSessionPaneAfterCatalog(state.sessionPane, catalog);
-        apply([
-          {type: "session.catalog.set", catalog, selectedSessionId: nextSessionPane.selectedSessionId},
+        const catalogActions: AppAction[] = [
+          {type: "session.catalog.set", catalog},
           {
           type: "tab.replace",
           tabId: "sessions",
           lines: sessionPaneToLines(nextSessionPane),
           preview: sessionPaneToPreview(nextSessionPane),
           },
-        ]);
+        ];
+        const previousSelectedDetail = state.sessionPane.selectedSessionId
+          ? state.sessionPane.detailsBySessionId[state.sessionPane.selectedSessionId]
+          : undefined;
+        const nextSelectedDetail = nextSessionPane.selectedSessionId
+          ? nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
+          : undefined;
+        if (
+          nextSessionPane.selectedSessionId !== state.sessionPane.selectedSessionId ||
+          (previousSelectedDetail !== undefined && nextSelectedDetail === undefined)
+        ) {
+          catalogActions.push({
+            type: "session.continuity.set",
+            continuity: continuityStateFromSession(state, nextSelectedDetail),
+          });
+        }
+        apply(catalogActions);
         if (
           nextSessionPane.selectedSessionId &&
           !nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
         ) {
-          requestSessionDetail(bridge, nextSessionPane.selectedSessionId);
-        } else {
-          const selectedDetail = nextSessionPane.selectedSessionId
-            ? nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
-            : undefined;
-          apply([{type: "session.continuity.set", continuity: continuityStateFromSession(state, selectedDetail)}]);
+          requestSessionDetail(bridge, dispatch, nextSessionPane.selectedSessionId, true);
         }
       }
     }
     if (eventType === "session.detail.result") {
-      const detail = sessionDetailFromEvent(typed);
-      if (detail) {
-        const nextSessionPane = nextSessionPaneAfterDetail(state.sessionPane, detail);
-        apply([
-          {type: "session.detail.set", detail},
-          {type: "session.continuity.set", continuity: continuityStateFromSession(state, detail)},
+      const result = sessionDetailResultFromEvent(typed);
+      if (result) {
+        const nextSessionPane = nextSessionPaneAfterDetailResult(
+          state.sessionPane,
+          result.requestId,
+          result.sessionId,
+          result.detail,
+        );
+        if (!nextSessionPane) {
+          return;
+        }
+        const detail = result.detail;
+        const detailActions: AppAction[] = [
+          {
+            type: "session.detail.received",
+            requestId: result.requestId,
+            sessionId: result.sessionId,
+            detail,
+          },
           {
           type: "tab.replace",
           tabId: "sessions",
           lines: sessionPaneToLines(nextSessionPane),
           preview: sessionPaneToPreview(nextSessionPane),
           },
-        ]);
+        ];
+        if (nextSessionPane.selectedSessionId === detail.session.session_id) {
+          const preserveExplicitResume =
+            state.sessionContinuity.continuityMode === "resume" &&
+            state.sessionContinuity.activeSessionId === detail.session.session_id;
+          detailActions.splice(1, 0, {
+            type: "session.continuity.set",
+            continuity: continuityStateFromSession(state, detail, preserveExplicitResume ? "resume" : "view"),
+          });
+        }
+        apply(detailActions);
       }
     }
     if (eventType === "command.graph.result") {
@@ -1926,7 +1909,7 @@ export function createBridgeEventHandler({
     }
     if (eventType === "runtime.snapshot.result") {
       const typedPayload = runtimeSnapshotPayloadFromEvent(typed);
-      const runtimeIsAuthoritative = typedPayload ? runtimePayloadHasAuthoritativeControlSignal(typedPayload) : true;
+      const runtimeIsAuthoritative = typedPayload ? runtimePayloadHasAuthoritativeControlSignal(typedPayload) : false;
       if (runtimeIsAuthoritative) {
         apply([{type: "surface.truth.mark", surface: "control"}]);
       }
@@ -1938,7 +1921,10 @@ export function createBridgeEventHandler({
       const supervisor = loadSupervisorControlState();
       const content = String(typed.content ?? "");
       const preview = typedPayload ? runtimePayloadToPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(content, supervisor);
-      const effectivePreview = runtimeIsAuthoritative ? preview : preserveDeferredControlPreview(preview, state.liveControlPreview);
+      const effectivePreview =
+        typedPayload && !runtimeIsAuthoritative
+          ? preserveDeferredControlPreview(preview, state.liveControlPreview)
+          : preview;
       const synchronizedRepoPreview = synchronizeRepoControlPreviews(state.liveRepoPreview, effectivePreview);
       if (synchronizedRepoPreview) {
         persistRepoPreview(synchronizedRepoPreview);
@@ -2045,6 +2031,15 @@ export function createBridgeEventHandler({
       const selectedStrategy = String(typed.routing_strategy ?? state.routePolicy.strategy ?? "responsive");
       dispatch({type: "bridge.config", provider: selectedProvider, model: selectedModel, strategy: selectedStrategy});
 
+      // Ctrl-C can arrive before bootstrap returns. That is a real cancelled
+      // turn boundary: consume the informational bootstrap result, but never
+      // launch the provider or auto-execute an inferred intent afterward.
+      if (pending?.cancelled) {
+        delete pendingBootstraps.current[requestId];
+        dispatch({type: "status.set", value: "cancelled before provider start"});
+        return;
+      }
+
       const intent = typed.intent as Record<string, unknown> | undefined;
       if (intent && String(intent.kind ?? "") === "command" && Boolean(intent.auto_execute)) {
         const command = `/${String(intent.command ?? "")}`;
@@ -2087,7 +2082,7 @@ export function createBridgeEventHandler({
         bridge.send("agent.routes");
         dispatch({type: "status.set", value: "agent routing surface ready"});
         if (pending) {
-          bridge.send("session.start", {
+          startSession({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
@@ -2102,7 +2097,7 @@ export function createBridgeEventHandler({
         bridge.send("evolution.surface");
         dispatch({type: "status.set", value: "evolution surface ready"});
         if (pending) {
-          bridge.send("session.start", {
+          startSession({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
@@ -2113,7 +2108,7 @@ export function createBridgeEventHandler({
           });
         }
       } else if (pending) {
-        bridge.send("session.start", {
+        startSession({
           provider: selectedProvider,
           model: selectedModel,
           prompt: pending.prompt,
@@ -2166,7 +2161,12 @@ export function createBridgeEventHandler({
       surfaceRefreshActions.forEach((action) => dispatch(action));
       if (actionType === "surface.refresh") {
         const surface = String(typed.surface ?? "").trim().toLowerCase();
-        if (surface === "repo" || surface === "workspace") {
+        const workspaceIsAuthoritative = workspaceEventHasAuthoritativeRepoSignal(typed);
+        const runtimePayload = runtimeSnapshotPayloadFromEvent(typed);
+        const runtimeIsAuthoritative = Boolean(
+          runtimePayload && runtimePayloadHasAuthoritativeControlSignal(runtimePayload),
+        );
+        if ((surface === "repo" || surface === "workspace") && workspaceIsAuthoritative) {
           dispatch({type: "surface.truth.mark", surface: "repo"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "repo");
@@ -2174,7 +2174,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if (surface === "control" || surface === "runtime") {
+        if ((surface === "control" || surface === "runtime") && runtimeIsAuthoritative) {
           dispatch({type: "surface.truth.mark", surface: "control"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "control");
@@ -2340,9 +2340,16 @@ export function surfaceRefreshActionsForBridgeEvent(
   if (surface === "sessions" || surface === "session") {
     const catalog = sessionCatalogFromEvent(typed);
     if (catalog) {
-      const nextSessionPane = nextSessionPaneAfterCatalog(sessionPane ?? {detailsBySessionId: {}} as SessionPaneState, catalog);
+      const nextSessionPane = nextSessionPaneAfterCatalog(
+        sessionPane ?? {
+          selectionProvenance: "follow_latest",
+          detailsBySessionId: {},
+          pendingDetailRequestsBySessionId: {},
+        },
+        catalog,
+      );
       return [
-        {type: "session.catalog.set", catalog, selectedSessionId: nextSessionPane.selectedSessionId},
+        {type: "session.catalog.set", catalog},
         {
           type: "tab.replace",
           tabId: "sessions",
@@ -2439,23 +2446,79 @@ export function paneActionStartActions(action: {summary: string; payload: Record
 export function App(): React.ReactElement {
   const {exit} = useApp();
   const [state, dispatch] = useReducer(reduceApp, initialState, createInitialAppState);
+  // FACE-1 regression fix: ink re-lays-out the EXISTING tree on stdout resize,
+  // but width-derived React props (zen 100-col clamp, compactShell, window
+  // sizes) stay stale until the next state event — offline that is the 15s
+  // probe, so a live 120->80 resize garbled for seconds. This tick forces a
+  // React re-render the moment the terminal resizes.
+  const [, setViewportTick] = useState(0);
+  // FACE-3 the scroll: the telemetry drawer is view-local — never persisted,
+  // reset each boot, meaningless outside the scroll face.
+  const [scrollDrawerOpen, setScrollDrawerOpen] = useState(false);
+  useEffect(() => {
+    const handleResize = (): void => {
+      setViewportTick((tick) => tick + 1);
+    };
+    process.stdout.on("resize", handleResize);
+    return () => {
+      process.stdout.off("resize", handleResize);
+    };
+  }, []);
 
   const activeTab = state.tabs.find((tab) => tab.id === state.uiMode.activeTabId) ?? state.tabs[0];
   const terminalWidth = (process.stdout.columns ?? Number(process.env.COLUMNS ?? "0")) || 120;
   const terminalHeight = (process.stdout.rows ?? Number(process.env.LINES ?? "0")) || 30;
   const compactShell = terminalWidth <= 90;
-  const paneWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - (compactShell ? 14 : 18));
+  // F-021: offsets re-derived from measured boot chrome — compact: header 4 +
+  // summary 1 + tab bar 1 + pane chrome 3 + composer 3 + footer 5 = 17; wide
+  // chrome measures ~22-24 but the offset stays at 20 so the expanded-trace
+  // anchor rows stay inside the end-anchored window at 100x30 (F-172 check).
+  const paneWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - (compactShell ? 17 : 20));
+  // Navigator rail (cockpit only): a fixed-width right column that mirrors the
+  // sidebar's clip-don't-squeeze discipline so it can only partition WIDTH,
+  // never inflate height (F-163 preserved by construction). It is the FIRST
+  // thing to yield — suppressed under compactShell and auto-hidden whenever the
+  // active pane would drop below 48 cols.
+  const railWidth = Math.min(40, Math.max(28, Math.round(terminalWidth * 0.3)));
+  const railSidebarOn = state.uiMode.sidebarVisible === "visible" && !compactShell;
+  const railVisible =
+    state.uiMode.railVisible &&
+    !compactShell &&
+    terminalWidth - railWidth - (railSidebarOn ? 34 : 0) >= 48;
+  const railChatLines = displayedTranscriptLinesForTab(state.tabs.find((tab) => tab.id === "chat"), state);
+  const railWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, paneWindowSize - 3);
   const outline = useMemo(() => outlineFromTabs(state.tabs), [state.tabs]);
   const modelChoices = selectableRouteTargets(state.routePolicy);
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
   const transcriptMeta = transcriptMetaForTab(activeTab);
+  // Display source of truth: name whichever model actually answered the latest
+  // turn, falling back to the configured route before any turn has run.
+  const liveRouteLabel = latestChatTurnRoute(state.executionEventLog) ?? routeLabel(state.routePolicy);
   const operatorSummaryItems = buildOperatorSummaryItems(state);
   const activeScrollOffset = Math.min(
     state.paneScrollOffsets[activeTab?.id ?? ""] ?? 0,
     scrollMaxOffsetForTab(activeTab, state, paneWindowSize),
   );
   const stateRef = useRef(state);
-  const pendingBootstraps = useRef<Record<string, {prompt: string; provider: string; model: string; messages: Array<{role: "user" | "assistant" | "system"; content: string}>; resumeSessionId?: string}>>({});
+  const cancellationRequestRef = useRef<{requestId: string; cancelRequestId: string} | null>(null);
+  const pendingBootstraps = useRef<Record<string, PendingBootstrap>>({});
+  const bootstrapCancellationGuardRef = useRef(0);
+  // F-157: prompts submitted while the bridge is offline wait here; the connect
+  // effect below drains the queue — every entry is dispatched or marked failed.
+  const queuedOfflinePrompts = useRef<Array<{
+    queueId: string;
+    prompt: string;
+    provider: string;
+    model: string;
+    strategy: string;
+    activeTabId: string;
+    messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
+    resumeSessionId?: string;
+  }>>([]);
+  const queuedOfflineCounter = useRef(0);
+  // F-158: slash commands submitted while the bridge is offline wait here; the connect
+  // effect drains them — every queued command is dispatched (command.run) or marked failed.
+  const queuedOfflineCommands = useRef<Array<{queueId: string; command: string}>>([]);
   const pendingCommandStream = useRef<PendingCommandStream | null>(null);
   const bridgeRef = useRef<DharmaBridge | null>(null);
   const handshakeBackoffRef = useRef({attempt: 0, nextAllowedAt: 0});
@@ -2558,11 +2621,89 @@ export function App(): React.ReactElement {
   }, [state]);
 
   useEffect(() => {
-    const selectedDetail = state.sessionPane.selectedSessionId
-      ? state.sessionPane.detailsBySessionId[state.sessionPane.selectedSessionId]
-      : undefined;
-    const nextContinuity = continuityStateFromSession(state, selectedDetail);
+    if (state.activeTurn.phase !== "cancelling") {
+      cancellationRequestRef.current = null;
+    }
+  }, [state.activeTurn]);
+
+  // F-157: bridge connect drains the offline prompt queue — each queued turn is
+  // dispatched (session.bootstrap) or marked failed; no third silent state.
+  // F-158: queued offline slash commands drain the same way via command.run.
+  useEffect(() => {
+    if (
+      state.bridgeStatus !== "connected" ||
+      (queuedOfflinePrompts.current.length === 0 && queuedOfflineCommands.current.length === 0)
+    ) {
+      return;
+    }
+    const commandEntries = queuedOfflineCommands.current.splice(0, queuedOfflineCommands.current.length);
+    for (const entry of commandEntries) {
+      try {
+        markPendingCommandStream(pendingCommandStream, {command: entry.command});
+        bridge.send("command.run", {command: entry.command});
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "dispatched")]},
+        ]);
+      } catch {
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "failed")]},
+        ]);
+      }
+    }
+    if (commandEntries.length > 0) {
+      dispatch({
+        type: "status.set",
+        value: `dispatched ${commandEntries.length} queued command${commandEntries.length === 1 ? "" : "s"}`,
+      });
+    }
+    if (queuedOfflinePrompts.current.length === 0) {
+      return;
+    }
+    const entries = queuedOfflinePrompts.current.splice(0, queuedOfflinePrompts.current.length);
+    for (const entry of entries) {
+      try {
+        const requestId = bridge.send("session.bootstrap", {
+          provider: entry.provider,
+          model: entry.model,
+          strategy: entry.strategy,
+          prompt: entry.prompt,
+          active_tab: entry.activeTabId,
+          resume_session_id: entry.resumeSessionId,
+        });
+        pendingBootstraps.current[requestId] = {
+          prompt: entry.prompt,
+          provider: entry.provider,
+          model: entry.model,
+          messages: entry.messages,
+          resumeSessionId: entry.resumeSessionId,
+        };
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "dispatched")]},
+        ]);
+      } catch {
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "failed")]},
+        ]);
+      }
+    }
+    dispatch({type: "status.set", value: `dispatched ${entries.length} queued prompt${entries.length === 1 ? "" : "s"}`});
+  }, [bridge, state.bridgeStatus]);
+
+  useEffect(() => {
     const current = state.sessionContinuity;
+    if (current.continuityMode !== "resume") {
+      return;
+    }
+    const selectedSessionId = state.sessionPane.selectedSessionId;
+    const selectedDetail = selectedSessionId
+      ? state.sessionPane.detailsBySessionId[selectedSessionId]
+      : undefined;
+    const preserveResume = Boolean(selectedSessionId && selectedSessionId === current.activeSessionId);
+    const nextContinuity = continuityStateFromSession(
+      state,
+      selectedDetail,
+      preserveResume ? "resume" : "view",
+    );
     if (
       current.activeSessionId === nextContinuity.activeSessionId &&
       current.resumeSessionId === nextContinuity.resumeSessionId &&
@@ -2575,7 +2716,13 @@ export function App(): React.ReactElement {
       return;
     }
     dispatch({type: "session.continuity.set", continuity: nextContinuity});
-  }, [state.sessionPane.selectedSessionId, state.sessionPane.detailsBySessionId, state.routePolicy.routeId]);
+  }, [
+    state.sessionContinuity.continuityMode,
+    state.sessionContinuity.activeSessionId,
+    state.sessionPane.selectedSessionId,
+    state.sessionPane.detailsBySessionId,
+    state.routePolicy.routeId,
+  ]);
 
   useEffect(() => {
     if (persistTimeoutRef.current) {
@@ -2597,17 +2744,265 @@ export function App(): React.ReactElement {
     dispatch({type: "ui.compact.set", compact: compactShell});
   }, [compactShell]);
 
+  // F-065/F-066 + operator word 2026-06-12: layout, pane, model, and tour
+  // intents resolve LOCALLY (offline-capable, instant) with a full transcript
+  // turn — the composer steers the UI in plain language or via slash commands.
+  function runLocalUiAction(submitted: string, intent: UiIntent): void {
+    // The confirmation rides the SAME assistant-event canonicalization as real
+    // backend answers (F-173), so steering the UI reads like a conversation:
+    // you ask, the Helm answers, the turn closes ✓ — multi-line tour included.
+    const respond = (message: string, activateTabId = "chat"): void => {
+      queueAppActions(dispatch, [
+        {
+          type: "execution.events.ingest",
+          events: [
+            userPromptExecutionEvent(submitted),
+            ...canonicalEventsFromBridgeEvent({
+              type: "assistant",
+              request_id: `local-ui-${Date.now()}`,
+              message,
+            }),
+            localCommandResultExecutionEvent(submitted, message.split("\n")[0] ?? message),
+          ],
+        },
+        {type: "tab.activate", tabId: activateTabId},
+        {type: "status.set", value: message.split("\n")[0] ?? message},
+      ]);
+    };
+    if (intent.kind === "layout") {
+      dispatch({type: "layout.mode.set", mode: intent.mode});
+      respond(
+        intent.mode === "zen"
+          ? "Zen — just the conversation. F2 or /cockpit brings the panel back."
+          : intent.mode === "scroll"
+            ? "The scroll — reading mode. ^D peeks telemetry · F2 or /zen returns."
+            : "Cockpit — full panel. F2 or /zen returns to the quiet view.",
+      );
+      return;
+    }
+    if (intent.kind === "pane") {
+      respond(
+        `Opened ${intent.title}. Tab cycles panes · ^K opens the switcher · say "open the chat pane" to come back.`,
+        intent.tabId,
+      );
+      return;
+    }
+    if (intent.kind === "model") {
+      if (stateRef.current.bridgeStatus !== "connected") {
+        respond(`Route switch needs the backend — it is ${stateRef.current.bridgeStatus}. Try again once connected.`);
+        return;
+      }
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: intent.target.provider,
+        model: intent.target.model,
+        strategy: stateRef.current.routePolicy.strategy,
+      });
+      respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
+      return;
+    }
+    if (intent.kind === "model_unknown") {
+      const menu = selectableRouteTargets(stateRef.current.routePolicy)
+        .map((target) => `  ${target.provider}:${target.model}`)
+        .join("\n");
+      respond(
+        `No route matches "${intent.query}". Available right now:\n${menu || "  (none — backend offline)"}\nSay "switch to <one of these>" or /model for the picker.`,
+      );
+      return;
+    }
+    if (intent.kind === "rail") {
+      const next = intent.on === "toggle" ? !stateRef.current.uiMode.railVisible : intent.on;
+      // The rail lives only in the cockpit face — turning it on brings the
+      // operator there so they can see it beside the Helm's panes.
+      if (next && stateRef.current.uiMode.layoutMode !== "cockpit") {
+        dispatch({type: "layout.mode.set", mode: "cockpit"});
+      }
+      dispatch({type: "rail.set", visible: next});
+      respond(
+        next
+          ? "Navigator docked — chat rides the right rail while the Helm's panes stay visible. Say \"undock\" or /rail to hide it."
+          : "Navigator undocked. /rail or \"dock the chat\" brings it back.",
+      );
+      return;
+    }
+    // The tour opens in its own isolated overlay box — never inline transcript
+    // text (operator word 2026-06-16).
+    if (intent.kind === "tour") {
+      dispatch({type: "tour.open"});
+      return;
+    }
+  }
+
+  function localUiSlashIntent(submitted: string): UiIntent | null {
+    const text = submitted.trim().toLowerCase();
+    if (text === "/zen") return {kind: "layout", mode: "zen"};
+    // FACE-2: /post is the command-post alias for /cockpit.
+    if (text === "/cockpit" || text === "/post") return {kind: "layout", mode: "cockpit"};
+    // FACE-3: the reading-first manuscript face.
+    if (text === "/scroll") return {kind: "layout", mode: "scroll"};
+    if (text === "/tour") return {kind: "tour"};
+    // Navigator rail: /navigator and /rail toggle the persistent chat rail.
+    if (text === "/navigator" || text === "/rail") return {kind: "rail", on: "toggle"};
+    return null;
+  }
+
+  function requestActiveTurnCancellation(source: "command" | "shortcut"): TurnCancellationDecision["kind"] {
+    const decision = decideTurnCancellation(stateRef.current.activeTurn);
+    if (decision.kind === "idle") {
+      const pendingEntry = Object.entries(pendingBootstraps.current)
+        .reverse()
+        .find(([, pending]) => !pending.cancelled);
+      if (pendingEntry) {
+        const [requestId, pending] = pendingEntry;
+        pending.cancelled = true;
+        bootstrapCancellationGuardRef.current = Date.now();
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: canonicalEventsFromBridgeEvent({
+              type: "session_end",
+              request_id: requestId,
+              provider_id: pending.provider,
+              success: false,
+              cancelled: true,
+              error_code: "cancelled",
+              error_message: "cancelled before provider start",
+            }),
+          },
+          {type: "tab.activate", tabId: "chat"},
+          {type: "status.set", value: "cancelled before provider start"},
+        ]);
+        return "request";
+      }
+      if (
+        Object.values(pendingBootstraps.current).some((pending) => pending.cancelled) ||
+        Date.now() - bootstrapCancellationGuardRef.current < 2_000
+      ) {
+        dispatch({type: "status.set", value: "cancellation already requested"});
+        return "already_requested";
+      }
+      if (source === "command") {
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: [
+              userPromptExecutionEvent("/cancel"),
+              localCommandResultExecutionEvent("/cancel", "no active turn to cancel"),
+            ],
+          },
+          {type: "tab.activate", tabId: "chat"},
+        ]);
+      }
+      dispatch({type: "status.set", value: "no active turn to cancel"});
+      return decision.kind;
+    }
+    if (decision.kind === "already_requested") {
+      dispatch({type: "status.set", value: "cancellation already requested"});
+      return decision.kind;
+    }
+    if (cancellationRequestRef.current?.requestId === decision.requestId) {
+      dispatch({type: "status.set", value: "cancellation already requested"});
+      return "already_requested";
+    }
+    try {
+      const cancelRequestId = bridge.send("session.cancel", {target_request_id: decision.requestId});
+      cancellationRequestRef.current = {requestId: decision.requestId, cancelRequestId};
+      queueAppActions(dispatch, [
+        {
+          type: "turn.cancel.request",
+          requestId: decision.requestId,
+          cancelRequestId,
+        },
+        {
+          type: "execution.events.ingest",
+          events: [localStatusExecutionEvent("cancellation requested", "operator", "running")],
+        },
+        {type: "status.set", value: "cancellation requested"},
+      ]);
+      return decision.kind;
+    } catch {
+      dispatch({type: "status.set", value: "cancellation request could not reach the backend"});
+      return "idle";
+    }
+  }
+
   function submitPrompt(prompt: string): void {
     const submitted = prompt.trim();
     if (!submitted) {
       return;
     }
     dispatch({type: "prompt.clear"});
+    if (submitted.toLowerCase() === "/cancel") {
+      requestActiveTurnCancellation("command");
+      return;
+    }
+    const deckMatch = submitted.trim().toLowerCase().match(/^\/deck\s+([a-z0-9_-]+)$/);
+    if (deckMatch) {
+      // F-065: /deck <name> enters deck-focus; until decks ship (S6) it focuses
+      // the matching pane inside the cockpit chrome.
+      dispatch({type: "layout.mode.set", mode: `deck-focus:${deckMatch[1]}`});
+      const target = stateRef.current.tabs.find((tab) => tab.id === deckMatch[1]);
+      runLocalUiAction(submitted, target
+        ? {kind: "pane", tabId: target.id, title: target.title}
+        : {kind: "layout", mode: "cockpit"});
+      return;
+    }
+    const slashIntent = localUiSlashIntent(submitted);
+    if (slashIntent) {
+      runLocalUiAction(submitted, slashIntent);
+      return;
+    }
+    if (!isSlashCommandPrompt(submitted)) {
+      const nlIntent = matchUiIntent(
+        submitted,
+        stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title})),
+        selectableRouteTargets(stateRef.current.routePolicy),
+      );
+      if (nlIntent) {
+        runLocalUiAction(submitted, nlIntent);
+        return;
+      }
+    } else {
+      // Gauntlet finding 2026-06-12: a typo'd command (/hlep) must never yank
+      // the user into the Control pane — unknown commands answer in-chat with
+      // the nearest registered command.
+      const commandName = submitted.slice(1).split(/\s+/)[0]?.toLowerCase() ?? "";
+      if (commandName && !REGISTERED_SLASH_COMMANDS.includes(commandName) && !isBareModelCommand(submitted)) {
+        const suggestion = closestCommand(commandName, REGISTERED_SLASH_COMMANDS);
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: [
+              userPromptExecutionEvent(submitted),
+              ...canonicalEventsFromBridgeEvent({
+                type: "assistant",
+                request_id: `local-unknown-${Date.now()}`,
+                message: suggestion
+                  ? `Unknown command /${commandName} — did you mean /${suggestion}? (/help lists everything)`
+                  : `Unknown command /${commandName}. /help lists everything; /tour gives the guided walkthrough.`,
+              }),
+              localCommandResultExecutionEvent(submitted, `unknown command /${commandName}`),
+            ],
+          },
+          {type: "tab.activate", tabId: "chat"},
+          {type: "status.set", value: `unknown command /${commandName}`},
+        ]);
+        return;
+      }
+    }
     if (isBareModelCommand(submitted)) {
       dispatch({
         type: "modelPicker.open",
         returnTabId: stateRef.current.uiMode.activeTabId,
       });
+      // F-158: even the picker shortcut leaves a completed transcript turn — no
+      // slash command may resolve without an entry in the chat transcript.
+      queueAppActions(dispatch, [
+        {
+          type: "execution.events.ingest",
+          events: [userPromptExecutionEvent(submitted), localCommandResultExecutionEvent(submitted, "route picker opened")],
+        },
+      ]);
       bridge.send("model.policy", {
         provider: stateRef.current.routePolicy.provider,
         model: stateRef.current.routePolicy.model,
@@ -2616,17 +3011,74 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "route picker ready"});
       return;
     }
+    if (!isSlashCommandPrompt(submitted) && stateRef.current.activeTurn.phase !== "idle") {
+      dispatch({type: "status.set", value: "a turn is already running; cancel it before starting another"});
+      return;
+    }
     if (isSlashCommandPrompt(submitted)) {
+      const commandEchoLine: TranscriptLine = {
+        id: `user-${Date.now()}`,
+        kind: "user",
+        text: `> ${submitted}`,
+      };
+      // F-158: every slash command leaves a visible transcript turn — the echoed
+      // command plus a result, or an explicit queued/failed status. The silent
+      // zero-feedback branch (live tour finding 3) is banned.
+      if (state.bridgeStatus === "offline") {
+        queuedOfflineCounter.current += 1;
+        const queueId = `q${queuedOfflineCounter.current}-${Date.now().toString(36)}`;
+        queuedOfflineCommands.current.push({queueId, command: submitted});
+        queueAppActions(dispatch, [
+          {type: "tab.activate", tabId: "chat"},
+          {type: "tab.append", tabId: "chat", lines: [commandEchoLine]},
+          {
+            type: "execution.events.ingest",
+            events: [userPromptExecutionEvent(submitted), queuedPromptExecutionEvent(queueId)],
+          },
+          {type: "status.set", value: "command queued (backend offline)"},
+        ]);
+        return;
+      }
       queueAppActions(dispatch, slashCommandStartActions({command: submitted}, "command"));
+      queueAppActions(dispatch, [
+        {type: "tab.append", tabId: "chat", lines: [commandEchoLine]},
+        {type: "execution.events.ingest", events: [userPromptExecutionEvent(submitted)]},
+      ]);
       markPendingCommandStream(pendingCommandStream, {command: submitted});
       bridge.send("command.run", {command: submitted});
     } else {
-      const messages = boundedContinuityMessages(state, submitted);
+      const messages = messagesForNextTurn(state, submitted);
       const userLine: TranscriptLine = {
         id: `user-${Date.now()}`,
         kind: "user",
         text: `> ${submitted}`,
       };
+      // F-157: while the bridge is offline the turn queues explicitly — no optimistic
+      // trace steps, no session.bootstrap into the void, never a perpetual running state.
+      if (state.bridgeStatus === "offline") {
+        queuedOfflineCounter.current += 1;
+        const queueId = `q${queuedOfflineCounter.current}-${Date.now().toString(36)}`;
+        queuedOfflinePrompts.current.push({
+          queueId,
+          prompt: submitted,
+          provider: state.routePolicy.provider,
+          model: state.routePolicy.model,
+          strategy: state.routePolicy.strategy,
+          activeTabId: state.uiMode.activeTabId,
+          messages,
+          resumeSessionId: state.sessionContinuity.resumeSessionId,
+        });
+        queueAppActions(dispatch, [
+          {type: "tab.activate", tabId: "chat"},
+          {type: "tab.append", tabId: "chat", lines: [userLine]},
+          {
+            type: "execution.events.ingest",
+            events: [userPromptExecutionEvent(submitted), queuedPromptExecutionEvent(queueId)],
+          },
+          {type: "status.set", value: "prompt queued (backend offline)"},
+        ]);
+        return;
+      }
       const route = routeLabel(state.routePolicy);
       queueAppActions(dispatch, [
         {type: "tab.activate", tabId: "chat"},
@@ -2673,6 +3125,10 @@ export function App(): React.ReactElement {
     if (action.summary === "focus selected approval") {
       return;
     }
+    if (action.requestType === "session.detail") {
+      requestSessionDetail(bridge, dispatch, String(action.payload.session_id ?? "").trim() || undefined);
+      return;
+    }
     const commandRunEvent = commandRunEventFromPaneAction(action);
     if (commandRunEvent) {
       markPendingCommandStream(pendingCommandStream, commandRunEvent);
@@ -2681,7 +3137,11 @@ export function App(): React.ReactElement {
   }
 
   function applyModelChoice(index: number): void {
-    const choices = selectableRouteTargets(stateRef.current.routePolicy);
+    const currentState = stateRef.current;
+    const choices = selectableRouteTargets(currentState.routePolicy);
+    const returnTabId = currentState.uiMode.activeOverlay.kind === "modelPicker"
+      ? currentState.uiMode.activeOverlay.returnTabId
+      : currentState.uiMode.activeTabId;
     const clampedIndex = Math.min(Math.max(index, 0), Math.max(choices.length - 1, 0));
     const choice = choices[clampedIndex];
     if (!choice) {
@@ -2699,14 +3159,92 @@ export function App(): React.ReactElement {
     });
     queueAppActions(dispatch, [
       {type: "modelPicker.close"},
+      {type: "tab.activate", tabId: returnTabId},
       {type: "status.set", value: `requesting route -> ${choice.provider}:${choice.model}`},
     ]);
   }
 
+  function selectSessionForInspection(sessionId: string): void {
+    const currentState = stateRef.current;
+    const detail = currentState.sessionPane.detailsBySessionId[sessionId];
+    queueAppActions(dispatch, [
+      {type: "session.select", sessionId},
+      {type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail)},
+      {type: "status.set", value: `viewing session ${sessionId} (next prompt remains fresh)`},
+    ]);
+  }
+
+  function armSelectedSessionResume(): void {
+    const currentState = stateRef.current;
+    const sessionId = currentState.sessionPane.selectedSessionId;
+    const detail = sessionId ? currentState.sessionPane.detailsBySessionId[sessionId] : undefined;
+    const eligibility = sessionResumeEligibility(currentState, detail);
+    if (!eligibility.canResume) {
+      if (eligibility.reason === "detail_unavailable" && sessionId) {
+        requestSessionDetail(bridge, dispatch, sessionId);
+        dispatch({type: "status.set", value: `loading ${sessionId}; press r again to arm resume`});
+        return;
+      }
+      const reason = {
+        detail_unavailable: "select a session first",
+        provider_unsupported: "runtime resume is currently Claude-only",
+        provider_mismatch: "selected session does not match the active provider",
+        replay_unverified: "selected transcript failed replay verification",
+        provider_session_missing: "selected session has no provider-native resume id",
+      }[eligibility.reason];
+      dispatch({type: "status.set", value: `resume unavailable: ${reason}`});
+      return;
+    }
+    if (!sessionId) {
+      dispatch({type: "status.set", value: "resume unavailable: select a session first"});
+      return;
+    }
+    queueAppActions(dispatch, [
+      {type: "session.select", sessionId},
+      {type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail, "resume")},
+    ]);
+    dispatch({type: "status.set", value: `resume armed for ${sessionId}; the next chat prompt continues it`});
+  }
+
+  function resetSessionResume(): void {
+    const currentState = stateRef.current;
+    const sessionId = currentState.sessionPane.selectedSessionId;
+    const detail = sessionId ? currentState.sessionPane.detailsBySessionId[sessionId] : undefined;
+    dispatch({type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail)});
+    dispatch({type: "status.set", value: "resume cleared; the next chat prompt starts fresh"});
+  }
+
+  // F-064: F2 toggles zen <-> cockpit. ink 5 blanks F-key input inside
+  // useInput (f2 is in nonAlphanumericKeys with no key flag), so the toggle
+  // listens on the raw stdin bytes instead: ESC OQ / ESC [12~ / ESC [[B.
+  const {stdin: rawStdin} = useStdin();
+  useEffect(() => {
+    if (!rawStdin) {
+      return;
+    }
+    const onData = (data: Buffer | string): void => {
+      const sequence = data.toString();
+      if (sequence === "OQ" || sequence === "[12~" || sequence === "[[B") {
+        if (stateRef.current.uiMode.activeOverlay.kind !== "none") {
+          return;
+        }
+        const next = stateRef.current.uiMode.layoutMode === "zen" ? "cockpit" : "zen";
+        dispatch({type: "layout.mode.set", mode: next});
+        dispatch({type: "status.set", value: `${next} layout — F2 toggles`});
+      }
+    };
+    rawStdin.on("data", onData);
+    return () => {
+      rawStdin.off("data", onData);
+    };
+  }, [rawStdin]);
+
   useInput((input, key) => {
-    if (key.ctrl && input === "c") {
-      bridge.close();
-      exit();
+    // The guided tour modal swallows the next keystroke to dismiss itself —
+    // any key closes it (operator word 2026-06-16).
+    if (state.uiMode.activeOverlay.kind === "tour") {
+      dispatch({type: "tour.close"});
+      dispatch({type: "status.set", value: "tour closed"});
       return;
     }
     if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
@@ -2735,15 +3273,20 @@ export function App(): React.ReactElement {
         }
         return;
       }
+      return;
     }
-      if (state.uiMode.activeOverlay.kind === "modelPicker") {
-        const choices = modelChoices;
-        const maxIndex = Math.max(choices.length - 1, 0);
-        if (key.escape) {
-          dispatch({type: "modelPicker.close"});
-          dispatch({type: "status.set", value: "model picker closed"});
-          return;
-        }
+    if (state.uiMode.activeOverlay.kind === "modelPicker") {
+      const choices = modelChoices;
+      const maxIndex = Math.max(choices.length - 1, 0);
+      if (key.escape) {
+        const returnTabId = state.uiMode.activeOverlay.returnTabId;
+        queueAppActions(dispatch, [
+          {type: "modelPicker.close"},
+          {type: "tab.activate", tabId: returnTabId},
+          {type: "status.set", value: "model picker closed"},
+        ]);
+        return;
+      }
       if (input === "j" || key.downArrow) {
         dispatch({type: "modelPicker.set", index: Math.min(state.uiMode.activeOverlay.selectedIndex + 1, maxIndex)});
         return;
@@ -2763,27 +3306,69 @@ export function App(): React.ReactElement {
         }
         return;
       }
+      return;
+    }
+    if (key.ctrl && input === "c") {
+      const cancellation = decideTurnCancellation(stateRef.current.activeTurn);
+      const bootstrapPending = Object.keys(pendingBootstraps.current).length > 0;
+      const bootstrapCancellationGuarded = Date.now() - bootstrapCancellationGuardRef.current < 2_000;
+      if (cancellation.kind !== "idle" || bootstrapPending || bootstrapCancellationGuarded) {
+        requestActiveTurnCancellation("shortcut");
+        return;
+      }
+      bridge.close();
+      exit();
+      return;
+    }
+    if (key.escape) {
+      const nextFocus = state.uiMode.keyboardFocus === "composer" ? "navigation" : "composer";
+      dispatch({type: "ui.focus.set", focus: nextFocus});
+      dispatch({type: "status.set", value: `${nextFocus} focus`});
+      return;
+    }
+    if (state.uiMode.keyboardFocus === "composer") {
+      if (isPlainReturn(input, key.return)) {
+        submitPrompt(state.prompt);
+        return;
+      }
+      if (key.backspace || key.delete) {
+        dispatch({type: "prompt.backspace"});
+        return;
+      }
+      if (!key.ctrl && !key.meta) {
+        const normalized = normalizeComposerInput(input);
+        if (normalized) {
+          dispatch({type: "prompt.append", value: normalized});
+        }
+      }
+      return;
     }
     if (activeTab?.kind === "sessions") {
-      if (input === "j") {
+      if (!key.ctrl && !key.meta && input === "j") {
         const nextSessionId = stepSessionSelection(stateRef.current, 1);
         if (nextSessionId) {
-          dispatch({type: "session.select", sessionId: nextSessionId});
-          dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+          selectSessionForInspection(nextSessionId);
         }
         return;
       }
-      if (input === "k") {
+      if (!key.ctrl && !key.meta && input === "k") {
         const nextSessionId = stepSessionSelection(stateRef.current, -1);
         if (nextSessionId) {
-          dispatch({type: "session.select", sessionId: nextSessionId});
-          dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+          selectSessionForInspection(nextSessionId);
         }
+        return;
+      }
+      if (!key.ctrl && !key.meta && input === "r") {
+        armSelectedSessionResume();
+        return;
+      }
+      if (!key.ctrl && !key.meta && input === "f") {
+        resetSessionResume();
         return;
       }
       if (key.return) {
         if (state.sessionPane.selectedSessionId) {
-          requestSessionDetail(bridge, state.sessionPane.selectedSessionId);
+          requestSessionDetail(bridge, dispatch, state.sessionPane.selectedSessionId);
           dispatch({type: "status.set", value: `refresh detail ${state.sessionPane.selectedSessionId}`});
         }
         return;
@@ -2846,8 +3431,7 @@ export function App(): React.ReactElement {
     if ((key.upArrow || key.downArrow) && activeTab?.kind === "sessions") {
       const nextSessionId = stepSessionSelection(stateRef.current, key.downArrow ? 1 : -1);
       if (nextSessionId) {
-        dispatch({type: "session.select", sessionId: nextSessionId});
-        dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+        selectSessionForInspection(nextSessionId);
       }
       return;
     }
@@ -2902,22 +3486,21 @@ export function App(): React.ReactElement {
       runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).tertiary);
       return;
     }
-    if (key.tab || key.rightArrow) {
-      dispatch({type: "tab.cycle", direction: 1});
-      return;
-    }
+    // F-159: the shift+tab branch must run BEFORE the plain-tab branch —
+    // Shift-Tab also sets key.tab, so the old order consumed it as forward
+    // (live tour finding 4: BTab navigated forward while the footer
+    // advertised reverse).
     if (key.leftArrow || (key.shift && key.tab)) {
       dispatch({type: "tab.cycle", direction: -1});
       return;
     }
-    if (input === "[") {
-      dispatch({type: "tab.cycle", direction: -1});
-      return;
-    }
-    if (input === "]") {
+    if (key.tab || key.rightArrow) {
       dispatch({type: "tab.cycle", direction: 1});
       return;
     }
+    // Design-truth law #6 (operator hit it live typing "5.1" — the "1" fired a
+    // sidebar command mid-sentence): printable keys ALWAYS reach the composer;
+    // navigation is chords only. Bare [ ] and 1/2/3 bindings are gone.
     if (key.ctrl && input === "g") {
       dispatch({type: "tab.activate", tabId: "chat"});
       return;
@@ -2961,6 +3544,12 @@ export function App(): React.ReactElement {
       return;
     }
     if (key.ctrl && input === "t") {
+      if ((activeTab?.id ?? "chat") === "chat") {
+        const nextExpanded = !stateRef.current.chatTraceExpanded;
+        dispatch({type: "trace.toggle"});
+        dispatch({type: "status.set", value: nextExpanded ? "trace expanded" : "trace collapsed"});
+        return;
+      }
       dispatch({type: "tab.activate", tabId: "control"});
       return;
     }
@@ -2988,65 +3577,188 @@ export function App(): React.ReactElement {
       dispatch({type: "activity.raw.toggle"});
       return;
     }
-    if (input === "1") {
-      dispatch({type: "sidebar.mode", mode: "toc"});
-      dispatch({type: "status.set", value: "sidebar -> toc"});
+    if (key.ctrl && input === "d" && state.uiMode.layoutMode === "scroll") {
+      // FACE-3: the scroll's telemetry drawer — scoped to the manuscript face
+      // so ^D stays free for future faces everywhere else.
+      setScrollDrawerOpen((open) => !open);
       return;
-    }
-    if (input === "2") {
-      dispatch({type: "sidebar.mode", mode: "context"});
-      dispatch({type: "status.set", value: "sidebar -> context"});
-      return;
-    }
-    if (input === "3") {
-      dispatch({type: "sidebar.mode", mode: "help"});
-      dispatch({type: "status.set", value: "sidebar -> help"});
-      return;
-    }
-    if (key.return) {
-      submitPrompt(state.prompt);
-      return;
-    }
-    if (key.backspace || key.delete) {
-      dispatch({type: "prompt.backspace"});
-      return;
-    }
-    if (!key.ctrl && !key.meta && input && !/[\u0000-\u001f\u007f]/.test(input)) {
-      dispatch({type: "prompt.append", value: input});
     }
   });
 
-  return (
-    <Box flexDirection="column">
-      <ShellHeader
-        routePolicy={state.routePolicy}
-        bridgeStatus={state.bridgeStatus}
-        activeTitle={activeTab?.title ?? "Workspace"}
-        focusMode={focusModeFor(activeTab, state)}
-        activeCount={state.tabs.length}
-        compact={compactShell}
-      />
-      {!compactShell ? (
-        <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-      ) : null}
-      <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
-      {activeTab?.kind === "chat" && !compactShell ? <ScenicStrip /> : null}
-      <Box marginTop={1}>
-        {state.uiMode.sidebarVisible !== "hidden" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
-          <Sidebar
-            mode={state.uiMode.sidebarMode}
-            outline={outline}
-            activeTabTitle={activeTab?.title ?? "Workspace"}
-            provider={state.routePolicy.provider}
-            model={state.routePolicy.model}
-            bridgeStatus={state.bridgeStatus}
-            tabs={state.tabs}
-            repoPreview={decorateSurfacePreview(state.liveRepoPreview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
-            controlPreview={decorateSurfacePreview(state.liveControlPreview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
-            compact={compactShell}
-            collapsed={state.uiMode.sidebarVisible === "collapsed"}
+  // The guided tour is an isolated, full-screen modal box (operator word
+  // 2026-06-16) — it pre-empts every face so it is never tangled with the
+  // transcript. Any key dismisses it (handled in the input handler above).
+  if (state.uiMode.activeOverlay.kind === "tour") {
+    const tourPanes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
+    return (
+      <TourOverlay lines={tourLines(tourPanes)} width={terminalWidth} height={terminalHeight} />
+    );
+  }
+
+  // F-111: zen is the boot default and contains exactly the transcript, the
+  // composer, and ONE thin status line (F-110) — the Claude Code-grade main
+  // stage. Tab/^K still navigate: any non-chat pane or overlay falls through
+  // to the full cockpit chrome below; returning to chat restores zen.
+  if (
+    state.uiMode.layoutMode === "zen" &&
+    activeTab?.kind === "chat" &&
+    state.uiMode.activeOverlay.kind === "none"
+  ) {
+    const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    // FACE-1 zen-pure: the status line carries only durable state (route +
+    // bridge liveness) — transient statusLine spam ("route confirmed",
+    // "sidebar ->") must never churn the zen frame.
+    const zenStatus = [
+      `zen/${state.uiMode.keyboardFocus}`,
+      `${routeLabel(state.routePolicy)} [${state.routePolicy.routeState}]`,
+      `bridge ${state.bridgeStatus}`,
+      "F2 cockpit · /tour",
+    ].join("  ·  ");
+    // Claude-Code baseline (operator hard rule "full screen, just like claude
+    // code" — the ~100-col clamp left a dead gulf on the right half of wide
+    // terminals): the zen frame spans the full terminal width.
+    const zenWidth = terminalWidth;
+    // Content-hugging like Claude Code: the composer sits directly under the
+    // last message (operator: "still too bulky" — the old bottom-pin left a
+    // dead gulf mid-screen). The frame stays full-height with the spacer BELOW
+    // the status line: mixed-height frames desync ink's in-place repaint
+    // (zen->cockpit->zen left a stale cockpit frame on screen).
+    return (
+      <Box flexDirection="column" height={terminalHeight}>
+        {/* Claude-Code baseline: conversation fills the top (newest hugs the
+            composer), composer + one stable status row pinned at the bottom.
+            Navigator is summonable (^N), off by default so the baseline stays pure. */}
+        <Box flexGrow={1} flexShrink={1} flexDirection="column" width={zenWidth}>
+          <TranscriptPane
+            frameless
+            bottomAnchor
+            title="Chat"
+            lines={displayedTranscriptLines}
+            scrollOffset={activeScrollOffset}
+            windowSize={zenWindow}
+            emptyState={transcriptMeta.emptyState}
+            accentColor={transcriptMeta.accentColor}
           />
+        </Box>
+        <Box flexShrink={0} flexDirection="column" width={zenWidth}>
+          <Composer
+            prompt={state.prompt}
+            focused={state.uiMode.keyboardFocus === "composer"}
+            compact={compactShell}
+            width={zenWidth}
+          />
+          <Box paddingX={1}>
+            <Text dimColor wrap="truncate-end">{zenStatus}</Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
+  // FACE-3 the scroll: a reading-first manuscript — the conversation as a
+  // clean centered column (~80 cols), one thin wave rule between turns, all
+  // telemetry folded behind a single toggleable drawer row (^D). The composer
+  // carries the frame's only border; Tab/^K still fall through to the cockpit
+  // chrome below, and returning to chat restores the manuscript.
+  if (
+    state.uiMode.layoutMode === "scroll" &&
+    activeTab?.kind === "chat" &&
+    state.uiMode.activeOverlay.kind === "none"
+  ) {
+    const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    // Manuscript measure: a touch under the zen clamp — the column is the
+    // identity of this face, so it earns gutters at wide terminals.
+    const scrollMeasure = Math.min(terminalWidth, 84);
+    const scrollStatus = `${state.uiMode.keyboardFocus} · ${scrollStatusLine({
+      drawerOpen: scrollDrawerOpen,
+      routeLabel: routeLabel(state.routePolicy),
+      bridgeStatus: state.bridgeStatus,
+      routeState: state.routePolicy.routeState,
+      strategy: state.routePolicy.strategy,
+    })}`;
+    return (
+      <Box flexDirection="column" height={terminalHeight} alignItems="center">
+        <Box flexShrink={0} flexDirection="column" width={scrollMeasure}>
+          <TranscriptPane
+            frameless
+            title="Chat"
+            lines={manuscriptLines(displayedTranscriptLines, scrollMeasure)}
+            scrollOffset={activeScrollOffset}
+            windowSize={scrollWindow}
+            emptyState={transcriptMeta.emptyState}
+            accentColor={transcriptMeta.accentColor}
+          />
+          <Composer
+            prompt={state.prompt}
+            focused={state.uiMode.keyboardFocus === "composer"}
+            compact={compactShell}
+            width={scrollMeasure}
+          />
+          <Box paddingX={1}>
+            <Text dimColor wrap="truncate-end">{scrollStatus}</Text>
+          </Box>
+        </Box>
+        <Box flexGrow={1} />
+      </Box>
+    );
+  }
+
+  return (
+    // F-163 fill law: the root owns exactly the terminal's rows — the pane row
+    // flexGrows into the spare height and CLIPS overgrown content (live sidebar
+    // telemetry previously inflated the layout past the terminal, scrolling the
+    // header, tab bar, and the entire conversation off-screen — operator live
+    // verdict 2026-06-12). Header/tab bar at top and composer/footer at bottom
+    // are now unconditionally visible at every size.
+    <Box flexDirection="column" height={terminalHeight}>
+      {/* flexShrink 0 on all fixed chrome: only the pane row below may flex.
+          Without it Yoga crushes the header/footer when pane content overflows. */}
+      <Box flexDirection="column" flexShrink={0}>
+        <ShellHeader
+          activeTitle={activeTab?.title ?? "Workspace"}
+          activeCount={state.tabs.length}
+          compact={compactShell}
+        />
+        <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
+        <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
+        {/* F-021: the 8-row wave renders only when the height budget affords it
+            (>= 40 rows) and the chat is still quiet — once real turns arrive the
+            transcript window owns those rows and the strip recedes. */}
+        {activeTab?.kind === "chat" && !compactShell && terminalHeight >= 40 && displayedTranscriptLines.length <= 4 ? (
+          <ScenicStrip />
         ) : null}
+      </Box>
+      <Box flexGrow={1} overflow="hidden">
+        {/* FACE-2 command post: sidebar is OFF by default (data panes carry
+            the info) and renders ONLY when explicitly visible — F-162: a
+            collapsed sidebar renders zero-width, never a 3-col "T" sliver. */}
+        {state.uiMode.sidebarVisible === "visible" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
+          // clip-don't-squeeze: the row stretches children to its height, and
+          // Yoga then crushes their inner columns into overlapping rows. The
+          // wrapper clips at natural height instead.
+          <Box flexDirection="column" overflow="hidden" flexShrink={0}>
+            <Box flexShrink={0} flexDirection="column">
+              <Sidebar
+                mode={state.uiMode.sidebarMode}
+                outline={outline}
+                activeTabTitle={activeTab?.title ?? "Workspace"}
+                provider={state.routePolicy.provider}
+                model={state.routePolicy.model}
+                bridgeStatus={state.bridgeStatus}
+                tabs={state.tabs}
+                repoPreview={decorateSurfacePreview(state.liveRepoPreview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
+                controlPreview={decorateSurfacePreview(state.liveControlPreview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
+                compact={compactShell}
+              />
+            </Box>
+          </Box>
+        ) : null}
+        <Box flexGrow={1} flexDirection="column" overflow="hidden">
+        {/* FACE-2 fill law: flexGrow stretches a SHORT pane to claim the spare
+            height (no dead gulf above the composer); flexShrink 0 keeps tall
+            content at natural height so the outer overflow CLIPS instead of
+            Yoga crushing columns into garble (F-022 clip-don't-squeeze). */}
+        <Box flexShrink={0} flexGrow={1} flexDirection="column">
         {state.uiMode.activeOverlay.kind === "paneSwitcher" ? (
           <PaneSwitcher
             tabs={state.tabs}
@@ -3099,7 +3811,11 @@ export function App(): React.ReactElement {
         ) : activeTab?.kind === "approvals" ? (
           <ApprovalsPane title={activeTab.title} approvalPane={state.approvalPane} />
         ) : activeTab?.kind === "sessions" ? (
-          <SessionsPane title={activeTab.title} sessionPane={state.sessionPane} />
+          <SessionsPane
+            title={activeTab.title}
+            sessionPane={state.sessionPane}
+            sessionContinuity={state.sessionContinuity}
+          />
         ) : activeTab?.kind === "agents" ? (
           <AgentsPane
             title={activeTab.title}
@@ -3125,15 +3841,43 @@ export function App(): React.ReactElement {
             accentColor={transcriptMeta.accentColor}
           />
         )}
+        </Box>
+        </Box>
+        {/* Navigator rail: the sidebar's mirror image on the right edge — a
+            fixed-width, clip-don't-squeeze column so it can only partition the
+            pane row's WIDTH, never inflate its height (F-163 by construction). */}
+        {railVisible ? (
+          <Box flexDirection="column" overflow="hidden" flexShrink={0} width={railWidth} borderStyle="single" borderColor={THEME.ridge} borderTop={false} borderRight={false} borderBottom={false}>
+            <NavigatorRail
+              lines={railChatLines}
+              narration={state.navigatorNarration}
+              routeLabel={liveRouteLabel}
+              activeTitle={activeTab?.title ?? "Workspace"}
+              windowSize={railWindowSize}
+              width={railWidth}
+            />
+          </Box>
+        ) : null}
       </Box>
-      <Composer prompt={state.prompt} compact={compactShell} />
-      <StatusFooter
-        statusLine={state.statusLine}
-        routeSummary={routeSummary(state.routePolicy)}
-        focusMode={focusModeFor(activeTab, state)}
-        footerHint={footerHintFor(activeTab?.id ?? "chat", state, shellControlOptions, compactShell)}
-        compact={compactShell}
-      />
+      <Box flexDirection="column" flexShrink={0}>
+        <Composer
+          prompt={state.prompt}
+          focused={state.uiMode.keyboardFocus === "composer"}
+          compact={compactShell}
+          width={terminalWidth}
+        />
+        {/* F-110: exactly ONE status row at every size — the single source
+            (F-164) for mode, route, gate state, and provider summary. */}
+        <StatusFooter
+          mode={focusModeFor(activeTab, state)}
+          routeLabel={routeLabel(state.routePolicy)}
+          bridgeStatus={state.bridgeStatus}
+          routeState={state.routePolicy.routeState}
+          strategy={state.routePolicy.strategy}
+          reason={state.routePolicy.availabilityReason}
+          compact={compactShell}
+        />
+      </Box>
     </Box>
   );
 }

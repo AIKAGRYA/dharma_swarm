@@ -1,0 +1,920 @@
+{
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm"
+  ],
+  "blocker_count": 36,
+  "blockers": [
+    {
+      "age_hours": 720.277,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "forge-v0.1-001",
+      "verified": false
+    },
+    {
+      "age_hours": 514.809,
+      "claimed_at": "2026-06-09T06:58:03.700816+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "ts-hb0631-credit",
+      "verified": false
+    },
+    {
+      "age_hours": 492.827,
+      "claimed_at": "2026-06-10T04:57:01.667278+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "ts-pr-babysit-div-20260610",
+      "verified": false
+    },
+    {
+      "age_hours": 473.831,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "approval_required"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "ts-evo-0611-1",
+      "verified": false
+    },
+    {
+      "age_hours": 473.831,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "operator_gated"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "ts-evo-0611-2",
+      "verified": false
+    },
+    {
+      "age_hours": 473.831,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "approval_required"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "ts-evo-0611-3",
+      "verified": false
+    },
+    {
+      "age_hours": 472.747,
+      "claimed_at": "2026-06-11T01:01:49.052113+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "reconcile-564-565-20260611",
+      "verified": false
+    },
+    {
+      "age_hours": 472.789,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "ts-converge-0611",
+      "verified": false
+    },
+    {
+      "age_hours": 472.789,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_missing_a2a_receipt_no_pointer",
+      "closed": true,
+      "flags": [],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Terminal row has no embedded A2A task receipt and no external receipt_path.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Recover or create a task-specific dharma_a2a_task_receipt.v1 receipt with evidence.",
+      "required_receipt_schema": "",
+      "status": "completed",
+      "task_id": "ts-converge-0611",
+      "verified": false
+    },
+    {
+      "age_hours": 445.999,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "holon-plan-review-opus-20260612",
+      "verified": false
+    },
+    {
+      "age_hours": 445.999,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "holon-plan-review-cursor-20260612",
+      "verified": false
+    },
+    {
+      "age_hours": 444.9,
+      "claimed_at": "2026-06-12T04:52:36.513465+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "dharma_a2a_task_receipt.v1",
+      "status": "claimed",
+      "task_id": "l1-fx-001",
+      "verified": false
+    },
+    {
+      "age_hours": 443.931,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "approval_required"
+      ],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "tam-wp-wp_dfa4e1134277",
+      "verified": false
+    },
+    {
+      "age_hours": 333.781,
+      "claimed_at": "2026-06-16T19:59:45.840398+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "yatagarasu-10cceaa8",
+      "verified": false
+    },
+    {
+      "age_hours": 275.511,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "operator_gated"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-gap-scan-fix",
+      "verified": false
+    },
+    {
+      "age_hours": 275.511,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "operator_gated"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-credit-monitor",
+      "verified": false
+    },
+    {
+      "age_hours": 275.511,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "classification": "open_stale_claimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "operator_gated"
+      ],
+      "lifecycle_state": "claimed_open",
+      "reason": "Claimed row is older than the stale threshold and has no terminal A2A receipt.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Close with a task-specific completed/blocked/failed receipt, or supervisor-block with evidence.",
+      "required_receipt_schema": "",
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-staging-decay",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-setu-sab-agni:20260627T1812Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-setu-sab-agni.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-setu-sab-agni.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-setu-sab-agni.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-setu-sab-agni",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-composer-mac:20260627T1744Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-codex-composer-mac",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-rushabdev:20260627T1812Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-rushabdev.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-rushabdev.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-rushabdev.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-codex-rushabdev",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-research-scout:20260627T1754Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-sab-research-scout",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-hardener:20260627T1744Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-sab-hardener",
+      "verified": false
+    },
+    {
+      "age_hours": 72.172,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-recruiter-bridge:20260627T1744Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-sab-recruiter-bridge",
+      "verified": false
+    },
+    {
+      "age_hours": 71.861,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d00-research-spark-3-challenge:20260627T1802Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-research-spark-3-challenge.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-research-spark-3-challenge.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-research-spark-3-challenge.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d00-research-spark-3-challenge",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-setu-approve-day1-queue:20260628T1544Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-setu-approve-day1-queue-20260628T1539Z.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-setu-approve-day1-queue-20260628T1539Z.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-setu-approve-day1-queue-20260628T1539Z.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-setu-approve-day1-queue",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "no_ack_only",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-semantic-reply-queue17:20260627T1834Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-semantic-reply-queue17.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-semantic-reply-queue17.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-semantic-reply-queue17.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-recruiter-bridge-candidate-draft:20260627T1834Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-recruiter-bridge-candidate-draft.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-recruiter-bridge-candidate-draft.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-recruiter-bridge-candidate-draft.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "operator_gated",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-hardener-route-service-runbook:20260627T1834Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-hardener-route-service-runbook.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-hardener-route-service-runbook.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-hardener-route-service-runbook.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-research-scout-channel-validation:20260627T1834Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-research-scout-channel-validation.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-research-scout-channel-validation.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-research-scout-channel-validation.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "verified": false
+    },
+    {
+      "age_hours": 71.344,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-rushabdev-federation-preflight:20260627T1834Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-rushabdev-federation-preflight.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-rushabdev-federation-preflight.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-rushabdev-federation-preflight.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+      "verified": false
+    },
+    {
+      "age_hours": 71.061,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [
+        "no_ack_only"
+      ],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "pending",
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark",
+      "verified": false
+    },
+    {
+      "age_hours": 70.441,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "no_ack_only",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d02-codex-visible-reply-proof:20260627T1925Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d02-codex-visible-reply-proof",
+      "verified": false
+    },
+    {
+      "age_hours": 70.441,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "no_ack_only",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d02-research-next-spark:20260627T1931Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-research-next-spark.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-research-next-spark.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-research-next-spark.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d02-research-next-spark",
+      "verified": false
+    },
+    {
+      "age_hours": 70.441,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "no_ack_only",
+        "operator_gated",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d02-hardener-top-risks:20260627T1925Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d02-hardener-top-risks",
+      "verified": false
+    },
+    {
+      "age_hours": 70.441,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "approval_required",
+        "no_ack_only",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d02-recruiter-first-spark-candidate:20260627T1925Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "verified": false
+    },
+    {
+      "age_hours": 70.441,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "closed_semantic_receipt_present_non_a2a",
+      "closed": true,
+      "flags": [
+        "no_ack_only",
+        "semantic_receipt_required"
+      ],
+      "lifecycle_state": "completed_unverified",
+      "reason": "Referenced semantic receipt validates, but it is not an embedded A2A task receipt.",
+      "receipt_id": "sab.semantic_receipt:sab-flywheel-d02-rushabdev-federation-watch:20260627T1931Z",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-rushabdev-federation-watch.semantic_receipt.json",
+      "receipt_pointer": {
+        "exists": true,
+        "path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-rushabdev-federation-watch.semantic_receipt.json",
+        "resolved_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-rushabdev-federation-watch.semantic_receipt.json",
+        "validation": {
+          "errors": [],
+          "valid": true
+        }
+      },
+      "receipt_validation_schema": "sab.semantic_receipt.v1",
+      "recommended_action": "Use a governed adapter only if the semantic artifact is accepted as evidence for an A2A receipt.",
+      "required_receipt_schema": "sab.semantic_receipt.v1",
+      "status": "completed",
+      "task_id": "sab-flywheel-d02-rushabdev-federation-watch",
+      "verified": false
+    }
+  ],
+  "classification_counts": {
+    "closed_missing_a2a_receipt_no_pointer": 1,
+    "closed_semantic_receipt_present_non_a2a": 18,
+    "open_stale_claimed_without_terminal_receipt": 11,
+    "open_stale_unclaimed_without_terminal_receipt": 6
+  },
+  "generated_at": "2026-06-30T17:46:37.880001Z",
+  "lifecycle_counts": {
+    "claimed_open": 11,
+    "completed_unverified": 19,
+    "open_unclaimed": 6
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "stale_after_hours": 24.0,
+  "total_tasks": 44
+}

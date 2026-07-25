@@ -1,6 +1,8 @@
 name: merge-master-mike-backlog
 
 on:
+  schedule:
+    - cron: "17 * * * *"  # cloud heartbeat; packet-only and merge-off by default
   workflow_dispatch:
     inputs:
       mode:
@@ -29,9 +31,9 @@ on:
       required_reviewers:
         description: Required reviewer receipt names before Mike may merge
         required: true
-        # Devin does not post review receipts (it commits), so it is not a
-        # required receipt — copilot and claude are what actually review.
-        default: copilot,claude
+        # Native installed-App reviews are the credential-free cloud quorum.
+        # Claude remains an optional deep/backup lane.
+        default: codex,copilot
         type: string
       merge_mode:
         description: Mike merge authority mode
@@ -92,14 +94,15 @@ jobs:
           DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
           DEVIN_NATS_CA_PEM: ${{ secrets.DEVIN_NATS_CA_PEM }}
           DEVIN_NATS_TLS_HOSTNAME: ${{ vars.DEVIN_NATS_TLS_HOSTNAME || secrets.DEVIN_NATS_TLS_HOSTNAME }}
-          MODE: ${{ inputs.mode }}
-          MAX_PRS: ${{ inputs.max_prs }}
-          LIMIT: ${{ inputs.limit }}
-          STATUSES: ${{ inputs.statuses }}
-          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers }}
-          MERGE_MODE: ${{ inputs.merge_mode }}
-          MERGE_METHOD: ${{ inputs.merge_method }}
-          NATS_REQUIRED: ${{ inputs.nats_required }}
+          DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"
+          MODE: ${{ inputs.mode || 'packet-only' }}
+          MAX_PRS: ${{ inputs.max_prs || '5' }}
+          LIMIT: ${{ inputs.limit || '100' }}
+          STATUSES: ${{ inputs.statuses || 'GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW' }}
+          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex,copilot' }}
+          MERGE_MODE: ${{ inputs.merge_mode || 'off' }}
+          MERGE_METHOD: ${{ inputs.merge_method || 'squash' }}
+          NATS_REQUIRED: ${{ inputs.nats_required || false }}
         run: |
           set -euo pipefail
           state_root="${RUNNER_TEMP}/dharma-pr-review"

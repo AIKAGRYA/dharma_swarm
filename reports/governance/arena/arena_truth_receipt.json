@@ -1,0 +1,95 @@
+{
+  "archive_cells": 5,
+  "best": {
+    "adjudication_rule": "synthesize",
+    "arm_scores": {
+      "best_single_full_budget": 0.375,
+      "best_single_parity_budget": 0.375,
+      "candidate": 1.0,
+      "random_or_static_ensemble": 0.375,
+      "same_budget_self_moa": 0.375
+    },
+    "behavioral_cell": [
+      0,
+      3,
+      3,
+      "broadcast",
+      "synthesize"
+    ],
+    "budget_parity": {
+      "best_single_full_budget": {
+        "budget_ref": 2400,
+        "total_compute": 2400,
+        "within_parity": true
+      },
+      "best_single_parity_budget": {
+        "budget_ref": 2400,
+        "total_compute": 2400,
+        "within_parity": true
+      },
+      "candidate": {
+        "budget_ref": 2400,
+        "total_compute": 2400,
+        "within_parity": true
+      },
+      "random_or_static_ensemble": {
+        "budget_ref": 2400,
+        "total_compute": 7200,
+        "within_parity": false
+      },
+      "same_budget_self_moa": {
+        "budget_ref": 2400,
+        "total_compute": 2400,
+        "within_parity": true
+      }
+    },
+    "budget_ref": 2400,
+    "closeout_state": "positive_lift_candidate",
+    "council_verdict": "corroborated",
+    "dpi": {
+      "decorrelation_bonus": 0.625,
+      "dpi": 2.170138888888889e-05,
+      "final_correct": true,
+      "learning_active": false,
+      "trust_multiplier": 1.0,
+      "verified_capability_delta": 1.25
+    },
+    "genome_id": "genome-6f74d65b34c0424e",
+    "roster": [
+      "alpha-math",
+      "beta-code",
+      "gamma-logic"
+    ],
+    "scorecard_hash": "435347a6e8c2c99ada1d1cb015786deba9621ab7ad92e18a4b7291e374931df1",
+    "significance": {
+      "ci95_lift": [
+        0.4166666666666667,
+        0.7916666666666666
+      ],
+      "iterations": 2000,
+      "method": "paired_seeded_bootstrap_percentile",
+      "n": 24,
+      "observed_lift": 0.625,
+      "p_value": 0.0,
+      "significant": true
+    }
+  },
+  "capability_claim": "none \u2014 hermetic fixture harness only. The fixture pool is CONSTRUCTED so that specialist routing beats best-single (Krogh-Vedelsby by design), so the lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1) and NOT commensurable with trust-gate C2 (which reads only live benchmark runs). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.",
+  "corpus": {
+    "path": "cold_start_corpus.jsonl",
+    "rows": 48,
+    "sha256": "05a3692e3b02d928ea6902ab47bfbcd14cef041fc637f3e7a33aab77e19c2054"
+  },
+  "digest": "6b17e427fa3e3e5f646eb7dc5336edf3f85b729d94f0bf14b78a43475cf79b3a",
+  "evaluated": 17,
+  "generated_at": "2026-07-05T17:28:54Z",
+  "generations": 12,
+  "hermetic": true,
+  "schema": "arena_truth_report.v1",
+  "scorer_hash": "5c5e5be906ed2e85328b3ae3dbf432f03fb70006a9b7b8b44b2c66a8d99f4acb",
+  "sealed_oracle_hash": "09d45ae6ba917f980b4b40e45f9cb8967edda832d083586e0d22659573bb3eec",
+  "seed": 0,
+  "task_manifest_hash": "76f69c2f2994dbe5cb57acf9524c6ff452f237af0f5eb1dbffe362aaf66c37bc",
+  "task_pack_id": "orchestration-arena-v1-frozen-verifiable-20260622-e2",
+  "winners": 2
+}

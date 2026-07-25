@@ -11,10 +11,19 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 const scoutMaxAttempts = 3
+
+// Sequential fetching over the full source list (default sources + up to ~40
+// beat-derived query sources in --beats mode) could exceed the cron scout
+// timeout before any observation is persisted, turning a slow/rate-limited
+// endpoint into an empty failed run instead of a partial success (Codex
+// review finding, main.go:52). Bounded concurrency keeps total wall time
+// close to one round-trip regardless of source count.
+const scoutFetchConcurrency = 8
 
 var scoutSleep = time.Sleep
 
@@ -39,20 +48,49 @@ func FetchSourcesWithContext(ctx context.Context, sources []Source) ([]Observati
 	return fetchSourcesWithClient(ctx, sources, client)
 }
 
+type sourceFetchOutcome struct {
+	name         string
+	observations []Observation
+	retries      int
+	err          error
+}
+
 func fetchSourcesWithClient(ctx context.Context, sources []Source, client *http.Client) ([]Observation, ScoutResult, error) {
 	result := ScoutResult{FetchEnabled: true, SourceCount: len(sources)}
+
+	// Fetch concurrently (bounded by scoutFetchConcurrency) but collect into
+	// an index-ordered slice so downstream ordering/determinism (and existing
+	// tests) match the old sequential behavior exactly.
+	outcomes := make([]sourceFetchOutcome, len(sources))
+	sem := make(chan struct{}, scoutFetchConcurrency)
+	var wg sync.WaitGroup
+	for i, source := range sources {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, source Source) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			body, retries, err := fetchSourceBytes(ctx, client, source)
+			outcome := sourceFetchOutcome{name: source.Name, retries: retries, err: err}
+			if err == nil {
+				outcome.observations = observationsFromBytes(source, body)
+			}
+			outcomes[i] = outcome
+		}(i, source)
+	}
+	wg.Wait()
+
 	observations := []Observation{}
 	var errors []string
-	for _, source := range sources {
-		body, retries, err := fetchSourceBytes(ctx, client, source)
-		result.RetryCount += retries
-		if err != nil {
+	for _, outcome := range outcomes {
+		result.RetryCount += outcome.retries
+		if outcome.err != nil {
 			result.FailedSources++
-			errors = append(errors, fmt.Sprintf("%s: %v", source.Name, err))
+			errors = append(errors, fmt.Sprintf("%s: %v", outcome.name, outcome.err))
 			continue
 		}
 		result.SuccessfulSources++
-		observations = append(observations, observationsFromBytes(source, body)...)
+		observations = append(observations, outcome.observations...)
 	}
 	result.Errors = errors
 	if len(errors) > 0 && len(observations) == 0 {

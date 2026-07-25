@@ -15,9 +15,12 @@
 
 - Public `www.palantir.com` pages and `palantir.com/docs` sitemap entries may be
   indexed as URLs and metadata.
-- Store original summaries, concept maps, and short compliant excerpts only.
-- Do not mirror full docs pages, course text, videos, transcripts, labs, quizzes,
-  or private tenant material.
+- Two-tier storage: bounded `source-cards/` (metadata, summaries, short excerpts)
+  and, for robots-allowed public `www.palantir.com` docs pages, full parsed prose
+  as local-only `deep-cards/` (under `~/.dharma`, never committed to git, internal
+  RAG only, no redistribution).
+- Do not mirror Learn/course bodies, course text, videos, transcripts, labs,
+  quizzes, gated, or private-tenant material.
 - Do not bypass login, robots, paywalls, course enrollment, browser restrictions,
   or rate limits.
 - `learn.palantir.com/page/course-catalog` is link/manual-review only until a

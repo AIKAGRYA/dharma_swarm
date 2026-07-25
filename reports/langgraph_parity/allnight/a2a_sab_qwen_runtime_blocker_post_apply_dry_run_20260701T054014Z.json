@@ -1,0 +1,29 @@
+{
+  "actions": [],
+  "applied": false,
+  "applied_count": 0,
+  "applied_rows": [],
+  "backup_path": "",
+  "candidate_count": 0,
+  "generated_at": "2026-07-01T05:40:14Z",
+  "post_readiness": {
+    "open_tasks": 9,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 1,
+  "skips": [
+    {
+      "detail": "blocked",
+      "reason": "already_closed",
+      "row_index": 38,
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
@@ -24,10 +26,15 @@ def _telemetry_client() -> TestClient:
 
 
 def test_telemetry_teams_route_registered_once() -> None:
-    client = _telemetry_client()
+    # The router is a module-level singleton; another test in the suite can
+    # mutate its route table, which (observed in CI) drops /api/telemetry/teams
+    # so the registration count reads 0. Reload so the assertion reflects the
+    # routes as declared in the module (still catches a real double
+    # registration -> count 2).
+    module = importlib.reload(telemetry_router)
     team_routes = [
         route
-        for route in client.app.routes
+        for route in module.router.routes
         if getattr(route, "path", None) == "/api/telemetry/teams"
         and "GET" in getattr(route, "methods", set())
     ]

@@ -14,9 +14,8 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
-from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
     AgentConfig,
@@ -56,9 +55,16 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 # The core execution (run_task) is the leaf invoked by spine-wrapped callers
 # (Orchestrator._run_task_via_spine, A2ABridge.submit_via_spine) which wrap
 # the actual call inside an invoke_agent() invoker closure to emit exactly one
-# EvidenceReceipt per dispatch. This import declares the surface's place in
-# the single blessed path; no god-object bypass of the spine for orchestrated work.
+# EvidenceReceipt per dispatch. These imports DECLARE the surface's place in
+# the single blessed path (declaration-by-import, kept deliberately unused);
+# no god-object bypass of the spine for orchestrated work.
+from dharma_swarm.spine.invoke import invoke_agent  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.routing import RoutingDecision  # noqa: F401  (spine-adoption declaration)
+
 logger = logging.getLogger(__name__)
+
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 
 _HEARTBEAT_THRESHOLD = timedelta(seconds=_SWARM_CFG.agent.heartbeat_threshold_seconds)
 _ERROR_PREFIXES = (
@@ -161,78 +167,29 @@ def _parse_tool_calls_from_text(
         except _json.JSONDecodeError:
             continue
 
-    if results:
-        return results
-
-    # Pattern 4: <function=name><parameter=key>value</parameter>...</function>
-    # This is the Claude/Anthropic-style XML tool-call dialect. It is NOT
-    # recognised by Patterns 1-3, so when a provider emits this format the
-    # raw XML was being stored verbatim as the task result — producing the
-    # "113 of 122 tasks with fake tool_call results" pathology documented in
-    # NIKKI 2026-07-16 KAGAMI/HI. Parsing it here lets the local tool loop
-    # actually execute the call and return a real result.
-    for fn_match in _re.finditer(
-        r"<function=(\w+)([^>]*?)>(.*?)</function>",
-        text,
-        _re.DOTALL,
-    ):
-        fn_name = fn_match.group(1)
-        if known_tools and fn_name not in known_tools:
-            continue
-        body = fn_match.group(3)
-        params: dict[str, Any] = {}
-        for pm in _re.finditer(
-            r"<parameter=([^>]+)>(.*?)</parameter>",
-            body,
-            _re.DOTALL,
-        ):
-            params[pm.group(1).strip()] = pm.group(2).strip()
-        results.append({
-            "id": f"text_{_uuid.uuid4().hex[:8]}",
-            "name": fn_name,
-            "arguments": _json.dumps(params),
-        })
-
     return results
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
-_NON_LOCAL_TOOLING_DIRECTIVES = (
-    "direct answer only",
-    "do not edit files",
-    "do not modify files",
-    "do not change files",
-    "do not write files",
-    "do not use local tools",
-    "do not use tools",
-    "no file changes",
-    "no file edits",
-    "no local tools",
-)
-_TOOLING_PHRASE_HINTS = (
+_TOOLING_HINTS = (
     "apply patch",
-    "fetch_url",
-    "grep_search",
-    "read file",
-    "run pytest",
-    "run tests",
-    "shell command",
-    "shell_exec",
-    "web_search",
-    "write file",
-)
-_TOOLING_WORD_HINTS = (
     "bug",
     "code",
     "edit",
+    "fetch_url",
     "file",
     "fix",
     "implement",
     "module",
     "patch",
     "pytest",
+    "read",
     "refactor",
+    "research",
     "script",
+    "search",
     "test",
+    "web_search",
+    "write",
 )
 _FRONTIER_HINTS = (
     "analyze",
@@ -557,29 +514,6 @@ def _metadata_bool(metadata: dict[str, Any], *keys: str) -> bool | None:
     return None
 
 
-def _has_tooling_hint(text: str) -> bool:
-    lowered = text.lower()
-    if any(phrase in lowered for phrase in _TOOLING_PHRASE_HINTS):
-        return True
-    return any(
-        re.search(rf"\b{re.escape(marker)}\b", lowered)
-        for marker in _TOOLING_WORD_HINTS
-    )
-
-
-def _forbids_local_tooling(task: Task, metadata: dict[str, Any]) -> bool:
-    override = _metadata_bool(
-        metadata,
-        "direct_answer_only",
-        "no_local_tooling",
-        "no_local_tools",
-    )
-    if override is not None:
-        return override
-    lowered = _task_text(task).lower()
-    return any(directive in lowered for directive in _NON_LOCAL_TOOLING_DIRECTIVES)
-
-
 def _priority_score(priority: TaskPriority) -> float:
     return {
         TaskPriority.LOW: 0.18,
@@ -615,17 +549,14 @@ def _requires_tooling(task: Task, config: AgentConfig) -> bool:
     )
     if override is not None:
         return override
-    if _task_requires_local_side_effects(task):
-        return True
-    if _forbids_local_tooling(task, metadata):
-        return False
     if metadata.get("modified"):
         return True
     if config.provider in {ProviderType.CLAUDE_CODE, ProviderType.CODEX}:
         return True
     if config.role in {AgentRole.CODER, AgentRole.TESTER, AgentRole.SURGEON}:
         return True
-    return _has_tooling_hint(_task_text(task))
+    lowered = _task_text(task).lower()
+    return any(marker in lowered for marker in _TOOLING_HINTS)
 
 
 def _requires_frontier_precision(task: Task, config: AgentConfig) -> bool:
@@ -817,10 +748,12 @@ def _build_route_request(
         "prefer_low_cost",
     )
     if preferred_low_cost is None:
-        preferred_low_cost = not requires_frontier and not privileged_action and task.priority in {
-            TaskPriority.LOW,
-            TaskPriority.NORMAL,
-        }
+        # Power-first default (routing consolidation 2026-06-21, operator-locked):
+        # cost is an OPT-IN nudge, so a task that does not ask for cheap routing
+        # no longer auto-prefers the free tier — the router reaches for the most
+        # capable provider. Tasks opt into cost via metadata preferred_low_cost /
+        # prefer_low_cost. See docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md.
+        preferred_low_cost = False
 
     requires_human_consent = _metadata_bool(
         metadata,
@@ -1224,6 +1157,76 @@ def _resolve_config_ontology_path(
     return state_dir / "ontology.db"
 
 
+_MAX_PROMPT_TOKENS: int = int(os.environ.get("DHARMA_MAX_PROMPT_TOKENS", "12000"))
+
+
+def _estimate_prompt_tokens(request: LLMRequest) -> int:
+    """Rough token count for a full LLMRequest (system + all message content).
+
+    Uses the 3.8 chars/token heuristic — same as _estimate_requested_tokens.
+    """
+    parts = [request.system or ""]
+    for msg in request.messages:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):  # multi-modal blocks
+            for block in content:
+                if isinstance(block, dict):
+                    parts.append(str(block.get("text", "")))
+    text = "\n".join(parts)
+    return max(int(len(text) / 3.8), 64)
+
+
+def _trim_context_to_budget(
+    request: LLMRequest,
+    max_tokens: int = _MAX_PROMPT_TOKENS,
+) -> LLMRequest:
+    """Drop lower-priority context sections until the prompt fits the token budget.
+
+    Priority (highest to lowest — drop from the bottom up):
+      1. Task title + description (never dropped)
+      2. Runtime Context Bundle
+      3. Memory Recall
+      4. Latent Gold          <- dropped first
+      5. Recent Fitness Feedback <- dropped second
+      6. Stigmergy marks / anything else injected below task
+
+    Returns a new LLMRequest; never mutates the original.
+    """
+    if _estimate_prompt_tokens(request) <= max_tokens:
+        return request  # already fits
+
+    if not request.messages:
+        return request
+
+    import re as _re
+
+    # Sections to strip, ordered from least to most important
+    _DROP_HEADERS = [
+        r"^## Recent Fitness Feedback.*?(?=\n## |\Z)",
+        r"^## Latent Gold.*?(?=\n## |\Z)",
+        r"^## Stigmergy Recall.*?(?=\n## |\Z)",
+        r"^## Memory Recall.*?(?=\n## |\Z)",
+        r"^## Runtime Context Bundle.*?(?=\n## |\Z)",
+    ]
+
+    content = request.messages[0].get("content", "") if request.messages else ""
+    if not isinstance(content, str):
+        return request  # multi-modal; skip trimming
+
+    trimmed = content
+    for pattern in _DROP_HEADERS:
+        if _estimate_prompt_tokens(
+            request.model_copy(update={"messages": [{"role": "user", "content": trimmed}]})
+        ) <= max_tokens:
+            break
+        trimmed = _re.sub(pattern, "", trimmed, flags=_re.S | _re.M).strip()
+
+    new_messages = [{**request.messages[0], "content": trimmed}, *request.messages[1:]]
+    return request.model_copy(update={"messages": new_messages})
+
+
 def _build_prompt(
     task: Task,
     config: AgentConfig,
@@ -1567,6 +1570,7 @@ def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
 def _resolve_local_tool_path(raw_path: str, *, workdir: Path) -> Path:
     # Normalize ~ and ~/ to the actual home directory
     raw = raw_path.strip()
+    home = str(Path.home())
     if raw.startswith("~/"):
         candidate = Path.home() / raw[2:]
     elif raw.startswith("~"):
@@ -1707,25 +1711,16 @@ class AgentRunner:
         self._lock = asyncio.Lock()
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._runtime_fields = build_runtime_field_registry_from_agent_config(config)
-        self.actual_served_provider = ""
-        self.actual_served_model = ""
-        self.selected_provider = ""
-        self.selected_model = ""
-        self.provider_model_truth_source = ""
-        self.provider_execution: bool | str = ""
-        self.provider_model_applicability = ""
-        self.provider_model_missing_reason = ""
-        self.no_provider_model_reason = ""
-        self.served_provider = ""
-        self.served_model = ""
-        self.provider_served = ""
-        self.model_served = ""
         # Letta-inspired self-managing memory (SQLite-backed)
         self._advanced_memory = advanced_memory
 
         # Sprint 3: Economic tracking
         self._economic_spine: Any = None
         self._tokens_used_total: int = 0
+        self._last_route_request: Optional[Any] = None
+        self._last_route_decision: Optional[Any] = None
+        self._last_response: Optional[LLMResponse] = None
+        self._last_usage: Dict[str, int] = {}
 
     def set_economic_spine(self, spine: Any) -> None:
         """Attach an EconomicSpine for cost tracking."""
@@ -1750,89 +1745,6 @@ class AgentRunner:
     def runtime_fields(self) -> RuntimeFieldRegistry:
         """Expose runtime mutation targets for prompt/parameter evolution."""
         return self._runtime_fields
-
-    def _clear_served_route(self) -> None:
-        self.actual_served_provider = ""
-        self.actual_served_model = ""
-        self.selected_provider = ""
-        self.selected_model = ""
-        self.provider_model_truth_source = ""
-        self.provider_execution = ""
-        self.provider_model_applicability = ""
-        self.provider_model_missing_reason = ""
-        self.no_provider_model_reason = ""
-        self.served_provider = ""
-        self.served_model = ""
-        self.provider_served = ""
-        self.model_served = ""
-
-    def _direct_provider_runtime_label(self) -> str:
-        if self._provider is None or _is_routed_provider(self._provider):
-            return ""
-        label = getattr(self._provider, "runtime_provider_type", "")
-        return label.strip() if isinstance(label, str) else ""
-
-    def _record_served_route(self, response: LLMResponse | None) -> None:
-        if response is None:
-            return
-        self._clear_served_route()
-        response_provider = str(getattr(response, "provider", "") or "").strip()
-        direct_runtime_provider = self._direct_provider_runtime_label()
-        provider = str(response_provider or direct_runtime_provider).strip()
-        model = str(getattr(response, "model", "") or "").strip()
-        if not provider or not model:
-            return
-        source = "runtime_provider.actual_served"
-        self.actual_served_provider = provider
-        self.actual_served_model = model
-        self.provider_model_truth_source = source
-        self.provider_execution = True
-        self.provider_model_applicability = "actual_served"
-        self.no_provider_model_reason = ""
-        self.served_provider = provider
-        self.served_model = model
-        self.provider_served = provider
-        self.model_served = model
-
-    def _record_no_provider_execution(self, task: Task, *, reason: str) -> None:
-        self._clear_served_route()
-        self.provider_execution = False
-        self.provider_model_applicability = "not_applicable"
-        self.provider_model_truth_source = "agent_runner.no_provider_execution"
-        self.no_provider_model_reason = reason
-        metadata = _task_metadata(task)
-        task.metadata = {
-            **metadata,
-            "provider_execution": False,
-            "provider_model_applicability": "not_applicable",
-            "provider_model_truth_source": self.provider_model_truth_source,
-            "no_provider_model_reason": reason,
-        }
-
-    def _record_attempted_route_from_exception(self, exc: BaseException) -> None:
-        provider = str(
-            getattr(exc, "last_attempt_provider", "")
-            or getattr(exc, "selected_provider", "")
-            or getattr(exc, "planned_provider", "")
-            or ""
-        ).strip()
-        model = str(
-            getattr(exc, "last_attempt_model", "")
-            or getattr(exc, "selected_model", "")
-            or getattr(exc, "planned_model", "")
-            or ""
-        ).strip()
-        if not provider or not model:
-            return
-        self._clear_served_route()
-        self.selected_provider = provider
-        self.selected_model = model
-        self.provider_model_truth_source = "agent_runner.provider_chain_failure"
-        self.provider_execution = True
-        self.provider_model_applicability = "failed_before_serve"
-        self.provider_model_missing_reason = (
-            "provider_chain_failed_before_actual_served_response"
-        )
 
     @property
     def advanced_memory(self) -> AgentMemoryManager | None:
@@ -1883,7 +1795,7 @@ class AgentRunner:
         async def remember(key: str, content: str, scope: str = "working", ttl: int | None = None) -> str:
             """Store a memory. Scope: working, short_term, long_term, shared."""
             s = MemoryScope(scope)
-            await mgr.remember(key, content, scope=s, ttl=ttl)
+            mem = await mgr.remember(key, content, scope=s, ttl=ttl)
             return f"Remembered '{key}' in {scope}"
 
         async def recall(query: str, scope: str | None = None, limit: int = 5) -> str:
@@ -1938,15 +1850,11 @@ class AgentRunner:
                 request,
                 available_provider_types=available_provider_types,
             )
-            try:
-                route_decision, response = await self._provider.complete_for_task(
-                    route_request,
-                    request,
-                    available_provider_types=available_provider_types,
-                )
-            except Exception as exc:
-                self._record_attempted_route_from_exception(exc)
-                raise
+            route_decision, response = await self._provider.complete_for_task(
+                route_request,
+                request,
+                available_provider_types=available_provider_types,
+            )
             return route_request, route_decision, response
         return None, None, await self._provider.complete(request)
 
@@ -2098,7 +2006,6 @@ class AgentRunner:
                 task,
                 current_request,
             )
-            self._record_served_route(response)
             if route_request is not None:
                 last_route_request = route_request
             if route_decision is not None:
@@ -2153,49 +2060,6 @@ class AgentRunner:
 
             current_request = current_request.model_copy(update={"messages": updated_messages})
 
-        if not _task_requires_local_side_effects(task):
-            final_messages = list(current_request.messages)
-            final_messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "The local tool round budget is exhausted. Do not call more tools. "
-                        "Return the best concise final answer now, based only on the task "
-                        "and the tool results already visible in this conversation."
-                    ),
-                }
-            )
-            final_request = current_request.model_copy(
-                update={
-                    "system": (
-                        f"{request.system}\n\n"
-                        "Tool-use budget exhausted. Produce a final answer without tool calls."
-                    ),
-                    "messages": final_messages,
-                    "tools": [],
-                }
-            )
-            route_request, route_decision, response = await self._invoke_provider(
-                task,
-                final_request,
-            )
-            self._record_served_route(response)
-            if route_request is not None:
-                last_route_request = route_request
-            if route_decision is not None:
-                last_route_decision = route_decision
-            if response.content and response.content.strip():
-                logger.warning(
-                    "Local tool loop exhausted for task %s; accepted final no-tool answer",
-                    task.id,
-                )
-                return (
-                    last_route_request,
-                    last_route_decision,
-                    response,
-                    response.content,
-                )
-
         raise RuntimeError(
             f"Local tool loop exceeded max rounds ({_tool_loop_max_rounds(task, self._config)})"
         )
@@ -2235,7 +2099,6 @@ class AgentRunner:
                     task,
                     request,
                 )
-                self._record_served_route(response)
                 result = response.content
             completion_latency_ms = (time.monotonic() - completion_started) * 1000.0
             return route_request, route_decision, response, result, completion_latency_ms
@@ -2335,7 +2198,10 @@ class AgentRunner:
         active_inference_engine: Any | None = None
         active_inference_prediction: Any | None = None
         observed_quality_score: float | None = None
-        self._clear_served_route()
+        self._last_route_request = None
+        self._last_route_decision = None
+        self._last_response = None
+        self._last_usage = {}
 
         _task_tracer = _jikoku_tracer()
         _task_span = _task_tracer.start(
@@ -2404,6 +2270,14 @@ class AgentRunner:
                 )
             request = _build_prompt(task, self._config, plan_context=plan_context)
             await _inject_stigmergy_context(request, task, self._config)
+            # Token budget gate: trim lower-priority context sections if over ceiling.
+            _tok = _estimate_prompt_tokens(request)
+            if _tok > _MAX_PROMPT_TOKENS:
+                logger.debug(
+                    "Prompt for task %s is ~%d tokens (ceiling %d); trimming context",
+                    task.id[:8], _tok, _MAX_PROMPT_TOKENS,
+                )
+                request = _trim_context_to_budget(request, _MAX_PROMPT_TOKENS)
             self._record_conversation_turn(
                 task,
                 role="user",
@@ -2546,10 +2420,6 @@ class AgentRunner:
                     attempts_remaining -= 1
                     attempt_index += 1
             else:
-                self._record_no_provider_execution(
-                    task,
-                    reason="agent_runner_no_provider_attached",
-                )
                 result = (
                     f"[mock] Agent {self._config.name} completed: {task.title}"
                 )
@@ -2592,7 +2462,10 @@ class AgentRunner:
                 result_text=result,
                 quality_score_override=observed_quality_score,
             )
-            self._record_served_route(response)
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
 
             # ── Langfuse / local observability trace ──
             try:
@@ -2646,8 +2519,8 @@ class AgentRunner:
                 self._state.turns_used += 1
                 self._state.tasks_completed += 1
                 self._state.current_task = None
-                self._state.status = AgentStatus.IDLE
                 self._state.last_heartbeat = _utc_now()
+            await self._post_task_lifecycle(task)
 
             await _leave_task_mark(
                 agent_name=self._config.name,
@@ -2817,6 +2690,10 @@ class AgentRunner:
                 result_text=str(exc),
                 quality_score_override=observed_quality_score,
             )
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
             self._observe_active_inference(
                 active_inference_engine,
                 active_inference_prediction,
@@ -2905,9 +2782,9 @@ class AgentRunner:
                 logger.debug("Telic seam recording failed", exc_info=True)
 
             async with self._lock:
-                self._state.status = AgentStatus.IDLE
                 self._state.current_task = None
                 self._state.error = str(exc)
+            await self._post_task_lifecycle(task)
             # Close outer task span (failure)
             try:
                 _task_tracer.end(_task_span, success=False, error=str(exc)[:200])
@@ -2917,6 +2794,40 @@ class AgentRunner:
                 "Agent %s failed task %s", self._config.name, task.id
             )
             raise
+
+    async def _post_task_lifecycle(self, task: Task) -> None:
+        """Implement BSP Vote-to-Halt after task completion.
+
+        If the agent's inbox is empty: transition to INACTIVE (voted-to-halt).
+        If messages are waiting: stay IDLE so the orchestrator can re-activate.
+        """
+        if self._message_bus is None:
+            async with self._lock:
+                self._state.status = AgentStatus.IDLE
+            return
+        try:
+            messages = await self._message_bus.receive(self.agent_id, limit=1)
+        except Exception:
+            # A bus failure is not an empty inbox: the agent may still have
+            # unread work, so stay reactivatable instead of voting to halt.
+            logger.warning(
+                "Message bus receive failed for agent %s at superstep boundary;"
+                " staying IDLE instead of voting to halt",
+                self._config.name,
+                exc_info=True,
+            )
+            async with self._lock:
+                self._state.status = AgentStatus.IDLE
+            return
+        async with self._lock:
+            if messages:
+                self._state.status = AgentStatus.IDLE
+            else:
+                self._state.status = AgentStatus.INACTIVE
+                logger.debug(
+                    "Agent %s voted to halt (INACTIVE) at superstep boundary",
+                    self._config.name,
+                )
 
     # -- worker delegation --------------------------------------------------
 

@@ -24,7 +24,6 @@ from typing import Any
 from dharma_swarm.field_knowledge_base import (
     ALL_FIELD_ENTRIES,
     FIELD_DOMAINS,
-    RelationType,
 )
 from dharma_swarm.semantic_gravity import (
     ConceptEdge,

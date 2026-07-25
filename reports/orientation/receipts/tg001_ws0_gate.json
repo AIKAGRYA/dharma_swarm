@@ -1,0 +1,16 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS0 gate completed: clean truth-graph worktree created from origin/main, make onboard passed, required gate docs read, ds-goal mission tg-001 initialized.",
+  "evidence": [
+    {"kind": "command", "value": "git -C /Users/dhyana/dharma_swarm worktree add /Users/dhyana/ds_codex_truthgraph -b codex/truth-graph-v1 origin/main"},
+    {"kind": "command", "value": "make onboard"},
+    {"kind": "command", "value": "/Users/dhyana/.dharma/bin/ds-goal init --mission-id tg-001 --json"}
+  ],
+  "verdict": "verified",
+  "next_action": "Continue implementation in /Users/dhyana/ds_codex_truthgraph only.",
+  "files_changed": [
+    "reports/orientation/receipts/tg001_ws0_gate.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS0"
+}

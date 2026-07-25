@@ -21,9 +21,7 @@ facade consumers see TaskBoard tasks as Cards with proper status mapping.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from pathlib import Path
 from typing import Any
 
 from dharma_swarm.board.event_log import BoardEvent, BoardEventLog
@@ -31,10 +29,7 @@ from dharma_swarm.board.models import (
     Card,
     CardId,
     CardStatus,
-    EventId,
     IsoDatetime,
-    ObjectiveId,
-    SourceSurface,
     Version,
 )
 from dharma_swarm.models import Task, TaskPriority, TaskStatus
@@ -53,6 +48,7 @@ _TASK_TO_CARD_STATUS: dict[TaskStatus, CardStatus] = {
     TaskStatus.COMPLETED: "done",
     TaskStatus.FAILED: "failed",
     TaskStatus.CANCELLED: "cancelled",
+    TaskStatus.QUARANTINED_FAKE_RESULT: "quarantined",
 }
 
 _CARD_TO_TASK_STATUS: dict[CardStatus, TaskStatus] = {
@@ -155,6 +151,11 @@ class TaskBoardAdapter:
         return self._event_log
 
     @property
+    def task_board(self) -> TaskBoard:
+        """Return the canonical TaskBoard owned by this projection adapter."""
+        return self._board
+
+    @property
     def cards(self) -> dict[CardId, Card]:
         return dict(self._cards)
 
@@ -248,18 +249,19 @@ class TaskBoardAdapter:
         new_card = new_card.model_copy(update={"version": new_version})
         self._cards[card_id] = new_card
 
-        self._event_log.append(
-            BoardEvent(
-                kind="card_transitioned",
-                card_id=card_id,
-                actor_id=actor_id,
-                actor_kind="agent",
-                card_version=new_version,
-                from_status=from_status,
-                to_status=new_card.status,
-                idempotency_key=f"tb_trans_{task_id}_{to_status.value}",
+        if kwargs.get("_emit_event", True):
+            self._event_log.append(
+                BoardEvent(
+                    kind="card_transitioned",
+                    card_id=card_id,
+                    actor_id=actor_id,
+                    actor_kind="agent",
+                    card_version=new_version,
+                    from_status=from_status,
+                    to_status=new_card.status,
+                    idempotency_key=f"tb_trans_{task_id}_{to_status.value}",
+                )
             )
-        )
         logger.info(
             "adapter.transition: %s %s→%s",
             card_id,

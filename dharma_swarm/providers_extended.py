@@ -181,7 +181,7 @@ class MoonshotProvider(LLMProvider):
         self._api_key = api_key or os.environ.get(MOONSHOT_API_KEY_ENV)
         self.base_url = base_url or os.environ.get(
             MOONSHOT_BASE_URL_ENV,
-            "https://api.moonshot.cn/v1",
+            "https://api.moonshot.ai/v1",
         )
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
@@ -190,7 +190,7 @@ class MoonshotProvider(LLMProvider):
             raise RuntimeError(f"{MOONSHOT_API_KEY_ENV} not set")
 
         payload = {
-            "model": request.model or "moonshot-v1-8k",
+            "model": request.model or "kimi-k3",
             "messages": request.messages,
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,

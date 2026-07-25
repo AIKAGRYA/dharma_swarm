@@ -1,0 +1,19 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS4 proves a live local NATS request/reply exchange using receipt-shaped payloads and records the proof for repo_context visibility.",
+  "evidence": [
+    {"kind": "command", "value": "bash scripts/governance/run_truth_graph_nats_e2e_demo.sh"},
+    {"kind": "path", "value": "reports/orientation/nats_e2e_receipt.json"},
+    {"kind": "path", "value": "scripts/governance/truth_graph_nats_e2e_demo.py"}
+  ],
+  "verdict": "verified",
+  "next_action": "Do not overclaim full future JetStream envelope compliance; this is local broker receipt-shape proof.",
+  "files_changed": [
+    "scripts/governance/truth_graph_nats_e2e_demo.py",
+    "scripts/governance/run_truth_graph_nats_e2e_demo.sh",
+    "reports/orientation/nats_e2e_receipt.json",
+    "reports/orientation/receipts/tg001_ws4_nats_e2e.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS4"
+}

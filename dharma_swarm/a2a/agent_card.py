@@ -23,13 +23,32 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
+
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
 _DHARMA_HOME = dharma_state_dir("DHARMA_HOME")
 _DEFAULT_CARDS_DIR = _DHARMA_HOME / "a2a" / "cards"
+
+SEMANTIC_OBJECT_A2A_CARD = "A2ACard"
+SEMANTIC_OBJECT_AGENT_UID = "AgentUID"
+SEMANTIC_OBJECT_NATS_SUBSTRATE = "NATSSubstrate"
+SEMANTIC_OBJECT_A2A_INBOX_ROUTE = "A2AInboxRoute"
+A2A_INBOX_ROUTE_ALIAS = "agent-inbox"
+
+AGENT_UID_ALIASES = {
+    "codex": "codex_composer",
+    "opus": "opus_composer",
+    "hermes": "hermes-m5",
+    "hermes_m5": "hermes-m5",
+    "devin": "devin-roaming-2987d222",
+    "fable-5-cursor": "fable_5_cursor",
+    "fable-claude-code": "fable_claude_code",
+    "fable-composer": "fable_composer",
+    "perplexity": "perplexity-computer",
+}
 
 
 def _utc_now_iso() -> str:
@@ -47,6 +66,61 @@ def _strip_internal(obj: Any) -> None:
     elif isinstance(obj, list):
         for item in obj:
             _strip_internal(item)
+
+
+def _validate_subject_token(token: str, *, label: str) -> str:
+    cleaned = (token or "").strip()
+    forbidden = {".", "*", ">", "/", "\\"}
+    if not cleaned or any(char.isspace() or char in forbidden for char in cleaned):
+        raise ValueError(f"invalid {label} for NATS subject: {cleaned!r}")
+    return cleaned
+
+
+def resolve_agent_uid(name: str, *, agent_uid: str = "") -> str:
+    """Resolve a display/card name into the stable AgentUID subject token."""
+    raw = agent_uid or AGENT_UID_ALIASES.get(name, name)
+    return _validate_subject_token(raw, label="agent uid")
+
+
+def a2a_inbox_subject(agent_uid: str) -> str:
+    return f"dharma.agent.{resolve_agent_uid(agent_uid)}.inbox"
+
+
+@dataclass(frozen=True)
+class A2AInboxRoute:
+    """Semantic Commons internal contact route for durable fleet transport."""
+
+    agent_uid: str
+    route: str = A2A_INBOX_ROUTE_ALIAS
+    substrate: str = SEMANTIC_OBJECT_NATS_SUBSTRATE
+
+    @property
+    def subject(self) -> str:
+        return a2a_inbox_subject(self.agent_uid)
+
+    @property
+    def ack_subject(self) -> str:
+        return f"{self.subject}.ack.{{packet_id}}"
+
+    @property
+    def reply_subject(self) -> str:
+        return f"{self.subject}.reply.{{packet_id}}"
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "route": self.route,
+            "substrate": self.substrate,
+            "agent_uid": resolve_agent_uid(self.agent_uid),
+            "subject": self.subject,
+            "ack_subject": self.ack_subject,
+            "reply_subject": self.reply_subject,
+        }
+
+    def to_supported_interface(self) -> dict[str, str]:
+        return {
+            "protocolBinding": SEMANTIC_OBJECT_A2A_INBOX_ROUTE,
+            **self.to_dict(),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +206,7 @@ class AgentCard:
 
     Attributes:
         name: Unique agent identifier within the swarm.
+        agent_uid: Stable durable AgentUID used in internal NATS subjects.
         description: What this agent does (1-2 sentences).
         skills: List of advertised skills (A2A 1.0 spec name).
         endpoint: For remote agents, the HTTP URL. For local, "local://".
@@ -151,6 +226,7 @@ class AgentCard:
     """
 
     name: str
+    agent_uid: str = ""
     description: str = ""
     skills: list[AgentSkill] = field(default_factory=list)
     capabilities: list[AgentSkill] = field(default_factory=list)
@@ -256,6 +332,7 @@ class AgentCard:
 
         return cls(
             name=name,
+            agent_uid=str(identity.get("agent_uid") or identity.get("uid") or name),
             description=description,
             skills=skills,
             role=role,
@@ -266,7 +343,7 @@ class AgentCard:
                 "tasks_failed": identity.get("tasks_failed", 0),
                 "avg_quality": identity.get("avg_quality", 0.0),
             },
-        )
+        ).standardize_internal_contact()
 
     def has_capability(self, query: str) -> bool:
         """Check if this agent has a capability matching the query."""
@@ -275,6 +352,35 @@ class AgentCard:
     def capability_names(self) -> list[str]:
         """Return list of capability name strings."""
         return [cap.name for cap in self.capabilities]
+
+    def a2a_inbox_route(self) -> A2AInboxRoute:
+        """Return the canonical Semantic Commons internal inbox route."""
+        return A2AInboxRoute(resolve_agent_uid(self.name, agent_uid=self.agent_uid))
+
+    def standardize_internal_contact(self) -> AgentCard:
+        """Project this card onto AgentUID + A2AInboxRoute.
+
+        Direct ``AgentCard(...)`` construction remains lightweight for tests and
+        external-edge cards. Registry load/register paths call this so persisted
+        fleet cards all expose the same internal NATS contact binding.
+        """
+        route = self.a2a_inbox_route()
+        self.agent_uid = route.agent_uid
+        self.supported_interfaces = _with_canonical_a2a_inbox_interface(
+            self.supported_interfaces,
+            route,
+        )
+        self.metadata = dict(self.metadata or {})
+        self.metadata["agent_uid"] = route.agent_uid
+        self.metadata["a2a_inbox_route"] = route.to_dict()
+        self.metadata["semantic_commons"] = {
+            "card": SEMANTIC_OBJECT_A2A_CARD,
+            "agent_uid": SEMANTIC_OBJECT_AGENT_UID,
+            "route": SEMANTIC_OBJECT_A2A_INBOX_ROUTE,
+            "substrate": SEMANTIC_OBJECT_NATS_SUBSTRATE,
+            "route_alias": A2A_INBOX_ROUTE_ALIAS,
+        }
+        return self
 
 
 def _skill(sid: str, desc: str, tags: list[str]) -> AgentSkill:
@@ -326,6 +432,37 @@ def _skills_for_role(role: str) -> list[AgentSkill]:
 _capabilities_for_role = _skills_for_role
 
 
+def _with_canonical_a2a_inbox_interface(
+    interfaces: list[dict[str, str]],
+    route: A2AInboxRoute,
+) -> list[dict[str, str]]:
+    """Replace stale internal contact bindings with the canonical route."""
+    preserved: list[dict[str, str]] = []
+    for item in interfaces:
+        if not isinstance(item, dict):
+            continue
+        if _is_internal_contact_interface(item):
+            continue
+        preserved.append(dict(item))
+    preserved.append(route.to_supported_interface())
+    return preserved
+
+
+def _is_internal_contact_interface(interface: dict[str, Any]) -> bool:
+    binding = str(interface.get("protocolBinding") or interface.get("protocol_binding") or "")
+    route = str(interface.get("route") or "")
+    subject = str(interface.get("subject") or "")
+    if binding == SEMANTIC_OBJECT_A2A_INBOX_ROUTE:
+        return True
+    if route == A2A_INBOX_ROUTE_ALIAS:
+        return True
+    if subject.startswith("dharma.agent.") and subject.endswith(".inbox"):
+        return True
+    if subject.startswith("dharma.a2a."):
+        return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Card Registry
 # ---------------------------------------------------------------------------
@@ -362,7 +499,7 @@ class CardRegistry:
         for path in sorted(self.cards_dir.glob("*.json")):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                card = AgentCard.from_dict(data)
+                card = AgentCard.from_dict(data).standardize_internal_contact()
                 self._cards[card.name] = card
             except Exception as exc:
                 logger.warning("Failed to load card %s: %s", path, exc)
@@ -385,6 +522,7 @@ class CardRegistry:
 
         Persists to disk immediately.
         """
+        card.standardize_internal_contact()
         card.updated_at = _utc_now_iso()
         self._cards[card.name] = card
         self._persist_card(card)
@@ -405,7 +543,27 @@ class CardRegistry:
 
     def get(self, name: str) -> AgentCard | None:
         """Get a card by agent name."""
-        return self._cards.get(name)
+        direct = self._cards.get(name)
+        if direct is not None:
+            return direct
+        try:
+            agent_uid = resolve_agent_uid(name)
+        except ValueError:
+            return None
+        by_uid = self._cards.get(agent_uid)
+        if by_uid is not None:
+            return by_uid
+        for card in self._cards.values():
+            if card.agent_uid == agent_uid:
+                return card
+        return None
+
+    def resolve_a2a_inbox_route(self, name: str) -> A2AInboxRoute | None:
+        """Resolve a card/display name to the canonical A2AInboxRoute."""
+        card = self.get(name)
+        if card is None:
+            return None
+        return card.a2a_inbox_route()
 
     def list_all(self) -> list[AgentCard]:
         """Return all registered cards, sorted by name."""

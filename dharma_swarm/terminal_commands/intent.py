@@ -6,10 +6,6 @@ from pathlib import Path
 import json
 
 
-from dharma_swarm.terminal_commands._helpers import (
-    DHARMA_STATE,
-    _run,
-)
 
 
 def cmd_intent_plan(prompt: str) -> None:

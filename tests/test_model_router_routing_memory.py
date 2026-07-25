@@ -22,6 +22,10 @@ class _DummyProvider:
         yield self.content
 
 
+def _fail_open_key_liveness() -> set[str] | None:
+    return None
+
+
 async def test_model_router_uses_persistent_routing_memory_to_reorder(tmp_path) -> None:
     store = RoutingMemoryStore(tmp_path / "routing.sqlite3")
     route_request = ProviderRouteRequest(
@@ -83,6 +87,7 @@ async def test_model_router_uses_persistent_routing_memory_to_reorder(tmp_path) 
             ProviderType.ANTHROPIC: _DummyProvider("frontier"),
         },
         routing_memory=store,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     decision, response = await router.complete_for_task(
@@ -120,6 +125,7 @@ async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) ->
             ProviderType.ANTHROPIC: _DummyProvider("frontier"),
         },
         routing_memory=store,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     router.record_task_feedback(

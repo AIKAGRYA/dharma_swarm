@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,15 +11,21 @@ from scripts.runtime import a2a_domain_reply_worker
 
 
 class _FakePublisher:
-    def __init__(self, *, fail_publish: bool = False) -> None:
+    def __init__(self, *, fail_publish: bool = False, return_puback: bool = True) -> None:
         self.fail_publish = fail_publish
+        self.return_puback = return_puback
         self.published: list[tuple[str, bytes]] = []
+        self.publish_kwargs: list[dict] = []
         self.flushes = 0
 
-    async def publish(self, subject: str, payload: bytes) -> None:
+    async def publish(self, subject: str, payload: bytes, **kwargs):
         if self.fail_publish:
             raise RuntimeError("publish failed")
         self.published.append((subject, payload))
+        self.publish_kwargs.append(kwargs)
+        if self.return_puback:
+            return SimpleNamespace(stream="DHARMA_A2A", seq=len(self.published))
+        return None
 
     async def flush(self, timeout: float | None = None) -> None:
         self.flushes += 1
@@ -194,6 +201,12 @@ async def test_publish_domain_reply_emits_typed_domain_receipt(tmp_path: Path) -
     assert receipt["semantic_reply_claim"] is False
     assert publisher.flushes == 1
     assert publisher.published[0][0] == "dharma.agent.hermes-m5.inbox.reply.packet-1"
+    assert publisher.publish_kwargs[0]["headers"]["Nats-Msg-Id"].startswith("domain_reply_")
+    assert receipt["transport_ack"] == {
+        "transport_ack": "JETSTREAM_PUB_ACK",
+        "stream": "DHARMA_A2A",
+        "seq": 1,
+    }
 
     payload = json.loads(publisher.published[0][1].decode("utf-8"))
     assert payload["schema_version"] == "dharma.a2a.domain_receipt.v1"
@@ -242,6 +255,30 @@ async def test_publish_domain_reply_preserves_explicit_peer_model_semantic_claim
     assert published["peer_model_processed_claim"] is True
     assert published["authenticated_target_runtime_claim"] is False
     assert published["validated_semantic_receipt_refs"] == [str(semantic.resolve())]
+
+
+@pytest.mark.asyncio
+async def test_publish_domain_reply_without_jetstream_puback_is_not_success(tmp_path: Path) -> None:
+    send = _send_receipt(tmp_path)
+    artifact = _reply_artifact(tmp_path)
+    target = a2a_domain_reply_worker.load_domain_reply_target(
+        send_receipt_path=send,
+        reply_artifact_path=artifact,
+        outbox_root=tmp_path / "outboxes",
+    )
+
+    receipt = await a2a_domain_reply_worker.publish_domain_reply(
+        target,
+        publisher=_FakePublisher(return_puback=False),
+        receipt_dir=tmp_path / "receipts",
+        endpoint="nats://127.0.0.1:4222",
+        stream="DHARMA_A2A",
+    )
+
+    assert receipt["status"] == "PUBLISH_FAILED"
+    assert receipt["reply_evidence_tier"] == "NO_CONTACT"
+    assert receipt["domain_receipt_claim"] is False
+    assert "durable puback" in receipt["error"]
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,42 @@
+# Generated count files. Every PR that adds/removes a file, test, or line would
+# change these if it committed them — the source of the O(n^2) "counter cascade".
+#
+# Under the reconcile model these files are NOT hand-committed in PRs: the
+# DocOps gate treats their counts as advisory (--counts-advisory), and
+# .github/workflows/docops-reconcile-main.yml regenerates them on push:main from
+# the tree. So PRs leave these lines identical to main and they never conflict in
+# the merge queue.
+#
+# `merge=union` is a defensive net only: if a PR ever does touch a count line, a
+# union merge auto-resolves it (no hard conflict that would kick the PR from the
+# queue) and the next push:main reconcile recomputes the authoritative value.
+docs/docops/AUTO_INVENTORY.md merge=union
+docs/governance/SOVEREIGN_MANIFEST.md merge=union
+
+# High-churn prose docs: independently refreshed by multiple agents/PRs in short
+# windows. `merge=union` prevents a hard conflict block — the result may need a
+# quick cleanup pass to remove duplicate sections, but the PR is never stuck.
+# Rule: only plain prose .md files here — never YAML, JSON, or code files where
+# silent duplication would produce invalid content.
+
+# State layer (morning brief + broken register): agents each write a full refresh.
+docs/state/LIVE_OPS_DASHBOARD.md merge=union
+docs/state/BROKEN_REGISTER.md merge=union
+
+# Root orientation maps: updated by every spine-wiring / loop-closure PR.
+CYBERNETIC_LOOP_MAP.md merge=union
+INTERFACE_MISMATCH_MAP.md merge=union
+
+# Governance evidence reports (active_track_evidence.*, track_portfolio.json,
+# trust_gate_status.json) are no longer tracked — regenerated locally and
+# published by CI to the generated/status branch — so they need no merge
+# attribute at all.
+
+# CLAUDE.md: deliberately NOT merge=union. It is updated by many governance,
+# track-open, and coherence PRs, but it carries a machine-generated managed
+# block (<!-- ACTIVE_TRACK:START --> … <!-- ACTIVE_TRACK:END -->) rendered by
+# scripts/governance/render_active_track_includes.py and marked "Do not
+# hand-edit". A union merge of two concurrent regenerations would keep BOTH
+# copies, duplicating the block — exactly the invalid-content failure the rule
+# above forbids. Resolve CLAUDE.md conflicts explicitly (or regenerate the
+# block post-merge), keeping union merge for plain-prose docs only.

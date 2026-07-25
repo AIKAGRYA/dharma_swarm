@@ -1,0 +1,55 @@
+# Pudgala rigor — graded claim/evidence binding (authentic verified-precondition).
+#
+# This is the AUTHENTIC version of "rigor = merge trust": the gate runs HERE, in
+# GitHub's trusted environment, so a PR author cannot forge a green check-run.
+# (The local ~/.dharma witness receipt proves integrity, not authenticity — it
+# can be produced by the author — so it must NOT be a merge signal on its own.)
+# Merge Master Mike's existing CI-green gate consumes this check; no change to
+# pr_merge_control is needed for it to count.
+#
+# TRUST RATCHET (config, not code):
+#   The gate runs BARE (no --warn-only / --enforce), so enforcement is driven by
+#   ONE switch: the AI-M1 hygiene pattern's stage
+#   (docs/governance/hygiene/patterns/AI-M1.yaml, promoted via
+#   scripts/governance/hygiene/promote.py — fail-safe: missing/malformed reads
+#   as advisory).
+#   Stage 0 (now): AI-M1 stage=advisory — exits 0, reports each active track's
+#     strongest evidence grade vs its required floor. Informational check-run;
+#     never blocks. Surfaces the rigor signal without breaking every PR.
+#   Stage 1+: promote AI-M1 to stage=enforced (and/or mark this a required
+#     status check in branch protection). Then a PR that drops a track below
+#     its floor fails this check, and Mike's CI-green gate blocks it. No edit
+#     to this file is needed for the flip.
+name: Pudgala rigor — claim/evidence binding
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rigor:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to full commit SHAs — repo policy requires it (supply-chain rigor,
+      # the same discipline this gate exists to enforce). SHAs match the rest of
+      # .github/workflows (checkout v4 / setup-python v5).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          # Full history so commit_on_main criteria can verify ancestry against
+          # origin/main (shallow checkout made them unverifiable → graded 0 in
+          # CI while passing locally).
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install minimal deps (gate is stdlib + PyYAML; pytest for test_passes)
+        # pytest so test_passes criteria can EXECUTE (without it they degrade
+        # to unverified → grade 0, making CI grades diverge from local runs).
+        # Project test deps are intentionally not installed; a target that
+        # needs them still reads unverified, which is the conservative default.
+        run: pip install pyyaml pytest
+      - name: Graded claim/evidence binding (stage-driven — AI-M1 is the switch)
+        run: python scripts/governance/check_claim_evidence_binding.py

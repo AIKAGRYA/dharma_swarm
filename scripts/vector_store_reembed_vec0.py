@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.vector_store import TFIDFEmbedder, VectorStore, _fts_match_query
 
 
@@ -45,7 +46,7 @@ class ReembedReceipt:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
     parser.add_argument("--query", action="append", default=[])
     parser.add_argument("--limit-per-query", type=int, default=100)
     parser.add_argument("--memory-retrieval-docs", action="store_true")
@@ -111,19 +112,9 @@ def reembed_queries(
     warnings: list[str] = []
     conn = store._connect()
     try:
-        if not store._has_vec0(conn):
+        has_vec0 = store._has_vec0(conn)
+        if not has_vec0:
             warnings.append("vec0_unavailable")
-            return _receipt(
-                state_dir=state_dir,
-                store=store,
-                started=started,
-                t0=t0,
-                dim=dim,
-                queries=query_receipts,
-                selected_rows=0,
-                upserted_rows=0,
-                warnings=warnings,
-            )
         for query in queries:
             fts_query = _fts_match_query(query)
             rows = []
@@ -199,16 +190,38 @@ def reembed_queries(
             else:
                 embedder.fit_add(texts)
             vectors = embedder.embed(texts)
+            if not has_vec0:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS vec_embeddings_fallback (
+                        rowid INTEGER PRIMARY KEY,
+                        embedding BLOB
+                    )
+                    """
+                )
             for (doc_id, (_content, _source)), vector in zip(selected.items(), vectors):
                 if not vector or len(vector) != dim:
                     warnings.append(f"bad_vector_dim:{doc_id}")
                     continue
                 packed = struct.pack(f"{dim}f", *vector)
-                conn.execute("DELETE FROM vec_embeddings WHERE rowid = ?", (doc_id,))
-                conn.execute(
-                    "INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)",
-                    (doc_id, packed),
-                )
+                if has_vec0:
+                    conn.execute("DELETE FROM vec_embeddings WHERE rowid = ?", (doc_id,))
+                    conn.execute(
+                        "INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)",
+                        (doc_id, packed),
+                    )
+                else:
+                    conn.execute(
+                        "DELETE FROM vec_embeddings_fallback WHERE rowid = ?",
+                        (doc_id,),
+                    )
+                    conn.execute(
+                        """
+                        INSERT INTO vec_embeddings_fallback(rowid, embedding)
+                        VALUES (?, ?)
+                        """,
+                        (doc_id, packed),
+                    )
                 upserted += 1
             conn.commit()
         return _receipt(

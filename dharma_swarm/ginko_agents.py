@@ -1,10 +1,12 @@
 """Ginko Agent Fleet — persistent AI agents for Dharmic Quant analysis.
 
-6 frontier AI agents analyze markets via the preferred runtime stack:
-  - KIMI: macro oracle (moonshotai/kimi-k2.5)
-  - DEEPSEEK: quant architect (deepseek/deepseek-chat-v3-0324)
-  - NEMOTRON: intelligence synthesizer (nvidia/llama-3.1-nemotron-70b-instruct:free)
-  - GLM: pipeline smith (zhipuai/glm-5-plus)
+6 frontier AI agents analyze markets via the preferred runtime stack. Each
+agent's model is DERIVED from dharma_swarm.model_pool at the FLOOR (no hand-typed
+model literals; see the _pool_route_id helper below):
+  - KIMI: macro oracle (kimi-k2.6 floor)
+  - DEEPSEEK: quant architect (deepseek-chat-v3-0324)
+  - NEMOTRON: intelligence synthesizer (mistral-large floor; nemotron banished)
+  - GLM: pipeline smith (glm-5 floor)
   - SENTINEL: risk warden (uses DEEPSEEK model)
   - SCOUT: alpha hunter (uses KIMI model)
 
@@ -22,7 +24,6 @@ import asyncio
 import httpx
 import json
 import logging
-import os
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -30,17 +31,60 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-from dharma_swarm.models import LLMRequest, ProviderType
-from dharma_swarm.runtime_provider import (
-    create_runtime_provider,
-    preferred_runtime_provider_configs,
-)
+from dharma_swarm import model_pool as _model_pool
 
 logger = logging.getLogger(__name__)
 
 GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 AGENTS_DIR = GINKO_DIR / "agents"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+# ---------------------------------------------------------------------------
+# Pool-sourced model ids (model-pool consolidation 2026-06)
+# ---------------------------------------------------------------------------
+#
+# Each fleet agent's ``model`` (and the rate-limit fallback chain) is an
+# OpenRouter routing string. These used to be hand-typed provider-specific
+# literals — exactly the drift the consolidation kills, and the surface where
+# sub-floor / banished models (qwen3.5-*, nemotron-*, llama-3.3-70b) crept in.
+# They are now DERIVED from a ``dharma_swarm.model_pool`` entry at the FLOOR
+# model, so every model-id string lives in exactly ONE place (the roster ->
+# pool) and no sub-floor literal can survive here. ``_pool_route_id`` prefers
+# the vendor-prefixed (``vendor/model``) route — the form ``_call_openrouter``
+# dispatches over — and raises at import if the pool has no such entry.
+
+
+def _pool_route_id(pool_id: str) -> str:
+    """Canonical OpenRouter-shaped model_id the pool serves for ``pool_id``.
+
+    Raises at import if the pool has no such entry — a fleet row can never
+    silently reference a model outside the pool/floor.
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:  # pragma: no cover - guarded by import-time construction
+        raise AssertionError(f"ginko fleet references unknown pool id {pool_id!r}")
+    for route in entry.routes:
+        if "/" in route.model_id:
+            return route.model_id
+    return entry.model_ids[0]
+
+
+# Logical pool ids each agent rides, at the FLOOR. Banished/out-of-pool legacy
+# routes are mapped to the nearest floor pool entry for that role, preserving
+# model-family diversity (Transcendence Principle):
+#   kimi-k2.5            -> kimi-k2.6              (K2.6 floor)
+#   zhipuai/glm-5-plus   -> glm-5                 (out-of-pool -> floor)
+#   nemotron-70b (synth) -> mistral-large-2411    (BANISHED -> distinct strong family)
+#   nemotron-3-super     -> glm-5                 (BANISHED -> floor, precision/code)
+#   qwen3.5-*            -> qwen3-235b-a22b        (sub-floor -> floor qwen openrouter route)
+# deepseek-chat-v3-0324 / deepseek-r1 are in-pool and ride their own entries.
+_KIMI_MODEL = _pool_route_id("kimi-k2.6")
+_DEEPSEEK_CHAT_MODEL = _pool_route_id("deepseek-chat-v3-0324")
+_DEEPSEEK_R1_MODEL = _pool_route_id("deepseek-r1")
+_GLM_MODEL = _pool_route_id("glm-5")
+_MISTRAL_LARGE_MODEL = _pool_route_id("mistral-large-2411")
+_QWEN_MODEL = _pool_route_id("qwen3-235b-a22b")
 
 # Maximum task entries kept in the in-memory history (full log on disk is unlimited)
 _MAX_MEMORY_HISTORY = 50
@@ -107,7 +151,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "kimi",
         "role": "macro_oracle",
-        "model": "moonshotai/kimi-k2.5",
+        "model": _KIMI_MODEL,
         "system_prompt": (
             "You are KIMI, the macro oracle of the Dharmic Quant fleet. "
             "Your domain is macroeconomic analysis: central bank policy, "
@@ -121,7 +165,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "deepseek",
         "role": "quant_architect",
-        "model": "deepseek/deepseek-chat-v3-0324",
+        "model": _DEEPSEEK_CHAT_MODEL,
         "system_prompt": (
             "You are DEEPSEEK, the quant architect of the Dharmic Quant fleet. "
             "Your domain is quantitative analysis: statistical modeling, "
@@ -135,7 +179,8 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "nemotron",
         "role": "intelligence_synthesizer",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct:free",
+        # nemotron-70b is BANISHED (sub-floor); ride a distinct strong family.
+        "model": _MISTRAL_LARGE_MODEL,
         "system_prompt": (
             "You are NEMOTRON, the intelligence synthesizer of the Dharmic "
             "Quant fleet. Your domain is multi-source intelligence fusion: "
@@ -149,7 +194,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "glm",
         "role": "pipeline_smith",
-        "model": "zhipuai/glm-5-plus",
+        "model": _GLM_MODEL,
         "system_prompt": (
             "You are GLM, the pipeline smith of the Dharmic Quant fleet. "
             "Your domain is data engineering and automation: Python code "
@@ -163,7 +208,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "sentinel",
         "role": "risk_warden",
-        "model": "deepseek/deepseek-chat-v3-0324",
+        "model": _DEEPSEEK_CHAT_MODEL,
         "system_prompt": (
             "You are SENTINEL, the risk warden of the Dharmic Quant fleet. "
             "Your domain is risk assessment and position monitoring: "
@@ -178,7 +223,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "scout",
         "role": "alpha_hunter",
-        "model": "moonshotai/kimi-k2.5",
+        "model": _KIMI_MODEL,
         "system_prompt": (
             "You are SCOUT, the alpha hunter of the Dharmic Quant fleet. "
             "Your domain is opportunity scanning: prediction market "
@@ -194,7 +239,8 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "qwen",
         "role": "contrarian_analyst",
-        "model": "qwen/qwen3.5-397b-a17b",
+        # qwen3.5-397b-a17b is sub-floor; ride the floor qwen3 openrouter route.
+        "model": _QWEN_MODEL,
         "system_prompt": (
             "You are QWEN, the contrarian analyst of the Dharmic Quant fleet. "
             "Your domain is adversarial analysis: finding the bear case when "
@@ -211,7 +257,7 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "garuda",
         "role": "deep_reasoner",
-        "model": "deepseek/deepseek-r1",
+        "model": _DEEPSEEK_R1_MODEL,
         "system_prompt": (
             "You are GARUDA, the deep reasoner of the Dharmic Quant fleet. "
             "Named after the divine eagle of the AGNI fleet — supreme vision, "
@@ -228,7 +274,8 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "vajra",
         "role": "execution_optimizer",
-        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        # nemotron-3-super is BANISHED (sub-floor); ride the glm-5 floor route.
+        "model": _GLM_MODEL,
         "system_prompt": (
             "You are VAJRA, the execution optimizer of the Dharmic Quant fleet. "
             "Named after the thunderbolt of the AGNI fleet — strikes once, "
@@ -245,7 +292,8 @@ FLEET_SPEC: list[dict[str, str]] = [
     {
         "name": "setu",
         "role": "cross_market_bridge",
-        "model": "qwen/qwen3.5-flash-02-23",
+        # qwen3.5-flash-02-23 is sub-floor; ride the floor qwen3 openrouter route.
+        "model": _QWEN_MODEL,
         "system_prompt": (
             "You are SETU, the cross-market bridge of the Dharmic Quant fleet. "
             "Named after the bridge of the AGNI fleet — the connective tissue "
@@ -503,24 +551,20 @@ class GinkoFleet:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-# Fallback models when primary is rate-limited (429) or unavailable
+# Fallback models when primary is rate-limited (429) or unavailable. Keyed by
+# the agent's (now pool-derived, floor) primary model id; every key and value is
+# a pool route at the FLOOR — no hand-typed sub-floor literal survives. The old
+# sub-floor qwen3.5-* / nemotron-* / llama-3.3-70b fallbacks are replaced by the
+# nearest floor pool routes (model-pool consolidation 2026-06).
 _MODEL_FALLBACKS: dict[str, list[str]] = {
-    "qwen/qwen3.5-397b-a17b": [
-        "qwen/qwen3.5-122b-a10b",
-        "qwen/qwen3.5-flash-02-23",
-        "qwen/qwen3-next-80b-a3b-instruct:free",
-    ],
-    "qwen/qwen3.5-flash-02-23": [
-        "qwen/qwen3.5-9b",
-        "qwen/qwen3-coder:free",
-    ],
-    "nvidia/nemotron-3-super-120b-a12b:free": [
-        "nvidia/nemotron-3-nano-30b-a3b:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-    ],
-    "deepseek/deepseek-r1": [
-        "deepseek/deepseek-chat-v3-0324",
-    ],
+    # qwen contrarian/bridge agents: cross-family strong floor fallbacks.
+    _QWEN_MODEL: [_DEEPSEEK_CHAT_MODEL, _GLM_MODEL],
+    # GLM pipeline / vajra execution: deepseek-chat then qwen3 floor.
+    _GLM_MODEL: [_DEEPSEEK_CHAT_MODEL, _QWEN_MODEL],
+    # nemotron synthesizer rides mistral-large; fall back to glm/deepseek.
+    _MISTRAL_LARGE_MODEL: [_GLM_MODEL, _DEEPSEEK_CHAT_MODEL],
+    # deep reasoner: r1 -> deepseek-chat.
+    _DEEPSEEK_R1_MODEL: [_DEEPSEEK_CHAT_MODEL],
 }
 
 
@@ -537,7 +581,7 @@ async def _call_openrouter(
     models from ``_MODEL_FALLBACKS`` before giving up.
 
     Args:
-        model: OpenRouter model identifier (e.g. "moonshotai/kimi-k2.5").
+        model: OpenRouter model identifier in vendor/model form (a pool route).
         messages: Chat messages in OpenAI format.
         temperature: Sampling temperature.
         max_tokens: Maximum response tokens.

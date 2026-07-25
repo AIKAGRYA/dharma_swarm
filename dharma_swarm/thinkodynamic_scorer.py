@@ -17,11 +17,10 @@ dimension added to DarwinEngine's existing 8-dimensional fitness.
 from __future__ import annotations
 
 import logging
-import math
 import re
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

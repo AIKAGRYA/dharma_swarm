@@ -19,7 +19,6 @@ import os
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 

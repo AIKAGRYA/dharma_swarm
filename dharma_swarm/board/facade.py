@@ -203,6 +203,32 @@ class BoardStoreFacade:
         """Retrieve a card by ID."""
         return self._cards.get(card_id)
 
+    def project_card(
+        self,
+        card: Card,
+        *,
+        operation: str,
+        actor_id: str = "command_api",
+    ) -> Card:
+        """Import an adapter projection without changing its canonical mapping."""
+        existing = self._cards.get(card.id)
+        self._cards[card.id] = card
+        kind = "card_created" if operation == "create" and existing is None else "card_transitioned"
+        self._event_log.append(
+            BoardEvent(
+                kind=kind,
+                card_id=card.id,
+                actor_id=actor_id,
+                actor_kind="facade",
+                card_version=card.version,
+                from_status=existing.status if existing else None,
+                to_status=card.status,
+                idempotency_key=f"shadow_{operation}_{card.id}_{card.version}",
+                detail={"operation": operation, "mode": "shadow"},
+            )
+        )
+        return card
+
     def list_cards(
         self,
         status: CardStatus | None = None,

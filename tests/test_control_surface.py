@@ -7,6 +7,7 @@ Observed reality comes from code, runtime, evidence adapters — not YAML.
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import textwrap
 from pathlib import Path
@@ -345,10 +346,13 @@ class TestManifestIsNotObservedTruth:
 class TestBrokenRegister:
     def test_parses_open_items(self, tmp_broken_register: Path) -> None:
         rows = _broken_register_rows(tmp_broken_register)
-        assert len(rows) >= 2
+        assert len(rows) == 2
 
         br099 = [r for r in rows if "BR-099" in r.label][0]
         assert br099.kind == "broken_register"
+        assert br099.raw["status"] == "OPEN"
+        assert br099.raw["is_open_like"] is True
+        assert br099.raw["is_closed_like"] is False
         assert br099.coherence_state == "drifted"
         assert br099.priority == "p0"  # BLOCKER -> p0
         assert br099.desired_state == "FIXED"
@@ -397,6 +401,77 @@ class TestRuntimeTruthProjection:
             and "RuntimeTruthPacket" in evidence.provenance_chain
             for evidence in row.evidence
         )
+
+
+def _write_delegation_runs_db(db_path: Path) -> None:
+    """Minimal runtime DB with a delegation_runs receipt_json row (spine pulse source)."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE delegation_runs ("
+            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
+            "started_at TEXT, trace_id TEXT DEFAULT '', receipt_json TEXT)"
+        )
+
+        def _mk(run_id: str, status: str, provider: str, ago_seconds: int) -> None:
+            ts = (now - timedelta(seconds=ago_seconds)).isoformat()
+            blob = json.dumps(
+                {
+                    "trace_id": f"trace-{run_id}",
+                    "provider": provider,
+                    "model": "m1",
+                    "status": status,
+                    "started_at": ts,
+                }
+            )
+            conn.execute(
+                "INSERT INTO delegation_runs VALUES (?, ?, ?, ?, ?, ?)",
+                (run_id, f"task-{run_id}", "completed", ts, f"trace-{run_id}", blob),
+            )
+
+        _mk("r1", "ok", "anthropic", 30)
+        _mk("r2", "ok", "openrouter", 120)
+        _mk("r3", "dropped", "none", 300)
+        _mk("r4", "ok", "groq", 5000)  # older than the 1h window
+
+
+class TestSpinePulseProjection:
+    def test_spine_pulse_row_projects_metrics_read_only(
+        self,
+        tmp_repo: Path,
+        tmp_path: Path,
+    ) -> None:
+        runtime_db = tmp_path / "runtime.db"
+        _write_delegation_runs_db(runtime_db)
+        before_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+
+        rows = build_control_surface_rows(repo_root=tmp_repo, runtime_db=runtime_db)
+        row = next(item for item in rows if item.id == "spine.pulse")
+
+        after_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+        assert before_hash == after_hash  # read-only, no mutation
+        assert row.coherence_state == "bound"
+        assert row.raw["present"] is True
+        assert row.raw["receipts_last_hour"] == 3
+        assert row.raw["dispatch_dropoff_count"] == 1
+        assert row.raw["last_receipt_age_seconds"] is not None
+        assert row.raw["last_receipt_age_seconds"] >= 0
+
+    def test_spine_pulse_row_graceful_absence(
+        self,
+        tmp_repo: Path,
+        tmp_path: Path,
+    ) -> None:
+        runtime_db = tmp_path / "absent-runtime.db"  # never created
+        rows = build_control_surface_rows(repo_root=tmp_repo, runtime_db=runtime_db)
+        row = next(item for item in rows if item.id == "spine.pulse")
+
+        assert row.raw["present"] is False
+        assert row.coherence_state == "declared_only"
+        assert "spine_not_live" in row.gap_codes
+        assert "spine not live on this host" in row.raw["detail"]
 
 
 # ---------------------------------------------------------------------------
@@ -454,6 +529,11 @@ class TestHumanDecisionPolicy:
             kind="broken_register",
             label="BR-999: test",
             declared_state="OPEN",
+            raw={
+                "status": "OPEN",
+                "is_open_like": True,
+                "is_closed_like": False,
+            },
         )
         assert _needs_human_decision(row) is True
 
@@ -705,6 +785,106 @@ class TestGoReceiptRows:
         )
         assert by_id["go.world_signal_receipts"].coherence_state == "declared_only"
 
+    def test_world_radar_health_row_surfaces_per_source_errors(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from dharma_swarm.operator_core.control_surface_go import (
+            _go_world_radar_health_rows,
+        )
+
+        state = tmp_repo / ".dharma"
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+
+        # No health file yet: the loop never ran on this host, no row.
+        assert _go_world_radar_health_rows() == []
+
+        health_path = state / "meta" / "world_radar" / "world_radar_health.json"
+        health_path.parent.mkdir(parents=True, exist_ok=True)
+        health_path.write_text(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "degraded",
+                    "checked_at": "2026-07-02T00:00:00+00:00",
+                    "successful_sources": 3,
+                    "failed_sources": 1,
+                    "scout_invocation_mode": "binary",
+                    "ingestor_invocation_mode": "go_run",
+                    "source_errors": [
+                        {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        rows = _go_world_radar_health_rows()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.id == "go.world_radar_health"
+        assert row.coherence_state == "partial"
+        assert "1 failed sources" in row.observed_state
+        assert "go_world_radar_source_errors" in row.gap_codes
+        assert row.raw["scout_invocation_mode"] == "binary"
+        assert row.raw["ingestor_invocation_mode"] == "go_run"
+        assert row.raw["source_errors"] == [
+            {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+        ]
+        error_evidence = [
+            item for item in row.evidence if "source_error source=arxiv_agents" in item.source
+        ]
+        assert len(error_evidence) == 1
+
+    def test_world_radar_health_row_surfaces_needs_host(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Toolchain-checked invocation: needs_host reaches the cockpit row."""
+        from dharma_swarm.operator_core.control_surface_go import (
+            _go_world_radar_health_rows,
+        )
+
+        state = tmp_repo / ".dharma"
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+        health_path = state / "meta" / "world_radar" / "world_radar_health.json"
+        health_path.parent.mkdir(parents=True, exist_ok=True)
+        health_path.write_text(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "degraded",
+                    "checked_at": "2026-07-03T00:00:00+00:00",
+                    "successful_sources": 0,
+                    "failed_sources": 0,
+                    "scout_invocation_mode": "needs_host",
+                    "ingestor_invocation_mode": "needs_host",
+                    "source_errors": [
+                        {
+                            "source": "world_scout_go",
+                            "stage": "scout",
+                            "error": (
+                                "no prebuilt world_scout_go binary and no Go toolchain "
+                                "on PATH — run `make go-build` (or install Go) on this host"
+                            ),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        rows = _go_world_radar_health_rows()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.coherence_state == "partial"
+        assert "needs_host" in row.observed_state
+        assert "go_world_radar_needs_host" in row.gap_codes
+        assert "go_world_radar_source_errors" in row.gap_codes
+        assert "make go-build" in row.next_action
+
 
 # ---------------------------------------------------------------------------
 # API endpoint tests
@@ -881,11 +1061,12 @@ class TestDashboardControlSurfacePage:
         page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
         assert page.exists(), f"cockpit page missing: {page}"
 
-    def test_cockpit_aliases_control_surface_page(self) -> None:
+    def test_cockpit_renders_operator_coherence_page(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
         page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
         text = page.read_text(encoding="utf-8")
-        assert 'export { default } from "../control-surface/page";' in text
+        assert "OperatorCoherenceCockpit" in text
+        assert 'from "@/components/operator-coherence/OperatorCoherenceCockpit"' in text
 
     def test_control_surface_renders_ops_runbook_panel(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
@@ -1191,6 +1372,11 @@ class TestHumanDecisionContext:
             kind="broken_register",
             label="BR-099: test",
             declared_state="OPEN",
+            raw={
+                "status": "OPEN",
+                "is_open_like": True,
+                "is_closed_like": False,
+            },
         )
         ctx = _build_human_decision_context(row)
         assert ctx.required is True
@@ -1342,6 +1528,25 @@ class TestVerificationTimeline:
 
 
 class TestBackwardCompatibility:
+    def test_control_surface_row_public_mapping_is_exactly_23_keys(self) -> None:
+        payload = ControlSurfaceRow(
+            id="test",
+            kind="api_router",
+            label="test",
+        ).to_dict()
+
+        expected_keys = {
+            "id", "kind", "label", "authority_role", "declared_state",
+            "desired_state", "observed_state", "coherence_state", "priority",
+            "owner_module", "truth_owner", "evidence", "evidence_labels",
+            "freshness", "gap_codes", "next_action",
+            "human_decision_required", "human_decision", "source_refs",
+            "source_ref_labels", "verification_timeline", "display_hints",
+            "raw",
+        }
+        assert len(payload) == 23
+        assert set(payload) == expected_keys
+
     def test_row_dict_has_all_original_fields(self, tmp_repo: Path) -> None:
         rows = build_control_surface_rows(repo_root=tmp_repo)
         original_fields = {

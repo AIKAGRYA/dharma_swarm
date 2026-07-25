@@ -13,7 +13,6 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from dharma_swarm.chetana import stigmergy_emit as emit_mod
 from dharma_swarm.chetana.ingest import ingest

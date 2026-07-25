@@ -174,12 +174,12 @@ SURFACE_RULES: tuple[SurfaceRule, ...] = (
             p("identity_import", r"ExecutionIdentity", "identity imported"),
             p("require_identity", r"require_identity", "required identity option exists"),
             p("begin_idempotent", r"try_begin_idempotent_side_effect", "tool side effects are idempotency-gated"),
-            p("complete_receipt", r"record_side_effect_complete_sync", "tool completion receipt is recorded"),
+            p("complete_idempotent", r"complete_idempotent_side_effect_sync", "tool idempotency completion is recorded"),
         ),
         adapter_ready=(
             p("identity_import", r"ExecutionIdentity", "identity imported"),
             p("intent_receipt", r"record_side_effect_intent_sync", "tool intent receipt is recorded"),
-            p("complete_receipt", r"record_side_effect_complete_sync", "tool completion receipt is recorded"),
+            p("complete_receipt", r"(record_side_effect_complete_sync|complete_idempotent_side_effect_sync)", "tool completion receipt is recorded"),
         ),
         priority=5,
     ),
@@ -233,7 +233,7 @@ SURFACE_RULES: tuple[SurfaceRule, ...] = (
         path_patterns=(
             "dharma_swarm/workflow.py",
             "dharma_swarm/checkpoint.py",
-            "dharma_swarm/durable_execution.py",
+            "dharma_swarm/graph/checkpoint.py",
             "dharma_swarm/canonical_replay.py",
         ),
         joined=(

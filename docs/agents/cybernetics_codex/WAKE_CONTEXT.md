@@ -28,7 +28,7 @@ Expected local surfaces after registration:
 ~/.dharma/agents/cybernetics_codex/last_receipt.json
 ```
 
-The NATS-facing subject is declared as `dharma.a2a.cybernetics-codex`, but this seed does not claim a running subscriber. Until a runtime bridge verifies it, the transport status is `declared_not_started`.
+The NATS-facing subject uses the Semantic Commons `A2AInboxRoute` / `agent-inbox`: `dharma.agent.cybernetics_codex.inbox`. This seed does not claim a running subscriber. Until a runtime bridge verifies it, the transport status is `declared_not_started`.
 
 ## First Commands
 

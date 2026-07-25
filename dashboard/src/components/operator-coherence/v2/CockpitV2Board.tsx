@@ -11,31 +11,26 @@ import {
 } from "lucide-react";
 import type { OperatorCoherenceReport } from "@/lib/operatorCoherence";
 import {
-  actionPacketToInspect,
+  actionToInspect,
   asText,
-  buildActionPackets,
   buildAuthorityInspect,
   buildLaneAdmissionInspect,
-  buildReportSourceSummary,
+  buildTrackLifecycleReviews,
   buildTopPanels,
-  buildAnswerRibbon,
-  buildEventTape,
-  buildUncertainty,
   DESIGN_SOURCES,
+  deriveBranchRiskProjection,
+  deriveCheckoutAuthority,
   filterCards,
   formatCount,
-  freshnessLabel,
   humanRisk,
   LANE_ADMISSION_FIELDS,
+  metricNeedsAttention,
   MODES,
   sourceToInspect,
-  tapeEventInspect,
-  uncertaintyInspect,
-  type AnswerDatum,
+  summarizeTrackLifecycleProjection,
+  trackLifecycleReviewToInspect,
   type CockpitMode,
   type InspectItem,
-  type TapeEvent,
-  type UncertaintyDatum,
 } from "./cockpitV2Model";
 import {
   V2CardRow,
@@ -43,9 +38,8 @@ import {
   V2FilterBar,
   V2Panel,
   V2Section,
-  toneClass,
 } from "./CockpitV2Primitives";
-import { CockpitTopology, RecursiveMandala } from "./CockpitV2Topology";
+import { SpinePulsePanel } from "@/components/cockpit/SpinePulsePanel";
 
 export function CockpitV2Board({
   report,
@@ -59,14 +53,9 @@ export function CockpitV2Board({
   const [mode, setMode] = useState<CockpitMode>("overview");
   const [query, setQuery] = useState("");
   const [inspect, setInspect] = useState<InspectItem | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const panels = useMemo(() => buildTopPanels(report), [report]);
-  const answers = useMemo(() => buildAnswerRibbon(report), [report]);
-  const actionPackets = useMemo(() => buildActionPackets(report), [report]);
-  const uncertainty = useMemo(() => buildUncertainty(report), [report]);
-  const tape = useMemo(() => buildEventTape(report), [report]);
   const filteredCards = useMemo(() => filterCards(report.cards, mode, query), [mode, query, report.cards]);
   const repairCards = useMemo(
     () => report.cards.filter((card) => card.lane === "Needs Repair" || card.lane === "Needs Decision"),
@@ -82,225 +71,46 @@ export function CockpitV2Board({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-
-  // Selection is preserved across modes (REQ-032): selectedId persists even
-  // when the user switches Linear ↔ Topology ↔ Recursive. The topology and
-  // mandala both write selectedId via onSelect, so the highlighted object is
-  // retained when the mode changes.
-  const inspectItem = (item: InspectItem) => {
-    setInspect(item);
-    if (item.id) setSelectedId(item.id);
-  };
   return (
     <div className="min-h-[calc(100vh-8rem)] space-y-3 overflow-x-hidden text-torinoko">
-      <V2Hero report={report} isLoading={isLoading} onRefresh={onRefresh} onInspect={inspectItem} />
-
-      <UncertaintyStrip items={uncertainty} onInspect={inspectItem} />
-
-      <AnswerRibbon answers={answers} onInspect={inspectItem} onFilter={(status) => { setQuery(status); setMode("evidence"); }} />
+      <V2Hero report={report} isLoading={isLoading} onRefresh={onRefresh} onInspect={setInspect} />
 
       <V2FilterBar modes={MODES} activeMode={mode} query={query} onMode={setMode} onQuery={setQuery} inputRef={searchRef} />
 
       <div className="grid gap-3 xl:grid-cols-6">
         {panels.map((panel) => (
-          <V2Panel key={panel.id} panel={panel} onInspect={inspectItem} />
+          <V2Panel key={panel.id} panel={panel} onInspect={setInspect} />
         ))}
       </div>
+
+      <SpinePulsePanel />
 
       {mode === "overview" ? (
         <OverviewMode
           report={report}
           repairCards={repairCards}
-          actionPackets={actionPackets}
           onMode={setMode}
-          onInspect={inspectItem}
+          onInspect={setInspect}
         />
-      ) : mode === "topology" ? (
-        <CockpitTopology report={report} selectedId={selectedId} filterText={query} onInspect={inspectItem} onSelect={setSelectedId} />
-      ) : mode === "recursive" ? (
-        <RecursiveMandala report={report} selectedId={selectedId} filterText={query} onInspect={inspectItem} onSelect={setSelectedId} />
-      ) : mode === "errors" ? (
-        <ErrorsMode report={report} items={uncertainty} onInspect={inspectItem} />
       ) : mode === "design" ? (
-        <DesignMode onInspect={inspectItem} />
+        <DesignMode onInspect={setInspect} />
       ) : mode === "tracks" ? (
-        <TracksMode report={report} onInspect={inspectItem} />
+        <TracksMode report={report} onInspect={setInspect} />
       ) : mode === "runtime" ? (
-        <RuntimeMode report={report} cards={filteredCards} onInspect={inspectItem} />
+        <RuntimeMode report={report} cards={filteredCards} onInspect={setInspect} />
       ) : mode === "git" ? (
-        <GitMode report={report} cards={filteredCards} onInspect={inspectItem} />
+        <GitMode report={report} cards={filteredCards} onInspect={setInspect} />
       ) : mode === "preservation" ? (
-        <PreservationMode report={report} cards={filteredCards} onInspect={inspectItem} />
+        <PreservationMode report={report} cards={filteredCards} onInspect={setInspect} />
       ) : (
-        <CardTableMode title={mode === "triage" ? "Triage queue" : "Evidence table"} cards={filteredCards} onInspect={inspectItem} />
+        <CardTableMode title={mode === "triage" ? "Triage queue" : "Evidence table"} cards={filteredCards} onInspect={setInspect} />
       )}
-
-      <ReceiptEventTape events={tape} onInspect={inspectItem} />
 
       <div className="rounded-md border border-sumi-800/60 bg-sumi-950/50 px-3 py-2 text-[10px] text-sumi-600">
         Data: `/api/operator-coherence/report` · receipts: `reports/governance/operator_coherence_cockpit.*` · design manifest: `docs/design/COCKPIT_V2_DESKTOP_SOURCE_MANIFEST.md`
       </div>
 
-      <V2Drawer item={inspect} onClose={() => { setInspect(null); setSelectedId(null); }} />
-    </div>
-  );
-}
-
-function UncertaintyStrip({ items, onInspect }: { items: UncertaintyDatum[]; onInspect: (item: InspectItem) => void }) {
-  // REQ-006 / core goal: source errors + missing evidence must be impossible to
-  // miss. This is a full-width banner directly under the hero, never hidden.
-  if (!items.length) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-rokusho/35 bg-rokusho/8 px-3 py-2 text-xs text-rokusho">
-        <ShieldAlert size={14} /> All probed sources responded. No source errors or unavailable systems in this snapshot.
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-md border border-bengara/50 bg-bengara/12 p-2.5">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-bengara">
-          <ShieldAlert size={14} /> {items.length} source{items.length === 1 ? "" : "s"} uncertain — absence is NOT success
-        </span>
-        <span className="text-[10px] text-sumi-400">gh / tmux / launchctl / ps / gcx unavailability is shown, never hidden</span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onInspect(uncertaintyInspect(item))}
-            className="group flex min-w-[180px] flex-1 items-start gap-2 rounded-md border border-bengara/35 bg-sumi-950/40 px-2.5 py-2 text-left hover:border-bengara/70"
-          >
-            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-bengara" />
-            <span className="min-w-0">
-              <span className="block truncate font-mono text-[11px] font-semibold text-torinoko">{item.label}</span>
-              <span className="mt-0.5 block line-clamp-2 text-[10px] leading-4 text-sumi-400">{item.detail}</span>
-              <span className="mt-1 inline-block rounded border border-bengara/40 px-1 py-0.5 text-[8px] uppercase tracking-[0.12em] text-bengara">
-                {item.state}
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AnswerRibbon({
-  answers,
-  onInspect,
-  onFilter,
-}: {
-  answers: AnswerDatum[];
-  onInspect: (item: InspectItem) => void;
-  onFilter: (status: string) => void;
-}) {
-  // Spec 11.3 / REQ-013/014 — under-60-second answers, one per question.
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-      {answers.map((answer) => (
-        <button
-          key={answer.key}
-          type="button"
-          onClick={() => {
-            onInspect(answer.inspect);
-            if (answer.filterStatus) onFilter(answer.filterStatus);
-          }}
-          title={answer.topEvidence}
-          className={`rounded-md border bg-sumi-950/40 p-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sumi-900/60 ${toneClass(answer.tone)}`}
-        >
-          <div className="text-[9px] font-semibold uppercase tracking-[0.14em] opacity-75">{answer.label}</div>
-          <div className="mt-1 font-mono text-2xl font-semibold leading-none tabular-nums text-torinoko">{answer.value}</div>
-          <div className="mt-1.5 line-clamp-2 text-[10px] leading-4 text-sumi-400">{answer.topEvidence}</div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ReceiptEventTape({ events, onInspect }: { events: TapeEvent[]; onInspect: (item: InspectItem) => void }) {
-  // Spec 11.9 / REQ-060: snapshot tape; history honestly labeled "not yet wired".
-  return (
-    <section className="rounded-md border border-sumi-800/60 bg-sumi-950/45 p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sumi-600">event tape · receipts + probes</div>
-        <span className="rounded border border-sumi-800/70 bg-sumi-900/40 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-sumi-500">
-          history not yet wired · single snapshot
-        </span>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {events.map((event) => (
-          <button
-            key={event.id}
-            type="button"
-            onClick={() => onInspect(tapeEventInspect(event))}
-            className={`flex min-w-[190px] shrink-0 flex-col gap-1 rounded-md border bg-sumi-950/40 px-2.5 py-2 text-left hover:bg-sumi-900/60 ${toneClass(event.tone)}`}
-          >
-            <span className="truncate font-mono text-[11px] font-semibold text-torinoko">{event.label}</span>
-            <span className="line-clamp-2 text-[10px] leading-4 text-sumi-400">{event.detail}</span>
-            <span className="text-[8px] uppercase tracking-[0.12em] opacity-70">{event.kind} · {freshnessLabel(event.freshness)}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ErrorsMode({
-  report,
-  items,
-  onInspect,
-}: {
-  report: OperatorCoherenceReport;
-  items: UncertaintyDatum[];
-  onInspect: (item: InspectItem) => void;
-}) {
-  const prCi = report.pr_ci_triage as { enabled?: boolean; reason?: string } | undefined;
-  return (
-    <div className="grid gap-3 xl:grid-cols-2">
-      <V2Section title="Unavailable / uncertain sources" eyebrow="REQ-006 / REQ-052 / REQ-070 / REQ-072">
-        <div className="space-y-2">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onInspect(uncertaintyInspect(item))}
-              className="grid w-full grid-cols-[minmax(0,1fr)_92px] gap-2 rounded-md border border-bengara/35 bg-sumi-950/35 p-3 text-left text-xs hover:border-bengara/70"
-            >
-              <div className="min-w-0">
-                <div className="truncate font-mono font-semibold text-torinoko">{item.label}</div>
-                <div className="mt-1 line-clamp-2 text-sumi-400">{item.detail}</div>
-              </div>
-              <div className="self-center rounded border border-bengara/40 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-bengara">
-                {item.state}
-              </div>
-            </button>
-          ))}
-        </div>
-      </V2Section>
-      <div className="space-y-3">
-        <V2Section title="PR / CI triage" eyebrow="gh auth required">
-          {prCi?.enabled === false ? (
-            <div className="rounded-md border border-bengara/35 bg-bengara/8 p-3 text-xs text-sumi-300">
-              <div className="font-semibold text-bengara">Unavailable</div>
-              <div className="mt-1">{prCi.reason ?? "gh auth unavailable; PR/CI triage omitted."}</div>
-              <div className="mt-2 text-sumi-500">Open PRs, CI state, blocked checks, and merge risk appear here once `gh auth` is restored. Until then this is uncertainty, not a clean state.</div>
-            </div>
-          ) : (
-            <div className="text-xs text-sumi-400">PR/CI data present in report.</div>
-          )}
-        </V2Section>
-        <V2Section title="Grafana / gcx integration" eyebrow="spec 11.10 — no fake telemetry">
-          <div className="rounded-md border border-sumi-800/55 bg-sumi-950/35 p-3 text-xs text-sumi-300">
-            <div className="font-semibold text-sumi-200">Unconfigured</div>
-            <div className="mt-1 text-sumi-400">
-              gcx context is not wired into the operator-coherence report. Datasources, dashboards, SLOs, and alerts are shown as unavailable until configured. No external telemetry is invented.
-            </div>
-            <div className="mt-2 font-mono text-[10px] text-sumi-600">next: configure Grafana Cloud context → discover datasources → render real sources only</div>
-          </div>
-        </V2Section>
-      </div>
+      <V2Drawer item={inspect} onClose={() => setInspect(null)} />
     </div>
   );
 }
@@ -317,11 +127,28 @@ function V2Hero({
   onInspect: (item: InspectItem) => void;
 }) {
   const sourceErrorCount = report.source_errors.length;
-  const source = buildReportSourceSummary(report);
-  const status = report.readiness.score >= 70 ? "STABLE" : report.readiness.score >= 40 ? "MIXED" : "DEGRADED";
+  const status = `EVIDENCE ${report.readiness.score}%`;
   const authorityInspect = buildAuthorityInspect(report);
-  const candidateBranch = report.git?.main?.branch ?? "unknown";
-  const localMax = (report.track_portfolio as { policy?: { max_active?: unknown } }).policy?.max_active;
+  const authority = deriveCheckoutAuthority(report);
+  const branchRisk = deriveBranchRiskProjection(report);
+  const authorityPalette = authority.tone === "danger"
+    ? "border-bengara/40 bg-bengara/10 hover:border-bengara/70"
+    : authority.tone === "warn"
+      ? "border-kinpaku/40 bg-kinpaku/8 hover:border-kinpaku/65"
+      : authority.tone === "ok"
+        ? "border-emerald-500/35 bg-emerald-500/8 hover:border-emerald-400/60"
+        : authority.tone === "info"
+          ? "border-aozora/35 bg-aozora/8 hover:border-aozora/60"
+          : "border-sumi-700/60 bg-sumi-900/35 hover:border-sumi-600";
+  const authorityAccent = authority.tone === "danger"
+    ? "text-bengara"
+    : authority.tone === "warn"
+      ? "text-kinpaku"
+      : authority.tone === "ok"
+        ? "text-emerald-400"
+        : authority.tone === "info"
+          ? "text-aozora"
+          : "text-sumi-500";
   return (
     <header className="rounded-md border border-sumi-800/60 bg-[linear-gradient(135deg,rgba(20,27,46,0.92),rgba(10,14,26,0.96))] p-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -330,7 +157,7 @@ function V2Hero({
             <Layers3 size={13} /> Mandala Mission Control · Linear Board Mode
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-4">
-            <h1 className="font-heading text-4xl font-semibold tracking-tight text-torinoko">Dharma Swarm Operator Observatory</h1>
+            <h1 className="font-heading text-4xl font-semibold tracking-tight text-torinoko">Cockpit V2</h1>
             <div className="font-mono text-3xl font-semibold text-kinpaku tabular-nums">{status}</div>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-sumi-400">
@@ -339,23 +166,23 @@ function V2Hero({
           <button
             type="button"
             onClick={() => onInspect(authorityInspect)}
-            className="mt-4 grid w-full max-w-4xl gap-3 rounded-md border border-bengara/40 bg-bengara/10 p-3 text-left text-xs hover:border-bengara/70 md:grid-cols-[minmax(0,1fr)_minmax(210px,0.45fr)]"
+            className={`mt-4 grid w-full max-w-4xl gap-3 rounded-md border p-3 text-left text-xs md:grid-cols-[minmax(0,1fr)_minmax(210px,0.45fr)] ${authorityPalette}`}
           >
             <div>
-              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-bengara">
-                <ShieldAlert size={13} /> Report source / read-only
+              <div className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${authorityAccent}`}>
+                <ShieldAlert size={13} /> {authority.label}
               </div>
               <div className="mt-1 text-sm font-semibold text-torinoko">
-                This observatory is a read-only source projection: {source.label}. Missing or partial evidence is treated as uncertainty.
+                {authority.detail}
               </div>
               <div className="mt-1 text-sumi-400">
-                Local branch `{candidateBranch}` reports {report.track_portfolio.active_count}/{asText(localMax)} active tracks via `/api/operator-coherence/report`; no canonical baseline is invented in the UI.
+                Observed branch `{authority.branch ?? "unknown"}` projects {authority.activeCount}/{authority.maxActive ?? "?"} active tracks. Remote canonicality is not asserted by this local report.
               </div>
             </div>
-            <div className="rounded border border-bengara/30 bg-sumi-950/35 p-2 font-mono text-[10px] text-sumi-300">
-              {source.mode.toUpperCase()}
+            <div className="rounded border border-sumi-700/50 bg-sumi-950/35 p-2 font-mono text-[10px] text-sumi-300">
+              HEAD {authority.head?.slice(0, 12) ?? "unavailable"}
               <br />
-              {source.ageHours == null ? "age unknown" : `${Math.round(source.ageHours)}h old`}
+              dirty paths: {authority.dirtyCount ?? "unavailable"}
             </div>
           </button>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -399,12 +226,9 @@ function V2Hero({
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs">
             <MiniStat label="cards" value={report.cards.length} />
-            <MiniStat label="branches" value={report.branch_census?.total ?? 0} />
+            <MiniStat label="branches" value={branchRisk.total} />
             <MiniStat label="live" value={report.live_ops?.summary?.by_status?.live ?? 0} />
-            <MiniStat label="errors" value={sourceErrorCount} />
-          </div>
-          <div className={`mt-2 rounded-md border px-2 py-1.5 text-[10px] uppercase tracking-[0.12em] ${toneClass(source.tone)}`}>
-            source mode: {source.mode} · {source.detail}
+            <MiniStat label="receipts" value={report.runtime_receipts?.receipt_count ?? 0} />
           </div>
         </div>
       </div>
@@ -424,13 +248,11 @@ function MiniStat({ label, value }: { label: string; value: unknown }) {
 function OverviewMode({
   report,
   repairCards,
-  actionPackets,
   onMode,
   onInspect,
 }: {
   report: OperatorCoherenceReport;
   repairCards: typeof report.cards;
-  actionPackets: ReturnType<typeof buildActionPackets>;
   onMode: (mode: CockpitMode) => void;
   onInspect: (item: InspectItem) => void;
 }) {
@@ -443,20 +265,19 @@ function OverviewMode({
           action={<ModeButton label="Open triage" onClick={() => onMode("triage")} />}
         >
           <div className="space-y-2">
-            {actionPackets.map((packet) => (
+            {report.executive.next_3_actions.map((action) => (
               <button
                 type="button"
-                key={packet.id}
-                onClick={() => onInspect(actionPacketToInspect(packet))}
+                key={`${action.kind}-${action.title}`}
+                onClick={() => onInspect(actionToInspect(action))}
                 className="grid w-full grid-cols-[28px_minmax(0,1fr)_120px] gap-3 rounded-md border border-kinpaku/25 bg-kinpaku/6 p-3 text-left text-sm hover:border-kinpaku/50 max-lg:grid-cols-1"
               >
                 <AlertTriangle size={16} className="mt-0.5 text-kinpaku" />
                 <div className="min-w-0">
-                  <div className="font-semibold text-torinoko">#{packet.rank} · {humanRisk(packet.risk)}</div>
-                  <div className="mt-1 line-clamp-2 text-xs text-sumi-400">{packet.why}</div>
-                  <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-kinpaku">proposal only · can act now: no</div>
+                  <div className="font-semibold text-torinoko">{humanRisk(action.risk)}</div>
+                  <div className="mt-1 line-clamp-2 text-xs text-sumi-400">{action.next_action}</div>
                 </div>
-                <div className="self-center text-right text-[10px] uppercase tracking-[0.14em] text-sumi-500 max-lg:text-left">{packet.urgency}</div>
+                <div className="self-center text-right text-[10px] uppercase tracking-[0.14em] text-sumi-500 max-lg:text-left">{action.kind}</div>
               </button>
             ))}
           </div>
@@ -470,11 +291,6 @@ function OverviewMode({
           <LiveOpsBars report={report} />
         </V2Section>
 
-        <V2Section title="Read-only action contract" eyebrow="operator safety">
-          <div className="rounded-md border border-kinpaku/30 bg-kinpaku/8 p-3 text-xs leading-5 text-sumi-300">
-            Recommendations are proposal packets only. This cockpit does not reset, stash, merge, kill, post, spend, or mutate systems. Future mutation requires an approved action API with blast radius, rollback, evidence, and receipt path.
-          </div>
-        </V2Section>
       </div>
 
       <div className="space-y-3">
@@ -501,6 +317,39 @@ function OverviewMode({
         <LaneAdmissionSection onInspect={onInspect} />
       </div>
     </div>
+  );
+}
+
+function TrackLifecycleReviewSection({ report, onInspect }: { report: OperatorCoherenceReport; onInspect: (item: InspectItem) => void }) {
+  const reviews = buildTrackLifecycleReviews(report);
+  const projection = summarizeTrackLifecycleProjection(report, reviews);
+  return (
+    <V2Section title="Active-track lifecycle review" eyebrow="reported SHIPPABLE triggers evidence review, never production proof">
+      <div className="space-y-2">
+        {reviews.map((review) => (
+          <button
+            key={review.rowKey}
+            type="button"
+            onClick={() => onInspect(trackLifecycleReviewToInspect(review))}
+            className="grid w-full grid-cols-[minmax(0,1fr)_190px] gap-3 rounded-md border border-sumi-800/55 bg-sumi-950/35 p-3 text-left text-xs hover:border-aozora/50 max-md:grid-cols-1"
+          >
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-torinoko">{review.trackName}</div>
+              <div className="mt-1 text-[10px] text-sumi-600">{review.trackId}</div>
+              <div className="mt-1 line-clamp-2 text-sumi-500">{review.action}</div>
+            </div>
+            <div className={`self-center rounded border px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] ${review.tone === "danger" ? "border-bengara/45 bg-bengara/10 text-bengara" : review.tone === "warn" ? "border-kinpaku/40 bg-kinpaku/8 text-kinpaku" : "border-aozora/35 bg-aozora/8 text-aozora"}`}>
+              {review.code.replaceAll("_", " ")}
+            </div>
+          </button>
+        ))}
+        {projection.code !== "TRACK_REVIEWS_AVAILABLE" ? (
+          <div className={`rounded-md border border-dashed p-6 text-center text-sm ${projection.code === "TRACK_ROWS_INCONSISTENT" || projection.code === "TRACK_SOURCE_UNAVAILABLE" ? "border-bengara/45 bg-bengara/8 text-bengara" : "border-sumi-800/70 text-sumi-600"}`}>
+            {projection.detail}
+          </div>
+        ) : null}
+      </div>
+    </V2Section>
   );
 }
 
@@ -538,15 +387,38 @@ function LaneAdmissionSection({ onInspect }: { onInspect: (item: InspectItem) =>
 }
 
 function SourceControlBars({ report }: { report: OperatorCoherenceReport }) {
+  const branchRisk = deriveBranchRiskProjection(report);
+  const branchTotal = Math.max(
+    branchRisk.total ?? 0,
+    branchRisk.localOnly ?? 0,
+    branchRisk.unpushed ?? 0,
+    branchRisk.orphaned ?? 0,
+    1,
+  );
+  const stashScale = Math.max(report.rogue_work_radar.stash_count, branchTotal);
+  const dirtyWorktrees = report.rogue_work_radar.dirty_worktree_count;
+  const worktreeScale = Math.max(report.git?.worktrees?.length ?? 0, dirtyWorktrees, 1);
   const metrics = [
-    ["Branches", report.branch_census?.total ?? 0, 207],
-    ["Local-only", report.branch_census?.local_only ?? 0, report.branch_census?.total ?? 1],
-    ["Unpushed", report.branch_census?.unpushed_ahead ?? 0, report.branch_census?.total ?? 1],
-    ["Orphaned", report.branch_census?.orphaned_gone ?? 0, report.branch_census?.total ?? 1],
-    ["Stashes", report.rogue_work_radar.stash_count, 100],
-    ["Dirty worktrees", report.rogue_work_radar.dirty_worktree_count, 12],
+    ["Branches", branchRisk.total, branchTotal],
+    ["Local-only", branchRisk.localOnly, branchTotal],
+    ["Unpushed", branchRisk.unpushed, branchTotal],
+    ["Orphaned", branchRisk.orphaned, branchTotal],
+    ["Stashes", report.rogue_work_radar.stash_count, stashScale],
+    ["Dirty worktrees", dirtyWorktrees, worktreeScale],
   ] as const;
-  return <BarList metrics={metrics} dangerAt={0.3} />;
+  const censusNote = branchRisk.conflicts.length
+    ? `Branch census ${branchRisk.source === "unavailable" ? "unavailable" : "contradictory"}: ${branchRisk.conflicts.join("; ")}`
+    : branchRisk.source === "unavailable"
+      ? "Branch census unavailable; no branch counts were observed."
+      : null;
+  return (
+    <div className="space-y-2">
+      <BarList metrics={metrics} dangerAt={0.3} />
+      {censusNote ? (
+        <p className={`text-[10px] ${branchRisk.conflicts.length ? "text-bengara" : "text-sumi-500"}`}>{censusNote}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function LiveOpsBars({ report }: { report: OperatorCoherenceReport }) {
@@ -563,12 +435,12 @@ function LiveOpsBars({ report }: { report: OperatorCoherenceReport }) {
   return <BarList metrics={metrics} dangerAt={0.12} />;
 }
 
-function BarList({ metrics, dangerAt }: { metrics: readonly (readonly [string, number, number])[]; dangerAt: number }) {
+function BarList({ metrics, dangerAt }: { metrics: readonly (readonly [string, number | null, number])[]; dangerAt: number }) {
   return (
     <div className="space-y-2">
       {metrics.map(([label, value, total]) => {
-        const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
-        const danger = label !== "Live" && value / Math.max(1, total) >= dangerAt;
+        const pct = value !== null && total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+        const danger = value !== null && metricNeedsAttention(label, value, total, dangerAt);
         return (
           <div key={label} className="grid grid-cols-[112px_minmax(0,1fr)_76px] items-center gap-3 text-xs">
             <div className="text-sumi-400">{label}</div>
@@ -622,6 +494,7 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
   const tracks = report.track_portfolio.tracks ?? [];
   return (
     <div className="space-y-3">
+      <TrackLifecycleReviewSection report={report} onInspect={onInspect} />
       <V2Section title="Track portfolio" eyebrow="ACTIVE_TRACK.yaml + active_track_evidence.json">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
@@ -630,12 +503,16 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
                 <th className="px-2 py-2">Track</th>
                 <th className="px-2 py-2">State</th>
                 <th className="px-2 py-2">Readiness</th>
+                <th className="px-2 py-2">Rigor</th>
                 <th className="px-2 py-2">Evidence</th>
                 <th className="px-2 py-2">Next items</th>
               </tr>
             </thead>
             <tbody>
-              {tracks.map((track, index) => (
+              {tracks.map((track, index) => {
+                const rigorous = Boolean(track.has_rigorous_evidence);
+                const capped = Boolean(track.readiness_capped);
+                return (
                 <tr
                   key={`${asText(track.id)}-${index}`}
                   onClick={() => onInspect({ type: "track", title: asText(track.name), subtitle: asText(track.id), status: asText(track.status), raw: track })}
@@ -643,11 +520,18 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
                 >
                   <td className="max-w-[360px] px-2 py-2 font-semibold text-sumi-200">{asText(track.name)}</td>
                   <td className="px-2 py-2 text-sumi-400">{asText(track.lifecycle)} · {track.stale ? "stale" : asText(track.status)}</td>
-                  <td className="px-2 py-2 font-mono text-sumi-300">{asText(track.readiness)}%</td>
+                  <td className="px-2 py-2 font-mono text-sumi-300">
+                    {asText(track.readiness)}%
+                    {capped ? <span className="ml-1 text-[10px] text-kinpaku">capped</span> : null}
+                  </td>
+                  <td className={`px-2 py-2 font-medium ${rigorous ? "text-emerald-400" : "text-kinpaku"}`}>
+                    {rigorous ? "rigorous" : asText(track.readiness_basis) || "existence-only"}
+                  </td>
                   <td className="px-2 py-2 text-sumi-400">{track.evidence_present ? "present" : "missing"}</td>
                   <td className="max-w-[420px] truncate px-2 py-2 text-sumi-500">{asText(track.next_items)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

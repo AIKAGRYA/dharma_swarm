@@ -1,0 +1,49 @@
+{
+  "applied": [],
+  "applied_count": 0,
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm",
+    "/Users/dhyana/.dharma/a2a_bus/collab/convergence"
+  ],
+  "backup_path": "",
+  "candidate_count": 0,
+  "candidates": [],
+  "generated_at": "2026-07-01T04:04:37Z",
+  "mode": "dry_run",
+  "post_readiness": {
+    "blocker_task_ids": {
+      "open_or_claimed_tasks_present": [
+        "forge-v0.1-001",
+        "holon-plan-review-cursor-20260612",
+        "holon-plan-review-opus-20260612",
+        "l1-fx-001",
+        "reconcile-564-565-20260611",
+        "sab-flywheel-d01-qwen-code-first-spark",
+        "tam-wp-wp_dfa4e1134277",
+        "ts-converge-0611",
+        "ts-evo-0611-1",
+        "ts-evo-0611-2",
+        "ts-evo-0611-3",
+        "ts-hb0631-credit",
+        "ts-pr-babysit-div-20260610",
+        "yatagarasu-10cceaa8",
+        "yatagarasu-20260619-credit-monitor",
+        "yatagarasu-20260619-gap-scan-fix",
+        "yatagarasu-20260619-staging-decay"
+      ]
+    },
+    "gate_status": "DEGRADED",
+    "open_tasks": 17,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": []
+}

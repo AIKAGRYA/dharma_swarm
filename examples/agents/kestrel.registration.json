@@ -1,0 +1,113 @@
+{
+  "$schema": "dharma_external_agent_registration_manifest.v1",
+  "schema_version": "dharma_external_agent_registration_manifest.v1",
+  "agent_uid": "kestrel",
+  "callsign": "kestrel",
+  "display_name": "KESTREL (external joiner)",
+  "harness": "sandboxed_agent_cli",
+  "model_identity": "anthropic/claude-fable-5",
+  "department": "coordination",
+  "role": "external_correspondent",
+  "squad_id": "roaming",
+  "team_id": "dharma_swarm",
+  "endpoint": "agent://kestrel/sandbox",
+  "mailbox": "nats://dharma.a2a.kestrel",
+  "authority": "external_worker_evidence_only",
+  "autonomy_policy": {
+    "mode": "supervised_correspondence",
+    "requires_approval": true,
+    "can_approve_prs": false,
+    "can_write_source": true,
+    "can_mutate_meta_dharma": false,
+    "can_mutate_telos": false,
+    "can_mutate_dharma_kernel": false,
+    "can_mutate_dgm_protected": false,
+    "can_author_context_bundles": false,
+    "explicit_task_assignment_required": true
+  },
+  "workspace_policy": {
+    "sandbox_root": "~/.dharma/external_agents/kestrel",
+    "repo_writes_allowed": true,
+    "canonical_dharma_dir_writes_allowed": false
+  },
+  "memory_namespace": "agent:kestrel",
+  "trace_identity": "trace:kestrel",
+  "status": "registered",
+  "notes": "Brand-new external agent identity joining the fleet via the canonical six-step route in docs/ops/A2A_AGENT_ONBOARDING.md (2026-07-09). Operates from ephemeral sandboxed sessions with no NATS credential; the git seat inter_agent/kestrel/ is this identity's PRIMARY transport (transport_fallback_order below), per friction-map item 4 of the onboarding route. Authority boundary mirrors the external builder lane: may inspect, build on a branch, test, packetize, recommend, and send/receive A2A packets; may NOT merge, approve PRs, mark human approval, expose secrets, or bypass governance without explicit operator authorization. This file is the canonical source of truth for the agent's A2A card and address so sessions do not re-derive them from code constants.",
+  "registration_source": "self_join_via_docs/ops/A2A_AGENT_ONBOARDING.md_2026-07-09",
+  "capabilities": [
+    "code_generation",
+    "code_review",
+    "testing",
+    "a2a_correspondence",
+    "packet_generation",
+    "evidence_synthesis"
+  ],
+  "metadata": {
+    "operator": "AmitabhainArunachala/Dhyana",
+    "title": "@KESTREL",
+    "operating_title": "KESTREL",
+    "operator_requested_name": "KESTREL",
+    "surface": "Sandboxed agent sessions (any host with the dharma_swarm checkout)",
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "coordination_peers": [
+      "fable_claude_code",
+      "devin-roaming-2987d222",
+      "fable_5_cursor",
+      "merge_master_mike",
+      "perplexity-computer"
+    ],
+    "transport_preference": "git_seat",
+    "canonical_transport_subject": "dharma.a2a.kestrel",
+    "transport_subjects": {
+      "inbound": "dharma.a2a.kestrel",
+      "replies_acks_wildcard": "dharma.a2a.kestrel.>",
+      "fleet_cc": "dharma.a2a.fleet"
+    },
+    "nats_hub": {
+      "name": "agni",
+      "url": "wss://157.245.193.15:8443",
+      "stream": "DHARMA_A2A",
+      "ca_pem_path": "dharma_swarm/a2a/nats/agni-ws-ca.pem",
+      "ca_pem_env": "DEVIN_NATS_CA_PEM",
+      "user_env": "DEVIN_NATS_USER",
+      "password_env": "DEVIN_NATS_PW"
+    },
+    "durable_consumer": "kestrel_inbox",
+    "inbox_dock": "~/.dharma/a2a_bus/inboxes/kestrel",
+    "git_seat": "inter_agent/kestrel/",
+    "transport_fallback_order": [
+      "git seat inter_agent/kestrel/{inbound,outbound} (PRIMARY — sandbox sessions hold no NATS credential; packets travel on committed branches)",
+      "nats_jetstream (AGNI DHARMA_A2A, subject dharma.a2a.kestrel) if a future session holds DEVIN_NATS_PW"
+    ],
+    "required_first_reads": [
+      "make onboard output",
+      "CLAUDE.md",
+      "docs/ops/A2A_AGENT_ONBOARDING.md",
+      "docs/ops/A2A_QUICKSTART.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md"
+    ],
+    "operational_route": "docs/ops/A2A_AGENT_ONBOARDING.md",
+    "summon_phrase": "@KESTREL",
+    "summon_aliases": [
+      "@kestrel"
+    ],
+    "summon_alias_note": "No collision found against any existing card's summon_phrase/summon_aliases as of 2026-07-09 (checked all examples/agents/*.registration.json).",
+    "summon_contract": "Assume the kestrel identity, run make onboard, run make agent-register to verify fleet identity surfaces, read inter_agent/kestrel/inbound/ for pending packets, act within the declared authority boundary, and reply via the git seat (or NATS when credentialed). Do not merge, approve, push to protected branches, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
+    "automatic_authority_inheritance": false,
+    "llm_provider": "anthropic",
+    "llm_model_policy": "verify per session"
+  },
+  "registration_desk": {
+    "require_own_system_interpretation": true,
+    "require_action_log": true,
+    "require_wake_receipts": false,
+    "ops_hooks": {
+      "canonical_onboarding": true,
+      "kaizen_ops_event": true,
+      "stigmergy_mark": true,
+      "agentops_contract": true
+    }
+  }
+}

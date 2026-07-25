@@ -22,6 +22,15 @@ from typing import Any, Iterable
 
 
 DEFAULT_CONFIG = Path("docs/docops/assertions.yaml")
+CANONICAL_ROOT_AGENTS_BYTES = (
+    b"# Agent entrypoint\n"
+    b"\n"
+    b"Run `make onboard` before non-trivial work.\n"
+    b"It reports session status; it does not grant permission to edit.\n"
+    b"Use `make agent-build-preflight PACKET=<path>` for exact edit admission.\n"
+    b"The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.\n"
+    b"Return the startup readback printed by onboarding before editing.\n"
+)
 IGNORE_DIR_NAMES = {
     ".git",
     ".claude",
@@ -201,9 +210,13 @@ def collect_metrics(repo_root: Path) -> dict[str, int]:
 
 
 def check_assertions(
-    repo_root: Path, config: dict[str, Any], metrics: dict[str, int]
+    repo_root: Path,
+    config: dict[str, Any],
+    metrics: dict[str, int],
+    counts_advisory: bool = False,
 ) -> list[Finding]:
     findings: list[Finding] = []
+    value_severity = "WARN" if counts_advisory else "FAIL"
     for assertion in config.get("assertions", []):
         assertion_id = assertion.get("id", "<missing-id>")
         doc_path = repo_root / assertion["doc"]
@@ -220,22 +233,40 @@ def check_assertions(
             )
             continue
         text = doc_path.read_text(encoding="utf-8", errors="ignore")
-        match = re.search(assertion["regex"], text, flags=re.MULTILINE)
-        if not match:
+        matches = list(re.finditer(assertion["regex"], text, flags=re.MULTILINE))
+        if not matches:
             findings.append(
                 Finding(
-                    "FAIL",
+                    value_severity,
                     "assertion",
                     f"{assertion_id}: regex did not match {assertion['doc']}",
                 )
             )
             continue
+        # Duplicate-token tripwire: an asserted count must appear EXACTLY once.
+        # Refreshes that append instead of replace duplicated the SOVEREIGN
+        # MANIFEST count table row-by-row until 2026-07-03 (rows quadruplicated
+        # while the checker happily validated the first match). Duplicates are
+        # manufactured decay — flag them even when the values agree.
+        if len(matches) > 1:
+            findings.append(
+                Finding(
+                    value_severity,
+                    "assertion-duplicate",
+                    (
+                        f"{assertion_id}: asserted token appears {len(matches)}x in "
+                        f"{assertion['doc']} — refreshes must REPLACE the row, never "
+                        "append; dedupe to exactly one occurrence"
+                    ),
+                )
+            )
+        match = matches[0]
         observed = match.group(1).replace(",", "")
         if str(expected) != observed:
             verify = assertion.get("verify", metric_name)
             findings.append(
                 Finding(
-                    "FAIL",
+                    value_severity,
                     "assertion",
                     (
                         f"{assertion_id}: doc says {observed}, "
@@ -345,6 +376,43 @@ def check_canonical_guard(
     ignore_patterns = guard.get("ignore", [])
     patterns = guard.get("managed_include", [])
     files = {repo_relative(path, repo_root): path for path in iter_files(repo_root, patterns)}
+    findings: list[Finding] = []
+
+    for rel in sorted(registered):
+        path = repo_root / rel
+        if not path.is_file():
+            findings.append(
+                Finding(
+                    "FAIL",
+                    "canonical",
+                    f"registered canonical file is missing: {rel}",
+                )
+            )
+
+    agents_path = repo_root / "AGENTS.md"
+    if "AGENTS.md" in registered and agents_path.is_file():
+        try:
+            agents_bytes = agents_path.read_bytes()
+        except OSError as exc:
+            findings.append(
+                Finding(
+                    "FAIL",
+                    "canonical",
+                    f"registered canonical file is unreadable: AGENTS.md ({exc})",
+                )
+            )
+        else:
+            if agents_bytes != CANONICAL_ROOT_AGENTS_BYTES:
+                findings.append(
+                    Finding(
+                        "FAIL",
+                        "canonical",
+                        (
+                            "AGENTS.md must be the byte-exact root pointer; it may not "
+                            "duplicate or extend the behavioral contract in CLAUDE.md"
+                        ),
+                    )
+                )
 
     changed_doc_statuses: dict[str, str] = {}
     if changed_files:
@@ -360,7 +428,6 @@ def check_canonical_guard(
                     files[rel] = path
                     changed_doc_statuses[rel] = status
 
-    findings: list[Finding] = []
     for rel, path in sorted(files.items()):
         if any(fnmatch.fnmatch(rel, pattern) for pattern in ignore_patterns):
             continue
@@ -495,102 +562,10 @@ def render_repo_inventory(metrics: dict[str, int]) -> str:
     return "\n".join(lines)
 
 
-def render_sovereign_manifest_inventory(metrics: dict[str, int]) -> str:
-    total_modules = metrics["dharma_python_modules"]
-    top_level_modules = metrics["dharma_top_level_python_modules"]
-    top_level_pct = 0.0 if total_modules == 0 else top_level_modules / total_modules * 100
-    rows = [
-        (
-            "Total Python modules",
-            f"**{total_modules:,}**",
-            "git ls-files dharma_swarm | rg '\\.py$' | wc -l",
-        ),
-        (
-            "Top-level (flat) modules",
-            f"**{top_level_modules:,} ({top_level_pct:.1f}%)**",
-            "git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l",
-        ),
-        (
-            "Total Python LOC",
-            f"**{metrics['total_python_loc']:,}**",
-            "wc -l across dharma_swarm Python modules",
-        ),
-        (
-            "Test files",
-            f"**{metrics['test_files']:,}**",
-            "git ls-files tests | rg '\\.py$' | wc -l",
-        ),
-        (
-            "Test functions",
-            f"**{metrics['test_def_occurrences']:,} `def test_` occurrences under tests/**",
-            "git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l",
-        ),
-        (
-            "Tests collected (pytest)",
-            "**Needs write-permitted refresh**",
-            "not run during this DocOps count pass",
-        ),
-        (
-            "Collection errors",
-            "**Historical: 16 on 2026-04-04**",
-            "refresh before relying on this count",
-        ),
-        (
-            "Markdown files",
-            f"**{metrics['markdown_files']:,}**",
-            "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l",
-        ),
-        (
-            "Markdown total lines",
-            f"**{metrics['markdown_total_lines']:,}**",
-            "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l",
-        ),
-        (
-            "Bridge files",
-            f"**{metrics['bridge_files']:,}**",
-            'find dharma_swarm -name "*bridge*.py" -type f | wc -l',
-        ),
-        (
-            "Adapter files",
-            f"**{metrics['adapter_files']:,} across 8 locations**",
-            'find dharma_swarm -type f | rg -i "adapter" | wc -l',
-        ),
-        (
-            "Orchestrator files",
-            f"**{metrics['orchestrator_files']:,}**",
-            'find dharma_swarm -name "*orchestrat*" | wc -l',
-        ),
-        (
-            "Router files",
-            f"**{metrics['router_files']:,}** (4,976 LOC total)",
-            'find dharma_swarm -type f | rg -i "rout" | wc -l',
-        ),
-        ("Memory modules", "**11** (5,848 LOC)", 'find dharma_swarm -name "*memory*"'),
-        ("Context modules", "**8** (5,828 LOC)", 'find dharma_swarm -name "*context*"'),
-        ("Provider types (enum)", "**18**", "models.py ProviderType enum"),
-        ("Provider classes", "**19** (including LLMProvider base)", 'grep "class.*Provider" providers.py'),
-        ("Kernel axioms", "**25** (10 original + 15 foundations)", "dharma_kernel.py MetaPrinciple enum"),
-        ("Telos gates", "**11** (2 Tier A, 1 Tier B, 8 Tier C)", "telos_gates.py core gates"),
-        ("SQLite-using modules", "**49**", "grep aiosqlite/sqlite3"),
-        ("JSONL-writing modules", "**126**", "grep .jsonl"),
-        ("~/.dharma/ subdirectories", "**74**", "ls ~/.dharma/"),
-        ("Circular dependency chains", "**9 confirmed**", "import tracing"),
-        ("Files >500 lines", "**148**", "wc -l + awk"),
-        ("Files >3000 lines", "**7**", "wc -l + awk"),
-    ]
-    lines = ["| Metric | Value | Verification |", "|--------|-------|-------------|"]
-    for metric, value, verification in rows:
-        verification = verification.replace("|", "\\|")
-        lines.append(f"| {metric} | {value} | {verification} |")
-    return "\n".join(lines)
-
-
 def generated_section(attrs: dict[str, str], metrics: dict[str, int]) -> str:
     metric = attrs.get("metric")
     if metric == "repo_inventory":
         return render_repo_inventory(metrics)
-    if metric == "sovereign_manifest_inventory":
-        return render_sovereign_manifest_inventory(metrics)
     raise ValueError(f"unknown auto section metric: {metric}")
 
 
@@ -620,7 +595,11 @@ def rewrite_auto_sections(text: str, metrics: dict[str, int]) -> tuple[str, bool
 
 
 def check_or_write_auto_sections(
-    repo_root: Path, config: dict[str, Any], metrics: dict[str, int], write: bool
+    repo_root: Path,
+    config: dict[str, Any],
+    metrics: dict[str, int],
+    write: bool,
+    counts_advisory: bool = False,
 ) -> list[Finding]:
     findings: list[Finding] = []
     patterns = config.get("auto_sections", {}).get("include", [])
@@ -640,7 +619,7 @@ def check_or_write_auto_sections(
         else:
             findings.append(
                 Finding(
-                    "FAIL",
+                    "WARN" if counts_advisory else "FAIL",
                     "auto-section",
                     (
                         f"{repo_relative(doc, repo_root)} has stale generated content; "
@@ -651,12 +630,115 @@ def check_or_write_auto_sections(
     return findings
 
 
+def _format_count(value: int, sample: str) -> str:
+    """Render ``value`` preserving the comma style of the matched ``sample``."""
+    return f"{value:,}" if "," in sample else str(value)
+
+
+def _replace_capture_group(match: re.Match[str], new_value: str) -> str:
+    """Return ``match.group(0)`` with capture group 1 replaced by ``new_value``."""
+    whole = match.group(0)
+    rel_start = match.start(1) - match.start(0)
+    rel_end = match.end(1) - match.start(0)
+    return whole[:rel_start] + new_value + whole[rel_end:]
+
+
+def _collapse_duplicate_assertion_lines(
+    text: str, assertions: list[dict[str, Any]]
+) -> tuple[str, int]:
+    """Collapse byte-identical full lines that carry an asserted count token to a
+    single occurrence, preserving order (first wins).
+
+    A ``merge=union`` merge appends a whole managed count row a second time; the
+    per-match value rewrite above then corrects BOTH copies' values but leaves
+    two identical rows, which the ``assertion-duplicate`` tripwire rejects — so
+    the writer was not actually idempotent and every doc-touching merge needed a
+    hand dedupe. Only exact full-line duplicates that match an assertion regex
+    are removed (a distinct row with a coincidentally equal count is never a
+    byte-identical line), and an asserted token is required to appear exactly
+    once anyway (that is what the tripwire enforces), so collapsing to one is
+    consistent with the gate, not a weakening of it.
+    """
+    patterns = [re.compile(a["regex"]) for a in assertions]
+    seen: set[str] = set()
+    kept: list[str] = []
+    removed = 0
+    for line in text.split("\n"):
+        if line.strip() and any(p.search(line) for p in patterns):
+            if line in seen:
+                removed += 1
+                continue
+            seen.add(line)
+        kept.append(line)
+    return "\n".join(kept), removed
+
+
+def write_assertion_counts(
+    repo_root: Path, config: dict[str, Any], metrics: dict[str, int]
+) -> list[Finding]:
+    """Rewrite every asserted count token in place to match live metrics, then
+    collapse any merge-duplicated count rows to a single occurrence.
+
+    Driven by the same ``assertions`` config that ``check_assertions`` reads, so
+    the writer can never drift from the gate. Each assertion's regex capture
+    group is replaced with the live metric value (comma style preserved) for
+    every non-overlapping match; then byte-identical duplicate count lines
+    (``merge=union`` artifacts) are collapsed. Idempotent and merge-healing.
+    """
+    findings: list[Finding] = []
+    by_doc: dict[Path, list[dict[str, Any]]] = {}
+    for assertion in config.get("assertions", []):
+        by_doc.setdefault(repo_root / assertion["doc"], []).append(assertion)
+
+    for doc_path, assertions in by_doc.items():
+        if not doc_path.exists():
+            findings.append(
+                Finding("FAIL", "assertion-write", f"missing doc: {doc_path}")
+            )
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        original = text
+        for assertion in assertions:
+            metric_name = assertion["metric"]
+            if metric_name not in metrics:
+                findings.append(
+                    Finding(
+                        "FAIL",
+                        "assertion-write",
+                        f"{assertion.get('id')}: unknown metric {metric_name}",
+                    )
+                )
+                continue
+            expected = metrics[metric_name]
+            pattern = re.compile(assertion["regex"], flags=re.MULTILINE)
+
+            def _sub(m: re.Match[str], _expected: int = expected) -> str:
+                return _replace_capture_group(m, _format_count(_expected, m.group(1)))
+
+            text = pattern.sub(_sub, text)
+        text, collapsed = _collapse_duplicate_assertion_lines(text, assertions)
+        if collapsed:
+            findings.append(
+                Finding(
+                    "INFO",
+                    "assertion-dedupe",
+                    f"{doc_path.name}: collapsed {collapsed} merge-duplicated count "
+                    "row(s) to a single occurrence",
+                )
+            )
+        if text != original:
+            doc_path.write_text(text, encoding="utf-8")
+    return findings
+
+
 def run_checks(
     repo_root: Path,
     config_path: Path,
     changed_from: str | None,
     today: date,
     write_auto_sections: bool,
+    write_manifest_counts: bool = False,
+    counts_advisory: bool = False,
 ) -> tuple[list[Finding], dict[str, int]]:
     config = load_config(config_path)
     metrics = collect_metrics(repo_root)
@@ -664,14 +746,17 @@ def run_checks(
     changed_files = [rel for _status, rel in changed_file_statuses]
 
     findings: list[Finding] = []
-    if write_auto_sections:
-        findings.extend(check_or_write_auto_sections(repo_root, config, metrics, True))
     findings.extend(check_staleness(config, today))
-    findings.extend(check_assertions(repo_root, config, metrics))
+    if write_manifest_counts:
+        findings.extend(write_assertion_counts(repo_root, config, metrics))
+    findings.extend(check_assertions(repo_root, config, metrics, counts_advisory))
     findings.extend(check_path_guards(repo_root, config))
     findings.extend(check_canonical_guard(repo_root, config, changed_file_statuses))
-    if not write_auto_sections:
-        findings.extend(check_or_write_auto_sections(repo_root, config, metrics, False))
+    findings.extend(
+        check_or_write_auto_sections(
+            repo_root, config, metrics, write_auto_sections, counts_advisory
+        )
+    )
     findings.extend(doc_review_candidates(repo_root, config, changed_files))
     return findings, metrics
 
@@ -837,14 +922,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--changed-from")
     parser.add_argument("--today")
     parser.add_argument("--write-auto-sections", action="store_true")
+    parser.add_argument(
+        "--write-manifest-counts",
+        action="store_true",
+        help=(
+            "Rewrite asserted count tokens (e.g. SOVEREIGN_MANIFEST counts) in "
+            "place to match live metrics. Used by the push:main reconcile job."
+        ),
+    )
+    parser.add_argument(
+        "--counts-advisory",
+        action="store_true",
+        help=(
+            "Downgrade generated-count drift (SOVEREIGN_MANIFEST count assertions "
+            "and AUTO_INVENTORY auto-sections) from FAIL to WARN. Counts are "
+            "reconciled on main by docops-reconcile-main.yml, so PRs and the "
+            "merge queue never gate on them. Structural problems (missing doc, "
+            "unknown metric, bad auto-section config) still FAIL."
+        ),
+    )
     parser.add_argument("--report-json", type=Path)
     parser.add_argument("--inventory-json", type=Path)
     parser.add_argument("--inventory-markdown", type=Path)
-    parser.add_argument(
-        "--inventory-only",
-        action="store_true",
-        help="Write corpus inventory artifacts without running blocking DocOps checks.",
-    )
     parser.add_argument(
         "--inventory-glob",
         action="append",
@@ -859,21 +958,15 @@ def main(argv: list[str] | None = None) -> int:
         config_path = repo_root / config_path
     today = parse_iso_date(args.today) if args.today else date.today()
 
-    config: dict[str, Any] | None = None
-    if args.inventory_only:
-        if not args.inventory_json and not args.inventory_markdown:
-            parser.error("--inventory-only requires --inventory-json or --inventory-markdown")
-        config = load_config(config_path)
-        metrics = collect_metrics(repo_root)
-        findings: list[Finding] = []
-    else:
-        findings, metrics = run_checks(
-            repo_root=repo_root,
-            config_path=config_path,
-            changed_from=args.changed_from,
-            today=today,
-            write_auto_sections=args.write_auto_sections,
-        )
+    findings, metrics = run_checks(
+        repo_root=repo_root,
+        config_path=config_path,
+        changed_from=args.changed_from,
+        today=today,
+        write_auto_sections=args.write_auto_sections,
+        write_manifest_counts=args.write_manifest_counts,
+        counts_advisory=args.counts_advisory,
+    )
     if args.report_json:
         report_path = args.report_json
         if not report_path.is_absolute():
@@ -881,8 +974,7 @@ def main(argv: list[str] | None = None) -> int:
         write_json(report_path, check_report_payload(findings, metrics, today))
 
     if args.inventory_json or args.inventory_markdown:
-        if config is None:
-            config = load_config(config_path)
+        config = load_config(config_path)
         patterns = args.inventory_glob or ["**/*.md"]
         inventory = scan_doc_inventory(repo_root, config, patterns)
         if args.inventory_json:
@@ -903,9 +995,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"metric {key}={metrics[key]}")
     for finding in findings:
         print(finding.render())
-    if args.inventory_only:
-        print("DocOps corpus inventory written")
-        return 0
     failures = [finding for finding in findings if finding.severity == "FAIL"]
     if failures:
         return 1

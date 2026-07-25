@@ -33,14 +33,12 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
 from dharma_swarm.archive import ArchiveEntry, EvolutionArchive, FitnessScore
 from dharma_swarm.elegance import evaluate_elegance
-from dharma_swarm.evolution import DarwinEngine, EvolutionStatus, Proposal
-from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType, _new_id, _utc_now
+from dharma_swarm.models import _new_id
 from dharma_swarm.traces import TraceEntry, TraceStore
 
 logger = logging.getLogger(__name__)
@@ -405,34 +403,29 @@ class AutoResearchLoop:
         if len(user_prompt) > 12000:
             user_prompt = user_prompt[:12000] + "\n... (truncated)"
 
-        from dharma_swarm.model_hierarchy import default_model as _default_model
-        request = LLMRequest(
-            model=_default_model(ProviderType.OPENROUTER),
-            messages=[{"role": "user", "content": user_prompt}],
-            system=system_prompt,
-            max_tokens=2048,
-            temperature=0.3,
-        )
-
+        # Dispatch via the canonical live-fallback chain (most-powerful-first),
+        # which includes the KEYLESS claude_code lane — never hardcode OpenRouter.
+        # Proposal generation no longer dies with "no provider" when keys are
+        # unset: claude_code dispatches keyless when headless `claude -p` smokes green.
         try:
-            # Try OpenRouter free tier first, then paid
-            for provider_type in (ProviderType.OPENROUTER_FREE, ProviderType.OPENROUTER):
-                provider = router._providers.get(provider_type)
-                if provider is None:
-                    continue
-                try:
-                    response: LLMResponse = await provider.complete(request)
-                    content = response.content.strip()
-                    if "NO_CHANGE" in content[:50]:
-                        logger.info("LLM declined to propose changes for %s", module_path.name)
-                        return None
-                    if "FIND:" in content and "REPLACE:" in content:
-                        return content
-                    logger.debug("LLM response not in FIND/REPLACE format for %s", module_path.name)
-                    return None
-                except Exception as exc:
-                    logger.debug("Provider %s failed: %s", provider_type, exc)
-                    continue
+            from dharma_swarm.runtime_provider import (
+                complete_via_preferred_runtime_providers,
+            )
+
+            response, _cfg = await complete_via_preferred_runtime_providers(
+                messages=[{"role": "user", "content": user_prompt}],
+                system=system_prompt,
+                max_tokens=2048,
+                temperature=0.3,
+            )
+            content = response.content.strip()
+            if "NO_CHANGE" in content[:50]:
+                logger.info("LLM declined to propose changes for %s", module_path.name)
+                return None
+            if "FIND:" in content and "REPLACE:" in content:
+                return content
+            logger.debug("LLM response not in FIND/REPLACE format for %s", module_path.name)
+            return None
         except Exception as exc:
             logger.debug("Proposal generation failed: %s", exc)
 

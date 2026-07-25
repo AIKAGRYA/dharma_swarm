@@ -5,11 +5,15 @@ tier in comments. Scope excludes ``scripts/`` (operator utilities).
 
 Routing truth (2026 maintenance):
 - ``api/routers/chat.py`` remains the in-repo **dashboard** bypass (per-request provider).
-- ``AutonomousAgent`` injected path: ``openrouter`` → ``ModelRouter.complete_for_task``
-  and ``anthropic`` → ``ModelRouter.complete_for_task`` when the router registers
-  overlapping runtime providers; ``codex`` always uses
+- ``AutonomousAgent`` injected path: ``anthropic`` and ``openrouter`` →
+  ``ModelRouter.complete_for_task`` when the router registers overlapping runtime
+  providers; ``codex`` always uses
   ``create_runtime_provider(..., working_dir=identity.working_directory)``;
   fallbacks use direct runtime chain. ``cli_wake`` documents no router (legacy CLI).
+- ``holon_bridge.py`` is the read-only agent-as-itself bridge and resolves through the
+  canonical runtime-provider door.
+- ``living_agent_kernel_provider_worker.py`` is the promoted kernel provider execution
+  boundary after promotion admission.
 Also asserts shared ``create_default_router()`` is invoked once per long-running
 ``orchestrate_live`` loop (source-inspect guard).
 """
@@ -32,6 +36,9 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
         "dharma_swarm/api_key_audit.py",
         "dharma_swarm/autonomous_agent.py",
         "dharma_swarm/consolidation.py",
+        "dharma_swarm/dgm_loop.py",
+        "dharma_swarm/forge_v1/canonical.py",
+        "dharma_swarm/forge_v1/providers.py",
         "dharma_swarm/holon_bridge.py",
         "dharma_swarm/operator_core/living_agent_kernel_provider_worker.py",
         "dharma_swarm/provider_matrix.py",

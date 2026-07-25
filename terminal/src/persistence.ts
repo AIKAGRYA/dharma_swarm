@@ -1,4 +1,4 @@
-import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync} from "node:fs";
+import {existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
@@ -25,11 +25,14 @@ const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 const STATE_PATH = path.join(TERMINAL_ROOT, ".dharma-terminal-state.json");
-const STATE_VERSION = 3;
+const PREVIEW_CACHE_PATH = path.join(TERMINAL_ROOT, ".dharma-terminal-preview-cache.json");
+const PREVIEW_CACHE_VERSION = 1;
+// v4 (FACE-2 command post): sidebar defaults OFF; legacy v3 state (which
+// carried test-residue "visible"/"collapsed" sidebars) is discarded on load.
+const STATE_VERSION = 4;
 const MAX_STATE_BYTES = 128 * 1024;
 const SUPERVISOR_STATE_ENV_VARS = ["DHARMA_TERMINAL_SUPERVISOR_STATE_DIR", "DHARMA_TERMINAL_STATE_DIR"];
 const DEFAULT_SUPERVISOR_ROOT = path.join(os.homedir(), ".dharma", "terminal_supervisor");
-const CONTROL_SUMMARY_FILENAME = "terminal-control-summary.json";
 const CONTROL_PREVIEW_FIELDS = [
   "Active task",
   "Acceptance",
@@ -131,6 +134,10 @@ type PersistedSnapshotOptions = {
   runtimePayload?: RuntimeSnapshotPayload;
 };
 
+export function terminalPreviewCachePath(): string {
+  return process.env.DHARMA_TERMINAL_PREVIEW_CACHE_PATH?.trim() || PREVIEW_CACHE_PATH;
+}
+
 export function loadStoredState(): RestoredState | null {
   if (!existsSync(STATE_PATH)) {
     return null;
@@ -145,8 +152,11 @@ export function loadStoredState(): RestoredState | null {
     if (decoded.version !== STATE_VERSION) {
       return null;
     }
+    // F-162/FACE-2: legacy "collapsed" (the 3-col "T" sliver) restores as
+    // hidden — the command post defaults sidebar-off; only an explicit
+    // "visible" survives the round-trip.
     return {
-      sidebarVisible: typeof decoded.sidebarVisible === "string" ? (decoded.sidebarVisible as "visible" | "collapsed" | "hidden") : decoded.sidebarVisible === false ? "hidden" : "collapsed",
+      sidebarVisible: decoded.sidebarVisible === "visible" || decoded.sidebarVisible === true ? "visible" : "hidden",
       sidebarMode: decoded.sidebarMode ?? "toc",
     };
   } catch {
@@ -174,6 +184,59 @@ function readJsonFile(filePath: string): Record<string, unknown> {
   }
 }
 
+function readDisplayCache(summary: SupervisorControlState): Record<string, unknown> {
+  const payload = readJsonFile(terminalPreviewCachePath());
+  if (
+    payload.authority !== "display_only" ||
+    payload.source_state_dir !== summary.stateDir ||
+    payload.repo_root !== REPO_ROOT
+  ) {
+    return {};
+  }
+  return payload;
+}
+
+function writeDisplayCache(summary: SupervisorControlState, payload: Record<string, unknown>): void {
+  const cachePath = terminalPreviewCachePath();
+  const nextPayload = {
+    ...payload,
+    version: PREVIEW_CACHE_VERSION,
+    authority: "display_only",
+    repo_root: REPO_ROOT,
+    source_state_dir: summary.stateDir,
+    cached_at: new Date().toISOString(),
+  };
+  mkdirSync(path.dirname(cachePath), {recursive: true});
+  const temporaryPath = `${cachePath}.${process.pid}.tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(nextPayload, null, 2) + "\n");
+  renameSync(temporaryPath, cachePath);
+}
+
+function readStoredDisplayPreview(
+  summary: SupervisorControlState,
+  allowedKeys: readonly string[],
+): TabPreview | null {
+  const allowed = new Set(allowedKeys);
+  const previewEntries = Object.entries(readDisplayCache(summary)).filter(
+    (entry): entry is [string, string] =>
+      typeof entry[1] === "string" &&
+      entry[1].trim().length > 0 &&
+      entry[0].startsWith("preview_") &&
+      allowed.has(previewLabelFromStorageKey(entry[0])),
+  );
+  if (previewEntries.length === 0) {
+    return null;
+  }
+  return Object.fromEntries(previewEntries.map(([key, value]) => [previewLabelFromStorageKey(key), value]));
+}
+
+function readStoredDisplaySnapshotPayload(
+  summary: SupervisorControlState,
+  kind: "workspace" | "runtime",
+): WorkspaceSnapshotPayload | RuntimeSnapshotPayload | undefined {
+  return snapshotPayloadFromRecord(readDisplayCache(summary), kind);
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
@@ -183,25 +246,23 @@ function summaryField(summary: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function recordField(record: Record<string, unknown>, key: string): string {
-  const value = record[key];
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function parseVerificationChecks(value: unknown): string[] {
-  if (!Array.isArray(value)) {
+  if (!Array.isArray(value) || value.length === 0) {
     return [];
   }
-  return value
-    .map((check) => {
-      if (typeof check !== "object" || check === null) {
-        return "";
-      }
-      const name = String((check as {name?: unknown}).name ?? "").trim();
-      const ok = Boolean((check as {ok?: unknown}).ok);
-      return name ? `${name} ${ok ? "ok" : "fail"}` : "";
-    })
-    .filter((entry) => entry.length > 0);
+  const checks: string[] = [];
+  for (const check of value) {
+    if (typeof check !== "object" || check === null) {
+      return [];
+    }
+    const name = (check as {name?: unknown}).name;
+    const ok = (check as {ok?: unknown}).ok;
+    if (typeof name !== "string" || !name.trim() || typeof ok !== "boolean") {
+      return [];
+    }
+    checks.push(`${name.trim()} ${ok ? "ok" : "fail"}`);
+  }
+  return checks;
 }
 
 function previewField(preview: TabPreview | undefined, key: string): string {
@@ -1450,29 +1511,6 @@ function previewLabelFromStorageKey(key: string): string {
   return key.replace(/^preview_/, "").replaceAll("_", " ");
 }
 
-function readStoredPreview(summaryPath: string, allowedKeys: readonly string[]): TabPreview | null {
-  const allowed = new Set(allowedKeys);
-  const stored = readJsonFile(summaryPath);
-  const previewEntries = Object.entries(stored).filter(
-    (entry): entry is [string, string] =>
-      typeof entry[1] === "string" &&
-      entry[1].trim().length > 0 &&
-      entry[0].startsWith("preview_") &&
-      allowed.has(previewLabelFromStorageKey(entry[0])),
-  );
-  if (previewEntries.length === 0) {
-    return null;
-  }
-  return Object.fromEntries(previewEntries.map(([key, value]) => [previewLabelFromStorageKey(key), value]));
-}
-
-function readStoredSnapshotPayload(
-  summaryPath: string,
-  kind: "workspace" | "runtime",
-): WorkspaceSnapshotPayload | RuntimeSnapshotPayload | undefined {
-  return snapshotPayloadFromRecord(readJsonFile(summaryPath), kind);
-}
-
 function previewFromRecord(record: Record<string, unknown>, allowedKeys: readonly string[]): TabPreview | null {
   const previewEntries = allowedKeys
     .map((key) => [key, record[key]] as const)
@@ -1483,14 +1521,6 @@ function previewFromRecord(record: Record<string, unknown>, allowedKeys: readonl
   return Object.fromEntries(previewEntries);
 }
 
-function previewRecord(preview: TabPreview | undefined, allowedKeys: readonly string[]): Record<string, string> {
-  return Object.fromEntries(
-    allowedKeys
-      .map((key) => [key, previewField(preview, key)] as const)
-      .filter((entry): entry is [string, string] => entry[1].length > 0),
-  );
-}
-
 function writeStoredPreview(
   summary: SupervisorControlState,
   preview: TabPreview | undefined,
@@ -1499,8 +1529,7 @@ function writeStoredPreview(
   if (!preview) {
     return;
   }
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
-  const payload = readJsonFile(summaryPath);
+  const payload = readDisplayCache(summary);
   for (const key of allowedKeys) {
     const value = previewField(preview, key);
     if (value) {
@@ -1508,8 +1537,7 @@ function writeStoredPreview(
     }
   }
   payload.ts = new Date().toISOString();
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(summaryPath, JSON.stringify(payload, null, 2) + "\n");
+  writeDisplayCache(summary, payload);
 }
 
 function writeStoredSnapshotPayload(
@@ -1520,36 +1548,18 @@ function writeStoredSnapshotPayload(
   if (!payloadValue) {
     return;
   }
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
-  const payload = readJsonFile(summaryPath);
+  const payload = readDisplayCache(summary);
   payload[storedSnapshotPayloadKey(kind)] = payloadValue;
   payload.ts = new Date().toISOString();
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(summaryPath, JSON.stringify(payload, null, 2) + "\n");
-}
-
-function writeRunSnapshotPayload(
-  summary: SupervisorControlState,
-  kind: "workspace" | "runtime",
-  payloadValue: WorkspaceSnapshotPayload | RuntimeSnapshotPayload | undefined,
-): void {
-  if (!payloadValue) {
-    return;
-  }
-  const runPath = path.join(summary.stateDir, "run.json");
-  const payload = readJsonFile(runPath);
-  payload[storedSnapshotPayloadKey(kind)] = payloadValue;
-  payload.ts = new Date().toISOString();
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(runPath, JSON.stringify(payload, null, 2) + "\n");
+  writeDisplayCache(summary, payload);
 }
 
 function mergeStoredPreviewFields(
-  summaryPath: string,
+  summary: SupervisorControlState,
   allowedKeys: readonly string[],
   preview: TabPreview | undefined,
 ): TabPreview | undefined {
-  const storedPreview = readStoredPreview(summaryPath, allowedKeys) ?? {};
+  const storedPreview = readStoredDisplayPreview(summary, allowedKeys) ?? {};
   const mergedPreview: TabPreview = {...storedPreview};
 
   if (preview) {
@@ -1564,141 +1574,32 @@ function mergeStoredPreviewFields(
   return Object.keys(mergedPreview).length > 0 ? mergedPreview : undefined;
 }
 
-function mergeVerificationChecks(
-  existingValue: unknown,
-  bundle: VerificationEntry[],
-): Array<Record<string, unknown> & {name: string; ok: boolean}> {
-  const existingChecks = Array.isArray(existingValue)
-    ? existingValue.filter(
-        (entry): entry is Record<string, unknown> & {name: string; ok: boolean} =>
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof (entry as {name?: unknown}).name === "string" &&
-          typeof (entry as {ok?: unknown}).ok === "boolean",
-      )
-    : [];
-
-  if (bundle.length === 0) {
-    return existingChecks;
-  }
-
-  return bundle.map((entry) => {
-    const existing = existingChecks.find((candidate) => candidate.name === entry.name);
-    return {
-      ...existing,
-      name: entry.name,
-      ok: entry.ok,
-    };
-  });
-}
-
-function writeVerificationSummaryFile(
-  summary: SupervisorControlState,
-  verificationSummary: string,
-  verificationBundle: VerificationEntry[],
-  verificationUpdatedAt: string,
-  preview?: TabPreview,
-): void {
-  const verificationPath = path.join(summary.stateDir, "verification.json");
-  const existingPayload = readJsonFile(verificationPath);
-  const effectiveSummary =
-    verificationSummary || (typeof existingPayload.summary === "string" ? String(existingPayload.summary) : "") || "none";
-  const verificationRows = buildVerificationSummaryRows(verificationBundle);
-  const payload: Record<string, unknown> = {
-    ...existingPayload,
-    ts: new Date().toISOString(),
-    summary: effectiveSummary,
-    checks: mergeVerificationChecks(existingPayload.checks, verificationBundle),
-    status: verificationRows.status,
-    passing: verificationRows.passing,
-    failing: verificationRows.failing,
-    bundle: verificationRows.bundle,
-    ...(preview ? {control_preview: previewRecord(preview, CONTROL_PREVIEW_FIELDS)} : {}),
-    ...(verificationUpdatedAt ? {updated_at: verificationUpdatedAt} : {}),
-  };
-
-  if (summary.continueRequired !== null) {
-    payload.continue_required = summary.continueRequired;
-  } else if (typeof existingPayload.continue_required !== "boolean") {
-    payload.continue_required = false;
-  }
-
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(verificationPath, JSON.stringify(payload, null, 2) + "\n");
-}
-
-function writeRunVerificationSummaryFile(
-  summary: SupervisorControlState,
-  verificationSummary: string,
-  verificationBundle: VerificationEntry[],
-  verificationUpdatedAt: string,
-  preview?: TabPreview,
-  options?: PersistedSnapshotOptions,
-): void {
-  const runPath = path.join(summary.stateDir, "run.json");
-  const existingPayload = readJsonFile(runPath);
-  const checks = verificationBundle.map((entry) => ({name: entry.name, ok: entry.ok}));
-  const verificationRows = buildVerificationSummaryRows(verificationBundle);
-  const nextSummaryFields = {
-    ...asRecord(existingPayload.last_summary_fields),
-    ...(summary.lastResultStatus ? {status: summary.lastResultStatus} : {}),
-    ...(summary.acceptance ? {acceptance: summary.acceptance} : {}),
-    ...(summary.nextTask ? {next_task: summary.nextTask} : {}),
-  };
-  const payload: Record<string, unknown> = {
-    ...existingPayload,
-    ts: new Date().toISOString(),
-    ...(summary.updatedAt ? {updated_at: summary.updatedAt} : {}),
-    ...(summary.cycle !== null ? {cycle: summary.cycle} : {}),
-    ...(summary.runStatus ? {status: summary.runStatus} : {}),
-    ...(summary.tasksTotal !== null ? {tasks_total: summary.tasksTotal} : {}),
-    ...(summary.tasksPending !== null ? {tasks_pending: summary.tasksPending} : {}),
-    ...(summary.activeTaskId ? {last_task_id: summary.activeTaskId} : {}),
-    ...(Object.keys(nextSummaryFields).length > 0 ? {last_summary_fields: nextSummaryFields} : {}),
-    ...(summary.continueRequired !== null ? {last_continue_required: summary.continueRequired} : {}),
-    ...(preview ? {last_control_preview: previewRecord(preview, CONTROL_PREVIEW_FIELDS)} : {}),
-    ...(options?.workspacePayload ? {workspace_payload: options.workspacePayload} : {}),
-    ...(options?.runtimePayload ? {runtime_payload: options.runtimePayload} : {}),
-    last_verification: {
-      ts: new Date().toISOString(),
-      summary: verificationSummary || "none",
-      checks,
-      status: previewField(preview, "Verification status") || verificationRows.status,
-      passing: previewField(preview, "Verification passing") || verificationRows.passing,
-      failing: previewField(preview, "Verification failing") || verificationRows.failing,
-      bundle: previewField(preview, "Verification bundle") || verificationBundleLabel(verificationBundle),
-      ...(verificationUpdatedAt ? {updated_at: verificationUpdatedAt} : {}),
-      ...(summary.continueRequired !== null ? {continue_required: summary.continueRequired} : {}),
-    },
-  };
-
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(runPath, JSON.stringify(payload, null, 2) + "\n");
-}
-
-function candidateSupervisorStateDirs(): string[] {
+function candidateSupervisorStateDirs(): Array<{stateDir: string; explicit: boolean}> {
   const explicit = SUPERVISOR_STATE_ENV_VARS.map((name) => process.env[name]?.trim() ?? "").filter(Boolean);
   if (explicit.length > 0) {
-    return explicit;
+    return explicit.map((stateDir) => ({stateDir, explicit: true}));
   }
   if (!existsSync(DEFAULT_SUPERVISOR_ROOT)) {
     return [];
   }
   return readdirSync(DEFAULT_SUPERVISOR_ROOT, {withFileTypes: true})
     .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(DEFAULT_SUPERVISOR_ROOT, entry.name, "state"));
+    .map((entry) => ({stateDir: path.join(DEFAULT_SUPERVISOR_ROOT, entry.name, "state"), explicit: false}));
 }
 
 export function resolveSupervisorStateDir(repoRoot = REPO_ROOT): string | null {
   const candidates = candidateSupervisorStateDirs()
-    .filter((stateDir) => existsSync(path.join(stateDir, "run.json")))
-    .map((stateDir) => {
+    .filter(({stateDir}) => existsSync(path.join(stateDir, "run.json")))
+    .map(({stateDir, explicit}) => {
       const run = readJsonFile(path.join(stateDir, "run.json"));
       const runRepoRoot = typeof run.repo_root === "string" ? run.repo_root : "";
       const updatedAt = typeof run.updated_at === "string" ? run.updated_at : "";
-      return {stateDir, runRepoRoot, updatedAt};
+      return {stateDir, explicit, runRepoRoot, updatedAt};
     })
-    .filter((candidate) => !candidate.runRepoRoot || path.resolve(candidate.runRepoRoot) === path.resolve(repoRoot));
+    .filter(
+      (candidate) =>
+        candidate.explicit || !candidate.runRepoRoot || path.resolve(candidate.runRepoRoot) === path.resolve(repoRoot),
+    );
 
   if (candidates.length === 0) {
     return null;
@@ -1726,18 +1627,27 @@ export function loadSupervisorControlState(repoRoot = REPO_ROOT): SupervisorCont
   const run = readJsonFile(path.join(stateDir, "run.json"));
   const verification = readJsonFile(path.join(stateDir, "verification.json"));
   const summary = asRecord(run.last_summary_fields);
-  const lastVerification = asRecord(run.last_verification);
-  const checks = parseVerificationChecks(verification.checks ?? lastVerification.checks);
+  const checks = parseVerificationChecks(verification.checks);
+  const verificationEntries = checks.map((entry) => {
+    const [name, status] = entry.split(/\s+/);
+    return {name, ok: status === "ok"};
+  });
+  const verificationRows = buildVerificationSummaryRows(verificationEntries);
   const verificationUpdatedAt =
-    typeof verification.updated_at === "string"
+    checks.length > 0 && typeof verification.updated_at === "string"
       ? verification.updated_at
-      : typeof verification.ts === "string"
+      : checks.length > 0 && typeof verification.ts === "string"
         ? verification.ts
-      : typeof lastVerification.updated_at === "string"
-        ? lastVerification.updated_at
-      : typeof lastVerification.ts === "string"
-        ? lastVerification.ts
         : "";
+  const runContinueRequired = run.last_continue_required;
+  const verificationContinueRequired = verification.continue_required;
+  const hasFailingCheck = verificationEntries.some((entry) => !entry.ok);
+  const continueRequired =
+    hasFailingCheck || runContinueRequired === true || verificationContinueRequired === true
+      ? true
+      : runContinueRequired === false && checks.length > 0 && verificationContinueRequired === false
+        ? false
+        : null;
 
   return {
     stateDir,
@@ -1748,24 +1658,14 @@ export function loadSupervisorControlState(repoRoot = REPO_ROOT): SupervisorCont
     activeTaskId: typeof run.last_task_id === "string" ? run.last_task_id : "",
     lastResultStatus: summaryField(summary, "status"),
     acceptance: summaryField(summary, "acceptance"),
-    verificationSummary:
-      typeof verification.summary === "string"
-        ? verification.summary
-        : typeof lastVerification.summary === "string"
-          ? lastVerification.summary
-          : "",
+    verificationSummary: checks.length > 0 ? verificationRows.bundle : "unknown",
     verificationChecks: checks,
-    verificationStatus: recordField(verification, "status") || recordField(lastVerification, "status"),
-    verificationPassing: recordField(verification, "passing") || recordField(lastVerification, "passing"),
-    verificationFailing: recordField(verification, "failing") || recordField(lastVerification, "failing"),
-    verificationBundle: recordField(verification, "bundle") || recordField(lastVerification, "bundle"),
+    verificationStatus: checks.length > 0 ? verificationRows.status : "unknown",
+    verificationPassing: checks.length > 0 ? verificationRows.passing : "unknown",
+    verificationFailing: checks.length > 0 ? verificationRows.failing : "unknown",
+    verificationBundle: checks.length > 0 ? verificationRows.bundle : "unknown",
     verificationUpdatedAt,
-    continueRequired:
-      typeof run.last_continue_required === "boolean"
-        ? run.last_continue_required
-        : typeof verification.continue_required === "boolean"
-          ? verification.continue_required
-          : null,
+    continueRequired,
     nextTask: summaryField(summary, "next_task"),
     updatedAt: typeof run.updated_at === "string" ? run.updated_at : "",
   };
@@ -1801,9 +1701,8 @@ export function loadSupervisorControlPreview(repoRoot = REPO_ROOT, now: Date = n
     }),
   );
   const verificationReceiptPath = defaultVerificationReceiptPath(undefined, summary.stateDir);
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
   const runtimePayloadPreview = (() => {
-    const payload = readStoredSnapshotPayload(summaryPath, "runtime");
+    const payload = readStoredDisplaySnapshotPayload(summary, "runtime");
     return payload ? runtimePayloadToPreview(payload as RuntimeSnapshotPayload, summary, now) : undefined;
   })();
   const runRuntimePayloadPreview = runRuntimePayload
@@ -1848,7 +1747,7 @@ export function loadSupervisorControlPreview(repoRoot = REPO_ROOT, now: Date = n
   fallbackPreview["Control truth preview"] = buildControlTruthPreview(fallbackPreview);
   fallbackPreview["Runtime summary"] = buildRuntimeSummaryPreview(fallbackPreview);
 
-  const storedPreview = readStoredPreview(summaryPath, CONTROL_PREVIEW_FIELDS);
+  const storedPreview = readStoredDisplayPreview(summary, CONTROL_PREVIEW_FIELDS);
   const repoDerivedPreview = controlPreviewFromRepoControl(storedPreview ?? undefined);
   const effectivePreview =
     mergePreviewSources(
@@ -1905,9 +1804,8 @@ export function loadSupervisorRepoPreview(repoRoot = REPO_ROOT): TabPreview | nu
   if (!summary) {
     return null;
   }
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
-  const storedPreview = readStoredPreview(summaryPath, REPO_PREVIEW_FIELDS);
-  const workspacePayload = readStoredSnapshotPayload(summaryPath, "workspace");
+  const storedPreview = readStoredDisplayPreview(summary, REPO_PREVIEW_FIELDS);
+  const workspacePayload = readStoredDisplaySnapshotPayload(summary, "workspace");
   const runPayload = readJsonFile(path.join(summary.stateDir, "run.json"));
   const runWorkspacePayload = snapshotPayloadFromRecord(runPayload, "workspace");
   const workspacePreview = workspacePayload
@@ -1945,15 +1843,13 @@ export function saveSupervisorRepoPreview(
   if (!preview) {
     return;
   }
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
-  const storedControlPreview = readStoredPreview(summaryPath, CONTROL_PREVIEW_FIELDS);
+  const storedControlPreview = readStoredDisplayPreview(summary, CONTROL_PREVIEW_FIELDS);
   const enrichedPreview = normalizeRepoPreview(preview, storedControlPreview ?? undefined);
   if (!enrichedPreview) {
     return;
   }
   if (options?.workspacePayload) {
     writeStoredSnapshotPayload(summary, "workspace", options.workspacePayload);
-    writeRunSnapshotPayload(summary, "workspace", options.workspacePayload);
   }
   writeStoredPreview(summary, enrichedPreview, REPO_PREVIEW_FIELDS);
   const synchronizedControlPreview = controlPreviewFromRepoControl(enrichedPreview);
@@ -1967,10 +1863,9 @@ export function saveSupervisorControlSummary(
   preview?: TabPreview,
   options?: PersistedSnapshotOptions,
 ): void {
-  const summaryPath = path.join(summary.stateDir, CONTROL_SUMMARY_FILENAME);
-  const existingPayload = readJsonFile(summaryPath);
+  const existingPayload = readDisplayCache(summary);
   const persistedAt = new Date().toISOString();
-  const mergedPreview = mergeStoredPreviewFields(summaryPath, CONTROL_PREVIEW_FIELDS, preview);
+  const mergedPreview = mergeStoredPreviewFields(summary, CONTROL_PREVIEW_FIELDS, preview);
   hydrateControlPreviewFromRepoControl(mergedPreview);
   const incomingPreviewBundleEntries = verificationEntriesFromPreview(preview);
   const incomingPreviewBundleLabel = incomingPreviewBundleEntries.length > 0 ? verificationBundleLabel(incomingPreviewBundleEntries) : "";
@@ -2119,21 +2014,5 @@ export function saveSupervisorControlSummary(
     ...previewPayload,
     ...(options?.runtimePayload ? {runtime_payload: options.runtimePayload} : {}),
   };
-  mkdirSync(summary.stateDir, {recursive: true});
-  writeFileSync(summaryPath, JSON.stringify(payload, null, 2) + "\n");
-  writeVerificationSummaryFile(
-    summary,
-    normalizedVerificationSummary,
-    effectiveVerificationBundle,
-    effectiveVerificationUpdated,
-    durablePreview,
-  );
-  writeRunVerificationSummaryFile(
-    summary,
-    normalizedVerificationSummary,
-    effectiveVerificationBundle,
-    effectiveVerificationUpdated,
-    durablePreview,
-    options,
-  );
+  writeDisplayCache(summary, payload);
 }

@@ -272,27 +272,17 @@ class WorldModelAgent:
         """Load state from disk or initialize from seed."""
         self._state = self.store.load_latest() or INITIAL_WORLD_STATE
 
-    async def initialize(self) -> WorldModelState:
-        """Initialize the agent state and write an initial snapshot if missing."""
-        await self.boot()
-        state = self._state or INITIAL_WORLD_STATE
-        if self.store.load_latest() is None:
-            self.store.save_snapshot(state)
-        self._state = state
-        return state
+    async def run_cycle(self) -> None:
+        """One maintenance cycle: refresh state and persist a snapshot.
 
-    async def run_cycle(self) -> dict[str, Any]:
-        """Run one bounded maintenance cycle and persist the current state."""
+        Honest scope: stock research via search/arxiv tools is not built yet,
+        so a cycle is load-or-keep state + versioned snapshot persistence.
+        The orchestrator's world-model loop calls this every 6h.
+        """
         if self._state is None:
             await self.boot()
-        state = self._state or INITIAL_WORLD_STATE
-        path = self.store.save_snapshot(state)
-        return {
-            "snapshot_path": str(path),
-            "stock_count": len(state.stocks),
-            "flow_count": len(state.flows),
-            "feedback_loop_count": len(state.feedback_loops),
-        }
+        if self._state is not None:
+            self.store.save_snapshot(self._state)
 
     async def run_loop(self) -> None:
         """Main execution cycle: research stocks, evaluate loops, sleep."""

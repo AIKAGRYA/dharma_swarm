@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 _LOG_ROTATION_BYTES = 50 * 1024 * 1024  # 50 MB
 from contextlib import contextmanager
 from dataclasses import dataclass, asdict, field
-import asyncio
 
 @dataclass
 class JikokuSpan:

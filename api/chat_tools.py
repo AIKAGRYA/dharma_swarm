@@ -6,17 +6,25 @@ swarm control, evolution, stigmergy, traces, git.
 
 from __future__ import annotations
 
-import asyncio
 import glob as globmod
 import json
 import logging
 import os
 import re
-import subprocess
 from pathlib import Path
+
+from api.chat_tool_execution import (
+    SecurityVulnerabilityException as _SecurityVulnerabilityException,
+    exec_grep,
+    exec_shell,
+)
 from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
+
+# Public compatibility: callers imported this from api.chat_tools before the
+# execution backend was split into api.chat_tool_execution.
+SecurityVulnerabilityException = _SecurityVulnerabilityException
 
 # Safety: scope filesystem operations to these roots
 ALLOWED_ROOTS = [
@@ -442,89 +450,6 @@ _DANGEROUS_PATTERNS = [
     re.compile(r">\s*/etc/"),
     re.compile(r"sudo\s"),
 ]
-
-
-async def exec_shell(args: dict) -> str:
-    command = args["command"]
-    timeout = min(60, args.get("timeout", 30))
-
-    # Gate check (S3 control — telos gates evaluate before execution)
-    try:
-        from dharma_swarm.telos_gates import check_action
-        from dharma_swarm.models import GateDecision
-        gate = check_action(action=f"shell_exec: {command[:200]}", content=command)
-        if gate.decision == GateDecision.BLOCK:
-            logger.warning("Gate blocked shell command: %s — %s", command[:100], gate.reason)
-            return f"ERROR: Gate blocked command: {gate.reason}"
-    except Exception:
-        logger.debug("Gate evaluation failed for shell command", exc_info=True)
-
-    # Pattern-based blocklist (defense in depth)
-    for pattern in _DANGEROUS_PATTERNS:
-        if pattern.search(command):
-            logger.warning("Blocked dangerous shell command: %s", command[:200])
-            return f"ERROR: Blocked dangerous command pattern"
-
-    # Audit log (P6 — witness everything)
-    logger.info("shell_exec: %s", command[:300])
-
-    try:
-        import shlex
-        proc = await asyncio.create_subprocess_exec(
-            *shlex.split(command),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(PROJECT_ROOT),
-        )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
-        out = stdout.decode(errors="replace")[:8000]
-        err = stderr.decode(errors="replace")[:2000]
-        result = f"exit_code: {proc.returncode}\n"
-        if out:
-            result += f"stdout:\n{out}\n"
-        if err:
-            result += f"stderr:\n{err}\n"
-        return result
-    except asyncio.TimeoutError:
-        return f"ERROR: Command timed out after {timeout}s"
-    except Exception as e:
-        return f"ERROR: {e}"
-
-
-async def exec_grep(args: dict) -> str:
-    pattern = args["pattern"]
-    search_path = _resolve_path(args.get("path", str(PROJECT_ROOT)))
-    file_glob = args.get("glob", "")
-    max_results = min(50, args.get("max_results", 30))
-
-    if not _path_allowed(str(search_path)):
-        return f"ERROR: Path {search_path} is outside allowed scope"
-
-    cmd_parts = ["rg", "--no-heading", "-n", "--max-count", str(max_results)]
-    if file_glob:
-        cmd_parts.extend(["--glob", file_glob])
-    cmd_parts.extend(["--", pattern, str(search_path)])
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd_parts,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
-        out = stdout.decode(errors="replace")[:6000]
-        if not out.strip():
-            return f"No matches for pattern '{pattern}'"
-        return out
-    except asyncio.TimeoutError:
-        return "ERROR: Search timed out"
-    except FileNotFoundError:
-        # Fallback to grep if rg not available
-        return "ERROR: ripgrep (rg) not found"
-    except Exception as e:
-        return f"ERROR: {e}"
 
 
 async def exec_glob(args: dict) -> str:

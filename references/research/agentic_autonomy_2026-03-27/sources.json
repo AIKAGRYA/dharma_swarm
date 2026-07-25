@@ -100,7 +100,7 @@
     {
       "id": "phase4-report-plugmem",
       "title": "Phase 4 Report PlugMem Note",
-      "local_path": "PHASE4_REPORT.md"
+      "local_path": "docs/_archive/2026-07/PHASE4_REPORT.md"
     },
     {
       "id": "mem-action-tests",
@@ -115,7 +115,7 @@
     {
       "id": "agent-runner-audit-mempo",
       "title": "Agent Runner Audit MemPO Notes",
-      "local_path": "agent_runner_audit.md"
+      "local_path": "docs/_archive/2026-04/agent_runner_audit.md"
     },
     {
       "id": "bundle-summary",

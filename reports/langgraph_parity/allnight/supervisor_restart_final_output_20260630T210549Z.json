@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-30T21:05:49Z",
+  "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "status": "completed",
+  "target_gate": "Supervisor restart-readable final-output-only policy and delegated-agent state",
+  "summary": "SUPERVISOR topology now persists supervisor_final_output_only alongside delegated_agent_ids and user_visible_output in the restartable topology state. Runtime topology-state receipts include the persisted state payload, so the policy is inspectable from the reopened RuntimeStateStore, describe_run(), and receipt ledger surfaces.",
+  "files_touched": [
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/runtime_topology.py",
+    "tests/test_orchestrator.py",
+    "reports/langgraph_parity/allnight/supervisor_restart_final_output_20260630T210549Z.json",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+  ],
+  "evidence": {
+    "persisted_topology": "topology_states.state contains mode=supervisor, delegated_agent_ids, supervisor_final_output_only=true, and user_visible_output=supervisor_final",
+    "restart_readback": "A fresh RuntimeStateStore reopens the runtime DB and reads the supervisor DelegationRun plus TopologyStateRecord by run_id.",
+    "operator_ledger_readback": "RuntimeStateStore.describe_run(run_id) exposes the same TopologyStateRecord state.",
+    "receipt_readback": "topology_state runtime receipts now include the persisted state payload, including supervisor_final_output_only=true."
+  },
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_orchestrator.py::test_supervisor_persists_restartable_final_output_policy_and_delegated_state tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state",
+      "result": "4 passed in 2.30s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/orchestrator.py dharma_swarm/runtime_topology.py tests/test_orchestrator.py tests/test_topology_execution.py tests/test_runtime_state.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+      "result": "51 passed in 46.26s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/runtime_topology.py tests/test_orchestrator.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/ruff check --select F821 dharma_swarm/orchestrator.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass with existing warnings; orchestrator.py is 3206 lines against ceiling 3215"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "pass; green=true"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "expected fail exit 2; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": "make onboard",
+      "result": "pass; known governance projection churn restored"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "score_after": 67,
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.",
+    "Provider truth still lacks an exhaustive live-provider matrix proof.",
+    "Runtime platform parity remains partial: assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

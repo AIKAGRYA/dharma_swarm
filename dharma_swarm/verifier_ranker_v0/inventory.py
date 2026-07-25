@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-from dharma_swarm.daemon_config import dharma_state_dir
 
 
 @dataclass(frozen=True)
@@ -243,7 +240,7 @@ def build_inventory(
     dharma_home: Path | None = None,
     sis_docs: Path | None = None,
 ) -> dict[str, Any]:
-    dharma_home = dharma_home or dharma_state_dir()
+    dharma_home = dharma_home or Path.home() / ".dharma"
     sis_docs = sis_docs or Path.home() / "sis" / "docs"
     runtime_db = dharma_home / "state" / "runtime.db"
     messages_db = dharma_home / "db" / "messages.db"

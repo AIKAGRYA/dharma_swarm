@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -20,6 +21,8 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 from dharma_swarm.models import (
     Message,
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY, from_agent TEXT NOT NULL, to_agent TEXT NOT NULL,
     subject TEXT, body TEXT NOT NULL, priority TEXT DEFAULT 'normal',
     status TEXT DEFAULT 'unread', created_at TEXT NOT NULL,
-    read_at TEXT, reply_to TEXT, metadata TEXT DEFAULT '{}'
+    read_at TEXT, reply_to TEXT, metadata TEXT DEFAULT '{}',
+    superstep_visible INTEGER NOT NULL DEFAULT 0
 )"""
 
 _HEARTBEATS_DDL = """
@@ -189,6 +193,20 @@ class MessageBus:
             for idx in _INDEXES:
                 await db.execute(idx)
             await db.commit()
+            # Backward-compat migration: add superstep_visible if not present.
+            # Only duplicate-column is benign.  Any other migration failure must
+            # fail closed: receive() depends on this column and would otherwise
+            # start failing later under normal traffic.
+            try:
+                await db.execute(
+                    "ALTER TABLE messages ADD COLUMN "
+                    "superstep_visible INTEGER NOT NULL DEFAULT 0"
+                )
+                await db.commit()
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
+                logger.debug("superstep_visible column already exists — skipping migration")
 
     def _resolve_message_identity(
         self,
@@ -221,6 +239,58 @@ class MessageBus:
             ).with_updates(message_id=message.id)
         return None
 
+    async def _message_row_exists(self, message_id: str) -> bool:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                "SELECT 1 FROM messages WHERE id = ?", (message_id,)
+            )
+            return (await cursor.fetchone()) is not None
+
+    async def _resume_unfinished_send(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        message: Message,
+        insert: Any,
+    ) -> str:
+        """Finish a retry whose prior attempt began the side effect but died.
+
+        An idempotency record with an empty receipt means the prior attempt
+        crashed between begin and complete — the INSERT may or may not have
+        happened. Never fabricate a receipt: verify the row, resume the
+        insert if it is missing, then complete the record.
+        """
+        record = await self._runtime_state.get_idempotency_record(
+            identity.idempotency_key,
+            side_effect_key,
+        )
+        receipt = record.result_receipt_id if record else ""
+        if receipt:
+            return receipt
+        # The retry may carry a regenerated Message id; the row written by the
+        # prior attempt is the one recorded at begin time, so probe that id.
+        canonical_id = message.id
+        if record is not None and isinstance(record.metadata, dict):
+            canonical_id = str(record.metadata.get("message_id") or message.id)
+        if await self._message_row_exists(canonical_id):
+            message_id = canonical_id
+        else:
+            message_id = message.id
+            try:
+                await self._run_with_lock_retry(insert)
+            except aiosqlite.IntegrityError:
+                logger.debug(
+                    "message %s inserted by a concurrent retry — treating as delivered",
+                    message.id,
+                )
+        await self._runtime_state.complete_idempotent_side_effect(
+            identity,
+            side_effect_key,
+            result_receipt_id=message_id,
+            metadata={"message_id": message_id, "resumed": True},
+        )
+        return message_id
+
     async def send(
         self,
         message: Message,
@@ -236,6 +306,21 @@ class MessageBus:
             execution_identity=execution_identity,
         )
         side_effect_key = ""
+
+        async def _send() -> str:
+            async with self._connect() as db:
+                await db.execute(
+                    "INSERT INTO messages (id, from_agent, to_agent, subject, body,"
+                    " priority, status, created_at, reply_to, metadata)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (message.id, message.from_agent, message.to_agent,
+                     message.subject, message.body, message.priority.value,
+                     message.status.value, message.created_at.isoformat(),
+                     message.reply_to, json.dumps(message.metadata)),
+                )
+                await db.commit()
+            return message.id
+
         if identity is not None:
             metadata = {
                 **dict(message.metadata or {}),
@@ -263,30 +348,14 @@ class MessageBus:
                     },
                 )
                 if not should_execute:
-                    record = await self._runtime_state.get_idempotency_record(
-                        identity.idempotency_key,
-                        side_effect_key,
+                    return await self._resume_unfinished_send(
+                        identity, side_effect_key, message, _send
                     )
-                    return (record.result_receipt_id if record else "") or message.id
                 await self._runtime_state.record_execution_identity(
                     identity,
                     source="message_bus.send",
                     metadata={"surface": "message_bus"},
                 )
-
-        async def _send() -> str:
-            async with self._connect() as db:
-                await db.execute(
-                    "INSERT INTO messages (id, from_agent, to_agent, subject, body,"
-                    " priority, status, created_at, reply_to, metadata)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (message.id, message.from_agent, message.to_agent,
-                     message.subject, message.body, message.priority.value,
-                     message.status.value, message.created_at.isoformat(),
-                     message.reply_to, json.dumps(message.metadata)),
-                )
-                await db.commit()
-            return message.id
 
         message_id = await self._run_with_lock_retry(_send)
         if identity is not None and self._runtime_state is not None:
@@ -298,15 +367,44 @@ class MessageBus:
             )
         return message_id
 
+    async def send_staged(
+        self,
+        message: Message,
+        *,
+        deliver_at_superstep: int = 0,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
+    ) -> str:
+        """Insert a message that becomes visible at ``deliver_at_superstep``."""
+        from dharma_swarm.message_bus_bsp import send_staged_impl
+
+        return await send_staged_impl(
+            self,
+            message,
+            deliver_at_superstep=deliver_at_superstep,
+            execution_identity=execution_identity,
+            require_identity=require_identity,
+        )
+
     async def receive(
-        self, agent_id: str, status: str = "unread", limit: int = 50,
+        self,
+        agent_id: str,
+        status: str = "unread",
+        limit: int = 50,
+        *,
+        current_superstep: int = 0,
     ) -> list[Message]:
-        """Fetch messages for an agent, ordered by priority then time."""
+        """Fetch messages for an agent visible at `current_superstep`.
+
+        Defaults to current_superstep=0 (all immediately-visible messages)
+        so existing callers that don't pass the argument are unaffected.
+        """
         async with self._connect(row_factory=aiosqlite.Row) as db:
             query = ("SELECT id, from_agent, to_agent, subject, body, priority,"
                      " status, created_at, read_at, reply_to, metadata"
-                     " FROM messages WHERE to_agent = ?")
-            params: list[Any] = [agent_id]
+                     " FROM messages WHERE to_agent = ?"
+                     " AND superstep_visible <= ?")
+            params: list[Any] = [agent_id, current_superstep]
             if status:
                 query += " AND status = ?"
                 params.append(status)

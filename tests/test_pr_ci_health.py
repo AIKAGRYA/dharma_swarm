@@ -83,3 +83,97 @@ def test_real_test_failure_and_merge_conflict():
     triage = classify_pr(_pr(400, state="dirty"), runs)
     assert set(triage.categories) == {"real_test_lint", "merge_conflict"}
     assert triage.actionable is True
+
+
+def test_zero_check_runs_is_ci_never_ran_never_green():
+    # Bot-rebase stranding signature: GITHUB_TOKEN pushes never trigger
+    # workflows, so the rebased head has ZERO check runs. This used to fall
+    # through the zero-categories fallback and report as green.
+    triage = classify_pr(_pr(1060), [])
+    assert "ci_never_ran" in triage.categories
+    assert "green" not in triage.categories
+    assert triage.actionable is True
+
+
+def test_zero_check_runs_behind_main_carries_both_categories():
+    triage = classify_pr(_pr(1004, state="behind"), [])
+    assert set(triage.categories) == {"behind_main", "ci_never_ran"}
+    assert triage.actionable is True
+
+
+def test_blocked_merge_state_is_merge_blocked_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(987, state="blocked"), runs)
+    assert triage.categories == ["merge_blocked"]
+    assert triage.actionable is True
+
+
+def test_blocked_state_with_zero_runs_carries_both_fail_closed_categories():
+    triage = classify_pr(_pr(1066, state="blocked"), [])
+    assert set(triage.categories) == {"merge_blocked", "ci_never_ran"}
+    assert triage.actionable is True
+
+
+def test_pending_runs_without_any_success_are_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": None, "status": "in_progress"}]
+    triage = classify_pr(_pr(1024), runs)
+    assert triage.categories == ["ci_pending"]
+    assert triage.actionable is True
+
+
+def test_report_summary_counts_ci_never_ran_separately():
+    rows = [
+        classify_pr(_pr(1060), []),
+        classify_pr(_pr(321), [{"name": "pytest (3.11)", "conclusion": "success"}]),
+    ]
+    md = pr_ci_health.render_markdown(rows)
+    assert "1 green" in md
+    assert "1 actionable" in md
+    assert "1 ci_never_ran" in md
+
+
+def test_startup_failure_and_stale_are_real_failures_even_with_other_success():
+    for conclusion in ("startup_failure", "stale"):
+        runs = [
+            {"name": "pytest (3.11)", "conclusion": "success"},
+            {"name": "required gate", "conclusion": conclusion},
+        ]
+        triage = classify_pr(_pr(1083), runs)
+        assert triage.categories == ["real_test_lint"]
+        assert triage.actionable is True
+
+
+def test_draft_with_passing_checks_is_not_green_or_actionable():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, draft=True), runs)
+    assert triage.categories == ["draft"]
+    assert triage.actionable is False
+
+
+def test_unknown_merge_state_with_passing_checks_is_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, state="unknown"), runs)
+    assert triage.categories == ["merge_unknown"]
+    assert triage.actionable is True
+
+
+def test_workflow_validates_push_authority_before_rebase():
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT || github.token"
+    ) in workflow
+    assert (
+        "PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT }}"
+    ) in workflow
+    assert "Validate trusted rebase push authority" in workflow
+    assert ".permissions.push // false" in workflow
+    assert 'echo "HAS_PUSH_TOKEN=$has_push_token" >> "$GITHUB_ENV"' in workflow
+    assert (
+        "HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
+        "secrets.MERGEMASTERMIKE_PAT != '' }}"
+    ) not in workflow

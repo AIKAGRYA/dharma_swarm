@@ -1,0 +1,45 @@
+{
+  "schema": "dharma.agent_lane_admission.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "fields": {
+    "lane_id": "string",
+    "agent_or_provider": "string",
+    "branch": "string",
+    "worktree": "string",
+    "base_ref": "string",
+    "canonicality": "enum:canonicality_taxonomy",
+    "intended_surfaces": "array<glob>",
+    "actual_touched_surfaces": "array<path>",
+    "dirty_untracked_count": "int",
+    "verification_commands": "array<string>",
+    "verification_results": "array<{command,result,detail}>",
+    "receipt_paths": "array<path>",
+    "preservation_status": "enum[none,local_only,off_machine]",
+    "depends_on": "array<id>",
+    "conflicts_with": "array<id_or_surface>",
+    "candidate_track": "string|null",
+    "promotion_recommendation": "enum:promotion_recommendation",
+    "operator_decision_needed": "array<string>",
+    "forge_arena_relevance": "enum[none,input_source,prerequisite,consumer]"
+  },
+  "promotion_recommendation_enum": [
+    "ADMIT_AS_ACTIVE_TRACK",
+    "FOLD_INTO_EXISTING_TRACK",
+    "KEEP_CANDIDATE",
+    "ARCHIVE_PRESERVED",
+    "NEEDS_PROD_REVIEW",
+    "BLOCKED_EXTERNAL_AUTH",
+    "DO_NOT_PROMOTE"
+  ],
+  "admission_gate": [
+    "canonicality >= OPEN_PR_REMOTE OR operator-approved extraction plan exists",
+    "actual_touched_surfaces subset of intended_surfaces",
+    "all verification_results pass or failures explained+accepted",
+    "no unresolved conflicts_with against ACTIVE track owned surfaces",
+    "preservation_status != none if unique local-only value",
+    "admitting keeps canonical portfolio within max_active",
+    "NEEDS_PROD_REVIEW cleared if production-grade claimed"
+  ],
+  "relationship_to_cockpit": "Lane Admission Packet is the promotion-grade superset of a cockpit card; backplane can synthesize a draft packet from cards of kind branch|worktree|dirty_files|proposed_track",
+  "first_instance": "OPERATOR_COHERENCE_COCKPIT_LANE_PACKET_2026-06-23.json"
+}

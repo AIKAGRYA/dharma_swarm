@@ -753,14 +753,24 @@ class TestTaskQueueSnapshot:
     ) -> None:
         board = await _make_board(tmp_path)
 
-        parent = await board.create("failed parent")
+        # A non-terminal (running, fresh) parent genuinely blocks its child: a
+        # dependency is only "satisfied" when terminal (completed/failed/dead_letter)
+        # or a running task stale >15min, per task_board._READY_QUERY.
+        blocking_parent = await board.create("running parent")
         blocked_child = await board.create("blocked child")
         ready_task = await board.create("independent ready task")
-        await _add_dependency(board, blocked_child.id, parent.id)
+        failed_task = await board.create("failed task")
+        await _add_dependency(board, blocked_child.id, blocking_parent.id)
 
         await _force_task_state(
             board,
-            parent.id,
+            blocking_parent.id,
+            status=TaskStatus.RUNNING.value,
+            updated_at=datetime.now(timezone.utc),
+        )
+        await _force_task_state(
+            board,
+            failed_task.id,
             status=TaskStatus.FAILED.value,
             metadata={"auto_rescue_count": 1, "last_failure_class": "long_timeout"},
         )

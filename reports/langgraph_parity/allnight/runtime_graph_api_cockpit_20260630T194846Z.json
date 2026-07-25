@@ -1,0 +1,92 @@
+{
+  "schema_version": "langgraph_parity_phase_receipt.v1",
+  "phase": "phase-7-platform-surface",
+  "slice": "runtime_graph_api_cockpit",
+  "timestamp": "2026-06-30T19:48:46Z",
+  "status": "completed_partial",
+  "score_after": 62,
+  "claim": "Runtime topology graph state is now inspectable through an operator API route and dashboard runtime page, backed by RuntimeStateStore. This is not full Phase 7 completion.",
+  "implementation": {
+    "read_model": "dharma_swarm/runtime_graph_views.py",
+    "operator_facade": "dharma_swarm/operator_views.py::OperatorViews.runtime_graph",
+    "api_route": "GET /api/runtime/graph",
+    "api_router": "api/routers/runtime.py",
+    "dashboard_fetch": "dashboard/src/lib/api.ts::fetchRuntimeGraph",
+    "dashboard_hook": "dashboard/src/hooks/useRuntimeControlPlane.ts",
+    "dashboard_page": "dashboard/src/app/dashboard/runtime/page.tsx"
+  },
+  "runtime_graph_fields": [
+    "active_agents",
+    "checkpoints",
+    "topology_states",
+    "runs",
+    "receipts",
+    "nodes",
+    "edges",
+    "handoff_receipts",
+    "allowed_handoffs",
+    "parent_child_edges",
+    "active_agent_edges",
+    "checkpoint_edges"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py",
+      "result": "4 passed in 0.95s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+      "result": "55 passed in 31.54s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py",
+      "result": "23 passed in 0.82s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": "npm run lint",
+      "result": "pass with existing warnings only; 0 errors, 19 warnings"
+    },
+    {
+      "command": "npm run build",
+      "result": "pass; /dashboard/runtime prerendered successfully"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "green=true; modules_over_500_lines stayed 207 -> 207"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass with existing warnings for context_compiler.py, orchestrator.py, and runtime_state.py"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "fail exit 2; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": "make onboard",
+      "result": "pass; generated known governance projection churn, restored as unrelated"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "remaining_blockers": [
+    "Phase 7 remains partial: assistants/configurations, threads/session API, full checkpoint history, streaming runtime events, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.",
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain incomplete.",
+    "Provider truth still lacks an exhaustive live-provider matrix proof."
+  ]
+}

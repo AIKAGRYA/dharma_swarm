@@ -4949,3 +4949,15 @@ def test_live_ops_census_does_not_execute_displayed_policy_commands(monkeypatch,
     assert observed
     assert observed <= allowed
     assert not (display_first_words - allowed) & observed
+
+
+def test_dharma_daemon_pattern_matches_container_and_cli_spellings():
+    """Dockerfile.swarm boots `python -m dharma_swarm.orchestrate_live`; the
+    CLI-only pattern could never match that cmdline, so the census reported
+    the daemon dead on every containerized host."""
+    import re
+
+    pattern = live_ops_census.PROCESS_PATTERNS["dharma_daemon"]
+    assert re.search(pattern, "python -m dharma_swarm.orchestrate_live")
+    assert re.search(pattern, "python3 -m dharma_swarm.dgc_cli orchestrate-live")
+    assert not re.search(pattern, "python3 -m dharma_swarm.dgc_cli cron daemon")

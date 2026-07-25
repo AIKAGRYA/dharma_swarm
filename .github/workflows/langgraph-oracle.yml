@@ -1,0 +1,126 @@
+name: langgraph-oracle
+
+# Differential oracle lane (dharmagraph-engine-2026-07, spec §3 Phase 1).
+# Runs the parity scenario inventory through BOTH engines — the dharma
+# langgraph_parity clone AND real langgraph 1.2.4 (test-oracle extra) —
+# and diffs semantic outcomes, uploading the machine-readable diff report
+# as an artifact. The rubric-frozen gauntlet is blocking for evidence
+# integrity, while a sub-100 grade remains an explicit governance blocker
+# rather than a CI failure. langgraph is a test oracle only and never enters
+# core dependencies (track non-goal).
+
+on:
+  pull_request:
+    paths:
+      - "dharma_swarm/graph/**"
+      - "dharma_swarm/langgraph_parity/**"
+      - "tests/test_langgraph_differential_oracle.py"
+      - "tests/test_graph_neutral_langgraph_oracle.py"
+      - "tests/test_dharmagraph_parity_gauntlet.py"
+      - "tests/test_graph_effects.py"
+      - "tests/oracle_support/**"
+      - "scripts/governance/dharmagraph_parity_gauntlet.py"
+      - "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+      - "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json"
+      - "reports/governance/dharmagraph_parity/**"
+      - ".github/workflows/langgraph-oracle.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  schedule:
+    - cron: "0 20 * * *" # nightly, after the 19:30 full-suite lane
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: langgraph-oracle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  differential-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The gauntlet replay proves rubric-freeze provenance with real git
+          # ancestry (git log -1 -- rubric, merge-base --is-ancestor); a
+          # shallow clone resolves every path to the fetch boundary commit and
+          # fails the custody check with a false mismatch.
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package + oracle extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,test-oracle]"
+          python -c "from importlib.metadata import version; print('langgraph', version('langgraph'))"
+
+      - name: Run differential oracle + DST seed
+        env:
+          OPENROUTER_API_KEY: sk-or-stub
+          ANTHROPIC_API_KEY: sk-ant-stub
+          TINY_ROUTER_BACKEND: heuristic
+          DHARMA_EVOLUTION_SHADOW: "1"
+          DGC_AUTONOMY_LEVEL: "0"
+          DHARMA_ORACLE_REPORT_PATH: ${{ runner.temp }}/oracle/langgraph_oracle_report.json
+        run: |
+          python -m pytest tests/test_langgraph_differential_oracle.py \
+            tests/test_graph_neutral_langgraph_oracle.py \
+            tests/test_dharmagraph_parity_gauntlet.py \
+            tests/test_graph_effects.py \
+            -q --tb=short --timeout=120 \
+            --junitxml=oracle.xml
+
+      - name: Replay rubric-frozen parity gauntlet
+        run: python scripts/governance/dharmagraph_parity_gauntlet.py --check
+
+      - name: Summarize diff report
+        if: always()
+        env:
+          DHARMA_ORACLE_REPORT_PATH: ${{ runner.temp }}/oracle/langgraph_oracle_report.json
+        run: |
+          python - <<'EOF'
+          import json, os
+          from pathlib import Path
+
+          path = Path(os.environ["DHARMA_ORACLE_REPORT_PATH"])
+          lines = ["## LangGraph differential oracle", ""]
+          if not path.exists():
+              lines.append("No diff report produced (suite failed before report write).")
+          else:
+              report = json.loads(path.read_text())
+              lines += [
+                  f"langgraph {report['langgraph_version']} — "
+                  f"{report['parity_count']}/{report['scenario_count']} scenarios at parity",
+                  "",
+                  "| Scenario | Verdict | Adjudicated deviations |",
+                  "|---|---|---|",
+              ]
+              for entry in report["scenarios"]:
+                  diff = entry["diff"]
+                  deviations = ", ".join(diff["adjudicated_deviations"]) or "—"
+                  lines.append(f"| {entry['scenario']} | {diff['verdict']} | {deviations} |")
+          out = "\n".join(lines) + "\n"
+          print(out)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(out)
+          EOF
+
+      - name: Upload oracle diff report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: langgraph-oracle-report
+          path: |
+            ${{ runner.temp }}/oracle/langgraph_oracle_report.json
+            reports/governance/dharmagraph_parity/**
+            oracle.xml

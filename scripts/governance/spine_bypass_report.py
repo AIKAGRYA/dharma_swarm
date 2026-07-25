@@ -37,9 +37,36 @@ _SUBMIT_RE = re.compile(r"(?:_server|(?<!\w)server)\.submit\(")
 # Known spine-adopted call sites: file:line pairs where .submit() is
 # intentionally inside an invoke_agent() invoker closure.
 _SPINE_ADOPTED: set[tuple[str, int]] = {
-    # a2a_bridge.submit_via_spine() invoker closure — wraps through invoke_agent
-    ("dharma_swarm/a2a/a2a_bridge.py", 126),
+    # submit_task_via_spine() invoker closure — the ONE blessed A2A submit
+    # path. All production surfaces (bridge ingest, node_gateway endpoints,
+    # a2a_client._dispatch_local, nats_transport.consume_message) route
+    # through this single call site.
+    ("dharma_swarm/a2a/spine_adapter.py", 88),
 }
+
+# Known intentional migration-bypass sites (allowlist).
+# Each entry: (relative_path, line_number, reason).
+#
+# DRAINED TO ZERO 2026-07-03 (spine-adoption item 4). Doctrine
+# (docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md §1): this stays empty.
+# The ONLY sanctioned way to add an entry is a PR that also raises the
+# `spine_bypass_entries` ratchet baseline
+# (docs/governance/hygiene/ratchet_baselines.json) with review — a visible
+# governance act, never a runtime escape hatch.
+_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}
+
+# Stable snippet-keyed fallback for intentional sites whose line numbers
+# drift during transport hardening. Keys are (relative_path, exact code
+# line). Kept EMPTY for the same doctrine reason as _INTENTIONAL_BYPASS:
+# every previously allowlisted dispatch path has been drained through
+# submit_task_via_spine(). Adding an entry is a reviewed governance act.
+_INTENTIONAL_BYPASS_SNIPPETS: dict[tuple[str, str], str] = {}
+
+# Known non-production lines (docstring examples, etc.)
+_NON_PRODUCTION: set[tuple[str, int]] = {
+    ("dharma_swarm/a2a/a2a_server.py", 327),  # docstring example
+}
+
 
 @dataclass
 class BypassEntry:
@@ -48,33 +75,6 @@ class BypassEntry:
     classification: str  # spine-adopted | intentional | unknown | non-production
     reason: str = ""
     code: str = ""
-    owner: str = ""
-    quarantine_status: str = ""
-    migration_target: str = ""
-    verification: str = ""
-
-
-@dataclass(frozen=True)
-class BypassQuarantine:
-    reason: str
-    owner: str
-    quarantine_status: str
-    migration_target: str
-    verification: str
-
-
-# Known intentional migration-bypass sites (allowlist).
-# Each entry: (relative_path, line_number, reason). Keep this literal dict so
-# ACTIVE_TRACK.yaml can prove completion only when the migration list drains to
-# exactly ``{}``.
-_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}
-
-_BYPASS_QUARANTINE: dict[tuple[str, int], BypassQuarantine] = {}
-
-# Known non-production lines (docstring examples, etc.)
-_NON_PRODUCTION: set[tuple[str, int]] = {
-    ("dharma_swarm/a2a/a2a_server.py", 259),  # docstring example
-}
 
 
 def _scan_production_submits() -> list[BypassEntry]:
@@ -120,16 +120,18 @@ def _scan_production_submits() -> list[BypassEntry]:
                         code=code,
                     ))
                 elif key in _INTENTIONAL_BYPASS:
-                    quarantine = _BYPASS_QUARANTINE.get(key)
                     entries.append(BypassEntry(
                         file=rel, line=i,
                         classification="intentional",
                         reason=_INTENTIONAL_BYPASS[key],
                         code=code,
-                        owner=quarantine.owner if quarantine else "",
-                        quarantine_status=quarantine.quarantine_status if quarantine else "",
-                        migration_target=quarantine.migration_target if quarantine else "",
-                        verification=quarantine.verification if quarantine else "",
+                    ))
+                elif (rel, code) in _INTENTIONAL_BYPASS_SNIPPETS:
+                    entries.append(BypassEntry(
+                        file=rel, line=i,
+                        classification="intentional",
+                        reason=_INTENTIONAL_BYPASS_SNIPPETS[(rel, code)],
+                        code=code,
                     ))
                 else:
                     entries.append(BypassEntry(
@@ -159,16 +161,10 @@ def _print_table(entries: list[BypassEntry]) -> None:
     intentional = counts.get("intentional", 0)
     unknown = counts.get("unknown", 0)
     non_prod = counts.get("non-production", 0)
-    quarantined = sum(
-        1
-        for e in entries
-        if e.classification == "intentional" and e.quarantine_status == "quarantined"
-    )
 
     print(f"  Total .submit() sites in dharma_swarm/:  {total}")
     print(f"  Spine-adopted (via invoke_agent):         {adopted}")
     print(f"  Intentional migration bypass:             {intentional}")
-    print(f"  Quarantined with owner/verification:      {quarantined}")
     print(f"  Unknown / unclassified:                   {unknown}")
     print(f"  Non-production (docstring/example):       {non_prod}")
     print()
@@ -178,13 +174,10 @@ def _print_table(entries: list[BypassEntry]) -> None:
         return
 
     # Detail table
-    print(f"{'Classification':<18} {'File':<45} {'Line':>5}  {'Owner':<36} {'Quarantine':<12} {'Reason'}")
-    print("-" * 170)
+    print(f"{'Classification':<18} {'File':<45} {'Line':>5}  {'Reason'}")
+    print("-" * 120)
     for e in entries:
-        print(
-            f"{e.classification:<18} {e.file:<45} {e.line:>5}  "
-            f"{e.owner:<36} {e.quarantine_status:<12} {e.reason}"
-        )
+        print(f"{e.classification:<18} {e.file:<45} {e.line:>5}  {e.reason}")
 
     print()
     if unknown > 0:
@@ -196,8 +189,7 @@ def _print_table(entries: list[BypassEntry]) -> None:
     else:
         print(
             "✓  All .submit() sites classified. "
-            f"{intentional} intentional bypass(es) remain on the migration allowlist; "
-            f"{quarantined} carry owner and verification metadata."
+            f"{intentional} intentional bypass(es) remain on the migration allowlist."
         )
     print()
 
@@ -213,10 +205,6 @@ def _print_json(entries: list[BypassEntry]) -> None:
                 "classification": e.classification,
                 "reason": e.reason,
                 "code": e.code,
-                "owner": e.owner,
-                "quarantine_status": e.quarantine_status,
-                "migration_target": e.migration_target,
-                "verification": e.verification,
             }
             for e in entries
         ],
@@ -225,11 +213,6 @@ def _print_json(entries: list[BypassEntry]) -> None:
     counts: dict[str, int] = {}
     for e in entries:
         counts[e.classification] = counts.get(e.classification, 0) + 1
-    counts["quarantined_intentional"] = sum(
-        1
-        for e in entries
-        if e.classification == "intentional" and e.quarantine_status == "quarantined"
-    )
     data["summary"] = counts
     print(json.dumps(data, indent=2))
 

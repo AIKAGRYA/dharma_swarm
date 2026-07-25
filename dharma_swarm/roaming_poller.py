@@ -21,7 +21,7 @@ import subprocess
 import time
 from typing import Any, Sequence
 
-from dharma_swarm.roaming_mailbox import MailboxResponse, MailboxTask, RoamingMailbox
+from dharma_swarm.roaming_mailbox import MailboxTask, RoamingMailbox
 
 
 @dataclass(frozen=True)

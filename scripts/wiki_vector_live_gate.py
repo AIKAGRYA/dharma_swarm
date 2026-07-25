@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
 
 
@@ -43,10 +44,10 @@ class WikiVectorGateReceipt:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
     parser.add_argument(
         "--wiki-concepts-dir",
-        default=str(Path.home() / ".dharma" / "knowledge" / "wiki" / "concepts"),
+        default=str(dharma_state_dir() / "knowledge" / "wiki" / "concepts"),
     )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--min-concepts", type=int, default=257)

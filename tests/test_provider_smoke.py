@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 
 import pytest
 
-from api.routers import chat as chat_router
 from dharma_swarm.models import ProviderType
 from dharma_swarm.provider_smoke import (
     _classify_error,
@@ -117,6 +117,8 @@ def test_run_provider_smoke_local_prefers_installed_chat_model_before_missing_de
 def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "test-ollama-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
     monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
     monkeypatch.setattr(
         "dharma_swarm.provider_smoke.list_ollama_manifest_models",
@@ -336,7 +338,8 @@ def test_probe_qwen_dashboard_reports_missing_config(monkeypatch) -> None:
 def test_probe_qwen_dashboard_collects_tool_calls_and_content(
     monkeypatch,
 ) -> None:
-    settings = chat_router.ChatRuntimeSettings(
+    active_chat_router = importlib.import_module("api.routers.chat")
+    settings = active_chat_router.ChatRuntimeSettings(
         provider=ProviderType.TOGETHER,
         api_key="together-key",
         base_url="https://api.together.xyz/v1",
@@ -351,7 +354,10 @@ def test_probe_qwen_dashboard_collects_tool_calls_and_content(
     )
 
     monkeypatch.setenv("TOGETHER_API_KEY", "together-key")
-    monkeypatch.setattr(chat_router, "_get_chat_settings", lambda profile_id=None: settings)
+    monkeypatch.setattr(
+        "api.routers.chat._get_chat_settings",
+        lambda profile_id=None: settings,
+    )
 
     async def _fake_agentic_stream(messages, runtime_settings, *, session_id="", profile_id=""):
         del messages
@@ -363,7 +369,7 @@ def test_probe_qwen_dashboard_collects_tool_calls_and_content(
         yield 'data: {"content":"Resolved provider and tool path confirmed."}\n\n'
         yield "data: [DONE]\n\n"
 
-    monkeypatch.setattr(chat_router, "_agentic_stream", _fake_agentic_stream)
+    monkeypatch.setattr("api.routers.chat._agentic_stream", _fake_agentic_stream)
 
     result = asyncio.run(_probe_qwen_dashboard("together", "inspect wiring"))
 

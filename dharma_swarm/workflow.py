@@ -36,7 +36,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 from uuid import uuid4
 
 from pydantic import BaseModel, Field

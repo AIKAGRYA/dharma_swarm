@@ -29,12 +29,16 @@ def test_build_claude_headless_env_clears_nested_session_markers() -> None:
         {
             "CLAUDECODE": "1",
             "CLAUDE_CODE_ENTRYPOINT": "nested",
+            "CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES": "true",
             "PATH": "/bin",
         }
     )
 
     assert "CLAUDECODE" not in env
     assert "CLAUDE_CODE_ENTRYPOINT" not in env
+    # Remote/web hosts inject this; it forces --include-partial-messages, which
+    # is invalid with --output-format text and breaks nested headless runs.
+    assert "CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES" not in env
     assert env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
 
 

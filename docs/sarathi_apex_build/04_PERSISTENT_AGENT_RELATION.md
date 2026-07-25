@@ -1,47 +1,29 @@
-# 04 — Persistent-Agent Relation (the lineage ladder)
+# 04 — Persistent-Agent Relation
 
-**Custody: VERIFIED 2026-07-06. Numbered front-door version of
-`11_PERSISTENT_AGENT_RELATION.md` (which keeps the full file:line table).**
+> **Design lineage:** This composition sketch is retained for context. Current
+> implementation and lifecycle boundaries are owned by
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
-## The ladder
+The stack is composition, not replacement:
 
 ```text
-PersistentAgent lineage            (older standing actor)
-  -> LivingAgentKernel durability  (wake ledger, leases, proof, closeback)
-    -> Holon runtime identity/governance  (load_holon + holon_wake_cycle)
-      -> Holon system product package      (dharma_swarm/holon_system)
-        -> Sarathi apex gateway            (the apex occupant; not yet breathing)
+Registry / identity records
+  -> PersistentAgent / AutonomousAgent lineage
+  -> LivingAgentKernel durable wake ledger + leases + closeback
+  -> Holon bridge/runtime/persistence/health
+  -> Existing orchestrator fan-out/fan-in
+  -> Sarathi apex wrapper: reversibility gate + roster + brief + continuity
 ```
 
-Each rung USES the rung below. Nothing here is a rewrite of the rung below.
-
-## The rungs, with canonical code
-
-| Rung | Canonical code | Verified anchor | Role |
+| Layer | Existing code | Meaning | What it is not |
 |---|---|---|---|
-| PersistentAgent lineage | `dharma_swarm/persistent_agent.py` (633L), `autonomous_agent.py` (1465L) | `PersistentAgent` @117, `AutonomousAgent` @384 | older standing/executing actor pattern |
-| LivingAgentKernel durability | `dharma_swarm/operator_core/living_agent_kernel.py` (2921L) | `LivingAgentKernel` | durable wake ledger + leases + proof ledger + closeback |
-| Holon runtime identity/governance | `holon_bridge.py` (`load_holon`), `holon_runtime.py` (`holon_wake_cycle`) | `load_holon` @106, `holon_wake_cycle` @53 | identity→runnable + govern-then-animate cycle |
-| Holon system package | `dharma_swarm/holon_system/` | facade re-exports (this pass) | product-shaped navigation layer over all organs |
-| Sarathi apex gateway | `dharma_swarm/holon_system/sarathi/` | `IMPLEMENTED = False` | apex chief-of-staff; specified, gated, not built |
+| Registry / identity | `dharma_swarm/agent_registry.py`; runtime `identity.json` files | Names, policy fields, admission metadata. | Liveness proof. |
+| Persistent actor lineage | `dharma_swarm/persistent_agent.py`; `dharma_swarm/autonomous_agent.py` | Older standing/executing actor patterns. | The apex holon body by itself. |
+| Living durable spine | `dharma_swarm/operator_core/living_agent_kernel*.py` | Wake ledger, leases, proof ledger, closeback, services. | Duplicate holon runtime. |
+| Holon runtime | `dharma_swarm/holon_bridge.py`; `dharma_swarm/holon_runtime.py`; `dharma_swarm/holon_persistence.py`; `dharma_swarm/holon_health.py` | Identity-aware governed wake cycle. | Sarathi-specific chief-of-staff loop by itself. |
+| Existing swarm orchestration | `dharma_swarm/swarm.py`; `dharma_swarm/agent_runner.py`; related orchestrator code | Load-bearing substrate for fan-out/fan-in and workers. | Something to collapse in this lane. |
+| Apex safety | `dharma_swarm/operator_core/reversibility_gate.py`; execution leases | Deterministic envelope for unattended action. | Model opinion or self-approval. |
+| Sarathi wrapper | Phase C `dharma_swarm/holon_system/sarathi/*` | Operator-facing apex package. | A parallel substrate. |
 
-## The load-bearing sentence
-
-> Sarathi is not just a PersistentAgent. Sarathi is the apex holon that USES
-> persistent-agent lineage + living-agent kernel + holon runtime + existing
-> orchestration + A2A transport + deterministic reversibility gating, then ADDS
-> operator-facing continuity — not a parallel rewrite.
-
-## Why this matters for confusion control
-
-The word "holon"/"agent" was collapsing five real strata into one. This ladder
-is the de-collapse. When someone says "just make Sarathi a persistent agent,"
-the answer is: a PersistentAgent has no reversibility gate, no gateway loop, no
-operator brief, no whole-fleet map. Those are the apex additions, and they are
-gated (see `06_PROOF_GATES.md`).
-
-## Authority is an envelope, not a rank
-
-The apex is MORE gated, not more powerful: reversible-safe autonomous floor,
-irreversible-operator-only ceiling, enforced in code by
-`operator_core/reversibility_gate.py` — not prose. See `05_SARATHI_APEX_MAP.md`.
+The legacy stack is substrate. The duplicate `holon/` package is not substrate;
+it is a fork and must be removed after its importers are migrated.

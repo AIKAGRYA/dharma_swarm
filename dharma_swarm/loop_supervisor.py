@@ -13,7 +13,6 @@ import logging
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
@@ -40,6 +39,9 @@ class LoopHealth:
     last_progress_score: float | None = None
     best_progress_score: float | None = None
     stagnant_cycles: int = 0
+    registered_at: float = 0.0      # monotonic timestamp of register_loop()
+    disabled: bool = False
+    disabled_reason: str | None = None
 
     @property
     def stale_seconds(self) -> float:
@@ -53,10 +55,20 @@ class LoopHealth:
             return False  # Never ticked = not started yet
         return self.stale_seconds > (2 * self.expected_interval)
 
+    @property
+    def state(self) -> str:
+        """4-state honesty — a never-started loop is NOT healthy (WP-LC1)."""
+        if self.disabled:
+            return "DISABLED"
+        if self.last_tick == 0:
+            return "NEVER_STARTED"
+        return "STALLED" if self.is_stalled else "RUNNING"
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["stale_seconds"] = round(self.stale_seconds, 1)
         d["is_stalled"] = self.is_stalled
+        d["state"] = self.state
         return d
 
 
@@ -118,20 +130,8 @@ class SupervisorAlert:
         return asdict(self)
 
 
-# ---------------------------------------------------------------------------
-# Intervention levels
-# ---------------------------------------------------------------------------
-
-INTERVENTIONS = [
-    "LOG_WARNING",     # Just log it
-    "PAUSE_LOOP",      # Suggest loop pause
-    "REDUCE_SCOPE",    # Reduce work per tick
-    "ALERT_DHYANA",    # Write alert file for human attention
-]
-
-
 def _escalation_level(error_count: int, stale_factor: float) -> str:
-    """Determine intervention level based on severity indicators."""
+    """Determine intervention level (see module docstring ladder)."""
     if stale_factor > 5.0 or error_count > 10:
         return "ALERT_DHYANA"
     if stale_factor > 3.0 or error_count > 5:
@@ -191,10 +191,18 @@ class LoopSupervisor:
     def register_loop(self, name: str, expected_interval: float) -> None:
         """Register a loop to be monitored."""
         self._loops[name] = LoopHealth(
-            name=name,
-            expected_interval=expected_interval,
+            name=name, expected_interval=expected_interval, registered_at=time.monotonic(),
         )
         self._error_windows[name] = _ErrorWindow()
+
+    def mark_disabled(self, name: str, reason: str) -> None:
+        """Mark a loop DISABLED (env-gate decidable at registration): rendered
+        distinctly, exempt from alarms.  Never fake-tick a pre-loop-return
+        body instead — that would manufacture a permanent false STALLED."""
+        health = self._loops.get(name)
+        if health is not None:
+            health.disabled = True
+            health.disabled_reason = reason[:200]
 
     def record_tick(self, loop_name: str) -> None:
         """Record that a loop has ticked (healthy heartbeat)."""
@@ -324,20 +332,30 @@ class LoopSupervisor:
         alerts: list[SupervisorAlert] = []
 
         for name, health in self._loops.items():
-            # Check stalls
-            if health.is_stalled:
-                stale_factor = health.stale_seconds / health.expected_interval
-                intervention = _escalation_level(health.error_count, stale_factor)
-                alert = SupervisorAlert(
-                    alert_type="LOOP_STALL",
+            # DISABLED loops are exempt from stall/never-started alarms
+            if health.disabled:
+                continue
+
+            # Stall + never-started share one alarm branch: is_stalled is False
+            # at last_tick == 0, which pre-WP-LC1 hid dead-at-boot loops forever,
+            # so never-started alarms on the same channel via registration age.
+            never_started = health.last_tick == 0 and health.registered_at > 0
+            age = time.monotonic() - health.registered_at if never_started else health.stale_seconds
+            if (never_started or health.is_stalled) and age > (2 * health.expected_interval):
+                intervention = _escalation_level(
+                    health.error_count, age / health.expected_interval
+                )
+                cause = "never started: registered" if never_started else "stalled:"
+                alerts.append(SupervisorAlert(
+                    alert_type="LOOP_NEVER_STARTED" if never_started else "LOOP_STALL",
                     loop_name=name,
                     severity="critical" if intervention in ("REDUCE_SCOPE", "ALERT_DHYANA") else "warning",
-                    message=f"Loop '{name}' stalled: {health.stale_seconds:.0f}s since last tick "
+                    message=f"Loop '{name}' {cause} {age:.0f}s "
+                            f"{'ago, 0 ticks' if never_started else 'since last tick'} "
                             f"(expected every {health.expected_interval:.0f}s)",
                     intervention=intervention,
                     timestamp=datetime.now(timezone.utc).isoformat(),
-                )
-                alerts.append(alert)
+                ))
 
             # Check retry storms
             ew = self._error_windows.get(name)
@@ -443,6 +461,18 @@ class LoopSupervisor:
 # CLI entry points
 # ---------------------------------------------------------------------------
 
+def _derive_legacy_state(health: dict[str, Any]) -> str:
+    """4-state fallback for pre-WP-LC1 state files (no ``state`` key) — a
+    never-started loop must still never render OK/RUNNING."""
+    if health.get("disabled"):
+        return "DISABLED"
+    if health.get("is_stalled"):
+        return "STALLED"
+    if not health.get("last_tick") and not health.get("tick_count"):
+        return "NEVER_STARTED"
+    return "RUNNING"
+
+
 def cmd_loop_status() -> int:
     """Print loop health status."""
     state = LoopSupervisor.load_state()
@@ -455,11 +485,11 @@ def cmd_loop_status() -> int:
 
     loops = state.get("loops", {})
     for name, health in loops.items():
-        stalled = "STALLED" if health.get("is_stalled") else "OK"
+        state_label = health.get("state") or _derive_legacy_state(health)
         stale = health.get("stale_seconds", 0)
         ticks = health.get("tick_count", 0)
         errors = health.get("error_count", 0)
-        print(f"  {name:<20} {stalled:>8}  ticks={ticks}  errors={errors}  stale={stale:.0f}s")
+        print(f"  {name:<20} {state_label:>13}  ticks={ticks}  errors={errors}  stale={stale:.0f}s")
 
     alerts = state.get("recent_alerts", [])
     if alerts:

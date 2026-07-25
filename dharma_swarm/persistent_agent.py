@@ -14,7 +14,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable, Awaitable
@@ -229,7 +229,18 @@ class PersistentAgent:
             if getattr(self, "_memory_kernel", None):
                 mk = self._memory_kernel
                 eps = list(mk.iter_episodes(limit_per_surface=12))
+                if not eps:
+                    return "nothing_to_reorganize (mk)"
+
                 from dharma_swarm.memory_kernel import writers as mk_writers
+                from dharma_swarm.memory_kernel.write_receipts import (
+                    DEFAULT_WRITE_RECEIPT_PATH,
+                    MemoryKernelWritePolicyOutcome,
+                    MemoryKernelWriteReceiptInput,
+                    append_write_receipts,
+                    governed_write_receipt,
+                )
+
                 specs = mk_writers.default_writer_specs() if hasattr(mk_writers, "default_writer_specs") else []
                 facts = min(3, len(eps))
                 edges = 1 if len(eps) > 4 else 0
@@ -243,35 +254,36 @@ class PersistentAgent:
                     "writer_specs": len(specs),
                     "bi_temporal": True,
                 }
+
+                request = MemoryKernelWriteReceiptInput(
+                    source_atom_ids=tuple(getattr(e, "id", str(i)) for i, e in enumerate(eps[:6])),
+                    proposed_operation="append_proposal",
+                    target_surface="memory_kernel.write_receipts",
+                    reason="sleep-time reorg (raw EPISODE -> FACT/EDGE for long-horizon context bridging)",
+                    reviewer_state="auto_scheduled_cron",
+                )
+                receipt = governed_write_receipt(request)
+                if receipt.policy_decision.outcome != MemoryKernelWritePolicyOutcome.ALLOW:
+                    reasons = ",".join(receipt.policy_decision.reasons)
+                    raise RuntimeError(f"memory reorg receipt denied: {reasons}")
+
+                repo_root = Path(mk.config.census.repo_root)
+                write_receipt_path = repo_root / DEFAULT_WRITE_RECEIPT_PATH
+                append_write_receipts(write_receipt_path, (receipt,))
+
+                # The local reorg file is a projection only. Do not create or
+                # report it until the governed receipt ledger append succeeds.
                 reorg_dir = self.state_dir / "holon_reorg"
                 reorg_dir.mkdir(parents=True, exist_ok=True)
-                rp = reorg_dir / f"{self.name}.jsonl"
-                import json
-                with open(rp, "a", encoding="utf-8") as f:
+                reorg_path = reorg_dir / f"{self.name}.jsonl"
+                with open(reorg_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(reorg) + "\n")
-                # p4: governed proposal via write_receipts (existing surface, no new authority).
-                reorg_receipt_path = None
-                try:
-                    from dharma_swarm.memory_kernel.write_receipts import governed_write_receipt, MemoryKernelWriteReceiptInput
-                    req = MemoryKernelWriteReceiptInput(
-                        source_atom_ids=tuple(getattr(e, "id", str(i)) for i, e in enumerate(eps[:6])),
-                        proposed_operation="promote_high_salience_episodes_to_fact_edge",
-                        target_surface="home.memory_kernel.promoted",
-                        reason="sleep-time reorg (raw EPISODE -> FACT/EDGE for long-horizon context bridging)",
-                        reviewer_state="auto_scheduled_cron",
-                    )
-                    rec = governed_write_receipt(req)
-                    reorg_receipt_path = str(rp)
-                    # also append the reorg summary as a sidecar artifact for external re-read
-                    with open(rp, "a", encoding="utf-8") as f:
-                        f.write(json.dumps({"write_receipt_id": getattr(rec, "receipt_id", None)}) + "\n")
-                except Exception:
-                    pass
+                    f.write(json.dumps({"write_receipt_id": receipt.receipt_id}) + "\n")
 
-                result = f"reorg: raw={len(eps)} facts={facts} edges={edges} artifact={rp.name}"
-                if reorg_receipt_path:
-                    result += f" receipt={reorg_receipt_path}"
-                return result
+                return (
+                    f"reorg: raw={len(eps)} facts={facts} edges={edges} "
+                    f"artifact={reorg_path.name} receipt={write_receipt_path}"
+                )
             # legacy simple path (no mk)
             bank = self._agent.memory
             await bank.load()
@@ -282,7 +294,7 @@ class PersistentAgent:
                 return f"demoted={demoted} (no mk)"
             return "nothing_to_demote (no mk)"
         except Exception as exc:
-            return f"error: {exc}"
+            raise RuntimeError(f"memory reorg failed: {exc}") from exc
 
     async def _cron_scan_stigmergy(self) -> str:
         """Scan for high-salience marks that might need attention."""
@@ -309,8 +321,13 @@ class PersistentAgent:
             if urgent:
                 top = urgent[0]
                 await self._task_queue.put(
-                    f"Urgent message from {top.from_agent}: {top.subject}"
+                    f"Urgent message from {top.from_agent}: {top.subject} — {top.body[:500]}"
                 )
+                # The queued task now carries the message body, so marking
+                # read here is a terminal disposition — wake() consumes the
+                # queued task, not the (now-read) bus row. Other previewed
+                # messages stay unread (act-then-mark).
+                await bus.mark_read(top.id)
                 return f"urgent={len(urgent)}, queued_response"
             return f"inbox={len(msgs)}, no_urgent"
         except Exception as exc:
@@ -405,6 +422,13 @@ class PersistentAgent:
                 top_msg = messages[0]
                 task_text = f"Respond to message from {top_msg.from_agent}: {top_msg.subject} — {top_msg.body[:300]}"
                 task_source = "message"
+                # Adopted as this cycle's task. Deferred act-then-mark: read
+                # status is recorded only once the message reaches a terminal
+                # disposition (wake succeeded, or gate refused it — witnessed),
+                # so a wake() crash leaves it unread for retry next cycle. A
+                # gate refusal still marks read, else a poison message would
+                # outrank self-tasks and wedge every future wake.
+                adopted_msg_id = top_msg.id
             else:
                 task_text = self._generate_self_task(hot_paths, salient_marks)
                 task_source = "self"
@@ -431,6 +455,8 @@ class PersistentAgent:
                 result_info["gate_reason"] = gate_outcome.get("reason", "")
                 result_info["gate_status"] = gate_outcome.get("gate_status", "")
                 await self._write_witness("BLOCKED", task_text, gate_outcome.get("reason", ""))
+                if task_source == "message":
+                    await bus.mark_read(adopted_msg_id)
                 return result_info
             if gate_outcome:
                 self._profile.record_gate(passed=True)
@@ -439,6 +465,11 @@ class PersistentAgent:
 
             # 8. Execute via AutonomousAgent ReAct loop
             agent_result: AgentResult = await self._agent.wake(task_text)
+
+            # Wake succeeded — the adopted message reached its terminal
+            # disposition; acknowledge it now (deferred act-then-mark).
+            if task_source == "message":
+                await bus.mark_read(adopted_msg_id)
 
             # 9. Save learnings
             key_insight = self._extract_key_insight(agent_result.summary)

@@ -322,7 +322,7 @@ If using this research:
 
 **Project**: Dharma Swarm
 **Telos**: Jagat Kalyan (universal welfare)
-**COLM 2026 Deadline**: Abstract Mar 26, Paper Mar 31
+**Venue deadline**: operator-owned (`~/.dharma/research_deadlines.json`); the original COLM 2026 dates (Mar 26/31) lapsed
 
 **Research Session**: 2026-03-08, ~90 minutes, 71K tokens used
 **Research Quality**: 50+ peer-reviewed sources, industry reports, case studies with $ values

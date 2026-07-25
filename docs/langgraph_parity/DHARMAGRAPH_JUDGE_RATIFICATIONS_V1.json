@@ -1,0 +1,19 @@
+{
+  "schema": "dharma_swarm.dharmagraph_judge_ratifications.v1",
+  "custody": {
+    "authority": "source_review",
+    "candidate_measurement": "excluded",
+    "semantics": "Exact attestation digests are promotion authority after review; judge identifiers are not cryptographic identity authentication. This file is intentionally excluded from the candidate source digest so ratification cannot alter the evidence it authorizes."
+  },
+  "ratifications": {
+    "codex-judge-3d40063d8": [
+      "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
+    ],
+    "claude-judge-c62fdf4dd": [
+      "450479a2a4a072fccc4d062573a06bb2f17889fb986c62c1f7521804498e56c4"
+    ],
+    "claude-judge-c83df531c": [
+      "abfcfd4f2439b9c0a33bc511730a3dc1797a8b267c237c0a234eca5cde0da86a"
+    ]
+  }
+}

@@ -28,6 +28,7 @@ inspiration:
 - product_surface
 connected_relevant_files:
 - README.md
+- docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
 - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
 - docs/REPO_RECLASSIFICATION_MATRIX_2026-04-01.md
 - docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md
@@ -148,6 +149,9 @@ That command shows the active track, live ops snapshot, open broken-register ite
 
 These are important, but they should not compete with repo-level canon:
 
+- [HOLON_RUNTIME_FULL_ESTATE_MAP.md](architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md):
+  current holon-specific body synthesis across source, runtime state, parallel
+  Hermes boundaries, proof obligations, and a dated readiness witness
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)

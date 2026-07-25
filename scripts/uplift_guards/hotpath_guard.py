@@ -36,7 +36,9 @@ HOTPATH_FILES: frozenset[str] = frozenset({
     "dharma_swarm/stigmergy.py",
     "dharma_swarm/catalytic_graph.py",
     "dharma_swarm/vsm_channels.py",
-    "dharma_swarm/diversity_archive.py",
+    # archive.py owns the live MAP-Elites grid (diversity_archive.py retired to
+    # a shim 2026-07-02, organism-rewire D6a).
+    "dharma_swarm/archive.py",
 })
 
 ACK_TAG = "[impact-checked]"

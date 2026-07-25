@@ -16,21 +16,42 @@ logger = logging.getLogger("e2e_boot")
 
 
 @pytest.fixture
-def state_dir(tmp_path):
+def state_dir(tmp_path, monkeypatch):
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
+    monkeypatch.delenv("DHARMA_READ_ONLY_BOOT", raising=False)
     d = tmp_path / ".dharma_e2e"
     d.mkdir()
     return str(d)
 
 
 @pytest.mark.asyncio
-async def test_full_lifecycle_boot(state_dir):
-    """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
+@pytest.mark.timeout(60)
+async def test_full_lifecycle_boot(state_dir, monkeypatch: pytest.MonkeyPatch):
+    """Boot swarm -> tick -> dispatch tasks -> verify completion pipeline.
+
+    Real SwarmManager init (agent pool, task board, etc.) costs ~16s CPU on
+    this checkout, over test-fast's blanket 10s budget (WP-0D suite-context
+    timeout). A per-test override keeps this E2E boot smoke test running in
+    required CI instead of a `slow` marker silently dropping it there too
+    (.github/workflows/tests.yml and `make test` both filter -m "not slow").
+    """
     from dharma_swarm.swarm import SwarmManager
     from pathlib import Path
+
+    async def _offline_run_task(self, task):  # noqa: ANN001
+        return "DHARMA SWARM ALIVE"
+
+    monkeypatch.setattr(
+        "dharma_swarm.agent_runner.AgentRunner.run_task",
+        _offline_run_task,
+    )
 
     logger.info("=== PHASE 1: Init SwarmManager ===")
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
+    startup_task = getattr(swarm, "_startup_background_task", None)
+    if startup_task is not None:
+        await asyncio.wait_for(startup_task, timeout=5.0)
 
     # Verify agents spawned (correct attr: _agent_pool)
     pool = swarm._agent_pool
@@ -135,10 +156,23 @@ async def test_full_lifecycle_boot(state_dir):
 
 
 @pytest.mark.asyncio
-async def test_custom_task_dispatch(state_dir):
-    """Create a custom task and verify it flows through the pipeline."""
+@pytest.mark.timeout(60)
+async def test_custom_task_dispatch(state_dir, monkeypatch: pytest.MonkeyPatch):
+    """Create a custom task and verify it flows through the pipeline.
+
+    Real SwarmManager.init() cost, same WP-0D suite-context timeout as
+    test_full_lifecycle_boot above.
+    """
     from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import TaskPriority
+
+    async def _offline_run_task(self, task):  # noqa: ANN001
+        return "DHARMA SWARM ALIVE"
+
+    monkeypatch.setattr(
+        "dharma_swarm.agent_runner.AgentRunner.run_task",
+        _offline_run_task,
+    )
 
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
@@ -152,7 +186,7 @@ async def test_custom_task_dispatch(state_dir):
     logger.info(f"Created task {task.id}")
 
     for i in range(15):
-        result = await swarm.tick()
+        await swarm.tick()
         await asyncio.sleep(0.05)
 
     updated = await swarm._task_board.get(task.id)
@@ -165,4 +199,4 @@ async def test_custom_task_dispatch(state_dir):
     except (asyncio.TimeoutError, Exception):
         pass
 
-    assert status != 'pending', f"Task stuck in pending — dispatch pipeline never picked it up"
+    assert status != 'pending', "Task stuck in pending — dispatch pipeline never picked it up"

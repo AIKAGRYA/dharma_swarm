@@ -19,32 +19,35 @@ repo governance; this file wins on Devin operational patterns.
 
 ## 1. Session Start Protocol
 
-Every Devin session on this repo MUST begin with:
+Every Devin session MUST begin in the checkout and branch assigned by its task
+or environment. Do not switch to or integrate `main` at startup. Read session
+status first:
 
 ```bash
-cd /home/ubuntu/repos/dharma-swarm && git pull origin main
+make onboard
 ```
 
-Then, before any code work:
+Then, before task work:
 
-1. Check `dharma_swarm/inter_agent/devin/inbound/` for messages from Mac-side agents
-2. Check for PRs labeled `for-devin` or mentioning `devin` in the title
-3. Check for GitHub Issues assigned to or mentioning `devin-roaming`
-4. If inbound messages exist, read and prepare responses in `outbound/`
-5. Run `make onboard` if doing any code changes (per CLAUDE.md)
+1. Every editing task requires a Session Entry Packet. Follow the canonical
+   procedure in `docs/governance/AGENTOPS.md` and run
+   `make agent-build-preflight PACKET="$SESSION_ENTRY_PACKET"` at its exact
+   clean baseline before editing, then stay inside its default-deny envelope.
+   `docs/governance/ACTIVE_TRACK.yaml` owns track and surface assignment; this
+   adapter grants no additional scope.
+2. Check `dharma_swarm/inter_agent/devin/inbound/` for messages from Mac-side agents
+3. Check for PRs labeled `for-devin` or mentioning `devin` in the title
+4. Check for GitHub Issues assigned to or mentioning `devin-roaming`
+5. If inbound messages exist, read and prepare responses in `outbound/`
 
-This is the **heartbeat check** — it runs before task work begins.
+This is the **heartbeat check**. It is read-only orientation, not permission to
+change branches, pull `main`, or expand the admitted task.
 
 ---
 
 ## 2. Agentic Leadership Stance
 
-**Do not wait for instructions. Propose and execute.**
-
-Lessons from Boris Cherny (creator of Claude Code): "The model just wants
-to use tools." "Build for the model six months from now." "All of Claude
-Code has been rewritten over and over. There is no part that was around
-six months ago."
+**Within an assigned and admitted task, propose and execute.**
 
 Apply this to every session:
 
@@ -54,13 +57,12 @@ Apply this to every session:
   Search tools, MCP tools, browser tools, child sessions, knowledge notes —
   use them all. The cost of an unused tool is zero; the cost of manual work
   that could be automated is compounding.
-- **Take the lead on work.** When the operator says "fix X," don't just fix X.
-  Understand WHY X is broken, fix the root cause, check for related issues,
-  and propose follow-up work. Surface adjacent problems proactively.
-- **Build for the future.** Every session should leave the repo in a better
-  state for the next session. Create skills for recurring workflows. Save
-  knowledge notes for hard-won context. Write outbound messages that help
-  future agents.
+- **Take the lead inside the admitted scope.** Understand why the assigned
+  problem is broken and fix its root cause within the task and packet. Report
+  adjacent problems without editing them; they require a separate admitted
+  packet or authority-owned change.
+- **Build for the future.** Persist reusable knowledge only when the admitted
+  scope includes it; otherwise propose it for separate work.
 
 ---
 
@@ -95,7 +97,7 @@ Create feedback loops, don't just execute linear tasks.
 ### 4.1 Heartbeat Loop (session start)
 
 ```
-pull → check inbound → check PRs/issues → respond or report → begin task
+onboard → validate applicable packet → check inbound → respond or report → begin task
 ```
 
 This is Section 1 above. Every session starts with it.
@@ -349,10 +351,10 @@ Apply it operationally:
    than any single agent could produce alone.
 
 **What this means for every session:**
-- Don't just do the minimum. Bring Devin's unique strengths to bear.
+- Solve the admitted task thoroughly without crossing its authority envelope.
 - Use tools the Mac-side agents can't (remote VM, persistent shell, browser testing).
 - Produce evidence artifacts (test results, screenshots, recordings).
-- Leave the repo in a better state than you found it.
+- Report adjacent opportunities; never edit them without separate admission.
 
 ---
 
@@ -373,7 +375,8 @@ but by closing loops:
 The adjacent possible for Devin sessions is: what NEW capabilities can
 Devin bring to the multi-agent ensemble that no other agent provides?
 Child sessions. Remote testing. CI iteration. Persistent execution.
-Cross-session memory. Tool discovery. These are Devin's creative frontier.
+Cross-session memory. Tool discovery. These are Devin's creative frontier,
+not implicit authority to widen an assigned task.
 
 ---
 
@@ -381,13 +384,13 @@ Cross-session memory. Tool discovery. These are Devin's creative frontier.
 
 | Action | Command / Tool |
 |---|---|
-| Pull latest | `git pull origin main` |
+| Onboard (first) | `make onboard` |
+| Inspect Session Entry Packet | `python3 scripts/governance/run_agent_work_packet.py --packet "$SESSION_ENTRY_PACKET" --inspect` |
+| Admit exact edit scope | `make agent-build-preflight PACKET="$SESSION_ENTRY_PACKET"` |
+| Check checkout | `git status --short --branch` |
 | Check inbound | `ls dharma_swarm/inter_agent/devin/inbound/` |
-| Run tests | `cd /home/ubuntu/repos/dharma-swarm && .venv/bin/python -m pytest tests/ -q` |
-| Run lint | `cd /home/ubuntu/repos/dharma-swarm && PATH=.venv/bin:$PATH .venv/bin/pre-commit run --all-files` |
-| Onboard | `cd /home/ubuntu/repos/dharma-swarm && make onboard` |
-| API server | `cd /home/ubuntu/repos/dharma-swarm && .venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 8420 --reload` |
-| Dashboard | `npm --prefix /home/ubuntu/repos/dharma-swarm/dashboard run dev` |
+| Run tests | `python3 -m pytest tests/ -q` |
+| Run lint | `pre-commit run --all-files` |
 | Check PR collisions | `gh pr list --state open --search "BR-NNN"` |
 | Discover MCP tools | `devin_mcp command="list_tools"` |
 | Search for tools | `tool_search_tool_bm25 query="<need>"` |
@@ -397,10 +400,10 @@ Cross-session memory. Tool discovery. These are Devin's creative frontier.
 ---
 
 *This file is the Devin-specific operational layer. CLAUDE.md remains the
-canonical behavioral contract for all agents. Both are read by Devin at
-session start. Together they form the complete operating manual.*
+canonical behavioral contract for all agents. `make onboard` is the first
+status read; exact edit admission is packet-bound and separate.*
 
-*Last updated: 2026-05-23 by devin-roaming-2987d222*
+*Last updated: 2026-07-11 for the A1 Session Entry custody repair.*
 
 *Sources: Boris Cherny (Claude Code creator) interviews (YC Lightcone Feb 2026,
 Every.to Oct 2025, Pragmatic Engineer Mar 2026, MAD Podcast Aug 2025);

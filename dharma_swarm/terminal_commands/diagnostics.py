@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 
 
@@ -56,7 +57,7 @@ def cmd_loops() -> None:
     # Cascade history
     history_path = meta_dir / "cascade_history.jsonl"
     if history_path.exists():
-        lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
+        lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
         print(f"\nCascade history: {len(lines)} runs")
         for line in lines[-5:]:
             try:
@@ -73,19 +74,16 @@ def cmd_loops() -> None:
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
-        except ValueError:
+            os.kill(pid, 0)
+            print(f"\nDaemon: running (PID {pid})")
+        except (ValueError, OSError):
             print("\nDaemon: dead (stale PID file)")
-        else:
-            if _pid_alive(pid):
-                print(f"\nDaemon: running (PID {pid})")
-            else:
-                print("\nDaemon: dead (stale PID file)")
     else:
         print("\nDaemon: not running")
 
     # Domain summary (latest scores per domain)
     if history_path.exists():
-        all_lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
+        all_lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
         latest_by_domain: dict[str, dict] = {}
         for line in all_lines:
             try:
@@ -149,11 +147,7 @@ def cmd_invariants() -> None:
         graph = CatalyticGraph()
         if not graph.load():
             # No persisted graph — fall back to hardcoded seed
-            try:
-                from dharma_swarm.catalytic_graph import seed_ecosystem
-                seed_ecosystem(graph)
-            except ImportError:
-                pass
+            graph.seed_ecosystem()
         mat, nodes = graph.adjacency_matrix()
         total_nodes = graph.node_count
         ac_sets = graph.detect_autocatalytic_sets()
@@ -171,11 +165,7 @@ def cmd_invariants() -> None:
     try:
         archive_path = state_dir / "evolution" / "archive.jsonl"
         if archive_path.exists():
-            entries = [
-                json.loads(line)
-                for line in archive_path.read_text().strip().split("\n")
-                if line.strip()
-            ]
+            entries = [json.loads(l) for l in archive_path.read_text().strip().split("\n") if l.strip()]
             if entries:
                 genome_length = max(len(entries), 9)
                 # Estimate mutation rate from recent entries
@@ -197,10 +187,10 @@ def cmd_invariants() -> None:
         if marks_path.exists():
             lines = marks_path.read_text().strip().split("\n")[-100:]  # last 100 marks
             agents = set()
-            for line in lines:
-                if line.strip():
+            for l in lines:
+                if l.strip():
                     try:
-                        m = json.loads(line)
+                        m = json.loads(l)
                         agents.add(m.get("agent", ""))
                     except json.JSONDecodeError:
                         pass
@@ -263,7 +253,7 @@ def cmd_transcendence() -> None:
             print(f"  Aggregation Lift:     {report.get('aggregation_lift', 'N/A')}")
             print(f"  Transcended:          {report.get('transcended', 'N/A')}")
         if report.get("individual_briers"):
-            print("\n  Individual Brier Scores:")
+            print(f"\n  Individual Brier Scores:")
             for src, score in sorted(report["individual_briers"].items()):
                 print(f"    {src}: {score}")
     except Exception as e:
@@ -394,8 +384,8 @@ def cmd_ui(surface: str = "list") -> None:
         lines.extend(
             [
                 "TUI",
-                "- primary operator cockpit: dgc dashboard",
-                "- direct module: python3 -m dharma_swarm.tui",
+                f"- primary operator cockpit: dgc dashboard",
+                f"- direct module: python3 -m dharma_swarm.tui",
                 f"- code: {root / 'dharma_swarm' / 'tui' / 'app.py'}",
             ]
         )
@@ -475,7 +465,7 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
         print(f"  Agents:   {result.agent_count}")
         if result.invariants:
             inv = result.invariants
-            print("  Invariants:")
+            print(f"  Invariants:")
             print(f"    Criticality:  {inv.criticality:.4f} ({inv.criticality_status})")
             print(f"    Closure:      {inv.closure_ratio:.4f} ({inv.closure_status})")
             print(f"    Info Retain:   {inv.info_retention:.6f} ({inv.info_retention_status})")
@@ -483,17 +473,17 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
             print(f"    Overall:      {inv.overall}")
         if result.transcendence_metrics:
             tm = result.transcendence_metrics
-            print("  Transcendence:")
+            print(f"  Transcendence:")
             print(f"    Margin:    {tm.transcendence_margin:.4f}")
             print(f"    Diversity: {tm.behavioral_div:.4f}")
             print(f"    Families:  {tm.n_model_families}")
         if result.prediction:
-            print("  Self-Prediction:")
+            print(f"  Self-Prediction:")
             print(f"    Predicted: {result.prediction.predicted_duration_ms:.0f}ms")
             if result.prediction.duration_error is not None:
                 print(f"    Error:     {result.prediction.duration_error:.0f}ms")
             if result.prediction.surprise:
-                print("    SURPRISE detected!")
+                print(f"    SURPRISE detected!")
         print(f"  Stages: {result.stage_timings}")
 
     asyncio.run(_run())

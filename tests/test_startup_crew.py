@@ -201,7 +201,9 @@ async def test_spawn_cybernetics_crew_passes_provider_model_and_prompt():
     assert "MEMORY SURVIVAL INSTINCT" in glm_call["system_prompt"]
 
     assert kimi_call["provider_type"] == ProviderType.OLLAMA
-    assert kimi_call["model"] == "kimi-k2.5:cloud"
+    # Floor uplift: cyber-kimi25 rides the K2.6 FLOOR via the pool (was the
+    # sub-floor kimi-k2.5:cloud before the model-pool consolidation).
+    assert kimi_call["model"] == "kimi-k2.6:cloud"
 
     assert codex_call["provider_type"] == ProviderType.OLLAMA
     assert codex_call["model"] == "qwen3-coder:480b-cloud"
@@ -231,14 +233,27 @@ async def test_create_seed_tasks_creates_all_when_board_empty():
 
 
 @pytest.mark.asyncio
-async def test_create_seed_tasks_replaces_date_placeholder():
+async def test_create_seed_tasks_replaces_date_placeholder(monkeypatch: pytest.MonkeyPatch):
+    # Exercise the {date} substitution mechanism directly: the curated seed set
+    # does not always carry a date placeholder, so pin a seed task that does and
+    # assert create_seed_tasks substitutes today's date for it.
+    monkeypatch.setattr(
+        sc,
+        "SEED_TASKS",
+        [
+            {
+                "title": "dated seed",
+                "description": "snapshot for {date} run",
+                "priority": TaskPriority.NORMAL,
+            }
+        ],
+    )
     swarm = _FakeSwarm(pending_tasks=0)
     await sc.create_seed_tasks(swarm)
 
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     joined = "\n".join(c["description"] for c in swarm.create_calls)
     assert "{date}" not in joined
-    # At least one task in current seed set should contain replaced date.
     assert date_str in joined
 
 

@@ -152,7 +152,13 @@ async def test_evolution_sandbox_pipeline(tmp_dharma):
     proposal = await engine.propose(
         component="test.py",
         change_type="mutation",
-        description="Improve error handling",
+        # Spans all three anekanta frames (mechanistic / phenomenological /
+        # systems) so the epistemological-diversity gate passes honestly.
+        description=(
+            "Improve error handling in the computation layer mechanism, "
+            "preserving the observer's awareness of failure modes while "
+            "strengthening system-level feedback and resilience."
+        ),
     )
     assert proposal.predicted_fitness > 0
 
@@ -264,11 +270,14 @@ async def test_canary_promote_and_rollback(tmp_dharma):
 # === Scenario 7: All 11 gates fire ===
 
 
-def test_all_eleven_gates_fire():
+def test_all_eleven_gates_fire(tmp_path):
     """All 11 gates should be present and evaluated."""
-    from dharma_swarm.telos_gates import TelosGatekeeper
+    from dharma_swarm.telos_gates import GateRegistry, TelosGatekeeper
 
-    gk = TelosGatekeeper()
+    # The operator's home may contain approved custom gates.  This assertion is
+    # specifically about the immutable core eleven, so give it an empty,
+    # test-owned registry instead of inheriting ambient authority state.
+    gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.json"))
     assert len(gk.GATES) == 11
 
     result = gk.check(action="echo test")

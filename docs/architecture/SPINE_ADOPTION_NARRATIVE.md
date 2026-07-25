@@ -42,14 +42,22 @@ row is success, not failure (see `spine/persistence.py` and
 
 | Surface | State | Mechanism |
 |---|---|---|
-| `a2a/a2a_bridge.py` | **Adopted (adapter)** | `submit_via_spine()` dispatches via `invoke_agent`; the legacy `A2AServer.submit()` runs *inside* the invoker so identity/idempotency/task-log behavior is unchanged. Production wiring of the trishula-inbox path is Slice 2 (allowlisted at `a2a_bridge.py:307`). |
-| `orchestrator.py` | **Adopted (flag-gated)** | `_run_task_via_spine()` behind `DHARMA_SPINE_DISPATCH=1` (default OFF; flag-off path byte-identical). Emits exactly one receipt per dispatch **and persists it** to `delegation_runs.receipt_json` (fail-open: a persistence error logs a warning and never breaks dispatch). |
-| `agent_runner.py` | **Not adopted** | Largest surface, migrated last by design. |
+| `a2a/spine_adapter.py` | **The one blessed A2A submit path** | `submit_task_via_spine()` (+ sync wrapper) dispatches via `invoke_agent`; the legacy `A2AServer.submit()` runs *inside* the invoker so identity/idempotency/task-log behavior is unchanged. This is the single `.submit()` call site the bypass scan blesses. |
+| `a2a/a2a_bridge.py` | **Adopted (delegates)** | `submit_via_spine()` / `_submit_via_spine_sync()` delegate to the shared adapter; trishula-inbox ingest (Slice 2) dispatches through it. |
+| `a2a/node_gateway.py` | **Adopted 2026-07-03** | Both submit endpoints (`POST /tasks`, `POST /a2a/tasks`) dispatch through `submit_task_via_spine` (one EvidenceReceipt per HTTP submit; pre-spine 500-on-internal-error contract preserved). |
+| `a2a/a2a_client.py` | **Adopted 2026-07-03** | `_dispatch_local` dispatches through `submit_task_via_spine_sync` (one EvidenceReceipt per in-process delegation; `trc_` auto-trace contract preserved). |
+| `a2a/nats_transport.py` | **Adopted 2026-07-03** | `consume_message` dispatches through `submit_task_via_spine` on top of its transport-level ExecutionIdentity/idempotency/ack-nack receipts (exception→nack contract preserved). |
+| `orchestrator.py` | **Adopted (default-on)** | `_run_task_via_spine()`; `DHARMA_SPINE_DISPATCH` explicit false-like values opt out. Emits exactly one receipt per dispatch **and persists it** to `delegation_runs.receipt_json` (fail-open: a persistence error logs a warning and never breaks dispatch). |
+| `agent_runner.py` | **Leaf by design** | `run_task` is the execution leaf invoked *inside* spine-wrapped callers (orchestrator / A2A adapter); it does not submit around the spine. |
 
-Known intentional bypasses are declared in
-`scripts/governance/spine_bypass_report.py::_INTENTIONAL_BYPASS` (5 sites at
-writing: trishula inbox, node_gateway ×2, a2a_client local dispatch,
-nats_transport). The track completes when that dict drains to `{}`.
+The intentional-bypass allowlist
+(`scripts/governance/spine_bypass_report.py::_INTENTIONAL_BYPASS`) **drained to
+`{}` on 2026-07-03**. It is held at zero two ways: the `spine_bypass_entries`
+quality-ratchet baseline is 0 (CI fails on any new entry), and the
+`spine-ownership` uplift guard fails closed on any unknown site or any
+allowlist entry above the ratchet baseline. The only sanctioned relief is a PR
+that visibly raises the baseline with review
+(ORGANISM_REWIRE_DOCTRINE_2026-07-02 §1).
 
 ## How completion is measured (and why the criteria look like this)
 
@@ -94,13 +102,15 @@ falsifiable. That episode is the track's reason for existing, in miniature.
 
 ## Remaining work (honest queue)
 
-1. **GATE 1** — operator witnesses the first live receipt (kit above).
-2. **Slice 2** — wire `submit_via_spine` into the trishula-inbox path
-   (`a2a_bridge.py:307`); sync→async bridging, dual-audit required.
-3. **agent_runner.py** — migrate `run_task` through `invoke_agent`.
-4. **Drain the allowlist** — node_gateway ×2, a2a_client, nats_transport
-   (coordinate with the NATS lane owner), then trishula; dict reaches `{}`.
-5. CI enforcement (allowlist-at-zero) once drained.
+1. **GATE 1** — operator witnesses the first live receipt (kit above). This is
+   the only remaining item; everything below it is done.
+2. ~~Slice 2 — trishula-inbox path~~ (done 2026-07-02).
+3. ~~agent_runner.py~~ — resolved architecturally: `run_task` is the leaf
+   invoked inside spine-wrapped callers; no bypass submit path exists.
+4. ~~Drain the allowlist~~ (done 2026-07-03 — node_gateway ×2, a2a_client,
+   nats_transport all through `spine_adapter.submit_task_via_spine`; dict is `{}`).
+5. ~~CI enforcement (allowlist-at-zero)~~ (done 2026-07-03 — ratchet baseline 0
+   + `spine-ownership` uplift guard invariant 3).
 
 ## Non-goals (track discipline)
 

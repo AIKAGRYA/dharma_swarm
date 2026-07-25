@@ -21,6 +21,7 @@ from dharma_swarm.autonomous_agent import (
     _identity_from_registered_holon,
     cli_wake,
 )
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import ProviderType
 
 # Cross-lane drift guard: the TUI-alias model resolver ships on the
@@ -68,7 +69,7 @@ class TestAgentIdentity:
     def test_defaults(self):
         ident = AgentIdentity(name="test", role="general", system_prompt="hi")
         assert ident.name == "test"
-        assert ident.model == "claude-sonnet-4-20250514"
+        assert ident.model == canonical_default_model(ProviderType.ANTHROPIC)
         assert ident.provider == "anthropic"
         assert ident.max_turns == 25
         assert len(ident.allowed_tools) > 0
@@ -360,6 +361,30 @@ class TestToolDispatch:
         agent = AutonomousAgent(ident)
         result = await agent._execute_tool("nonexistent_tool", {})
         assert "Unknown tool" in result
+
+    @pytest.mark.asyncio
+    async def test_gate_crash_fails_closed(self, monkeypatch, tmp_path):
+        # A crashed telos gate must refuse the side-effect tool, not wave it
+        # through (the pre-2026-07-07 behavior was `except Exception: pass`).
+        def boom(**kwargs):
+            raise RuntimeError("gate down")
+
+        monkeypatch.setattr("dharma_swarm.telos_gates.check_action", boom)
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s",
+            allowed_tools=["bash", "read_file"],
+            working_directory=str(tmp_path),
+        )
+        agent = AutonomousAgent(ident)
+        result = await agent._execute_tool("bash", {"command": "echo hi"})
+        assert "GATE UNAVAILABLE" in result
+        assert "hi" not in result.splitlines()[-1]  # command did not run
+
+        # Non-side-effect tools are unaffected by a downed gate.
+        probe = tmp_path / "probe.txt"
+        probe.write_text("ok")
+        result2 = await agent._execute_tool("read_file", {"path": str(probe)})
+        assert "GATE UNAVAILABLE" not in result2
 
 
 # ---------------------------------------------------------------------------
@@ -835,3 +860,87 @@ class TestSaveRunReport:
         assert data["agent"] == "reporter"
         assert data["turns"] == 3
         assert data["tokens_in"] == 100
+
+
+class TestCheckInboxMarksRead:
+    """Regression: fetched inbox messages must eventually be marked read so the
+    same message is not re-injected into the system prompt every cycle, BUT the
+    acknowledgement is deferred to wake success so a failed wake does not
+    permanently hide messages (mirrors the consumer pattern in
+    contracts/runtime_adapters.py)."""
+
+    @staticmethod
+    async def _make_agent_with_message(tmp_path):
+        from dharma_swarm.message_bus import MessageBus
+        from dharma_swarm.models import Message
+
+        bus = MessageBus(tmp_path / "messages.db")
+        await bus.init_db()
+        await bus.send(Message(
+            from_agent="peer", to_agent="listener",
+            subject="ping", body="please look at this",
+        ))
+        ident = AgentIdentity(name="listener", role="r", system_prompt="s")
+        agent = AutonomousAgent(ident)
+        agent._message_bus = bus
+        return agent, bus
+
+    @pytest.mark.asyncio
+    async def test_check_inbox_defers_ack(self, tmp_path):
+        agent, bus = await self._make_agent_with_message(tmp_path)
+
+        first = await agent._check_inbox()
+        assert len(first) == 1
+        assert "ping" in first[0]
+
+        # Deferred: NOT marked read yet, but queued for acknowledgement.
+        assert len(await bus.receive("listener", status="unread")) == 1
+        assert len(agent._inbox_pending_ack) == 1
+
+    @pytest.mark.asyncio
+    async def test_handled_message_not_refetched_after_ack(self, tmp_path):
+        agent, bus = await self._make_agent_with_message(tmp_path)
+
+        first = await agent._check_inbox()
+        assert len(first) == 1
+
+        # Wake succeeded -> acknowledge the delivered messages.
+        await agent._ack_inbox()
+
+        # Second cycle: the handled message must NOT come back.
+        second = await agent._check_inbox()
+        assert second == []
+
+        # Store confirms the message was marked read, not deleted.
+        assert await bus.receive("listener", status="unread") == []
+        assert len(await bus.receive("listener", status="read")) == 1
+        assert agent._inbox_pending_ack == []
+
+    @pytest.mark.asyncio
+    async def test_wake_failure_leaves_messages_unread(self, tmp_path):
+        agent, bus = await self._make_agent_with_message(tmp_path)
+
+        # Isolate the wake from real memory/report subsystems.
+        agent.memory = MagicMock()
+        agent.memory.load = AsyncMock()
+        agent.memory.get_working_context = AsyncMock(return_value="")
+        agent.memory.remember = AsyncMock()
+        agent.memory.save = AsyncMock()
+        agent._save_run_report = AsyncMock()
+
+        # The reason+act loop blows up (e.g. provider failure) mid-wake.
+        agent._reason_and_act = AsyncMock(side_effect=RuntimeError("provider down"))
+
+        with pytest.raises(RuntimeError, match="provider down"):
+            await agent.wake("task")
+
+        # Ack never ran: the message stays unread for the next cycle to retry.
+        assert len(await bus.receive("listener", status="unread")) == 1
+        assert await bus.receive("listener", status="read") == []
+        assert len(agent._inbox_pending_ack) == 1
+
+        # A later successful re-check + ack still delivers and clears it.
+        second = await agent._check_inbox()
+        assert len(second) == 1
+        await agent._ack_inbox()
+        assert await bus.receive("listener", status="unread") == []

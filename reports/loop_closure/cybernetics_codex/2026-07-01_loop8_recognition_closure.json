@@ -1,0 +1,446 @@
+{
+  "act_evidence": {
+    "actor": "dharma_swarm.meta_daemon.RecognitionEngine.synthesize",
+    "recognition_history_archive": {
+      "bytes": 957,
+      "exists": true,
+      "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/history/seed_20260701_000000.md",
+      "sha256": "eef7a4ccd95d225ce0d613c3a3043757608101f7520f950b93ad47d27bb563ee"
+    },
+    "recognition_seed": {
+      "bytes": 957,
+      "exists": true,
+      "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md",
+      "sha256": "eef7a4ccd95d225ce0d613c3a3043757608101f7520f950b93ad47d27bb563ee"
+    },
+    "seed_contains_marker": true,
+    "seed_contains_required_loop_domains": true,
+    "seed_snippet": "6-07-01 00:00 UTC Type: light ## System State: R_V=0.618 (loop-history-eigenform) ## Research: 0d to abstract, 0d to paper (crunch) ## Autocatalytic: 10 nodes, 10 edges ## Cascade Loops: 10 recent runs, 10 converged, 10 eigenforms, best fitness=0.89, domains: loop8recognitionclosure:loop11:replication_monitor:90be551a65b3, loop8recognitionclosure:loop10:context_agent:cbe2fbe3090f, loop8recognitionclosure:loop1:swarm_task_loop:9c54c9a2494f, loop8recognitionclosure:loop3:evolution_loop:770475305ae6, loop8recognitionclosure:loop5:zeitgeist_",
+    "synthesis_type": "light"
+  },
+  "adapt_evidence": {
+    "context_after": {
+      "context_chars": 24812,
+      "context_sha256": "64cd13000c8b280f96868c0ec46f835305c8da421e18433ad0fbd213e518f7eb",
+      "marker_present": true,
+      "recognition_seed_present": true
+    },
+    "context_before": {
+      "context_chars": 23823,
+      "context_sha256": "6e61c6bb69ba47dc5d84899e95dabe329652247a9efdcc24bbcdf59cab964b44",
+      "marker_present": false,
+      "recognition_seed_present": false
+    },
+    "context_changed": true,
+    "reader": "dharma_swarm.context.build_agent_context"
+  },
+  "adapt_proof": {
+    "after": {
+      "context_chars": 24812,
+      "context_sha256": "64cd13000c8b280f96868c0ec46f835305c8da421e18433ad0fbd213e518f7eb",
+      "marker_present": true,
+      "recognition_seed_present": true
+    },
+    "before": {
+      "context_chars": 23823,
+      "context_sha256": "6e61c6bb69ba47dc5d84899e95dabe329652247a9efdcc24bbcdf59cab964b44",
+      "marker_present": false,
+      "recognition_seed_present": false
+    },
+    "fed_forward": true,
+    "field": "recognition_seed.md -> later build_agent_context() L9 block",
+    "seed_path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md"
+  },
+  "closed": true,
+  "constrain_evidence": {
+    "admitted_to_recognition_engine": true,
+    "all_cascade_records_sha_bound": true,
+    "history_digest_present": true,
+    "provider_truth_claimed": false,
+    "required_loops_closed": true,
+    "required_loops_present": true
+  },
+  "cycle_detail": [
+    {
+      "cascade_records": 10,
+      "cycle": 1,
+      "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+      "history_dir": "$REPO_ROOT/reports/loop_closure/cybernetics_codex",
+      "required_closed": true,
+      "required_loops": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        10,
+        11
+      ],
+      "required_present": true,
+      "seed_written": true
+    },
+    {
+      "context_after": {
+        "context_chars": 24812,
+        "context_sha256": "64cd13000c8b280f96868c0ec46f835305c8da421e18433ad0fbd213e518f7eb",
+        "marker_present": true,
+        "recognition_seed_present": true
+      },
+      "context_before": {
+        "context_chars": 23823,
+        "context_sha256": "6e61c6bb69ba47dc5d84899e95dabe329652247a9efdcc24bbcdf59cab964b44",
+        "marker_present": false,
+        "recognition_seed_present": false
+      },
+      "context_changed": true,
+      "cycle": 2,
+      "later_context_reader": "dharma_swarm.context.build_agent_context"
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "cascade_records": [
+      {
+        "best_fitness": 0.81,
+        "converged": true,
+        "cycles": 107,
+        "domain": "loop8recognitionclosure:loop1:swarm_task_loop:9c54c9a2494f",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json",
+        "receipt_sha256": "9c54c9a2494fbe773e9cdd3a6922a87f53c8369292d0418cad0199b048624805"
+      },
+      {
+        "best_fitness": 0.82,
+        "converged": true,
+        "cycles": 3,
+        "domain": "loop8recognitionclosure:loop2:organism_heartbeat:1c7fe59174b4",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json",
+        "receipt_sha256": "1c7fe59174b485c3c126f4174ccd6c64073cf303aa54fb3f837996087263f26b"
+      },
+      {
+        "best_fitness": 0.83,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop3:evolution_loop:770475305ae6",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json",
+        "receipt_sha256": "770475305ae6ee83e1848ecd7a4aef12b8175fa5614369417500bf497347d30e"
+      },
+      {
+        "best_fitness": 0.84,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop4:consolidation_memory:71a54a5dc576",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json",
+        "receipt_sha256": "71a54a5dc576085f14b1ebb9507cf0f0e64e0b76034186d0d3ff4b02bc664134"
+      },
+      {
+        "best_fitness": 0.85,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop5:zeitgeist_internal_pressure:33ff0f9a21fe",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop5_zeitgeist_closure.json",
+        "receipt_sha256": "33ff0f9a21fea4a08a3d12bac358add3c3377fa553972af9e2a712acaa5c6fcd"
+      },
+      {
+        "best_fitness": 0.86,
+        "converged": true,
+        "cycles": 4,
+        "domain": "loop8recognitionclosure:loop6:witness_auditor:b6b8bce0ab32",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop6_witness_closure.json",
+        "receipt_sha256": "b6b8bce0ab32627c45a8deb5ab6db04fcfd1e7734bc681d7416c2bc41e093e01"
+      },
+      {
+        "best_fitness": 0.87,
+        "converged": true,
+        "cycles": 1,
+        "domain": "loop8recognitionclosure:loop7:training_flywheel:ac5ef89ee1ab",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+        "receipt_sha256": "ac5ef89ee1aba647799eab7325687abaf300f3bd230117266d41a3794473b587"
+      },
+      {
+        "best_fitness": 0.89,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop9:conductors:538f044e312b",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
+        "receipt_sha256": "538f044e312bd34f31abc69f95dc380d75a828feec0afbf481a2bd1dfa57b922"
+      },
+      {
+        "best_fitness": 0.8,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop10:context_agent:cbe2fbe3090f",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json",
+        "receipt_sha256": "cbe2fbe3090fe5423e3cbc69362e10a7f59648e3089031c490084e23fb6c3d9a"
+      },
+      {
+        "best_fitness": 0.81,
+        "converged": true,
+        "cycles": 2,
+        "domain": "loop8recognitionclosure:loop11:replication_monitor:90be551a65b3",
+        "eigenform_reached": true,
+        "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+        "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json",
+        "receipt_sha256": "90be551a65b34909d7ee6b4b13f1b17bbde1980a4700ca46dc87776d43db2e83"
+      }
+    ],
+    "interpreted_files": {
+      "autocatalytic_graph": {
+        "bytes": 3809,
+        "exists": true,
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cc_catalytic_graph.json",
+        "sha256": "6b357da7e81d09662b81c7151e20a2ba45a74b8655a5c6ce37bc3efcad304e32"
+      },
+      "cascade_history": {
+        "bytes": 4298,
+        "exists": true,
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cascade_history.jsonl",
+        "sha256": "c96e7287814689046262695607e319f516bd2722bbea50944435c93a78cce641"
+      },
+      "self_model": {
+        "bytes": 4465,
+        "exists": true,
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/loop8_eigenform_self_model.json",
+        "sha256": "004cafaf35fcf31e86c52a5c0cefd78713deacde3fc89acdaf10884f01d2b5cb"
+      },
+      "system_rv": {
+        "bytes": 158,
+        "exists": true,
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/system_rv.json",
+        "sha256": "2332f75454662c88ae6354db783c8f4beadedf37ab1b3eba964ca1879c3c6872"
+      }
+    },
+    "interpreter": "receipt_history_to_recognition_cascade_history",
+    "self_model": {
+      "closed_loop_count": 10,
+      "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+      "loop_refs": [
+        {
+          "adapt_field": "Loop 1 bounded spine dispatch marks fed into stigmergy state",
+          "cycles": 107,
+          "loop": 1,
+          "loop_id": "swarm_task_loop",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json",
+          "receipt_sha256": "9c54c9a2494fbe773e9cdd3a6922a87f53c8369292d0418cad0199b048624805"
+        },
+        {
+          "adapt_field": "algedonic_activation.recent_activations (adaptive memory the next cycle consults)",
+          "cycles": 3,
+          "loop": 2,
+          "loop_id": "organism_heartbeat",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json",
+          "receipt_sha256": "1c7fe59174b485c3c126f4174ccd6c64073cf303aa54fb3f837996087263f26b"
+        },
+        {
+          "adapt_field": "scratch Darwin predictor history + archive parent selection read by the later proposal cycle",
+          "cycles": 2,
+          "loop": 3,
+          "loop_id": "evolution_loop",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json",
+          "receipt_sha256": "770475305ae6ee83e1848ecd7a4aef12b8175fa5614369417500bf497347d30e"
+        },
+        {
+          "adapt_field": "StrangeLoopMemory META consolidation count, then later memory/context readers",
+          "cycles": 2,
+          "loop": 4,
+          "loop_id": "consolidation_memory",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json",
+          "receipt_sha256": "71a54a5dc576085f14b1ebb9507cf0f0e64e0b76034186d0d3ff4b02bc664134"
+        },
+        {
+          "adapt_field": "TelosGatekeeper resolved trust_mode via gate_pressure.json (S4->S3 override the next gate check consults)",
+          "cycles": 2,
+          "loop": 5,
+          "loop_id": "zeitgeist_internal_pressure",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop5_zeitgeist_closure.json",
+          "receipt_sha256": "33ff0f9a21fea4a08a3d12bac358add3c3377fa553972af9e2a712acaa5c6fcd"
+        },
+        {
+          "adapt_field": "stigmergy governance channel marks authored by 'witness' (strictly-growing adaptive state governance + downstream loops consult)",
+          "cycles": 4,
+          "loop": 6,
+          "loop_id": "witness_auditor",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop6_witness_closure.json",
+          "receipt_sha256": "b6b8bce0ab32627c45a8deb5ab6db04fcfd1e7734bc681d7416c2bc41e093e01"
+        },
+        {
+          "adapt_field": "StrategyReinforcer persisted patterns -> fresh later-cycle build_reinforced_prompt() strategy injection",
+          "cycles": 1,
+          "loop": 7,
+          "loop_id": "training_flywheel",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+          "receipt_sha256": "ac5ef89ee1aba647799eab7325687abaf300f3bd230117266d41a3794473b587"
+        },
+        {
+          "adapt_field": "PersistentAgent AgentCronScheduler run_count/last_run state",
+          "cycles": 2,
+          "loop": 9,
+          "loop_id": "conductors",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
+          "receipt_sha256": "538f044e312bd34f31abc69f95dc380d75a828feec0afbf481a2bd1dfa57b922"
+        },
+        {
+          "adapt_field": "memory-aware context package checksum, then later context/package read",
+          "cycles": 2,
+          "loop": 10,
+          "loop_id": "context_agent",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json",
+          "receipt_sha256": "cbe2fbe3090fe5423e3cbc69362e10a7f59648e3089031c490084e23fb6c3d9a"
+        },
+        {
+          "adapt_field": "ReplicationProtocol durable proposals/dynamic_roster/probation state",
+          "cycles": 2,
+          "loop": 11,
+          "loop_id": "replication_monitor",
+          "receipt_path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json",
+          "receipt_sha256": "90be551a65b34909d7ee6b4b13f1b17bbde1980a4700ca46dc87776d43db2e83"
+        }
+      ],
+      "marker": "loop8recognitionclosure",
+      "schema_version": "loop8_recognition_eigenform.self_model.v1",
+      "total_cycles": 127
+    }
+  },
+  "later_cycle_read_evidence": {
+    "later_context_snippet": "6-07-01 00:00 UTC Type: light ## System State: R_V=0.618 (loop-history-eigenform) ## Research: 0d to abstract, 0d to paper (crunch) ## Autocatalytic: 10 nodes, 10 edges ## Cascade Loops: 10 recent runs, 10 converged, 10 eigenforms, best fitness=0.89, domains: loop8recognitionclosure:loop11:replication_monitor:90be551a65b3, loop8recognitionclosure:loop10:context_agent:cbe2fbe3090f, loop8recognitionclosure:loop1:swarm_task_loop:9c54c9a2494f, loop8recognitionclosure:loop3:evolution_loop:770475305ae6, loop8recognitionclosure:loop5:zeitgeist_",
+    "later_reader": "dharma_swarm.context.build_agent_context",
+    "marker_present_in_later_context": true,
+    "recognition_seed_section_present": true
+  },
+  "loop": 8,
+  "loop_id": "recognition_eigenform",
+  "observed_at": "2026-07-01T00:00:00Z",
+  "provider_truth": {
+    "external_provider_invoked": false,
+    "provider_truth_claimed": false
+  },
+  "real_data": true,
+  "sense_evidence": {
+    "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
+    "history_dir": "$REPO_ROOT/reports/loop_closure/cybernetics_codex",
+    "reader": "scripts.loop8_recognition_closure_run.read_loop_history",
+    "receipts_read": [
+      {
+        "closed": true,
+        "cycles": 107,
+        "loop": 1,
+        "loop_id": "swarm_task_loop",
+        "path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json",
+        "sha256": "9c54c9a2494fbe773e9cdd3a6922a87f53c8369292d0418cad0199b048624805"
+      },
+      {
+        "closed": true,
+        "cycles": 3,
+        "loop": 2,
+        "loop_id": "organism_heartbeat",
+        "path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json",
+        "sha256": "1c7fe59174b485c3c126f4174ccd6c64073cf303aa54fb3f837996087263f26b"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 3,
+        "loop_id": "evolution_loop",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json",
+        "sha256": "770475305ae6ee83e1848ecd7a4aef12b8175fa5614369417500bf497347d30e"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 4,
+        "loop_id": "consolidation_memory",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json",
+        "sha256": "71a54a5dc576085f14b1ebb9507cf0f0e64e0b76034186d0d3ff4b02bc664134"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 5,
+        "loop_id": "zeitgeist_internal_pressure",
+        "path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop5_zeitgeist_closure.json",
+        "sha256": "33ff0f9a21fea4a08a3d12bac358add3c3377fa553972af9e2a712acaa5c6fcd"
+      },
+      {
+        "closed": true,
+        "cycles": 4,
+        "loop": 6,
+        "loop_id": "witness_auditor",
+        "path": "reports/loop_closure/cybernetics_codex/2026-06-23_loop6_witness_closure.json",
+        "sha256": "b6b8bce0ab32627c45a8deb5ab6db04fcfd1e7734bc681d7416c2bc41e093e01"
+      },
+      {
+        "closed": true,
+        "cycles": 1,
+        "loop": 7,
+        "loop_id": "training_flywheel",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+        "sha256": "ac5ef89ee1aba647799eab7325687abaf300f3bd230117266d41a3794473b587"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 9,
+        "loop_id": "conductors",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
+        "sha256": "538f044e312bd34f31abc69f95dc380d75a828feec0afbf481a2bd1dfa57b922"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 10,
+        "loop_id": "context_agent",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json",
+        "sha256": "cbe2fbe3090fe5423e3cbc69362e10a7f59648e3089031c490084e23fb6c3d9a"
+      },
+      {
+        "closed": true,
+        "cycles": 2,
+        "loop": 11,
+        "loop_id": "replication_monitor",
+        "path": "reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json",
+        "sha256": "90be551a65b34909d7ee6b4b13f1b17bbde1980a4700ca46dc87776d43db2e83"
+      }
+    ],
+    "required_loops": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      9,
+      10,
+      11
+    ]
+  },
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  },
+  "work_dir": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure"
+}

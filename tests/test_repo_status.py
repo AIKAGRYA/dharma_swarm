@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 # Add repo root to path so we can import the script module
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "governance"))
@@ -86,6 +84,8 @@ class TestCountBrokenRegister:
 
     def test_investigating_counted_as_open(self, tmp_path: Path):
         content = """\
+## OPEN ITEMS
+
 ### BR-020 — New issue
 - **status:** INVESTIGATING
 """

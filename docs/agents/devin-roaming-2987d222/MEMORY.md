@@ -20,8 +20,10 @@ repo so any agent (including my future self) can read it cold.
 
 ### What I Learned
 
-- Onboard is now single-door v2 (#563): portfolio rendering, parallel work
-  lanes, fleet receipt, `--fast/--json`. Run it; trust it over doc prose.
+- At the time, #563 described onboard as “single-door v2” and rendered the
+  portfolio, parallel lanes, and fleet receipt. This is historical: current
+  `make onboard` is read-only session status, packet-bound preflight owns edit
+  admission, and current owner docs supersede this session note.
 - ACTIVE_SURFACE_MANIFEST.yaml has been demoted in practice: it is the
   Surface layer of the three-layer SSoT model (Intent = ACTIVE_TRACK.yaml,
   Surface = manifest, State = LIVE_OPS_DASHBOARD.md) and is read on demand,

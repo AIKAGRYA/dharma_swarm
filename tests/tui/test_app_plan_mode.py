@@ -125,7 +125,6 @@ class _DummyStore:
         self._transcript.append(event)
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_plan_mode_uses_strict_prompt_and_default_permissions(
     monkeypatch,
 ) -> None:
@@ -136,6 +135,13 @@ def test_send_to_claude_plan_mode_uses_strict_prompt_and_default_permissions(
 
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-plan")
     monkeypatch.setattr(app, "_get_state_context", lambda: "cached context")
+    # Credential/routing gate: deterministically simulate a host with no
+    # claude/codex CLI credentials (the real CI/sandboxed condition), so the
+    # default-provider fallback to the free ollama floor lane below is exercised
+    # regardless of what happens to be on this machine's PATH.
+    monkeypatch.setattr(
+        app, "_provider_ready", lambda provider_id: provider_id not in ("claude", "codex")
+    )
 
     app._send_to_claude("design a plan")
 
@@ -173,7 +179,6 @@ def test_get_state_context_includes_latent_gold(monkeypatch, tmp_path) -> None:
     assert "latent branch" in out
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_normal_mode_keeps_bypass_permissions(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -182,6 +187,9 @@ def test_send_to_claude_normal_mode_keeps_bypass_permissions(monkeypatch) -> Non
 
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-normal")
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("hello")
 
@@ -201,7 +209,6 @@ def test_mode_cycle_synchronizes_command_handler() -> None:
     assert app._commands.mode == "P"
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_recovers_stale_lock_after_session_end(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -213,6 +220,9 @@ def test_send_to_claude_recovers_stale_lock_after_session_end(monkeypatch) -> No
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-stale")
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("resume please")
 
@@ -242,7 +252,6 @@ def test_send_to_claude_blocks_when_actively_running(monkeypatch) -> None:
     assert any("already running" in line for line in main.stream_output.errors)
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_recovers_running_lock_from_completed_session_meta(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -255,6 +264,9 @@ def test_send_to_claude_recovers_running_lock_from_completed_session_meta(monkey
     main = _DummyMain(running=True)
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("resume after stale completion")
 
@@ -473,10 +485,10 @@ def test_model_set_action_switches_provider_and_model(monkeypatch) -> None:
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_save_model_policy", lambda: None)
 
-    app._handle_action("model:set codex-5.4", "model set codex-5.4")
+    app._handle_action("model:set gpt-5.5", "model set gpt-5.5")
 
     assert app._active_provider == "codex"
-    assert app._active_model == "gpt-5.4"
+    assert app._active_model == "gpt-5.5"
     assert any("Model switched" in line for line in main.stream_output.system)
 
 
@@ -517,10 +529,13 @@ def test_model_set_resets_provider_session_even_same_provider(monkeypatch) -> No
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_save_model_policy", lambda: None)
 
-    app._handle_action("model:set opus-4.6", "model set opus-4.6")
+    # Switch to a DIFFERENT claude model (sonnet-4.6) — same provider, real
+    # model switch — so the "resets session even on same provider" path fires.
+    # (The default active model is now the floor opus-4.8, also claude.)
+    app._handle_action("model:set sonnet-4.6", "model set sonnet-4.6")
 
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-opus-4-6"
+    assert app._active_model == "claude-sonnet-4.6"
     assert app._provider_session_id is None
 
 
@@ -545,9 +560,9 @@ def test_model_set_action_accepts_index(monkeypatch) -> None:
 
     app._handle_action("model:set 3", "model set 3")
 
-    # Index 3 is now kimi-k2.5 (free frontier) per model_hierarchy.py
-    assert app._active_provider == "ollama"
-    assert app._active_model == "kimi-k2.5:cloud"
+    # Index 3 is now the FLOOR gpt-5.5 lane (codex) — the picker is floor-only.
+    assert app._active_provider == "codex"
+    assert app._active_model == "gpt-5.5"
 
 
 def test_model_auto_strategy_sets_profile(monkeypatch) -> None:
@@ -599,10 +614,10 @@ def test_inline_switch_short_circuits_send(monkeypatch) -> None:
     sent: list[str] = []
     monkeypatch.setattr(app, "_dispatch_prompt", lambda text, **kwargs: sent.append(text))
 
-    handled = app._maybe_handle_inline_model_switch("please switch to opus 4.6")
+    handled = app._maybe_handle_inline_model_switch("please switch to opus 4.8")
     assert handled is True
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-opus-4-6"
+    assert app._active_model == "claude-opus-4.8"
     assert sent == []
 
 
@@ -649,11 +664,13 @@ def test_auto_fallback_prefers_non_claude_provider_for_usage_exhaustion(monkeypa
 
     moved = app._try_auto_fallback(main.stream_output, reason="usage exhaustion")
 
+    # Floor-only picker: the first non-claude FLOOR fallback (responsive order)
+    # is the keyless Kimi K2.6 floor lane on Ollama — never a sub-floor model.
     assert moved is True
-    assert app._active_provider == "codex"
-    assert app._active_model == "gpt-5.4"
-    assert app._preferred_provider == "codex"
-    assert app._preferred_model == "gpt-5.4"
+    assert app._active_provider == "ollama"
+    assert app._active_model == "kimi-k2.6:cloud"
+    assert app._preferred_provider == "ollama"
+    assert app._preferred_model == "kimi-k2.6:cloud"
     assert policy_saves == [True]
     assert dispatched == [("keep going", False, False)]
-    assert any("Preferred route updated to codex:gpt-5.4" in line for line in main.stream_output.system)
+    assert any("Preferred route updated to ollama:kimi-k2.6:cloud" in line for line in main.stream_output.system)

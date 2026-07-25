@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from dharma_swarm.tui.engine.events import CanonicalEvent as LegacyCanonicalEvent
-from dharma_swarm.tui.engine.events import ToolCallComplete
+from dharma_swarm.tui.engine.events import ToolCallComplete, UserPrompt
 
 from .contracts import (
     CanonicalEventEnvelope,
@@ -101,7 +101,7 @@ def event_envelope_from_legacy_event(
     return CanonicalEventEnvelope(
         event_id=f"evt-{uuid4()}",
         event_type=event_type,
-        source=EventSource.PROVIDER,
+        source=EventSource.OPERATOR if isinstance(event, UserPrompt) else EventSource.PROVIDER,
         audience=audience,
         transport=transport,
         session_id=session_id,
@@ -154,18 +154,48 @@ def routing_decision_from_policy(
         if provider and model:
             fallback_chain.append(f"{provider}:{model}")
 
+    selected_provider = str(policy.get("selected_provider", "") or "")
+    selected_model = str(policy.get("selected_model", "") or "")
+    targets = [item for item in policy.get("targets", []) if isinstance(item, dict)]
+    active_target = next(
+        (
+            item
+            for item in targets
+            if str(item.get("provider", "") or "") == selected_provider
+            and str(item.get("model", "") or "") == selected_model
+        ),
+        None,
+    )
+    route_state = (
+        str(active_target.get("route_state", "") or "unverified")
+        if active_target is not None
+        else "unverified"
+    )
+    selectable = (
+        bool(active_target.get("selectable", active_target.get("picker_visible", False)))
+        if active_target is not None
+        else False
+    )
+
     return CanonicalRoutingDecision(
         route_id=str(policy.get("selected_route", "") or "unknown"),
-        provider_id=str(policy.get("selected_provider", "") or ""),
-        model_id=str(policy.get("selected_model", "") or ""),
+        provider_id=selected_provider,
+        model_id=selected_model,
         strategy=str(policy.get("strategy", "") or "responsive"),
         reason=reason,
         fallback_chain=fallback_chain,
-        degraded=not bool(policy.get("targets")),
+        degraded=route_state != "ready" or not selectable,
         metadata={
             "active_label": policy.get("active_label"),
             "default_route": policy.get("default_route"),
-            "targets": policy.get("targets", []),
+            "route_state": route_state,
+            "selectable": selectable,
+            "availability_reason": (
+                active_target.get("availability_reason")
+                if active_target is not None
+                else "route_target_missing"
+            ),
+            "targets": targets,
         },
     )
 

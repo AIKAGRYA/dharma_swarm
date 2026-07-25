@@ -9,7 +9,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-lc</string>
-        <string>cd /Users/dhyana/dharma_swarm || exit 1; set -a; source /Users/dhyana/.dharma/agent_keys.env; source /Users/dhyana/dharma_swarm/.env 2&gt;/dev/null; set +a; unset GITHUB_TOKEN; exec env PYTHONPATH=/Users/dhyana/dharma_swarm TINY_ROUTER_BACKEND=heuristic ./.venv/bin/python -m dharma_swarm.dgc_cli cron daemon</string>
+        <string>cd __DHARMA_SWARM_ROOT__ &amp;&amp; source scripts/load_runtime_env.sh &amp;&amp; exec dgc cron daemon</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -31,16 +31,12 @@
     <string>~/.dharma/logs/cron-daemon.stderr.log</string>
 
     <key>WorkingDirectory</key>
-    <string>/Users/dhyana/dharma_swarm</string>
+    <string>__DHARMA_SWARM_ROOT__</string>
 
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
         <string>/Users/dhyana/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <key>PYTHONPATH</key>
-        <string>/Users/dhyana/dharma_swarm</string>
-        <key>DHARMA_SPINE_DISPATCH</key>
-        <string>1</string>
     </dict>
 </dict>
 </plist>

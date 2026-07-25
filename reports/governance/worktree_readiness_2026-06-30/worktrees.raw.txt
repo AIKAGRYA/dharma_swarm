@@ -97,4 +97,3 @@ branch refs/heads/codex/reconciliation-promotion-20260626
 worktree /Users/dhyana/worktrees/pr689_closure
 HEAD 91dfe4db255f0078670288017683a00f5c901fcc
 branch refs/heads/pr-689-closure
-

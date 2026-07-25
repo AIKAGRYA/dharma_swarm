@@ -1,5 +1,6 @@
-"""Runtime organ — load a holon and run governed wake cycles."""
+"""Runtime facades over canonical holon runtime modules."""
 
-from __future__ import annotations
+from .bridge import RunningHolon, load_holon
+from .wake_cycle import holon_wake_cycle, run_holon_loop
 
-__all__ = ["bridge", "wake", "persistence", "provider"]
+__all__ = ["RunningHolon", "load_holon", "holon_wake_cycle", "run_holon_loop"]

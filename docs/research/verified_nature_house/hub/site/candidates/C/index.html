@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>The Seam — Candidate C (draft, not published)</title>
+<style>
+  /* Candidate C · "The Console" — terminal/instrument. Hermetic: no CDNs/fonts/network.
+     Bet: trust through rigor + density. A field monitor for the whole industry.
+     Honest: numbers are static + sourced + as-of-dated; the only motion is a cosmetic
+     cursor/type-in. No fake real-time data. */
+  :root{
+    --bg:#0b0f0d; --panel:#10160f; --panel-2:#0e130c; --line:#23301f;
+    --fg:#c9d4c8; --dim:#7e8d7c; --green:#5fbf86; --amber:#d6a23a; --red:#cf5a48;
+    --mono:"SFMono-Regular","SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);
+    font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--green);text-decoration:none}a:hover{text-decoration:underline}
+  .draft{background:#1a1206;border-bottom:1px solid var(--amber);color:var(--amber);
+    font-size:11px;letter-spacing:.06em;text-align:center;padding:.4rem}
+  /* status bar */
+  .status{display:flex;flex-wrap:wrap;gap:1.2rem;align-items:center;padding:.6rem 1rem;
+    border-bottom:1px solid var(--line);background:var(--panel);font-size:11px;letter-spacing:.05em}
+  .status .b{color:var(--green)}.status .sep{color:var(--line)}
+  .status .tag{color:var(--dim)}.status .tag b{color:var(--fg)}
+  .cursor{display:inline-block;width:7px;height:13px;background:var(--green);vertical-align:middle;animation:bl 1.1s steps(1) infinite}
+  @keyframes bl{50%{opacity:0}}
+  .wrap{max-width:1180px;margin:0 auto;padding:1.4rem 1rem 4rem}
+  .row2{display:grid;grid-template-columns:1.1fr 2fr;gap:1rem;margin-bottom:1rem}
+  @media(max-width:820px){.row2{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);background:var(--panel-2);padding:1rem 1.1rem}
+  .panel h2{font-size:11px;letter-spacing:.16em;color:var(--dim);font-weight:400;margin:0 0 .9rem;text-transform:uppercase}
+  /* seam index */
+  .idx .k{display:flex;justify-content:space-between;margin:.35rem 0}
+  .idx .k .nm{color:var(--fg)}.idx .k .nm small{color:var(--dim);margin-left:.4rem}
+  .idx .k .val{color:var(--green)}
+  .idx .k.lo .val{color:var(--amber)}.idx .k.zero .val{color:var(--red)}
+  .idx .out{margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--line);font-size:15px}
+  .idx .out b{color:var(--red);font-size:20px}
+  .idx .note{color:var(--dim);margin-top:.6rem;font-size:11px;line-height:1.5}
+  /* metrics strip */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem}
+  .m{border:1px solid var(--line);padding:.7rem;background:var(--panel-2)}
+  .m .lab{color:var(--dim);font-size:10px;letter-spacing:.08em}
+  .m .v{color:var(--fg);font-size:18px;margin:.25rem 0}
+  .m .v .u{color:var(--amber);font-size:11px}
+  .m .s{color:var(--green);font-size:10px}
+  /* the field grid */
+  table{width:100%;border-collapse:collapse;margin-top:.4rem;font-size:12px}
+  th{text-align:left;color:var(--dim);font-weight:400;font-size:10px;letter-spacing:.1em;
+    border-bottom:1px solid var(--line);padding:.5rem .6rem}
+  td{padding:.5rem .6rem;border-bottom:1px solid #161d14;vertical-align:top}
+  tr:hover td{background:#0f150d}
+  td.id{color:var(--dim)}td.cl{font-weight:600}
+  td.seam{color:var(--dim)}
+  tr.unocc td{background:#1a1206;border-top:1px solid var(--amber);border-bottom:1px solid var(--amber)}
+  tr.unocc td.cl{color:var(--amber)}tr.unocc td .hl{color:var(--amber)}
+  .c0{color:#5fbf86}.c1{color:#7bb5d6}.c2{color:#caa14a}.c3{color:#cf8a5b}.c4{color:#9b8fd1}.c5{color:#d6708f}
+  /* offer */
+  .tx{border:1px solid var(--green);background:#0c140e;padding:1.4rem;margin-top:1.4rem}
+  .tx .h{color:var(--green);font-size:11px;letter-spacing:.16em;margin-bottom:.6rem}
+  .tx p{margin:0;color:var(--fg);line-height:1.6;max-width:80ch}
+  footer{color:var(--dim);font-size:11px;border-top:1px solid var(--line);margin-top:1.6rem;padding-top:1.2rem;line-height:1.7}
+  @media (prefers-reduced-motion: reduce){.cursor{animation:none}}
+</style>
+</head>
+<body>
+<div class="draft">DRAFT · NOT PUBLISHED · DESIGN CANDIDATE C · $0 · SEED · NOTHING HERE IS LIVE</div>
+
+<div class="status">
+  <span class="b">SEAM // FIELD&nbsp;MONITOR</span>
+  <span class="sep">│</span><span class="tag">as-of <b>2026-06</b></span>
+  <span class="sep">│</span><span class="tag">rev <b>$0</b></span>
+  <span class="sep">│</span><span class="tag">stage <b>SEED 5/100</b></span>
+  <span class="sep">│</span><span id="boot" class="tag"></span><span class="cursor"></span>
+</div>
+
+<div class="wrap">
+  <div class="row2">
+    <!-- SEAM INDEX -->
+    <div class="panel idx">
+      <h2>Seam Index · our construct</h2>
+      <div class="k"><span class="nm">DIVERSE_COMPETENCE<small>~105 actors</small></span><span class="val">0.92</span></div>
+      <div class="k lo"><span class="nm">ERROR_DECORRELATION<small>shared blind spots</small></span><span class="val">0.07</span></div>
+      <div class="k zero"><span class="nm">QUALITY_AGGREGATION<small>none</small></span><span class="val">0.02</span></div>
+      <div class="out">LIFT = C × D × A = <b>≈ 0.00</b></div>
+      <div class="note">A hundred experts. No collective lift over the best single rater
+      (Condorcet 1785 · Krogh–Vedelsby 1995). The math is in <a href="#">/proof</a>.</div>
+    </div>
+    <!-- METRICS -->
+    <div class="panel">
+      <h2>Field telemetry · sourced, dated, banded</h2>
+      <div class="metrics">
+        <div class="m"><div class="lab">DC_POWER_TWH</div><div class="v">415→945 <span class="u">band</span></div><div class="s">IEA · 2024→2030 [IND]</div></div>
+        <div class="m"><div class="lab">BIODIV_MKT_USD</div><div class="v">~8M</div><div class="s">Pollination [IND]</div></div>
+        <div class="m"><div class="lab">NATURE_FIN_GAP</div><div class="v">~700B<span class="u">/yr</span></div><div class="s">UNDP/WEF [IND]</div></div>
+        <div class="m"><div class="lab">CCP_LABELLED</div><div class="v">~4%</div><div class="s">ICVCM 2024 [IND]</div></div>
+        <div class="m"><div class="lab">REMOVAL_PREMIUM</div><div class="v">10–100× <span class="u">band</span></div><div class="s">market [IND]</div></div>
+        <div class="m"><div class="lab">RATER_AGREEMENT</div><div class="v">LOW</div><div class="s">CMW "rating the raters" [IND]</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE FIELD GRID -->
+  <div class="panel">
+    <h2>The field · ~105 actors · the slice each holds, and the seam it leaves</h2>
+    <table>
+      <thead><tr><th>ID</th><th>CLUSTER</th><th>ACTOR</th><th>HOLDS</th><th>SEAM (our reading)</th></tr></thead>
+      <tbody>
+        <tr><td class="id">A·01</td><td class="cl c0">ENERGY</td><td>NVIDIA</td><td>the GPUs; "power-limited industry"</td><td class="seam">efficiency-per-watt, never absolute reduction; no link to restoration</td></tr>
+        <tr><td class="id">B·19</td><td class="cl c1">CARBON</td><td>Microsoft</td><td>~80–90% of durable-removal demand</td><td class="seam">a one-buyer market; no link from its footprint to regeneration</td></tr>
+        <tr><td class="id">B·31</td><td class="cl c1">RATING</td><td>Sylvera</td><td>credit ratings</td><td class="seam">rated one project high while peers rated it low; no one reconciles raters</td></tr>
+        <tr><td class="id">C·37</td><td class="cl c2">MRV</td><td>Pachama</td><td>satellite+LiDAR forest-carbon</td><td class="seam">canopy proxy; additionality is a model prediction, not ground truth</td></tr>
+        <tr><td class="id">C·53</td><td class="cl c2">MRV</td><td>NatureMetrics</td><td>eDNA biodiversity</td><td class="seam">presence/richness, not abundance/carbon; disconnected from the carbon stack</td></tr>
+        <tr><td class="id">D·69</td><td class="cl c3">JUSTICE</td><td>ICCA Consortium</td><td>IPLC territory custody</td><td class="seam">holds the custody evidence; structurally hard to connect to finance</td></tr>
+        <tr><td class="id">E·74</td><td class="cl c4">STANDARD</td><td>TNFD</td><td>nature disclosure (500+ adopters)</td><td class="seam">disclosure ≠ verification; "aligned" is self-declared</td></tr>
+        <tr><td class="id">E·82</td><td class="cl c4">FINANCE</td><td>Just Climate</td><td>natural-climate investment</td><td class="seam">capital parked at the verification gate</td></tr>
+        <tr><td class="id">F·92</td><td class="cl c5">THINKER</td><td>Dasgupta Review</td><td>nature-as-asset economics</td><td class="seam">the accounting frame, not the verification substrate</td></tr>
+        <tr class="unocc"><td class="id">——</td><td class="cl">SEAM</td><td><span class="hl">UNOCCUPIED</span></td><td><span class="hl">the decorrelated, receipted, footprint-metered verification layer</span></td><td class="seam"><span class="hl">no actor holds this position. that is the finding.</span></td></tr>
+      </tbody>
+    </table>
+    <div style="color:var(--dim);font-size:11px;margin-top:.7rem">9 of ~105 shown · full sourced map: <a href="../../THE_HUNDRED.md">THE_HUNDRED.md</a> · names can be redacted at publish (<code>build.py --redact</code>)</div>
+  </div>
+
+  <div class="tx">
+    <div class="h">// TRANSMISSION · THE OFFER</div>
+    <p>A free, decorrelated second opinion on one public restoration or carbon-removal
+    claim — ensembling independent methods to surface the counterfactual and the
+    disagreement single-vendor judges miss, with our own estimated footprint printed on
+    the output. No cost, no strings. If it helps, it helps; if it's wrong, we show our
+    work. Earned, not decreed.</p>
+  </div>
+
+  <footer>
+    $0 lifetime revenue · seed-stage · independent analysis of public actors · no endorsements ·
+    not affiliated with any named actor · figures sourced/dated/banded · "Seam Index" + "the Circle" are our constructs<br />
+    Candidate C of several — see <a href="../README.md">the design competition</a>. Scaffold for review, not a public site.
+  </footer>
+</div>
+
+<script>
+  // hermetic, cosmetic only: type the boot tagline once. No data is faked.
+  (function(){
+    var el=document.getElementById("boot"); if(!el) return;
+    var msg="diagnosing field…", i=0, reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if(reduce){el.textContent=msg;return;}
+    (function tick(){ el.textContent=msg.slice(0,i++); if(i<=msg.length) setTimeout(tick,55); })();
+  })();
+</script>
+</body>
+</html>

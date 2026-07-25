@@ -1,13 +1,20 @@
-# Sovereign Agent Holons — the single home
+# Sovereign Agent Holons — Historical Design Corpus
 
-**Created:** 2026-06-08 · **Status:** brainstorm → design → first-brick spec → Wen's reconciled plan folded in · **Owner:** Dhyana + opus_composer
+> **Authority notice (2026-07-13):** This folder preserves the June research,
+> design, and first-brick lineage. It is not the current code/body or liveness
+> authority. Start with
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> for the holon-specific body synthesis, dated witness, recent work, and gaps.
 
-> **New here?** Read [INDEX.md](INDEX.md) first (5 min). **Need a file?** [MAP.md](MAP.md) lists every artifact.
-> **Want the truth about what's built vs. only written?** Read **[STATE_OF_TRUTH.md](STATE_OF_TRUTH.md)** — docs vs. code vs. wired, verified against source 2026-06-08.
+**Created:** 2026-06-08 · **Status:** historical design/research corpus · **Owner:** Dhyana + opus_composer
+
+> **Researching the June design lineage?** Read [INDEX.md](INDEX.md) first (5 min).
+> [MAP.md](MAP.md) lists the historical artifacts, and
+> [STATE_OF_TRUTH.md](STATE_OF_TRUTH.md) preserves the 2026-06-08 code audit.
 > Ingested source material (qwen vision docs + Perplexity reports, accuracy-flagged) is under [`ingested/`](ingested/INGESTED_MANIFEST.md).
 > **Competitive landscape** — the 10 most powerful persistent agents of mid-2026 mapped to our five properties, the empty governance seat, and who to copy per organ: **[FRONTIER_PEERS.md](FRONTIER_PEERS.md)**.
 
-This directory is the one home for the **sovereign holon** initiative: making dharma_swarm's
+This directory is the historical design home for the **sovereign holon** initiative: making dharma_swarm's
 registered persistent agents into *holons* — each one simultaneously
 
 - a **sovereign agent** you can sit with and talk to on its own terms (its own identity, memory,
@@ -26,9 +33,9 @@ from its banks."
 
 | File | What it is |
 |---|---|
-| `README.md` | This file — verified state + addendum of new 2026-06-08 findings. |
-| `INDEX.md` | **READ FIRST** — shortest path through the initiative; build sequence at a glance. |
-| `MAP.md` | **Where does X live?** — every sovereign-holon artifact in or out of this folder. |
+| `README.md` | This file — historical state summary + 2026-06-08 findings. |
+| `INDEX.md` | Historical read order through the June initiative. |
+| `MAP.md` | Historical artifact index in and beyond this folder. |
 | `00_RESEARCH_DOSSIER.md` | 52-source research dossier — frontier landscape, verified internal-wiring reality, gap analysis, two ironies. |
 | `01_BUILD_GUIDE.md` | Original organ-model walk-through and architecture diagram. Subsumed by 02+05, kept for reference. |
 | `02_FIRST_BRICK_SPEC.md` | Executable spec for the first brick — 6 acceptance criteria, exact file:line evidence, prompt-injection scope, two-tier model routing. |

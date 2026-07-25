@@ -99,7 +99,6 @@ jobs:
 
             # Close if beyond close threshold (unless draft)
             if [ "$days_stale" -ge "$close_days" ] && [ "$is_draft" != "true" ]; then
-              summary+="- **CLOSED** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
               if [ "$DRY_RUN" = "false" ]; then
                 close_msg="## 🗂️ Auto-closed: stale PR
 
@@ -113,12 +112,22 @@ jobs:
           **To reopen:** If this work is still needed, reopen the PR and rebase onto \`main\`. Consider marking long-running work as a draft."
 
                 gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-                gh pr close "$number" --repo "$GH_REPO" --comment "Auto-closed by stale-pr governance workflow" || true
-
-                # Delete the branch (orphan cleanup)
-                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                # The close is the job's purpose: count it only when it happened,
+                # and say so when it did not (a rejected close used to be counted
+                # and reported as CLOSED — a silent misreport).
+                if gh pr close "$number" --repo "$GH_REPO" --comment "Auto-closed by stale-pr governance workflow"; then
+                  closed_count=$((closed_count + 1))
+                  summary+="- **CLOSED** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
+                  # Delete the branch (orphan cleanup)
+                  gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                else
+                  echo "::warning::close of #${number} was rejected — reported as FAILED-TO-CLOSE, not closed"
+                  summary+="- **FAILED-TO-CLOSE** #${number}: ${title}\n"
+                fi
+              else
+                closed_count=$((closed_count + 1))
+                summary+="- **WOULD CLOSE (dry-run)** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
               fi
-              closed_count=$((closed_count + 1))
 
             # Warn if at warning threshold but not yet closeable
             elif [ -z "$has_stale" ]; then

@@ -266,21 +266,21 @@ def test_install_launchd_service_writes_absolute_paths(tmp_path, monkeypatch):
     (scripts_dir / "com.dharma.cron-daemon.plist").write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
-<dict>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/opt/homebrew/bin/dgc</string>
-        <string>cron</string>
-        <string>daemon</string>
-    </array>
+	<dict>
+	    <key>ProgramArguments</key>
+	    <array>
+	        <string>/bin/bash</string>
+	        <string>-lc</string>
+	        <string>cd __DHARMA_SWARM_ROOT__ &amp;&amp; source scripts/load_runtime_env.sh &amp;&amp; exec dgc cron daemon</string>
+	    </array>
     <key>StandardOutPath</key>
     <string>~/.dharma/logs/cron-daemon.stdout.log</string>
     <key>StandardErrorPath</key>
     <string>~/.dharma/logs/cron-daemon.stderr.log</string>
-    <key>WorkingDirectory</key>
-    <string>~</string>
-</dict>
-</plist>
+	    <key>WorkingDirectory</key>
+	    <string>__DHARMA_SWARM_ROOT__</string>
+	</dict>
+	</plist>
 """,
         encoding="utf-8",
     )
@@ -305,7 +305,8 @@ def test_install_launchd_service_writes_absolute_paths(tmp_path, monkeypatch):
     assert "~" not in rendered
     assert f"{home}/.dharma/logs/cron-daemon.stdout.log" in rendered
     assert f"{home}/.dharma/logs/cron-daemon.stderr.log" in rendered
-    assert f"<string>{home}</string>" in rendered
+    assert "source scripts/load_runtime_env.sh" in rendered
+    assert f"<string>{repo_root}</string>" in rendered
 
     @patch("dharma_swarm.custodians._get_model_for_role", return_value="test-model/v1")
     def test_dry_run_no_files_changed(self, mock_model, py_tree, monkeypatch):
@@ -390,7 +391,10 @@ class TestCronIntegration:
         assert ok is True
         assert err is None
         assert "linter" in output
-        mock_cycle.assert_called_once_with(roles=["linter", "doc_patcher"], dry_run=False)
+        # PR-001 fail-closed: scheduled custodian runs are dry-run by default
+        # (no agent spawn, no commit, no merge) unless the full promotion
+        # infrastructure + explicit opt-in are present.
+        mock_cycle.assert_called_once_with(roles=["linter", "doc_patcher"], dry_run=True)
 
     @patch("dharma_swarm.custodians.run_custodian_cycle")
     def test_cron_run_fn_partial_failure(self, mock_cycle):
@@ -408,7 +412,8 @@ class TestCronIntegration:
             CustodianResult(role="test_gap_closer", success=True, model="m"),
         ]
         ok, output, err = custodians_run_fn({"prompt": "daily"})
-        mock_cycle.assert_called_once_with(roles=["test_gap_closer"], dry_run=False)
+        # PR-001 fail-closed: dry-run by default (see test_cron_run_fn_success).
+        mock_cycle.assert_called_once_with(roles=["test_gap_closer"], dry_run=True)
 
     @patch("dharma_swarm.custodians.run_custodian_cycle", side_effect=RuntimeError("boom"))
     def test_cron_run_fn_exception(self, mock_cycle):

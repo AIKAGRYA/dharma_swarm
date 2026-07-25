@@ -1,0 +1,66 @@
+{
+  "provider": "claude_code",
+  "model": "claude-sonnet-4-5",
+  "spine_dispatch": "1",
+  "read_only_boot": "1",
+  "ollama_force_local": "1",
+  "agents": 2,
+  "tasks_requested": 4,
+  "tasks_completed": 4,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "served_provider_truth": {
+    "runtime_db": "/root/.dharma/state/runtime.db",
+    "exists": true,
+    "completed_runs_with_truth": 5,
+    "delegation_receipts_with_truth": 5,
+    "runtime_receipts_with_truth": 0,
+    "sample": {
+      "source": "receipt_json",
+      "run_id": "run_deb3cb0e42ab484c",
+      "served_provider": "claude_code",
+      "served_model": "claude-sonnet-4-5"
+    }
+  },
+  "evidence_receipts": {
+    "34b7de61-303b-40c4-a3d0-2ba59eb0d598": "ok",
+    "47b75492-6449-487a-b57a-b253e6678897": "ok",
+    "dc7601b7-7a14-4b57-987c-e6d805052fd4": "ok",
+    "7f6cedb3-333b-4d02-8144-01851e319f93": "ok"
+  },
+  "tick_errors": [],
+  "ticks": 148,
+  "stigmergy_hot_paths": [],
+  "state_dir": "/root/.dharma",
+  "canonical_state": true,
+  "tasks": [
+    {
+      "task_id": "6262bfc6d2734c2a",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "The sandbox restricts writes outside the working directory. The answer to the task is complete:\n\n**Why feedback loops need both sensing and acting:** A feedback"
+    },
+    {
+      "task_id": "62d9141aa7c7476f",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "<mem>\nconfidence: 0.95\nkey_facts:\n- Core answer delivered: 3 failure modes with mitigations\n- Sandbox blocks directory creation and writes outside current worki"
+    },
+    {
+      "task_id": "d7c3fd440a4145d6",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "**Task Result:**\n\n**Exponential backoff retry principle:** Double the wait time between retry attempts (starting from a small base delay) and cap at a maximum i"
+    },
+    {
+      "task_id": "070278a36fb84485",
+      "title": "loop1-closure-0004",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "The sandbox restricts writes outside the working directory. The core answer is complete above.\n\n**Task Result:**\n\nA rate limit constrains the *speed* of resourc"
+    }
+  ]
+}

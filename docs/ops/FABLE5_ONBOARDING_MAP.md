@@ -18,7 +18,11 @@ cd /Users/dhyana/dharma_swarm_main
 make onboard
 ```
 
-Do not read the repo from a cold start. `make onboard` is the single door into current operating reality; it renders active tracks, branch state, dirty pressure, live ops, broken-register items, hygiene, and tool guidance from existing owners.
+Do not read the repo from a cold start. Run `make onboard` for compact,
+read-only session status. Use `make organism-status` for the deeper organism
+projection. Before editing, bind a packet and run
+`make agent-build-preflight PACKET=<path>`; onboarding status alone is not edit
+permission.
 
 ## First Five Surfaces
 
@@ -118,5 +122,5 @@ If the edit broadens beyond docs, also run:
 
 ```bash
 make hygiene-check
-make agent-build-closeout
+make agent-build-closeout PACKET=<path>
 ```

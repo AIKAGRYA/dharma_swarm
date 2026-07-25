@@ -3,7 +3,7 @@
 Layer 0 (constitution): telos_gates, dharma_kernel, invariants
 Layer 1 (substrate): traces, signal_bus, message_bus, telemetry_plane
 Layer 2 (services): orchestrator, providers, agent_runner, checkpoint, handoff, models
-Layer 3 (living): evolution, stigmergy, strange_loop, organism, cascade, diversity_archive
+Layer 3 (living): evolution, stigmergy, strange_loop, organism, cascade
 Layer 4 (surface): swarmlens_app, dgc_cli
 Layer 5 (verification): monitor, vsm_channels, transcendence_metrics
 
@@ -25,7 +25,7 @@ _LAYER_DEFS: dict[int, set[str]] = {
     0: {"telos_gates", "dharma_kernel", "invariants"},
     1: {"traces", "signal_bus", "message_bus", "telemetry_plane"},
     2: {"orchestrator", "providers", "agent_runner", "checkpoint", "handoff", "models"},
-    3: {"evolution", "stigmergy", "strange_loop", "organism", "cascade", "diversity_archive"},
+    3: {"evolution", "stigmergy", "strange_loop", "organism", "cascade"},
     4: {"swarmlens_app", "dgc_cli"},
     5: {"monitor", "vsm_channels", "transcendence_metrics"},
 }

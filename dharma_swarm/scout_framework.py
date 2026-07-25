@@ -27,7 +27,6 @@ import logging
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +123,7 @@ DOMAINS: dict[str, dict[str, Any]] = {
         "model": "xiaomi/mimo-v2-pro",
         "files": [
             "dharma_swarm/evolution.py",
-            "dharma_swarm/diversity_archive.py",
+            "dharma_swarm/archive.py",
         ],
         "commands": [
             ("evolution archive", "wc -l ~/.dharma/evolution/archive.jsonl 2>/dev/null || echo 'no archive'"),
@@ -183,9 +182,27 @@ DOMAINS: dict[str, dict[str, Any]] = {
     },
 }
 
-# Default models for cost tiers
-FREE_MODEL = "glm-5:cloud"  # Ollama Cloud — $0
-CHEAP_MODEL = "xiaomi/mimo-v2-pro"  # OpenRouter — $1/M
+# Default models for cost tiers. The free Ollama-Cloud lane is sourced from the
+# ONE model pool at the FLOOR (glm-5), so no model-id literal lives here — the
+# pool's ollama_cloud_model_ids() is the single source. ``_glm5_cloud_id`` picks
+# the glm-5 entry's Ollama-Cloud route.
+from dharma_swarm import model_pool as _model_pool
+
+
+def _glm5_cloud_id() -> str:
+    """The glm-5 Ollama-Cloud route id from the pool (FLOOR for the glm family)."""
+    entry = _model_pool.get_entry("glm-5")
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.endswith(":cloud"):
+                return mid
+    # Fail-safe: first cloud id the pool serves (never strands the scout).
+    cloud_ids = _model_pool.ollama_cloud_model_ids()
+    return cloud_ids[0] if cloud_ids else "glm-5"
+
+
+FREE_MODEL = _glm5_cloud_id()  # Ollama Cloud — $0, glm-5 floor via the pool
+CHEAP_MODEL = "xiaomi/mimo-v2-pro"  # OpenRouter — $1/M (xiaomi, off-pool tier)
 
 
 # ---------------------------------------------------------------------------

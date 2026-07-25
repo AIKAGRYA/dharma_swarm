@@ -14,6 +14,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.archive import read_one_wire_fitness_authority
+from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.loop_closure_quarantine import (
+    LIVE_ROW_PREDICATE,
+    has_quarantine_columns,
+    quarantined_failure_counts,
+)
+
 try:  # pragma: no cover - exercised by repo runtime; tests run with PyYAML.
     import yaml  # type: ignore
 except Exception:  # pragma: no cover
@@ -21,16 +29,25 @@ except Exception:  # pragma: no cover
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_STATE_DIR = Path.home() / ".dharma"
+DEFAULT_STATE_DIR = dharma_state_dir()
 
 AGENT_ID = "cybernetics_codex"
 CALLSIGN = "cybernetics-codex"
-SCHEMA_VERSION = "cybernetics_codex.audit.v1"
+SCHEMA_VERSION = "cybernetics_codex.audit.v3"
+LOOP1_BOUNDED_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop1*_spine_dispatch.json"
+# General per-loop closure receipts for the cascade (loops 2..11). Each proves
+# its OWN sense->interpret->constrain->act->adapt cycle on real data, mirroring
+# the Loop 1 bounded-replay pattern but loop-agnostic. The audit VERIFIES the
+# structural evidence (see _evaluate_loop_closure_replay); it never trusts a
+# bare "closed" boolean carried by the receipt itself.
+LOOP_CLOSURE_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop{number}_*closure.json"
+LOOP_CLOSURE_TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 REPO_AGENT_HOME = Path("docs/agents/cybernetics_codex")
 SEED_FILE = REPO_AGENT_HOME / "agent.seed.yaml"
 SOUL_FILE = REPO_AGENT_HOME / "SOUL.md"
 CONTEXT_ENGINEERING_FILE = REPO_AGENT_HOME / "CONTEXT_ENGINEERING.md"
-NATS_SUBJECT = "dharma.a2a.cybernetics-codex"
+A2A_INBOX_ROUTE = "agent-inbox"
+NATS_SUBJECT = "dharma.agent.cybernetics_codex.inbox"
 
 OWNED_SURFACES = [
     "docs/ops/CYBERNETICS_CODEX.md",
@@ -64,6 +81,11 @@ VERIFIER_COMMANDS = [
     "pytest -q tests/test_cybernetics_codex.py tests/test_manifest_health.py",
 ]
 
+SERVED_PROVIDER_KEYS = ("actual_served_provider", "served_provider", "provider")
+SERVED_MODEL_KEYS = ("actual_served_model", "served_model", "model")
+NON_PROVIDER_VALUES = {"", "none", "null", "unknown", "orchestrator"}
+SQLITE_IN_CHUNK_SIZE = 500
+
 LOOPS = [
     (1, "swarm_task_loop", "Swarm Task Loop"),
     (2, "organism_heartbeat", "Organism Heartbeat"),
@@ -80,12 +102,77 @@ LOOPS = [
     (13, "free_evolution_grind", "Free Evolution Grind"),
 ]
 
+VERDICT_TIERS = {
+    "HARNESS_PROVEN": (
+        "A bounded replay/regression harness proves the loop can execute "
+        "sense -> interpret -> constrain -> act -> adapt, but the evidence may "
+        "be scratch or manufactured by the harness and is not production-live "
+        "closure."
+    ),
+    "CLOSED_LIVE": (
+        "The loop is proven from its declared live owner surface, with no "
+        "scratch-only or self-seeded evidence standing in for production state."
+    ),
+}
+
+LIVE_OWNER_SURFACE_CRITERIA = {
+    1: (
+        "runtime.delegation_runs/runtime_receipts in the audited daemon scope "
+        "show real completed provider work, zero dispatch_dropoff, and a later "
+        "routing/adaptation read caused by that work"
+    ),
+    2: (
+        "standing organism pulse/algedonic owner surface shows a non-scratch "
+        "daemon cycle whose adaptive state is consumed by a later daemon cycle"
+    ),
+    3: (
+        "live DarwinEngine/evolution archive owner surface shows a governed "
+        "non-scratch proposal outcome consumed by a later predictor/archive "
+        "selection without internal fitness contamination"
+    ),
+    4: (
+        "live memory owner surface shows external/completed work, not the "
+        "closure script itself, consolidated and consumed by later context"
+    ),
+    5: (
+        "live zeitgeist/environment owner surface shows non-synthetic external "
+        "signals changing a later gate/priority decision"
+    ),
+    6: (
+        "live witness/runtime receipt owner surface shows production completions "
+        "audited and governance marks consumed by downstream routing"
+    ),
+    7: (
+        "live trajectory owner surface contains non-synthetic recent trajectories "
+        "that the flywheel scores and persists into later strategy selection"
+    ),
+    8: (
+        "live recognition/context owner surface shows non-scratch loop-history "
+        "receipts generating a seed later consumed by an agent context build"
+    ),
+    9: (
+        "live conductor/cron owner surface shows production scheduler state "
+        "changed by observed signals and suppressing/altering a later tick"
+    ),
+    10: (
+        "live context-package owner surface shows production memory inputs "
+        "changing a served context package later read by an agent"
+    ),
+    11: (
+        "live replication owner surface shows a real proposal materialized into "
+        "roster/probation state and observed by a later monitor cycle"
+    ),
+    12: "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
+    13: "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
+}
+
 
 def build_audit(
     *,
     repo_root: Path | str = REPO_ROOT,
     state_dir: Path | str = DEFAULT_STATE_DIR,
     runtime_db: Path | str | None = None,
+    since: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build a read-only cybernetic closure-ledger packet."""
@@ -94,13 +181,15 @@ def build_audit(
     db_path = Path(runtime_db) if runtime_db else state / "state" / "runtime.db"
     observed_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
 
-    runtime = read_runtime_summary(db_path)
+    runtime = read_runtime_summary(db_path, since=since)
     one_wire = read_one_wire_summary(state)
     archive = read_archive_summary(state)
     manifest = read_manifest_registration(repo)
     active_track = read_active_track_summary(repo)
     seed = read_seed_summary(repo)
     live_registration = read_live_registration_summary(state)
+    bounded_replays = read_bounded_replays_summary(repo)
+    bounded_replays.update(read_loop_closure_replays(repo))
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -122,118 +211,55 @@ def build_audit(
         "seed_registration": seed,
         "live_registration": live_registration,
         "runtime": runtime,
+        "bounded_replays": bounded_replays,
         "one_wire": one_wire,
         "evolution_archive": archive,
-        "loop_statuses": build_loop_statuses(runtime, one_wire, archive),
+        "loop_statuses": build_loop_statuses(
+            runtime,
+            one_wire,
+            archive,
+            bounded_replays=bounded_replays,
+        ),
+        "verdict_tiers": VERDICT_TIERS,
+        "live_owner_surface_criteria": {
+            f"loop{number}": criterion
+            for number, criterion in LIVE_OWNER_SURFACE_CRITERIA.items()
+        },
         "verifier_commands": VERIFIER_COMMANDS,
         "closure_rule": (
-            "A loop is closed only when sense -> interpret -> constrain -> act -> "
-            "adapt all fire on real data, every transition emits a receipt to its "
-            "owner surface, and a fresh agent can replay an automated check."
+            "A production-live loop is closed only when sense -> interpret -> "
+            "constrain -> act -> adapt all fire on live owner-surface data, "
+            "every transition emits a receipt to that owner surface, and a "
+            "fresh agent can replay an automated check. Scratch or self-seeded "
+            "bounded replays are HARNESS_PROVEN, not CLOSED_LIVE."
+        ),
+        "loop1_acceptance_rule": (
+            "A2A-surface rows may legitimately leave delegation_runs.receipt_json "
+            "empty; the production truth this audit requires is actual served "
+            "provider/model on delegation metadata or runtime_receipts, with no "
+            "dispatch_dropoff in the audited scope."
         ),
         "next_build_packet": [
-            "Add an end-to-end fake-provider Loop 1 closure test requiring persisted EvidenceReceipt.",
-            "Use Opus Phase 1b output as input evidence, then cross-check runtime DB, witness logs, and orient output.",
+            "Keep Loop 1 bounded replay green; drain or quarantine historical dispatch_dropoff rows (scripts/runtime/dispatch_dropoff_quarantine.py, receipted) before any standing all-history daemon-clean claim.",
+            "Promote HARNESS_PROVEN loops to CLOSED_LIVE only after one live-owner-surface criterion passes per loop.",
+            "Add an audit mode that can re-execute replay commands or record why re-execution was skipped.",
             "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
             "Regenerate the loop map from a live projection instead of hand-editing stale prose.",
         ],
     }
 
-
-def build_external_worker_registration(
-    *,
-    dharma_home: Path | str | None = None,
-    repo_root: Path | str = REPO_ROOT,
-):
-    """Construct the Stage-1 registration record for the steward.
-
-    This is intentionally local metadata only: it creates a discoverable dock,
-    external registration, A2A card, and onboarding receipt when passed to the
-    registration desk. It does not start a daemon or bind a provider.
-    """
-    from dharma_swarm.external_agent_registration import (
-        AutonomyPolicy,
-        ExternalAgentAuthority,
-        ExternalAgentStatus,
-        ExternalRoamingWorker,
-        WorkspacePolicy,
-        external_agent_sandbox_root,
-    )
-
-    home = Path(dharma_home) if dharma_home else DEFAULT_STATE_DIR
-    repo = Path(repo_root)
-    return ExternalRoamingWorker(
-        agent_uid=AGENT_ID,
-        callsign=CALLSIGN,
-        display_name="Cybernetics Codex Steward",
-        harness="codex",
-        model_identity="codex",
-        department="cybernetics",
-        role="closure_ledger_steward",
-        squad_id="loop_closure",
-        team_id="dharma_swarm",
-        endpoint="pending://manual",
-        mailbox=f"nats://{NATS_SUBJECT}",
-        authority=ExternalAgentAuthority.EXTERNAL_WORKER_EVIDENCE_ONLY,
-        autonomy_policy=AutonomyPolicy(
-            mode="manual",
-            requires_approval=True,
-            explicit_task_assignment_required=True,
-        ),
-        workspace_policy=WorkspacePolicy(
-            sandbox_root=str(external_agent_sandbox_root(home) / AGENT_ID),
-            repo_writes_allowed=False,
-            canonical_dharma_dir_writes_allowed=False,
-        ),
-        memory_namespace=f"agent:{AGENT_ID}",
-        trace_identity=f"trace:{AGENT_ID}",
-        status=ExternalAgentStatus.REGISTERED,
-        is_returning_historical_embodiment=False,
-        notes=(
-            "Read-only cybernetic loop closure steward. Evidence-only: audits "
-            "loop closure claims, One Wire invariants, provider health receipts, "
-            "and VSM/cybernetic stewardship surfaces. No provider calls, source "
-            "writes, dispatch, PR approval, spend, or live external account action."
-        ),
-        registration_source="cybernetics_codex_registration",
-        capabilities=(
-            "cybernetic_loop_audit",
-            "closure_ledger",
-            "vsm_mapping",
-            "one_wire_guardian_review",
-            "receipt_integrity",
-            "context_engineering",
-        ),
-        metadata={
-            "repo_home": str(repo / REPO_AGENT_HOME),
-            "seed_path": str(repo / SEED_FILE),
-            "soul_file": str(repo / SOUL_FILE),
-            "context_engineering_desk": str(repo / CONTEXT_ENGINEERING_FILE),
-            "charter": str(repo / "docs/ops/CYBERNETICS_CODEX.md"),
-            "manifest_agent_id": AGENT_ID,
-            "nats_subject": NATS_SUBJECT,
-            "nats_runtime_status": "declared_not_started",
-            "a2a_transport_status": "card_registered_only_after_onboarding",
-            "authority_boundary": "external_worker_evidence_only",
-            "no_provider_calls": True,
-            "no_autonomous_dispatch": True,
-            "one_wire_invariant": (
-                "internal artifacts never touch archive fitness; only "
-                "countersigned external acted receipts above quorum do"
-            ),
-        },
-    )
-
-
-def read_runtime_summary(db_path: Path) -> dict[str, Any]:
+def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "path": str(db_path),
         "exists": db_path.exists(),
         "read_ok": False,
+        "scope": {"since": since},
         "tables": {},
         "delegation_runs": {},
         "failure_codes": [],
+        "quarantine": {},
         "receipt_json": {},
+        "provider_truth": {},
     }
     if not db_path.exists():
         summary["error"] = "runtime DB missing"
@@ -259,8 +285,14 @@ def read_runtime_summary(db_path: Path) -> dict[str, Any]:
             summary["tables"][table] = _table_summary(conn, table)
 
         if _table_exists(conn, "delegation_runs"):
+            where_sql, where_args = _time_scope_sql(
+                conn,
+                "delegation_runs",
+                "coalesce(completed_at, started_at)",
+                since,
+            )
             row = conn.execute(
-                """
+                f"""
                 select
                   count(*) as total,
                   sum(status='completed') as completed,
@@ -270,38 +302,79 @@ def read_runtime_summary(db_path: Path) -> dict[str, Any]:
                   min(started_at) as first_started,
                   max(coalesce(completed_at, started_at)) as last_seen
                 from delegation_runs
+                {where_sql}
                 """
+                ,
+                where_args,
             ).fetchone()
             summary["delegation_runs"] = dict(row or {})
+            # Live failure counts EXCLUDE quarantined-historical rows (marker
+            # columns owned by loop_closure_quarantine — no new store) while the
+            # quarantined tally is reported SEPARATELY below, never hidden.
+            quarantine_supported = has_quarantine_columns(conn)
+            live_failed = "status='failed'"
+            if quarantine_supported:
+                live_failed = f"{live_failed} and {LIVE_ROW_PREDICATE}"
             summary["failure_codes"] = [
                 dict(r)
                 for r in conn.execute(
-                    """
+                    f"""
                     select
                       failure_code,
                       count(*) as count,
                       max(coalesce(completed_at, started_at)) as last_seen
                     from delegation_runs
-                    where status='failed'
+                    {_and_where(where_sql, live_failed)}
                     group by failure_code
                     order by count desc
                     limit 12
-                    """
+                    """,
+                    where_args,
                 ).fetchall()
             ]
-            receipt_row = conn.execute(
-                """
-                select
-                  count(*) as total,
-                  sum(receipt_json is not null and length(receipt_json)>2) as rows_with_receipt_json,
-                  max(case
-                    when receipt_json is not null and length(receipt_json)>2
-                    then coalesce(completed_at, started_at)
-                  end) as latest_receipt_run
-                from delegation_runs
-                """
-            ).fetchone()
-            summary["receipt_json"] = dict(receipt_row or {})
+            quarantined_codes = quarantined_failure_counts(conn, where_sql, where_args)
+            summary["quarantine"] = {
+                "supported": quarantine_supported,
+                "failure_codes_quarantined": quarantined_codes,
+                "failed_rows_quarantined": sum(
+                    int(r.get("count") or 0) for r in quarantined_codes
+                ),
+                "dispatch_dropoff_quarantined": next(
+                    (
+                        int(r.get("count") or 0)
+                        for r in quarantined_codes
+                        if str(r.get("failure_code")) == "dispatch_dropoff"
+                    ),
+                    0,
+                ),
+            }
+            if _column_exists(conn, "delegation_runs", "receipt_json"):
+                receipt_row = conn.execute(
+                    f"""
+                    select
+                      count(*) as total,
+                      sum(receipt_json is not null and length(receipt_json)>2) as rows_with_receipt_json,
+                      max(case
+                        when receipt_json is not null and length(receipt_json)>2
+                        then coalesce(completed_at, started_at)
+                      end) as latest_receipt_run
+                    from delegation_runs
+                    {where_sql}
+                    """,
+                    where_args,
+                ).fetchone()
+                summary["receipt_json"] = dict(receipt_row or {})
+            else:
+                summary["receipt_json"] = {
+                    "total": int(summary["delegation_runs"].get("total") or 0),
+                    "rows_with_receipt_json": 0,
+                    "latest_receipt_run": None,
+                    "surface": "missing_column",
+                }
+            summary["receipt_json"]["surface"] = "orchestrator"
+            summary["receipt_json"]["a2a_empty_is_success"] = True
+
+        summary["provider_truth"] = _served_provider_truth_summary(conn, since=since)
     except sqlite3.Error as exc:
         summary["read_ok"] = False
         summary["error"] = f"query failed: {type(exc).__name__}: {exc}"
@@ -310,71 +383,514 @@ def read_runtime_summary(db_path: Path) -> dict[str, Any]:
     return summary
 
 
-def read_one_wire_summary(state_dir: Path) -> dict[str, Any]:
-    path = state_dir / "forge_measurement_guardian" / "cycle-003-fitness-quorum-guard.json"
+def read_bounded_replays_summary(repo_root: Path) -> dict[str, Any]:
+    """Read bounded replay proof reports owned by the Cybernetics Codex lane."""
     out: dict[str, Any] = {
-        "guardian_receipt": str(path),
-        "exists": path.exists(),
-        "required_confirmed": 5,
-        "required_domains": 3,
-        "eligible": False,
-        "fitness_authority_granted": False,
+        "loop1": {
+            "exists": False,
+            "closed": False,
+            "path": None,
+            "blocker": "no bounded Loop 1 replay report found",
+        }
     }
-    if not path.exists():
-        out["blocker"] = "guardian quorum receipt missing"
+    reports = sorted(
+        repo_root.glob(LOOP1_BOUNDED_REPLAY_GLOB),
+        key=lambda path: path.stat().st_mtime if path.exists() else 0.0,
+        reverse=True,
+    )
+    if not reports:
+        return out
+
+    report_path = reports[0]
+    loop1 = out["loop1"]
+    loop1["exists"] = True
+    loop1["path"] = str(report_path)
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        loop1["blocker"] = f"bounded replay report unreadable: {type(exc).__name__}: {exc}"
+        return out
+
+    served_truth = data.get("served_provider_truth") or {}
+    evidence_receipts = data.get("evidence_receipts") or {}
+    tasks_requested = int(data.get("tasks_requested") or 0)
+    tasks_completed = int(data.get("tasks_completed") or 0)
+    dispatch_dropoffs = int(data.get("dispatch_dropoffs") or 0)
+    tick_errors = data.get("tick_errors") or []
+    completed_with_truth = int(served_truth.get("completed_runs_with_truth") or 0)
+    receipt_truth = int(served_truth.get("delegation_receipts_with_truth") or 0)
+    receipt_statuses = [str(status) for status in evidence_receipts.values()]
+    closed = (
+        tasks_requested > 0
+        and tasks_completed == tasks_requested
+        and dispatch_dropoffs == 0
+        and not tick_errors
+        and bool(receipt_statuses)
+        and all(status == "ok" for status in receipt_statuses)
+        and completed_with_truth >= tasks_completed
+    )
+    loop1.update(
+        {
+            "closed": closed,
+            "harness_proven": closed,
+            "closed_live": False,
+            "tasks_requested": tasks_requested,
+            "tasks_completed": tasks_completed,
+            "tasks_failed": int(data.get("tasks_failed") or 0),
+            "dispatch_dropoffs": dispatch_dropoffs,
+            "tick_errors": len(tick_errors),
+            "evidence_receipts": len(receipt_statuses),
+            "evidence_receipts_ok": sum(1 for status in receipt_statuses if status == "ok"),
+            "completed_runs_with_truth": completed_with_truth,
+            "delegation_receipts_with_truth": receipt_truth,
+            "served_provider_sample": served_truth.get("sample"),
+            "state_dir": data.get("state_dir"),
+            "provider": data.get("provider"),
+            "model": data.get("model"),
+            "spine_dispatch": data.get("spine_dispatch"),
+            "read_only_boot": data.get("read_only_boot"),
+            "ollama_force_local": data.get("ollama_force_local"),
+            "blocker": "" if closed else "bounded replay did not satisfy strict Loop 1 closure predicate",
+        }
+    )
+    return out
+
+
+def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
+    """Honest, loop-agnostic harness criterion for a cascade loop's replay.
+
+    Harness-proven only when the receipt proves, structurally, that the loop ran
+    the full cybernetic cycle on bounded replay data:
+      - cycles ran on real data (cycles > 0 and real_data true),
+      - every sense/interpret/constrain/act/adapt transition emitted a receipt,
+      - the adapt transition produced a real before != after change that fed the
+        next cycle (adapt_proof.fed_forward true), and
+      - no tick errors.
+    The boolean is COMPUTED here from the evidence; a receipt's own "closed" field
+    is never trusted (FORBIDDEN_ACTIONS: claim closure from smoke tests/prose).
+    It still does not imply CLOSED_LIVE; live closure requires the declared owner
+    surface criterion for that loop.
+    """
+    transitions = data.get("transitions_receipted") or {}
+    adapt = data.get("adapt_proof") or {}
+    cycles = int(data.get("cycles") or 0)
+    tick_errors = data.get("tick_errors") or []
+    transitions_ok = all(bool(transitions.get(t)) for t in LOOP_CLOSURE_TRANSITIONS)
+    adapt_real = (
+        bool(adapt)
+        and bool(adapt.get("fed_forward"))
+        and adapt.get("before") != adapt.get("after")
+    )
+    harness_proven = (
+        cycles > 0
+        and bool(data.get("real_data"))
+        and transitions_ok
+        and adapt_real
+        and not tick_errors
+    )
+    return {
+        "exists": True,
+        "closed": harness_proven,
+        "harness_proven": harness_proven,
+        "closed_live": False,
+        "cycles": cycles,
+        "transitions_ok": transitions_ok,
+        "adapt_real": adapt_real,
+        "tick_errors": len(tick_errors),
+        "adapt_proof": adapt or None,
+        "blocker": (
+            "" if harness_proven
+            else "general loop closure replay did not satisfy the strict cascade criterion"
+        ),
+    }
+
+
+def read_loop_closure_replays(repo_root: Path) -> dict[str, Any]:
+    """Project per-loop (2..11) closure replays from the loop-closure surface.
+
+    Mirrors read_bounded_replays_summary but loop-agnostic. Loops with no receipt
+    return exists=False/closed=False, so the audit's existing PARTIAL logic still
+    governs them — this only ever ADDS a CLOSED verdict for a loop that ships a
+    strict, structurally-verified replay.
+    """
+    out: dict[str, Any] = {}
+    for number, loop_id, _label in LOOPS:
+        if number in (1, 12, 13):
+            continue
+        key = f"loop{number}"
+        glob = LOOP_CLOSURE_REPLAY_GLOB.format(number=number)
+        reports = sorted(
+            repo_root.glob(glob),
+            key=lambda p: p.stat().st_mtime if p.exists() else 0.0,
+            reverse=True,
+        )
+        if not reports:
+            out[key] = {
+                "exists": False,
+                "closed": False,
+                "path": None,
+                "blocker": f"no bounded closure replay report found for loop {number}",
+            }
+            continue
+        path = reports[0]
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            out[key] = {
+                "exists": True,
+                "closed": False,
+                "path": str(path),
+                "blocker": f"closure replay unreadable: {type(exc).__name__}: {exc}",
+            }
+            continue
+        evaluated = _evaluate_loop_closure_replay(data)
+        evaluated["path"] = str(path)
+        evaluated["loop_id"] = data.get("loop_id") or loop_id
+        out[key] = evaluated
+    return out
+
+
+def _served_provider_truth_summary(
+    conn: sqlite3.Connection,
+    *,
+    since: str | None = None,
+) -> dict[str, Any]:
+    truth_run_ids: set[str] = set()
+    truth_run_timestamps: dict[str, str] = {}
+    completed_run_ids: set[str] = set()
+    out: dict[str, Any] = {
+        "definition": (
+            "Counts rows carrying actual served provider/model truth. "
+            "A2A runtime_receipts are canonical even when receipt_json is empty."
+        ),
+        "delegation_runs": {
+            "total": 0,
+            "completed": 0,
+            "rows_with_served_provider_model": 0,
+            "completed_with_served_provider_model": 0,
+            "latest_truth_run": None,
+            "sample": None,
+        },
+        "runtime_receipts": {
+            "total": 0,
+            "rows_with_served_provider_model": 0,
+            "completed_rows_with_served_provider_model": 0,
+            "unique_runs_with_served_provider_model": 0,
+            "unique_completed_runs_with_served_provider_model": 0,
+            "latest_truth_receipt": None,
+            "latest_completed_truth_receipt": None,
+            "sample": None,
+            "completed_sample": None,
+        },
+    }
+
+    if _table_exists(conn, "delegation_runs"):
+        columns = _table_columns(conn, "delegation_runs")
+        select_cols = [
+            "run_id",
+            "status",
+            "coalesce(completed_at, started_at) as observed_at",
+        ]
+        if "metadata_json" in columns:
+            select_cols.append("metadata_json")
+        else:
+            select_cols.append("'{}' as metadata_json")
+        if "receipt_json" in columns:
+            select_cols.append("receipt_json")
+        else:
+            select_cols.append("null as receipt_json")
+        where_sql, where_args = _time_scope_sql(
+            conn,
+            "delegation_runs",
+            "coalesce(completed_at, started_at)",
+            since,
+        )
+        for row in conn.execute(
+            f"select {', '.join(select_cols)} from delegation_runs {where_sql}",
+            where_args,
+        ):
+            out["delegation_runs"]["total"] += 1
+            status = str(row["status"] or "")
+            if status == "completed":
+                out["delegation_runs"]["completed"] += 1
+                if row["run_id"]:
+                    completed_run_ids.add(str(row["run_id"]))
+            truth = (
+                _extract_served_provider_truth(_loads_json(row["metadata_json"]))
+                or _extract_served_provider_truth(_loads_json(row["receipt_json"]))
+            )
+            if truth:
+                out["delegation_runs"]["rows_with_served_provider_model"] += 1
+                if status == "completed":
+                    out["delegation_runs"]["completed_with_served_provider_model"] += 1
+                    if row["run_id"]:
+                        run_id = str(row["run_id"])
+                        truth_run_ids.add(run_id)
+                        _record_truth_timestamp(
+                            truth_run_timestamps,
+                            run_id=run_id,
+                            observed_at=row["observed_at"],
+                        )
+                observed_at = row["observed_at"]
+                if (
+                    observed_at
+                    and (
+                        out["delegation_runs"]["latest_truth_run"] is None
+                        or str(observed_at) > str(out["delegation_runs"]["latest_truth_run"])
+                    )
+                ):
+                    out["delegation_runs"]["latest_truth_run"] = observed_at
+                    out["delegation_runs"]["sample"] = {
+                        "run_id": row["run_id"],
+                        **truth,
+                    }
+
+    if _table_exists(conn, "runtime_receipts"):
+        columns = _table_columns(conn, "runtime_receipts")
+        select_cols = ["receipt_id"]
+        select_cols.append("run_id" if "run_id" in columns else "'' as run_id")
+        select_cols.append("created_at" if "created_at" in columns else "null as created_at")
+        select_cols.append("payload_json" if "payload_json" in columns else "'{}' as payload_json")
+        where_sql, where_args = _time_scope_sql(conn, "runtime_receipts", "created_at", since)
+        truth_runs: set[str] = set()
+        completed_truth_runs: set[str] = set()
+        for row in conn.execute(
+            f"select {', '.join(select_cols)} from runtime_receipts {where_sql}",
+            where_args,
+        ):
+            out["runtime_receipts"]["total"] += 1
+            truth = _extract_served_provider_truth(_loads_json(row["payload_json"]))
+            if not truth:
+                continue
+            out["runtime_receipts"]["rows_with_served_provider_model"] += 1
+            if row["run_id"]:
+                run_id = str(row["run_id"])
+                truth_runs.add(run_id)
+                if run_id in completed_run_ids:
+                    completed_truth_runs.add(run_id)
+                    out["runtime_receipts"]["completed_rows_with_served_provider_model"] += 1
+                    _record_truth_timestamp(
+                        truth_run_timestamps,
+                        run_id=run_id,
+                        observed_at=row["created_at"],
+                    )
+            observed_at = row["created_at"]
+            if (
+                observed_at
+                and (
+                    out["runtime_receipts"]["latest_truth_receipt"] is None
+                    or str(observed_at) > str(out["runtime_receipts"]["latest_truth_receipt"])
+                )
+            ):
+                out["runtime_receipts"]["latest_truth_receipt"] = observed_at
+                out["runtime_receipts"]["sample"] = {
+                    "receipt_id": row["receipt_id"],
+                    "run_id": row["run_id"],
+                    **truth,
+                }
+            if row["run_id"] and str(row["run_id"]) in completed_run_ids:
+                if (
+                    observed_at
+                    and (
+                        out["runtime_receipts"]["latest_completed_truth_receipt"] is None
+                        or str(observed_at) > str(
+                            out["runtime_receipts"]["latest_completed_truth_receipt"]
+                        )
+                    )
+                ):
+                    out["runtime_receipts"]["latest_completed_truth_receipt"] = observed_at
+                    out["runtime_receipts"]["completed_sample"] = {
+                        "receipt_id": row["receipt_id"],
+                        "run_id": row["run_id"],
+                        **truth,
+                    }
+        out["runtime_receipts"]["unique_runs_with_served_provider_model"] = len(truth_runs)
+        out["runtime_receipts"]["unique_completed_runs_with_served_provider_model"] = len(
+            completed_truth_runs
+        )
+        truth_run_ids.update(completed_truth_runs)
+
+    latest_truth = max(
+        (
+            str(value)
+            for value in (
+                out["delegation_runs"]["latest_truth_run"],
+                out["runtime_receipts"]["latest_completed_truth_receipt"],
+            )
+            if value
+        ),
+        default=None,
+    )
+    out["routing_adaptation"] = _routing_adaptation_after_truth_summary(
+        conn,
+        latest_truth=latest_truth,
+        truth_run_ids=truth_run_ids,
+        truth_timestamps_by_run_id=truth_run_timestamps,
+    )
+    return out
+
+
+def _record_truth_timestamp(
+    timestamps: dict[str, str],
+    *,
+    run_id: str,
+    observed_at: Any,
+) -> None:
+    if not run_id or not observed_at:
+        return
+    observed = str(observed_at)
+    previous = timestamps.get(run_id)
+    if previous is None or observed > previous:
+        timestamps[run_id] = observed
+
+
+def _timestamp_column(conn: sqlite3.Connection, table: str) -> str | None:
+    columns = _table_columns(conn, table)
+    for column in ("created_at", "updated_at", "recorded_at", "completed_at", "started_at"):
+        if column in columns:
+            return column
+    return None
+
+
+def _routing_adaptation_after_truth_summary(
+    conn: sqlite3.Connection,
+    *,
+    latest_truth: str | None,
+    truth_run_ids: set[str],
+    truth_timestamps_by_run_id: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "latest_served_truth": latest_truth,
+        "truth_run_ids_sample": sorted(truth_run_ids)[:20],
+        "truth_run_timestamps_sample": dict(
+            sorted((truth_timestamps_by_run_id or {}).items())[:20]
+        ),
+        "has_later_causal_read": False,
+        "tables": {},
+    }
+    for table in ("routing_decisions", "model_routing_outcomes", "external_outcomes"):
+        if not _table_exists(conn, table):
+            out["tables"][table] = {
+                "exists": False,
+                "rows": 0,
+                "rows_after_served_truth": 0,
+                "correlated_rows_after_served_truth": 0,
+            }
+            continue
+        timestamp_column = _timestamp_column(conn, table)
+        rows = int(conn.execute(f"select count(*) from {table}").fetchone()[0] or 0)
+        latest = (
+            conn.execute(f"select max({timestamp_column}) from {table}").fetchone()[0]
+            if timestamp_column
+            else None
+        )
+        rows_after_truth = 0
+        correlated_after_truth = 0
+        if latest_truth and timestamp_column:
+            rows_after_truth = int(
+                conn.execute(
+                    f"select count(*) from {table} where {timestamp_column} > ?",
+                    (latest_truth,),
+                ).fetchone()[0]
+                or 0
+            )
+            columns = _table_columns(conn, table)
+            if "run_id" in columns and truth_run_ids:
+                correlated_after_truth = _count_correlated_rows_after_truth(
+                    conn,
+                    table=table,
+                    timestamp_column=timestamp_column,
+                    latest_truth=latest_truth,
+                    truth_run_ids=truth_run_ids,
+                    truth_timestamps_by_run_id=truth_timestamps_by_run_id,
+                )
+        out["tables"][table] = {
+            "exists": True,
+            "rows": rows,
+            "timestamp_column": timestamp_column,
+            "latest": latest,
+            "rows_after_served_truth": rows_after_truth,
+            "correlated_rows_after_served_truth": correlated_after_truth,
+        }
+        if correlated_after_truth > 0:
+            out["has_later_causal_read"] = True
+    return out
+
+
+def _count_correlated_rows_after_truth(
+    conn: sqlite3.Connection,
+    *,
+    table: str,
+    timestamp_column: str,
+    latest_truth: str,
+    truth_run_ids: set[str],
+    truth_timestamps_by_run_id: dict[str, str] | None = None,
+) -> int:
+    if truth_timestamps_by_run_id:
+        total = 0
+        for run_id, served_truth_at in truth_timestamps_by_run_id.items():
+            if run_id not in truth_run_ids:
+                continue
+            total += int(
+                conn.execute(
+                    (
+                        f"select count(*) from {table} "
+                        f"where {timestamp_column} > ? and run_id = ?"
+                    ),
+                    (served_truth_at, run_id),
+                ).fetchone()[0]
+                or 0
+            )
+        return total
+
+    total = 0
+    ordered = sorted(truth_run_ids)
+    for offset in range(0, len(ordered), SQLITE_IN_CHUNK_SIZE):
+        chunk = ordered[offset : offset + SQLITE_IN_CHUNK_SIZE]
+        placeholders = ",".join("?" for _ in chunk)
+        total += int(
+            conn.execute(
+                (
+                    f"select count(*) from {table} "
+                    f"where {timestamp_column} > ? and run_id in ({placeholders})"
+                ),
+                (latest_truth, *chunk),
+            ).fetchone()[0]
+            or 0
+        )
+    return total
+
+
+def read_one_wire_summary(state_dir: Path) -> dict[str, Any]:
+    authority = read_one_wire_fitness_authority(state_dir)
+    out: dict[str, Any] = {
+        "guardian_receipt": str(authority.receipt_path),
+        "exists": authority.exists,
+        "required_confirmed": authority.required_confirmed,
+        "required_domains": authority.required_domains,
+        "confirmed": authority.confirmed,
+        "domains": authority.domains,
+        "eligible": authority.allowed,
+        "eligible_to_set_archive_fitness": authority.eligible_to_set_archive_fitness,
+        "fitness_authority_granted": authority.fitness_authority_granted,
+        "archive_fitness_changed": authority.archive_fitness_changed,
+    }
+    if authority.blocker:
+        out["blocker"] = authority.blocker
+    if not authority.exists:
         return out
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(authority.receipt_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         out["blocker"] = f"guardian receipt unreadable: {type(exc).__name__}"
         return out
 
+    if not isinstance(payload, dict):
+        return out
     out["payload_keys"] = sorted(payload)[:20]
-    authority = payload.get("authority_result") if isinstance(payload, dict) else {}
     threshold = payload.get("threshold_guard") if isinstance(payload, dict) else {}
-    if isinstance(authority, dict):
-        out["confirmed"] = authority.get("confirmed_receipt_count", out.get("confirmed", 0))
-        out["domains"] = authority.get("domain_count", out.get("domains", 0))
-        out["eligible"] = authority.get("eligible_to_set_archive_fitness", out.get("eligible", False))
-        out["archive_fitness_changed"] = authority.get(
-            "archive_fitness_changed",
-            out.get("archive_fitness_changed", False),
-        )
-        out["fitness_authority_granted"] = authority.get(
-            "fitness_authority_granted",
-            out.get("fitness_authority_granted", False),
-        )
     if isinstance(threshold, dict):
-        out["required_confirmed"] = threshold.get(
-            "required_confirmed_receipts",
-            out["required_confirmed"],
-        )
-        out["required_domains"] = threshold.get(
-            "required_distinct_domains",
-            out["required_domains"],
-        )
-        out["confirmed"] = threshold.get("observed_confirmed_receipts", out.get("confirmed", 0))
-        out["domains"] = threshold.get("observed_distinct_domains", out.get("domains", 0))
         out["observed_domains"] = threshold.get("observed_domains", [])
-    for key in ("confirmed", "domains", "eligible", "archive_fitness_changed", "fitness_authority_granted"):
-        if key in payload:
-            out[key] = payload[key]
-    confirmed = int(out.get("confirmed") or 0)
-    domains = int(out.get("domains") or 0)
-    required_confirmed = int(out.get("required_confirmed") or 5)
-    required_domains = int(out.get("required_domains") or 3)
-    eligible = (
-        bool(out.get("eligible"))
-        and bool(out.get("fitness_authority_granted"))
-        and confirmed >= required_confirmed
-        and domains >= required_domains
-    )
-    out["eligible"] = eligible
-    if not eligible:
-        out["blocker"] = (
-            f"guardian quorum below threshold: "
-            f"N={confirmed}/{required_confirmed}, M={domains}/{required_domains}"
-        )
     return out
 
 
@@ -487,6 +1003,7 @@ def read_seed_summary(repo_root: Path) -> dict[str, Any]:
         "agent_uid": data.get("agent_uid"),
         "callsign": data.get("callsign"),
         "authority": data.get("authority"),
+        "a2a_route": ((data.get("mailbox") or {}).get("route")),
         "nats_subject": ((data.get("mailbox") or {}).get("nats_subject")),
         "nats_runtime_status": (
             (data.get("mailbox") or {}).get("runtime_status")
@@ -551,6 +1068,13 @@ def read_live_registration_summary(state_dir: Path) -> dict[str, Any]:
     elif out.get("authority") != "external_worker_evidence_only":
         out["blocker"] = f"unexpected authority: {out.get('authority')}"
         out["registered"] = False
+    elif out.get("nats_subject") != NATS_SUBJECT or out.get("mailbox") != f"nats://{NATS_SUBJECT}":
+        out["blocker"] = (
+            "live registration route drift: expected "
+            f"{A2A_INBOX_ROUTE}/{NATS_SUBJECT}, got "
+            f"{out.get('mailbox') or out.get('nats_subject')}"
+        )
+        out["registered"] = False
     return out
 
 
@@ -558,39 +1082,169 @@ def build_loop_statuses(
     runtime: dict[str, Any],
     one_wire: dict[str, Any],
     archive: dict[str, Any],
+    *,
+    bounded_replays: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows = []
     delegation = runtime.get("delegation_runs") or {}
     total_runs = int(delegation.get("total") or 0)
     completed = int(delegation.get("completed") or 0)
-    receipt_rows = int((runtime.get("receipt_json") or {}).get("rows_with_receipt_json") or 0)
+    provider_truth = runtime.get("provider_truth") or {}
+    delegation_truth = provider_truth.get("delegation_runs") or {}
+    runtime_receipt_truth = provider_truth.get("runtime_receipts") or {}
+    completed_with_truth = int(
+        delegation_truth.get("completed_with_served_provider_model") or 0
+    )
+    runtime_receipt_truth_rows = int(
+        runtime_receipt_truth.get("rows_with_served_provider_model") or 0
+    )
+    runtime_receipt_completed_truth_rows = int(
+        runtime_receipt_truth.get("completed_rows_with_served_provider_model") or 0
+    )
+    routing_adaptation = provider_truth.get("routing_adaptation") or {}
+    loop1_has_later_routing = _has_later_correlated_routing_adaptation(
+        routing_adaptation
+    )
     failure_counts = {
         str(r.get("failure_code")): int(r.get("count") or 0)
         for r in runtime.get("failure_codes") or []
     }
+    quarantined_dropoffs = int(
+        (runtime.get("quarantine") or {}).get("dispatch_dropoff_quarantined") or 0
+    )
     one_wire_eligible = bool(one_wire.get("eligible"))
     archive_risk = int(archive.get("positive_internal_fitness_risk") or 0)
+    loop1_replay = ((bounded_replays or {}).get("loop1") or {})
+    loop1_harness_proven = bool(loop1_replay.get("harness_proven") or loop1_replay.get("closed"))
+    loop1_closed_live = (
+        loop1_harness_proven
+        and total_runs > 0
+        and completed > 0
+        and failure_counts.get("dispatch_dropoff", 0) == 0
+        and (completed_with_truth > 0 or runtime_receipt_completed_truth_rows > 0)
+        and loop1_has_later_routing
+    )
 
     for number, loop_id, label in LOOPS:
         status = "UNKNOWN"
         blocker = "no fresh closure packet inspected by cybernetics_codex"
         evidence: list[str] = []
 
+        # Cascade loops (2..11): a strict, structurally-verified closure replay
+        # proves the harness. It does not close the live loop unless the
+        # declared owner-surface criterion also passes.
+        general_replay = (bounded_replays or {}).get(f"loop{number}") or {}
+        replay_harness_proven = bool(
+            general_replay.get("harness_proven") or general_replay.get("closed")
+        )
+        if number not in (1, 12, 13) and replay_harness_proven:
+            rows.append({
+                "number": number,
+                "id": loop_id,
+                "label": label,
+                "verdict": "HARNESS_PROVEN",
+                "evidence": [f"bounded_replays.loop{number}"],
+                "blocker": (
+                    f"bounded closure replay proves the loop {number} harness "
+                    f"(cycles={general_replay.get('cycles')}, all transitions "
+                    "receipted, adapt change fed the next cycle); not CLOSED_LIVE "
+                    "until live owner-surface criterion passes"
+                ),
+                "live_owner_surface_criterion": LIVE_OWNER_SURFACE_CRITERIA[number],
+            })
+            continue
+
         if number == 1:
-            evidence = ["runtime.delegation_runs", "runtime.receipt_json", "runtime.failure_codes"]
+            evidence = [
+                "runtime.delegation_runs",
+                "runtime.runtime_receipts",
+                "runtime.provider_truth",
+                "runtime.failure_codes",
+            ]
+            if loop1_harness_proven:
+                evidence.append("bounded_replays.loop1")
+            if loop1_has_later_routing:
+                evidence.append("runtime.provider_truth.routing_adaptation")
             if total_runs == 0:
                 status = "UNKNOWN"
                 blocker = "no delegation runs found"
-            elif receipt_rows < total_runs or failure_counts.get("dispatch_dropoff", 0):
+            elif loop1_closed_live:
+                status = "CLOSED_LIVE"
+                blocker = (
+                    "audited runtime scope has served provider/model truth, "
+                    "zero dispatch_dropoff, a later correlated routing/adaptation "
+                    "read, and the Loop 1 replay proves current dispatch receipts"
+                )
+            elif loop1_harness_proven:
+                missing: list[str] = []
+                if failure_counts.get("dispatch_dropoff", 0):
+                    missing.append(
+                        f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                    )
+                if completed == 0:
+                    missing.append("no completed delegation runs in runtime scope")
+                if completed_with_truth == 0 and runtime_receipt_completed_truth_rows == 0:
+                    missing.append("no served provider/model truth from completed work")
+                if not loop1_has_later_routing:
+                    missing.append(
+                        "no later correlated routing/adaptation read after served-provider truth"
+                    )
+                status = "HARNESS_PROVEN"
+                blocker = (
+                    "bounded replay proves current Loop 1 harness "
+                    f"({loop1_replay.get('tasks_completed')}/"
+                    f"{loop1_replay.get('tasks_requested')} completed, "
+                    f"dispatch_dropoff={loop1_replay.get('dispatch_dropoffs')}, "
+                    f"evidence_receipts_ok={loop1_replay.get('evidence_receipts_ok')}, "
+                    f"served_provider_truth="
+                    f"{loop1_replay.get('completed_runs_with_truth')}); "
+                    "not CLOSED_LIVE: "
+                    + "; ".join(missing or ["live owner-surface criterion not fully met"])
+                )
+            elif failure_counts.get("dispatch_dropoff", 0):
                 status = "PARTIAL"
                 blocker = (
                     f"activity exists ({completed}/{total_runs} completed), but "
-                    f"receipt_json coverage is {receipt_rows}/{total_runs} and "
-                    f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                    f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}; "
+                    f"served_provider_truth completed={completed_with_truth}/{completed}, "
+                    f"runtime_receipts_completed={runtime_receipt_completed_truth_rows}/"
+                    f"{runtime_receipt_truth_rows}. "
+                    "receipt_json is orchestrator-surface only, not an A2A closure requirement"
                 )
+            elif completed == 0:
+                status = "PARTIAL"
+                blocker = "runtime activity exists, but no completed delegation runs in scope"
+            elif completed_with_truth == 0 and runtime_receipt_completed_truth_rows == 0:
+                status = "PARTIAL"
+                if runtime_receipt_truth_rows:
+                    blocker = (
+                        f"{completed}/{total_runs} runs completed; runtime_receipts "
+                        f"had {runtime_receipt_truth_rows} served_provider/served_model "
+                        "row(s), but none joined to completed delegation work"
+                    )
+                else:
+                    blocker = (
+                        f"{completed}/{total_runs} runs completed, but no actual "
+                        "served_provider/served_model truth was found on completed "
+                        "delegation metadata or runtime_receipts"
+                    )
             else:
                 status = "NEEDS_ADVERSARIAL_REVIEW"
-                blocker = "runtime receipts look complete; still needs witness/adapt proof"
+                blocker = (
+                    f"served provider/model truth exists "
+                    f"(delegation completed={completed_with_truth}/{completed}, "
+                    f"runtime_receipts_completed={runtime_receipt_completed_truth_rows}/"
+                    f"{runtime_receipt_truth_rows}); still needs "
+                    "bounded spine-dispatch replay proving tick N changes tick N+1"
+                )
+            if quarantined_dropoffs:
+                # Never hide the quarantined-historical tally: the live count
+                # above excludes these rows, but the claim stays honest only if
+                # the audit reports them alongside it.
+                blocker += (
+                    f"; dispatch_dropoff_quarantined_historical={quarantined_dropoffs} "
+                    "(excluded from live count; rows remain auditable in delegation_runs)"
+                )
         elif number in {12, 13}:
             evidence = ["one_wire.guardian_receipt", "evolution_archive"]
             if not one_wire_eligible:
@@ -622,55 +1276,21 @@ def build_loop_statuses(
             "verdict": status,
             "evidence": evidence,
             "blocker": blocker,
+            "live_owner_surface_criterion": LIVE_OWNER_SURFACE_CRITERIA[number],
         })
     return rows
 
 
-def format_markdown(report: dict[str, Any]) -> str:
-    """Render a compact human-readable audit packet."""
-    lines = [
-        "# cybernetics_codex Audit",
-        "",
-        f"- observed_at: `{report['observed_at']}`",
-        f"- mode: `{report['agent']['mode']}`",
-        f"- manifest_registered: `{report['manifest_registration'].get('registered')}`",
-        f"- loop_track_found: `{report['active_track'].get('loop_track_found')}`",
-        f"- seed_registered: `{report['seed_registration'].get('registered')}`",
-        f"- live_registration: `{report['live_registration'].get('registered')}`",
-        f"- nats_runtime_status: `{report['live_registration'].get('nats_runtime_status')}`",
-        "",
-        "## Runtime",
-        "",
-    ]
-    runtime = report["runtime"]
-    delegation = runtime.get("delegation_runs") or {}
-    receipt = runtime.get("receipt_json") or {}
-    lines.extend([
-        f"- runtime_db: `{runtime.get('path')}`",
-        f"- read_ok: `{runtime.get('read_ok')}`",
-        f"- delegation_runs: `{delegation.get('total', 0)}` total, "
-        f"`{delegation.get('completed', 0)}` completed, "
-        f"`{delegation.get('failed', 0)}` failed",
-        f"- receipt_json: `{receipt.get('rows_with_receipt_json', 0)}` rows",
-        "",
-        "## Loop Statuses",
-        "",
-        "| # | Loop | Verdict | Blocker |",
-        "|---|---|---|---|",
-    ])
-    for row in report["loop_statuses"]:
-        lines.append(
-            f"| {row['number']} | {row['label']} | {row['verdict']} | "
-            f"{str(row['blocker']).replace('|', '/')} |"
-        )
-    lines.extend([
-        "",
-        "## Verifier Commands",
-        "",
-        *[f"- `{cmd}`" for cmd in report["verifier_commands"]],
-        "",
-    ])
-    return "\n".join(lines)
+def _has_later_correlated_routing_adaptation(
+    routing_adaptation: dict[str, Any],
+) -> bool:
+    tables = routing_adaptation.get("tables") or {}
+    for table_summary in tables.values():
+        if not isinstance(table_summary, dict):
+            continue
+        if int(table_summary.get("correlated_rows_after_served_truth") or 0) > 0:
+            return True
+    return False
 
 
 def _table_summary(conn: sqlite3.Connection, table: str) -> dict[str, Any]:
@@ -695,6 +1315,72 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
 
 def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
     return any(row[1] == column for row in conn.execute(f"pragma table_info({table})"))
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f"pragma table_info({table})")}
+
+
+def _time_scope_sql(
+    conn: sqlite3.Connection,
+    table: str,
+    expression: str,
+    since: str | None,
+) -> tuple[str, tuple[str, ...]]:
+    if not since:
+        return "", ()
+    column_names = _table_columns(conn, table)
+    needed = {"created_at"} if expression == "created_at" else {"started_at", "completed_at"}
+    if not needed.intersection(column_names):
+        return "", ()
+    return f"where {expression} >= ?", (since,)
+
+
+def _and_where(where_sql: str, predicate: str) -> str:
+    if where_sql.strip():
+        return f"{where_sql} and {predicate}"
+    return f"where {predicate}"
+
+
+def _loads_json(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return None
+
+
+def _extract_served_provider_truth(value: Any) -> dict[str, str] | None:
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            provider = _first_text_key(current, SERVED_PROVIDER_KEYS)
+            model = _first_text_key(current, SERVED_MODEL_KEYS)
+            if provider and model and provider.casefold() not in NON_PROVIDER_VALUES:
+                return {"served_provider": provider, "served_model": model}
+            for nested in current.values():
+                if isinstance(nested, (dict, list)):
+                    stack.append(nested)
+        elif isinstance(current, list):
+            stack.extend(item for item in current if isinstance(item, (dict, list)))
+    return None
+
+
+def _first_text_key(data: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = data.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
 
 
 def _read_yaml(path: Path) -> Any:

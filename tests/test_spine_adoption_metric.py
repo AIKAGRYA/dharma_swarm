@@ -202,6 +202,7 @@ def test_known_joined_surfaces() -> None:
         "message_bus_transport",
         "a2a_server_ingress",
         "artifact_store",
+        "tool_registry_dispatch",
     ]
     for sid in expected_joined:
         assert surface_map.get(sid) == "joined", (

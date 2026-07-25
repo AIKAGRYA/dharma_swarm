@@ -68,6 +68,12 @@ def build_claude_headless_env(
     merged["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     merged.pop("CLAUDECODE", None)
     merged.pop("CLAUDE_CODE_ENTRYPOINT", None)
+    # Claude Code on the web / remote hosts inject this to stream partial
+    # messages to the parent session. It forces `--include-partial-messages`,
+    # which is only valid with `--output-format=stream-json` and therefore
+    # breaks every headless `--output-format text|json` run nested inside a
+    # remote session. Drop it so the claude_code provider lane works there.
+    merged.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
     return merged
 
 

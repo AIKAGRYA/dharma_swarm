@@ -1,0 +1,121 @@
+{
+  "schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v2.overlay",
+  "status": "FROZEN_BEFORE_V2_RESULTS",
+  "frozen_on": "2026-07-11",
+  "subject": "DharmaGraph versus real installed LangGraph 1.2.4, completeness-corrected rerun",
+  "base_rubric": {
+    "path": "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v1",
+    "freeze_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
+    "materialization": "Load the immutable V1 object, append each facet_addition to the named row, apply weight_updates, append capability_additions, merge corpus_additions, and require 41 unique rows whose integer weights sum to 100.",
+    "freeze_lineage": "Pre-result freeze commits 66214c5c71425abaeee811e0bf5f7eb58c365eca (V1) and 7b8662ed5 (V2 completeness correction) lived on the PR #889 branch; the squash merge 6965d38dc8df4bc487e97465ed2f08ffa8274e31 collapsed that lineage into one commit on main, so the on-main custody anchor is the squash commit. The rubric content is byte-identical to the pre-result freeze; the original commit-ordered freeze proof survives at refs/pull/889/head (fetchable: git fetch origin refs/pull/889/head)."
+  },
+  "supersedes": {
+    "rubric": "DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "reason": "The independent completeness critic found one omitted installed prebuilt/tool-execution class and material omitted facets after a provisional V1 execution. V1 remains immutable and is not a final grade.",
+    "result_artifact_status": "NO_V1_RESULT_ARTIFACT_COMMITTED",
+    "rule": "No V2 differential result may be computed until this overlay has its own committing ancestor."
+  },
+  "completeness_critic": {
+    "verdict": "NO_WHOLE_CORE_ENGINE_CLASS_MISSING; ONE_INSTALLED_PREBUILT_CLASS_AND_MATERIAL_FACETS_ADDED",
+    "core_class_inventory": "Graph construction, Pregel execution, channels, persistence, interrupts, streaming, store, cache, runtime, functional API, and introspection were already represented.",
+    "citations": [
+      "site-packages/langgraph/prebuilt/__init__.py:1",
+      "site-packages/langgraph/prebuilt/tool_node.py:1",
+      "site-packages/langgraph/channels/__init__.py:1",
+      "site-packages/langgraph/channels/delta.py:25",
+      "site-packages/langgraph/channels/untracked_value.py:15",
+      "site-packages/langgraph/checkpoint/base/__init__.py:320",
+      "site-packages/langgraph/pregel/protocol.py:195",
+      "site-packages/langgraph/types.py:368",
+      "site-packages/langgraph/pregel/main.py:978",
+      "site-packages/langgraph/types.py:518"
+    ]
+  },
+  "weight_updates": {
+    "LG30": {
+      "from": 5,
+      "to": 4,
+      "reason": "Renormalize one non-claim-critical usage point into the newly represented installed prebuilt class; all frozen durability floors remain unchanged."
+    }
+  },
+  "facet_additions": {
+    "LG10": [
+      "any_value",
+      "untracked_value",
+      "delta_channel",
+      "last_value_after_finish",
+      "named_barrier_after_finish"
+    ],
+    "LG12": [
+      "typed_v2_invoke",
+      "typed_v2_ainvoke"
+    ],
+    "LG14": [
+      "delete_thread",
+      "delete_for_runs",
+      "copy_thread",
+      "prune",
+      "get_delta_channel_history",
+      "async_checkpoint_lifecycle"
+    ],
+    "LG18": [
+      "delta_channel_durable_history"
+    ],
+    "LG29": [
+      "cache_key_func"
+    ],
+    "LG34": [
+      "config_json_schema"
+    ]
+  },
+  "capability_additions": [
+    {
+      "id": "PB01",
+      "name": "Prebuilt agent and tool execution, validation, injection, parallel calls, errors, and Command updates",
+      "class": "installed_prebuilt",
+      "weight": 1,
+      "usage_count": 0,
+      "legacy_gates": [
+        "D"
+      ],
+      "reference": "site-packages/langgraph/prebuilt/__init__.py:1",
+      "dharma_custody": "dharma_swarm/graph/__init__.py:66",
+      "facets": [
+        "create_react_agent",
+        "tool_node",
+        "parallel_tool_calls",
+        "tool_error_handling",
+        "tool_call_transformer",
+        "validation_node",
+        "tools_condition",
+        "injected_state",
+        "injected_store",
+        "tool_runtime",
+        "command_state_updates"
+      ],
+      "probe_kind": "installed_prebuilt_surface_and_tool_semantics",
+      "gap_card": "parity-gap-pb01-prebuilt-tools"
+    }
+  ],
+  "corpus_additions": {
+    "new_parametric_workloads": [
+      "seeded_prebuilt_tool_surface_probe"
+    ],
+    "completeness_control": {
+      "id": "COMPLETE01",
+      "question": "Which installed LangGraph capability is missing from the matrix entirely?",
+      "required_observation": "No omitted core-engine class; every omitted installed prebuilt class or material facet is either added here or recorded as an operator-ratified exclusion.",
+      "observation": "PB01 and the enumerated facet additions close the critic's findings before V2 grading."
+    }
+  },
+  "operator_ratified_exclusions": [],
+  "weighting_assertion": {
+    "base_total": 100,
+    "removed_from_lg30": 1,
+    "added_to_pb01": 1,
+    "materialized_total": 100,
+    "materialized_row_count": 41,
+    "durability_floors_unchanged": true
+  }
+}

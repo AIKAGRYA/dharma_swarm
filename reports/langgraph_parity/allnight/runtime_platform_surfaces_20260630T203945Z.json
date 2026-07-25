@@ -1,0 +1,60 @@
+{
+  "schema_version": "langgraph_parity_runtime_platform_surface_receipt.v1",
+  "timestamp": "2026-06-30T20:39:45Z",
+  "status": "completed_partial",
+  "score_after_round": 65,
+  "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "implemented": {
+    "runtime_platform_views": [
+      "RuntimeStateStore-backed session/thread state snapshot",
+      "RuntimeStateStore-backed delegation run listing with checkpoint summary fields",
+      "Run detail projection through RuntimeStateStore.describe_run",
+      "Checkpoint/topology snapshot history projection",
+      "Session/runtime event history projection"
+    ],
+    "operator_api": [
+      "OperatorViews.runtime_sessions",
+      "OperatorViews.runtime_runs",
+      "OperatorViews.runtime_run_detail",
+      "OperatorViews.runtime_checkpoints",
+      "OperatorViews.runtime_events"
+    ],
+    "http_routes": [
+      "GET /api/runtime/sessions",
+      "GET /api/runtime/runs",
+      "GET /api/runtime/runs/{run_id}",
+      "GET /api/runtime/checkpoints",
+      "GET /api/runtime/events"
+    ]
+  },
+  "canonical_store": {
+    "store": "dharma_swarm.runtime_state.RuntimeStateStore",
+    "parallel_store_added": false,
+    "tables_read": [
+      "sessions",
+      "delegation_runs",
+      "topology_states",
+      "runtime_receipts",
+      "session_events"
+    ],
+    "api_db_selection": "DHARMA_RUNTIME_DB when set, DEFAULT_RUNTIME_DB otherwise"
+  },
+  "verification": {
+    "pytest_runtime_graph_api": "5 passed in 0.68s",
+    "pytest_runtime_api_topology_subset": "57 passed in 34.45s",
+    "pytest_langgraph_parity_plus_runtime_api": "25 passed in 1.10s",
+    "compileall": "passed",
+    "ruff_focused": "passed",
+    "module_budget": "passed with existing warnings only",
+    "hygiene_ratchet": "passed green=true",
+    "spine_dispatch_mode_report_strict": "passed spine_default_on",
+    "git_diff_check": "passed",
+    "a2a_readiness_strict": "failed exit 2: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+  },
+  "remaining_blockers": [
+    "A2A strict readiness is still red and blocks any production-grade parity claim.",
+    "Phase 7 remains partial: assistants/configurations, streaming runtime transport, background/cron runs, and interrupt/resume/human approval surfaces are incomplete or unproven.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending."
+  ]
+}

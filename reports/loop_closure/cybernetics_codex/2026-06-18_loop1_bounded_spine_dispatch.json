@@ -1,0 +1,57 @@
+{
+  "provider": "ollama",
+  "model": "llama3.2:latest",
+  "spine_dispatch": "1",
+  "read_only_boot": "1",
+  "ollama_force_local": "1",
+  "agents": 1,
+  "tasks_requested": 3,
+  "tasks_completed": 3,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "served_provider_truth": {
+    "runtime_db": "$TMPDIR/loop1-closure-a7w_anpw/state/runtime.db",
+    "exists": true,
+    "completed_runs_with_truth": 3,
+    "delegation_receipts_with_truth": 3,
+    "runtime_receipts_with_truth": 0,
+    "sample": {
+      "source": "receipt_json",
+      "run_id": "run_3171b0246227406e",
+      "served_provider": "ollama",
+      "served_model": "llama3.2:latest"
+    }
+  },
+  "evidence_receipts": {
+    "590a69a5-5fee-4c52-bab2-d59882e70c29": "ok",
+    "b5803621-0e31-4a48-be02-9c926bd2a433": "ok",
+    "3de2e0d1-4095-4031-a89e-968b7514da36": "ok"
+  },
+  "tick_errors": [],
+  "ticks": 20,
+  "stigmergy_hot_paths": [],
+  "state_dir": "$TMPDIR/loop1-closure-a7w_anpw",
+  "tasks": [
+    {
+      "task_id": "d8e6c6ebc85547fc",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Task Summary\n\nFeedback loops need both sensing and acting to effectively learn from their environment and make informed decisions. Sensing allows the loop to"
+    },
+    {
+      "task_id": "2ad7f82872744c84",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "**Failure Modes of a Distributed Task Queue**\n\n### 1. **Insufficient Epistemological Diversity in the Task Queue**\n\n* Failure Mode: The task queue lacks suffici"
+    },
+    {
+      "task_id": "68ef357479874b26",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "One concise principle for retrying transient failures with exponential backoff is:\n\n**\"Retry failed actions with increasing delay, proportional to the number of"
+    }
+  ]
+}

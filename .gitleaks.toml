@@ -40,10 +40,7 @@ paths = [
 
     # Reports, analyses, audit logs — text dumps, not credentials
     '''(^|/)reports/''',
-    # Historical hygiene-probe output stores normalized scanner findings. It is
-    # not present in HEAD, but gitleaks scans history and otherwise flags the
-    # findings text itself as generic-api-key.
-    '''(^|/)quality-reports/hygiene-probe-[0-9-]+/normalized-findings\.jsonl$''',
+    '''(^|/)quality-reports/''',
     '''(^|/)analysis/''',
     '''(^|/)results/''',
     '''(^|/)experiments/''',

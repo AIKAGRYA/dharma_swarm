@@ -167,7 +167,7 @@ def _load_simple_source(
             clip = extract_webclip(source)
             merged_tags = list(dict.fromkeys(tags + clip.tags))
             return clip.body, clip.source_url or str(source.resolve()), clip.title or title, merged_tags
-        if source_kind in ("pdf", "voice"):
+        if source_kind in ("pdf", "document", "voice"):
             converted = extract_via_markitdown(source)
             if not converted.ok:
                 raise RuntimeError(converted.error or "markitdown extraction failed")

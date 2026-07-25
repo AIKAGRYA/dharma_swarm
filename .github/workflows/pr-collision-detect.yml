@@ -137,14 +137,16 @@ jobs:
           only the latest/most complete PR for a given intent should remain open.
           Close superseded PRs with a comment linking to the successor.*"
 
-          existing="$(gh pr view "${PR_NUMBER}" --json comments \
-            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
-            | head -1)"
+          # Look up an existing marked comment via the REST issues API so the id
+          # is the NUMERIC comment id the PATCH endpoint expects. gh pr view
+          # --json comments returns a GraphQL node id, which 404s against
+          # /issues/comments/{id} and hard-failed this whole check.
+          existing="$(gh api "/repos/${GH_REPO}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq 'map(select(.body | startswith("'"${marker}"'"))) | .[0].id // empty')"
 
           if [ -n "${existing}" ]; then
-            gh api --method PATCH \
-              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -f body="${body}"
+            gh api --method PATCH "/repos/${GH_REPO}/issues/comments/${existing}" \
+              -f body="${body}" || gh pr comment "${PR_NUMBER}" --body "${body}"
           else
             gh pr comment "${PR_NUMBER}" --body "${body}"
           fi
@@ -171,14 +173,16 @@ jobs:
           intersection cleanly. See \`docs/governance/COHERENCE_DELTA.md\`.*"
 
           # Find an existing bot comment with our marker (idempotent re-runs).
-          existing="$(gh pr view "${PR_NUMBER}" --json comments \
-            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
-            | head -1)"
+          # Look up an existing marked comment via the REST issues API so the id
+          # is the NUMERIC comment id the PATCH endpoint expects. gh pr view
+          # --json comments returns a GraphQL node id, which 404s against
+          # /issues/comments/{id} and hard-failed this whole check.
+          existing="$(gh api "/repos/${GH_REPO}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq 'map(select(.body | startswith("'"${marker}"'"))) | .[0].id // empty')"
 
           if [ -n "${existing}" ]; then
-            gh api --method PATCH \
-              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -f body="${body}"
+            gh api --method PATCH "/repos/${GH_REPO}/issues/comments/${existing}" \
+              -f body="${body}" || gh pr comment "${PR_NUMBER}" --body "${body}"
           else
             gh pr comment "${PR_NUMBER}" --body "${body}"
           fi

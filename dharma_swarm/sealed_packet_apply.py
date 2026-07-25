@@ -7,12 +7,14 @@ out of ``evolution.py`` while preserving DarwinEngine as the public authority.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 import fnmatch
 import json
 from pathlib import Path
 from typing import Any
 
 from dharma_swarm.diff_applier import parse_unified_diff
+from dharma_swarm.promotion_gate import SEALED_PACKET_BLOCKED_PATHS as _SEALED_PACKET_BLOCKED_PATHS
 from dharma_swarm.evolution import (
     EvidenceTier,
     EvolutionStatus,
@@ -21,23 +23,6 @@ from dharma_swarm.evolution import (
     SealedPacketApplyResult,
 )
 from dharma_swarm.traces import TraceEntry
-
-
-_SEALED_PACKET_BLOCKED_PATHS: tuple[str, ...] = (
-    ".github/workflows/*",
-    ".pre-commit-config.yaml",
-    "dharma_swarm/agent_runner.py",
-    "dharma_swarm/dgc_cli.py",
-    "dharma_swarm/dharma_kernel.py",
-    "dharma_swarm/frontier_council.py",
-    "dharma_swarm/guardian_crew.py",
-    "dharma_swarm/insight_brief.py",
-    "dharma_swarm/models.py",
-    "dharma_swarm/orchestrate_live.py",
-    "dharma_swarm/orchestrator.py",
-    "dharma_swarm/swarm.py",
-    "dharma_swarm/telos_gates.py",
-)
 
 
 async def apply_sealed_packet(
@@ -49,10 +34,25 @@ async def apply_sealed_packet(
     proof_timeout: float = 120.0,
     max_diff_lines: int = 50,
     halt_path: Path | None = None,
+    promotion_verification: dict[str, Any] | None = None,
+    trusted_judge_public_keys: Iterable[str | bytes] = (),
 ) -> SealedPacketApplyResult:
     """Validate, gate, prove, and archive a sealed Build Protocol packet."""
     root = Path(dryrun_root).expanduser().resolve()
     result = SealedPacketApplyResult(packet_root=str(root), shadow=shadow)
+    if not shadow:
+        from dharma_swarm.promotion_gate import _promotion_verification_allows_live
+
+        if not _promotion_verification_allows_live(
+            promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys,
+        ):
+            return await _refuse_sealed_packet(
+                engine,
+                result,
+                "live apply requires forge_v2.verify_promotion packet",
+                "promotion_verification",
+            )
     stop_file = halt_path or (Path.home() / ".dharma" / "HALT_DARWIN_PROPOSALS")
     if Path(stop_file).exists():
         return await _refuse_sealed_packet(engine, result, "halt switch present", "kill_switch")
@@ -124,6 +124,20 @@ async def apply_sealed_packet(
                 "sealed packet diff failed conservative guards",
                 guard_failures,
             )
+        if not shadow:
+            authorized = {
+                str(entry).strip()
+                for entry in (dict(promotion_verification or {}).get("authorized_source_files") or [])
+                if str(entry).strip()
+            }
+            unauthorized = [path for path in files_changed if path not in authorized]
+            if unauthorized:
+                return await _refuse_sealed_packet(
+                    engine,
+                    result,
+                    "sealed packet diff touches files the promotion packet does not authorize",
+                    [f"path_not_authorized_by_promotion:{path}" for path in unauthorized],
+                )
     else:
         files_changed = []
         diff_lines = 0
@@ -143,7 +157,7 @@ async def apply_sealed_packet(
     component = files_changed[0] if files_changed else _first_allowed_path(allowed_paths)
     proposal = Proposal(
         component=component or "sealed_packet",
-        change_type="sealed_packet",
+        change_type="sealed_packet_shadow" if shadow else "sealed_packet",
         description=description,
         diff=diff_text,
         spec_ref=str(build_meta.get("spec_path") or root),
@@ -160,6 +174,7 @@ async def apply_sealed_packet(
             "build_protocol_version": build_meta.get("protocol_version", "v0"),
             "diff_ref": diff_ref,
             "diff_missing": diff_missing,
+            "shadow": shadow,
         },
     )
     result.proposal_id = proposal.id

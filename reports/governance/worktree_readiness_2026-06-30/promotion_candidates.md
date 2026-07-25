@@ -1,7 +1,7 @@
 # Promotion Candidates First Pass
 
-Generated: 2026-06-30 JST  
-Scope: read-only assessment of seven named branches against current local `origin/main` (`bd121c827`).  
+Generated: 2026-06-30 JST
+Scope: read-only assessment of seven named branches against current local `origin/main` (`bd121c827`).
 Write constraint observed: only this receipt was written. Candidate branches were not checked out, edited, fetched, pushed, merged, or rebased.
 
 ## Global Coordination Notes
@@ -28,9 +28,9 @@ Write constraint observed: only this receipt was written. Candidate branches wer
 
 ## 1. slice/roast-skill
 
-Disposition: `PR_NOW`  
-Production value: Medium. Adds an anti-sycophancy `roast` skill for adversarial decision review before spend/build/launch decisions.  
-Readiness: High. Clean linked worktree; tiny diff; existing draft PR #716.  
+Disposition: `PR_NOW`
+Production value: Medium. Adds an anti-sycophancy `roast` skill for adversarial decision review before spend/build/launch decisions.
+Readiness: High. Clean linked worktree; tiny diff; existing draft PR #716.
 Conflict risk: Low to medium. Only shared overlap observed is `docs/docops/assertions.yaml`; PR snapshot says merge state `UNSTABLE`, with `pytest (3.11)` failure and `pytest (3.12)` success.
 
 Verifier facts:
@@ -62,9 +62,9 @@ python -m pytest -q --strict-markers
 
 ## 2. ratchet/loop-phases-1-3
 
-Disposition: `REBASE_FIRST`  
-Production value: Very high. Adds cybernetic loop ratchet gates, deterministic audit pipeline stages, anti-gaming checks, warrant validation, CI wiring, and broad tests.  
-Readiness: Medium-high. Linked worktree is clean and branch has extensive tests, but it is 23 behind / 19 ahead and merge-base is `c53721d5f`, the semantic commons tip, so it depends on work now already in `origin/main`.  
+Disposition: `REBASE_FIRST`
+Production value: Very high. Adds cybernetic loop ratchet gates, deterministic audit pipeline stages, anti-gaming checks, warrant validation, CI wiring, and broad tests.
+Readiness: Medium-high. Linked worktree is clean and branch has extensive tests, but it is 23 behind / 19 ahead and merge-base is `c53721d5f`, the semantic commons tip, so it depends on work now already in `origin/main`.
 Conflict risk: Medium. Mostly additive, but `pyproject.toml` overlaps with main.
 
 Verifier facts:
@@ -137,9 +137,9 @@ PYTHONPATH=. python scripts/governance/hygiene/check_hygiene_integrity.py
 
 ## 3. loop-closure/supplychain-bronze-20260620
 
-Disposition: `PRESERVE_WIP`  
-Production value: High. Adds `frontier_council.py` and closes bronze supply-chain intake into verifier/archive receipts with a full-chain test.  
-Readiness: Medium. Committed diff is small, but linked worktree is dirty and its upstream is gone.  
+Disposition: `PRESERVE_WIP`
+Production value: High. Adds `frontier_council.py` and closes bronze supply-chain intake into verifier/archive receipts with a full-chain test.
+Readiness: Medium. Committed diff is small, but linked worktree is dirty and its upstream is gone.
 Conflict risk: Medium. Overlap detected on `docs/ontology/semantic_objects.yaml`; worktree WIP modifies unrelated tests and governance receipts.
 
 Verifier facts:
@@ -188,9 +188,9 @@ PYTHONPATH=. python -m pytest -q tests/test_frontier_council_supply_chain.py --s
 
 ## 4. codex/pudgala-autopoiesis-protostar-20260626
 
-Disposition: `REBASE_FIRST`  
-Production value: High. Adds graded evidence gates, claim/evidence binding, mutation score gate, and anti-slop governance track machinery.  
-Readiness: Medium. Remote branch exists; no local branch. PR #704 exists and snapshot checks were green, but PR merge state was `DIRTY`.  
+Disposition: `REBASE_FIRST`
+Production value: High. Adds graded evidence gates, claim/evidence binding, mutation score gate, and anti-slop governance track machinery.
+Readiness: Medium. Remote branch exists; no local branch. PR #704 exists and snapshot checks were green, but PR merge state was `DIRTY`.
 Conflict risk: High. Since merge-base is semantic commons tip, nearly every touched file also changed on main; overlap includes `Makefile`, governance docs, `pyproject.toml`, active track evidence, governance scripts, and tests.
 
 Verifier facts:
@@ -248,9 +248,9 @@ PYTHONPATH=. python scripts/governance/check_claim_evidence_binding.py --warn-on
 
 ## 5. forge-v1/tokenbroker-scoreboard-20260620
 
-Disposition: `PRESERVE_WIP`  
-Production value: Very high. Adds a Forge v1 scoreboard, TokenBroker equal-budget enforcement, sandbox verifier, best-of-N comparison, SWE-bench hooks, provider bridge, and RunPod runbook.  
-Readiness: Medium-low. Committed slice is mostly additive, but old and 212 behind; linked worktree has substantial dirty provider/model-pool/v2 work that must not be mixed into promotion.  
+Disposition: `PRESERVE_WIP`
+Production value: Very high. Adds a Forge v1 scoreboard, TokenBroker equal-budget enforcement, sandbox verifier, best-of-N comparison, SWE-bench hooks, provider bridge, and RunPod runbook.
+Readiness: Medium-low. Committed slice is mostly additive, but old and 212 behind; linked worktree has substantial dirty provider/model-pool/v2 work that must not be mixed into promotion.
 Conflict risk: Low for committed files; high coordination risk because of active dirty worktree.
 
 Verifier facts:
@@ -331,9 +331,9 @@ PYTHONPATH=. python -m pytest -q tests/test_forge_v1.py tests/test_forge_v1_full
 
 ## 6. cashclaw/revenue-hydra-v1
 
-Disposition: `SPLIT_FIRST`  
-Production value: High but high-risk. Adds revenue scouting/intake, action gateway, claim tracking, hydra evolution, and human approval token gates.  
-Readiness: Low as a single promotion. The branch is huge and dominated by generated/run artifacts under `reports/revenue_wedge/evolution/*`. Linked worktree also has dirty WIP.  
+Disposition: `SPLIT_FIRST`
+Production value: High but high-risk. Adds revenue scouting/intake, action gateway, claim tracking, hydra evolution, and human approval token gates.
+Readiness: Low as a single promotion. The branch is huge and dominated by generated/run artifacts under `reports/revenue_wedge/evolution/*`. Linked worktree also has dirty WIP.
 Conflict risk: Low path overlap on committed branch, but high review/security risk due action/PR/claim code and artifact volume.
 
 Verifier facts:
@@ -423,9 +423,9 @@ Recommended split order:
 
 ## 7. codex/semantic-commons-livingdock-composer-100
 
-Disposition: `ARCHIVE_AFTER_APPROVAL`  
-Production value: Already realized in main for committed branch tip.  
-Readiness: Do not promote committed branch; `origin/main...branch` is empty. Linked worktree has dirty WIP that should become a new named branch if still desired.  
+Disposition: `ARCHIVE_AFTER_APPROVAL`
+Production value: Already realized in main for committed branch tip.
+Readiness: Do not promote committed branch; `origin/main...branch` is empty. Linked worktree has dirty WIP that should become a new named branch if still desired.
 Conflict risk: None for committed branch; high for linked WIP if recovered without splitting.
 
 Verifier facts:
@@ -491,4 +491,3 @@ git -C /Users/dhyana/ds_semantic_commons_100 ls-files --others --exclude-standar
 ```
 
 If approved, archive the branch pointer after preserving or discarding WIP by explicit operator decision.
-

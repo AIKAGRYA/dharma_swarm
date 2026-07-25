@@ -1,0 +1,67 @@
+name: hermetic
+
+# Hermetic supply chain (INTEGRITY_CODEX.md F) + CODEOWNERS auto-routed from
+# measured blast radius (N-1). The verdict is a function of the pinned lockfile
+# and pinned toolchain, not live PyPI: a lockfile that drifts from pyproject.toml
+# fails the install here rather than silently resolving fresh at install time.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermetic-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pin uv so the drift verdict depends on a fixed resolver, not whatever
+  # uv version the runner happens to ship.
+  UV_VERSION: "0.11.2"
+
+jobs:
+  hermetic-install:
+    name: Hermetic install — lockfile drift fails
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned uv
+        run: python -m pip install --upgrade "uv==${UV_VERSION}"
+
+      - name: Hermetic install (lockfile drift fails)
+        run: |
+          # uv lock --check is the drift oracle: it fails when uv.lock no longer
+          # matches pyproject.toml (uv sync --frozen alone would install the stale
+          # lock and pass). uv sync --frozen then installs the exact locked
+          # closure without touching PyPI's live index for resolution.
+          uv lock --check
+          uv sync --frozen --extra dev
+
+  codeowners-blast-radius:
+    name: CODEOWNERS — measured blast-radius routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify every measured heavy module is routed
+        run: python3 scripts/governance/codeowners_blast_radius.py --check

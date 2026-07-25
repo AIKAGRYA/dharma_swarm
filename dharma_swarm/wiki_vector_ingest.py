@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 
 @dataclass(frozen=True)
 class WikiVectorIngestReceipt:
@@ -30,10 +32,10 @@ def ingest_wiki_concepts(
 ) -> WikiVectorIngestReceipt:
     """Ingest live wiki concepts into vector + compact retrieval projections."""
 
-    resolved_state_dir = Path(state_dir or Path.home() / ".dharma").expanduser()
+    resolved_state_dir = Path(state_dir or dharma_state_dir()).expanduser()
     resolved_wiki_dir = Path(
         wiki_concepts_dir
-        or Path.home() / ".dharma" / "knowledge" / "wiki" / "concepts"
+        or dharma_state_dir() / "knowledge" / "wiki" / "concepts"
     ).expanduser()
 
     from scripts.memory_retrieval_sync_index import sync_memory_retrieval_index

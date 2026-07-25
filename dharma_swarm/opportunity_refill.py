@@ -269,24 +269,26 @@ class OpportunityRefill:
         """Record the refill wrapper's own stage observation in runtime truth."""
         if self._runtime_state is None or not sr.task_id or not sr.run_id or not sr.claim_id:
             return
-        identity = ExecutionIdentity.new(
-            task_id=sr.task_id,
-            agent_id="opportunity_agent",
-            session_id=str(getattr(self._dispatcher, "_session_id", "") or ""),
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            causation_id=f"opportunity_refill:{row.id}:{sr.stage}",
-            run_id=sr.run_id,
-            claim_id=sr.claim_id,
-            idempotency_key=f"idem_{sr.run_id}",
-            proposal_id=sr.proposal_id,
-            metadata={
-                "source": "opportunity_refill",
-                "opportunity_id": row.id,
-                "opportunity_type": row.type,
-                "stage": sr.stage,
-            },
-        )
+        identity = self._runtime_state.get_execution_identity_sync(sr.run_id)
+        if identity is None:
+            identity = ExecutionIdentity.new(
+                task_id=sr.task_id,
+                agent_id="opportunity_agent",
+                session_id=str(getattr(self._dispatcher, "_session_id", "") or ""),
+                trace_id=trace_id,
+                correlation_id=correlation_id,
+                causation_id=f"opportunity:{row.id}:{sr.stage}",
+                run_id=sr.run_id,
+                claim_id=sr.claim_id,
+                idempotency_key=f"idem_{sr.run_id}",
+                proposal_id=sr.proposal_id,
+                metadata={
+                    "source": "opportunity_refill",
+                    "opportunity_id": row.id,
+                    "opportunity_type": row.type,
+                    "stage": sr.stage,
+                },
+            )
         payload = {
             "opportunity_id": row.id,
             "opportunity_type": row.type,

@@ -1,18 +1,5 @@
-"""Observability organ — holon health + canonical truth projection (read-only)."""
+"""Observability facades."""
 
-from __future__ import annotations
+from .proof_gates import proof_gate_summary
 
-from dharma_swarm.holon_canonical_state import (
-    build_canonical_holon_state,
-    canonical_state_path,
-    project_canonical_holon_state,
-)
-from dharma_swarm.holon_health import holon_health_rows, holon_status
-
-__all__ = [
-    "build_canonical_holon_state",
-    "canonical_state_path",
-    "holon_health_rows",
-    "holon_status",
-    "project_canonical_holon_state",
-]
+__all__ = ["proof_gate_summary"]

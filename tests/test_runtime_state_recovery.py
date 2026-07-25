@@ -147,3 +147,142 @@ async def test_message_bus_conflicting_idempotency_key_does_not_insert_second_me
 
     assert _message_count(bus_path) == 1
     assert [message.id for message in await bus.receive("bob")] == [first_id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_returns_same_receipt(tmp_path: Path) -> None:
+    """Retrying send_staged() with the same identity must return the recorded
+    receipt instead of re-inserting and hitting the messages.id primary key."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-retry",
+        task_id="task-staged-retry",
+        idempotency_key="idem-staged-retry",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    first_id = await bus.send_staged(message, deliver_at_superstep=2)
+    retry_id = await bus.send_staged(message, deliver_at_superstep=2)
+
+    assert retry_id == first_id
+    assert _message_count(bus_path) == 1
+    assert await bus.receive("bob", current_superstep=1) == []
+    assert [m.id for m in await bus.receive("bob", current_superstep=2)] == [first_id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_resumes_insert_after_crash_before_write(tmp_path: Path) -> None:
+    """A retry after a crash between begin and INSERT must write the row,
+    not fabricate a receipt for a message that was never persisted."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-crash-insert",
+        task_id="task-staged-crash-insert",
+        idempotency_key="idem-staged-crash-insert",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_retry = bus._run_with_lock_retry
+
+    async def _crash_before_insert(fn):
+        raise RuntimeError("crash before insert")
+
+    bus._run_with_lock_retry = _crash_before_insert  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before insert"):
+        await bus.send_staged(message, deliver_at_superstep=2)
+    bus._run_with_lock_retry = original_retry  # type: ignore[method-assign]
+    assert _message_count(bus_path) == 0
+
+    retry_id = await bus.send_staged(message, deliver_at_superstep=2)
+
+    assert retry_id == message.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=2)] == [message.id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_completes_after_crash_before_completion(tmp_path: Path) -> None:
+    """A retry after a crash between INSERT and completion must return the
+    receipt for the already-written row without inserting a duplicate."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-crash-complete",
+        task_id="task-staged-crash-complete",
+        idempotency_key="idem-staged-crash-complete",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_complete = runtime.complete_idempotent_side_effect
+    crashed = {"done": False}
+
+    async def _crash_once(*args, **kwargs):
+        if not crashed["done"]:
+            crashed["done"] = True
+            raise RuntimeError("crash before completion")
+        return await original_complete(*args, **kwargs)
+
+    runtime.complete_idempotent_side_effect = _crash_once  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before completion"):
+        await bus.send_staged(message, deliver_at_superstep=1)
+    assert _message_count(bus_path) == 1
+
+    retry_id = await bus.send_staged(message, deliver_at_superstep=1)
+
+    assert retry_id == message.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=1)] == [message.id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_with_regenerated_id_returns_original_row(tmp_path: Path) -> None:
+    """A retry carrying the same idempotency key but a regenerated Message id
+    must resume against the row recorded at begin time, not insert a duplicate."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-regen-id",
+        task_id="task-staged-regen-id",
+        idempotency_key="idem-staged-regen-id",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    first = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_complete = runtime.complete_idempotent_side_effect
+    crashed = {"done": False}
+
+    async def _crash_once(*args, **kwargs):
+        if not crashed["done"]:
+            crashed["done"] = True
+            raise RuntimeError("crash before completion")
+        return await original_complete(*args, **kwargs)
+
+    runtime.complete_idempotent_side_effect = _crash_once  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before completion"):
+        await bus.send_staged(first, deliver_at_superstep=1)
+    assert _message_count(bus_path) == 1
+
+    retry = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+    assert retry.id != first.id
+    retry_receipt = await bus.send_staged(retry, deliver_at_superstep=1)
+
+    assert retry_receipt == first.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=1)] == [first.id]

@@ -1,40 +1,40 @@
-│ Changed n/a         │ │                                                                                              │
-│ Summary n/a         │ │                                                                                              │
-│ Lead change n/a |   │ │                                                                                              │
-│ n/a                 │ │                                                                                              │
-│ Lead file n/a       │ │                                                                                              │
-│ Lead dep n/a        │ │                                                                                              │
-│ Repo Risk           │ │                                                                                              │
-│ Risk n/a            │ │                                                                                              │
-│ Count n/a peers |   │ │                                                                                              │
-│ warnings n/a        │ │                                                                                              │
-│ Warnings n/a        │ │                                                                                              │
-│ Members n/a         │ │                                                                                              │
-│ Severity n/a |      │ │                                                                                              │
-│ warning n/a         │ │                                                                                              │
-│ Topology signal n/a │ │                                                                                              │
-│  | none             │ │                                                                                              │
-│ Branch divergence   │ │                                                                                              │
-│ n/a                 │ │                                                                                              │
-│ Detached peers none │ │                                                                                              │
-│                     │ │                                                                                              │
-│ Lead peer n/a       │ │                                                                                              │
-│ Pressure n/a        │ │                                                                                              │
-│ Control Preview     │ │                                                                                              │
-│ Ontology            │ │                                                                                              │
-│ Ver n/a | concepts  │ │                                                                                              │
-│ n/a                 │ │                                                                                              │
-╰─────────────────────╯ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Operator Prompt                                                                                                      │
-│ >                                                                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Dharma Terminal
+ Type a message below · F2 opens the cockpit
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                                    │
-│ route  ready | codex:gpt-5.4                                                                                         │
-│ mode  tab navigation                                                                                                 │
-│ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T   │
-│ ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh shell | ^U compact trace | ^I raw on                      │
+│ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ zen/composer  ·  claude:claude-opus-4.8 [unverified]  ·  bridge offline  ·  F2 cockpit · /tour

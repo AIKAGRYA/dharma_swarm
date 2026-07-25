@@ -193,9 +193,13 @@ async def test_flywheel_exporter_filters_session_events_when_trace_is_missing(tm
     db_path = tmp_path / "runtime.db"
     runtime_state = RuntimeStateStore(db_path)
     memory_lattice = MemoryLattice(db_path=db_path, event_log_dir=tmp_path / "events")
+    # Mint the artifact through a store without a runtime_state so no execution
+    # identity (and therefore no trace_id) is stamped: this is the legacy/untraced
+    # shape that exercises the session_filtered fallback. Native trace propagation
+    # always stamps a trace when runtime_state is wired.
     artifact_store = RuntimeArtifactStore(
         base_dir=tmp_path / "workspace" / "sessions",
-        runtime_state=runtime_state,
+        runtime_state=None,
     )
     await runtime_state.init_db()
     await memory_lattice.init_db()
@@ -217,6 +221,7 @@ async def test_flywheel_exporter_filters_session_events_when_trace_is_missing(tm
         task_id="task-no-trace",
         run_id="run-no-trace",
     )
+    await runtime_state.record_artifact(stored.record)
     await runtime_state.record_delegation_run(
         DelegationRun(
             run_id="run-no-trace",

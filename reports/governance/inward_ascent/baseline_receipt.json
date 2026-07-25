@@ -1,0 +1,127 @@
+{
+  "content_digest": "e313628e407385b72c88572b2308f87b7c411677005940ff92295c15b84a01e3",
+  "digest": "43021d4ad12026cdd8ea439bdeed7f38b2cc0a4d0c1d28f69c652165f07cb57a",
+  "doctrine": "read model projects truth from owners; unmeasured = UNKNOWN, never green",
+  "generated_at": "2026-07-07T05:09:35Z",
+  "host": "devin-box",
+  "schema_version": "dharma_swarm.inward_ascent_baseline.v1",
+  "state_dir": "/home/ubuntu/.dharma",
+  "summary": {
+    "surfaces_measured": 2,
+    "surfaces_total": 9,
+    "surfaces_unknown": 7
+  },
+  "surfaces": [
+    {
+      "id": "ingest_volume",
+      "label": "Bronze raw receipts landed",
+      "measured": true,
+      "note": "live-capable: HN Algolia fetch verified this host; 0 = organs dark, not broken",
+      "owner": ".dharma/meta/intelligence_supply_chain/bronze/raw_receipts",
+      "ratchet_direction": "up",
+      "ten_x_target": 0.0,
+      "unit": "receipts",
+      "value": 0
+    },
+    {
+      "id": "ingest_quality",
+      "label": "Corroborated ingest fraction",
+      "measured": false,
+      "note": "no bronze receipts on this host \u2014 cannot measure corroboration yet",
+      "owner": "/home/ubuntu/.dharma/meta/intelligence_supply_chain/bronze/raw_receipts",
+      "ratchet_direction": "up",
+      "ten_x_target": null,
+      "unit": "fraction",
+      "value": null
+    },
+    {
+      "id": "ontology_coverage",
+      "label": "Ontology entities",
+      "measured": false,
+      "note": "ontology.db ABSENT on this host (BR-007) \u2014 coverage UNKNOWN, measurable only on the daemon host that owns the store",
+      "owner": "/home/ubuntu/.dharma/ontology.db",
+      "ratchet_direction": "up",
+      "ten_x_target": null,
+      "unit": "entities",
+      "value": null
+    },
+    {
+      "id": "memory_hit_rate",
+      "label": "Memory-kernel hit-rate",
+      "measured": false,
+      "note": "no retrieval-QA harness yet \u2014 hit-rate UNMEASURED; the retrieval/memory gym creates verifiable QA over ingested corpora; no kernel store on this host",
+      "owner": "dharma_swarm/memory_kernel/",
+      "ratchet_direction": "up",
+      "ten_x_target": null,
+      "unit": "fraction",
+      "value": null
+    },
+    {
+      "detail": {
+        "inert_gate_markers": 1
+      },
+      "id": "gate_catch_rate",
+      "label": "Gate catch-rate (held-out attacks)",
+      "measured": false,
+      "note": "no held-out attack corpus yet \u2014 catch-rate UNMEASURED; the gate red-team gym calibrates inert gates (e.g. BHED_GNAN)",
+      "owner": "dharma_swarm/telos_gates.py",
+      "ratchet_direction": "up",
+      "ten_x_target": null,
+      "unit": "fraction",
+      "value": null
+    },
+    {
+      "detail": {
+        "delegation_runs": 0
+      },
+      "id": "routing_regret",
+      "label": "Routing regret vs history",
+      "measured": false,
+      "note": "delegation_runs rows=0 present but replay evaluator not built (Phase 1) \u2014 regret UNMEASURED",
+      "owner": "/home/ubuntu/.dharma/state/runtime.db",
+      "ratchet_direction": "down",
+      "ten_x_target": null,
+      "unit": "regret",
+      "value": null
+    },
+    {
+      "id": "self_model_accuracy",
+      "label": "Self-model test-break accuracy",
+      "measured": false,
+      "note": "no self-model harness yet \u2014 UNMEASURED; the self-model gym scores predictions of which tests a diff breaks by running them",
+      "owner": "(self-model gym \u2014 Phase 1)",
+      "ratchet_direction": "up",
+      "ten_x_target": null,
+      "unit": "fraction",
+      "value": null
+    },
+    {
+      "id": "forecast_brier",
+      "label": "Forecast Brier score",
+      "measured": false,
+      "note": "no RESOLVED predictions on this host \u2014 Brier undefined; the forecasting gym exists to create resolvable predictions",
+      "owner": "dharma_swarm/ginko_brier.py",
+      "ratchet_direction": "down",
+      "ten_x_target": null,
+      "unit": "brier",
+      "value": null
+    },
+    {
+      "detail": {
+        "commits": 1331,
+        "merges": 273,
+        "shallow": "false",
+        "snapshot_sha": "de92625f23b3a9a8495cc014cb01e7016db8c1ba"
+      },
+      "id": "git_history_gym",
+      "label": "git-history gym substrate (commits/merges)",
+      "measured": true,
+      "note": "non-shallow=True; landed merges = real solved tasks",
+      "owner": "git log de92625f23b3a9a8495cc014cb01e7016db8c1ba (frozen snapshot)",
+      "ratchet_direction": "up",
+      "ten_x_target": 13310.0,
+      "unit": "commits",
+      "value": 1331
+    }
+  ]
+}

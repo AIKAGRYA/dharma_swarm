@@ -1,9 +1,12 @@
 import argparse
 import asyncio
+import json
 import sys
 import time
+from pathlib import Path
 
 import pytest
+import yaml
 from scripts.runtime import pr_merge_control as prc
 
 
@@ -11,6 +14,14 @@ def _ci_required_success_rollup():
     return [
         {"name": "DocOps integrity gate", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {
+            "name": "Onboarding admission parity",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+        },
+        {"name": "gitleaks", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "pytest (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "pytest (3.12)", "status": "COMPLETED", "conclusion": "SUCCESS"},
     ]
 
 
@@ -61,6 +72,40 @@ def test_classify_pr_uses_latest_duplicate_check_run():
     assert result["checks"]["failing"] == []
     assert result["checks"]["passing"] == ["Coherence Delta PR body"]
     assert result["checks"]["raw_total"] == 2
+    assert result["checks"]["total"] == 1
+
+
+def test_classify_pr_newest_run_wins_even_when_older_run_finishes_later():
+    """Duplicate runs are ordered by start time: an older run that completes
+    after a newer failing run must not flip the context green."""
+    pr = {
+        "number": 1,
+        "title": "overlapping rerun",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "startedAt": "2026-06-01T10:00:00Z",
+                "completedAt": "2026-06-01T10:10:00Z",
+            },
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "startedAt": "2026-06-01T10:05:00Z",
+                "completedAt": "2026-06-01T10:06:00Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["checks"]["failing"] == ["pytest (3.11)"]
+    assert result["checks"]["passing"] == []
     assert result["checks"]["total"] == 1
 
 
@@ -265,6 +310,280 @@ def test_select_fanout_items_prefers_allowed_statuses_in_order():
     )
 
     assert [item["number"] for item in selected] == [12, 13, 11]
+
+
+def _write_current_fanout_packet(
+    state_root,
+    *,
+    pr_number=12,
+    head_sha="abc123",
+    base_sha="base123",
+    updated_at="2026-06-01T02:00:00Z",
+    gate_decision="MERGE_CANDIDATE",
+):
+    packet_dir = state_root / f"pr-{pr_number}" / "20260601T020000Z"
+    packet_dir.mkdir(parents=True)
+    prc.write_json(
+        packet_dir / "FACTS.json",
+        {
+            "pr": {
+                "number": pr_number,
+                "headRefOid": head_sha,
+                "baseRefOid": base_sha,
+                "updatedAt": updated_at,
+            },
+            "classification": {
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "reviewDecision": "NONE",
+            },
+        },
+    )
+    prc.write_json(packet_dir / "MERGE_GATE.json", {"decision": gate_decision, "blockers": []})
+    return packet_dir
+
+
+def test_select_fanout_plan_skips_current_packet_gate(tmp_path):
+    packet_dir = _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "already packeted",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            },
+            {
+                "number": 13,
+                "title": "new work",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T03:00:00Z",
+                "reviewDecision": "NONE",
+            },
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [13]
+    assert plan["skipped_current"][0]["number"] == 12
+    assert plan["skipped_current"][0]["packet_dir"] == str(packet_dir)
+
+
+def test_select_fanout_plan_reprocesses_when_pr_updated_timestamp_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, updated_at="2026-06-01T02:00:00Z")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "metadata changed",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_when_head_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, head_sha="abc123")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new head",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_when_base_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, base_sha="base123")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new base",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base456",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_blocked_gate(tmp_path):
+    _write_current_fanout_packet(tmp_path, gate_decision="BLOCKED")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "blocked gate",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "force",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_zero_max_selects_none(tmp_path):
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "would otherwise select",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
+def test_select_fanout_plan_zero_max_does_not_scan_current_packets(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "current but disabled",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
+def test_should_skip_current_fanout_only_for_packet_only_off_mode():
+    base = {
+        "reprocess_current": False,
+        "packet_only": True,
+        "merge_mode": "off",
+    }
+
+    assert prc.should_skip_current_fanout(argparse.Namespace(**base)) is True
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "packet_only": False})) is False
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "merge_mode": "auto-when-clean"})) is False
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "reprocess_current": True})) is False
 
 
 def test_build_queue_summary_counts_statuses():
@@ -762,6 +1081,403 @@ def test_gate_blocks_missing_required_ci_truth(tmp_path, monkeypatch):
     assert "required CI docops_integrity is MISSING; run `make docops-integrity`" in gate["blockers"]
 
 
+@pytest.mark.parametrize(
+    ("github_status", "conclusion", "expected_status"),
+    [
+        (None, None, "MISSING"),
+        ("IN_PROGRESS", "", "PENDING"),
+        ("COMPLETED", "FAILURE", "FAIL"),
+    ],
+)
+def test_gate_blocks_nonpassing_onboarding_admission_parity(
+    tmp_path,
+    monkeypatch,
+    github_status,
+    conclusion,
+    expected_status,
+):
+    """WP-0F2 consumer proof: the manual Mike path fails closed on the
+    onboarding required context straight from the live CI truth contract —
+    no candidate-contract shim. Contract v5 requires the context as
+    onboarding_session_status; the assertion reads the entry's id and
+    local_command from the contract itself so a rename fails loudly here."""
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+
+    contract = prc.load_ci_truth_contract()
+    onboarding_entries = [
+        entry
+        for entry in contract["required"]
+        if "Onboarding admission parity" in entry.get("names", [])
+    ]
+    assert len(onboarding_entries) == 1, (
+        "CI truth contract must require the onboarding admission context"
+    )
+    entry_id = onboarding_entries[0]["id"]
+    local_command = onboarding_entries[0].get("local_command", "")
+
+    rollup = [
+        item
+        for item in _ci_required_success_rollup()
+        if item["name"] != "Onboarding admission parity"
+    ]
+    if github_status is not None:
+        rollup.append(
+            {
+                "name": "Onboarding admission parity",
+                "status": github_status,
+                "conclusion": conclusion,
+            }
+        )
+    body = """
+- Organ touched: `tests/test_pr_merge_control.py` (Mike-owned consumer proof).
+- Declared-vs-actual gap closed: manual merge authority blocks nonpassing onboarding admission.
+- Proof that re-reads the map: the live CI truth contract is evaluated by build_gate.
+- New drift introduced: none; the gate only gets stricter.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+    blocker = (
+        f"required CI {entry_id} is {expected_status}; run `{local_command}`"
+    )
+    assert gate["decision"] == "BLOCKED"
+    assert gate["ci_truth"]["verdict"] == "FAIL"
+    assert blocker in gate["blockers"]
+
+
+_WORKFLOWS_ROOT = Path(__file__).resolve().parents[1]
+_AUTOMERGE_WORKFLOW = _WORKFLOWS_ROOT / ".github" / "workflows" / "automerge.yml"
+_PARITY_MANIFEST = _WORKFLOWS_ROOT / "scripts" / "governance" / "ci_parity_manifest.json"
+
+# The plan's exhaustive fail-closed states for a required check
+# (docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:1100-1103):
+# absent, pending, failed, cancelled, timed out, action required.
+_NONSUCCESS_REQUIRED_STATES = [
+    (None, None, "MISSING"),
+    ("IN_PROGRESS", "", "PENDING"),
+    ("COMPLETED", "FAILURE", "FAIL"),
+    ("COMPLETED", "CANCELLED", "FAIL"),
+    ("COMPLETED", "TIMED_OUT", "FAIL"),
+    ("COMPLETED", "ACTION_REQUIRED", "FAIL"),
+]
+
+
+def _contract_success_rollup(contract):
+    return [
+        {"name": entry["names"][0], "status": "COMPLETED", "conclusion": "SUCCESS"}
+        for entry in contract["required"]
+    ]
+
+
+def _build_gate_for_rollup(base_dir, monkeypatch, rollup):
+    out_dir = base_dir / "packet"
+    out_dir.mkdir(parents=True)
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+    body = """
+- Organ touched: `tests/test_pr_merge_control.py` (Mike-owned consumer proof).
+- Declared-vs-actual gap closed: every entry path consumes one required-check truth.
+- Proof that re-reads the map: the live CI truth contract is evaluated by build_gate.
+- New drift introduced: none; the gate only gets stricter.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+    return prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(base_dir),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("github_status", "conclusion", "expected_status"), _NONSUCCESS_REQUIRED_STATES
+)
+def test_gate_blocks_every_required_entry_on_every_nonsuccess_state(
+    tmp_path,
+    monkeypatch,
+    github_status,
+    conclusion,
+    expected_status,
+):
+    """WP-0F2 consumer proof, set-agnostic: the manual Mike path fails closed
+    for EVERY required entry the live CI truth contract declares, on every
+    fail-closed state the Titanium plan enumerates (plan :1100-1103). The
+    entries are read from the contract at runtime, so ratifying a different
+    final set (WP-0F1) is exercised by this exact test without edits."""
+    contract = prc.load_ci_truth_contract()
+    assert contract["required"], "CI truth contract must declare required entries"
+    for index, entry in enumerate(contract["required"]):
+        rollup = [
+            item
+            for item in _contract_success_rollup(contract)
+            if item["name"] != entry["names"][0]
+        ]
+        if github_status is not None:
+            rollup.append(
+                {
+                    "name": entry["names"][0],
+                    "status": github_status,
+                    "conclusion": conclusion,
+                }
+            )
+        gate = _build_gate_for_rollup(tmp_path / f"case{index}", monkeypatch, rollup)
+        blocker = (
+            f"required CI {entry['id']} is {expected_status}; "
+            f"run `{entry.get('local_command', '')}`"
+        )
+        assert gate["decision"] == "BLOCKED", entry["id"]
+        assert gate["ci_truth"]["verdict"] == "FAIL", entry["id"]
+        assert blocker in gate["blockers"], entry["id"]
+
+
+def test_automerge_and_mike_share_one_required_check_authority():
+    """WP-0F2 single-truth proof (plan :1092-1094): automerge derives its
+    required set solely from ci_parity_manifest.json, Mike's gate from the CI
+    truth contract, and the two are the same canonical set. Parity is already
+    fail-closed at contract load (ci_truth.py:114-127); asserting the equality
+    here makes divergence fail loudly inside Mike's own suite, and asserting
+    no manifest context appears literally in automerge.yml keeps a private
+    context list from ever coming back."""
+    contract = prc.load_ci_truth_contract()
+    manifest = json.loads(_PARITY_MANIFEST.read_text(encoding="utf-8"))
+    manifest_contexts = sorted(
+        str(entry["context"]) for entry in manifest["required_contexts"]
+    )
+    canonical = sorted(str(entry["names"][0]) for entry in contract["required"])
+    assert manifest_contexts == canonical
+    text = _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert "scripts/governance/ci_parity_manifest.json" in text
+    assert "steps.required_contexts.outputs.required_checks" in text
+    for context in manifest_contexts:
+        assert context not in text, (
+            f"automerge.yml must not hardcode required context {context!r}"
+        )
+
+
+def _automerge_required_check_skips(rollup, required_contexts):
+    """Python mirror of automerge.yml's step-3 jq evaluation: normalize each
+    rollup item (PENDING when incomplete, else uppercase conclusion or
+    NO_CONCLUSION), keep the latest entry per name, then skip when any
+    required context is missing or outside the green set
+    {SUCCESS, NEUTRAL, SKIPPED}."""
+    normalized = {}
+    for ordinal, item in enumerate(rollup):
+        name = str(
+            item.get("name") or item.get("context") or item.get("workflowName") or "unnamed"
+        )
+        observed = str(item.get("startedAt") or item.get("completedAt") or "")
+        if str(item.get("status") or "COMPLETED") != "COMPLETED":
+            state = "PENDING"
+        else:
+            state = str(item.get("conclusion") or item.get("state") or "").upper()
+            state = state or "NO_CONCLUSION"
+        key = (observed, ordinal)
+        current = normalized.get(name)
+        if current is None or key > current[0]:
+            normalized[name] = (key, state)
+    states = {name: state for name, (_, state) in normalized.items()}
+    missing = [context for context in required_contexts if context not in states]
+    not_green = [
+        context
+        for context in required_contexts
+        if context in states and states[context] not in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+    ]
+    return bool(missing or not_green)
+
+
+def test_automerge_skip_matches_mike_fail_on_every_nonsuccess_state():
+    """WP-0F2 same-verdict proof (plan :1106): for every required context and
+    every fail-closed state, the manifest-driven automerge path skips AND the
+    contract-driven CI truth verdict is FAIL — the two entry paths cannot
+    disagree in the fail direction."""
+    contract = prc.load_ci_truth_contract()
+    required_contexts = [str(entry["names"][0]) for entry in contract["required"]]
+    for entry in contract["required"]:
+        for github_status, conclusion, _expected in _NONSUCCESS_REQUIRED_STATES:
+            rollup = [
+                item
+                for item in _contract_success_rollup(contract)
+                if item["name"] != entry["names"][0]
+            ]
+            if github_status is not None:
+                rollup.append(
+                    {
+                        "name": entry["names"][0],
+                        "status": github_status,
+                        "conclusion": conclusion,
+                    }
+                )
+            assert _automerge_required_check_skips(rollup, required_contexts), (
+                entry["id"],
+                conclusion,
+            )
+            verdict = prc.evaluate_ci_rollup(rollup, contract)["verdict"]
+            assert verdict == "FAIL", (entry["id"], conclusion)
+
+
+def test_workflow_dispatch_event_and_schedule_paths_share_one_gate_job():
+    """WP-0F2 entry-path proof (plan :1106): manual workflow_dispatch, PR
+    events, check_suite, review events, and the scheduled sweep all enter the
+    single `evaluate` job, whose manifest-load and candidate-evaluation steps
+    carry no event-conditional `if`, so every path traverses the identical
+    required-check evaluation."""
+    workflow = yaml.safe_load(_AUTOMERGE_WORKFLOW.read_text(encoding="utf-8"))
+    triggers = workflow.get("on") or workflow.get(True)
+    assert {
+        "pull_request",
+        "check_suite",
+        "pull_request_review",
+        "schedule",
+        "workflow_dispatch",
+    } <= set(triggers)
+    jobs = workflow["jobs"]
+    assert list(jobs) == ["evaluate"]
+    steps = {step.get("name"): step for step in jobs["evaluate"]["steps"]}
+    required_step = steps["Load manifest-driven required contexts"]
+    evaluate_step = steps["Evaluate candidates and dispatch Mike"]
+    assert "if" not in required_step
+    assert "if" not in evaluate_step
+    event_pr = jobs["evaluate"]["env"]["EVENT_PR"]
+    assert "github.event.pull_request.number" in event_pr
+    assert "github.event.inputs.pr" in event_pr
+
+
+def test_bot_pr_waiver_cannot_bypass_required_check_evaluation():
+    """WP-0F2 waiver-scope proof (plan :1097): `bot-pr` waives reviewer
+    receipts only. Lexical confinement over automerge.yml's evaluate script:
+    the required-check block (step-3 comment through the step-4 comment)
+    gates on missing_required / required_not_green with an unconditional
+    skip, and contains no bot-pr, mike-watch, or merge_when_clean branch
+    that could exempt a labeled PR from it."""
+    workflow = yaml.safe_load(_AUTOMERGE_WORKFLOW.read_text(encoding="utf-8"))
+    steps = {step.get("name"): step for step in workflow["jobs"]["evaluate"]["steps"]}
+    script = steps["Evaluate candidates and dispatch Mike"]["run"]
+    block = script[script.index("# 3.") : script.index("# 4.")]
+    assert "missing_required" in block
+    assert "required_not_green" in block
+    assert "continue" in block
+    assert "bot-pr" not in block
+    assert "mike-watch" not in block
+    assert "merge_when_clean" not in block
+
+
+def test_gate_reports_advisory_red_and_pending_without_granting_authority(
+    tmp_path, monkeypatch
+):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    body = """
+- Organ touched: `scripts/runtime/pr_merge_control.py`
+- Declared-vs-actual gap closed: Mike consumes the exact protected CI set.
+- Proof that re-reads the map: this test keeps advisory failures visible.
+- New drift introduced: advisory checks do not silently gain merge authority.
+"""
+    rollup = _ci_required_success_rollup() + [
+        {
+            "name": "Quality ratchet - repo-wide fitness function",
+            "status": "COMPLETED",
+            "conclusion": "FAILURE",
+        },
+        {
+            "name": "Onboarding macOS 3.81 compatibility",
+            "status": "IN_PROGRESS",
+            "conclusion": "",
+        },
+    ]
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="none",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["blockers"] == []
+    assert any("reported failing checks" in warning for warning in gate["warnings"])
+    assert any("reported pending checks" in warning for warning in gate["warnings"])
+
+
 def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, monkeypatch):
     out_dir = tmp_path / "packet"
     out_dir.mkdir()
@@ -983,3 +1699,212 @@ def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatc
     assert gate["decision"] == "BLOCKED"
     assert "backup reviewer requires --backup-reviewer-reason" in gate["blockers"]
     assert gate["backup_review_policy"]["status"] == "missing_reason"
+
+
+def _advisory_thread(login):
+    return {
+        "isResolved": False,
+        "isOutdated": False,
+        "comments": {"nodes": [{"author": {"login": login}, "body": "summary"}]},
+    }
+
+
+_BOT_PR_BODY = """
+- Organ touched: `docs/governance/spine_adoption_metric.json`
+- Declared-vs-actual gap closed: the automated metric snapshot is refreshed.
+- Proof that re-reads the map: the generator re-reads the spine adoption owner.
+- New drift introduced: none; this is a trusted automation refresh.
+"""
+
+
+def test_thread_is_advisory_only_classifies_greptile_solo_thread():
+    assert prc.thread_is_advisory_only(_advisory_thread("greptile-apps")) is True
+    assert prc.thread_is_advisory_only(_advisory_thread("johnvincentshrader")) is False
+    # A thread with any non-advisory participant is never advisory-only.
+    mixed = {
+        "comments": {
+            "nodes": [
+                {"author": {"login": "greptile-apps"}},
+                {"author": {"login": "johnvincentshrader"}},
+            ]
+        }
+    }
+    assert prc.thread_is_advisory_only(mixed) is False
+    # An empty/authorless thread is conservatively treated as blocking.
+    assert prc.thread_is_advisory_only({"comments": {"nodes": []}}) is False
+
+
+def test_gate_waives_required_reviewers_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    # No reviewer receipts written on purpose: a bot-pr must merge without them.
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved": [], "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["required_reviewers"] == []
+    assert gate["bot_pr"]["is_bot_pr"] is True
+    assert any("waived required reviewer receipts" in w for w in gate["warnings"])
+    assert not any("receipt" in b for b in gate["blockers"])
+
+
+def test_gate_ignores_advisory_bot_threads_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    threads = {
+        "ok": True,
+        "unresolved": [_advisory_thread("greptile-apps")],
+        "unresolved_count": 1,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["review_threads"]["blocking_unresolved_count"] == 0
+    assert not any("unresolved review threads" in b for b in gate["blockers"])
+    assert any("advisory review thread" in w for w in gate["warnings"])
+
+
+def test_gate_still_blocks_non_advisory_threads_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    threads = {
+        "ok": True,
+        # Greptile's solo thread is advisory; a human thread is a real request.
+        "unresolved": [_advisory_thread("greptile-apps"), _advisory_thread("johnvincentshrader")],
+        "unresolved_count": 2,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["review_threads"]["blocking_unresolved_count"] == 1
+    assert "1 unresolved review threads" in gate["blockers"]
+
+
+def test_gate_does_not_waive_threads_for_non_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    # Fully reviewed PR; the only blocker is an advisory greptile thread, which
+    # must STILL block because the PR is not labelled bot-pr.
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+    threads = {
+        "ok": True,
+        "unresolved": [_advisory_thread("greptile-apps")],
+        "unresolved_count": 1,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["bot_pr"]["is_bot_pr"] is False
+    assert "1 unresolved review threads" in gate["blockers"]

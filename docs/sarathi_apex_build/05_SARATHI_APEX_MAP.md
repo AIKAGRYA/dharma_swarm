@@ -1,73 +1,63 @@
-# 05 — Sarathi Apex Map (what Sarathi is, and its target package)
+# 05 — Sarathi Apex Map
 
-**Custody: VERIFIED 2026-07-06. Sarathi is specified + partially seated; NOT alive.**
+> **Sarathi intent, not current operating state:** For the landed body synthesis,
+> dated witness, and proposed promotion model, use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
-## What Sarathi is (and is not)
+## What Sarathi is
 
-- **Is:** the apex continuity holon — chief-of-staff seat that holds the whole
-  fleet/life map, conducts the other holons (codex/fable/fugu) and the Hermes
-  field-ops organ, runs ONLY reversible-safe loops unattended, queues
-  irreversible actions for the operator, and surfaces one highest-leverage lane.
-- **Is NOT:** the whole build (that is the holon system); a separate
-  orchestrator/router/store; "alive" because `identity.json` exists.
+Sarathi is intended to be the apex continuity holon over the holon system: a
+chief-of-staff seat that can observe holon/runtime state, prepare briefs, route
+work, and take only code-deterministic reversible-safe actions unattended.
 
-## Current honest status (from `01_CURRENT_STATE.md`)
+## What Sarathi is not yet
 
-- registered: yes · model `gemini-2.5-flash` · `service_alive`: no · heartbeat: none
-- has: identity/mind (`~/.dharma/agents/sarathi`), committed reversibility gate,
-  a `sarathi` WakeProfile in the shared wake shell, read-only proof receipts.
-- missing: state file, inbox, bridge heartbeat, gateway loop, roster, contract.
-- `wake_loop_active`: **false** (and must stay false until proof gate 9).
+Sarathi is not yet a breathing holon. Current evidence shows identity and one
+ported safety/wake brick, not unattended metabolism. `wake_loop_active=true` is
+still forbidden until an unattended proof exists.
 
-## Target source package (specified; behind proof gates 6-10)
+## Repo-side package target (Phase C)
 
 ```text
 dharma_swarm/holon_system/sarathi/
-  __init__.py    # IMPLEMENTED = False (present now; honest placeholder)
-  gateway.py     # read-only readiness snapshot + pullable operator brief (present now)
-  pulse.py       # one governed tick wrapping holon_runtime.holon_wake_cycle(planned_action=...)
-  roster.py      # load + status of sub-holons (codex/fable/fugu) + hermes organ
-  brief.py       # operator-facing daily brief generation
-  scoreboard.py  # where Hermes still wins vs where Sarathi now wins (receipts only)
+  gateway.py
+  pulse.py
+  roster.py
+  brief.py
+  scoreboard.py
 ```
 
-`gateway.py` now exists as a deliberately read-only remote-readiness primitive:
-it can render a snapshot and write a finite operator brief into the Sarathi
-runtime outbox. It does **not** run the apex decision loop, select/act on a lane,
-send a phone message, approve work, or claim liveness. The remaining
-gateway/pulse/roster/brief/scoreboard behavior is built one proof gate at a time.
+Status: **created on the clean branch** as source surfaces that return honest
+`wake_loop_active=false` / `alive_claim=false` snapshots.
 
-## The runtime wrapper rule
+Runtime wrapper target:
 
-The eventual `~/.dharma/agents/sarathi/gateway/sarathi_gateway.py` must be ONLY:
-
-```python
-from dharma_swarm.holon_system.sarathi.gateway import main
-
-if __name__ == "__main__":
-    main()
+```text
+~/.dharma/agents/sarathi/gateway/sarathi_gateway.py
 ```
 
-Real implementation lives in the repo; `~/.dharma` gets a shim. Never the reverse
-(constraint #11).
+Status: **created as a thin runtime wrapper** importing
+`dharma_swarm.holon_system.sarathi.gateway`. It should not become the source of
+truth.
 
-## The one structural thing that already beats Hermes
+## Runtime surfaces still needed
 
-The code-deterministic reversibility gate (`operator_core/reversibility_gate.py`,
-committed `f18fe8476`): approval is a function of the action string + operator
-reachability, taking NO model input by construction. A weak model resolved at 3am
-cannot widen authority. `holon_runtime.holon_wake_cycle` accepts `planned_action`
-and routes it through this gate before any work runs. That seam is Sarathi's apex
-safety spine, and it exists and is tested today.
+```text
+~/.dharma/a2a_bus/state/sarathi.json
+~/.dharma/a2a_bus/inboxes/sarathi/
+~/.dharma/a2a_bus/bridge_heartbeats/sarathi.json
+~/.dharma/agents/sarathi/gateway/sarathi_gateway.py
+~/.dharma/agents/sarathi/HOLARCHY_CONTRACT.md
+~/.dharma/agents/sarathi/SUB_HOLON_ROSTER.yaml
+```
 
-## Definition of "alive" (do not claim before all true)
+These are listed for Phase C/runtime integration; this Phase A docs commit does
+not claim mutable runtime liveness. The state/heartbeat files now exist with
+`status=scaffolded_not_alive`, `wake_loop_active=false`, and `alive_claim=false`.
 
-1. `load_holon("sarathi")` from the canonical path — OK today.
-2. reversibility gate blocks irreversible/unreachable actions — OK today.
-3. `holon_wake_cycle` wrapped by the gate — seam exists today.
-4. `sarathi` wake profile — OK today.
-5. wake receipt from an unattended run within the reversible-safe envelope — NO.
-6. operator-facing continuity (brief/phone/outbox) — NO.
-7. `wake_loop_active` stays false until 5 and 6 — enforced.
+## Admission boundary
 
-See `06_PROOF_GATES.md` for the ordered gate list.
+Sarathi may summarize and prepare operator-facing state before the overnight
+proof. It may not self-promote, approve leases, push, email, trade, spend, or
+alter production state unattended. The reversibility gate is code, not a model
+judgment.

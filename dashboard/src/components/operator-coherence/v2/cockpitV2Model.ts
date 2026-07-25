@@ -8,18 +8,14 @@ import type {
 export type CockpitMode =
   | "overview"
   | "triage"
-  | "topology"
-  | "recursive"
   | "git"
   | "runtime"
   | "tracks"
   | "preservation"
   | "evidence"
-  | "errors"
   | "design";
 
 export interface InspectItem {
-  id?: string;
   type: "panel" | "card" | "action" | "track" | "source";
   title: string;
   subtitle?: string;
@@ -42,29 +38,6 @@ export interface CockpitPanelDatum {
 
 export type TruthTone = "ok" | "warn" | "danger" | "info" | "muted";
 
-export interface ReportSourceSummary {
-  mode: "live" | "cached" | "partial" | "stale" | "unavailable";
-  label: string;
-  detail: string;
-  tone: TruthTone;
-  ageHours: number | null;
-}
-
-export interface ActionPacket {
-  id: string;
-  title: string;
-  rank: number;
-  urgency: "low" | "medium" | "high" | "critical";
-  why: string;
-  evidence: CoherenceEvidence[];
-  targets: string[];
-  expectedImpact: string;
-  risk: string;
-  operatorDecision: boolean;
-  allowedNow: false;
-  raw: CoherenceAction;
-}
-
 export interface TruthBadgeDatum {
   code: string;
   label: string;
@@ -72,22 +45,83 @@ export interface TruthBadgeDatum {
   tone: TruthTone;
 }
 
+export type CheckoutAuthorityCode =
+  | "CLEAN_LOCAL_MAIN"
+  | "DIVERGED_LOCAL_MAIN"
+  | "CLEAN_LOCAL_BRANCH"
+  | "DIRTY_LOCAL_CHECKOUT"
+  | "CHECKOUT_STATE_UNAVAILABLE";
+
+export interface CheckoutAuthorityDatum {
+  code: CheckoutAuthorityCode;
+  label: string;
+  detail: string;
+  tone: TruthTone;
+  branch: string | null;
+  head: string | null;
+  dirtyCount: number | null;
+  ahead: number | null;
+  behind: number | null;
+  activeCount: number;
+  maxActive: number | null;
+}
+
+export type TrackLifecycleReviewCode =
+  | "TRACK_ID_UNAVAILABLE"
+  | "TRACK_ID_DUPLICATE"
+  | "REFRESH_STALE_EVIDENCE"
+  | "ADD_COMPLETION_EVIDENCE"
+  | "STRENGTHEN_EVIDENCE"
+  | "OPERATOR_CLOSURE_REVIEW"
+  | "CONTINUE_ACTIVE_WORK";
+
+export interface TrackLifecycleReviewDatum {
+  rowKey: string;
+  trackId: string;
+  trackName: string;
+  code: TrackLifecycleReviewCode;
+  action: string;
+  detail: string;
+  tone: CockpitPanelDatum["tone"];
+  reportedShippable: boolean;
+  raw: OperatorCoherenceReport["track_portfolio"]["tracks"][number];
+}
+
+export interface BranchRiskProjection {
+  total: number | null;
+  localOnly: number | null;
+  unpushed: number | null;
+  orphaned: number | null;
+  source: "branch_census" | "rogue_work_radar" | "mixed" | "contradictory" | "unavailable";
+  conflicts: string[];
+}
+
+export type TrackLifecycleProjectionCode =
+  | "TRACK_REVIEWS_AVAILABLE"
+  | "TRACK_ROWS_INCONSISTENT"
+  | "TRACK_SOURCE_UNAVAILABLE"
+  | "NO_ACTIVE_TRACKS";
+
+export interface TrackLifecycleProjectionSummary {
+  code: TrackLifecycleProjectionCode;
+  declaredActiveCount: number;
+  renderedReviewCount: number;
+  detail: string;
+}
+
 export const MODES: { id: CockpitMode; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "morning check" },
   { id: "triage", label: "Triage", hint: "needs action" },
-  { id: "topology", label: "Topology", hint: "repo graph" },
-  { id: "recursive", label: "Recursive", hint: "mandala" },
   { id: "git", label: "Git", hint: "branches/worktrees" },
   { id: "runtime", label: "Runtime", hint: "live ops" },
   { id: "tracks", label: "Tracks", hint: "portfolio" },
   { id: "preservation", label: "Preservation", hint: "safety" },
   { id: "evidence", label: "Evidence", hint: "raw truth" },
-  { id: "errors", label: "Errors", hint: "uncertainty" },
   { id: "design", label: "Design Sources", hint: "Desktop canon" },
 ];
 
 export const TRUTH_TAXONOMY: TruthBadgeDatum[] = [
-  { code: "CANONICAL_ORIGIN_MAIN", label: "Canonical", detail: "Confirmed origin/main baseline, not local candidate state.", tone: "ok" },
+  { code: "CLEAN_LOCAL_MAIN", label: "Clean local main", detail: "The observed local main checkout is clean; remote canonicality is not proven here.", tone: "ok" },
   { code: "CLEAN_RECONCILIATION_WORKTREE", label: "Clean worktree", detail: "Reconciliation checkout with no dirty local projection.", tone: "ok" },
   { code: "DIRTY_LOCAL_CANDIDATE", label: "Dirty candidate", detail: "Local checkout or worktree state that must not be treated as canonical.", tone: "danger" },
   { code: "OPEN_PR_REMOTE", label: "Open PR/remote", detail: "Remote-backed review surface; confirm CI before promotion.", tone: "info" },
@@ -231,9 +265,73 @@ export function asText(value: unknown): string {
 }
 
 export function formatCount(value: unknown): string {
-  const n = typeof value === "number" ? value : Number(value ?? 0);
-  if (!Number.isFinite(n)) return "0";
+  if (value == null || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US").format(n);
+}
+
+function observedNonNegativeCount(...candidates: unknown[]): number | null {
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+  }
+  return null;
+}
+
+function hasSourceError(report: OperatorCoherenceReport, source: string): boolean {
+  return report.source_errors.some((error) => error.source === source);
+}
+
+export function deriveBranchRiskProjection(report: OperatorCoherenceReport): BranchRiskProjection {
+  if (hasSourceError(report, "git.for_each_ref")) {
+    return {
+      total: null,
+      localOnly: null,
+      unpushed: null,
+      orphaned: null,
+      source: "unavailable",
+      conflicts: ["git.for_each_ref probe failed"],
+    };
+  }
+  const census = report.branch_census;
+  const radar = report.rogue_work_radar;
+  const censusValues = [census?.total, census?.local_only, census?.unpushed_ahead, census?.orphaned_gone];
+  const fallbackValues = [
+    radar.local_branch_total,
+    radar.local_only_branch_count,
+    radar.unpushed_branch_count,
+    radar.orphaned_branch_count,
+  ];
+  const usedCensus = censusValues.some((value) => observedNonNegativeCount(value) !== null);
+  const usedFallback = censusValues.some(
+    (value, index) => observedNonNegativeCount(value) === null && observedNonNegativeCount(fallbackValues[index]) !== null,
+  );
+  const conflicts: string[] = [];
+  const resolve = (label: string, primary: unknown, fallback: unknown): number | null => {
+    const primaryCount = observedNonNegativeCount(primary);
+    const fallbackCount = observedNonNegativeCount(fallback);
+    if (primaryCount !== null && fallbackCount !== null && primaryCount !== fallbackCount) {
+      conflicts.push(`${label}: branch_census=${primaryCount}, rogue_work_radar=${fallbackCount}`);
+      return null;
+    }
+    return primaryCount ?? fallbackCount;
+  };
+  return {
+    total: resolve("total", census?.total, radar.local_branch_total),
+    localOnly: resolve("local_only", census?.local_only, radar.local_only_branch_count),
+    unpushed: resolve("unpushed", census?.unpushed_ahead, radar.unpushed_branch_count),
+    orphaned: resolve("orphaned", census?.orphaned_gone, radar.orphaned_branch_count),
+    source: conflicts.length
+      ? "contradictory"
+      : usedCensus && usedFallback
+      ? "mixed"
+      : usedCensus
+        ? "branch_census"
+        : usedFallback || fallbackValues.some((value) => observedNonNegativeCount(value) !== null)
+          ? "rogue_work_radar"
+          : "unavailable",
+    conflicts,
+  };
 }
 
 export function readinessTone(score: number): CockpitPanelDatum["tone"] {
@@ -242,39 +340,9 @@ export function readinessTone(score: number): CockpitPanelDatum["tone"] {
   return "danger";
 }
 
-export function reportAgeHours(report: OperatorCoherenceReport, now = new Date()): number | null {
-  const generated = Date.parse(report.generated_at);
-  if (!Number.isFinite(generated)) return null;
-  return Math.max(0, (now.getTime() - generated) / 3_600_000);
-}
-
-export function buildReportSourceSummary(report: OperatorCoherenceReport, now = new Date()): ReportSourceSummary {
-  const explicit = String(report.status ?? "").toLowerCase();
-  const ageHours = reportAgeHours(report, now);
-  const staleByAge = ageHours != null && ageHours > 24;
-  const hasErrors = (report.source_errors ?? []).length > 0;
-  const missingCore = !report.cards?.length || !Object.keys(report.readiness?.categories ?? {}).length;
-  let mode: ReportSourceSummary["mode"] = "live";
-  if (explicit.includes("unavailable") || missingCore) mode = "unavailable";
-  else if (explicit.includes("partial") || hasErrors) mode = "partial";
-  else if (explicit.includes("stale") || staleByAge) mode = "stale";
-  else if (explicit.includes("cached")) mode = "cached";
-
-  const tone: TruthTone =
-    mode === "live" ? "ok" : mode === "cached" || mode === "stale" ? "warn" : mode === "partial" ? "danger" : "muted";
-  const label =
-    mode === "live"
-      ? "live report"
-      : mode === "cached"
-        ? "cached report"
-        : mode === "partial"
-          ? "partial report"
-          : mode === "stale"
-            ? "stale report"
-            : "report unavailable";
-  const ageText = ageHours == null ? "age unknown" : `${Math.round(ageHours)}h old`;
-  const detail = `${label}; ${ageText}; ${report.source_errors?.length ?? 0} source error(s); generated ${report.generated_at}`;
-  return { mode, label, detail, tone, ageHours };
+export function metricNeedsAttention(label: string, value: number, total: number, dangerAt: number): boolean {
+  if (label === "Live" || label === "Branches") return false;
+  return value / Math.max(1, total) >= dangerAt;
 }
 
 export function cardTone(card: CoherenceCard): CockpitPanelDatum["tone"] {
@@ -315,7 +383,6 @@ export function cardFacetBadges(card: CoherenceCard): string[] {
 export function cardToInspect(card: CoherenceCard): InspectItem {
   const truth = classifyCardTruth(card);
   return {
-    id: card.id,
     type: "card",
     title: card.title,
     subtitle: `${humanKind(card.kind)} · ${truth.code} · ${card.track || "unknown track"}`,
@@ -329,7 +396,6 @@ export function cardToInspect(card: CoherenceCard): InspectItem {
 
 export function actionToInspect(action: CoherenceAction): InspectItem {
   return {
-    id: `action:${action.kind}:${action.title}`,
     type: "action",
     title: action.title,
     subtitle: humanKind(action.kind),
@@ -340,51 +406,8 @@ export function actionToInspect(action: CoherenceAction): InspectItem {
   };
 }
 
-function urgencyForRisk(risk: string, rank: number): ActionPacket["urgency"] {
-  const text = risk.toLowerCase();
-  if (text.includes("critical") || text.includes("blocked") || text.includes("breakage")) return "critical";
-  if (text.includes("dirty") || text.includes("unpreserved") || text.includes("local") || rank === 1) return "high";
-  if (text.includes("stale") || text.includes("orphaned") || text.includes("unpushed")) return "medium";
-  return "low";
-}
-
-export function buildActionPackets(report: OperatorCoherenceReport): ActionPacket[] {
-  return (report.executive?.next_3_actions ?? []).slice(0, 3).map((action, index) => {
-    const evidence = action.evidence ?? [];
-    return {
-      id: `action:${index + 1}:${action.kind}:${action.title}`.replace(/[^a-zA-Z0-9_.:-]/g, "_"),
-      title: action.title || humanRisk(action.risk),
-      rank: index + 1,
-      urgency: urgencyForRisk(action.risk ?? "", index + 1),
-      why: action.next_action || action.title || "operator action proposed by report",
-      evidence,
-      targets: evidence.map((ev) => ev.path ?? ev.source).filter(Boolean).slice(0, 5),
-      expectedImpact: action.next_action || "resolve or preserve the highest-ranked report risk",
-      risk: action.risk,
-      operatorDecision: true,
-      allowedNow: false,
-      raw: action,
-    };
-  });
-}
-
-export function actionPacketToInspect(packet: ActionPacket): InspectItem {
-  return {
-    id: packet.id,
-    type: "action",
-    title: packet.title,
-    subtitle: `rank ${packet.rank} · ${packet.urgency} · proposal only`,
-    status: packet.allowedNow ? "approved" : "proposal_only",
-    risk: humanRisk(packet.risk),
-    nextAction: packet.expectedImpact,
-    evidence: packet.evidence,
-    raw: packet,
-  };
-}
-
 export function sourceToInspect(source: (typeof DESIGN_SOURCES)[number]): InspectItem {
   return {
-    id: `source:${source.id}`,
     type: "source",
     title: source.label,
     subtitle: source.path,
@@ -395,42 +418,187 @@ export function sourceToInspect(source: (typeof DESIGN_SOURCES)[number]): Inspec
   };
 }
 
-export function buildAuthorityInspect(report: OperatorCoherenceReport): InspectItem {
-  const localMax = (report.track_portfolio as { policy?: { max_active?: unknown } }).policy?.max_active;
-  const candidateBranch = report.git?.main?.branch ?? "unknown local branch";
-  const source = buildReportSourceSummary(report);
+export function deriveCheckoutAuthority(report: OperatorCoherenceReport): CheckoutAuthorityDatum {
+  const main = report.git?.main;
+  const normalizeObservation = (value: unknown): string | null => {
+    if (typeof value !== "string" || !value.trim()) return null;
+    const normalized = value.trim();
+    const lower = normalized.toLowerCase();
+    if (
+      ["unknown", "unavailable", "n/a", "none", "null", "head", "(no branch)", "detached"].includes(lower)
+      || lower.startsWith("head (")
+      || lower.includes("no branch")
+    ) return null;
+    return normalized;
+  };
+  const branch = normalizeObservation(main?.branch);
+  const head = normalizeObservation(main?.head);
+  const branchLine = typeof main?.branch_line === "string" ? main.branch_line.trim() : "";
+  const branchLineBranch = branchLine.startsWith("## ")
+    ? normalizeObservation(branchLine.slice(3).split("...", 1)[0].split(" [", 1)[0])
+    : null;
+  const upstreamObserved = branchLine.includes("...");
+  const upstreamGone = branchLine.toLowerCase().includes("[gone]");
+  const observedDirtyTotal = observedNonNegativeCount(main?.dirty_count);
+  const trackedDirtyCount = observedNonNegativeCount(main?.tracked_dirty_count);
+  const untrackedCount = observedNonNegativeCount(main?.untracked_count);
+  const componentDirtyTotal = trackedDirtyCount !== null && untrackedCount !== null
+    ? trackedDirtyCount + untrackedCount
+    : null;
+  const dirtyCount = observedDirtyTotal ?? componentDirtyTotal;
+  const dirtyFlag = typeof main?.dirty === "boolean" ? main.dirty : null;
+  const dirtyContradictions: string[] = [];
+  if (observedDirtyTotal !== null && componentDirtyTotal !== null && observedDirtyTotal !== componentDirtyTotal) {
+    dirtyContradictions.push(`dirty_count=${observedDirtyTotal} but tracked+untracked=${componentDirtyTotal}`);
+  }
+  if (dirtyCount !== null && dirtyFlag !== null && dirtyFlag !== (dirtyCount > 0)) {
+    dirtyContradictions.push(`dirty=${dirtyFlag} but numeric dirty total=${dirtyCount}`);
+  }
+  if (observedDirtyTotal !== null && trackedDirtyCount !== null && trackedDirtyCount > observedDirtyTotal) {
+    dirtyContradictions.push(`tracked_dirty_count=${trackedDirtyCount} exceeds dirty_count=${observedDirtyTotal}`);
+  }
+  if (observedDirtyTotal !== null && untrackedCount !== null && untrackedCount > observedDirtyTotal) {
+    dirtyContradictions.push(`untracked_count=${untrackedCount} exceeds dirty_count=${observedDirtyTotal}`);
+  }
+  const ahead = observedNonNegativeCount(main?.ahead);
+  const behind = observedNonNegativeCount(main?.behind);
+  const maxActive = observedNonNegativeCount(report.track_portfolio.policy?.max_active);
+  const shared = {
+    branch,
+    head,
+    dirtyCount,
+    ahead,
+    behind,
+    activeCount: report.track_portfolio.active_count,
+    maxActive,
+  };
+  const unavailable = (detail: string): CheckoutAuthorityDatum => ({
+    ...shared,
+    code: "CHECKOUT_STATE_UNAVAILABLE",
+    label: "Checkout state unavailable",
+    detail,
+    tone: "muted",
+  });
+
+  if (hasSourceError(report, "git.status")) {
+    return unavailable(
+      "git.status probe failed; no checkout authority claim is safe.",
+    );
+  }
+  if (!head) {
+    return unavailable("HEAD evidence is missing or carries an unavailable sentinel; no checkout authority claim is safe.");
+  }
+  if (dirtyContradictions.length) {
+    return unavailable(`Dirty-state evidence is contradictory (${dirtyContradictions.join("; ")}); no clean-checkout authority claim is safe.`);
+  }
+  if (dirtyCount === null) {
+    const knownDirtySignal = dirtyFlag === true || (trackedDirtyCount ?? 0) > 0 || (untrackedCount ?? 0) > 0;
+    return unavailable(knownDirtySignal
+      ? "Dirty-state evidence indicates local changes, but an exact reconciled dirty count is unavailable; no clean-checkout authority claim is safe."
+      : "Dirty-count evidence is missing or carries an unavailable sentinel; no checkout authority claim is safe.");
+  }
+  if (dirtyCount > 0) {
+    return {
+      ...shared,
+      code: "DIRTY_LOCAL_CHECKOUT",
+      label: "Dirty local checkout",
+      detail: `${dirtyCount} local path${dirtyCount === 1 ? "" : "s"} differ from HEAD; preserve or extract them before promotion.`,
+      tone: "danger",
+    };
+  }
+  if (!branch) {
+    return unavailable("Branch evidence is missing or carries an unavailable sentinel; no clean-checkout authority claim is safe.");
+  }
+  if (branchLine && !branchLineBranch) {
+    return unavailable("The observed branch status line is malformed or unavailable; no clean-checkout authority claim is safe.");
+  }
+  if (branchLineBranch && branchLineBranch !== branch) {
+    return unavailable(
+      `Branch evidence is contradictory (branch=${branch} but branch status reports ${branchLineBranch}); no clean-checkout authority claim is safe.`,
+    );
+  }
+  if (branch === "main") {
+    if (upstreamGone) {
+      return unavailable("The observed upstream for local main is gone; alignment is not established.");
+    }
+    if (!upstreamObserved) {
+      return unavailable("The local main checkout is clean, but no upstream relation is present in the observed branch status; alignment is not established.");
+    }
+    if (ahead === null || behind === null) {
+      return unavailable("The local main checkout is clean, but ahead/behind evidence is unavailable; upstream alignment is not established.");
+    }
+    const branchLineAhead = Number(main?.branch_line?.match(/\bahead\s+(\d+)/i)?.[1] ?? 0);
+    const branchLineBehind = Number(main?.branch_line?.match(/\bbehind\s+(\d+)/i)?.[1] ?? 0);
+    if (ahead !== branchLineAhead || behind !== branchLineBehind) {
+      return unavailable(
+        `Numeric ahead/behind evidence (${ahead}/${behind}) contradicts the observed branch status (${branchLineAhead}/${branchLineBehind}); alignment is not established.`,
+      );
+    }
+    if (ahead > 0 || behind > 0) {
+      return {
+        ...shared,
+        code: "DIVERGED_LOCAL_MAIN",
+        label: "Diverged local main",
+        detail: `The observed local main is ahead ${ahead} and behind ${behind}; reconcile it before any clean-main promotion claim.`,
+        tone: "warn",
+      };
+    }
+    return {
+      ...shared,
+      code: "CLEAN_LOCAL_MAIN",
+      label: "Clean local main",
+      detail: "The observed local main is clean and reports no ahead/behind divergence. This does not prove remote freshness; verify the fetched origin/main identity separately.",
+      tone: "ok",
+    };
+  }
   return {
-    id: "panel:authority",
+    ...shared,
+    code: "CLEAN_LOCAL_BRANCH",
+    label: "Clean local branch",
+    detail: "The observed branch checkout is clean. Review its upstream and diff before any promotion or canonical claim.",
+    tone: "info",
+  };
+}
+
+export function buildAuthorityInspect(report: OperatorCoherenceReport): InspectItem {
+  const authority = deriveCheckoutAuthority(report);
+  const shortHead = authority.head?.slice(0, 12) ?? "unknown";
+  const branch = authority.branch ?? "unknown";
+  const portfolio = `${authority.activeCount}/${authority.maxActive ?? "?"} active`;
+  const nextAction = authority.code === "DIRTY_LOCAL_CHECKOUT"
+    ? "Preserve or extract local changes, then refresh the report before promotion."
+    : authority.code === "DIVERGED_LOCAL_MAIN"
+      ? "Reconcile local main with its fetched upstream, then refresh the report."
+      : authority.code === "CLEAN_LOCAL_MAIN"
+        ? "Treat this as aligned local-main evidence only; verify fetched origin/main freshness separately before a canonical claim."
+        : authority.code === "CLEAN_LOCAL_BRANCH"
+          ? "Review upstream, ahead/behind state, and branch diff before promotion."
+          : "Restore complete git observation and refresh the report before acting on checkout authority.";
+  return {
     type: "panel",
-    title: "Report authority and source mode",
-    subtitle: `${candidateBranch} · ${source.label}`,
-    status: `local ${report.track_portfolio.active_count}/${asText(localMax)} active tracks · report ${report.status ?? "snapshot"}`,
-    risk: "This panel reports only fields available in the operator-coherence report; missing canonical baseline evidence is uncertainty.",
-    nextAction: "Use the report evidence and receipts before promoting, merging, or treating this checkout as canonical.",
+    title: "Observed checkout authority",
+    subtitle: `${authority.code} · ${branch}`,
+    status: `${portfolio} · HEAD ${shortHead}`,
+    risk: authority.detail,
+    nextAction,
     evidence: [
       {
         kind: "git",
         source: "report.git.main",
-        detail: report.git?.main?.branch_line ?? candidateBranch,
+        detail: `${report.git?.main?.branch_line ?? branch}; head=${shortHead}; dirty_count=${authority.dirtyCount ?? "unknown"}; ahead=${authority.ahead ?? "unknown"}; behind=${authority.behind ?? "unknown"}`,
       },
       {
         kind: "track_portfolio",
-        source: "reports/governance/operator_coherence_cockpit.json",
-        detail: `local projection active_count=${report.track_portfolio.active_count}, max_active=${asText(localMax)}`,
-      },
-      {
-        kind: "source_mode",
-        source: "/api/operator-coherence/report",
-        detail: source.detail,
+        source: "report.track_portfolio",
+        detail: `active_count=${authority.activeCount}, max_active=${authority.maxActive ?? "unknown"}`,
       },
     ],
-    raw: { report_status: report.status, local_git: report.git?.main, local_track_portfolio: report.track_portfolio, source_refs: report.source_refs },
+    raw: { checkout_authority: authority, local_git: report.git?.main, track_portfolio: report.track_portfolio },
   };
 }
 
 export function buildLaneAdmissionInspect(): InspectItem {
   return {
-    id: "panel:lane-admission",
     type: "panel",
     title: "Agent Lane Admission Packet contract",
     subtitle: "UI consumer contract for parallel agent lanes",
@@ -446,6 +614,149 @@ export function buildLaneAdmissionInspect(): InspectItem {
       },
     ],
     raw: { required_fields: LANE_ADMISSION_FIELDS },
+  };
+}
+
+export function buildTrackLifecycleReviews(report: OperatorCoherenceReport): TrackLifecycleReviewDatum[] {
+  if (hasSourceError(report, "docs/governance/ACTIVE_TRACK.yaml")) return [];
+  const activeTracks = report.track_portfolio.tracks.filter((track) => track.lifecycle === "active");
+  const observedIds = activeTracks.map((track) => (
+    typeof track.id === "string" && track.id.trim() ? track.id.trim() : null
+  ));
+  const idCounts = observedIds.reduce<Map<string, number>>((counts, trackId) => {
+    if (trackId) counts.set(trackId, (counts.get(trackId) ?? 0) + 1);
+    return counts;
+  }, new Map());
+  return activeTracks
+    .map((track, index) => {
+      const observedId = observedIds[index];
+      const observedName = typeof track.name === "string" && track.name.trim() ? track.name.trim() : null;
+      const trackId = observedId ?? `unidentified-active-row-${index + 1}`;
+      const rowKey = observedId && idCounts.get(observedId) === 1
+        ? observedId
+        : `${trackId}::row-${index + 1}`;
+      const trackName = observedName ?? observedId ?? `Unidentified active track row ${index + 1}`;
+      const shared = { rowKey, trackId, trackName, reportedShippable: track.shippable === true, raw: track };
+      if (!observedId) {
+        return {
+          ...shared,
+          code: "TRACK_ID_UNAVAILABLE",
+          action: "Restore the canonical track identifier before lifecycle review or promotion.",
+          detail: "The report emitted an active lifecycle row without a track ID; the row cannot be bound to portfolio authority.",
+          tone: "danger",
+        };
+      }
+      if ((idCounts.get(observedId) ?? 0) > 1) {
+        return {
+          ...shared,
+          code: "TRACK_ID_DUPLICATE",
+          action: "Repair duplicate track identifiers before lifecycle review or promotion.",
+          detail: `The report emitted ${idCounts.get(observedId)} active lifecycle rows with ID ${observedId}; none can be bound uniquely to portfolio authority.`,
+          tone: "danger",
+        };
+      }
+      if (track.stale) {
+        return {
+          ...shared,
+          code: "REFRESH_STALE_EVIDENCE",
+          action: "Refresh the expired evidence and re-run lifecycle checks before considering closure.",
+          detail: "The active track's verification window is stale.",
+          tone: "danger",
+        };
+      }
+      if (!track.evidence_present) {
+        return {
+          ...shared,
+          code: "ADD_COMPLETION_EVIDENCE",
+          action: "Attach completion evidence that exercises the declared criteria.",
+          detail: "The active-track declaration has no matching generated evidence row.",
+          tone: "danger",
+        };
+      }
+      if (!track.has_rigorous_evidence) {
+        return {
+          ...shared,
+          code: "STRENGTHEN_EVIDENCE",
+          action: "Replace existence-only signals with behavioral proof before lifecycle promotion.",
+          detail: track.readiness_capped
+            ? "Displayed readiness is capped because the evidence is not rigorous."
+            : "Evidence exists, but it is not classified as rigorous behavioral proof.",
+          tone: "warn",
+        };
+      }
+      if (track.shippable === true) {
+        return {
+          ...shared,
+          code: "OPERATOR_CLOSURE_REVIEW",
+          action: "Review closure kind, claim boundary, unresolved obligations, and any explicit production proof before closing.",
+          detail: "The live report marks this active track SHIPPABLE. That may reflect declared lifecycle state or generated checks; independently verify completion evidence before closure. It is not production proof.",
+          tone: "info",
+        };
+      }
+      return {
+        ...shared,
+        code: "CONTINUE_ACTIVE_WORK",
+        action: "Continue the declared next items and keep evidence current.",
+        detail: `Active lifecycle status: ${asText(track.status)}; checker readiness ${asText(track.readiness)}%.`,
+        tone: "info",
+      };
+    });
+}
+
+export function summarizeTrackLifecycleProjection(
+  report: OperatorCoherenceReport,
+  reviews: TrackLifecycleReviewDatum[] = buildTrackLifecycleReviews(report),
+): TrackLifecycleProjectionSummary {
+  const declaredActiveCount = observedNonNegativeCount(report.track_portfolio.active_count) ?? 0;
+  const renderedReviewCount = reviews.length;
+  if (hasSourceError(report, "docs/governance/ACTIVE_TRACK.yaml")) {
+    return {
+      code: "TRACK_SOURCE_UNAVAILABLE",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: "The ACTIVE_TRACK governance probe failed; lifecycle rows and active counts are unavailable and must not be treated as an empty portfolio.",
+    };
+  }
+  if (declaredActiveCount === 0 && renderedReviewCount === 0) {
+    return {
+      code: "NO_ACTIVE_TRACKS",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: "No active tracks are present in the live portfolio projection.",
+    };
+  }
+  if (declaredActiveCount !== renderedReviewCount) {
+    return {
+      code: "TRACK_ROWS_INCONSISTENT",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: `Lifecycle rows are incomplete or contradictory: the portfolio declares ${declaredActiveCount} active track${declaredActiveCount === 1 ? "" : "s"}, but ${renderedReviewCount} active row${renderedReviewCount === 1 ? " is" : "s are"} available. Refresh the report before lifecycle claims.`,
+    };
+  }
+  return {
+    code: "TRACK_REVIEWS_AVAILABLE",
+    declaredActiveCount,
+    renderedReviewCount,
+    detail: `${renderedReviewCount} active lifecycle review row${renderedReviewCount === 1 ? "" : "s"} available.`,
+  };
+}
+
+export function trackLifecycleReviewToInspect(review: TrackLifecycleReviewDatum): InspectItem {
+  return {
+    type: "track",
+    title: review.trackName,
+    subtitle: `${review.trackId} · active-track lifecycle review`,
+    status: review.code,
+    risk: review.detail,
+    nextAction: review.action,
+    evidence: [
+      {
+        kind: "track_lifecycle",
+        source: "report.track_portfolio.tracks",
+        detail: `${review.code}; reported_shippable=${review.reportedShippable}`,
+      },
+    ],
+    raw: review.raw,
   };
 }
 
@@ -466,905 +777,6 @@ export function buildHandoff(item: InspectItem): string {
     "",
     "Expected output: recommendation, safe plan, verification command, and receipt path.",
   ].filter(Boolean).join("\n");
-}
-
-/* ============================================================
-   Freshness — REQ-007, REQ-062: stale must be visually distinct
-   ============================================================ */
-
-export type Freshness = "fresh" | "aging" | "stale" | "unknown";
-
-export function freshnessFromAge(ageHours: number | null | undefined): Freshness {
-  if (ageHours == null || !Number.isFinite(ageHours)) return "unknown";
-  if (ageHours < 24) return "fresh";
-  if (ageHours < 24 * 7) return "aging";
-  return "stale";
-}
-
-export function freshnessTone(freshness: Freshness): TruthTone {
-  switch (freshness) {
-    case "fresh":
-      return "ok";
-    case "aging":
-      return "warn";
-    case "stale":
-      return "danger";
-    default:
-      return "muted";
-  }
-}
-
-export function freshnessLabel(freshness: Freshness): string {
-  switch (freshness) {
-    case "fresh":
-      return "fresh";
-    case "aging":
-      return "aging";
-    case "stale":
-      return "stale";
-    default:
-      return "unknown age";
-  }
-}
-
-export function cardFreshness(card: CoherenceCard): Freshness {
-  if (card.facets?.live) return "fresh";
-  const ages = (card.evidence ?? [])
-    .map((ev) => ev.age_hours)
-    .filter((age): age is number => typeof age === "number" && Number.isFinite(age));
-  if (card.facets?.stale) {
-    // Stale facet wins unless evidence proves fresh.
-    if (ages.length && Math.min(...ages) < 24) return "aging";
-    return "stale";
-  }
-  if (!ages.length) return "unknown";
-  return freshnessFromAge(Math.min(...ages));
-}
-
-/* ============================================================
-   Answer Ribbon — REQ-013/REQ-014, spec 11.3
-   Under-60-second answers bound to report.definition_answers.
-   ============================================================ */
-
-export type AnswerKey =
-  | "safe"
-  | "dirty"
-  | "abandoned"
-  | "live"
-  | "blocked"
-  | "rogue"
-  | "next"
-  | "readiness";
-
-export interface AnswerDatum {
-  key: AnswerKey;
-  label: string;
-  question: string;
-  value: string;
-  count: number | null;
-  topEvidence: string;
-  tone: TruthTone;
-  /** filter mode this answer maps to when clicked; null = inspect only */
-  filterStatus: string | null;
-  inspect: InspectItem;
-}
-
-type DefinitionAnswers = {
-  what_is_safe?: CoherenceCard[];
-  what_is_dirty?: CoherenceCard[];
-  what_is_abandoned?: CoherenceCard[];
-  what_is_live?: CoherenceCard[];
-  what_is_blocked?: CoherenceCard[];
-  what_might_be_rogue?: CoherenceCard[];
-  what_should_i_do_next?: CoherenceAction[];
-  [key: string]: unknown;
-};
-
-function answerCards(report: OperatorCoherenceReport, key: keyof DefinitionAnswers): CoherenceCard[] {
-  const da = (report.definition_answers ?? {}) as DefinitionAnswers;
-  const value = da[key];
-  return Array.isArray(value) ? (value as CoherenceCard[]) : [];
-}
-
-function topEvidenceText(cards: CoherenceCard[]): string {
-  const first = cards[0];
-  if (!first) return "no items — verify source before trusting blank";
-  const ev = first.evidence?.[0];
-  const base = first.title || first.id;
-  return ev?.detail ? `${base} — ${ev.detail}` : ev?.source ? `${base} — ${ev.source}` : base;
-}
-
-function cardsToInspect(title: string, question: string, cards: CoherenceCard[]): InspectItem {
-  return {
-    type: "panel",
-    title,
-    subtitle: question,
-    status: cards.length ? `${cards.length} items` : "0 items",
-    evidence: cards.slice(0, 12).flatMap((card) =>
-      (card.evidence ?? []).slice(0, 1).map((ev) => ({
-        ...ev,
-        source: `${card.title || card.id} · ${ev.source}`,
-      })),
-    ),
-    raw: cards,
-  };
-}
-
-export function buildAnswerRibbon(report: OperatorCoherenceReport): AnswerDatum[] {
-  const safe = answerCards(report, "what_is_safe");
-  const dirty = answerCards(report, "what_is_dirty");
-  const abandoned = answerCards(report, "what_is_abandoned");
-  const live = answerCards(report, "what_is_live");
-  const blocked = answerCards(report, "what_is_blocked");
-  const rogue = answerCards(report, "what_might_be_rogue");
-  const da = (report.definition_answers ?? {}) as DefinitionAnswers;
-  const next = Array.isArray(da.what_should_i_do_next) ? da.what_should_i_do_next : [];
-  const readiness = report.readiness?.score ?? 0;
-
-  return [
-    {
-      key: "safe",
-      label: "Safe",
-      question: "What is safe?",
-      value: String(safe.length),
-      count: safe.length,
-      topEvidence: topEvidenceText(safe),
-      tone: safe.length ? "ok" : "muted",
-      filterStatus: "safe",
-      inspect: cardsToInspect("What is safe", "No immediate action indicated", safe),
-    },
-    {
-      key: "dirty",
-      label: "Dirty",
-      question: "What is dirty?",
-      value: String(dirty.length),
-      count: dirty.length,
-      topEvidence: topEvidenceText(dirty),
-      tone: dirty.length ? "danger" : "ok",
-      filterStatus: "dirty",
-      inspect: cardsToInspect("What is dirty", "Local uncommitted / unmerged work", dirty),
-    },
-    {
-      key: "abandoned",
-      label: "Abandoned",
-      question: "What is abandoned?",
-      value: String(abandoned.length),
-      count: abandoned.length,
-      topEvidence: topEvidenceText(abandoned),
-      tone: abandoned.length ? "warn" : "ok",
-      filterStatus: "abandoned",
-      inspect: cardsToInspect("What is abandoned", "Stale, orphaned, or upstream-gone work", abandoned),
-    },
-    {
-      key: "live",
-      label: "Live",
-      question: "What is live?",
-      // REQ-006/anti-pattern: empty live is uncertainty, not blank success.
-      value: live.length ? String(live.length) : "0",
-      count: live.length,
-      topEvidence: live.length ? topEvidenceText(live) : "no fresh live surfaces proven — treat as uncertainty",
-      tone: live.length ? "ok" : "warn",
-      filterStatus: "live",
-      inspect: cardsToInspect("What is live", "Surface actively running and fresh", live),
-    },
-    {
-      key: "blocked",
-      label: "Blocked",
-      question: "What is blocked?",
-      value: String(blocked.length),
-      count: blocked.length,
-      topEvidence: topEvidenceText(blocked),
-      tone: blocked.length ? "danger" : "ok",
-      filterStatus: "blocked",
-      inspect: cardsToInspect("What is blocked", "Known blocker prevents progress", blocked),
-    },
-    {
-      key: "rogue",
-      label: "Rogue",
-      question: "What might be rogue?",
-      value: String(rogue.length),
-      count: rogue.length,
-      topEvidence: topEvidenceText(rogue),
-      tone: rogue.length ? "warn" : "ok",
-      filterStatus: "rogue",
-      inspect: cardsToInspect("What might be rogue", "Work not attached to a canonical active track/owner", rogue),
-    },
-    {
-      key: "next",
-      label: "Next",
-      question: "What should I do next?",
-      value: String(next.length),
-      count: next.length,
-      topEvidence: next[0]?.next_action ?? next[0]?.title ?? "no ranked action",
-      tone: next.length ? "info" : "muted",
-      filterStatus: null,
-      inspect: {
-        type: "panel",
-        title: "What should I do next",
-        subtitle: "Top operator actions — proposal only",
-        status: `${next.length} ranked`,
-        evidence: next.flatMap((a) => a.evidence ?? []),
-        raw: next,
-      },
-    },
-    {
-      key: "readiness",
-      label: "Readiness",
-      question: "Is the system okay?",
-      value: `${readiness}%`,
-      count: null,
-      topEvidence: report.readiness?.interpretation ?? "computed projection",
-      tone: readinessTone(readiness),
-      filterStatus: null,
-      inspect: {
-        type: "panel",
-        title: "Prod readiness",
-        subtitle: "Weighted score from evidence categories",
-        status: `${readiness}%`,
-        evidence: Object.entries(report.readiness?.categories ?? {}).map(([source, item]) => ({
-          kind: "score",
-          source,
-          detail: `${item.score}% × ${Math.round(item.weight * 100)}% — ${item.why}`,
-        })),
-        raw: report.readiness,
-      },
-    },
-  ];
-}
-
-/* ============================================================
-   Uncertainty / external systems — REQ-006, REQ-052, REQ-070,
-   REQ-072, anti-patterns 2/3/4. Make uncertainty impossible to miss.
-   ============================================================ */
-
-export interface UncertaintyDatum {
-  id: string;
-  label: string;
-  /** unavailable | partial | degraded */
-  state: "unavailable" | "partial" | "degraded";
-  detail: string;
-  source: string;
-  evidence: CoherenceEvidence[];
-}
-
-function sourceErrorFor(report: OperatorCoherenceReport, needle: string): { source: string; error: string; timestamp?: string } | undefined {
-  return report.source_errors.find((err) => err.source.includes(needle) || err.error.includes(needle));
-}
-
-export function buildUncertainty(report: OperatorCoherenceReport): UncertaintyDatum[] {
-  const out: UncertaintyDatum[] = [];
-
-  // Raw source errors from the probe pipeline.
-  for (const err of report.source_errors) {
-    out.push({
-      id: `source:${err.source}`,
-      label: err.source,
-      state: "unavailable",
-      detail: err.error.trim() || "source error reported",
-      source: err.source,
-      evidence: [{ kind: "source_error", source: err.source, detail: err.error.trim(), observed_at: err.timestamp }],
-    });
-  }
-
-  // gh auth / PR-CI (REQ-070): explicit uncertainty, never silent success.
-  const ghErr = sourceErrorFor(report, "github") ?? sourceErrorFor(report, "gh");
-  const prCi = report.pr_ci_triage as { enabled?: boolean; reason?: string } | undefined;
-  if (prCi?.enabled === false || ghErr) {
-    const already = out.some((u) => u.id === `source:${ghErr?.source ?? ""}`);
-    if (!already) {
-      out.push({
-        id: "external:gh",
-        label: "GitHub PR/CI",
-        state: "unavailable",
-        detail: prCi?.reason ?? ghErr?.error?.trim() ?? "gh auth unavailable; PR/CI triage omitted",
-        source: "github.auth",
-        evidence: [{ kind: "external", source: "pr_ci_triage", detail: prCi?.reason ?? "gh_auth_unavailable" }],
-      });
-    }
-  }
-
-  // tmux (REQ-052): unavailable is uncertainty, not health.
-  const tmuxErr = sourceErrorFor(report, "tmux");
-  if (!tmuxErr && (report.agent_terminal_census?.tmux_sessions ?? []).length === 0) {
-    out.push({
-      id: "external:tmux",
-      label: "tmux sessions",
-      state: "unavailable",
-      detail: "no tmux socket/session observed; agent terminal liveness is uncertain, not healthy",
-      source: "tmux.ls",
-      evidence: [{ kind: "external", source: "agent_terminal_census.tmux_sessions", detail: "0 sessions observed" }],
-    });
-  }
-
-  // gcx / Grafana Cloud (REQ-072, spec 11.10): not wired into report yet.
-  out.push({
-    id: "external:gcx",
-    label: "Grafana / gcx",
-    state: "unavailable",
-    detail: "gcx context not wired into the operator-coherence report; external observability shown as unavailable, never faked",
-    source: "gcx.config",
-    evidence: [{ kind: "external", source: "gcx", detail: "no datasource/SLO/alert telemetry available until configured" }],
-  });
-
-  return out;
-}
-
-export function uncertaintyInspect(item: UncertaintyDatum): InspectItem {
-  return {
-    type: "source",
-    title: item.label,
-    subtitle: `${item.source} · ${item.state}`,
-    status: item.state,
-    risk: "Missing evidence — do not read absence as success",
-    nextAction: "Restore the source (auth/session/config) or treat dependent claims as uncertain.",
-    evidence: item.evidence,
-    raw: item,
-  };
-}
-
-/* ============================================================
-   Topology — REQ-030/031/032/034/035, spec 7.1/7.2/8.5/11.6
-   Derived CockpitNode / CockpitEdge with stable IDs.
-   ============================================================ */
-
-export type NodeKind =
-  | "readiness_category"
-  | "track"
-  | "card"
-  | "branch"
-  | "worktree"
-  | "surface"
-  | "receipt"
-  | "source_error"
-  | "action"
-  | "system";
-
-export interface CockpitNode {
-  id: string;
-  label: string;
-  kind: NodeKind;
-  status: string;
-  risk: "none" | "low" | "medium" | "high" | "critical" | "unknown";
-  freshness: Freshness;
-  authority: "read_only" | "proposal_required" | "operator_required" | "unavailable";
-  cluster: string;
-  track?: string;
-  branch?: string;
-  sourcePath?: string;
-  score?: number;
-  evidenceCount: number;
-  nextAction?: string;
-  tone: TruthTone;
-  pulse: boolean;
-  inspect: InspectItem;
-}
-
-export interface CockpitEdge {
-  id: string;
-  source: string;
-  target: string;
-  relation:
-    | "belongs_to"
-    | "depends_on"
-    | "evidence_for"
-    | "blocks"
-    | "runs_on"
-    | "checked_by"
-    | "upstream_of"
-    | "receipt_for"
-    | "proposes";
-  status: string;
-  strength: number;
-  freshness: Freshness;
-  uncertain: boolean;
-  evidence: string[];
-}
-
-export interface CockpitGraph {
-  nodes: CockpitNode[];
-  edges: CockpitEdge[];
-}
-
-const ROOT_ID = "system:readiness";
-
-function riskLevel(card: CoherenceCard): CockpitNode["risk"] {
-  const r = card.risk ?? "";
-  if (card.lane === "Needs Repair") return "high";
-  if (r.includes("blocked") || r.includes("breakage") || r.includes("ci_failed")) return "critical";
-  if (r.includes("dirty") || r.includes("orphaned") || r.includes("local_only")) return "high";
-  if (r.includes("stale")) return "medium";
-  if (card.facets?.operator_decision) return "medium";
-  if (card.facets?.preserved || card.facets?.live) return "low";
-  return "unknown";
-}
-
-function cardAuthority(card: CoherenceCard): CockpitNode["authority"] {
-  if (card.facets?.operator_decision) return "operator_required";
-  if (card.lane === "Needs Repair" || card.lane === "Needs Decision") return "proposal_required";
-  return "read_only";
-}
-
-function safeId(prefix: string, value: string, index: number): string {
-  const base = (value || `${index}`).replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 60);
-  return `${prefix}:${base}:${index}`;
-}
-
-export function buildTopology(report: OperatorCoherenceReport): CockpitGraph {
-  const nodes: CockpitNode[] = [];
-  const edges: CockpitEdge[] = [];
-  const trackNodeByName = new Map<string, string>();
-
-  // Root: readiness.
-  const readiness = report.readiness?.score ?? 0;
-  nodes.push({
-    id: ROOT_ID,
-    label: `Readiness ${readiness}%`,
-    kind: "system",
-    status: report.executive?.health ?? "unknown",
-    risk: readiness >= 70 ? "low" : readiness >= 40 ? "medium" : "high",
-    freshness: "fresh",
-    authority: "read_only",
-    cluster: "system",
-    score: readiness,
-    evidenceCount: Object.keys(report.readiness?.categories ?? {}).length,
-    tone: readinessTone(readiness),
-    pulse: false,
-    inspect: {
-      type: "panel",
-      title: "System readiness",
-      subtitle: report.readiness?.interpretation,
-      status: `${readiness}%`,
-      evidence: Object.entries(report.readiness?.categories ?? {}).map(([source, item]) => ({
-        kind: "score",
-        source,
-        detail: `${item.score}% × ${Math.round(item.weight * 100)}%`,
-      })),
-      raw: report.readiness,
-    },
-  });
-
-  // Readiness categories: evidence_for root.
-  Object.entries(report.readiness?.categories ?? {}).forEach(([name, cat], index) => {
-    const id = safeId("cat", name, index);
-    nodes.push({
-      id,
-      label: name.replaceAll("_", " "),
-      kind: "readiness_category",
-      status: cat.score >= 70 ? "done" : cat.score >= 40 ? "warn" : "danger",
-      risk: cat.score >= 70 ? "low" : cat.score >= 40 ? "medium" : "high",
-      freshness: "fresh",
-      authority: "read_only",
-      cluster: "readiness",
-      score: cat.score,
-      evidenceCount: 1,
-      tone: readinessTone(cat.score),
-      pulse: false,
-      inspect: {
-        type: "panel",
-        title: name.replaceAll("_", " "),
-        subtitle: `${cat.score}% × ${Math.round(cat.weight * 100)}% weight`,
-        status: `${cat.score}%`,
-        evidence: [{ kind: "score", source: name, detail: cat.why }],
-        raw: cat,
-      },
-    });
-    edges.push({
-      id: `e:${id}->${ROOT_ID}`,
-      source: id,
-      target: ROOT_ID,
-      relation: "evidence_for",
-      status: nodes[nodes.length - 1].status,
-      strength: cat.weight,
-      freshness: "fresh",
-      uncertain: false,
-      evidence: [cat.why],
-    });
-  });
-
-  // Tracks: belongs_to root (organ clusters).
-  const tracks = (report.track_portfolio?.tracks ?? []) as Record<string, unknown>[];
-  tracks.forEach((track, index) => {
-    const name = asText(track.name);
-    const id = safeId("track", asText(track.id) || name, index);
-    const stale = Boolean(track.stale);
-    trackNodeByName.set(name, id);
-    nodes.push({
-      id,
-      label: name,
-      kind: "track",
-      status: stale ? "stale" : asText(track.status) || "unknown",
-      risk: stale ? "medium" : "low",
-      freshness: stale ? "stale" : "aging",
-      authority: "read_only",
-      cluster: "tracks",
-      evidenceCount: track.evidence_present ? 1 : 0,
-      tone: stale ? "warn" : "info",
-      pulse: false,
-      inspect: {
-        type: "track",
-        title: name,
-        subtitle: asText(track.id),
-        status: asText(track.status),
-        raw: track,
-      },
-    });
-    edges.push({
-      id: `e:${id}->${ROOT_ID}`,
-      source: id,
-      target: ROOT_ID,
-      relation: "belongs_to",
-      status: stale ? "stale" : "safe",
-      strength: 0.4,
-      freshness: stale ? "stale" : "aging",
-      uncertain: !track.evidence_present,
-      evidence: [asText(track.evidence_path ?? track.status ?? track.id)],
-    });
-  });
-
-  // Live surfaces: runs_on root, pulse only if live AND fresh.
-  const surfaces = (report.live_ops?.surfaces ?? []) as Record<string, unknown>[];
-  surfaces.forEach((surface, index) => {
-    const status = asText(surface.status) || "unknown";
-    const id = safeId("surface", asText(surface.id), index);
-    const fresh = freshnessFromAge(typeof surface.age_hours === "number" ? surface.age_hours : null);
-    const isLive = status === "live" && fresh === "fresh";
-    const tone: TruthTone = status === "live" ? "ok" : status === "blocked" ? "danger" : status === "stale" ? "warn" : "muted";
-    nodes.push({
-      id,
-      label: asText(surface.label) || asText(surface.id),
-      kind: "surface",
-      status,
-      risk: status === "blocked" ? "critical" : status === "stale" ? "medium" : "low",
-      freshness: status === "live" ? (fresh === "unknown" ? "stale" : fresh) : fresh,
-      authority: surface.human_authority_required ? "operator_required" : "read_only",
-      cluster: "live_ops",
-      evidenceCount: status === "unknown" ? 0 : 1,
-      nextAction: asText(surface.desired_state) === "live" && status !== "live" ? "Desired live but stopped" : undefined,
-      tone,
-      pulse: isLive,
-      inspect: {
-        type: "card",
-        title: asText(surface.label) || asText(surface.id),
-        subtitle: `live-ops surface · ${status}`,
-        status,
-        risk: asText(surface.desired_state) === "live" && status !== "live" ? "Desired live, not live" : undefined,
-        evidence: [{ kind: "live_ops", source: "scripts/runtime/live_ops_census.py", detail: `status=${status} desired=${asText(surface.desired_state)}`, age_hours: typeof surface.age_hours === "number" ? surface.age_hours : null }],
-        raw: surface,
-      },
-    });
-    edges.push({
-      id: `e:${id}->${ROOT_ID}`,
-      source: id,
-      target: ROOT_ID,
-      relation: "runs_on",
-      status,
-      strength: 0.5,
-      freshness: status === "live" ? (fresh === "unknown" ? "stale" : fresh) : fresh,
-      uncertain: status === "unknown",
-      evidence: [`status=${status} desired=${asText(surface.desired_state)}`],
-    });
-  });
-
-  // Cards attach to their track or root. Node kind preserves branch/worktree/receipt semantics.
-  report.cards.forEach((card, index) => {
-    const semanticKind: CockpitNode["kind"] =
-      card.kind === "branch"
-        ? "branch"
-        : card.kind === "worktree" || card.kind === "dirty_files"
-          ? "worktree"
-          : card.kind === "runtime_receipts" || card.kind === "runtime_db" || card.kind.includes("receipt")
-            ? "receipt"
-            : "card";
-    const id = safeId(semanticKind, card.id, index);
-    const truth = classifyCardTruth(card);
-    const fresh = cardFreshness(card);
-    const trackTarget = card.track && trackNodeByName.get(card.track);
-    nodes.push({
-      id,
-      label: card.title || card.id,
-      kind: semanticKind,
-      status:
-        card.facets?.live ? "live" :
-          card.facets?.local_only || card.kind === "dirty_files" || card.kind === "worktree" ? "dirty" :
-            card.facets?.rogue ? "rogue" :
-              card.facets?.stale ? "stale" :
-                card.lane === "Needs Repair" ? "danger" :
-                  card.facets?.operator_decision ? "needs" : "warn",
-      risk: riskLevel(card),
-      freshness: fresh,
-      authority: cardAuthority(card),
-      cluster: card.track && trackTarget ? card.track : card.lane,
-      track: card.track,
-      branch: card.branch,
-      sourcePath: card.evidence?.find((ev) => ev.path)?.path ?? card.evidence?.[0]?.source,
-      evidenceCount: card.evidence?.length ?? 0,
-      nextAction: card.next_action,
-      tone: truth.tone,
-      pulse: false,
-      inspect: cardToInspect(card),
-    });
-    edges.push({
-      id: `e:${id}->${trackTarget ?? ROOT_ID}`,
-      source: id,
-      target: trackTarget ?? ROOT_ID,
-      relation: card.lane === "Needs Repair" ? "blocks" : "belongs_to",
-      status: card.lane === "Needs Repair" ? "blocked" : "needs",
-      strength: 0.3,
-      freshness: fresh,
-      uncertain: (card.evidence?.length ?? 0) === 0,
-      evidence: (card.evidence ?? []).map((ev) => ev.detail || ev.source).slice(0, 3),
-    });
-  });
-
-  // Action packets: proposal-only action objects from report.executive.next_3_actions.
-  buildActionPackets(report).forEach((packet) => {
-    nodes.push({
-      id: packet.id,
-      label: packet.title,
-      kind: "action",
-      status: "needs",
-      risk: packet.urgency === "critical" ? "critical" : packet.urgency === "high" ? "high" : packet.urgency === "medium" ? "medium" : "low",
-      freshness: "fresh",
-      authority: "proposal_required",
-      cluster: "actions",
-      evidenceCount: packet.evidence.length,
-      nextAction: packet.expectedImpact,
-      sourcePath: packet.targets[0],
-      tone: packet.urgency === "critical" || packet.urgency === "high" ? "danger" : "warn",
-      pulse: false,
-      inspect: actionPacketToInspect(packet),
-    });
-    edges.push({
-      id: `e:${packet.id}->${ROOT_ID}`,
-      source: packet.id,
-      target: ROOT_ID,
-      relation: "proposes",
-      status: "needs",
-      strength: 0.65,
-      freshness: "fresh",
-      uncertain: packet.evidence.length === 0,
-      evidence: packet.evidence.map((ev) => ev.detail || ev.source).slice(0, 3),
-    });
-  });
-
-  // Receipt files not already represented as cards get explicit receipt nodes.
-  const receipts = (report.runtime_receipts?.recent_receipts ?? []) as Record<string, unknown>[];
-  receipts.slice(0, 24).forEach((receipt, index) => {
-    const path = asText(receipt.path);
-    const age = typeof receipt.age_hours === "number" ? receipt.age_hours : null;
-    const fresh = freshnessFromAge(age);
-    const id = safeId("receipt", path, index);
-    if (nodes.some((node) => node.sourcePath === path)) return;
-    nodes.push({
-      id,
-      label: path.split("/").pop() ?? path,
-      kind: "receipt",
-      status: fresh === "stale" ? "stale" : fresh === "unknown" ? "unknown" : "done",
-      risk: fresh === "stale" ? "medium" : fresh === "unknown" ? "unknown" : "low",
-      freshness: fresh,
-      authority: "read_only",
-      cluster: "receipts",
-      sourcePath: path,
-      evidenceCount: 1,
-      tone: freshnessTone(fresh),
-      pulse: false,
-      inspect: {
-        id,
-        type: "source",
-        title: path.split("/").pop() ?? path,
-        subtitle: "receipt evidence",
-        status: freshnessLabel(fresh),
-        evidence: [{ kind: "receipt", source: path, path, age_hours: age }],
-        raw: receipt,
-      },
-    });
-    edges.push({
-      id: `e:${id}->${ROOT_ID}`,
-      source: id,
-      target: ROOT_ID,
-      relation: "receipt_for",
-      status: fresh === "stale" ? "stale" : "done",
-      strength: 0.25,
-      freshness: fresh,
-      uncertain: fresh === "unknown",
-      evidence: [path],
-    });
-  });
-
-  // Source errors: checked_by root, always uncertain/dashed.
-  report.source_errors.forEach((err, index) => {
-    const id = safeId("err", err.source, index);
-    nodes.push({
-      id,
-      label: err.source,
-      kind: "source_error",
-      status: "unknown",
-      risk: "unknown",
-      freshness: "unknown",
-      authority: "unavailable",
-      cluster: "uncertainty",
-      evidenceCount: 1,
-      tone: "muted",
-      pulse: false,
-      inspect: {
-        type: "source",
-        title: err.source,
-        subtitle: "source unavailable",
-        status: "unavailable",
-        risk: "Missing evidence is uncertainty, not success",
-        evidence: [{ kind: "source_error", source: err.source, detail: err.error.trim(), observed_at: err.timestamp }],
-        raw: err,
-      },
-    });
-    edges.push({
-      id: `e:${id}->${ROOT_ID}`,
-      source: id,
-      target: ROOT_ID,
-      relation: "checked_by",
-      status: "unknown",
-      strength: 0.2,
-      freshness: "unknown",
-      uncertain: true,
-      evidence: [err.error.trim()],
-    });
-  });
-
-  return { nodes, edges };
-}
-
-export function nodeMatchesFilter(node: CockpitNode, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const haystack = [
-    node.id,
-    node.label,
-    node.kind,
-    node.status,
-    node.risk,
-    node.freshness,
-    node.authority,
-    node.cluster,
-    node.track,
-    node.branch,
-    node.sourcePath,
-    node.nextAction,
-    node.inspect.title,
-    node.inspect.subtitle,
-    node.inspect.risk,
-    node.inspect.nextAction,
-    ...(node.inspect.evidence ?? []).map((ev) => `${ev.source} ${ev.path ?? ""} ${ev.detail ?? ""}`),
-  ].join(" ").toLowerCase();
-  return haystack.includes(q);
-}
-
-/** Stable cluster ordering used by topology + recursive layouts. */
-export const CLUSTER_ORDER = ["system", "readiness", "actions", "tracks", "live_ops", "receipts", "uncertainty"] as const;
-
-/** All status codes the UI may render; used by the token-coverage test. */
-export const STATUS_TOKENS = [
-  "safe",
-  "dirty",
-  "abandoned",
-  "live",
-  "blocked",
-  "rogue",
-  "stale",
-  "unknown",
-  "needs",
-  "warn",
-  "danger",
-  "running",
-  "done",
-  "special",
-] as const;
-
-export type StatusToken = (typeof STATUS_TOKENS)[number];
-
-/** Map any status string to a visual tone — guarantees no unmapped status. */
-export function statusTone(status: string): TruthTone {
-  switch (status) {
-    case "safe":
-    case "done":
-    case "live":
-      return "ok";
-    case "needs":
-    case "warn":
-    case "stale":
-    case "abandoned":
-    case "rogue":
-      return "warn";
-    case "dirty":
-    case "blocked":
-    case "danger":
-      return "danger";
-    case "running":
-    case "special":
-      return "info";
-    default:
-      return "muted";
-  }
-}
-
-/* ============================================================
-   Receipt / event tape — REQ-060/061/062, spec 11.9
-   History not yet wired: single-snapshot honesty.
-   ============================================================ */
-
-export interface TapeEvent {
-  id: string;
-  label: string;
-  kind: "report" | "receipt" | "runtime_db" | "source_error" | "live_ops" | "pr_ci";
-  freshness: Freshness;
-  detail: string;
-  tone: TruthTone;
-  evidence: CoherenceEvidence[];
-}
-
-export function buildEventTape(report: OperatorCoherenceReport): TapeEvent[] {
-  const events: TapeEvent[] = [];
-
-  events.push({
-    id: "event:report",
-    label: "Report generated",
-    kind: "report",
-    freshness: "fresh",
-    detail: report.generated_at,
-    tone: "info",
-    evidence: [{ kind: "report", source: "/api/operator-coherence/report", detail: report.generated_at }],
-  });
-
-  const receipts = (report.runtime_receipts?.recent_receipts ?? []) as Record<string, unknown>[];
-  receipts.slice(0, 8).forEach((receipt, index) => {
-    const age = typeof receipt.age_hours === "number" ? receipt.age_hours : null;
-    const fresh = freshnessFromAge(age);
-    events.push({
-      id: safeId("receipt", asText(receipt.path), index),
-      label: asText(receipt.path).split("/").pop() ?? asText(receipt.path),
-      kind: "receipt",
-      freshness: fresh,
-      detail: `${asText(receipt.path)} · ${age != null ? `${Math.round(age)}h old` : "age unknown"}`,
-      tone: freshnessTone(fresh),
-      evidence: [{ kind: "receipt", source: asText(receipt.path), path: asText(receipt.path), age_hours: age }],
-    });
-  });
-
-  for (const err of report.source_errors) {
-    events.push({
-      id: `event:err:${err.source}`,
-      label: `${err.source} unavailable`,
-      kind: "source_error",
-      freshness: "unknown",
-      detail: err.error.trim(),
-      tone: "muted",
-      evidence: [{ kind: "source_error", source: err.source, detail: err.error.trim(), observed_at: err.timestamp }],
-    });
-  }
-
-  const prCi = report.pr_ci_triage as { enabled?: boolean; reason?: string } | undefined;
-  if (prCi?.enabled === false) {
-    events.push({
-      id: "event:pr_ci",
-      label: "PR/CI unavailable",
-      kind: "pr_ci",
-      freshness: "unknown",
-      detail: prCi.reason ?? "gh auth unavailable",
-      tone: "muted",
-      evidence: [{ kind: "external", source: "pr_ci_triage", detail: prCi.reason ?? "gh_auth_unavailable" }],
-    });
-  }
-
-  return events;
-}
-
-export function tapeEventInspect(event: TapeEvent): InspectItem {
-  return {
-    type: "source",
-    title: event.label,
-    subtitle: `${event.kind} · ${freshnessLabel(event.freshness)}`,
-    status: event.kind === "source_error" || event.kind === "pr_ci" ? "unavailable" : event.freshness,
-    evidence: event.evidence,
-    raw: event,
-  };
 }
 
 export function modeMatches(card: CoherenceCard, mode: CockpitMode): boolean {
@@ -1415,6 +827,7 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
   const runtimeTotal = report.live_ops?.summary?.total ?? 0;
   const receiptCount = report.runtime_receipts?.receipt_count ?? 0;
   const sourceControl = report.readiness.categories.source_control_coherence;
+  const branchRisk = deriveBranchRiskProjection(report);
   const runtime = report.readiness.categories.runtime_telemetry_liveness;
   const preservation = report.readiness.categories.preservation_safety;
   const needsDecision = report.kanban.find((lane) => lane.lane === "Needs Decision")?.count ?? 0;
@@ -1423,16 +836,17 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
   return [
     {
       id: "readiness",
-      eyebrow: "System verdict",
-      title: "Prod readiness",
+      eyebrow: "Heuristic projection",
+      title: "Evidence coherence",
       value: `${report.readiness.score}%`,
-      detail: report.readiness.interpretation,
+      detail: `Heuristic evidence score · ${report.readiness.interpretation}`,
       tone: readinessTone(report.readiness.score),
       inspect: {
         type: "panel",
-        title: "Prod readiness",
-        subtitle: "Weighted score from 8 evidence categories",
+        title: "Evidence coherence",
+        subtitle: "Weighted heuristic from 8 evidence categories; not a production-readiness verdict",
         status: String(report.readiness.score),
+        risk: "This score is a projection, not production proof.",
         evidence: Object.entries(report.readiness.categories).map(([source, item]) => ({
           kind: "score",
           source,
@@ -1445,9 +859,9 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
       id: "source-control",
       eyebrow: "Git coherence",
       title: "Source control",
-      value: `${sourceControl?.score ?? 0}%`,
-      detail: `${report.branch_census?.total ?? 0} branches · ${report.rogue_work_radar.stash_count} stashes`,
-      tone: readinessTone(sourceControl?.score ?? 0),
+      value: sourceControl ? `${sourceControl.score}%` : "—",
+      detail: `${formatCount(branchRisk.total)} branches · ${report.rogue_work_radar.stash_count} stashes · ${branchRisk.source.replaceAll("_", " ")}${branchRisk.conflicts.length ? ` · ${branchRisk.conflicts.join("; ")}` : ""}`,
+      tone: sourceControl ? readinessTone(sourceControl.score) : "muted",
       inspect: {
         type: "panel",
         title: "Source control radar",

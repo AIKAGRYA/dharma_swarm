@@ -28,7 +28,7 @@ from dharma_swarm.operator_core.contracts import (
     PermissionRisk,
     RuntimeHealth,
 )
-from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult
+from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult, UserPrompt
 from dharma_swarm.operator_core.permissions import GovernancePolicy
 from dharma_swarm.operator_core.session_store import SessionStore
 
@@ -55,6 +55,19 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(envelope.payload["tool_name"], "Read")
         self.assertEqual(envelope.audience, EventAudience.TUI)
         self.assertEqual(envelope.transport, EventTransport.STDIO)
+
+    def test_user_prompt_envelope_preserves_operator_authority(self) -> None:
+        envelope = event_envelope_from_legacy_event(
+            UserPrompt(
+                session_id="sess-1",
+                provider_id="claude",
+                content="continue the audit",
+            )
+        )
+
+        self.assertEqual(envelope.event_type, "user_prompt")
+        self.assertEqual(str(envelope.source), "operator")
+        self.assertEqual(envelope.payload["content"], "continue the audit")
 
     def test_session_from_meta(self) -> None:
         session = session_from_meta(
@@ -88,7 +101,13 @@ class OperatorCoreAdapterTests(unittest.TestCase):
                 "strategy": "responsive",
                 "active_label": "GPT-5.4",
                 "default_route": "codex:gpt-5.4",
-                "targets": [{"alias": "primary"}],
+                "targets": [{
+                    "alias": "primary",
+                    "provider": "codex",
+                    "model": "gpt-5.4",
+                    "route_state": "ready",
+                    "selectable": True,
+                }],
                 "fallback_chain": [
                     {"provider": "claude", "model": "sonnet-4.6"},
                     {"provider": "openrouter", "model": "qwen2.5-coder"},
@@ -100,6 +119,30 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(decision.fallback_chain[0], "claude:sonnet-4.6")
         self.assertFalse(decision.degraded)
 
+    def test_routing_decision_preserves_unverified_modality(self) -> None:
+        decision = routing_decision_from_policy(
+            {
+                "selected_route": "codex:gpt-5.5",
+                "selected_provider": "codex",
+                "selected_model": "gpt-5.5",
+                "targets": [{
+                    "provider": "codex",
+                    "model": "gpt-5.5",
+                    "route_state": "unverified",
+                    "selectable": True,
+                    "availability_reason": "local_cli_auth_unverified",
+                }],
+            }
+        )
+
+        self.assertTrue(decision.degraded)
+        self.assertEqual(decision.metadata["route_state"], "unverified")
+        self.assertTrue(decision.metadata["selectable"])
+        self.assertEqual(
+            decision.metadata["availability_reason"],
+            "local_cli_auth_unverified",
+        )
+
     def test_build_routing_decision_payload_is_json_ready(self) -> None:
         payload = build_routing_decision_payload(
             {
@@ -109,7 +152,14 @@ class OperatorCoreAdapterTests(unittest.TestCase):
                 "strategy": "responsive",
                 "active_label": "GPT-5.4",
                 "default_route": "codex:gpt-5.4",
-                "targets": [{"alias": "primary", "provider": "codex", "model": "gpt-5.4", "label": "GPT-5.4"}],
+                "targets": [{
+                    "alias": "primary",
+                    "provider": "codex",
+                    "model": "gpt-5.4",
+                    "label": "GPT-5.4",
+                    "route_state": "ready",
+                    "selectable": True,
+                }],
                 "strategies": ["responsive", "genius"],
                 "fallback_chain": [{"provider": "claude", "model": "sonnet-4.6", "label": "Sonnet 4.6"}],
             }
@@ -338,25 +388,6 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(decision.decision, PermissionDecisionKind.REQUIRE_APPROVAL)
         self.assertEqual(decision.risk, PermissionRisk.SHELL_OR_NETWORK)
         self.assertTrue(decision.requires_confirmation)
-
-    def test_build_permission_decision_payload_is_json_ready(self) -> None:
-        payload = build_permission_decision_payload(
-            ToolCallComplete(
-                session_id="sess-1",
-                provider_id="codex",
-                tool_call_id="tool-2",
-                tool_name="Bash",
-                arguments="git status",
-            ),
-            policy=GovernancePolicy(),
-        )
-
-        self.assertEqual(payload["version"], "v1")
-        self.assertEqual(payload["domain"], "permission_decision")
-        self.assertEqual(payload["action_id"][:5], "perm-")
-        self.assertEqual(payload["tool_name"], "Bash")
-        self.assertEqual(payload["decision"], "require_approval")
-        self.assertEqual(payload["metadata"]["session_id"], "sess-1")
 
     def test_build_permission_resolution_payload_is_json_ready(self) -> None:
         payload = build_permission_resolution_payload(

@@ -1,4 +1,59 @@
-version: "3.8"
+# ---------------------------------------------------------------------------
+# Provider lane pass-through — SINGLE SOURCE: dharma_swarm/api_keys.py
+# (PROVIDER_API_KEY_ENV_KEYS / PROVIDER_BASE_URL_ENV_KEYS / ENV_ALIASES).
+# Every service that runs dharma code gets the FULL canonical provider env
+# surface, so the container sees exactly the lanes the routing system knows.
+# Parity with the registry and .env.example is enforced by
+# tests/test_provider_env_parity.py — to add a provider: registry first,
+# then this block, then .env.example, and the test stays green.
+# ---------------------------------------------------------------------------
+x-provider-env: &provider-env
+  # canonical API key lanes
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:-}
+  OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+  SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+  TOGETHER_API_KEY: ${TOGETHER_API_KEY:-}
+  FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+  GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+  SAMBANOVA_API_KEY: ${SAMBANOVA_API_KEY:-}
+  MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+  CHUTES_API_KEY: ${CHUTES_API_KEY:-}
+  ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+  KIMI_API_KEY: ${KIMI_API_KEY:-}
+  MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+  # documented aliases (normalize_env_aliases() maps these at process start)
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+  NIM_API_KEY: ${NIM_API_KEY:-}
+  PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+  GLM_API_KEY: ${GLM_API_KEY:-}
+  ZAI_API_KEY: ${ZAI_API_KEY:-}
+  ZHIPUAI_API_KEY: ${ZHIPUAI_API_KEY:-}
+  BIGMODEL_API_KEY: ${BIGMODEL_API_KEY:-}
+  MOONSHOT_KIMI_API_KEY: ${MOONSHOT_KIMI_API_KEY:-}
+  DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+  # base URL overrides
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+  NVIDIA_NIM_BASE_URL: ${NVIDIA_NIM_BASE_URL:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+  GROQ_BASE_URL: ${GROQ_BASE_URL:-}
+  CEREBRAS_BASE_URL: ${CEREBRAS_BASE_URL:-}
+  SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-}
+  TOGETHER_BASE_URL: ${TOGETHER_BASE_URL:-}
+  FIREWORKS_BASE_URL: ${FIREWORKS_BASE_URL:-}
+  GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-}
+  SAMBANOVA_BASE_URL: ${SAMBANOVA_BASE_URL:-}
+  MISTRAL_BASE_URL: ${MISTRAL_BASE_URL:-}
+  CHUTES_BASE_URL: ${CHUTES_BASE_URL:-}
+  ZHIPU_BASE_URL: ${ZHIPU_BASE_URL:-}
+  KIMI_BASE_URL: ${KIMI_BASE_URL:-}
+  MOONSHOT_BASE_URL: ${MOONSHOT_BASE_URL:-}
 
 services:
   web:
@@ -9,13 +64,12 @@ services:
     volumes:
       - ginko-data:/root/.dharma/ginko
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+      <<: *provider-env
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/fleet"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -27,19 +81,32 @@ services:
       dockerfile: Dockerfile.swarm
     container_name: dharma-swarm
     ports:
-      - "7433:7433"   # health API: curl http://localhost:7433/health
+      - "127.0.0.1:7433:7433"   # health API (loopback-only: world bind reopened MeghaDharma exposure on clean redeploys; 2026-07-09 forensics)
     volumes:
       - dharma-state:/root/.dharma
-      - ./dharma_swarm:/app/dharma_swarm:ro  # hot-reload source
+      - ./dharma_swarm:/app/dharma_swarm:ro  # source is READ-ONLY (never mutable)
+      # PR-001: writable evolution surfaces are SEPARATE volumes, never source.
+      - evolution-worktrees:/evolution_worktrees          # scratch worktrees (rw)
+      - evolution-archive:/evolution_archive:ro           # immutable experiment artifacts
+      # Protected evaluator is mounted READ-ONLY when present. If absent,
+      # promotion-grade evaluation is unavailable (fail-closed).
+      - ${DHARMA_EVAL_MOUNT:-/dev/null}:/mnt/dharma_eval:ro
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - TINY_ROUTER_BACKEND=heuristic
-      - DHARMA_EVOLUTION_SHADOW=${DHARMA_EVOLUTION_SHADOW:-0}
-      - DGC_AUTONOMY_LEVEL=${DGC_AUTONOMY_LEVEL:-2}
-      - DHARMA_STATE_DIR=/root/.dharma
-      - GUARDIAN_INTERVAL_SECONDS=14400
+      <<: *provider-env
+      TINY_ROUTER_BACKEND: heuristic
+      # PR-001 fail-closed defaults: safe with ZERO configuration.
+      DHARMA_EVOLUTION_SHADOW: ${DHARMA_EVOLUTION_SHADOW:-1}   # 1 = shadow (never mutate source)
+      DGC_AUTONOMY_LEVEL: ${DGC_AUTONOMY_LEVEL:-1}             # never default to 2
+      DHARMA_SELF_IMPROVE: ${DHARMA_SELF_IMPROVE:-0}           # off by default
+      DHARMA_ALLOW_LIVE_MUTATION: ${DHARMA_ALLOW_LIVE_MUTATION:-0}  # live mutation forbidden
+      DHARMA_ALLOW_CUSTODIAN_MERGE: ${DHARMA_ALLOW_CUSTODIAN_MERGE:-0}
+      DHARMA_EVOLUTION_WORKTREE_ROOT: /evolution_worktrees
+      # D1 (organism-rewire-2026-07): spine dispatch is STANDING here — every
+      # production dispatch flows through invoke_agent() and emits exactly one
+      # EvidenceReceipt, so Loop-1 closure reads LIVE persistently on the daemon.
+      DHARMA_SPINE_DISPATCH: "1"
+      DHARMA_STATE_DIR: /root/.dharma
+      GUARDIAN_INTERVAL_SECONDS: "14400"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7433/health"]
@@ -54,27 +121,42 @@ services:
     volumes:
       - ginko-data:/root/.dharma/ginko
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-    entrypoint: ["python3", "-c", "
-import asyncio, time, logging;
-logging.basicConfig(level=logging.INFO);
-logger = logging.getLogger('ginko-cron');
-async def run_cycle():
-    from dharma_swarm.ginko_orchestrator import action_full_cycle;
-    result = await action_full_cycle();
-    logger.info('Cycle complete: %s', {k: 'OK' if not isinstance(v, dict) or 'error' not in v else v['error'] for k, v in result.items() if k != 'total_duration_ms'});
-    return result;
-while True:
-    try: asyncio.run(run_cycle());
-    except Exception as e: logger.error('Cycle failed: %s', e);
-    time.sleep(21600);
-"]
+      <<: *provider-env
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+    # A real module, not inline `python3 -c`: YAML scalar folding collapsed
+    # the old multi-line inline script onto one line (SyntaxError) — the cron
+    # container crash-looped on every fresh deploy.
+    entrypoint: ["python3", "-m", "dharma_swarm.ginko_cron_loop"]
     restart: unless-stopped
+
+  # Off-host replication of the runtime truth store (VPS profile only —
+  # `docker compose --profile vps up -d`). Local/Mac behavior unchanged.
+  # Configure LITESTREAM_* in .env; without a replica URL, do not enable
+  # this profile. See docs/ops/RUNBOOK.md §3e and scripts/ops/litestream.yml.
+  litestream:
+    image: litestream/litestream:0.3.13
+    container_name: dharma-litestream
+    profiles: ["vps"]
+    command: replicate -config /etc/litestream.yml
+    volumes:
+      - dharma-state:/data
+      - ./scripts/ops/litestream.yml:/etc/litestream.yml:ro
+    environment:
+      LITESTREAM_REPLICA_URL: ${LITESTREAM_REPLICA_URL:-}
+      LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      - swarm
 
 volumes:
   dharma-state:
     driver: local
   ginko-data:
+    driver: local
+  # PR-001: evolution surfaces kept SEPARATE from runtime state and from source.
+  evolution-worktrees:      # writable scratch worktrees for isolated experiments
+    driver: local
+  evolution-archive:        # immutable experiment artifacts (mounted read-only)
     driver: local

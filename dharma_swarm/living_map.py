@@ -11,7 +11,6 @@ Usage:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -20,7 +19,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +406,7 @@ def generate(layer: int | None = None) -> str:
     clusters = [
         ("PSMV vault",              "0.95", "34K files  DORMANT — highest value, untouched"),
         ("Kailash Obsidian",        "0.89", "590+ notes  spiritual/AI synthesis"),
-        ("mech-interp / R_V paper", "0.86", "COLM deadline Mar 26/31  ~65% done"),
+        ("mech-interp / R_V paper", "0.86", "venue re-anchor pending (research_deadlines.json)  ~65% done"),
         ("Trishula comms",          "0.80", f"{trishula.get('message_count','?')} msgs pending  three-machine nervous system"),
         ("DHARMIC_GODEL_CLAW",      "0.79", "telos-seeded agent architecture  historical"),
     ]

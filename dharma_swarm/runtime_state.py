@@ -13,7 +13,7 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -76,6 +76,24 @@ CREATE TABLE IF NOT EXISTS delegation_runs (
     metadata_json TEXT NOT NULL DEFAULT '{}',
     trace_id TEXT NOT NULL DEFAULT '',
     receipt_json TEXT
+)"""
+
+_TOPOLOGY_STATES_DDL = """
+CREATE TABLE IF NOT EXISTS topology_states (
+    run_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL DEFAULT '',
+    task_id TEXT NOT NULL,
+    topology TEXT NOT NULL,
+    active_agent TEXT NOT NULL DEFAULT '',
+    current_node TEXT NOT NULL DEFAULT '',
+    checkpoint_id TEXT NOT NULL DEFAULT '',
+    parent_run_id TEXT NOT NULL DEFAULT '',
+    child_run_ids_json TEXT NOT NULL DEFAULT '[]',
+    allowed_handoffs_json TEXT NOT NULL DEFAULT '{}',
+    handoff_receipts_json TEXT NOT NULL DEFAULT '[]',
+    state_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 )"""
 
 _WORKSPACE_LEASES_DDL = """
@@ -270,6 +288,9 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_claims_agent_status ON task_claims(agent_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_runs_task_status ON delegation_runs(task_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_runs_session_started ON delegation_runs(session_id, started_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_session_updated ON topology_states(session_id, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_task_updated ON topology_states(task_id, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_topology_updated ON topology_states(topology, updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_leases_zone_released ON workspace_leases(zone_path, released_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_task_created ON artifact_records(task_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_run_created ON artifact_records(run_id, created_at)",
@@ -301,6 +322,18 @@ def _utc_now_iso() -> str:
     return _utc_now().isoformat()
 
 
+def _next_idempotency_token(
+    observed: datetime | None, floor: datetime | None = None,
+) -> str:
+    candidates = [_utc_now()]
+    if observed is not None:
+        observed = observed.replace(tzinfo=observed.tzinfo or timezone.utc)
+        candidates.append(observed + timedelta(microseconds=1))
+    if floor is not None:
+        candidates.append(floor.replace(tzinfo=floor.tzinfo or timezone.utc))
+    return max(candidates).isoformat()
+
+
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:16]}"
 
@@ -317,6 +350,8 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "identity_mapping",
         "idempotency_consumed",
         "runtime_warrant",
+        "topology_state",
+        "topology_handoff",
         "ontology_action_requested",
         "ontology_action_applied",
         "child_spawned",
@@ -399,16 +434,24 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
 
 
+# Wait up to this long for a competing writer to release the write lock before
+# raising "database is locked". WAL lets readers and a writer coexist, but two
+# writers still serialize; without a busy timeout the loser fails instantly.
+_BUSY_TIMEOUT_MS = 5_000
+
+
 def _apply_connection_pragmas_sync(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA synchronous=NORMAL")
+    db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
 
 
 async def _apply_connection_pragmas_async(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
 
 
 def ensure_runtime_state_schema_sync(
@@ -422,6 +465,7 @@ def ensure_runtime_state_schema_sync(
         _SESSIONS_DDL,
         _TASK_CLAIMS_DDL,
         _DELEGATION_RUNS_DDL,
+        _TOPOLOGY_STATES_DDL,
         _WORKSPACE_LEASES_DDL,
         _ARTIFACT_RECORDS_DDL,
         _ARTIFACT_LINKS_DDL,
@@ -464,6 +508,7 @@ async def ensure_runtime_state_schema_async(
         _SESSIONS_DDL,
         _TASK_CLAIMS_DDL,
         _DELEGATION_RUNS_DDL,
+        _TOPOLOGY_STATES_DDL,
         _WORKSPACE_LEASES_DDL,
         _ARTIFACT_RECORDS_DDL,
         _ARTIFACT_LINKS_DDL,
@@ -540,6 +585,25 @@ class DelegationRun:
     completed_at: datetime | None = None
     failure_code: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TopologyStateRecord:
+    run_id: str
+    task_id: str
+    topology: str
+    schema_version: str = "topology_state_record.v1"
+    session_id: str = ""
+    active_agent: str = ""
+    current_node: str = ""
+    checkpoint_id: str = ""
+    parent_run_id: str = ""
+    child_run_ids: list[str] = field(default_factory=list)
+    allowed_handoffs: dict[str, list[str]] = field(default_factory=dict)
+    handoff_receipts: list[dict[str, Any]] = field(default_factory=list)
+    state: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=_utc_now)
+    updated_at: datetime = field(default_factory=_utc_now)
 
 
 @dataclass(frozen=True)
@@ -812,6 +876,38 @@ def _row_to_run(row: sqlite3.Row | aiosqlite.Row) -> DelegationRun:
         completed_at=_parse_dt(row["completed_at"]),
         failure_code=str(row["failure_code"] or ""),
         metadata=_json_load(row["metadata_json"], {}),
+    )
+
+
+def _row_to_topology_state(row: sqlite3.Row | aiosqlite.Row) -> TopologyStateRecord:
+    child_run_ids = _json_load(row["child_run_ids_json"], [])
+    if not isinstance(child_run_ids, list):
+        child_run_ids = []
+    allowed = _json_load(row["allowed_handoffs_json"], {})
+    if not isinstance(allowed, dict):
+        allowed = {}
+    normalized_allowed: dict[str, list[str]] = {}
+    for key, value in allowed.items():
+        if isinstance(value, (list, tuple, set)):
+            normalized_allowed[str(key)] = [str(item) for item in value]
+    handoffs = _json_load(row["handoff_receipts_json"], [])
+    if not isinstance(handoffs, list):
+        handoffs = []
+    return TopologyStateRecord(
+        run_id=str(row["run_id"]),
+        session_id=str(row["session_id"] or ""),
+        task_id=str(row["task_id"]),
+        topology=str(row["topology"]),
+        active_agent=str(row["active_agent"] or ""),
+        current_node=str(row["current_node"] or ""),
+        checkpoint_id=str(row["checkpoint_id"] or ""),
+        parent_run_id=str(row["parent_run_id"] or ""),
+        child_run_ids=[str(item) for item in child_run_ids],
+        allowed_handoffs=normalized_allowed,
+        handoff_receipts=[item for item in handoffs if isinstance(item, dict)],
+        state=_json_load(row["state_json"], {}),
+        created_at=_parse_dt(row["created_at"]) or _utc_now(),
+        updated_at=_parse_dt(row["updated_at"]) or _utc_now(),
     )
 
 
@@ -1762,6 +1858,7 @@ class RuntimeStateStore:
         if corr.cell_id:
             claim.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
@@ -1988,6 +2085,7 @@ class RuntimeStateStore:
         if corr.cell_id:
             run.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
@@ -2130,6 +2228,123 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_run(row) for row in rows]
+
+    async def record_topology_state(
+        self,
+        state: TopologyStateRecord,
+    ) -> TopologyStateRecord:
+        await self.init_db()
+        now = _utc_now()
+        created_at = state.created_at or now
+        updated_at = state.updated_at or now
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            await db.execute(
+                "INSERT INTO topology_states (run_id, session_id, task_id, topology,"
+                " active_agent, current_node, checkpoint_id, parent_run_id,"
+                " child_run_ids_json, allowed_handoffs_json, handoff_receipts_json,"
+                " state_json, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(run_id) DO UPDATE SET"
+                " session_id = excluded.session_id,"
+                " task_id = excluded.task_id,"
+                " topology = excluded.topology,"
+                " active_agent = excluded.active_agent,"
+                " current_node = excluded.current_node,"
+                " checkpoint_id = excluded.checkpoint_id,"
+                " parent_run_id = excluded.parent_run_id,"
+                " child_run_ids_json = excluded.child_run_ids_json,"
+                " allowed_handoffs_json = excluded.allowed_handoffs_json,"
+                " handoff_receipts_json = excluded.handoff_receipts_json,"
+                " state_json = excluded.state_json,"
+                " updated_at = excluded.updated_at",
+                (
+                    state.run_id,
+                    state.session_id,
+                    state.task_id,
+                    state.topology,
+                    state.active_agent,
+                    state.current_node,
+                    state.checkpoint_id,
+                    state.parent_run_id,
+                    _json_dump([str(item) for item in state.child_run_ids]),
+                    _json_dump(state.allowed_handoffs),
+                    _json_dump(state.handoff_receipts),
+                    _json_dump(state.state),
+                    created_at.isoformat(),
+                    updated_at.isoformat(),
+                ),
+            )
+            await db.commit()
+        loaded = await self.get_topology_state(state.run_id)
+        assert loaded is not None
+        return loaded
+
+    async def get_topology_state(self, run_id: str) -> TopologyStateRecord | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, topology, active_agent,"
+                    " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+                    " allowed_handoffs_json, handoff_receipts_json, state_json,"
+                    " created_at, updated_at FROM topology_states WHERE run_id = ?",
+                    (run_id,),
+                )
+            ).fetchone()
+        return _row_to_topology_state(row) if row is not None else None
+
+    async def get_latest_topology_state_for_task(
+        self,
+        task_id: str,
+    ) -> TopologyStateRecord | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, topology, active_agent,"
+                    " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+                    " allowed_handoffs_json, handoff_receipts_json, state_json,"
+                    " created_at, updated_at FROM topology_states"
+                    " WHERE task_id = ? ORDER BY updated_at DESC LIMIT 1",
+                    (task_id,),
+                )
+            ).fetchone()
+        return _row_to_topology_state(row) if row is not None else None
+
+    async def list_topology_states(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+    ) -> list[TopologyStateRecord]:
+        await self.init_db()
+        query = (
+            "SELECT run_id, session_id, task_id, topology, active_agent,"
+            " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+            " allowed_handoffs_json, handoff_receipts_json, state_json,"
+            " created_at, updated_at FROM topology_states WHERE 1=1"
+        )
+        params: list[Any] = []
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if task_id is not None:
+            query += " AND task_id = ?"
+            params.append(task_id)
+        if topology is not None:
+            query += " AND topology = ?"
+            params.append(topology)
+        query += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(max(1, limit))
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+        return [_row_to_topology_state(row) for row in rows]
 
     # ── Sync helpers (for non-async callers like OpportunityDispatcher) ──
 
@@ -2786,6 +3001,7 @@ class RuntimeStateStore:
         _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
@@ -3516,8 +3732,8 @@ class RuntimeStateStore:
         existing: IdempotencyRecord,
         *,
         metadata: dict[str, Any] | None = None,
-    ) -> IdempotencyRecord:
-        now = _utc_now_iso()
+    ) -> bool:
+        now = _next_idempotency_token(existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(
             existing,
             {
@@ -3527,30 +3743,29 @@ class RuntimeStateStore:
             },
         )
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
+            cur = await db.execute(
                 "UPDATE idempotency_records SET status = 'stale',"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND updated_at = ?",
                 (
                     _json_dump(merged_metadata),
                     now,
                     existing.idempotency_key,
                     existing.side_effect_key,
+                    existing.updated_at.isoformat(),
                 ),
             )
             await db.commit()
-        record = await self.get_idempotency_record(existing.idempotency_key, existing.side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
-        return record
+        return int(cur.rowcount or 0) == 1
 
     def _mark_idempotency_record_stale_sync(
         self,
         existing: IdempotencyRecord,
         *,
         metadata: dict[str, Any] | None = None,
-    ) -> IdempotencyRecord:
-        now = _utc_now_iso()
+    ) -> bool:
+        now = _next_idempotency_token(existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(
             existing,
             {
@@ -3561,22 +3776,21 @@ class RuntimeStateStore:
         )
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            cur = db.execute(
                 "UPDATE idempotency_records SET status = 'stale',"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND updated_at = ?",
                 (
                     _json_dump(merged_metadata),
                     now,
                     existing.idempotency_key,
                     existing.side_effect_key,
+                    existing.updated_at.isoformat(),
                 ),
             )
             db.commit()
-        record = self.get_idempotency_record_sync(existing.idempotency_key, existing.side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
-        return record
+        return int(cur.rowcount or 0) == 1
 
     async def _handle_existing_idempotency_record(
         self,
@@ -3608,17 +3822,18 @@ class RuntimeStateStore:
             and stale_after_seconds is not None
             and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
         ):
-            await self._mark_idempotency_record_stale(existing, metadata=metadata)
-            await self.record_idempotency_consumed(
-                identity,
-                existing.side_effect_key,
-                status="stale",
-                payload={
-                    **dict(metadata or {}),
-                    "stale_after_seconds": stale_after_seconds,
-                },
-            )
-            return
+            marked = await self._mark_idempotency_record_stale(existing, metadata=metadata)
+            if marked:
+                await self.record_idempotency_consumed(
+                    identity,
+                    existing.side_effect_key,
+                    status="stale",
+                    payload={
+                        **dict(metadata or {}),
+                        "stale_after_seconds": stale_after_seconds,
+                    },
+                )
+                return
         await self.record_idempotency_consumed(
             identity,
             existing.side_effect_key,
@@ -3656,17 +3871,18 @@ class RuntimeStateStore:
             and stale_after_seconds is not None
             and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
         ):
-            self._mark_idempotency_record_stale_sync(existing, metadata=metadata)
-            self.record_idempotency_consumed_sync(
-                identity,
-                existing.side_effect_key,
-                status="stale",
-                payload={
-                    **dict(metadata or {}),
-                    "stale_after_seconds": stale_after_seconds,
-                },
-            )
-            return
+            marked = self._mark_idempotency_record_stale_sync(existing, metadata=metadata)
+            if marked:
+                self.record_idempotency_consumed_sync(
+                    identity,
+                    existing.side_effect_key,
+                    status="stale",
+                    payload={
+                        **dict(metadata or {}),
+                        "stale_after_seconds": stale_after_seconds,
+                    },
+                )
+                return
         self.record_idempotency_consumed_sync(
             identity,
             existing.side_effect_key,
@@ -3674,19 +3890,20 @@ class RuntimeStateStore:
             payload=metadata,
         )
 
-    async def try_begin_idempotent_side_effect(
+    async def try_begin_idempotent_side_effect_with_token(
         self,
         identity: ExecutionIdentity,
         side_effect_key: str,
         *,
         metadata: dict[str, Any] | None = None,
         stale_after_seconds: float | None = None,
-    ) -> bool:
+        ownership_time: datetime | None = None,
+    ) -> datetime | None:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
         await self.init_db()
-        now = _utc_now_iso()
+        now = _next_idempotency_token(None, ownership_time)
         async with aiosqlite.connect(self.db_path) as db:
             cur = await db.execute(
                 "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
@@ -3717,20 +3934,30 @@ class RuntimeStateStore:
                 metadata=metadata,
                 stale_after_seconds=stale_after_seconds,
             )
-            return False
+            return None
         await self.record_idempotency_consumed(
             identity,
             side_effect_key,
             status="accepted",
             payload=metadata,
         )
-        if inserted:
-            await self.record_side_effect_intent(
-                identity,
-                side_effect_key,
-                payload=metadata,
-            )
-        return inserted
+        await self.record_side_effect_intent(identity, side_effect_key, payload=metadata)
+        return datetime.fromisoformat(now)
+
+    async def try_begin_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        stale_after_seconds: float | None = None,
+    ) -> bool:
+        """Preserve the public boolean begin API."""
+        token = await self.try_begin_idempotent_side_effect_with_token(
+            identity, side_effect_key, metadata=metadata,
+            stale_after_seconds=stale_after_seconds,
+        )
+        return token is not None
 
     def try_begin_idempotent_side_effect_sync(
         self,
@@ -3799,29 +4026,30 @@ class RuntimeStateStore:
         status: str = "completed",
         result_receipt_id: str = "",
         metadata: dict[str, Any] | None = None,
+        expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
         await self.init_db()
-        now = _utc_now_iso()
         existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(existing, metadata)
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
+            sql = (
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
-                (
-                    status,
-                    result_receipt_id,
-                    _json_dump(merged_metadata),
-                    now,
-                    identity.idempotency_key,
-                    side_effect_key,
-                ),
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
             )
+            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
+                                 identity.idempotency_key, side_effect_key]
+            if expected_updated_at is not None:
+                sql += " AND status = 'started' AND updated_at = ?"
+                params.append(expected_updated_at.isoformat())
+            cur = await db.execute(sql, tuple(params))
             await db.commit()
+        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+            raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         await self.record_side_effect_complete(
             identity,
@@ -3840,30 +4068,31 @@ class RuntimeStateStore:
         status: str = "completed",
         result_receipt_id: str = "",
         metadata: dict[str, Any] | None = None,
+        expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
         self.init_db_sync()
-        now = _utc_now_iso()
         existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(existing, metadata)
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            sql = (
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
-                (
-                    status,
-                    result_receipt_id,
-                    _json_dump(merged_metadata),
-                    now,
-                    identity.idempotency_key,
-                    side_effect_key,
-                ),
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
             )
+            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
+                                 identity.idempotency_key, side_effect_key]
+            if expected_updated_at is not None:
+                sql += " AND status = 'started' AND updated_at = ?"
+                params.append(expected_updated_at.isoformat())
+            cur = db.execute(sql, tuple(params))
             db.commit()
+        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+            raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         self.record_side_effect_complete_sync(
             identity,
@@ -3873,6 +4102,67 @@ class RuntimeStateStore:
             payload=merged_metadata,
         )
         return record
+
+    async def try_reclaim_idempotent_side_effect_with_token(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        expected_status: str,
+        expected_updated_at: datetime | None = None,
+        ownership_time: datetime | None = None,
+    ) -> datetime | None:
+        identity.require_for_dispatch()
+        if not side_effect_key:
+            raise ValueError("side_effect_key is required")
+        await self.init_db()
+        now = _next_idempotency_token(expected_updated_at, ownership_time)
+        sql = (
+            "UPDATE idempotency_records SET status = 'started', run_id = ?,"
+            " task_id = ?, trace_id = ?, correlation_id = ?, updated_at = ?"
+            " WHERE idempotency_key = ? AND side_effect_key = ? AND status = ?"
+        )
+        params: list[Any] = [
+            identity.run_id,
+            identity.task_id,
+            identity.trace_id,
+            identity.correlation_id,
+            now,
+            identity.idempotency_key,
+            side_effect_key,
+            expected_status,
+        ]
+        if expected_updated_at is not None:
+            sql += " AND updated_at = ?"
+            params.append(expected_updated_at.isoformat())
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(sql, tuple(params))
+            await db.commit()
+            reclaimed = int(cur.rowcount or 0) == 1
+        if reclaimed:
+            await self.record_idempotency_consumed(
+                identity,
+                side_effect_key,
+                status="reclaimed",
+                payload={"expected_status": expected_status,
+                         "ownership_token": now},
+            )
+        return datetime.fromisoformat(now) if reclaimed else None
+
+    async def try_reclaim_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> bool:
+        """Preserve the public boolean reclaim API."""
+        token = await self.try_reclaim_idempotent_side_effect_with_token(
+            identity, side_effect_key, expected_status=expected_status,
+            expected_updated_at=expected_updated_at,
+        )
+        return token is not None
 
     async def get_idempotency_record(
         self,
@@ -3942,6 +4232,7 @@ class RuntimeStateStore:
         receipts = await self.list_runtime_receipts(run_id=run_id, limit=200)
         mappings = await self.list_mapping_receipts(run_id=run_id, limit=200)
         children = await self.list_child_runs(run_id)
+        topology_state = await self.get_topology_state(run_id)
         idempotency_records: list[IdempotencyRecord] = []
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
@@ -3964,6 +4255,7 @@ class RuntimeStateStore:
             "receipts": receipts,
             "mappings": mappings,
             "children": children,
+            "topology_state": topology_state,
             "idempotency_records": idempotency_records,
         }
 

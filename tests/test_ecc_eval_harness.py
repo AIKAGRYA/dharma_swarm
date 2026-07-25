@@ -198,6 +198,46 @@ async def test_bus_schema_mock():
         assert result.passed is True
 
 
+@pytest.mark.asyncio
+async def test_round_trip_probes_never_touch_production_state(tmp_path):
+    """Regression: the round-trip smoke probes must write ONLY to a throwaway
+    temp dir, never the production state stores.
+
+    Before the 2026-07-13 fix, ``eval_task_roundtrip`` created an
+    ``eval_probe_task`` in ``~/.dharma/db/tasks.db`` on every run (root cause of
+    the 184 junk pending tasks); the message-bus and stigmergy probes likewise
+    left ``EVAL_PROBE`` artifacts behind. Here we point the production stores at
+    empty temp stand-ins, run all three probes for real, and assert the stand-ins
+    are left completely untouched while the probes still pass. This fails on the
+    pre-fix code (the probes wrote into the patched production paths).
+    """
+    import dharma_swarm.ecc_eval_harness as harness
+    import dharma_swarm.stigmergy as stigmergy
+    from dharma_swarm.ecc_eval_harness import (
+        eval_fitness_signal_flow,
+        eval_stigmergy_roundtrip,
+        eval_task_roundtrip,
+    )
+
+    prod_state = tmp_path / "prod_dharma"           # stands in for ~/.dharma
+    prod_stig = tmp_path / "prod_dharma_stigmergy"  # stands in for the stigmergy default base
+
+    with patch.object(harness, "STATE_DIR", prod_state), \
+            patch.object(stigmergy, "_DEFAULT_BASE", prod_stig):
+        r_task = await eval_task_roundtrip()
+        r_bus = await eval_fitness_signal_flow()
+        r_stig = await eval_stigmergy_roundtrip()
+
+    # The probes still prove the machinery round-trips...
+    assert r_task.passed, r_task.error
+    assert r_bus.passed, r_bus.error
+    assert r_stig.passed, r_stig.error
+
+    # ...but nothing was written under the production stand-ins.
+    assert not prod_state.exists(), "a probe wrote into the production STATE_DIR"
+    assert not prod_stig.exists(), "a probe wrote into the production stigmergy store"
+
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------

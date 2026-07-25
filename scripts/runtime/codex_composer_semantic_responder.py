@@ -25,10 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.holon_canonical_state import (  # noqa: E402
-    project_canonical_holon_state,
-)
-from dharma_swarm.holon_service_liveness import record_service_heartbeat  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
     DEFAULT_OUTBOX_ROOT,
     DEFAULT_RECEIPT_DIR as DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
@@ -44,7 +41,7 @@ from scripts.runtime.codex_composer_semantic_inbox_drain import (  # noqa: E402
 from scripts.runtime.pr_merge_control import _nats_config, stamp, utc_now  # noqa: E402
 
 DEFAULT_AGENT_UID = "codex_composer"
-DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
 DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 DEFAULT_STATE_DIR = (
@@ -65,6 +62,7 @@ CANONICAL_PROJECTION_SCHEMA_VERSION = (
 )
 RESPONDER_SERVICE_ID = "codex-composer-semantic-responder"
 RESPONDER_LAUNCHD_LABEL = "com.dharma.codex-composer-semantic-responder"
+CANONICAL_PROJECTION_AVAILABLE = False
 NO_PENDING_DELIVERIES_STATUS = "NO_PENDING_DELIVERIES"
 DELIVERIES_LEASE_HELD_STATUS = "PENDING_DELIVERIES_LEASE_HELD"
 # A semantic drain succeeded (model-authored artifact exists) but the domain
@@ -75,6 +73,9 @@ DELIVERIES_LEASE_HELD_STATUS = "PENDING_DELIVERIES_LEASE_HELD"
 # work items of A2A_MASTER_SPEC_v1.md.
 PENDING_PUBLISH_STATUS = "SEMANTIC_SUCCESS_PENDING_PUBLISH"
 PENDING_PUBLISH_DIRNAME = "pending_publish"
+PUBLISH_RETRIES_EXHAUSTED_STATUS = "PUBLISH_RETRIES_EXHAUSTED_DLQ"
+DEAD_LETTER_DIRNAME = "dead_letter"
+DEFAULT_MAX_PUBLISH_ATTEMPTS = 5
 A2A_INBOX_BRIDGE_SCHEMA_VERSION = "dharma.a2a.inbox_bridge_heartbeat.v1"
 A2A_BRIDGE_FRESH_AFTER_SECONDS = 3600
 A2A_BRIDGE_REACHABLE_STATUSES = {
@@ -88,6 +89,7 @@ PROCESSED_STATUSES = {
     "DOMAIN_REPLY_PUBLISHED",
     "SEMANTIC_DRAINED_NO_PUBLISH",
     "ARTIFACT_INVALID",
+    PUBLISH_RETRIES_EXHAUSTED_STATUS,
 }
 
 
@@ -251,6 +253,8 @@ def _responder_runtime_status(loop_status: str) -> str:
         return "processed_delivery"
     if loop_status == PENDING_PUBLISH_STATUS:
         return "semantic_success_pending_publish"
+    if loop_status == PUBLISH_RETRIES_EXHAUSTED_STATUS:
+        return "dead_lettered"
     if loop_status == "SEMANTIC_DRAINED_SEND_RECEIPT_MISSING":
         return "degraded"
     return "error"
@@ -268,6 +272,8 @@ def _canonical_status_for_loop(loop_status: str) -> str:
         return "partial_operating_semantic_responder_baselined_existing_backlog"
     if runtime_status == "semantic_success_pending_publish":
         return "partial_operating_semantic_responder_semantic_success_pending_publish"
+    if runtime_status == "dead_lettered":
+        return "partial_operating_semantic_responder_dead_lettered"
     if runtime_status == "degraded":
         return "partial_operating_semantic_responder_degraded"
     return "partial_operating_semantic_responder_error"
@@ -318,59 +324,19 @@ def project_canonical_responder_state(
     state_dir: Path,
     latest_receipt: dict[str, Any] | None = None,
 ) -> Path:
-    """Project responder liveness into canonical fleet truth."""
-    path = canonical_state_path.expanduser().resolve()
-    existing = _read_json_or_empty(path)
-    _assert_safe_canonical_target(path, agent_uid, existing)
-    loop_status = str(heartbeat.get("loop_status") or "unknown")
-    runtime_status = _responder_runtime_status(loop_status)
-    latest_processed = _latest_processed_delivery(state_dir)
-    latest_refs = _latest_receipt_refs(latest_receipt)
-    agents_root = path.parent.parent.parent / "agents"
-    record_service_heartbeat(
+    """Fail honestly until canonical main supplies the projection modules."""
+    del (
+        canonical_state_path,
+        heartbeat,
         agent_uid,
-        agents_root=agents_root,
-        service_id=RESPONDER_SERVICE_ID,
-        status="idle" if runtime_status in {
-            "idle",
-            "processed_delivery",
-            "waiting_on_delivery_lease",
-            "baselined_existing_backlog",
-        } else "error",
-        runtime_ref={
-            "loop_status": loop_status,
-            "runtime_status": runtime_status,
-            "pending_delivery_count": int(heartbeat.get("pending_delivery_count") or 0),
-            "provider": provider,
-            "model": model,
-        },
-        proof_ref={
-            "kind": "codex_composer_semantic_responder_loop",
-            "local_heartbeat_path": str(heartbeat.get("heartbeat_path") or ""),
-            "latest_receipt": latest_refs,
-        },
-        claim_scope={
-            "semantic_responder_fresh": True,
-            "last_processed_delivery_status": str(latest_processed.get("status") or loop_status),
-            "no_pending_deliveries": loop_status == NO_PENDING_DELIVERIES_STATUS,
-            "handler_ack_is_semantic_cognition": False,
-            "live_model_call_claimed": False,
-        },
+        provider,
+        model,
+        state_dir,
+        latest_receipt,
     )
-
-    project_canonical_holon_state(
-        agent_uid,
-        agents_root=agents_root,
-        a2a_bus=path.parent.parent,
-        semantic_responder_state_dir=state_dir,
-        provider=provider,
-        model=model,
-        service_id=RESPONDER_SERVICE_ID,
-        launchd_label=RESPONDER_LAUNCHD_LABEL,
-        pid=int(heartbeat.get("pid") or os.getpid()),
-        live_model_call_claimed=False,
+    raise RuntimeError(
+        "canonical holon projection modules are unavailable on this checkout"
     )
-    return path
 
 
 CanonicalProjector = Callable[..., Path]
@@ -417,7 +383,10 @@ def write_responder_heartbeat(
     heartbeat_path = root / "heartbeat.json"
     heartbeat["heartbeat_path"] = str(heartbeat_path)
     _write_json(heartbeat_path, heartbeat)
-    if project_canonical_state:
+    if project_canonical_state and (
+        CANONICAL_PROJECTION_AVAILABLE
+        or canonical_projector is not project_canonical_responder_state
+    ):
         canonical_path = canonical_state_path or canonical_state_path_for_agent(agent_uid)
         project_path = canonical_projector(
             canonical_state_path=canonical_path,
@@ -429,6 +398,10 @@ def write_responder_heartbeat(
             latest_receipt=latest_receipt,
         )
         heartbeat["canonical_state_path"] = str(project_path)
+        _write_json(heartbeat_path, heartbeat)
+    elif project_canonical_state:
+        heartbeat["canonical_projection_status"] = "UNAVAILABLE_ON_CHECKOUT"
+        heartbeat["canonical_state_path"] = ""
         _write_json(heartbeat_path, heartbeat)
     return heartbeat
 
@@ -563,6 +536,8 @@ def release_lease(path: Path | None) -> None:
 
 
 def mark_processed(state_dir: Path | str, delivery: Delivery, *, status: str, receipt_path: str) -> None:
+    if delivery.delivery_id in processed_delivery_ids(state_dir):
+        return
     _append_jsonl(
         Path(state_dir).expanduser().resolve() / PROCESSED_FILENAME,
         {
@@ -683,6 +658,98 @@ def _pending_publish_path(state_dir: Path | str, delivery_id: str) -> Path:
     return root / f"{_safe_token(delivery_id)}.json"
 
 
+def _dead_letter_path(state_dir: Path | str, delivery_id: str) -> Path:
+    root = Path(state_dir).expanduser().resolve() / DEAD_LETTER_DIRNAME
+    return root / f"{_safe_token(delivery_id)}.json"
+
+
+def _write_json_once(path: Path, payload: dict[str, Any]) -> bool:
+    """Atomically create one immutable JSON object.
+
+    The deterministic target plus an exclusive hard-link promotion makes a
+    terminal delivery effect idempotent across process crashes and restarts.
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.parent / f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp"
+    _write_json(temporary, payload)
+    try:
+        os.link(temporary, path)
+    except FileExistsError:
+        return False
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+    path.chmod(0o600)
+    return True
+
+
+def load_dead_letter(state_dir: Path | str, delivery_id: str) -> dict[str, Any] | None:
+    path = _dead_letter_path(state_dir, delivery_id)
+    try:
+        payload = _read_json(path)
+    except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
+        return None
+    if str(payload.get("delivery_id") or "") != delivery_id:
+        raise ValueError(f"dead letter delivery id mismatch: {path}")
+    return payload
+
+
+def write_dead_letter(
+    state_dir: Path | str,
+    delivery: Delivery,
+    *,
+    pending_job: dict[str, Any],
+    attempt_count: int,
+    reason: str,
+    error: str = "",
+    operator_quarantined: bool = False,
+) -> tuple[Path, dict[str, Any], bool]:
+    """Create the exactly-once terminal record for an unpublishable reply."""
+
+    path = _dead_letter_path(state_dir, delivery.delivery_id)
+    now = utc_now()
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "timestamp": now,
+        "status": PUBLISH_RETRIES_EXHAUSTED_STATUS,
+        "delivery_id": delivery.delivery_id,
+        "packet_id": delivery.packet_id,
+        "reply_subject": delivery.reply_subject,
+        "delivery_record_path": str(delivery.path),
+        "publish_attempt_count": max(0, int(attempt_count)),
+        "first_pending_at": str(
+            pending_job.get("first_pending_at")
+            or pending_job.get("timestamp")
+            or now
+        ),
+        "last_attempt_at": now,
+        "terminal_reason": reason,
+        "last_error": error,
+        "operator_quarantined": operator_quarantined,
+        "semantic_reply_claim": bool(pending_job.get("semantic_reply_claim")),
+        "domain_reply_artifact_path": str(
+            pending_job.get("domain_reply_artifact_path") or ""
+        ),
+        "semantic_receipt_path": str(pending_job.get("semantic_receipt_path") or ""),
+        "semantic_receipt_id": str(pending_job.get("semantic_receipt_id") or ""),
+        "preserved_pending_publish": pending_job,
+        "authority_boundary": (
+            "Terminal delivery state prevents another semantic model run. "
+            "It does not claim domain publication or remote effect."
+        ),
+    }
+    created = _write_json_once(path, payload)
+    if not created:
+        existing = load_dead_letter(state_dir, delivery.delivery_id)
+        if existing is None:
+            raise RuntimeError(f"dead letter exists but is unreadable: {path}")
+        payload = existing
+    return path, payload, created
+
+
 def load_pending_publish(state_dir: Path | str, delivery_id: str) -> dict[str, Any] | None:
     """Return a saved semantic-success job whose publish has not completed.
 
@@ -715,15 +782,19 @@ def save_pending_publish(
     delivery: "Delivery",
     *,
     drain_receipt: dict[str, Any],
+    attempt_count: int,
+    last_error: str = "",
 ) -> Path:
     """Persist a semantic-success drain so a later tick can retry publish only."""
 
     path = _pending_publish_path(state_dir, delivery.delivery_id)
+    previous = _read_json_or_empty(path)
+    now = utc_now()
     _write_json(
         path,
         {
             "schema_version": SCHEMA_VERSION,
-            "timestamp": utc_now(),
+            "timestamp": now,
             "delivery_id": delivery.delivery_id,
             "packet_id": delivery.packet_id,
             "reply_subject": delivery.reply_subject,
@@ -733,6 +804,14 @@ def save_pending_publish(
             "semantic_receipt_id": str(drain_receipt.get("semantic_receipt_id") or ""),
             "semantic_reply_claim": bool(drain_receipt.get("semantic_reply_claim")),
             "drain_receipt": drain_receipt,
+            "publish_attempt_count": max(1, int(attempt_count)),
+            "first_pending_at": str(
+                previous.get("first_pending_at")
+                or previous.get("timestamp")
+                or now
+            ),
+            "last_attempt_at": now,
+            "last_error": last_error,
         },
     )
     return path
@@ -763,9 +842,54 @@ def process_delivery(
     stream: str,
     timeout_s: float,
     flush_timeout_s: float,
+    max_publish_attempts: int = DEFAULT_MAX_PUBLISH_ATTEMPTS,
     drain_func: DrainFunc = drain_semantic_inbox,
     publish_func: PublishFunc = publish_domain_reply_sync,
 ) -> dict[str, Any]:
+    max_publish_attempts = max(1, int(max_publish_attempts))
+    existing_dead_letter = load_dead_letter(state_dir, delivery.delivery_id)
+    if existing_dead_letter is not None:
+        receipt = {
+            "schema_version": SCHEMA_VERSION,
+            "timestamp": utc_now(),
+            "status": PUBLISH_RETRIES_EXHAUSTED_STATUS,
+            "agent_uid": agent_uid,
+            "delivery_id": delivery.delivery_id,
+            "packet_id": delivery.packet_id,
+            "reply_subject": delivery.reply_subject,
+            "delivery_record_path": str(delivery.path),
+            "send_receipt_path": "",
+            "semantic_drain_receipt": dict(
+                existing_dead_letter.get("preserved_pending_publish", {}).get(
+                    "drain_receipt", {}
+                )
+            ),
+            "domain_reply_publish_receipt": {},
+            "semantic_reply_claim": bool(
+                existing_dead_letter.get("semantic_reply_claim")
+            ),
+            "domain_receipt_claim": False,
+            "reused_pending_publish": True,
+            "semantic_success_pinned": True,
+            "publish_attempt_count": int(
+                existing_dead_letter.get("publish_attempt_count") or 0
+            ),
+            "max_publish_attempts": max_publish_attempts,
+            "dead_letter_path": str(
+                _dead_letter_path(state_dir, delivery.delivery_id)
+            ),
+            "terminal_effect_reused": True,
+            "handler_ack_is_semantic_cognition": False,
+            "authenticated_target_runtime_claim": False,
+            "no_publish": no_publish,
+            "operator_contact_note": (
+                "Reused the immutable terminal delivery record. No semantic "
+                "model or domain publisher was invoked."
+            ),
+        }
+        write_responder_receipt(state_dir, receipt)
+        return receipt
+
     send_receipt_path = find_send_receipt(
         send_receipt_root,
         agent_uid=agent_uid,
@@ -783,6 +907,9 @@ def process_delivery(
     status = "FAILED"
     error = ""
     reused_pending_publish = False
+    prior_publish_attempts = int(
+        (pending_job or {}).get("publish_attempt_count") or 0
+    )
     try:
         if pending_job is not None:
             drain_receipt = dict(pending_job.get("drain_receipt") or {})
@@ -823,17 +950,75 @@ def process_delivery(
     semantic_success = bool((drain_receipt or {}).get("semantic_reply_claim"))
     publish_completed = status == "DOMAIN_REPLY_PUBLISHED"
     semantic_success_pinned = False
+    dead_letter_path = ""
+    terminal_effect_created = False
+    publish_attempt_count = prior_publish_attempts
     if not no_publish and semantic_success and not publish_completed:
-        try:
-            save_pending_publish(state_dir, delivery, drain_receipt=drain_receipt or {})
+        publish_attempt_count = prior_publish_attempts + 1
+        pending_snapshot = {
+            **dict(pending_job or {}),
+            "delivery_id": delivery.delivery_id,
+            "packet_id": delivery.packet_id,
+            "reply_subject": delivery.reply_subject,
+            "delivery_record_path": str(delivery.path),
+            "domain_reply_artifact_path": str(
+                (drain_receipt or {}).get("domain_reply_artifact_path") or ""
+            ),
+            "semantic_receipt_path": str(
+                (drain_receipt or {}).get("semantic_receipt_path") or ""
+            ),
+            "semantic_receipt_id": str(
+                (drain_receipt or {}).get("semantic_receipt_id") or ""
+            ),
+            "semantic_reply_claim": True,
+            "drain_receipt": drain_receipt or {},
+            "publish_attempt_count": publish_attempt_count,
+        }
+        if publish_attempt_count >= max_publish_attempts:
+            dead_letter, _, terminal_effect_created = write_dead_letter(
+                state_dir,
+                delivery,
+                pending_job=pending_snapshot,
+                attempt_count=publish_attempt_count,
+                reason=(
+                    "matching causal send receipt did not arrive"
+                    if send_receipt_path is None
+                    else "domain reply publication did not complete"
+                ),
+                error=error or status,
+            )
+            dead_letter_path = str(dead_letter)
+            clear_pending_publish(state_dir, delivery.delivery_id)
+            status = PUBLISH_RETRIES_EXHAUSTED_STATUS
             semantic_success_pinned = True
-        except OSError:
-            semantic_success_pinned = False
-        # Only relabel when no publish was even attempted (send receipt or
-        # artifact missing); a real publish failure keeps its own status so it
-        # remains visible, while still not being marked processed (so it retries).
-        if publish_receipt is None:
-            status = PENDING_PUBLISH_STATUS
+        else:
+            try:
+                save_pending_publish(
+                    state_dir,
+                    delivery,
+                    drain_receipt=drain_receipt or {},
+                    attempt_count=publish_attempt_count,
+                    last_error=error or status,
+                )
+                semantic_success_pinned = True
+            except OSError as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                dead_letter, _, terminal_effect_created = write_dead_letter(
+                    state_dir,
+                    delivery,
+                    pending_job=pending_snapshot,
+                    attempt_count=publish_attempt_count,
+                    reason="pending publish state could not be persisted safely",
+                    error=error,
+                )
+                dead_letter_path = str(dead_letter)
+                status = PUBLISH_RETRIES_EXHAUSTED_STATUS
+                semantic_success_pinned = True
+            # Only relabel when no publish was even attempted (send receipt or
+            # artifact missing); a real publish failure keeps its own status so
+            # it remains visible until the bounded terminal attempt.
+            if publish_receipt is None and status != PUBLISH_RETRIES_EXHAUSTED_STATUS:
+                status = PENDING_PUBLISH_STATUS
     elif publish_completed:
         clear_pending_publish(state_dir, delivery.delivery_id)
 
@@ -853,6 +1038,10 @@ def process_delivery(
         "domain_receipt_claim": bool((publish_receipt or {}).get("domain_receipt_claim")),
         "reused_pending_publish": reused_pending_publish,
         "semantic_success_pinned": semantic_success_pinned,
+        "publish_attempt_count": publish_attempt_count,
+        "max_publish_attempts": max_publish_attempts,
+        "dead_letter_path": dead_letter_path,
+        "terminal_effect_created": terminal_effect_created,
         "handler_ack_is_semantic_cognition": False,
         "authenticated_target_runtime_claim": False,
         "no_publish": no_publish,
@@ -874,8 +1063,111 @@ def process_delivery(
             "the model critic was not re-run, so a prior semantic reply cannot be "
             "overwritten by a later provider failure."
         )
+    if status == PUBLISH_RETRIES_EXHAUSTED_STATUS:
+        receipt["operator_contact_note"] = (
+            "The pinned semantic success reached its bounded publication limit "
+            "and was preserved in one immutable dead-letter record. No domain "
+            "publication or remote effect is claimed."
+        )
     write_responder_receipt(state_dir, receipt)
     return receipt
+
+
+def quarantine_packet(
+    *,
+    inbox_dir: Path,
+    state_dir: Path,
+    agent_uid: str,
+    packet_id: str,
+    reason: str,
+    lease_ttl_s: float,
+) -> dict[str, Any]:
+    """Terminalize one known pending semantic success without invoking a model."""
+
+    matches = pending_deliveries(
+        inbox_dir,
+        agent_uid=agent_uid,
+        processed_ids=set(),
+        limit=0,
+        packet_id=packet_id,
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            f"quarantine requires exactly one delivery for packet {packet_id!r}; "
+            f"found {len(matches)}"
+        )
+    delivery = matches[0]
+    lease = acquire_lease(state_dir, delivery.delivery_id, ttl_s=lease_ttl_s)
+    if lease is None:
+        raise RuntimeError(f"delivery lease is held: {delivery.delivery_id}")
+    try:
+        existing = load_dead_letter(state_dir, delivery.delivery_id)
+        pending_job = load_pending_publish(state_dir, delivery.delivery_id)
+        if existing is None and pending_job is None:
+            raise ValueError(
+                "quarantine requires a pinned semantic success or an existing dead letter"
+            )
+        attempt_count = int(
+            (existing or pending_job or {}).get("publish_attempt_count") or 1
+        )
+        if existing is None:
+            dead_letter_path, dead_letter, created = write_dead_letter(
+                state_dir,
+                delivery,
+                pending_job=dict(pending_job or {}),
+                attempt_count=attempt_count,
+                reason=reason,
+                error=str((pending_job or {}).get("last_error") or ""),
+                operator_quarantined=True,
+            )
+        else:
+            dead_letter_path = _dead_letter_path(state_dir, delivery.delivery_id)
+            dead_letter = existing
+            created = False
+        receipt = {
+            "schema_version": SCHEMA_VERSION,
+            "timestamp": utc_now(),
+            "status": PUBLISH_RETRIES_EXHAUSTED_STATUS,
+            "agent_uid": agent_uid,
+            "delivery_id": delivery.delivery_id,
+            "packet_id": delivery.packet_id,
+            "reply_subject": delivery.reply_subject,
+            "delivery_record_path": str(delivery.path),
+            "send_receipt_path": "",
+            "semantic_drain_receipt": dict(
+                (pending_job or {}).get("drain_receipt") or {}
+            ),
+            "domain_reply_publish_receipt": {},
+            "semantic_reply_claim": bool(
+                (pending_job or dead_letter).get("semantic_reply_claim")
+            ),
+            "domain_receipt_claim": False,
+            "reused_pending_publish": True,
+            "semantic_success_pinned": True,
+            "publish_attempt_count": attempt_count,
+            "dead_letter_path": str(dead_letter_path),
+            "terminal_effect_created": created,
+            "operator_quarantined": True,
+            "handler_ack_is_semantic_cognition": False,
+            "authenticated_target_runtime_claim": False,
+            "no_publish": False,
+            "operator_contact_note": (
+                "Operator-authorized quarantine preserved the pinned semantic "
+                "artifact and terminalized the delivery without invoking a "
+                "model or publisher."
+            ),
+        }
+        receipt_path = write_responder_receipt(state_dir, receipt)
+        mark_processed(
+            state_dir,
+            delivery,
+            status=PUBLISH_RETRIES_EXHAUSTED_STATUS,
+            receipt_path=str(receipt_path),
+        )
+        clear_pending_publish(state_dir, delivery.delivery_id)
+        return receipt
+    finally:
+        release_lease(lease)
 
 
 def run_once(
@@ -897,6 +1189,7 @@ def run_once(
     flush_timeout_s: float,
     limit: int,
     lease_ttl_s: float,
+    max_publish_attempts: int = DEFAULT_MAX_PUBLISH_ATTEMPTS,
     packet_id: str = "",
     canonical_state_path: Path | None = None,
     project_canonical_state: bool = True,
@@ -936,6 +1229,7 @@ def run_once(
                 stream=stream,
                 timeout_s=timeout_s,
                 flush_timeout_s=flush_timeout_s,
+                max_publish_attempts=max_publish_attempts,
                 drain_func=drain_func,
                 publish_func=publish_func,
             )
@@ -980,7 +1274,12 @@ def _path(value: str) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("mode", choices=["once", "loop", "baseline"], nargs="?", default="once")
+    parser.add_argument(
+        "mode",
+        choices=["once", "loop", "baseline", "quarantine"],
+        nargs="?",
+        default="once",
+    )
     parser.add_argument("--agent-uid", default=DEFAULT_AGENT_UID)
     parser.add_argument("--inbox-dir", default=str(DEFAULT_INBOX_DIR))
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
@@ -997,6 +1296,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--interval-s", type=float, default=30.0)
     parser.add_argument("--lease-ttl-s", type=float, default=1800.0)
     parser.add_argument("--packet-id", default="", help="only process this packet id")
+    parser.add_argument(
+        "--max-publish-attempts",
+        type=int,
+        default=DEFAULT_MAX_PUBLISH_ATTEMPTS,
+        help="terminalize a pinned semantic success after this many publish cycles",
+    )
+    parser.add_argument(
+        "--quarantine-reason",
+        default="operator-authorized poison-packet containment",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--flush-timeout", type=float, default=2.0)
     parser.add_argument(
@@ -1036,10 +1345,31 @@ def main(argv: list[str] | None = None) -> int:
         "flush_timeout_s": args.flush_timeout,
         "limit": args.limit,
         "lease_ttl_s": args.lease_ttl_s,
+        "max_publish_attempts": args.max_publish_attempts,
         "packet_id": args.packet_id,
         "canonical_state_path": canonical_state_path,
         "project_canonical_state": not args.no_canonical_state,
     }
+
+    if args.mode == "quarantine":
+        if not args.packet_id:
+            parser.error("quarantine mode requires --packet-id")
+        receipt = quarantine_packet(
+            inbox_dir=common["inbox_dir"],
+            state_dir=common["state_dir"],
+            agent_uid=args.agent_uid,
+            packet_id=args.packet_id,
+            reason=args.quarantine_reason,
+            lease_ttl_s=args.lease_ttl_s,
+        )
+        if args.json:
+            print(json.dumps(receipt, indent=2, sort_keys=True))
+        else:
+            print(
+                f"{receipt['status']} packet_id={receipt['packet_id']} "
+                f"dead_letter={receipt['dead_letter_path']}"
+            )
+        return 0
 
     if args.mode == "baseline":
         receipt = baseline_existing_deliveries(

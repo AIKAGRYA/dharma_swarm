@@ -16,10 +16,21 @@ import math
 import re
 from collections import Counter
 from enum import Enum
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+def mint_intent_idempotency_key() -> str:
+    """Origin mint for a consequential intent's idempotency key (ADR-009).
+
+    Each intent instance mints exactly one key at creation; downstream
+    layers (dispatch identity, board rows, A2A envelopes) PROPAGATE it,
+    never re-mint. Two submissions of the same text are two intents.
+    """
+    return f"intent_{uuid4().hex[:16]}"
 
 
 # ── Stopwords for TF-IDF ────────────────────────────────────────────
@@ -171,6 +182,9 @@ class TaskIntent(BaseModel):
     parallel: bool = False
     risk_level: str = "low"  # low/medium/high/critical
     tags: list[str] = Field(default_factory=list)
+    # ADR-009: minted at origin (one per intent instance), propagated —
+    # never re-minted — by downstream layers.
+    idempotency_key: str = Field(default_factory=mint_intent_idempotency_key)
 
 
 class DecomposedTask(BaseModel):

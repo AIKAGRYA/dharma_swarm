@@ -76,7 +76,7 @@ All in `dharma_swarm/`, all currently flat (not in a sub-package):
 Plus:
 - `requirements-ginko.txt` — domain-specific dependency pin
 - `scripts/ginko_run_signals.py` — CLI entry for signal generation
-- `docs/GINKO_ENHANCEMENT_WAVE.md` + `docs/plans/GINKO_ENHANCEMENT_WAVE.md` — earlier planning docs
+- `docs/plans/GINKO_ENHANCEMENT_WAVE.md` — earlier planning doc (the identical `docs/` copy was removed 2026-07-03)
 
 Total mentions of `ginko` (case-insensitive) across `.py`/`.md`/`.yaml`/`.json`/`.toml`/`.sh`: **1201** as of 2026-05-20.
 

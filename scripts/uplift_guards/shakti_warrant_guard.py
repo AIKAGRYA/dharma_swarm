@@ -11,6 +11,22 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 ACK_TAG = "[impact-checked]"
 ACK_ENV = "DHARMA_UPLIFT_ACK"
 ACK_ENV_VALUE = "impact-checked"
+# WP-0C1 (TIT-005): the warrant subprocess must never inherit an open stdin
+# (a non-TTY pipe blocks it forever) and must carry a finite wall clock.
+TIMEOUT_ENV = "DHARMA_UPLIFT_GUARD_TIMEOUT"
+DEFAULT_TIMEOUT_SECONDS = 300.0
+
+
+def _guard_timeout() -> float:
+    raw = os.environ.get(TIMEOUT_ENV, "").strip()
+    if raw:
+        try:
+            value = float(raw)
+            if value > 0:
+                return value
+        except ValueError:
+            pass
+    return DEFAULT_TIMEOUT_SECONDS
 
 
 def _python_executable() -> str:
@@ -89,16 +105,26 @@ def check_fourfold_shakti_warrant(
     if os.environ.get("DHARMA_SKIP_SHAKTI_WARRANT_GUARD", "").strip() == "1":
         return True, "shakti warrant guard skipped by DHARMA_SKIP_SHAKTI_WARRANT_GUARD=1"
 
-    proc = subprocess.run(
-        _command(
-            repo_root,
-            impact_checked=_impact_acknowledged(repo_root, commit_msg_file),
-        ),
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    timeout_seconds = _guard_timeout()
+    try:
+        proc = subprocess.run(
+            _command(
+                repo_root,
+                impact_checked=_impact_acknowledged(repo_root, commit_msg_file),
+            ),
+            cwd=str(repo_root),
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return False, (
+            f"UPLIFT_GUARD_TIMEOUT: fourfold shakti warrant exceeded "
+            f"{timeout_seconds:g}s wall clock (named nonzero failure; raise "
+            f"{TIMEOUT_ENV} only with cause)"
+        )
     output = "\n".join(part.strip() for part in [proc.stdout, proc.stderr] if part.strip())
     if proc.returncode == 0:
         return True, _summarize_warrant_output(output)

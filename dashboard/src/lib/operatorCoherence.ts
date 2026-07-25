@@ -66,24 +66,28 @@ export interface CoherenceAction {
   evidence: CoherenceEvidence[];
 }
 
-export interface OperatingLoopStatus {
-  id: string;
-  title: string;
-  status: string;
-  cadence: string;
-  owner: string;
-  receipt_path: string;
-  last_age_hours?: number | null;
-  metrics?: Record<string, unknown>;
-  next_action: string;
-  evidence: CoherenceEvidence[];
-  raw?: Record<string, unknown>;
+export interface CoherenceTrack {
+  id?: string;
+  name?: string;
+  lifecycle?: string;
+  status?: string;
+  owner?: string;
+  branch?: string;
+  pr?: string;
+  stale?: boolean;
+  readiness?: number;
+  criteria_pass_rate?: number;
+  has_rigorous_evidence?: boolean;
+  readiness_basis?: string;
+  readiness_capped?: boolean;
+  shippable?: boolean;
+  evidence_present?: boolean;
+  next_items?: unknown[];
+  [key: string]: unknown;
 }
 
 export interface OperatorCoherenceReport {
   schema_version: string;
-  /** Wrapper/backend status when present. Missing status is treated as snapshot/ok. */
-  status?: string;
   generated_at: string;
   repo_root: string;
   source_errors: { source: string; error: string; timestamp?: string }[];
@@ -99,7 +103,11 @@ export interface OperatorCoherenceReport {
   track_portfolio: {
     active_count: number;
     closed_count: number;
-    tracks: Record<string, unknown>[];
+    policy?: {
+      max_active?: number;
+      [key: string]: unknown;
+    };
+    tracks: CoherenceTrack[];
     proposed_tracks: Record<string, unknown>[];
     broken_register: Record<string, unknown>;
   };
@@ -131,8 +139,12 @@ export interface OperatorCoherenceReport {
     main?: {
       branch?: string;
       branch_line?: string;
+      head?: string;
       ahead?: number;
       behind?: number;
+      dirty_count?: number;
+      tracked_dirty_count?: number;
+      untracked_count?: number;
       dirty?: boolean;
     };
     worktrees?: Record<string, unknown>[];
@@ -160,87 +172,7 @@ export interface OperatorCoherenceReport {
   };
   preservation_ledger: Record<string, unknown>;
   pr_ci_triage: Record<string, unknown>;
-  operating_loops?: {
-    schema_version?: string;
-    summary?: { total?: number; healthy?: number; needs_attention?: number; stub?: number };
-    loops?: OperatingLoopStatus[];
-  };
   definition_answers: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function asArray<T = unknown>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function normalizeOperatorCoherenceReport(raw: unknown, wrapperStatus?: string): OperatorCoherenceReport {
-  const source = isRecord(raw) ? raw : {};
-  const readiness = isRecord(source.readiness) ? source.readiness : {};
-  const executive = isRecord(source.executive) ? source.executive : {};
-  const trackPortfolio = isRecord(source.track_portfolio) ? source.track_portfolio : {};
-  const rogueWorkRadar = isRecord(source.rogue_work_radar) ? source.rogue_work_radar : {};
-  const operatorSurfaces = isRecord(source.operator_surfaces) ? source.operator_surfaces : {};
-
-  const normalized: OperatorCoherenceReport = {
-    ...(source as Partial<OperatorCoherenceReport>),
-    schema_version: typeof source.schema_version === "string" ? source.schema_version : "operator_coherence_cockpit.unknown",
-    status: typeof source.status === "string" ? source.status : wrapperStatus,
-    generated_at: typeof source.generated_at === "string" ? source.generated_at : new Date().toISOString(),
-    repo_root: typeof source.repo_root === "string" ? source.repo_root : "unknown",
-    source_errors: asArray<{ source: string; error: string; timestamp?: string }>(source.source_errors),
-    executive: {
-      health: typeof executive.health === "string" ? executive.health : "unknown",
-      prod_readiness_estimate:
-        typeof executive.prod_readiness_estimate === "number"
-          ? executive.prod_readiness_estimate
-          : typeof readiness.score === "number"
-            ? readiness.score
-            : 0,
-      top_blockers: asArray<CoherenceAction>(executive.top_blockers),
-      next_3_actions: asArray<CoherenceAction>(executive.next_3_actions),
-    },
-    readiness: {
-      score: typeof readiness.score === "number" ? readiness.score : 0,
-      interpretation: typeof readiness.interpretation === "string" ? readiness.interpretation : "readiness evidence missing",
-      weights: isRecord(readiness.weights) ? (readiness.weights as Record<string, number>) : {},
-      categories: isRecord(readiness.categories) ? (readiness.categories as Record<string, ReadinessCategory>) : {},
-    },
-    kanban: asArray<KanbanLane>(source.kanban),
-    cards: asArray<CoherenceCard>(source.cards),
-    track_portfolio: {
-      ...(trackPortfolio as Partial<OperatorCoherenceReport["track_portfolio"]>),
-      active_count: typeof trackPortfolio.active_count === "number" ? trackPortfolio.active_count : 0,
-      closed_count: typeof trackPortfolio.closed_count === "number" ? trackPortfolio.closed_count : 0,
-      tracks: asArray<Record<string, unknown>>(trackPortfolio.tracks),
-      proposed_tracks: asArray<Record<string, unknown>>(trackPortfolio.proposed_tracks),
-      broken_register: isRecord(trackPortfolio.broken_register) ? trackPortfolio.broken_register : {},
-    },
-    rogue_work_radar: {
-      ...(rogueWorkRadar as Partial<OperatorCoherenceReport["rogue_work_radar"]>),
-      cards: asArray<CoherenceCard>(rogueWorkRadar.cards),
-      dirty_worktree_count: typeof rogueWorkRadar.dirty_worktree_count === "number" ? rogueWorkRadar.dirty_worktree_count : 0,
-      local_only_count: typeof rogueWorkRadar.local_only_count === "number" ? rogueWorkRadar.local_only_count : 0,
-      stash_count: typeof rogueWorkRadar.stash_count === "number" ? rogueWorkRadar.stash_count : 0,
-    },
-    agent_terminal_census: isRecord(source.agent_terminal_census) ? source.agent_terminal_census : {},
-    operator_surfaces: {
-      surfaces: asArray<Record<string, unknown>>(operatorSurfaces.surfaces),
-      abandoned_dashboard_candidates: asArray<Record<string, unknown>>(operatorSurfaces.abandoned_dashboard_candidates),
-    },
-    preservation_ledger: isRecord(source.preservation_ledger) ? source.preservation_ledger : {},
-    pr_ci_triage: isRecord(source.pr_ci_triage) ? source.pr_ci_triage : {},
-    definition_answers: isRecord(source.definition_answers) ? source.definition_answers : {},
-    metadata: isRecord(source.metadata) ? source.metadata : {},
-  };
-
-  if (!Array.isArray(normalized.live_ops?.surfaces) && normalized.live_ops) normalized.live_ops.surfaces = [];
-  if (!Array.isArray(normalized.runtime_receipts?.recent_receipts) && normalized.runtime_receipts) normalized.runtime_receipts.recent_receipts = [];
-  if (!Array.isArray(normalized.runtime_receipts?.runtime_dbs) && normalized.runtime_receipts) normalized.runtime_receipts.runtime_dbs = [];
-  return normalized;
 }
 
 export async function fetchOperatorCoherenceReport(options?: {
@@ -265,21 +197,17 @@ export async function fetchOperatorCoherenceReport(options?: {
   }
   const json = await res.json();
   if (json && typeof json === "object" && "data" in json) {
-    const wrapper = json as Record<string, unknown>;
-    const report = normalizeOperatorCoherenceReport(wrapper.data, String(wrapper.status ?? "ok"));
-    const sourceErrors = report.source_errors;
     return {
-      status: String(wrapper.status ?? "ok"),
-      data: report,
-      error: sourceErrors.length > 0 ? "source_errors_present" : "",
-      timestamp: report.generated_at,
+      status: String(json.status ?? "ok"),
+      data: json.data as OperatorCoherenceReport,
+      error: Array.isArray(json.source_errors) && json.source_errors.length > 0 ? "source_errors_present" : "",
+      timestamp: typeof json.generated_at === "string" ? json.generated_at : new Date().toISOString(),
     };
   }
-  const report = normalizeOperatorCoherenceReport(json, "ok");
   return {
-    status: report.status ?? "ok",
-    data: report,
-    error: report.source_errors.length > 0 ? "source_errors_present" : "",
-    timestamp: report.generated_at,
+    status: "ok",
+    data: json as OperatorCoherenceReport,
+    error: "",
+    timestamp: new Date().toISOString(),
   };
 }

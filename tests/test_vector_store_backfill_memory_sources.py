@@ -172,6 +172,66 @@ def test_load_text_file_and_backfill_source_file(tmp_path):
     assert any("communication transports" in row["content"] for row in results)
 
 
+def test_backfill_memory_sources_invalidates_replaced_source_file_rows(tmp_path):
+    doc = tmp_path / "concept.md"
+    doc.write_text("Obsolete amber concept text for source uid replacement.", encoding="utf-8")
+
+    first = backfill_memory_sources(
+        state_dir=tmp_path,
+        memory_jsonl_paths=(),
+        agents_context_paths=(),
+        text_file_paths=(doc,),
+        dim=32,
+    )
+
+    assert first.inserted_rows == 1
+    assert first.invalidated_rows == 0
+
+    doc.write_text("Fresh cyan concept text for source uid replacement.", encoding="utf-8")
+    second = backfill_memory_sources(
+        state_dir=tmp_path,
+        memory_jsonl_paths=(),
+        agents_context_paths=(),
+        text_file_paths=(doc,),
+        dim=32,
+    )
+
+    assert second.inserted_rows == 1
+    assert second.invalidated_rows == 1
+
+    source_uid = load_text_file(doc)[0].uid
+    store = VectorStore(state_dir=tmp_path, dim=32)
+    conn = store._connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT content, valid_until, metadata_json
+            FROM vec_documents
+            WHERE layer = 'source_file'
+            ORDER BY id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    source_rows = [
+        row
+        for row in rows
+        if json.loads(row["metadata_json"]).get("source_uid") == source_uid
+    ]
+    active_rows = [row for row in source_rows if row["valid_until"] is None]
+    invalid_rows = [row for row in source_rows if row["valid_until"] is not None]
+
+    assert len(source_rows) == 2
+    assert len(active_rows) == 1
+    assert len(invalid_rows) == 1
+    assert "Fresh cyan concept" in active_rows[0]["content"]
+    assert "Obsolete amber concept" in invalid_rows[0]["content"]
+
+    stale_results = store.search_fts("Obsolete amber concept", top_k=5)
+    assert all("Obsolete amber concept" not in row["content"] for row in stale_results)
+
+
 def test_discover_text_files_prioritizes_docs_and_skips_noisy_dirs(tmp_path):
     docs = tmp_path / "docs"
     docs.mkdir()

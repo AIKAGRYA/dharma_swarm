@@ -25,6 +25,7 @@ from dharma_swarm.model_hierarchy import (
     TIER_FREE,
     TIER_PAID,
     heuristic_score,
+    intelligence_order,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.smart_router import SmartRouter, SmartRouterConfig
@@ -48,36 +49,21 @@ def _dedupe_keep_order(items: Iterable[ProviderType]) -> list[ProviderType]:
     return out
 
 
-def _provider_values(items: Iterable[ProviderType]) -> list[str]:
-    return [item.value for item in items]
+def _coerce_provider(value: Any) -> ProviderType | None:
+    """Best-effort coerce a context value (str or ProviderType) to a member.
 
-
-def _route_trace_stage(
-    stage: str,
-    *,
-    input_providers: Iterable[ProviderType] | None = None,
-    output_providers: Iterable[ProviderType] | None = None,
-    applied: bool | None = None,
-    reasons: Iterable[str] | None = None,
-    metadata: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Build a bounded, secret-free route trace entry."""
-    entry: dict[str, Any] = {"stage": stage}
-    if input_providers is not None:
-        entry["input_providers"] = _provider_values(input_providers)
-    if output_providers is not None:
-        entry["output_providers"] = _provider_values(output_providers)
-    if applied is not None:
-        entry["applied"] = bool(applied)
-    if reasons is not None:
-        entry["reasons"] = [str(reason)[:160] for reason in list(reasons)[:12]]
-    if metadata:
-        entry["metadata"] = {
-            str(key)[:64]: value
-            for key, value in metadata.items()
-            if isinstance(value, (str, int, float, bool)) or value is None
-        }
-    return entry
+    The route context carries ``preferred_provider`` as a ProviderType.value
+    string (set by agent_runner). Returns None on anything unrecognized so an
+    explicit pin degrades to the ranked chain (pin + safe fallback).
+    """
+    if isinstance(value, ProviderType):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return ProviderType(value.strip())
+        except ValueError:
+            return None
+    return None
 
 
 @dataclass(frozen=True)
@@ -90,7 +76,9 @@ class ProviderRouteRequest:
     expected_impact: float
     estimated_latency_ms: int = 800
     estimated_tokens: int = 1200
-    preferred_low_cost: bool = True
+    # Power-first default (operator decision 2026-06-21): cost is an OPT-IN
+    # nudge, so this defaults False. Set True to prefer cheaper providers.
+    preferred_low_cost: bool = False
     requires_frontier_precision: bool = False
     privileged_action: bool = False
     requires_human_consent: bool = False
@@ -111,6 +99,7 @@ class ProviderRoutingConfig:
     )
     japanese_quality_priority: tuple[ProviderType, ...] = (
         ProviderType.OPENROUTER,
+        ProviderType.MOONSHOT,
         ProviderType.OLLAMA,
         ProviderType.NVIDIA_NIM,
         ProviderType.SILICONFLOW,
@@ -129,6 +118,15 @@ class ProviderRoutingConfig:
         ProviderType.SAMBANOVA,
     )
     reasoning_priority: tuple[ProviderType, ...] = DELIBERATIVE_REASONING_PRIORITY
+    # Power-first default (operator decision 2026-06-21): with no explicit cost
+    # request, rank by raw model intelligence (most capable first), NOT the
+    # free-tier-first seed order. Cost is an opt-in nudge via preferred_low_cost.
+    power_first: bool = True
+    power_first_priority: tuple[ProviderType, ...] = field(
+        default_factory=lambda: tuple(
+            intelligence_order(CANONICAL_SEED_ORDER, respect_cost_tiers=False)
+        )
+    )
     default_model_hints: dict[ProviderType, str] = field(
         default_factory=lambda: dict(DEFAULT_MODELS)
     )
@@ -150,7 +148,6 @@ class ProviderRouteDecision:
     confidence: float
     requires_human: bool
     reasons: list[str]
-    route_trace: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ProviderPolicyRouter:
@@ -192,6 +189,22 @@ class ProviderPolicyRouter:
         *,
         available_providers: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
+        """Select a provider + fallback chain under the single routing precedence.
+
+        Order (see docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md):
+            explicit > capability/power > malleable overlays > availability
+
+        1. EXPLICIT: a named provider/model short-circuits here and is pinned at
+           position 0 (it can never be demoted by an overlay).
+        2. CAPABILITY/POWER: with no cost request, candidates are ranked
+           most-capable-first (power_first base ordering in _candidate_providers).
+        3. OVERLAYS: cost (SmartRouter), language, reasoning, tooling, then the
+           telemetry overlay refine the ranking when their signals apply.
+        The post-decision learned overlays (session affinity, routing-memory
+        EWMA, reward, canary) and availability pruning run in ModelRouter, never
+        overriding an explicit pin. Each pass appends to ``reasons`` (the audit
+        trail).
+        """
         decision = self.decision_router.route(
             DecisionInput(
                 action_name=request.action_name,
@@ -210,89 +223,50 @@ class ProviderPolicyRouter:
 
         path = decision.path
         reasons = list(decision.reasons)
-        route_trace: list[dict[str, Any]] = [
-            _route_trace_stage(
-                "decision_path",
-                applied=True,
-                reasons=reasons,
-                metadata={
-                    "path": path.value,
-                    "confidence": round(float(decision.confidence), 4),
-                    "requires_human": bool(decision.requires_human),
-                },
-            )
-        ]
         if (
             request.requires_frontier_precision
             and self.config.force_escalate_when_frontier_required
             and path != RoutePath.ESCALATE
         ):
-            previous_path = path
             path = RoutePath.ESCALATE
             reasons.append("frontier_precision_requested")
-            route_trace.append(
-                _route_trace_stage(
-                    "frontier_precision",
-                    applied=True,
-                    metadata={
-                        "from_path": previous_path.value,
-                        "to_path": path.value,
-                        "reason": "frontier_precision_requested",
-                    },
-                )
-            )
 
         candidates = self._candidate_providers(
             path=path,
             prefer_low_cost=request.preferred_low_cost,
             context=request.context,
         )
-        route_trace.append(
-            _route_trace_stage(
-                "candidate_seed",
-                output_providers=candidates,
-                metadata={
-                    "path": path.value,
-                    "preferred_low_cost": bool(request.preferred_low_cost),
-                    "requires_tooling": bool(request.context.get("requires_tooling")),
-                    "prefer_japanese_quality": bool(
-                        request.context.get("prefer_japanese_quality")
-                    ),
-                    "complexity_tier": str(
-                        request.context.get("complexity_tier", "")
-                    )[:32],
-                },
-            )
-        )
         available = _dedupe_keep_order(available_providers or [])
         if available:
             filtered = [item for item in candidates if item in available]
-            fell_back_to_available = False
             if not filtered:
                 filtered = available
-                fell_back_to_available = True
         else:
             filtered = candidates
-            fell_back_to_available = False
-        route_trace.append(
-            _route_trace_stage(
-                "availability_filter",
-                input_providers=candidates,
-                output_providers=filtered,
-                applied=bool(available),
-                metadata={
-                    "available_count": len(available),
-                    "fallback_to_available": fell_back_to_available,
-                },
-            )
-        )
+
+        # Explicit-wins (pin + safe fallback): if the caller named a provider,
+        # it becomes the selection and short-circuits the cost/telemetry
+        # re-ranking so it can never be demoted out of position 0. An
+        # unavailable pin (named provider not registered) degrades to the
+        # ranked chain below — that is the "safe fallback" half.
+        explicit = _coerce_provider(request.context.get("preferred_provider"))
+        if explicit is not None:
+            honorable = (not available) or (explicit in available) or (explicit in filtered)
+            if honorable:
+                pinned = _dedupe_keep_order([explicit, *filtered])
+                reasons.append(f"explicit_provider_pinned={explicit.value}")
+                raw_hint = request.context.get("preferred_model")
+                return self._finalize_decision(
+                    path=path,
+                    chain=pinned,
+                    decision=decision,
+                    reasons=reasons,
+                    model_hint_override=raw_hint if isinstance(raw_hint, str) and raw_hint else None,
+                )
 
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
         requires_tooling = bool(request.context.get("requires_tooling"))
-        smart_input = list(filtered)
-        smart_metadata: dict[str, Any] = {}
-        smart_applied = False
         if (
             self._smart_router is not None
             and path != RoutePath.ESCALATE
@@ -307,64 +281,45 @@ class ProviderPolicyRouter:
                     filtered, smart_decision.cost_tier,
                 )
                 reasons.append(f"smart_router_tier={smart_decision.cost_tier.value}")
-                smart_applied = filtered != smart_input
-                smart_metadata = {
-                    "cost_tier": smart_decision.cost_tier.value,
-                    "selected_count": len(smart_decision.selected_providers),
-                }
-        else:
-            smart_metadata = {
-                "skipped": True,
-                "path": path.value,
-                "requires_frontier_precision": bool(request.requires_frontier_precision),
-                "requires_tooling": requires_tooling,
-                "preferred_low_cost": bool(request.preferred_low_cost),
-            }
-        route_trace.append(
-            _route_trace_stage(
-                "smart_router",
-                input_providers=smart_input,
-                output_providers=filtered,
-                applied=smart_applied,
-                metadata=smart_metadata,
-            )
-        )
 
-        telemetry_input = list(filtered)
         filtered, telemetry_reasons = self._apply_telemetry_overlay(
             candidates=filtered,
             path=path,
             request=request,
         )
         reasons.extend(telemetry_reasons)
-        route_trace.append(
-            _route_trace_stage(
-                "telemetry_overlay",
-                input_providers=telemetry_input,
-                output_providers=filtered,
-                applied=filtered != telemetry_input,
-                reasons=telemetry_reasons,
-            )
+
+        return self._finalize_decision(
+            path=path,
+            chain=filtered,
+            decision=decision,
+            reasons=reasons,
         )
 
-        selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
-        fallbacks = [item for item in filtered[1:] if item != selected]
-        route_trace.append(
-            _route_trace_stage(
-                "selection",
-                output_providers=[selected, *fallbacks],
-                reasons=reasons,
-                metadata={
-                    "selected_provider": selected.value,
-                    "selected_model_hint": self.config.default_model_hints.get(selected),
-                    "fallback_count": len(fallbacks),
-                },
-            )
+    def _finalize_decision(
+        self,
+        *,
+        path: RoutePath,
+        chain: list[ProviderType],
+        decision: Any,
+        reasons: list[str],
+        model_hint_override: str | None = None,
+    ) -> ProviderRouteDecision:
+        """Build the ProviderRouteDecision from a final, ordered provider chain.
+
+        Shared by the normal ranked path and the explicit-wins short-circuit so
+        both construct an identical decision shape. ``model_hint_override`` lets
+        an explicit model request set the selected hint directly.
+        """
+        selected = chain[0] if chain else ProviderType.CLAUDE_CODE
+        fallbacks = [item for item in chain[1:] if item != selected]
+        selected_model_hint = (
+            model_hint_override or self.config.default_model_hints.get(selected)
         )
         return ProviderRouteDecision(
             path=path,
             selected_provider=selected,
-            selected_model_hint=self.config.default_model_hints.get(selected),
+            selected_model_hint=selected_model_hint,
             fallback_providers=fallbacks,
             fallback_model_hints=[
                 self.config.default_model_hints[item]
@@ -374,7 +329,6 @@ class ProviderPolicyRouter:
             confidence=decision.confidence,
             requires_human=decision.requires_human,
             reasons=reasons,
-            route_trace=route_trace,
         )
 
     def _resolve_telemetry_enabled(self) -> bool:
@@ -545,6 +499,22 @@ class ProviderPolicyRouter:
 
         if requires_tooling:
             candidates = list(self.config.tooling_candidates) + candidates
+
+        # Power-first base ordering (operator decision 2026-06-21): with no
+        # explicit cost request, rank by raw model intelligence — most capable
+        # first — instead of the free-tier-first seed order. The language /
+        # reasoning / cost overlays below refine this when they apply; when none
+        # apply (the common default), power-first stands.
+        if (
+            self.config.power_first
+            and not prefer_low_cost
+            and path != RoutePath.ESCALATE
+        ):
+            priority = {
+                provider: idx
+                for idx, provider in enumerate(self.config.power_first_priority)
+            }
+            candidates.sort(key=lambda provider: priority.get(provider, len(priority)))
 
         if prefer_japanese_quality:
             priority = {

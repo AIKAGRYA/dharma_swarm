@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
-import asyncio
 
 
 # ---------------------------------------------------------------------------
@@ -113,16 +111,16 @@ def cmd_sprint(
         gather_system_state,
         generate_evolved_prompt,
         generate_local_prompt,
-        _days_to_colm,
         _SHARED_DIR,
     )
+    from dharma_swarm.research_deadlines import deadline_line
 
     today = _date.today().strftime("%Y%m%d")
     out_path = Path(output) if output else _SHARED_DIR / f"SPRINT_8H_{today}.md"
-    colm_days, colm_paper = _days_to_colm()
+    research_line = deadline_line()
 
     print(f"[sprint] Generating sprint for {today}")
-    print(f"  COLM: {colm_days}d (abstract) / {colm_paper}d (paper)")
+    print(f"  Research deadline: {research_line}")
 
     state = gather_system_state()
     live = state.get("live_signals", {})
@@ -137,7 +135,7 @@ def cmd_sprint(
         prompt_text = generate_local_prompt(
             test_summary=test_summary,
             prev_todo=prev_todo,
-            colm_days=colm_days,
+            deadline_line=research_line,
         )
         mode = "local"
     else:
@@ -147,7 +145,7 @@ def cmd_sprint(
                 system_state=state,
                 test_summary=test_summary,
                 prev_todo=prev_todo,
-                colm_days=colm_days,
+                deadline_line=research_line,
                 llm_timeout_sec=llm_timeout_sec,
             ))
             mode = "LLM"
@@ -156,7 +154,7 @@ def cmd_sprint(
             prompt_text = generate_local_prompt(
                 test_summary=test_summary,
                 prev_todo=prev_todo,
-                colm_days=colm_days,
+                deadline_line=research_line,
             )
             mode = "local (fallback)"
 
@@ -164,7 +162,7 @@ def cmd_sprint(
     out_path.write_text(
         f"# 8-HOUR SPRINT — {today}\n"
         f"**Generated**: {_date.today().isoformat()} | **Mode**: {mode}\n"
-        f"**COLM**: {colm_days} days (abstract) / {colm_paper} days (paper)\n\n"
+        f"**Research deadline**: {research_line}\n\n"
         + prompt_text
     )
     print(f"[sprint] Written to: {out_path}")
@@ -207,7 +205,6 @@ def cmd_foreman(
     from dharma_swarm.foreman import (
         add_project,
         format_status,
-        load_projects,
         run_cycle,
         create_foreman_cron_job,
     )
@@ -274,7 +271,7 @@ def cmd_initiatives(
     reason: str = "",
 ) -> None:
     """Initiative depth ledger commands."""
-    from dharma_swarm.iteration_depth import IterationLedger, CompoundingQueue
+    from dharma_swarm.iteration_depth import IterationLedger
 
     ledger = IterationLedger()
     ledger.load()

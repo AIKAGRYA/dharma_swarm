@@ -706,7 +706,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_eauto.add_argument("--model", default="")
     p_eauto.add_argument("--context", default="", help="Focus area or context for the LLM")
     p_eauto.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
-    p_eauto.add_argument("--shadow", action="store_true", help="Dry-run: generate proposals but don't apply diffs")
+    p_eauto.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
     p_eauto.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
 
     p_edaemon = evolve_sub.add_parser("daemon", help="Run continuous autonomous evolution")
@@ -715,7 +715,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_edaemon.add_argument("--model", default="")
     p_edaemon.add_argument("--cycles", type=int, default=None, help="Max cycles (default: infinite)")
     p_edaemon.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
-    p_edaemon.add_argument("--shadow", action="store_true", help="Dry-run: generate proposals but don't apply diffs")
+    p_edaemon.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
     p_edaemon.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
 
     # -- dharma --
@@ -984,6 +984,19 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # -- loop-status --
     sub.add_parser("loop-status", help="Loop supervisor — health of all loops")
+
+    # -- spine --
+    p_spine = sub.add_parser("spine", help="Runtime truth spine — live EvidenceReceipt stream")
+    spine_sub = p_spine.add_subparsers(dest="spine_cmd")
+    p_spine_tail = spine_sub.add_parser(
+        "tail", help="Tail the live EvidenceReceipt stream (one line per receipt)"
+    )
+    p_spine_tail.add_argument(
+        "--limit", type=int, default=20, help="Number of receipts to show (default 20)"
+    )
+    p_spine_tail.add_argument(
+        "--follow", action="store_true", help="Poll for new receipts every 2s until Ctrl-C"
+    )
 
     # -- skills --
     sub.add_parser("skills", help="List discovered skills (v0.4.0)")
@@ -1922,6 +1935,15 @@ def main() -> None:
             rc = cmd_loop_status()
             if rc != 0:
                 raise SystemExit(rc)
+        case "spine":
+            match args.spine_cmd:
+                case "tail":
+                    from dharma_swarm.operator_core.spine_tail import cmd_spine_tail
+                    rc = cmd_spine_tail(limit=args.limit, follow=args.follow)
+                    if rc != 0:
+                        raise SystemExit(rc)
+                case _:
+                    parser.parse_args(["spine", "--help"])
         case "skills":
             cmd_skills()
         case "route":

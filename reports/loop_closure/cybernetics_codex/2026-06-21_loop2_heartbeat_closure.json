@@ -1,0 +1,69 @@
+{
+  "loop": 2,
+  "loop_id": "organism_heartbeat",
+  "cycles": 3,
+  "real_data": true,
+  "transitions_receipted": {
+    "sense": true,
+    "interpret": true,
+    "constrain": true,
+    "act": true,
+    "adapt": true
+  },
+  "adapt_proof": {
+    "field": "algedonic_activation.recent_activations (adaptive memory the next cycle consults)",
+    "before": 0,
+    "after": 12,
+    "fed_forward": true,
+    "total_actions": 6
+  },
+  "tick_errors": [],
+  "cycle_detail": [
+    {
+      "cycle": 1,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.2846,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence",
+        "telos_drift"
+      ],
+      "actions": [
+        "rebalance_priorities",
+        "gnani_checkpoint"
+      ],
+      "activation_log_len": 4
+    },
+    {
+      "cycle": 2,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.2846,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence",
+        "telos_drift"
+      ],
+      "actions": [
+        "rebalance_priorities",
+        "gnani_checkpoint"
+      ],
+      "activation_log_len": 8
+    },
+    {
+      "cycle": 3,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.2846,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence",
+        "telos_drift"
+      ],
+      "actions": [
+        "rebalance_priorities",
+        "gnani_checkpoint"
+      ],
+      "activation_log_len": 12
+    }
+  ],
+  "observed_at": "2026-06-21T12:00:19.129469Z"
+}

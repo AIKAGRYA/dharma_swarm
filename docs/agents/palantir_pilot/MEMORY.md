@@ -31,6 +31,9 @@
   a deep card's `## Content` section (`_extract_note_answer_claim`) and the claim
   cap rose 520 -> 1400. `build_answer_packet` now returns multi-thousand-char
   source-grounded answers instead of a first-sentence stub. 29/29 unit tests green.
-- The thin v1 `source-cards/` still exist and still carry the accurate
-  metadata-only boundary; the v1 boundary strings are pinned by tests and were
-  left intact. Deep cards are a separate, separately-bounded layer.
+- Two-tier storage: the thin v1 `source-cards/` carry the metadata-only boundary;
+  `deep-cards/` carry full parsed prose of robots-allowed public docs pages,
+  local-only under `~/.dharma` (never committed to git, internal RAG only, no
+  redistribution). The boundary strings across the policy surfaces, packets, and
+  seed were reconciled to own this deep-card layer while still forbidding
+  Learn/course/gated/private full-text.

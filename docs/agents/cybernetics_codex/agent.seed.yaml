@@ -24,7 +24,8 @@ runtime_pointers:
 
 mailbox:
   callsign: cybernetics-codex
-  nats_subject: dharma.a2a.cybernetics-codex
+  route: agent-inbox
+  nats_subject: dharma.agent.cybernetics_codex.inbox
   endpoint: pending://manual
   runtime_status: declared_not_started
   transport_claim: address_declared_card_registered_only

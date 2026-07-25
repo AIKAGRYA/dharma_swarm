@@ -1,0 +1,101 @@
+{
+  "$schema": "dharma_external_agent_registration_manifest.v1",
+  "schema_version": "dharma_external_agent_registration_manifest.v1",
+  "agent_uid": "perplexity-computer",
+  "callsign": "perplexity",
+  "display_name": "Perplexity Computer",
+  "harness": "perplexity_computer_sandbox",
+  "model_identity": "perplexity/computer",
+  "department": "verification",
+  "role": "evidence_reconciler",
+  "squad_id": "fleet",
+  "team_id": "dharma_swarm",
+  "endpoint": "file://inter_agent/perplexity-computer/inbound",
+  "mailbox": "nats://dharma.a2a.perplexity-computer",
+  "authority": "external_worker_evidence_only",
+  "autonomy_policy": {
+    "mode": "stage1_evidence_only_manual_wake",
+    "requires_approval": true,
+    "can_approve_prs": false,
+    "can_write_source": false,
+    "can_mutate_meta_dharma": false,
+    "can_mutate_telos": false,
+    "can_mutate_dharma_kernel": false,
+    "can_mutate_dgm_protected": false,
+    "can_author_context_bundles": false,
+    "explicit_task_assignment_required": true
+  },
+  "workspace_policy": {
+    "sandbox_root": "~/.dharma/external_agents/perplexity-computer",
+    "repo_writes_allowed": true,
+    "canonical_dharma_dir_writes_allowed": false
+  },
+  "memory_namespace": "agent:perplexity-computer",
+  "trace_identity": "trace:perplexity-computer",
+  "status": "registered",
+  "notes": "Perplexity Computer seat: Stage-1 evidence-only manual seat for cross-agent verdict reconciliation, PR/receipt critique, and research synthesis. Sessions are ephemeral sandbox threads with no daemon; durable presence lives in this card, the inter_agent/perplexity-computer/ git seat, and docs/agents/perplexity-computer/ surfaces. The seat holds NO fleet NATS credentials (ACL record: Issue #407); its verified transport is the file-mirror git seat plus operator relay, and the mailbox subject above is reserved-but-not-live until the publish-to-peer ACL rework (FLEET_FIELD_REGISTRY decision FFR-D1) provisions it. This card resolves the perplexity vs perplexity-computer naming drift: the uid is perplexity-computer; the legacy inter_agent/perplexity/ inbox naming is superseded. Registered from the seat's own 2026-07-09 field-probe request, operator-ratified.",
+  "registration_source": "field_probe_2026_07_09_seat_existence_slice_operator_ratified",
+  "capabilities": [
+    "research_synthesis",
+    "verdict_reconciliation",
+    "pr_critique",
+    "receipt_critique",
+    "audit",
+    "a2a_collaboration"
+  ],
+  "metadata": {
+    "operator": "AmitabhainArunachala/Dhyana",
+    "title": "@PERPLEXITY",
+    "operating_title": "Perplexity Computer",
+    "surface": "Perplexity Computer cloud sandbox (iOS/web threads)",
+    "provider": "perplexity-ai",
+    "coordination_peers": [
+      "fable_claude_code",
+      "devin-roaming-2987d222",
+      "merge_master_mike",
+      "codex",
+      "hermes",
+      "rushabdev"
+    ],
+    "transport_preference": "git_seat_file_mirror",
+    "canonical_transport_subject": "dharma.a2a.perplexity-computer",
+    "transport_subjects": {
+      "inbound": "dharma.a2a.perplexity-computer",
+      "replies_acks_wildcard": "dharma.a2a.perplexity-computer.>",
+      "fleet_cc": "dharma.a2a.fleet"
+    },
+    "nats_hub": {
+      "name": "agni",
+      "url": "wss://157.245.193.15:8443",
+      "stream": "DHARMA_A2A",
+      "ca_pem_path": "dharma_swarm/a2a/nats/agni-ws-ca.pem",
+      "credentials_status": "none_issued; see Issue #407 and FLEET_FIELD_REGISTRY FFR-D1"
+    },
+    "git_seat": "inter_agent/perplexity-computer/",
+    "legacy_inbox_alias": "inter_agent/perplexity/ (superseded)",
+    "wake_surfaces": [
+      "docs/agents/perplexity-computer/WAKE_RITUAL.md",
+      "inter_agent/perplexity-computer/inbound/",
+      "roaming_mailbox/tasks/"
+    ],
+    "required_first_reads": [
+      "docs/ops/FLEET_FIELD_REGISTRY.yaml",
+      "docs/ops/A2A_QUICKSTART.md",
+      "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+    ],
+    "summon_phrase": "@PERPLEXITY",
+    "summon_aliases": ["@perplexity", "@perplexity-computer"],
+    "automatic_authority_inheritance": false
+  },
+  "registration_desk": {
+    "require_own_system_interpretation": true,
+    "require_action_log": true,
+    "require_wake_receipts": false,
+    "ops_hooks": {
+      "canonical_onboarding": true,
+      "kaizen_ops_event": true,
+      "stigmergy_mark": true,
+      "agentops_contract": true
+    }
+  }
+}

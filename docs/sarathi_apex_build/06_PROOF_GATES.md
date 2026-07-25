@@ -1,57 +1,76 @@
-# 06 — Proof Gates (gate-ordered, not mythological)
+# 06 — Proof Gates
 
-**Custody: VERIFIED 2026-07-06. A gate is DONE only with a receipt/command.**
+> **Collapse-lane gate record:** Gates 1–9 describe the work that landed through
+> PR #821. The current promotion ladder and remaining effect/service proof are
+> owned by
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
-Future work is ordered by these gates. Do not skip. Do not claim a later gate
-before an earlier one has a receipt. "Done" = a command output or artifact path,
-never narration.
+## Ten gates
 
-| # | Gate | Done when | Status |
-|---|---|---|---|
-| 1 | deterministic reversibility gate committed + tests pass | `reversibility_gate.py` tracked; `pytest tests/test_reversibility_gate.py` green | **DONE** (`f18fe8476`; 9 passed) |
-| 2 | `load_holon` supports `@frontier` / `resolve_top_available_at_wake` | a resolver test: `@frontier` picks top-available model or logs honest fallback | **DONE** — `resolve_top_available_at_wake()` routes through `model_hierarchy.get_live_order()` + `runtime_provider`; `load_holon("sarathi")` resolved to `ollama/glm-5:cloud` on 2026-07-06 |
-| 3 | Fugu provider drift resolved or modeled as external | `dgc agent status` emits no `sakana -> defaulting to claude_code` warning, OR `sakana` is a declared external provider | **DONE** — `ProviderType.SAKANA` exists as external-only; `dgc agent status --json` emits no `sakana -> defaulting to claude_code` warning |
-| 4 | Fable standing semantic daemon proven | a fresh `fable_composer` service heartbeat + a semantic reply receipt from an unattended run | **OPEN** — `service_alive=false`, `heartbeat_seen=false` |
-| 5 | Sarathi runtime surfaces created | `~/.dharma/a2a_bus/state/sarathi.json`, inbox dir, bridge heartbeat exist (as runtime, with repo map entries) | **PARTIAL** — state/inbox/bridge/wrapper/roster/contract exist; `service_heartbeats.jsonl` missing |
-| 6 | Sarathi gateway wraps `holon_wake_cycle` | `holon_system/sarathi/gateway.py` calls `holon_wake_cycle(planned_action=...)` behind the gate | **PARTIAL** — `gateway.py` exists as read-only snapshot/outbox brief; no apex loop wrapping `holon_wake_cycle` yet |
-| 7 | Sarathi pulse reads Hermes + Codex + Fable/Fugu state | a `pulse.py` run produces a state bundle citing each seat's live liveness | **OPEN** |
-| 8 | operator brief produced | a `brief.py` run writes a dated operator brief receipt | **PARTIAL** — a readiness brief can be written to Sarathi outbox; no daily apex operator brief yet |
-| 9 | overnight durability proof | one unattended lease-gated run leaves wake receipts across N hours; only then may `wake_loop_active` flip true | **OPEN** — do NOT flip before this |
-| 10 | scoreboard: where Hermes wins vs where Sarathi wins | `scoreboard.py` emits a receipts-only comparison; no "we beat Hermes" claim without it | **OPEN** |
+| Gate | Requirement | Current status |
+|---:|---|---|
+| 1 | Deterministic reversibility gate committed and tested. | **DONE-on-fork** at `f18fe8476`; **PORTED-in-Phase-A** at `8a3a2e657`; scoped test command below passed. |
+| 2 | `holon_wake_cycle()` gates caller-supplied `planned_action` before work. | Done in `dharma_swarm/holon_runtime.py`; tests cover safe and blocked actions. |
+| 3 | Sarathi is registered as a wake profile without forking the wake shell. | Done in `scripts/runtime/codex_composer_wake_loop.py`; tests cover `sarathi`. |
+| 4 | Code/runtime boundary is documented and runtime state is not committed. | Done in `02_CODEBASE_RUNTIME_BOUNDARY.md`; no runtime state added. |
+| 5 | Hermes-organ comparison distinguishes exists/partial/missing/scattered. | Done in `03_HOLON_SYSTEM_CODE_MAP.md`. |
+| 6 | Orphan maps are metabolized. | `AGENT_HOLON_CODE_MAP.md` and `HOLON_RUNTIME_FULL_ESTATE_MAP.md` are committed under `docs/architecture/` and linked from README. |
+| 7 | Duplicate holon fork removed after importer migration. | Done in Phase B: `scripts/verify_holon_harness_prod.py` now imports `dharma_swarm.holon_runtime`; `holon/` removed. |
+| 8 | `sprawl_guard.py` exits `0` on the clean branch. | Done in Phase B; output below. |
+| 9 | Sarathi facade/package/runtime wrapper exists without source-in-runtime. | Done in Phase C: repo source under `dharma_swarm/holon_system/`; runtime wrapper is thin and imports repo code. |
+| 10 | Unattended proof exists before any `wake_loop_active=true` claim. | Pending; no alive claim made. |
 
-## Gate discipline
+## Verification already run in Phase A
 
-- Gate 1 is the keystone and it is done. Everything else composes on top.
-- Gates 2-4 are substrate correctness (resolver, provider enum, one proven
-  standing daemon) and should precede Sarathi-body gates 5-9.
-- Gate 9 is the ONLY thing that authorizes `wake_loop_active=true`. Constraints
-  #1 and #2 forbid claiming alive/active before it.
-- Gate 10 is the ONLY thing that authorizes any "beats Hermes/OpenClaw" claim
-  (constraint #3).
+```text
+$ cd /Users/dhyana/ds_holon_collapse_20260707
+$ .venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon_runtime.py tests/test_codex_composer_wake_loop.py -q
+.......................................                                  [100%]
+39 passed in 0.62s
+```
 
-## Verification commands per gate
+## Anti-sprawl harness contract
+
+Every new map must be linked from `README.md` or it is sprawl. The collapse
+spine is not considered done by prose; it is done only when:
 
 ```bash
-# gate 1
-.venv/bin/python -m pytest tests/test_reversibility_gate.py -q
-
-# gate 2
-.venv/bin/python -m pytest tests/test_runtime_provider.py tests/test_holon_bridge.py -q
-.venv/bin/python - <<'PY'
-from dharma_swarm.holon_bridge import load_holon
-h = load_holon("sarathi")
-print(h.provider_type, h.model, h.identity.get("_runtime_model_resolution"))
-PY
-
-# gate 3
-.venv/bin/python -m dharma_swarm.dgc_cli agent status --json 2>&1 | grep -i 'defaulting to claude_code' || echo "no drift warning"
-
-# gate 4 / 5 (liveness is receipts, not identity)
-.venv/bin/python -m dharma_swarm.dgc_cli agent status --json
-
-# gate 6 seam (already present)
-.venv/bin/python -m pytest tests/test_holon_runtime.py -q
-
-# anti-sprawl (must reach exit 0 after the holon/ fork collapse)
 python3 scripts/governance/sprawl_guard.py
+```
+
+exits `0` on `feat/holon-system-collapse-base`.
+
+## Phase B verification
+
+```text
+$ python3 scripts/governance/sprawl_guard.py; echo EXIT=$?
+[1] SINGLETON SYMBOLS
+  OK   def load_holon -> dharma_swarm/holon_bridge.py
+  OK   def holon_wake_cycle -> dharma_swarm/holon_runtime.py
+[2] FORBIDDEN IMPORTS
+  OK   no runtime import of holon.holon_bridge
+  OK   no runtime import of holon.holon_runtime
+[3] COPY DRIFT
+  holon_bridge.py: 1 tracked copies, 1 DISTINCT contents
+  holon_runtime.py: 1 tracked copies, 1 DISTINCT contents
+RESULT: CLEAN — no sprawl findings.
+EXIT=0
+
+$ .venv/bin/python -m pytest tests/test_holon*.py tests/test_reversibility_gate.py tests/test_codex_composer_wake_loop.py -q
+108 passed, 1 warning in 1.16s
+```
+
+## Phase C verification
+
+```text
+$ python3 scripts/governance/sprawl_guard.py
+RESULT: CLEAN — no sprawl findings.
+
+$ .venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon*.py tests/test_codex_composer_wake_loop.py tests/test_holon_system_imports.py -q
+116 passed, 1 warning in 1.12s
+
+$ DHARMA_SWARM_REPO=/Users/dhyana/ds_holon_collapse_20260707 ~/.dharma/agents/sarathi/gateway/sarathi_gateway.py
+schema_version=dharma.sarathi.gateway_snapshot.v1
+wake_loop_active=false
+alive_claim=false
 ```

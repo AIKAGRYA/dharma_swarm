@@ -350,6 +350,10 @@ class TestBrowserAgentHttpxFallback:
 class TestToolRegistryIntegration:
     """Test that browser tools are registered in the tool registry."""
 
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     def test_check_browser_available(self):
         assert _check_browser_available() is True
 
@@ -366,6 +370,10 @@ class TestToolRegistryIntegration:
         assert registry.get_toolset_for_tool("browser_navigate") == "browser"
         assert registry.get_toolset_for_tool("browser_extract") == "browser"
 
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     def test_browser_toolset_available(self):
         from dharma_swarm.tool_registry import registry
         assert registry.is_toolset_available("browser") is True
@@ -473,6 +481,10 @@ class TestCookieManagement:
 class TestContextManager:
     """Test async context manager protocol."""
 
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     @pytest.mark.asyncio
     async def test_context_manager_start_stop(self):
         """BrowserAgent should start/stop cleanly as context manager."""

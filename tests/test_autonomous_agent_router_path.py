@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import dharma_swarm.autonomous_agent as autonomous_agent_module
+import dharma_swarm.runtime_provider as runtime_provider_module
 from dharma_swarm.autonomous_agent import (
     AgentIdentity,
     AutonomousAgent,
@@ -207,6 +209,48 @@ async def test_anthropic_turn_falls_back_to_runtime_provider_factory(
     out = await agent._call_anthropic("s", [{"role": "user", "content": "hi"}], defs)
     assert out["text"] == ["factory-anthropic"]
     mock_factory.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_anthropic_direct_attempts_shared_claude_cli_once(monkeypatch) -> None:
+    monkeypatch.delenv("DHARMA_FORCE_ANTHROPIC_API", raising=False)
+    monkeypatch.setattr(
+        runtime_provider_module,
+        "_resolve_cli_binary",
+        lambda _name: "/fixture/bin/claude",
+    )
+    attempted: list[ProviderType] = []
+
+    class _FailingProvider:
+        async def complete(self, _request: LLMRequest) -> LLMResponse:
+            raise RuntimeError("fixture CLI failure")
+
+        async def close(self) -> None:
+            return None
+
+    def _factory(config: RuntimeProviderConfig) -> _FailingProvider:
+        attempted.append(config.provider)
+        return _FailingProvider()
+
+    monkeypatch.setattr(autonomous_agent_module, "create_runtime_provider", _factory)
+    agent = AutonomousAgent(
+        AgentIdentity(
+            name="unit",
+            role="test",
+            system_prompt="sys",
+            provider="anthropic",
+            model="claude-test",
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="fixture CLI failure"):
+        await agent._call_anthropic(
+            "system",
+            [{"role": "user", "content": "hi"}],
+            [],
+        )
+
+    assert attempted == [ProviderType.ANTHROPIC]
 
 
 @patch(

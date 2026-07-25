@@ -6,8 +6,9 @@ Status: commercially usable for internal demo and managed-diagnostic sales prep
 
 ## Fresh runtime artifacts
 
-- `semantic_graph.json`
+- `semantic_graph.json` → see [`semantic_graph.POINTER.md`](semantic_graph.POINTER.md)
   - Fresh graph from this turn: `2471` concepts, `19800` edges.
+  - 8.8MB JSON moved to release [`evidence-snapshot-20260313`](https://github.com/AmitabhainArunachala/dharma_swarm/releases/tag/evidence-snapshot-20260313); pointer stub preserves provenance and download URL.
 - `semantic_brief_packet.md`
   - Fresh brief packet from this turn: `3` semantic briefs, `3` execution briefs, `0.591` average readiness.
 - `campaign.json`

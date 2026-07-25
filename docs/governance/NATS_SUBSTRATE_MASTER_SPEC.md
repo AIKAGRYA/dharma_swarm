@@ -95,6 +95,26 @@ All publishes use the `Nats-Msg-Id` header set to the envelope `message_id`.
 The first local deployment may use one replica; clustered deployment raises the
 replica count without changing subjects or envelope fields.
 
+### Live Topology vs Target Topology (field-probed 2026-07-09)
+
+The `DS_*` table above is the TARGET contract. The 2026-07-09 fleet field
+probe (six seats, receipts in `inter_agent/`) confirmed unanimously that no
+`DS_*` stream runs live anywhere; a fresh agent that goes looking for
+`DS_TASKS` on a broker will find nothing. What actually runs:
+
+| Target (this spec) | Live today | Where |
+|---|---|---|
+| `DS_TASKS` / `DS_DLQ` streams | `DHARMA_A2A` stream | AGNI hub (`wss://157.245.193.15:8443`, plain `nats://157.245.193.15:4222`) |
+| `dharma.agent.<uid>.inbox` subjects | legacy `dharma.a2a.<callsign>` subjects | AGNI hub |
+| clustered internal broker | second unbridged broker `DHARMA_FLEET` | operator Mac `127.0.0.1:4222`, often offline |
+
+The per-agent live routing truth (actual lane, subjects, credential env-var
+names, last verified send/receive) is owned by
+`docs/ops/FLEET_FIELD_REGISTRY.yaml` (`python3
+scripts/runtime/fleet_field_registry.py`), refreshed by probe receipts.
+Migration from the live topology to this spec's target topology happens
+through that registry's `decisions` block, not by silently editing this table.
+
 ## Durable Consumer Contract
 
 Consumer names are stable slugs derived from `agent_uid`. They must contain
@@ -223,6 +243,9 @@ The sender keeps `--route a2a` as a compatibility path for
 `dharma.agent.<agent_uid>.inbox` and records `route` plus `target_uid` in the
 receipt. Known aliases may resolve display handles such as `hermes` to stable
 UIDs such as `hermes-m5`; callers may pass `--agent-uid` for explicit routing.
+In Semantic Commons this internal binding is `A2AInboxRoute` with alias
+`agent-inbox`, carried on every standardized `A2ACard` as the
+`NATSSubstrate` contact route.
 
 The CLI fallback can prove at most `PUBLISH_ACCEPTED`. It cannot claim
 `HANDLER_ACKED` or `DOMAIN_RECEIPTED`, because it does not own the target

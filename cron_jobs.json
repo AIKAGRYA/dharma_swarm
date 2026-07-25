@@ -54,7 +54,7 @@
       "openrouter_free",
       "openrouter"
     ],
-    "prompt": "Generate a morning briefing for Dhyana (4:30 AM WITA). Check:\n1. AGNI state (~/agni-workspace/WORKING.md)\n2. Trishula inbox count and any non-ack messages\n3. DGC memory developments from overnight\n4. R_V paper status (~/mech-interp-latent-lab-phase1/R_V_PAPER/)\n5. Any blocked items anywhere in the system\n6. DREAM JOURNAL: read ~/.dharma/subconscious/journal/LATEST_JOURNAL.md — if it exists, include the HOT-temperature ideas from last night's subconscious layer as a section called 'From the Subconscious'. Flag any publishable-relevant or experiment-relevant seeds.\n7. JAGAT KALYAN: Read ~/.dharma/shared/jk_pulse.md for momentum status. Read ~/.dharma/shared/jk_alert.md if it exists — include any HIGH URGENCY items (grant deadlines, partner moves). Check ~/jagat_kalyan/EVOLUTION_LOG.md for overnight codebase changes. Include a 'Jagat Kalyan' section in the brief.\n8. WORLD ZEITGEIST: Read ~/.dharma/meta/world_signal_brief.md and ~/.dharma/meta/world_radar/world_radar_health.md. Include promotion-ready external signals, incubating movements, failed sources, and the concrete next move.\n\nWrite brief, actionable summary to ~/dgc-core/daemon/morning_brief.md",
+    "prompt": "Generate a morning briefing for Dhyana (4:30 AM WITA). Check:\n1. AGNI state (~/agni-workspace/WORKING.md)\n2. Trishula inbox count and any non-ack messages\n3. DGC memory developments from overnight\n4. R_V paper status (~/mech-interp-latent-lab-phase1/R_V_PAPER/)\n5. Any blocked items anywhere in the system\n6. DREAM JOURNAL: read ~/.dharma/subconscious/journal/LATEST_JOURNAL.md \u2014 if it exists, include the HOT-temperature ideas from last night's subconscious layer as a section called 'From the Subconscious'. Flag any publishable-relevant or experiment-relevant seeds.\n7. JAGAT KALYAN: Read ~/.dharma/shared/jk_pulse.md for momentum status. Read ~/.dharma/shared/jk_alert.md if it exists \u2014 include any HIGH URGENCY items (grant deadlines, partner moves). Check ~/jagat_kalyan/EVOLUTION_LOG.md for overnight codebase changes. Include a 'Jagat Kalyan' section in the brief.\n8. WORLD ZEITGEIST: Read ~/.dharma/meta/world_signal_brief.md and ~/.dharma/meta/world_radar/world_radar_health.md. Include promotion-ready external signals, incubating movements, failed sources, and the concrete next move.\n\nWrite brief, actionable summary to ~/dgc-core/daemon/morning_brief.md",
     "enabled": true
   },
   {
@@ -111,7 +111,7 @@
       "minute": 0
     },
     "model": "sonnet",
-    "prompt": "Run a HUM dream cycle. Select semantically dense files from the entire system (PSMV, mech-interp, dharma_swarm, CLAUDE files, Kailash vault — everything).\n\nExecute:\ncd ~/dharma_swarm && python3 -c \"\nimport asyncio, json\nfrom dharma_swarm.subconscious_v2 import run_dream_cycle, WakeTrigger, select_dense_files\nfiles = select_dense_files(count=8)\nprint('Selected files:')\nfor f in files:\n    print(f'  {f.parent.name}/{f.name}')\nresult = asyncio.run(run_dream_cycle(file_paths=files, trigger=WakeTrigger.SCHEDULED))\nassociations = result['associations']\nhigh = [a for a in associations if a['salience'] >= 0.7]\nprint(f'\\nDream cycle: {len(associations)} total, {len(high)} high-salience')\nfor a in high:\n    print(f'  [{a[\\\"resonance_type\\\"]}] {a[\\\"salience\\\"]:.2f}: {a[\\\"description\\\"][:180]}')\n\"\n\nWrite results to ~/.dharma/witness/hum_$(date +%Y%m%d).md with: files selected, associations found, any invented vocabulary, flag HIGH VALUE if phenomenological+mechanistic bridge found.",
+    "prompt": "Run a HUM dream cycle. Select semantically dense files from the entire system (PSMV, mech-interp, dharma_swarm, CLAUDE files, Kailash vault \u2014 everything).\n\nExecute:\ncd ~/dharma_swarm && python3 -c \"\nimport asyncio, json\nfrom dharma_swarm.subconscious_v2 import run_dream_cycle, WakeTrigger, select_dense_files\nfiles = select_dense_files(count=8)\nprint('Selected files:')\nfor f in files:\n    print(f'  {f.parent.name}/{f.name}')\nresult = asyncio.run(run_dream_cycle(file_paths=files, trigger=WakeTrigger.SCHEDULED))\nassociations = result['associations']\nhigh = [a for a in associations if a['salience'] >= 0.7]\nprint(f'\\nDream cycle: {len(associations)} total, {len(high)} high-salience')\nfor a in high:\n    print(f'  [{a[\\\"resonance_type\\\"]}] {a[\\\"salience\\\"]:.2f}: {a[\\\"description\\\"][:180]}')\n\"\n\nWrite results to ~/.dharma/witness/hum_$(date +%Y%m%d).md with: files selected, associations found, any invented vocabulary, flag HIGH VALUE if phenomenological+mechanistic bridge found.",
     "enabled": true
   },
   {
@@ -136,19 +136,7 @@
     },
     "model": "sonnet",
     "enabled": true,
-    "prompt": "Generate today's adaptive 8-hour sprint prompt.\n\nExecute:\ncd ~/dharma_swarm && dgc sprint\n\nIf dgc is not in PATH:\ncd ~/dharma_swarm && python3 -m dharma_swarm.cli sprint\n\nThis reads: morning brief, dream seeds, sprint handoff, witness logs,\nand last 5 allout cycles — then generates a fresh GRANULAR/META/QUALITY\nsprint prompt to ~/.dharma/shared/SPRINT_8H_$(date +%Y%m%d).md\n\nReport: sprint file path, char count, COLM days remaining, quality verdict."
-  },
-  {
-    "id": "subconscious_fleet",
-    "name": "Subconscious Fleet Dream Run",
-    "trigger": "cron",
-    "schedule": {
-      "hour": 3,
-      "minute": 30
-    },
-    "model": "sonnet",
-    "enabled": false,
-    "prompt": "Run subconscious fleet with 6 parallel agents.\n\nExecute:\ncd ~/dharma_swarm && python3 -c \"\nimport asyncio, json\nfrom dharma_swarm.subconscious_fleet import run_fleet\nresult = asyncio.run(run_fleet(fleet_size=6))\nhigh = result.get('high_salience', [])\nprint(f'Fleet done: {result[\\\"fleet_size\\\"]} agents, {len(result[\\\"dreams\\\"])} dreams, {len(high)} high-salience')\nfor d in high[:5]:\n    print(f'  [{d.get(\\\"resonance_type\\\",\\\"?\\\")}] {d.get(\\\"salience\\\",0):.2f}: {str(d.get(\\\"description\\\",\\\"\\\"))[:160]}')\nprint(\\\"Provider breakdown:\\\", result.get(\\\"provider_breakdown\\\", {}))\n\"\n\nWrite results to ~/.dharma/witness/fleet_$(date +%Y%m%d_%H%M).md with: agents used, dreams found, high-salience items, provider breakdown."
+    "prompt": "Generate today's adaptive 8-hour sprint prompt.\n\nExecute:\ncd ~/dharma_swarm && dgc sprint\n\nIf dgc is not in PATH:\ncd ~/dharma_swarm && python3 -m dharma_swarm.cli sprint\n\nThis reads: morning brief, dream seeds, sprint handoff, witness logs,\nand last 5 allout cycles \u2014 then generates a fresh GRANULAR/META/QUALITY\nsprint prompt to ~/.dharma/shared/SPRINT_8H_$(date +%Y%m%d).md\n\nReport: sprint file path, char count, research-deadline line, quality verdict."
   },
   {
     "id": "jk_scout",
@@ -160,7 +148,7 @@
     },
     "model": "sonnet",
     "enabled": true,
-    "prompt": "You are the Jagat Kalyan Scout. Your job: find developments that advance the JK loop.\n\nSearch for (use web search):\n1. Carbon market news — Verra updates, Gold Standard changes, ICVCM decisions, new dMRV pilots\n2. AI company carbon pledges — any new commitments from Anthropic, Microsoft, Google, Meta, OpenAI, Amazon\n3. Grant deadlines — Anthropic Economic Futures (rolling, $10-50K), Microsoft Climate Innovation Fund, Bezos Earth Fund, Google.org Impact Challenge\n4. Ecological restoration breakthroughs — mangrove, reforestation, soil carbon projects seeking funding\n5. AI displacement data — new reports on job losses, just transition programs, workforce development\n6. Policy changes — EU carbon border adjustments, Article 6 implementations, national offset regulations\n\nCross-reference against ~/jagat_kalyan/PARTNER_RESEARCH.md — are any listed partners making moves?\n\nFor each finding:\n- URGENCY: HIGH (act within 7 days) / MEDIUM (act within 30 days) / LOW (background awareness)\n- RELEVANCE: How directly does this connect to the JK loop?\n- ACTION: What should Dhyana do about it?\n\nAppend findings to ~/jagat_kalyan/SCOUT_LOG.md (create if not exists, prepend today's date header).\nIf any HIGH URGENCY items, also write to ~/.dharma/shared/jk_alert.md for morning brief pickup.\n\nMax 500 words per scout run. No theater. Only real findings."
+    "prompt": "You are the Jagat Kalyan Scout. Your job: find developments that advance the JK loop.\n\nSearch for (use web search):\n1. Carbon market news \u2014 Verra updates, Gold Standard changes, ICVCM decisions, new dMRV pilots\n2. AI company carbon pledges \u2014 any new commitments from Anthropic, Microsoft, Google, Meta, OpenAI, Amazon\n3. Grant deadlines \u2014 Anthropic Economic Futures (rolling, $10-50K), Microsoft Climate Innovation Fund, Bezos Earth Fund, Google.org Impact Challenge\n4. Ecological restoration breakthroughs \u2014 mangrove, reforestation, soil carbon projects seeking funding\n5. AI displacement data \u2014 new reports on job losses, just transition programs, workforce development\n6. Policy changes \u2014 EU carbon border adjustments, Article 6 implementations, national offset regulations\n\nCross-reference against ~/jagat_kalyan/PARTNER_RESEARCH.md \u2014 are any listed partners making moves?\n\nFor each finding:\n- URGENCY: HIGH (act within 7 days) / MEDIUM (act within 30 days) / LOW (background awareness)\n- RELEVANCE: How directly does this connect to the JK loop?\n- ACTION: What should Dhyana do about it?\n\nAppend findings to ~/jagat_kalyan/SCOUT_LOG.md (create if not exists, prepend today's date header).\nIf any HIGH URGENCY items, also write to ~/.dharma/shared/jk_alert.md for morning brief pickup.\n\nMax 500 words per scout run. No theater. Only real findings."
   },
   {
     "id": "jk_evolve",
@@ -172,7 +160,7 @@
     },
     "model": "sonnet",
     "enabled": true,
-    "prompt": "You are the Jagat Kalyan Evolution Agent. Your job: make the JK codebase better every week.\n\nRead the current state:\n1. ~/jagat_kalyan/app.py — FastAPI application\n2. ~/jagat_kalyan/matching.py — Claude API matching engine\n3. ~/jagat_kalyan/models.py — SQLAlchemy models\n4. ~/jagat_kalyan/seed_data.py — Seed data\n5. ~/jagat_kalyan/WELFARE_TONS_SPEC.md — The mathematical spec\n6. ~/jagat_kalyan/EVOLUTION_LOG.md — Previous evolutions (if exists)\n\nPick ONE improvement from this priority list:\n- P0: Missing tests (create tests/test_matching.py, tests/test_models.py)\n- P0: Welfare-ton calculation endpoint (implement the W = C*E*A*B*V*P formula from spec)\n- P1: API documentation (OpenAPI descriptions for all endpoints)\n- P1: Carbon attribution middleware (per-request carbon estimate)\n- P2: Better seed data (more realistic projects from PARTNER_RESEARCH.md orgs)\n- P2: Health check endpoint (/health with DB status)\n- P3: Export endpoints (CSV/JSON of matches for reporting)\n- P3: Webhook for new match notifications\n\nFor the ONE improvement you pick:\n1. Write the code change\n2. Verify it doesn't break imports: cd ~/jagat_kalyan && source .venv/bin/activate && python -c 'from app import app; print(\"OK\")'\n3. Log what you did to ~/jagat_kalyan/EVOLUTION_LOG.md with date, what changed, why\n\nRules:\n- ONE change per run. Small, testable, shippable.\n- Don't break existing functionality.\n- Follow existing code style.\n- No sprawl. Edit existing files when possible."
+    "prompt": "You are the Jagat Kalyan Evolution Agent. Your job: make the JK codebase better every week.\n\nRead the current state:\n1. ~/jagat_kalyan/app.py \u2014 FastAPI application\n2. ~/jagat_kalyan/matching.py \u2014 Claude API matching engine\n3. ~/jagat_kalyan/models.py \u2014 SQLAlchemy models\n4. ~/jagat_kalyan/seed_data.py \u2014 Seed data\n5. ~/jagat_kalyan/WELFARE_TONS_SPEC.md \u2014 The mathematical spec\n6. ~/jagat_kalyan/EVOLUTION_LOG.md \u2014 Previous evolutions (if exists)\n\nPick ONE improvement from this priority list:\n- P0: Missing tests (create tests/test_matching.py, tests/test_models.py)\n- P0: Welfare-ton calculation endpoint (implement the W = C*E*A*B*V*P formula from spec)\n- P1: API documentation (OpenAPI descriptions for all endpoints)\n- P1: Carbon attribution middleware (per-request carbon estimate)\n- P2: Better seed data (more realistic projects from PARTNER_RESEARCH.md orgs)\n- P2: Health check endpoint (/health with DB status)\n- P3: Export endpoints (CSV/JSON of matches for reporting)\n- P3: Webhook for new match notifications\n\nFor the ONE improvement you pick:\n1. Write the code change\n2. Verify it doesn't break imports: cd ~/jagat_kalyan && source .venv/bin/activate && python -c 'from app import app; print(\"OK\")'\n3. Log what you did to ~/jagat_kalyan/EVOLUTION_LOG.md with date, what changed, why\n\nRules:\n- ONE change per run. Small, testable, shippable.\n- Don't break existing functionality.\n- Follow existing code style.\n- No sprawl. Edit existing files when possible."
   },
   {
     "id": "jk_pulse",
@@ -190,7 +178,7 @@
       "openrouter"
     ],
     "enabled": true,
-    "prompt": "You are the Jagat Kalyan Pulse. Quick health check:\n\n1. Does ~/jagat_kalyan/ exist with app.py, matching.py, models.py? (basic sanity)\n2. Is ~/jagat_kalyan/jagat_kalyan.db present and has data? (sqlite3 ... 'SELECT COUNT(*) FROM projects')\n3. When was ~/jagat_kalyan/SCOUT_LOG.md last modified? (days since last scout)\n4. When was ~/jagat_kalyan/EVOLUTION_LOG.md last modified? (days since last evolution)\n5. Any files in ~/.dharma/shared/jk_alert.md? (unread alerts)\n\nCompute MOMENTUM SCORE:\n- days_since_scout + days_since_evolution + days_since_any_jk_file_changed / 3\n- GREEN: <3 days avg | YELLOW: 3-7 days | RED: >7 days\n\nWrite one-line status to ~/.dharma/shared/jk_pulse.md:\nJK PULSE [DATE] [GREEN/YELLOW/RED] — [one sentence summary]\n\nMax 50 words total. This is a heartbeat, not a report."
+    "prompt": "You are the Jagat Kalyan Pulse. Quick health check:\n\n1. Does ~/jagat_kalyan/ exist with app.py, matching.py, models.py? (basic sanity)\n2. Is ~/jagat_kalyan/jagat_kalyan.db present and has data? (sqlite3 ... 'SELECT COUNT(*) FROM projects')\n3. When was ~/jagat_kalyan/SCOUT_LOG.md last modified? (days since last scout)\n4. When was ~/jagat_kalyan/EVOLUTION_LOG.md last modified? (days since last evolution)\n5. Any files in ~/.dharma/shared/jk_alert.md? (unread alerts)\n\nCompute MOMENTUM SCORE:\n- days_since_scout + days_since_evolution + days_since_any_jk_file_changed / 3\n- GREEN: <3 days avg | YELLOW: 3-7 days | RED: >7 days\n\nWrite one-line status to ~/.dharma/shared/jk_pulse.md:\nJK PULSE [DATE] [GREEN/YELLOW/RED] \u2014 [one sentence summary]\n\nMax 50 words total. This is a heartbeat, not a report."
   },
   {
     "id": "overnight_director",
@@ -205,11 +193,11 @@
     "autonomy": 1,
     "max_tokens": 500000,
     "enabled": true,
-    "prompt": "Overnight director placeholder — actual execution handled by overnight_director handler."
+    "prompt": "Overnight director placeholder \u2014 actual execution handled by overnight_director handler."
   },
   {
     "id": "scout_sweep",
-    "name": "Scout Sweep — All Domains",
+    "name": "Scout Sweep \u2014 All Domains",
     "trigger": "cron",
     "schedule": {
       "hour": 1,
@@ -218,7 +206,7 @@
     "handler": "scout_sweep",
     "scout_model": "xiaomi/mimo-v2-pro",
     "enabled": true,
-    "prompt": "Scout sweep placeholder — execution handled by scout_sweep handler."
+    "prompt": "Scout sweep placeholder \u2014 execution handled by scout_sweep handler."
   },
   {
     "id": "scout_synthesis",
@@ -230,7 +218,7 @@
     },
     "handler": "scout_synthesis",
     "enabled": true,
-    "prompt": "Scout synthesis placeholder — execution handled by scout_synthesis handler."
+    "prompt": "Scout synthesis placeholder \u2014 execution handled by scout_synthesis handler."
   },
   {
     "id": "operator_brief",
@@ -247,18 +235,18 @@
   },
   {
     "id": "revenue_scout",
-    "name": "Revenue Scout — Autonomous Target Scouting & Intelligence Ingestion",
+    "name": "Revenue Scout \u2014 Autonomous Target Scouting & Intelligence Ingestion",
     "trigger": "interval",
     "interval_seconds": 21600,
     "handler": "revenue_scout",
     "min_qualification_score": 0.3,
     "max_targets_per_cycle": 10,
     "enabled": true,
-    "prompt": "Revenue scout cycle — execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the RevenueSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
+    "prompt": "Revenue scout cycle \u2014 execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the RevenueSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
   },
   {
     "id": "world_scout",
-    "name": "World Scout — External Zeitgeist Radar",
+    "name": "World Scout \u2014 External Zeitgeist Radar",
     "trigger": "interval",
     "interval_seconds": 3600,
     "handler": "world_scout",
@@ -269,8 +257,22 @@
     "prompt": "Fetch configured public world sources, normalize signals, build ~/.dharma/meta/world_signal_board.json and ~/.dharma/meta/world_signal_brief.md, incubate weak movements, and promote independently verified world signals into the Shakti zeitgeist inbox."
   },
   {
+    "id": "signal_deep_sweep",
+    "name": "Signal Deep Sweep \u2014 capped multi-beat research sweep + verification",
+    "trigger": "interval",
+    "interval_seconds": 86400,
+    "handler": "signal_deep_sweep",
+    "max_verifications": 8,
+    "scout_timeout_sec": 300,
+    "verification_timeout_sec": 300,
+    "synthesis_timeout_sec": 300,
+    "fetch": false,
+    "enabled": false,
+    "prompt": "Separate, lower-cadence (daily) cousin of world_scout: sweeps a capped set of curated research beats (tools/world_scout_go DefaultBeats(), agentic-engineering niche), clusters into movements, persists a rolling theme window (dharma_swarm/world_radar/theme_window.py), then dispatches a CAPPED (max_verifications) adversarial-verification pass and one synthesis call through invoke_agent() -- never a bespoke dispatch path. Writes a digest under ~/.dharma/meta/world_radar/deep_sweep/ only; never writes MemoryKernel, canon, or a proposed_tracks draft (see docs/governance/proposed_tracks/signal-synthesis-desk-2026-07.yaml). Disabled by default (fetch=false, enabled=false): unlike world_scout's free API scraping, this dispatches real LLM calls every run and should be turned on deliberately by the operator, not silently. Set enabled=true and either fetch=true or DHARMA_SIGNAL_DEEP_SWEEP_FETCH=1 to activate."
+  },
+  {
     "id": "shakti_executive",
-    "name": "Shakti Executive — Opportunity Board Refresh",
+    "name": "Shakti Executive \u2014 Opportunity Board Refresh",
     "trigger": "cron",
     "schedule": {
       "hour": 4,
@@ -339,6 +341,17 @@
     "prompt": "Bulk-promote staging atoms (type=atomic, confidence>=0.5) to trusted wiki/concepts. Prevents unbounded staging growth (~1k atoms/day ingest with zero graduation)."
   },
   {
+    "id": "github_ingestor_inbox",
+    "name": "GitHub Ingestor Inbox Drain",
+    "trigger": "interval",
+    "interval_seconds": 900,
+    "handler": "shell",
+    "shell_command": "python3 scripts/runtime/github_ingestor_runner.py --max-files 20",
+    "timeout_sec": 120,
+    "enabled": true,
+    "prompt": "Drain ~/.dharma/meta/github_ingest_inbox/: run each dropped GitHub event payload envelope through tools/github_ingestor_go so it lands as a go_evidence_receipt.v0 in ~/.dharma/go_receipts/github/ (go-g04 live trigger; host-aware, no GitHub API calls)."
+  },
+  {
     "id": "hermes_heartbeat_poll",
     "name": "Hermes M5 Heartbeat + Queue Poll",
     "trigger": "interval",
@@ -377,8 +390,8 @@
       "minute": 0
     },
     "handler": "shell",
-    "shell_command": "python3 scripts/check_provider_credits.py --json --output ~/.dharma/logs/provider_credits_latest.json",
+    "shell_command": "bash scripts/refresh_provider_status.sh",
     "enabled": true,
-    "prompt": "Check all provider API keys for presence and credit exhaustion. Writes diagnostic to logs for operator review."
+    "prompt": "Refresh dkeys provider liveness and provider credit heuristics through the canonical runtime env loader. Writes key-status and credit diagnostics for operator review."
   }
 ]

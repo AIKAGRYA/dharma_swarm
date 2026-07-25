@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from api.models import AgentOut, ApiResponse, SpawnAgentRequest
 from api.routers._agent_aliases import alias_candidates, matches_agent_alias
-from api.ws import manager
+from api.ws import authenticate_dashboard_websocket, manager
 from dharma_swarm.ontology_agents import (
     agent_display_name,
     agent_slug,
@@ -23,7 +22,7 @@ from dharma_swarm.ontology_agents import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["agents"])
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+ws_router = APIRouter(tags=["agents"])
 
 
 def _get_swarm():
@@ -35,6 +34,12 @@ def _get_trace_store():
     from api.main import get_trace_store
 
     return get_trace_store()
+
+
+def _get_agent_directory():
+    from api.main import get_agent_directory
+
+    return get_agent_directory()
 
 
 def _get_agent_registry():
@@ -198,142 +203,6 @@ def _common_roles(current_role: str | None) -> list[str]:
     return roles
 
 
-def _path_group_status(root: Path, relatives: tuple[str, ...]) -> dict:
-    present = [str(root / rel) for rel in relatives if (root / rel).exists()]
-    missing = [rel for rel in relatives if not (root / rel).exists()]
-    if not missing:
-        status = "pass"
-    elif present:
-        status = "partial"
-    else:
-        status = "missing"
-    return {
-        "status": status,
-        "present": present,
-        "missing": missing,
-    }
-
-
-def _holon_detail(
-    *,
-    agent_id: str,
-    selected_name: str,
-    selected_id: str,
-    agent_out: dict,
-) -> dict | None:
-    """Return LivingDock-backed HOLON metadata for dashboard agent detail."""
-    try:
-        from dharma_swarm import holon_bridge
-        from dharma_swarm.living_dock_verifier import verify_living_dock
-        from dharma_swarm.verify.d_score import score_agent
-    except Exception:
-        logger.debug("HOLON detail imports failed", exc_info=True)
-        return None
-
-    agents_root = Path(getattr(holon_bridge, "AGENTS_ROOT", Path.home() / ".dharma" / "agents")).expanduser()
-    dharma_home = agents_root.parent if agents_root.name == "agents" else Path.home() / ".dharma"
-    candidates: list[str] = []
-    for value in (
-        selected_name,
-        selected_id,
-        agent_id,
-        str(agent_out.get("name") or ""),
-        str(agent_out.get("agent_slug") or ""),
-        str(agent_out.get("display_name") or ""),
-    ):
-        for candidate in alias_candidates(value):
-            if candidate and candidate not in candidates:
-                candidates.append(candidate)
-
-    holon_uid = ""
-    for candidate in candidates:
-        if "/" in candidate or "\\" in candidate or candidate in {".", ".."}:
-            continue
-        dock = agents_root / candidate
-        if dock.exists() and ((dock / "identity.json").exists() or (dock / "living_agent.json").exists()):
-            holon_uid = candidate
-            break
-    if not holon_uid:
-        return None
-
-    dock = agents_root / holon_uid
-    try:
-        living_dock = verify_living_dock(
-            holon_uid,
-            dharma_home=dharma_home,
-            agents_root=agents_root,
-        ).to_dict()
-    except Exception as exc:
-        living_dock = {
-            "agent_uid": holon_uid,
-            "status": "error",
-            "living_dock_path": str(dock),
-            "findings": [{"severity": "fail", "code": "living_dock_verifier_error", "message": type(exc).__name__}],
-            "evidence_paths": [],
-        }
-
-    dialogue_status = _path_group_status(
-        dock,
-        (
-            "dialogue/operator_sessions.jsonl",
-            "dialogue/relationship_memory.jsonl",
-            "dialogue/conversation_receipts",
-            "talk_receipts.jsonl",
-        ),
-    )
-    conversation_dir = dock / "dialogue" / "conversation_receipts"
-    dialogue_status["conversation_receipt_count"] = (
-        len(list(conversation_dir.glob("*.json"))) if conversation_dir.exists() else 0
-    )
-    sanctum_status = _path_group_status(
-        dock,
-        (
-            "sanctum/codex",
-            "sanctum/vault",
-            "sanctum/dojo",
-            "sanctum/ingest_gate",
-            "sanctum/tools",
-            "sanctum/receipts",
-        ),
-    )
-    d_score: dict
-    try:
-        report = score_agent(holon_uid, repo_root=_REPO_ROOT, state_root=dharma_home).to_dict()
-        d_score = {
-            "schema_version": report["schema_version"],
-            "generated_at": report["generated_at"],
-            "total_score": report["total_score"],
-            "claimed_level": report["claimed_level"],
-            "verified_level": report["verified_level"],
-            "hard_gate_failures": report["hard_gate_failures"],
-            "evidence_paths": report["evidence_paths"][:20],
-        }
-    except Exception as exc:
-        d_score = {
-            "status": "error",
-            "error": type(exc).__name__,
-        }
-
-    return {
-        "schema_version": "dharma.agent_detail_holon.v1",
-        "agent_uid": holon_uid,
-        "is_holon": True,
-        "living_dock": living_dock,
-        "living_dock_status": living_dock.get("status"),
-        "living_dock_path": str(dock),
-        "dialogue_status": dialogue_status,
-        "sanctum_status": sanctum_status,
-        "receipt_paths": list(dict.fromkeys(living_dock.get("evidence_paths", [])))[:40],
-        "chat": {
-            "href": f"/holon/{holon_uid}/chat",
-            "history_href": f"/holon/{holon_uid}/chat/history",
-            "routing_mode": "own_model_read_only",
-            "protected_action_claim": False,
-        },
-        "d_score": d_score,
-    }
-
-
 async def _resolve_agent_payload(agent_id: str) -> dict | None:
     swarm = _get_swarm()
     try:
@@ -405,12 +274,6 @@ async def _resolve_agent_payload(agent_id: str) -> dict | None:
             else []
         ),
         "task_history": list(reversed(registry_identity.get("task_history", [])))[0:50],
-        "holon": _holon_detail(
-            agent_id=agent_id,
-            selected_name=selected_name,
-            selected_id=selected_id,
-            agent_out=agent_out,
-        ),
     }
 
 
@@ -447,6 +310,19 @@ async def list_agents() -> ApiResponse:
         return ApiResponse(data=[_agent_to_out(a) for a in agents])
     except Exception as e:
         return ApiResponse(data=[], error=str(e))
+
+
+@router.get("/agents/directory")
+async def list_agent_directory() -> ApiResponse:
+    """Return the stable-UID, credential-safe control-plane directory."""
+    directory = _get_agent_directory()
+    if directory is None:
+        return ApiResponse(status="error", data=[], error="AgentDirectory not initialized")
+    try:
+        entries = await directory.list_entries()
+        return ApiResponse(data=[entry.to_dict() for entry in entries])
+    except Exception as exc:
+        return ApiResponse(status="error", data=[], error=str(exc))
 
 
 @router.get("/agents/{agent_id}")
@@ -723,21 +599,50 @@ async def get_agent_notes(agent_id: str) -> ApiResponse:
     return ApiResponse(data={"notes": notes})
 
 
+@ws_router.websocket("/ws/agents")
 @router.websocket("/ws/agents")
 async def ws_agents(websocket: WebSocket):
-    await manager.connect(websocket, "agents")
+    auth = await authenticate_dashboard_websocket(websocket)
+    if not auth.authorized:
+        return
+    await manager.connect(
+        websocket,
+        "agents",
+        subprotocol=auth.selected_subprotocol,
+    )
+    disconnected = asyncio.create_task(_wait_for_agent_websocket_disconnect(websocket))
     try:
-        while True:
+        while not disconnected.done():
             # Send periodic updates
             try:
                 swarm = _get_swarm()
                 agents = await swarm.list_agents()
-                await manager.send_personal(websocket, {
-                    "event": "agents_update",
-                    "agents": [_agent_to_out(a) for a in agents],
-                })
+                sent = await manager.send_personal(
+                    websocket,
+                    {
+                        "event": "agents_update",
+                        "agents": [_agent_to_out(a) for a in agents],
+                    },
+                )
+                if not sent:
+                    break
             except Exception:
                 logger.debug("Failed to send periodic agent update over WebSocket", exc_info=True)
-            await asyncio.sleep(5)
-    except WebSocketDisconnect:
+            await asyncio.wait({disconnected}, timeout=5)
+    finally:
+        if not disconnected.done():
+            disconnected.cancel()
+            try:
+                await disconnected
+            except asyncio.CancelledError:
+                pass
         await manager.disconnect(websocket, "agents")
+
+
+async def _wait_for_agent_websocket_disconnect(websocket: WebSocket) -> None:
+    """Consume ignored client frames so close notifications remain observable."""
+    while True:
+        try:
+            await websocket.receive_text()
+        except (WebSocketDisconnect, RuntimeError):
+            return

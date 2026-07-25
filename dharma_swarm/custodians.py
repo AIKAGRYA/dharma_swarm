@@ -355,8 +355,44 @@ def _run_tests(project_path: str, test_command: str | None = None) -> bool:
 # ── Auto-Merge ───────────────────────────────────────────────────────
 
 
+def _promotion_infra_complete(project_path: str, branch_name: str) -> tuple[bool, str]:
+    """Fail-closed gate for any scheduled merge-to-main. ALL must hold:
+    explicit opt-in, valid promotion lease, clean source tree, explicit target
+    SHA. While promotion infrastructure is incomplete this returns False, so the
+    merge path stays dry-run only."""
+    from dharma_swarm import evolution_safety as _esafe
+
+    reasons: list[str] = []
+    if os.environ.get("DHARMA_ALLOW_CUSTODIAN_MERGE", "0") != "1":
+        reasons.append("DHARMA_ALLOW_CUSTODIAN_MERGE!=1")
+    if _esafe.load_live_mutation_lease() is None:
+        reasons.append("no_promotion_lease")
+    if not os.environ.get("DHARMA_PROMOTION_TARGET_SHA", "").strip():
+        reasons.append("no_explicit_target_sha")
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=project_path,
+            capture_output=True, text=True, timeout=15,
+        )
+        if status.returncode != 0 or status.stdout.strip():
+            reasons.append("source_tree_not_clean")
+    except (subprocess.SubprocessError, OSError):
+        reasons.append("source_tree_status_unknown")
+    return (not reasons, ",".join(reasons))
+
+
 def _git_merge_to_main(project_path: str, branch_name: str) -> bool:
-    """Merge a custodian branch back to main. Returns True on success."""
+    """Merge a custodian branch back to main. Returns True on success.
+
+    PR-001 fail-closed: refuses to merge unless the full promotion infrastructure
+    is present. Default posture: no scheduled merge ever runs."""
+    ok, why = _promotion_infra_complete(project_path, branch_name)
+    if not ok:
+        logger.warning(
+            "custodian merge to main DENIED (fail-closed): %s — branch %s left "
+            "for manual human promotion", why, branch_name,
+        )
+        return False
     try:
         # Switch to main
         r = subprocess.run(
@@ -792,8 +828,19 @@ def custodians_run_fn(job: dict[str, Any]) -> tuple[bool, str, str | None]:
     group = job.get("prompt", "6h").strip().lower()
     role_names = CRON_GROUPS.get(group, list(ROLES.keys()))
 
+    # PR-001 fail-closed: scheduled custodian runs are dry-run unless BOTH an
+    # explicit opt-in and the full promotion infrastructure are present. Any
+    # missing piece -> dry-run only (no agent spawn, no commit, no merge).
+    _proj = str(Path.home() / "dharma_swarm")
+    _infra_ok, _infra_why = _promotion_infra_complete(_proj, "cron")
+    _cron_dry_run = not (
+        os.environ.get("DHARMA_ALLOW_CUSTODIAN_MERGE", "0") == "1" and _infra_ok
+    )
+    if _cron_dry_run:
+        logger.info("custodians cron: dry-run (fail-closed: %s)", _infra_why or "default")
+
     try:
-        results = run_custodian_cycle(roles=role_names, dry_run=False)
+        results = run_custodian_cycle(roles=role_names, dry_run=_cron_dry_run)
         lines = [f"# Custodian Fleet — {group} cycle", ""]
         for r in results:
             status = "✅" if r.success else "❌"
@@ -847,7 +894,6 @@ def install_launchd_service() -> bool:
     Creates log directory. Returns True on success.
     """
     import platform
-    import shutil
 
     if platform.system() != "Darwin":
         logger.info("Launchd is macOS-only; skipping service install")
@@ -880,6 +926,7 @@ def install_launchd_service() -> bool:
         "<string>~</string>",
         f"<string>{home_str}</string>",
     )
+    plist_text = plist_text.replace("__DHARMA_SWARM_ROOT__", str(DHARMA_SWARM_ROOT))
     dest.write_text(plist_text, encoding="utf-8")
 
     # Load (unload first if already loaded)

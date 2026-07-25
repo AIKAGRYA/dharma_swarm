@@ -8,12 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import Task, TaskDispatch, _new_id
-from dharma_swarm.runtime_state import (
-    ArtifactRecord,
-    DelegationRun,
-    RuntimeReceipt,
-    TaskClaim,
-)
+from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeReceipt, TaskClaim
+from dharma_swarm.runtime_topology import record_subagent_tool_children, record_topology_state
+from dharma_swarm.runtime_lifecycle_identity import ensure_execution_identity_for_dispatch
+from dharma_swarm.runtime_lifecycle_payloads import mission_payload, route_truth, runtime_metadata
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
@@ -31,397 +29,6 @@ class RuntimeLifecycle:
         if task is None or not isinstance(task.metadata, dict):
             return {}
         return dict(task.metadata)
-
-    @staticmethod
-    def _first_text(*values: Any) -> str:
-        for value in values:
-            text = str(value or "").strip()
-            if text:
-                return text
-        return ""
-
-    @staticmethod
-    def _falseish(value: Any) -> bool:
-        if value is False:
-            return True
-        return str(value or "").strip().lower() in {"false", "0", "no"}
-
-    @staticmethod
-    def _trueish(value: Any) -> bool:
-        if value is True:
-            return True
-        return str(value or "").strip().lower() in {"true", "1", "yes"}
-
-    def _mission_payload(
-        self,
-        task_metadata: dict[str, Any],
-        dispatch_metadata: dict[str, Any],
-        identity_metadata: dict[str, Any],
-        *,
-        task_id: str,
-    ) -> dict[str, str]:
-        explicit_mission_id = self._first_text(
-            task_metadata.get("mission_id"),
-            task_metadata.get("missionId"),
-            dispatch_metadata.get("mission_id"),
-            dispatch_metadata.get("missionId"),
-            identity_metadata.get("mission_id"),
-            identity_metadata.get("missionId"),
-        )
-        explicit_mission = self._first_text(
-            task_metadata.get("mission"),
-            dispatch_metadata.get("mission"),
-            identity_metadata.get("mission"),
-        )
-        mission = self._first_text(
-            explicit_mission,
-            explicit_mission_id,
-            self._ledger.session_id,
-            task_id,
-        )
-        mission_id = self._first_text(explicit_mission_id, explicit_mission, mission)
-        return {
-            "mission_id": mission_id,
-            "mission": mission,
-            "mission_id_source": (
-                "explicit_mission_id"
-                if explicit_mission_id
-                else "explicit_mission"
-                if explicit_mission
-                else "runtime_lifecycle_fallback"
-            ),
-        }
-
-    @classmethod
-    def _explicit_no_provider_execution(
-        cls,
-        task_metadata: dict[str, Any],
-        dispatch_metadata: dict[str, Any],
-        identity_metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        provider_execution_false = any(
-            cls._falseish(payload.get("provider_execution"))
-            for payload in (task_metadata, dispatch_metadata, identity_metadata)
-        )
-        if not provider_execution_false:
-            return {}
-        truth_source = cls._first_text(
-            task_metadata.get("provider_model_truth_source"),
-            dispatch_metadata.get("provider_model_truth_source"),
-            identity_metadata.get("provider_model_truth_source"),
-            task_metadata.get("route_truth_source"),
-            dispatch_metadata.get("route_truth_source"),
-            identity_metadata.get("route_truth_source"),
-        )
-        applicability = cls._first_text(
-            task_metadata.get("provider_model_applicability"),
-            dispatch_metadata.get("provider_model_applicability"),
-            identity_metadata.get("provider_model_applicability"),
-        )
-        reason = cls._first_text(
-            task_metadata.get("no_provider_model_reason"),
-            dispatch_metadata.get("no_provider_model_reason"),
-            identity_metadata.get("no_provider_model_reason"),
-        )
-        if not truth_source or not (applicability or reason):
-            return {}
-        truth: dict[str, Any] = {
-            "provider_execution": False,
-            "provider_model_truth_source": truth_source,
-        }
-        if applicability:
-            truth["provider_model_applicability"] = applicability
-        if reason:
-            truth["no_provider_model_reason"] = reason
-        return truth
-
-    @classmethod
-    def _explicit_unproven_provider_execution(
-        cls,
-        task_metadata: dict[str, Any],
-        dispatch_metadata: dict[str, Any],
-        identity_metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        provider_execution_true = any(
-            cls._trueish(payload.get("provider_execution"))
-            for payload in (task_metadata, dispatch_metadata, identity_metadata)
-        )
-        if not provider_execution_true:
-            return {}
-        truth_source = cls._first_text(
-            task_metadata.get("provider_model_truth_source"),
-            dispatch_metadata.get("provider_model_truth_source"),
-            identity_metadata.get("provider_model_truth_source"),
-            task_metadata.get("route_truth_source"),
-            dispatch_metadata.get("route_truth_source"),
-            identity_metadata.get("route_truth_source"),
-        )
-        if not truth_source:
-            return {}
-        applicability = cls._first_text(
-            task_metadata.get("provider_model_applicability"),
-            dispatch_metadata.get("provider_model_applicability"),
-            identity_metadata.get("provider_model_applicability"),
-            "actual_served_unproven",
-        )
-        reason = cls._first_text(
-            task_metadata.get("provider_model_missing_reason"),
-            dispatch_metadata.get("provider_model_missing_reason"),
-            identity_metadata.get("provider_model_missing_reason"),
-            "provider_execution_completed_without_actual_served_runtime_evidence",
-        )
-        return {
-            "provider_execution": True,
-            "provider_model_applicability": applicability,
-            "provider_model_truth_source": truth_source,
-            "provider_model_missing_reason": reason,
-        }
-
-    @staticmethod
-    def _failure_no_provider_execution(failure_code: str) -> dict[str, Any]:
-        normalized = str(failure_code or "").strip()
-        reasons = {
-            "dispatch_dropoff": "dispatch_dropoff_before_worker_execution",
-            "claim_timeout": "claim_timeout_before_worker_execution",
-        }
-        reason = reasons.get(normalized)
-        if not reason:
-            return {}
-        return {
-            "provider_execution": False,
-            "provider_model_applicability": "not_applicable",
-            "provider_model_truth_source": (
-                f"runtime_lifecycle.{normalized}_no_provider_execution"
-            ),
-            "no_provider_model_reason": reason,
-        }
-
-    @staticmethod
-    def _is_terminal_status(status: str) -> bool:
-        normalized = str(status or "").strip().lower()
-        return bool(normalized) and normalized not in {
-            "accepted",
-            "assigned",
-            "claimed",
-            "created",
-            "in_progress",
-            "pending",
-            "queued",
-            "running",
-            "started",
-            "submitted",
-        }
-
-    @classmethod
-    def _terminal_unproven_provider_execution(
-        cls,
-        *,
-        status: str,
-    ) -> dict[str, Any]:
-        if not cls._is_terminal_status(status):
-            return {}
-        return {
-            "provider_execution": True,
-            "provider_model_applicability": "actual_served_unproven",
-            "provider_model_truth_source": "runtime_lifecycle.provider_execution_unproven",
-            "provider_model_missing_reason": (
-                "terminal_receipt_missing_actual_served_or_no_provider_evidence"
-            ),
-        }
-
-    @classmethod
-    def _pending_provider_execution(
-        cls,
-        *,
-        status: str,
-    ) -> dict[str, Any]:
-        if cls._is_terminal_status(status):
-            return {}
-        return {
-            "provider_execution": "pending",
-            "provider_model_applicability": "pending_execution",
-            "provider_model_truth_source": "runtime_lifecycle.provider_execution_pending",
-            "provider_model_pending_reason": "worker_execution_not_terminal",
-        }
-
-    @staticmethod
-    def _has_served_provider_model(route: dict[str, Any]) -> bool:
-        provider = any(
-            route.get(key)
-            for key in (
-                "actual_served_provider",
-                "served_provider",
-                "actual_provider",
-                "provider_served",
-            )
-        )
-        model = any(
-            route.get(key)
-            for key in (
-                "actual_served_model",
-                "served_model",
-                "actual_model",
-                "model_served",
-            )
-        )
-        return provider and model
-
-    @classmethod
-    def _route_truth(
-        cls,
-        task_metadata: dict[str, Any],
-        dispatch_metadata: dict[str, Any],
-        identity_metadata: dict[str, Any],
-        *,
-        failure_code: str = "",
-        status: str = "",
-    ) -> dict[str, Any]:
-        served_provider = cls._first_text(
-            task_metadata.get("actual_served_provider"),
-            dispatch_metadata.get("actual_served_provider"),
-            identity_metadata.get("actual_served_provider"),
-            task_metadata.get("served_provider"),
-            dispatch_metadata.get("served_provider"),
-            identity_metadata.get("served_provider"),
-            task_metadata.get("actual_provider"),
-            dispatch_metadata.get("actual_provider"),
-            identity_metadata.get("actual_provider"),
-            task_metadata.get("provider_served"),
-            dispatch_metadata.get("provider_served"),
-            identity_metadata.get("provider_served"),
-        )
-        selected_provider = cls._first_text(
-            task_metadata.get("selected_provider"),
-            dispatch_metadata.get("selected_provider"),
-            identity_metadata.get("selected_provider"),
-            task_metadata.get("provider_selected"),
-            dispatch_metadata.get("provider_selected"),
-        )
-        ambiguous_provider = cls._first_text(
-            task_metadata.get("provider"),
-            dispatch_metadata.get("provider"),
-            identity_metadata.get("provider"),
-        )
-        served_model = cls._first_text(
-            task_metadata.get("actual_served_model"),
-            dispatch_metadata.get("actual_served_model"),
-            identity_metadata.get("actual_served_model"),
-            task_metadata.get("served_model"),
-            dispatch_metadata.get("served_model"),
-            identity_metadata.get("served_model"),
-            task_metadata.get("actual_model"),
-            dispatch_metadata.get("actual_model"),
-            identity_metadata.get("actual_model"),
-            task_metadata.get("model_served"),
-            dispatch_metadata.get("model_served"),
-            identity_metadata.get("model_served"),
-        )
-        selected_model = cls._first_text(
-            task_metadata.get("selected_model"),
-            dispatch_metadata.get("selected_model"),
-            identity_metadata.get("selected_model"),
-            task_metadata.get("model_selected"),
-            dispatch_metadata.get("model_selected"),
-            task_metadata.get("selected_model_hint"),
-            dispatch_metadata.get("selected_model_hint"),
-        )
-        ambiguous_model = cls._first_text(
-            task_metadata.get("model"),
-            dispatch_metadata.get("model"),
-            identity_metadata.get("model"),
-        )
-        if not selected_provider and not served_provider:
-            selected_provider = ambiguous_provider
-        if not selected_model and not served_model:
-            selected_model = ambiguous_model
-        route: dict[str, Any] = {}
-        if served_provider:
-            route["actual_served_provider"] = served_provider
-            route["served_provider"] = served_provider
-            route["provider_served"] = served_provider
-            route["provider"] = served_provider
-        if selected_provider:
-            route["selected_provider"] = selected_provider
-            route.setdefault("provider", selected_provider)
-        if served_model:
-            route["actual_served_model"] = served_model
-            route["served_model"] = served_model
-            route["model_served"] = served_model
-            route["model"] = served_model
-        if selected_model:
-            route["selected_model"] = selected_model
-            route["selected_model_hint"] = selected_model
-            route.setdefault("model", selected_model)
-        source = cls._first_text(
-            task_metadata.get("provider_model_truth_source"),
-            dispatch_metadata.get("provider_model_truth_source"),
-            identity_metadata.get("provider_model_truth_source"),
-            task_metadata.get("route_truth_source"),
-            dispatch_metadata.get("route_truth_source"),
-            identity_metadata.get("route_truth_source"),
-        )
-        if route and source:
-            route["provider_model_truth_source"] = source
-        explicit_applicability = cls._first_text(
-            task_metadata.get("provider_model_applicability"),
-            dispatch_metadata.get("provider_model_applicability"),
-            identity_metadata.get("provider_model_applicability"),
-        )
-        explicit_missing_reason = cls._first_text(
-            task_metadata.get("provider_model_missing_reason"),
-            dispatch_metadata.get("provider_model_missing_reason"),
-            identity_metadata.get("provider_model_missing_reason"),
-        )
-        explicit_no_provider = cls._explicit_no_provider_execution(
-            task_metadata,
-            dispatch_metadata,
-            identity_metadata,
-        )
-        if explicit_no_provider and not cls._has_served_provider_model(route):
-            return explicit_no_provider
-        failure_no_provider = cls._failure_no_provider_execution(failure_code)
-        if failure_no_provider and not cls._has_served_provider_model(route):
-            return failure_no_provider
-        if route and source and not cls._has_served_provider_model(route):
-            if cls._is_terminal_status(status):
-                route["provider_execution"] = True
-                if explicit_applicability:
-                    applicability = explicit_applicability
-                elif source == "agent_runner.provider_chain_failure":
-                    applicability = "failed_before_serve"
-                else:
-                    applicability = "actual_served_unproven"
-                route["provider_model_applicability"] = applicability
-                route["provider_model_truth_source"] = source
-                if explicit_missing_reason:
-                    reason = explicit_missing_reason
-                elif applicability == "failed_before_serve":
-                    reason = "provider_chain_failed_before_actual_served_response"
-                else:
-                    reason = "attempted_route_selected_without_actual_served_runtime_evidence"
-                route["provider_model_missing_reason"] = reason
-                return route
-            route["provider_execution"] = "pending"
-            route["provider_model_applicability"] = "pending_execution"
-            route["provider_model_truth_source"] = source
-            route["provider_model_pending_reason"] = "worker_execution_not_terminal"
-            return route
-        explicit_unproven_provider = cls._explicit_unproven_provider_execution(
-            task_metadata,
-            dispatch_metadata,
-            identity_metadata,
-        )
-        if explicit_unproven_provider and not cls._has_served_provider_model(route):
-            return explicit_unproven_provider
-        pending_provider = cls._pending_provider_execution(status=status)
-        if pending_provider and not route:
-            return pending_provider
-        terminal_unproven_provider = cls._terminal_unproven_provider_execution(
-            status=status,
-        )
-        if terminal_unproven_provider and not route:
-            return terminal_unproven_provider
-        return route
 
     @staticmethod
     def _coerce_int(value: Any, default: int) -> int:
@@ -471,128 +78,15 @@ class RuntimeLifecycle:
         task: Task | None = None,
         require: bool = False,
     ) -> ExecutionIdentity:
-        task_meta = self._task_meta(task)
-        nested = task_meta.get("execution_identity")
-        merged: dict[str, Any] = {}
-        if isinstance(nested, dict):
-            merged.update(nested)
-        merged.update(task_meta)
-        dispatch_nested = td.metadata.get("execution_identity")
-        if isinstance(dispatch_nested, dict):
-            merged.update(dispatch_nested)
-        merged.update(td.metadata)
-
-        run_id = str(
-            merged.get("run_id")
-            or merged.get("runtime_run_id")
-            or self.ensure_runtime_run_id(td)
-        ).strip()
-        trace_id = str(merged.get("trace_id") or "").strip()
-        if not trace_id:
-            try:
-                from dharma_swarm.correlation_context import get_correlation
-
-                trace_id = get_correlation().trace_id
-            except Exception:
-                trace_id = ""
-        if require and not trace_id:
-            raise MissingExecutionIdentity("ExecutionIdentity requires trace_id on this path")
-        correlation_id = str(merged.get("correlation_id") or trace_id).strip()
-        if require and not correlation_id:
-            raise MissingExecutionIdentity("ExecutionIdentity requires correlation_id on this path")
-        claim_id = str(merged.get("claim_id") or "").strip()
-        if require and not claim_id:
-            raise MissingExecutionIdentity("ExecutionIdentity requires claim_id on this path")
-
-        identity = ExecutionIdentity.new(
-            task_id=td.task_id,
-            agent_id=td.agent_id,
+        return ensure_execution_identity_for_dispatch(
+            td,
+            task=task,
+            task_metadata=self._task_meta(task),
             session_id=self._ledger.session_id,
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            causation_id=str(merged.get("causation_id") or ""),
-            parent_run_id=str(merged.get("parent_run_id") or ""),
-            run_id=run_id,
-            claim_id=claim_id,
-            idempotency_key=str(merged.get("idempotency_key") or ""),
-            external_a2a_task_id=str(merged.get("external_a2a_task_id") or ""),
-            message_id=str(merged.get("message_id") or ""),
-            event_id=str(merged.get("event_id") or ""),
-            artifact_id=str(merged.get("artifact_id") or ""),
-            proposal_id=str(merged.get("proposal_id") or ""),
-            metadata={
-                "source": "runtime_lifecycle.ensure_execution_identity",
-                **dict(merged.get("metadata") or {}),
-            },
+            ensure_runtime_run_id=self.ensure_runtime_run_id,
+            runtime_state_store=self._runtime_state_store(),
+            require=require,
         )
-        td.metadata.update(
-            {
-                "execution_identity": identity.to_dict(),
-                "trace_id": identity.trace_id,
-                "correlation_id": identity.correlation_id,
-                "runtime_run_id": identity.run_id,
-                "run_id": identity.run_id,
-                "claim_id": identity.claim_id,
-                "agent_id": identity.agent_id,
-                "session_id": identity.session_id,
-                "idempotency_key": identity.idempotency_key,
-            }
-        )
-        if task is not None:
-            task.metadata = {
-                **self._task_meta(task),
-                "execution_identity": identity.to_dict(),
-                "trace_id": identity.trace_id,
-                "correlation_id": identity.correlation_id,
-                "runtime_run_id": identity.run_id,
-                "run_id": identity.run_id,
-                "claim_id": identity.claim_id,
-                "idempotency_key": identity.idempotency_key,
-            }
-        store = self._runtime_state_store()
-        if store is not None:
-            store.record_execution_identity_sync(
-                identity,
-                source="runtime_lifecycle",
-            )
-        elif require:
-            raise MissingExecutionIdentity("RuntimeStateStore is required on this path")
-        return identity.require_for_dispatch()
-
-    def runtime_metadata(
-        self,
-        td: TaskDispatch,
-        *,
-        status: str,
-        failure_code: str = "",
-        error: str = "",
-        result: str | None = None,
-    ) -> dict[str, Any]:
-        metadata = {
-            "source": "orchestrator",
-            "status": status,
-            "topology": td.topology.value if td.topology else "dispatch",
-            "timeout_seconds": td.timeout_seconds,
-            "retry_count": td.metadata.get("retry_count", 0),
-            "max_retries": td.metadata.get("max_retries", 0),
-            "claim_timeout_seconds": td.metadata.get("claim_timeout_seconds", 0),
-        }
-        if failure_code:
-            metadata["failure_code"] = failure_code
-        if error:
-            metadata["error"] = error[:500]
-        if result is not None:
-            metadata["result_chars"] = len(result or "")
-        for key in (
-            "context_bundle_id",
-            "context_bundle_status",
-            "context_bundle_error",
-            "runtime_db_path",
-        ):
-            value = td.metadata.get(key)
-            if value:
-                metadata[key] = value
-        return metadata
 
     async def record_task_claim(
         self,
@@ -616,18 +110,19 @@ class RuntimeLifecycle:
             require=require_identity,
         )
         task_meta = self._task_meta(task)
-        route_truth = self._route_truth(
+        route_payload = route_truth(
             task_meta,
             td.metadata,
             identity.metadata,
             failure_code=failure_code,
             status=status,
         )
-        mission_payload = self._mission_payload(
+        mission = mission_payload(
             task_meta,
             td.metadata,
             identity.metadata,
             task_id=td.task_id,
+            session_id=self._ledger.session_id,
         )
         active_claim = task_meta.get("active_claim")
         if not isinstance(active_claim, dict):
@@ -649,14 +144,14 @@ class RuntimeLifecycle:
             heartbeat_at=heartbeat_at,
             stale_after=stale_after,
             retry_count=max(0, self._coerce_int(td.metadata.get("retry_count"), 0)),
-            metadata=self.runtime_metadata(
+            metadata=runtime_metadata(
                 td,
                 status=status,
                 failure_code=failure_code,
                 error=error,
             )
-            | route_truth
-            | mission_payload
+            | route_payload
+            | mission
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
@@ -671,16 +166,20 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "claim_id": identity.claim_id,
                 "failure_code": failure_code,
-                **mission_payload,
+                **mission,
                 "receipt_status": status,
-                **route_truth,
+                **route_payload,
             }
+            await store.record_execution_identity(
+                identity,
+                source="runtime_lifecycle.record_task_claim",
+            )
             inserted = await store.try_begin_idempotent_side_effect(
                 identity,
                 side_effect_key,
                 metadata=receipt_payload,
             )
-            await store.record_task_claim(claim, emit_receipt=False)
+            await store.record_task_claim(claim)
             await store.record_runtime_receipt(
                 RuntimeReceipt(
                     receipt_id=receipt_id,
@@ -738,7 +237,7 @@ class RuntimeLifecycle:
         if not started_raw:
             td.metadata["runtime_run_started_at"] = started_at.isoformat()
         task_meta = self._task_meta(task)
-        route_truth = self._route_truth(
+        route_payload = route_truth(
             task_meta,
             td.metadata,
             identity.metadata,
@@ -749,11 +248,12 @@ class RuntimeLifecycle:
         if not isinstance(requested_output, list):
             requested_output = []
         current_artifact_id = str(task_meta.get("current_artifact_id", "") or "")
-        mission_payload = self._mission_payload(
+        mission = mission_payload(
             task_meta,
             td.metadata,
             identity.metadata,
             task_id=td.task_id,
+            session_id=self._ledger.session_id,
         )
         artifact_refs = (
             [f"artifact_records:{current_artifact_id}"]
@@ -775,15 +275,15 @@ class RuntimeLifecycle:
             started_at=started_at,
             completed_at=completed_at,
             failure_code=failure_code,
-            metadata=self.runtime_metadata(
+            metadata=runtime_metadata(
                 td,
                 status=status,
                 failure_code=failure_code,
                 error=error,
                 result=result,
             )
-            | route_truth
-            | mission_payload
+            | route_payload
+            | mission
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
@@ -797,20 +297,42 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "failure_code": failure_code,
                 "result_chars": len(result or ""),
-                **mission_payload,
+                **mission,
                 "artifact_refs": artifact_refs,
                 "no_artifact_refs_reason": ""
                 if artifact_refs
                 else "delegation_run has no current_artifact_id",
                 "receipt_status": status,
-                **route_truth,
+                **route_payload,
             }
+            await store.record_execution_identity(
+                identity,
+                source="runtime_lifecycle.record_delegation_run",
+            )
             inserted = await store.try_begin_idempotent_side_effect(
                 identity,
                 side_effect_key,
                 metadata=receipt_payload,
             )
-            await store.record_delegation_run(run, emit_receipt=False)
+            await store.record_delegation_run(run)
+            await record_subagent_tool_children(
+                store=store,
+                identity=identity,
+                td=td,
+                session_id=self._ledger.session_id,
+                status=status,
+                started_at=started_at,
+                mission=mission,
+                route_payload=route_payload,
+            )
+            await record_topology_state(
+                store=store,
+                identity=identity,
+                td=td,
+                task_meta=task_meta,
+                session_id=self._ledger.session_id,
+                status=status,
+            )
             await store.record_runtime_receipt(
                 RuntimeReceipt(
                     receipt_id=receipt_id,
@@ -890,13 +412,14 @@ class RuntimeLifecycle:
             **self._task_meta(task),
             **dict(metadata or {}),
         }
-        mission_payload = self._mission_payload(
+        mission = mission_payload(
             artifact_metadata,
             {},
             {},
             task_id=task.id,
+            session_id=self._ledger.session_id,
         )
-        route_truth = self._route_truth(artifact_metadata, {}, {})
+        route_payload = route_truth(artifact_metadata, {}, {})
         identity = ExecutionIdentity.from_metadata(
             artifact_metadata,
             task_id=task.id,
@@ -938,10 +461,10 @@ class RuntimeLifecycle:
                     "artifact_id": artifact_id,
                     "artifact_kind": artifact_kind,
                     "artifact_refs": [f"artifact_records:{artifact_id}"],
-                    **mission_payload,
+                    **mission,
                     "payload_path": str(payload_path),
                     "manifest_path": str(manifest_path or ""),
-                    **route_truth,
+                    **route_payload,
                 }
                 await store.record_runtime_receipt(
                     RuntimeReceipt(

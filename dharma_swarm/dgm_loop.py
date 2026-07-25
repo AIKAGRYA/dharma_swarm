@@ -42,9 +42,8 @@ Usage as agent task::
      provider timeout — optimize provider retry logic'"
 
 Relationship to existing code:
-    - DarwinEngine.auto_evolve(shadow=False) is the underlying executor.
-      This module wraps it with open-ended archive sampling and a swarm-specific
-      fitness signal rather than a fixed source file list.
+    - DarwinEngine.auto_evolve is the underlying executor.  This module invokes
+      it in shadow mode only; live promotion is owned by Forge verify_promotion.
     - selector.py has _novelty_weight() which is the right primitive but is not
       wired into the auto_evolve source file selection. This module uses it.
     - EvolutionArchive.list_entries() returns all entries with lineage.
@@ -60,15 +59,107 @@ Reference: Sakana AI Darwin Gödel Machine (ICLR 2026)
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import json
 import logging
+import os
 import random
+import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
+DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S = 1800.0
+FORGE_FITNESS_MODULE = "dharma_swarm.forge_v1.forge_v2.forge_fitness"
+FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX = "FORGE_GENOME_FITNESS_JSON "
+
+
+def _jsonable_forge_genome(genome: dict[str, Any] | Any) -> dict[str, Any]:
+    if isinstance(genome, dict):
+        return dict(genome)
+    if is_dataclass(genome):
+        return asdict(genome)
+    to_dict = getattr(genome, "to_dict", None)
+    if callable(to_dict):
+        data = to_dict()
+        if isinstance(data, dict):
+            return data
+    raise TypeError("Forge genome subprocess grading requires a dict-like or dataclass genome")
+
+
+def _forge_grade_subprocess_timeout() -> float:
+    raw = os.environ.get("DGM_FORGE_GRADE_SUBPROCESS_TIMEOUT_S")
+    if not raw:
+        return DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S
+
+
+def _forge_fitness_available() -> bool:
+    return importlib.util.find_spec(FORGE_FITNESS_MODULE) is not None
+
+
+def _parse_forge_grade_subprocess_stdout(stdout: bytes) -> dict[str, Any]:
+    text = stdout.decode("utf-8", errors="replace")
+    for line in reversed(text.splitlines()):
+        if line.startswith(FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX):
+            return json.loads(line[len(FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX):])
+    raise RuntimeError("Forge grade subprocess did not emit a structured fitness result")
+
+
+async def _grade_forge_genome_in_subprocess(
+    genome: dict[str, Any] | Any,
+    instance_ids: list[str],
+    *,
+    split: str,
+    timeout_s: float | None = None,
+) -> dict[str, Any]:
+    """Run the sync Forge grade path in an isolated Python process.
+
+    The Forge runner and provider clients use sync wrappers that create their own
+    event loops.  Running that stack inside the DGM async process, or a worker
+    thread spawned by it, has provider-specific failure modes.  A subprocess
+    gives each grade a fresh interpreter, fresh event loop, and crash boundary.
+    """
+    if not _forge_fitness_available():
+        raise RuntimeError(
+            "Forge genome subprocess grader is unavailable; U2 must land "
+            f"{FORGE_FITNESS_MODULE} before default DGM forge grading can run."
+        )
+    payload = {
+        "genome": _jsonable_forge_genome(genome),
+        "instance_ids": list(instance_ids),
+        "split": split,
+    }
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        FORGE_FITNESS_MODULE,
+        "--json-stdin",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")),
+            timeout=timeout_s or _forge_grade_subprocess_timeout(),
+        )
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.wait()
+        raise TimeoutError("Forge grade subprocess timed out") from exc
+    if proc.returncode != 0:
+        err = stderr.decode("utf-8", errors="replace").strip()
+        out = stdout.decode("utf-8", errors="replace").strip()
+        detail = err or out or f"exit={proc.returncode}"
+        raise RuntimeError(f"Forge grade subprocess failed: {detail[:2000]}")
+    return _parse_forge_grade_subprocess_stdout(stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +175,9 @@ class DGMResult:
     fitness_before: float = 0.0
     fitness_after: float = 0.0
     fitness_delta: float = 0.0           # positive = improvement
+    forge_grade: dict[str, Any] = field(default_factory=dict)
+    promote_eligible: bool = False
+    promotion_blockers: list[str] = field(default_factory=list)
     applied: bool = False                # diff was applied to real code
     rolled_back: bool = False            # diff was rolled back after test failure
     shadow_mode: bool = True             # True means no real mutation occurred
@@ -235,6 +329,18 @@ DGM_PROTECTED_FILES = frozenset({
     "dharma_kernel.py",
     "evolution.py",
     "config.py",
+    # Frozen Forge ruler/evaluator lane.  DGM must not mutate the scorer it is
+    # trying to beat.
+    "stats.py",
+    "critic.py",
+    "runner.py",
+    "budget.py",
+    "provenance.py",
+    "promote.py",
+    "signals.py",
+    "arms.py",
+    "forge_fitness.py",
+    "verify_promotion.py",
 })
 
 
@@ -269,7 +375,8 @@ class DGMLoop:
         engine: DarwinEngine instance.
         state_dir: DHARMA state directory (~/.dharma).
         novelty_pressure: 0.0=exploit, 1.0=explore. 0.7 matches Sakana DGM.
-        shadow_mode: If True, propose but don't apply diffs. Env var override.
+        shadow_mode: If True, propose but don't apply diffs.  ``False`` is
+            refused here; Forge verify_promotion is the only live-apply door.
     """
 
     def __init__(
@@ -283,16 +390,63 @@ class DGMLoop:
         self._state_dir = state_dir or dharma_state_dir()
         self._novelty_pressure = novelty_pressure
 
-        import os
-        if shadow_mode is None:
-            # Default: shadow ON unless explicitly disabled AND autonomy >= 2
-            env_shadow = os.environ.get("DHARMA_EVOLUTION_SHADOW", "1")
-            autonomy = int(os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-            self._shadow_mode = not (env_shadow == "0" and autonomy >= 2)
-        else:
-            self._shadow_mode = shadow_mode
+        if shadow_mode is False:
+            raise ValueError(
+                "DGMLoop live apply is disabled; use forge_v2.verify_promotion "
+                "as the sole promotion/live-apply door."
+            )
+        self._shadow_mode = True
 
         self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+
+    async def run_forge_genome_generation(
+        self,
+        genome: dict[str, Any] | Any,
+        instance_ids: list[str],
+        *,
+        split: str = "explore",
+        grade_fn: Any | None = None,
+    ) -> DGMResult:
+        """Score a DGM scaffold genome with the real Forge held-out grader.
+
+        This is the RSI Lab JOIN path: genome fitness comes from
+        ``forge_v2.forge_fitness.grade_genome`` instead of Darwin's local pytest
+        cycle.  It never applies code diffs; promotion remains owned by
+        ``forge_v2.verify_promotion``.
+        """
+        start = time.monotonic()
+        result = DGMResult(shadow_mode=True, source_file="forge_scaffold")
+        try:
+            arm = getattr(genome, "arm", None)
+            if arm is None and isinstance(genome, dict):
+                arm = genome.get("arm", "verify_chain")
+            result.source_file = f"forge_scaffold::{arm or 'verify_chain'}"
+            if grade_fn is not None:
+                fitness = grade_fn(
+                    genome,
+                    list(instance_ids),
+                    split=split,
+                )
+                fitness_dict = fitness.to_dict() if hasattr(fitness, "to_dict") else dict(fitness)
+            else:
+                fitness_dict = await _grade_forge_genome_in_subprocess(
+                    genome,
+                    list(instance_ids),
+                    split=split,
+                )
+            result.forge_grade = fitness_dict
+            result.fitness_after = float(fitness_dict.get("fitness", 0.0) or 0.0)
+            result.fitness_delta = result.fitness_after - result.fitness_before
+            result.promote_eligible = bool(fitness_dict.get("promote_eligible", False))
+            result.promotion_blockers = list(fitness_dict.get("blockers", []) or [])
+            result.proposals_submitted = 1
+            result.proposals_gated = 1
+        except Exception as exc:
+            result.error = str(exc)
+            logger.error("DGM Forge genome generation failed: %s", exc, exc_info=True)
+
+        result.duration_seconds = time.monotonic() - start
+        return result
 
     async def run_one_generation(
         self,
@@ -372,15 +526,31 @@ class DGMLoop:
 
         # Step 4: Run auto_evolve with the selected source file and parent context
         try:
-            from dharma_swarm.providers import OpenRouterProvider
-            import os as _os
+            from dharma_swarm.key_oracle import dispatchable_now
+            from dharma_swarm.runtime_provider import (
+                create_runtime_provider,
+                preferred_runtime_provider_configs,
+            )
 
+            # Pick a provider that is ACTUALLY dispatchable right now — decided by
+            # the oracle, NOT a hardcoded env-key check. dispatchable_now()
+            # includes the KEYLESS claude_code lane (live only when headless
+            # `claude -p` smokes green), so this loop no longer falsely reports
+            # "no provider" when dispatch is available with zero keys.
             provider = None
-            if _os.environ.get("OPENROUTER_API_KEY"):
-                provider = OpenRouterProvider()
+            live = dispatchable_now()
+            for cfg in preferred_runtime_provider_configs():
+                name = str(getattr(cfg.provider, "value", cfg.provider)).lower()
+                if name in live:
+                    provider = create_runtime_provider(cfg)
+                    break
 
             if provider is None:
-                result.error = "No LLM provider available (set OPENROUTER_API_KEY)"
+                result.error = (
+                    "No dispatchable LLM provider. Dispatch is normally keyless via "
+                    "claude_code — check key_oracle.dispatchable_now(); add a key only "
+                    "to widen the roster."
+                )
                 result.duration_seconds = time.monotonic() - start
                 return result
 
@@ -390,6 +560,7 @@ class DGMLoop:
                 shadow=self._shadow_mode,
                 timeout=timeout,
                 context=full_context,
+                parent_id=result.parent_id,
             )
 
             result.proposals_submitted = evo_result.proposals_submitted
@@ -541,24 +712,51 @@ async def run_dgm_evolution_task(
     n_generations: int = 1,
     shadow: bool | None = None,
     state_dir: Path | None = None,
+    allow_legacy_local_fitness: bool = False,
 ) -> dict[str, Any]:
-    """Entry point for autonomous agents calling the DGM loop as a tool.
+    """Legacy source-file DGM task.
 
-    Agents call this when they want to trigger a real evolution cycle.
-    This is the bridge between the task system and the DarwinEngine.
+    RSI Lab DGM fitness must come from Forge held-out grading.  The default
+    agent-callable path therefore refuses this local-Darwin source-file loop and
+    points callers to ``run_dgm_forge_genome_task``.  The legacy shadow path is
+    kept only for explicit non-promotion experimentation.
 
     Args:
         source_file: Which file to evolve (agent_runner.py, etc.). None = auto-select.
         fitness_context: What operational context to guide the evolution
             (e.g. "tasks are timing out on provider calls — improve retry logic").
         n_generations: How many generations to run (1 = quick, 80 = full DGM run).
-        shadow: True=dry-run, False=real mutation. None=use environment defaults.
+        shadow: True=dry-run. False is refused; live mutation must go through
+            forge_v2.verify_promotion.
         state_dir: DHARMA state directory.
+        allow_legacy_local_fitness: Explicit opt-in for the old local Darwin
+            shadow loop.  Never promotion-eligible.
 
     Returns:
         Dict with results, summary, and lineage information.
     """
     state_dir = state_dir or dharma_state_dir()
+    if shadow is False:
+        return {
+            "success": False,
+            "error": (
+                "DGMLoop live apply is disabled; use forge_v2.verify_promotion "
+                "as the sole promotion/live-apply door."
+            ),
+            "shadow_mode": True,
+        }
+
+    if not allow_legacy_local_fitness:
+        return {
+            "success": False,
+            "error": (
+                "Legacy source-file DGM uses local Darwin fitness and is disabled "
+                "for RSI Lab. Use run_dgm_forge_genome_task so fitness comes from "
+                "forge_v2.forge_fitness.grade_genome."
+            ),
+            "shadow_mode": True,
+            "forge_required": True,
+        }
 
     # Load the DarwinEngine from the running swarm
     try:
@@ -622,6 +820,37 @@ async def run_dgm_evolution_task(
             "archive_growth": (results[-1].archive_size_after - results[0].archive_size_before) if results else 0,
             "shadow_mode": loop._shadow_mode,
         }
+
+
+async def run_dgm_forge_genome_task(
+    genome: dict[str, Any],
+    instance_ids: list[str],
+    *,
+    split: str = "explore",
+    state_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Agent-callable DGM scaffold task whose fitness is Forge-held-out grade."""
+    from dharma_swarm.evolution import DarwinEngine
+
+    state_dir = state_dir or dharma_state_dir()
+    engine = DarwinEngine(archive_path=state_dir / "evolution" / "archive.jsonl")
+    loop = DGMLoop(engine=engine, state_dir=state_dir, shadow_mode=True)
+    result = await loop.run_forge_genome_generation(
+        genome,
+        instance_ids,
+        split=split,
+    )
+    return {
+        "success": result.error is None,
+        "summary": result.summary(),
+        "fitness_after": result.fitness_after,
+        "fitness_delta": result.fitness_delta,
+        "promote_eligible": result.promote_eligible,
+        "promotion_blockers": result.promotion_blockers,
+        "forge_grade": result.forge_grade,
+        "shadow_mode": result.shadow_mode,
+        "error": result.error,
+    }
 
 
 # ---------------------------------------------------------------------------

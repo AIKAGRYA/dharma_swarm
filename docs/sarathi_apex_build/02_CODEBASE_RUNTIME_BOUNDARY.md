@@ -1,64 +1,45 @@
-# 02 — Codebase / Runtime Boundary
+# 02 — Codebase / Runtime Boundary Verdict
 
-**Custody: doctrine, VERIFIED against live layout 2026-07-06.**
+> **Dated lane detail:** The boundary principle remains valid, but counts and
+> the dated surface witness defer to
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md);
+> current operating state remains owned by onboarding and Live Ops.
 
-The split is correct. The disease is *drift across* the split, not the split
-itself.
+## Verdict
 
-## The three homes
+Keep the boundary. Do **not** merge repo and runtime homes.
 
-| Home | Is | Holds | In git? |
-|---|---|---|---|
-| `/Users/dhyana/dharma_swarm` | source code | modules, tests, schemas, docs, CLI/API, versioned logic | YES |
-| `/Users/dhyana/.dharma` | mutable runtime | identities, state, ledgers, inboxes, heartbeats, receipts, leases | NO |
-| `/Users/dhyana/.hermes/hermes-agent` | third-party product | NousResearch Hermes Agent (35 top-level dirs) + its own runtime | NO (side ecosystem) |
+| Home | Verdict | Role |
+|---|---|---|
+| `dharma_swarm/` | Source of truth for code | Python modules, tests, schemas, docs, proof gates, CLIs. |
+| `~/.dharma/` | Mutable runtime state | Identities, inboxes, heartbeats, ledgers, wake receipts, local runtime wrappers. |
+| `~/.hermes/` | Side ecosystem | NousResearch Hermes Agent product checkout/runtime; `hermes-m5` is a field-ops peer, not dharma holon lineage. |
 
-One sentence: **code integrity lives in git; mutable runtime state lives under
-`~/.dharma`; Hermes is a separate product we benchmark against, not our lineage.**
+## Five identity homes currently in play
 
-## Why the split is right
+1. `~/.dharma/agents`
+2. `~/.dharma/ginko/agents`
+3. `docs/agents`
+4. `~/.dharma/a2a/cards`
+5. `~/.dharma/external_agents`
 
-- Source is reviewable, testable, diffable, and reproducible only when it is in
-  git. Runtime state is per-machine, high-churn, and often secrets-adjacent —
-  committing it corrupts history and leaks.
-- A runtime wrapper (e.g. a launchd/tmux shim) MAY live under `~/.dharma`, but
-  the real implementation it calls MUST live in the repo (constraint #11).
+Known drift includes hyphen/underscore aliases, stale identities, and provider
+enum mismatch (`fugu_ultra` / `sakana`). This lane records the drift and points
+to the agent-admission semantic-commons track as owner of remediation; it does
+not normalize runtime state.
 
-## The drift (what actually goes wrong)
+## Boundary rule
 
-1. **Source-like scripts living only in runtime.** A `.py` with real logic under
-   `~/.dharma/agents/<name>/...` that has no repo owner. Fix: repo owns logic;
-   `~/.dharma` gets a thin `from dharma_swarm... import main` shim.
-2. **Multiple identity homes.** Live counts: `~/.dharma/agents` (67),
-   `~/.dharma/ginko/agents` (52, legacy), `dharma_swarm/docs/agents` (11, repo
-   docs), `~/.dharma/external_agents` (26). Four homes = four truths.
-3. **Hyphen/underscore duplicates.** `hermes-m5` vs `hermes_m5`, composer
-   variants. Same seat, two slugs, two state files.
-4. **Runtime state without a repo-tracked map entry.** A live surface under
-   `~/.dharma` that nothing in git declares. `ACTIVE_SURFACE_MANIFEST.yaml` is
-   the repo-side registry that is supposed to close this gap.
-5. **"Alive" claims from identity docs.** A `SOUL.md` / `identity.json` existing
-   is NOT liveness. Liveness = a fresh service heartbeat or wake receipt. Live
-   proof today: 17 registered, 0 service_alive.
+- Runtime wrappers under `~/.dharma` must stay thin and import repo-owned code.
+- Runtime heartbeats/inboxes/receipts are mutable evidence and must not be
+  committed as source.
+- Source-like code for Sarathi belongs under `dharma_swarm/holon_system/sarathi/`
+  once Phase C unlocks.
+- A file in `~/.dharma/agents/sarathi` can be a prompt, identity, or wrapper; it
+  cannot be the canonical implementation of Sarathi.
 
-## The rule going forward
+## Anti-overclaim rule
 
-Every new artifact must be classified as exactly one of:
-
-```text
-code     -> dharma_swarm/ (git)
-runtime  -> ~/.dharma/    (not git; must have a repo map entry)
-doc      -> docs/         (git)
-receipt  -> reports/ or ~/.dharma; commit only if explicitly curated
-archive  -> compost; named as such
-```
-
-If a thing is "code that happens to run from `~/.dharma`", it is code: put the
-logic in `dharma_swarm/holon_system/...` and leave a shim in `~/.dharma`.
-
-## Boundary verdict
-
-Split = CORRECT. Enforcement = PARTIAL. The `holon_system/` facade package
-(added this pass) is the repo-side home so runtime shims finally have something
-canonical to import. The remaining drift (identity homes, hyphen dupes,
-`holon/` fork) is tracked in `07_BACKLOG.md` and gated by `sprawl_guard.py`.
+`identity.json`, `SOUL.md`, `BOOT.md`, compass counts, or an A2A card prove that
+a named seat exists. They do not prove that a breathing holon is running. Alive
+requires wake receipts and the proof gates in `06_PROOF_GATES.md`.

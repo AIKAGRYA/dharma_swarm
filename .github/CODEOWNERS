@@ -14,8 +14,76 @@
 /dharma_swarm/telos_gates.py            @AmitabhainArunachala
 /dharma_swarm/swarm.py                  @AmitabhainArunachala
 /dharma_swarm/orchestrator.py           @AmitabhainArunachala
-/dharma_swarm/runtime_state.py          @AmitabhainArunachala
 /dharma_swarm/providers.py              @AmitabhainArunachala
+
+# Governance switch-set — the files that decide what the gates enforce.
+# Editing any of these changes the ceiling itself, so they are routed
+# explicitly and reviewed apart from ordinary code. The ratchet and
+# module-budget gates additionally grade their baselines from the
+# merge-base, so a PR cannot loosen these in the same diff it needs them.
+/docs/governance/hygiene/patterns/AI-M1.yaml            @AmitabhainArunachala
+/docs/governance/evidence_grades.yaml                   @AmitabhainArunachala
+/docs/governance/hygiene/ratchet_baselines.json         @AmitabhainArunachala
+/scripts/governance/check_module_budget.py              @AmitabhainArunachala
+/.github/workflows/pudgala-rigor.yml                    @AmitabhainArunachala
+/.github/workflows/quality-ratchet.yml                  @AmitabhainArunachala
+/.github/workflows/module-budget.yml                    @AmitabhainArunachala
+
+# Measured blast-radius owners — auto-derived, not doctrine-picked.
+# Every module below carries a transitive importer count at or above the
+# threshold in scripts/governance/codeowners_blast_radius.py, meaning a change
+# to it can affect that many other modules. Regenerate this block with
+#   python3 scripts/governance/codeowners_blast_radius.py --emit
+# and verify coverage with --check (wired in .github/workflows/hermetic.yml).
+/dharma_swarm/models.py                 @AmitabhainArunachala
+/dharma_swarm/stigmergy.py              @AmitabhainArunachala
+/dharma_swarm/_stigmergy_lock.py        @AmitabhainArunachala
+/dharma_swarm/traces.py                 @AmitabhainArunachala
+/dharma_swarm/correlation_context.py    @AmitabhainArunachala
+/dharma_swarm/daemon_config.py          @AmitabhainArunachala
+/dharma_swarm/runtime_contract.py       @AmitabhainArunachala
+/dharma_swarm/engine/knowledge_store.py @AmitabhainArunachala
+/dharma_swarm/engine/event_memory.py    @AmitabhainArunachala
+/dharma_swarm/spine/identity.py         @AmitabhainArunachala
+/dharma_swarm/runtime_state.py          @AmitabhainArunachala
+/dharma_swarm/execution_profile.py      @AmitabhainArunachala
+/dharma_swarm/merkle_log.py             @AmitabhainArunachala
+/dharma_swarm/archive.py                @AmitabhainArunachala
+/dharma_swarm/api_keys.py               @AmitabhainArunachala
+/dharma_swarm/runtime_env_loader.py     @AmitabhainArunachala
+/dharma_swarm/tiny_router_shadow.py     @AmitabhainArunachala
+/dharma_swarm/model_defaults.py         @AmitabhainArunachala
+/dharma_swarm/model_hierarchy.py       @AmitabhainArunachala
+/dharma_swarm/resilience.py             @AmitabhainArunachala
+/dharma_swarm/routing_memory.py         @AmitabhainArunachala
+/dharma_swarm/evolution_roster.py       @AmitabhainArunachala
+/dharma_swarm/model_pool.py             @AmitabhainArunachala
+/dharma_swarm/ollama_config.py          @AmitabhainArunachala
+/dharma_swarm/telemetry_plane.py        @AmitabhainArunachala
+/dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala
+/dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala
+/dharma_swarm/router_retrospective.py   @AmitabhainArunachala
+/dharma_swarm/codex_cli.py              @AmitabhainArunachala
+/dharma_swarm/cost_tracker.py           @AmitabhainArunachala
+/dharma_swarm/decision_router.py        @AmitabhainArunachala
+/dharma_swarm/key_oracle.py             @AmitabhainArunachala
+/dharma_swarm/spine/tollbooth.py        @AmitabhainArunachala
+/dharma_swarm/__init__.py               @AmitabhainArunachala
+/dharma_swarm/base_provider.py          @AmitabhainArunachala
+/dharma_swarm/metrics.py                @AmitabhainArunachala
+/dharma_swarm/moonshot_provider.py      @AmitabhainArunachala
+/dharma_swarm/provider_policy.py        @AmitabhainArunachala
+/dharma_swarm/provider_transport.py     @AmitabhainArunachala
+/dharma_swarm/router_v1.py              @AmitabhainArunachala
+/dharma_swarm/runtime_provider.py       @AmitabhainArunachala
+/dharma_swarm/semantic_gravity.py       @AmitabhainArunachala
+/dharma_swarm/signal_bus.py             @AmitabhainArunachala
+/dharma_swarm/smart_router.py           @AmitabhainArunachala
+/dharma_swarm/swarm_router.py           @AmitabhainArunachala
+/dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala
+/dharma_swarm/embedders.py              @AmitabhainArunachala
+/dharma_swarm/vector_fallback_guard.py  @AmitabhainArunachala
+/dharma_swarm/vector_store.py           @AmitabhainArunachala
 
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala

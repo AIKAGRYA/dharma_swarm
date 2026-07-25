@@ -1,0 +1,25 @@
+# name-drift allowlist — pre-existing unresolved first-party imports,
+# grandfathered when check_name_drift.py was introduced. Each line is a
+# `path::kind::detail` signature. Shrinking this file (by fixing the
+# stale reference) tightens the ratchet. Regenerate with:
+#   python3 scripts/governance/check_name_drift.py --update-baseline
+.semgrep/tests/test_providers_canonical.py::missing-name::`from dharma_swarm.providers import get_provider` -> name not defined in module
+benchmarks/gauntlet.py::missing-name::`from dharma_swarm.web_search import ArxivBackend` -> name not defined in module
+benchmarks/gauntlet.py::missing-name::`from dharma_swarm.web_search import BraveBackend` -> name not defined in module
+benchmarks/gauntlet.py::missing-name::`from dharma_swarm.web_search import FinnhubBackend` -> name not defined in module
+benchmarks/gauntlet.py::missing-name::`from dharma_swarm.web_search import PerplexityBackend` -> name not defined in module
+dharma_swarm/gnani_lodestone.py::missing-name::`from dharma_swarm.graph_nexus import ConceptGraph` -> name not defined in module
+dharma_swarm/gnani_lodestone.py::missing-name::`from dharma_swarm.graph_nexus import ConceptNode` -> name not defined in module
+dharma_swarm/orchestrate_live.py::missing-name::`from dharma_swarm.mission_contract import load_latest_mission` -> name not defined in module
+dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_adapters.base import ...` -> module not found on disk
+dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.event_types import ...` -> module not found on disk
+dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.events import ...` -> module not found on disk
+dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.stream_parser import ...` -> module not found on disk
+dharma_swarm/terminal_commands/meta.py::missing-module::`from dharma_swarm.cross_pollination import ...` -> module not found on disk
+scripts/launch_singularity_research.py::missing-name::`from dharma_swarm.models import Agent` -> name not defined in module
+scripts/psmv_deep_read.py::missing-module::`from dharma_swarm.protocols.recursive_reading import ...` -> module not found on disk
+scripts/seed_signal_map.py::missing-name::`from dharma_swarm.signal_map import SignalMapManager` -> name not defined in module
+scripts/test_meta_learning.py::missing-module::`from dharma_swarm.meta_learning_prototype import ...` -> module not found on disk
+tests/test_autonomous_agent.py::missing-name::`from dharma_swarm.autonomous_agent import _resolve_agent_model_override` -> name not defined in module
+tests/test_terminal_bridge.py::missing-name::`from dharma_swarm.terminal_bridge import system_commands_module` -> name not defined in module
+tests/test_tui.py::missing-name::`from dharma_swarm.tui import DGCApp` -> name not defined in module

@@ -1,0 +1,70 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-converge-0611:d8616ceffa99",
+      "duplicate_terminal_row_index": 14,
+      "original_status": "pending",
+      "reason": "same_task_id_terminal_verified_duplicate",
+      "row_index": 13,
+      "task_id": "ts-converge-0611",
+      "terminal_agent_uid": "fable_composer",
+      "terminal_authority": "legacy_proof_pointer_recovery",
+      "terminal_receipt_id": "a2a-task-receipt:ts-converge-0611:28da1fdabddc",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "agent_uid": "a2a_supervisor",
+  "applied": [
+    {
+      "duplicate_terminal_receipt_id": "a2a-task-receipt:ts-converge-0611:28da1fdabddc",
+      "duplicate_terminal_row_index": 14,
+      "receipt_id": "a2a-task-receipt:ts-converge-0611:d8616ceffa99",
+      "row_index": 13,
+      "status": "blocked",
+      "task_id": "ts-converge-0611",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "applied_count": 1,
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-verified-duplicate-block-20260701T050248Z.bak",
+  "candidate_count": 1,
+  "generated_at": "2026-07-01T05:02:48Z",
+  "mode": "apply",
+  "post_readiness": {
+    "blocker_task_ids": {
+      "open_or_claimed_tasks_present": [
+        "forge-v0.1-001",
+        "holon-plan-review-cursor-20260612",
+        "holon-plan-review-opus-20260612",
+        "l1-fx-001",
+        "reconcile-564-565-20260611",
+        "sab-flywheel-d01-qwen-code-first-spark",
+        "tam-wp-wp_dfa4e1134277",
+        "ts-hb0631-credit",
+        "ts-pr-babysit-div-20260610",
+        "yatagarasu-10cceaa8"
+      ]
+    },
+    "gate_status": "DEGRADED",
+    "open_tasks": 10,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": []
+}

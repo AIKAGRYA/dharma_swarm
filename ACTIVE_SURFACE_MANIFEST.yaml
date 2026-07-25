@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-20"
+last_updated: "2026-07-11"
 
 state_dir:
   canonical: "~/.dharma"
@@ -85,6 +85,15 @@ api_routers:
   - id: control_surface
     prefix: /api/control-surface
     module: api.routers.control_surface
+  - id: model_pool
+    prefix: /api/pool
+    module: api.routers.model_pool
+  - id: operator_coherence
+    prefix: /api/operator-coherence
+    module: api.routers.operator_coherence
+  - id: runtime
+    prefix: /api/runtime
+    module: api.routers.runtime
   - id: revenue
     prefix: /api/revenue
     module: api.routers.revenue
@@ -164,6 +173,9 @@ health_check_registry:
   api_router_registered:
     description: "Verify the API router prefix is registered in api/main.py"
     type: api_probe
+  api_endpoint_registered:
+    description: "Verify each declared api_dependency resolves to a real registered route path (not just the prefix)"
+    type: api_probe
   dashboard_route_exists:
     description: "Verify the dashboard page directory exists under dashboard/src/app/dashboard/"
     type: file_exists
@@ -193,12 +205,14 @@ health_check_registry:
 # Every dashboard page: desired state, observed-state checks, gap info.
 
 dashboard_surfaces:
+  # Cockpit is a read-only projection of the operator-coherence read model.
+  # It projects truth from owners; it is NOT an authority or a command surface.
   - id: cockpit
     label: "Cockpit"
     route: /dashboard/cockpit
-    api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    api_dependencies: [/api/operator-coherence/report]
     status: live
-    health_check_ids: [dashboard_route_exists, api_router_registered]
+    health_check_ids: [dashboard_route_exists, api_router_registered, api_endpoint_registered]
     priority: p0
     next_action: null
 
@@ -404,6 +418,21 @@ agents:
     priority: p0
     next_action: null
 
+  - id: cybernetics_codex
+    label: "Cybernetics Codex Steward"
+    module: dharma_swarm/cybernetics_codex.py
+    seed: docs/agents/cybernetics_codex/agent.seed.yaml
+    status: shadow
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [audit, lineage, telemetry]
+    priority: p0
+    registration:
+      a2a_card: ~/.dharma/a2a/cards/cybernetics-codex.json
+      route: agent-inbox
+      nats_subject: dharma.agent.cybernetics_codex.inbox
+      nats_runtime_status: declared_not_started
+    next_action: "Run cybernetics_codex_audit.py after each bounded closure batch"
+
   - id: telos_gatekeeper
     label: "Telos Gatekeeper"
     module: dharma_swarm/telos_gates.py
@@ -452,11 +481,11 @@ agents:
   - id: boardstore_facade
     label: "BoardStore Facade"
     module: dharma_swarm/board/facade.py
-    status: live
+    status: shadow
     health_check_ids: [module_file_exists, test_file_exists]
     wired_to: [tasks, lineage, audit]
     priority: p0
-    next_action: "Adapt TaskBoard behind facade in a later BoardStore adapter track"
+    next_action: "Shadow projection active: BoardStore facade wraps existing TaskBoard without replacing canonical path"
 
   - id: sakshi_provenance
     label: "Sakshi Provenance Log"

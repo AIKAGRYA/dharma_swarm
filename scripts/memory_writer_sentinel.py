@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from dharma_swarm.memory_kernel.writers import (
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.memory_kernel.writers import (  # noqa: E402
     DiscoveredWriteStatus,
     DiscoveryTriageCategory,
     MemoryWriterSentinel,
@@ -127,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
             DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
             DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
         }
+        and not _write_decision_reviewed(discovery)
         for discovery in discoveries
     ):
         return 5
@@ -257,6 +263,12 @@ def _write_decision_surface(item) -> str:
         return ""
     value = item.write_decision.get("resolved_surface_id")
     return value if isinstance(value, str) else ""
+
+
+def _write_decision_reviewed(item) -> bool:
+    if not item.write_decision:
+        return False
+    return bool(item.write_decision.get("reviewed_baseline"))
 
 
 if __name__ == "__main__":

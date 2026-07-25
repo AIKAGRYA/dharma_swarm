@@ -1,0 +1,60 @@
+{
+  "schema": "dharma.prod_readiness.continuation.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "authority": {
+    "canonical_ref": "origin/main",
+    "canonical_commit": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "active_count": 7,
+    "max_active": 10,
+    "orchestration_track_cap_allowed": true,
+    "dirty_checkout_authoritative": false
+  },
+  "ingested_packet": {
+    "markdown": "reports/governance/prod_readiness/PROD_GRADE_REVIEW_RESULTS_2026-06-22.md",
+    "json": "reports/governance/prod_readiness/PROD_GRADE_REVIEW_RESULTS_2026-06-22.json"
+  },
+  "track_actions": [
+    {
+      "track_id": "runtime-truth-reconciliation-2026-06",
+      "production_verdict": "CLOSE_READY_WITH_FOLLOWUP",
+      "continuation_action": "candidate_closure_after_dependency_honest_operator_rendering_and_fresh_runtime_db_receipt"
+    },
+    {
+      "track_id": "runtime-truth-nats-2026-06",
+      "production_verdict": "KEEP_ACTIVE_PROD_HARDENING",
+      "continuation_action": "keep_active_require_live_nats_ack_and_owned_surface_reconciliation"
+    },
+    {
+      "track_id": "truth-graph-platform-2026-06",
+      "production_verdict": "KEEP_ACTIVE_PROD_HARDENING",
+      "continuation_action": "keep_active_require_fresh_nats_presence_proof_and_dependency_honest_orient"
+    },
+    {
+      "track_id": "composer-holon-spine-longrun-2026-06",
+      "production_verdict": "SPLIT_BEFORE_CLOSE",
+      "continuation_action": "split_build_a_readiness_from_standing_wake_longrun_successor"
+    },
+    {
+      "track_id": "provider-routing-consolidation-2026-06",
+      "production_verdict": "CLOSE_READY_WITH_FOLLOWUP",
+      "continuation_action": "candidate_closure_after_live_provider_canary_or_explicit_environment_gated_followup"
+    }
+  ],
+  "next_sequence": [
+    "authority_check_operator_coherence_cockpit",
+    "make_cockpit_control_tower_candidate",
+    "draft_agent_lane_admission_packet_standard",
+    "wire_prod_readiness_packet_into_cockpit_or_linked_portfolio_truth",
+    "prepare_candidate_closure_packets_for_provider_routing_and_runtime_truth_reconciliation",
+    "keep_nats_and_truth_graph_active_for_live_hardening",
+    "split_composer_holon_longrun_before_any_closure",
+    "admit_orchestration_arena_v1_only_as_narrow_falsifiable_track"
+  ],
+  "open_uncertainties": [
+    "github_auth_unavailable_for_pr_ci_truth",
+    "nats_live_proof_connection_refused",
+    "operator_coherence_cockpit_location_and_commit_unknown_in_this_packet",
+    "off_machine_preservation_still_required_before_cleanup",
+    "render_active_track_includes_check_has_conflicting_reports_and_requires_reproduction"
+  ]
+}

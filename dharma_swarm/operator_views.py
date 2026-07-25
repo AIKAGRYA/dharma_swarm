@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from dharma_swarm.operator_bridge import OperatorBridge
+from dharma_swarm.runtime_agent_server_views import RuntimeAgentServerViews
+from dharma_swarm.runtime_graph_views import RuntimeGraphViews
+from dharma_swarm.runtime_platform_views import RuntimePlatformViews
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
 
 
@@ -124,6 +127,142 @@ class OperatorViews:
             for run in runs
             if run.status not in {"completed", "failed", "stale_recovered"}
         ][: max(1, limit)]
+
+    async def runtime_graph(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+        receipt_limit: int = 50,
+    ) -> dict[str, Any]:
+        """Return an operator graph snapshot from canonical runtime state."""
+        return await RuntimeGraphViews(self.runtime_state).runtime_graph(
+            session_id=session_id,
+            task_id=task_id,
+            topology=topology,
+            limit=limit,
+            receipt_limit=receipt_limit,
+        )
+
+    async def runtime_sessions(
+        self,
+        *,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted runtime session/thread state for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_sessions(
+            status=status,
+            limit=limit,
+        )
+
+    async def runtime_runs(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted delegation runs for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_runs(
+            session_id=session_id,
+            task_id=task_id,
+            status=status,
+            limit=limit,
+        )
+
+    async def runtime_run_detail(self, run_id: str) -> dict[str, Any]:
+        """Return the canonical ledger detail for a single runtime run."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_run_detail(run_id)
+
+    async def runtime_checkpoints(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted checkpoint/topology snapshots for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_checkpoints(
+            session_id=session_id,
+            task_id=task_id,
+            topology=topology,
+            limit=limit,
+        )
+
+    async def runtime_events(
+        self,
+        *,
+        session_id: str | None = None,
+        ledger_kind: str | None = None,
+        event_name: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted session/runtime event history for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_events(
+            session_id=session_id,
+            ledger_kind=ledger_kind,
+            event_name=event_name,
+            limit=limit,
+        )
+
+    async def runtime_interrupts(
+        self,
+        *,
+        session_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return interrupt/resume/human-approval state from runtime events."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_interrupts(
+            session_id=session_id,
+            status=status,
+            limit=limit,
+        )
+
+    async def runtime_control_action(
+        self,
+        *,
+        action: str,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        run_id: str | None = None,
+        approval_id: str | None = None,
+        interrupt_id: str | None = None,
+        resume_token: str | None = None,
+        actor: str = "operator",
+        reason: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record an auditable approve/reject/resume runtime control action."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_control_action(
+            action=action,
+            session_id=session_id,
+            task_id=task_id,
+            run_id=run_id,
+            approval_id=approval_id,
+            interrupt_id=interrupt_id,
+            resume_token=resume_token,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        )
+
+    async def runtime_assistants(self, *, limit: int = 50) -> dict[str, Any]:
+        """Return assistants/configurations projected from runtime state."""
+        return await RuntimeAgentServerViews(self.runtime_state).runtime_assistants(
+            limit=limit,
+        )
+
+    async def runtime_background_jobs(self, *, limit: int = 50) -> dict[str, Any]:
+        """Return background/cron job state projected from runtime and cron storage."""
+        return await RuntimeAgentServerViews(self.runtime_state).runtime_background_jobs(
+            limit=limit,
+        )
 
     async def recent_operator_actions(
         self,

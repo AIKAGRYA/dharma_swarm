@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -58,7 +59,7 @@ def sample_task(tmp_path):
         dimension="documented",
         targets=["main.py"],
         acceptance_criteria="All public functions have docstrings",
-        test_command="python3 -m pytest test_main.py",
+        test_command=f"{sys.executable} -m pytest test_main.py",
     )
 
 
@@ -106,7 +107,7 @@ class TestBuildPrompt:
 
     def test_test_command_in_system(self, sample_task):
         system, _ = build_prompt(sample_task)
-        assert "python3 -m pytest" in system
+        assert f"{sys.executable} -m pytest" in system
 
     def test_no_targets(self, sample_task):
         sample_task.targets = []

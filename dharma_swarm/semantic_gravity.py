@@ -20,13 +20,12 @@ the lattice inward.  Weak clusters decay like stigmergic marks.
 from __future__ import annotations
 
 import json
-import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from statistics import mean, stdev
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from pydantic import BaseModel, Field
 

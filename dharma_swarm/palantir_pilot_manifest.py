@@ -1,4 +1,9 @@
-"""Palantir Pilot manifest and registration helpers."""
+"""Palantir Pilot — constants, manifest building, and file-writing helpers.
+
+This module owns the agent identity constants, public source declarations,
+forbidden-action policy, `build_source_manifest`, `build_external_worker_registration`,
+`format_markdown`, `write_manifest_json`, and `write_wiki_home`.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +12,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+DHARMA_HOME_SURFACE = str(Path("~") / ".dharma")
 
 AGENT_ID = "palantir_pilot"
 CALLSIGN = "palantir-pilot"
@@ -52,14 +57,14 @@ OWNED_SURFACES = [
     "scripts/research/palantir_query_cookbook.py",
     "scripts/research/palantir_learning_backlog.py",
     "tests/test_palantir_pilot.py",
-    "~/.dharma/knowledge/wiki/research/palantir-pilot.md",
-    "~/.dharma/knowledge/wiki/research/palantir-pilot/**",
-    "~/.dharma/knowledge/wiki/raw/palantir-pilot/**",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/research/palantir-pilot.md",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/research/palantir-pilot/**",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/raw/palantir-pilot/**",
 ]
 
 FORBIDDEN_ACTIONS = [
     "bypass login, paywall, robots.txt, rate limits, or course enrollment controls",
-    "store full copyrighted Palantir pages, course text, videos, transcripts, or labs wholesale",
+    "store Learn/course bodies, videos, transcripts, labs, or quizzes wholesale, or commit deep-card prose to git (full prose of robots-allowed public docs pages, kept local-only as deep-cards, is permitted)",
     "claim official Palantir affiliation, certification, access, or insider knowledge",
     "read or write provider secrets outside the declared Dharma key owner",
     "spend money, enroll accounts, submit forms, or touch live external accounts",
@@ -101,7 +106,7 @@ PUBLIC_SOURCES = [
         "url": "https://www.palantir.com/docs/sitemap.xml",
         "surface": "public_docs_sitemap",
         "access_status": "autonomous_fetch_allowed_observed_2026-06-14",
-        "ingestion_policy": "Index URLs, lastmod values, product family, and distilled summaries. Do not mirror full pages.",
+        "ingestion_policy": "Index URLs, lastmod values, product family, and distilled summaries; for robots-allowed public docs pages, also store full parsed prose as local-only deep-cards. Do not mirror Learn/course bodies or private-tenant material.",
     },
     {
         "id": "palantir_www_sitemap",
@@ -219,6 +224,7 @@ def build_source_manifest(
                 "short excerpts within copyright limits",
                 "original summaries and concept maps",
                 "bounded public docs source cards",
+                "full-text deep-cards for robots-allowed public docs pages (local-only under ~/.dharma, never committed)",
                 "balanced public docs source-card expansion receipts",
                 "archive-only source-card cleanup receipts",
                 "task playbooks synthesized from bounded source cards",
@@ -229,7 +235,7 @@ def build_source_manifest(
                 "query-answer receipts with citations",
             ],
             "disallowed_storage": [
-                "full docs pages copied into the repo or wiki",
+                "full docs-page prose committed into the git repo (public deep-cards stay local-only under ~/.dharma, never committed)",
                 "course videos, transcripts, labs, or quizzes copied wholesale",
                 "private tenant material",
                 "credentialed Palantir content unless the operator supplies explicit rights and boundaries",
@@ -427,7 +433,7 @@ def format_markdown(manifest: dict[str, Any]) -> str:
             "",
             "## Storage Rule",
             "",
-            "Store links, metadata, timestamps, original summaries, concept maps, and short compliant excerpts. Do not mirror full pages, courses, videos, labs, quizzes, or private tenant material.",
+            "Store links, metadata, timestamps, original summaries, concept maps, short excerpts, and — for robots-allowed public docs pages — full parsed prose as local-only deep-cards (under ~/.dharma, never committed to git). Do not mirror Learn/course bodies, videos, labs, quizzes, or private-tenant material.",
             "",
             "## Current Workspace",
             "",
@@ -470,53 +476,3 @@ def write_manifest_json(path: Path, manifest: dict[str, Any]) -> None:
 def write_wiki_home(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(format_markdown(manifest), encoding="utf-8")
-
-
-def latest_source_index_path(dharma_home: Path | str = DEFAULT_DHARMA_HOME) -> Path | None:
-    """Return the newest Palantir Pilot source-index JSON path, if present."""
-
-    raw_dir = Path(dharma_home).expanduser() / RAW_SOURCE_DIR
-    if not raw_dir.exists():
-        return None
-    paths = sorted(raw_dir.glob("source-index-*.json"))
-    return paths[-1] if paths else None
-
-
-def memory_plane_db_path(dharma_home: Path | str = DEFAULT_DHARMA_HOME) -> Path:
-    """Return the local Dharma memory-plane DB path for Palantir Pilot receipts."""
-
-    return Path(dharma_home).expanduser() / MEMORY_PLANE_DB
-
-
-__all__ = [
-    "AGENT_ID",
-    "CALLSIGN",
-    "CONTEXT_ENGINEERING_FILE",
-    "DATABASE_SOURCE_KINDS",
-    "DEFAULT_DHARMA_HOME",
-    "DISPLAY_NAME",
-    "DOC_FAMILY_PREFIXES",
-    "FORBIDDEN_ACTIONS",
-    "MEMORY_PLANE_DB",
-    "NATS_SUBJECT",
-    "OWNED_SURFACES",
-    "PUBLIC_SOURCES",
-    "QUERY_CONSUMER",
-    "RAW_SOURCE_DIR",
-    "REPO_AGENT_HOME",
-    "REPO_ROOT",
-    "SCHEMA_VERSION",
-    "SEED_FILE",
-    "SOUL_FILE",
-    "VERIFIER_COMMANDS",
-    "WIKI_HOME",
-    "WIKI_SOURCE_DIR",
-    "build_external_worker_registration",
-    "build_source_manifest",
-    "format_markdown",
-    "latest_source_index_path",
-    "memory_plane_db_path",
-    "summarize_source_families",
-    "write_manifest_json",
-    "write_wiki_home",
-]

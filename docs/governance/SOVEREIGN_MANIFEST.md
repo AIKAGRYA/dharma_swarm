@@ -14,400 +14,103 @@
 
 <!-- ACTIVE_TRACK:START -->
 
-<!-- This block is generated from docs/governance/ACTIVE_TRACK.yaml.
-     Do not hand-edit. Run scripts/governance/render_active_track_includes.py
-     after updating the YAML. -->
-
-**Active portfolio:** 11 co-equal track(s) (WIP warn 11, max 11). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
-
-**Spine objectives (each track serves one):**
-
-- `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
-- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
-- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (covered)
-
-### Runtime Truth Reconciliation — operator-visible truth packets
-
-**Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Relations:** complements: runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
-**Moves vital signs:** quality_gates, memory_persistence
-
-The Runtime Truth Spine substrate is merged and shippable. This track moves
-from substrate existence to read-only reconciliation: operator-visible
-runtime truth packets that separate heartbeat, readiness, artifact progress,
-completion, authority, projection/cache, mutation, and external-gated proof.
-
-The track must not create a new truth store, daemon, receipt system, or
-authority surface. It projects from existing owners only:
-spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
-for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
-and existing operator/onboard/control-surface rows for read-only rendering.
-
-Doctrine line that must hold:
-  Read models project truth from owners; they do not become authority.
-
-**Next items:**
-
-- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
-- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
-- [test] Protect A2A single-persistence invariant while adding runtime truth projections.
-
-**Non-goals:**
-
-- Do not create a new daemon, database, event log, truth store, or receipt system.
-- Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
-- Do not mutate external systems, live processes, archive fitness, payments, or gateways.
-- Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
-- Do not build Verified Experiment Loop runtime in this track.
-- Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
-
-### Runtime Truth NATS — internal live transport for A2A dispatch
-
-**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06
-**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/nats_transport.py, dharma_swarm/a2a/a2a_server.py, dharma_swarm/operator_core/nats_live_contact.py, dharma_swarm/operator_core/nats_substrate_status.py, scripts/runtime/a2a_send.py, scripts/runtime/a2a_inbox_bridge.py, scripts/runtime/a2a_domain_reply_worker.py, scripts/runtime/a2a_reply_capture.py, scripts/governance/check_nats_substrate_contract.py, tests/test_nats_transport.py, tests/test_nats_substrate_contract.py, reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md
-**Moves vital signs:** tool_coverage, quality_gates
-
-The concurrent Codex transport lane. NATS was scoped out of the global
-prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
-scoped track with non-overlapping surfaces (transport layer only). This
-track wires the internal live transport so A2A dispatch can travel at
-broker speed, distinct from the reconciliation lane's read-model surfaces.
-
-Surface separation is the safety boundary: this track owns the NATS
-transport, handler idempotency, proof probes, contract checker, and
-focused tests. The cloud-agent bridge owns its ingress module; this track's
-checker verifies that module delegates to A2ANatsTransport. It may touch
-operator_core only for NATS-specific live-contact/status probes; the
-reconciliation lane's broader read models remain projection-only.
-
-**Next items:**
-
-- [code] Collect fresh live broker evidence with current HANDLER_ACKED or DOMAIN_RECEIPTED proof, or explicitly close this slice as local/offline substrate evidence.
-
-**Non-goals:**
-
-- Do not introduce Redis or gRPC as part of this track.
-- Do not broaden operator_core beyond NATS-specific live-contact/status probes.
-- Do not add a parallel spine-check CI workflow.
-
-### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-
-**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, docs/agent_tasks/2026-06-14_runtime_spine_hardening_goal.md, scripts/uplift_guards/check_spine_ownership.py
-**Moves vital signs:** quality_gates, tool_coverage
-
-spine-adoption ships end-to-end: every production dispatch flows through
-invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-in v1) into the v2 portfolio while merging origin/main. In the v2
-multi-track model it runs as a co-equal peer of the reconciliation and
-NATS lanes rather than requiring their closure; reconciliation's open
-status is main's standing declaration and is left to the operator.
-
-Runtime-only audit baseline, 2026-06-14 JST:
-  Baseline production-readiness score: 54/100; current hardening score
-  is tracked in hardening_status above.
-  Rejected claim: 88/100 production-ready.
-  The spine has useful live pieces, but it is not yet the coherent,
-  default, governed runtime substrate for the whole repo. Score movement
-  now requires hardening evidence: bypass drainage, default dispatch
-  adoption, receipt saturation, live bridge/process agreement, and
-  operator-surface honesty.
-
-**Next items:**
-
-- [runtime] (blocker) Prove one daemon/default dispatch run with DHARMA_SPINE_DISPATCH=1 lands a fresh EvidenceReceipt and scoped runtime receipt coverage.
-- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
-- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [governance] (blocker) Promote the zero-bypass allowlist state into uplift guard enforcement without weakening NATS/runtime ownership checks.
-- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-- [runtime] (blocker) Run the 54/100 Runtime Spine Hardening long goal and raise the score only through executable gates.
-
-**Non-goals:**
-
-- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
-### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
-
-**Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06
-**Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
-**Moves vital signs:** quality_gates, eval_coverage
-
-Operator-instructed campaign (2026-06-11 master prompt): wire all 13
-cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
-sense->interpret->constrain->act->adapt on real data with receipts to
-its declared owner surface and an automated closure check.
-
-Phase 0 (research dossier, no build code) ships first. Phases proceed
-in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
-then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
-gated behind the One Wire external-receipt quorum (N>=5, M>=3).
-
-Invariant that must hold throughout:
-  Internal artifacts never touch archive fitness; only countersigned
-  external acted receipts above quorum do.
-
-**Next items:**
-
-- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
-- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
-- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
-
-**Non-goals:**
-
-- Do not weaken, bypass, or hard-code any telos gate to close a loop.
-- Do not let internal artifacts touch archive fitness (One Wire quorum stands).
-- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
-- Do not commit provider API keys or any credentials.
-- Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
-
-### Orientation Graph — whole-system view served on token one
-
-**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06
-**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
-**Moves vital signs:** quality_gates
-
-Operator directive 2026-06-11: any agent must see the whole system at
-once — identity (why), organs, active tracks, canon custody, liveness,
-and the broken register — in ~10 seconds, not by grepping prose. This
-track delivers that as a single read-only orientation view.
-
-The track creates NO new truth store and NO authority surface. It
-projects from the existing owners only: foundations/THE_ORGANISM.md
-and docs/vision_maps/NORTH_STAR.md (identity),
-docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
-docs/governance/ACTIVE_TRACK.yaml (tracks),
-docs/docops/assertions.yaml canonical_guard.registered + the worktree
-(custody), the live ops census receipt (liveness), and
-docs/state/BROKEN_REGISTER.md (broken).
-
-Doctrine line that must hold (same as the reconciliation lane's):
-  Read models project truth from owners; they do not become authority.
-
-The one-section identity hook added to agent_onboard.py (a surface the
-reconciliation lane owns) was done under explicit operator instruction
-2026-06-11, is read-only pointers, and does not touch that lane's
-runtime-truth rendering or non-goals.
-
-**Next items:**
-
-- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
-- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
-
-**Non-goals:**
-
-- Do not create a new daemon, database, vector store, event log, or truth store.
-- Do not mutate owner files; the view writes nothing.
-- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
-- Do not touch operator_core/** or runtime_state.py.
-
-### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
-
-**Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
-**Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
-**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
-
-Build A from the composer convergence: merge Verified Composer Command
-Spine v1 with the Sovereign Holon Orchestrator target, bringing
-fable_composer and codex_composer up as the first read-only composer
-holon pair. The track is active as a scoped longrun lane, not as a new
-receipt owner. Command receipts are projections of spine.EvidenceReceipt.
-
-The clean GitHub-main mirror remains the merge target; the active build
-lane currently lives on qwen/spine-adoption because that lane contains
-the holon docs, modules, and verifier tests. The lane must reconcile back
-to main through the normal review path before it is called shipped.
-
-**Next items:**
-
-- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
-- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
-- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
-- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
-
-**Non-goals:**
-
-- Do not create a new durable receipt store; project over spine.EvidenceReceipt.
-- Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
-- Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
-- Do not merge holon substrate to main without the frozen verifier runbook passing.
-
-### AgentAdmission + Semantic Commons — one door for agent identity and naming
-
-**Track id:** `agent-admission-semantic-commons-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Relations:** complements: cybernetics-codex-stewardship-2026-06
-**Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, dharma_swarm/semantic_commons.py, dharma_swarm/engine/hybrid_retriever.py, dharma_swarm/context.py, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py, tests/test_hybrid_retriever.py
-**Moves vital signs:** quality_gates, memory_persistence
-
-Operator directive 2026-06-14: promote AgentAdmission and the Semantic
-Commons from discussion into an official track. The track creates the
-single admission path for any new persistent agent and the living semantic
-object/alias index used to prevent name drift.
-
-Canonical intent:
-  AgentAdmission is the full lifecycle for a new swarm/fleet identity.
-  Semantic Commons is the typed, versioned naming surface agents update
-  as they build, without pretending the ontology is final.
-  SessionOrientation is the layered L0-L4 loading contract that keeps
-  agents from paying broad-search context costs before route selection.
-
-**Next items:**
-
-- [docs] (blocker) Create docs/ontology/SEMANTIC_COMMONS.md with lifecycle states: seed, working, preferred, canonical, deprecated, forbidden.
-- [docs] (blocker) Create semantic_objects.yaml and semantic_aliases.yaml with AgentAdmission, RegistrationDesk, AgentSeed, LivingDock, A2ACard, NameDriftPreflight, and SessionOrientation.
-- [code] (blocker) Add one `dgc agent admit`/`make agent-admit` path or a documented shim that does not collide with make onboard semantics.
-- [test] (blocker) Add tests proving aliases catch hyphen/underscore/name-drift collisions.
-- [docs] (blocker) Generate read-only Obsidian/PKM Semantic Commons projections with Bases dashboard views.
-- [docs] (blocker) Add retrieval scoping contract proving structure-first recall before lexical/vector/graph search.
-- [code] (blocker) Wire Semantic Commons scope metadata into HybridRetriever runtime evidence.
-
-**Non-goals:**
-
-- Do not overload `make onboard`; it remains session/governance orientation.
-- Do not hard-freeze the ontology; use lifecycle states for terms.
-- Do not admit agents without a name-drift preflight and a receipt.
-- Do not bypass existing registration desk or living-agent owner surfaces.
-
-### Cybernetics Codex Stewardship — permanent owner for loop ecology
-
-**Track id:** `cybernetics-codex-stewardship-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `research-depth` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Relations:** complements: agent-admission-semantic-commons-2026-06 · depends_on: loop-closure-2026-06
-**Owns surfaces:** docs/ops/CYBERNETICS_CODEX.md, docs/agents/cybernetics_codex/**, dharma_swarm/cybernetics_codex.py, scripts/governance/cybernetics_codex_audit.py, scripts/governance/register_cybernetics_codex.py, tests/test_cybernetics_codex.py, reports/loop_closure/cybernetics_codex/**
-**Moves vital signs:** quality_gates, eval_coverage, memory_persistence
-
-Promotes cybernetics_codex from a local loop-closure helper into an
-official stewardship track. The steward owns the operational cybernetics
-layer: loop closure claims, VSM/cybernetic mapping, receipt freshness,
-multi-loop interference review, and closure-verifier discipline.
-
-This track does not close the 13 loops itself. It creates the persistent
-technician/holon seat that keeps cybernetics from decaying back into a
-metaphor.
-
-**Next items:**
-
-- [docs] (blocker) Write the admission receipt packet under reports/loop_closure/cybernetics_codex/.
-- [runtime] (blocker) Prove one fresh cybernetics_codex audit from a clean context and record the runtime heartbeat receipt.
-- [governance] Add the steward to the future AgentAdmission path once that track lands.
-
-**Non-goals:**
-
-- Do not grant write authority over loop hot paths without a later build track.
-- Do not weaken telos gates to make a loop look closed.
-- Do not treat a declared NATS card as a running subscriber.
-- Do not duplicate runtime_state, witness, or active-track authority.
-
-### TELOS AI Morning Refinery — user-facing semantic refinery seed
-
-**Track id:** `telos-ai-morning-refinery-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Owns surfaces:** docs/vision_maps/TELOS_AI_SEED_SPEC_V0.md, docs/vision_maps/TELOS_MORNING_REFINERY_V0.md, docs/research/telos_ai/**, PRODUCT_SURFACE.md, dashboard/src/app/dashboard/telos*/**, dashboard/src/components/telos*/**, tests/test_telos*.py
-**Moves vital signs:** eval_coverage, cost_efficiency
-
-Promotes the TELOS AI seed and Morning Refinery lane into the portfolio
-as the user-facing product/revenue bridge. The track is still design and
-evidence work: no live external account action, no raw private material
-promotion, and no product claims before receipts.
-
-The product hypothesis: a morning-page-to-semantic-refinery loop that
-helps one human turn private dharma signals into corrected vectors,
-bridge candidates, venture seeds, and consent-gated public artifacts.
-
-**Next items:**
-
-- [external] (blocker) Run an operator-mediated external action on a consented, sanitized TELOS output and capture redacted durable evidence outside the repo.
-- [receipt] (blocker) Only after that external action exists, create reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md using the schema without exposing private material.
-
-**Non-goals:**
-
-- Do not process private user material into repo artifacts without explicit consent.
-- Do not send outreach, charge money, or touch live external accounts in this track.
-- Do not build a generic journaling app.
-- Do not claim product-market or revenue proof without acted external receipts.
-
-### Helm Worldclass Terminal — operator TUI integration and verification lane
-
-**Track id:** `helm-worldclass-terminal-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Owns surfaces:** terminal/**, docs/TERMINAL_TUI_TMUX_HARNESS_2026-04-02.md, docs/plans/2026-04-02-terminal-*.md, reports/terminal/**
-**Moves vital signs:** quality_gates, tool_coverage
-
-Promotes the high-activity Helm terminal work into an official track so
-terminal UI changes stop living as a large invisible branch. The track
-owns operator-facing TUI polish only when backed by golden frames, compact
-viewport checks, and live tmux receipts.
-
-**Next items:**
-
-- [docs] (blocker) Collect the current Helm branch diff into a closeout packet with exact tests and screenshots/terminal captures.
-- [governance] (blocker) Either split the branch into reviewable PRs or state the large-diff exception with receipts.
-
-**Non-goals:**
-
-- Do not change runtime providers, agent dispatch, or receipt semantics.
-- Do not ship cosmetic changes without golden-frame and compact-terminal checks.
-- Do not leave terminal branch work outside the active-track surface.
-
-### A2A Cloud-Agent Bridge — cloud reasoners onto the NATS substrate
-
-**Track id:** `a2a-cloud-agent-bridge-2026-06` · **Status:** ACTIVE · **Owner:** @codex_composer
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
-**Relations:** complements: agent-admission-semantic-commons-2026-06
-**Owns surfaces:** docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml, docs/architecture/A2A_CLOUD_BRIDGE.md, dharma_swarm/a2a/a2a_cloud_contact.py, dharma_swarm/a2a/contact_registry.py, dharma_swarm/a2a/verifier.py, reports/state/a2a_score_denominator.md, tests/test_a2a_cloud_contact.py
-**Moves vital signs:** tool_coverage, memory_persistence
-
-Promotes the proposed cloud-agent bridge into the active portfolio. The
-track extends the local A2A/NATS contact pattern so cloud-resident agents
-like perplexity-computer and Devin can enter the same message contract
-without manual operator copy/paste transport.
-
-This is transport-only. It must not create a second task format, a second
-receipt owner, or a live public ingress without explicit operator approval.
-
-**Next items:**
-
-- [docs] (blocker) Write the architecture ADR and threat model before implementation.
-- [test] (blocker) Implement a local-only round-trip test with no public ingress or external accounts.
-
-**Non-goals:**
-
-- Do not expose public ingress, spend, or live external accounts in this track.
-- Do not change invoke_agent or the spine receipt contract.
-- Do not create a perplexity-specific message format.
-- Do not mark cloud agents live until liveness is receipted by the same verifier class as local agents.
-
-**Recently closed tracks:**
-
-- `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
-- `trace-identity-coverage-2026-05` — Trace Identity Coverage — native propagation and soft coverage findings (SUPERSEDED, closed 2026-05-28)
-- `trace-attractor-causal-spine-2026-05` — Trace Attractor Causal Spine — operator-visible trace packets (SHIPPED, closed 2026-05-21)
-
-For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
+<!-- GENERATED — do not hand-edit.
+     source-of-truth: docs/governance/ACTIVE_TRACK.yaml
+     render: python3 scripts/governance/render_active_track_includes.py
+     check:  python3 scripts/governance/render_active_track_includes.py --check
+     checked by: .github/workflows/active-track.yml, make docops-integrity,
+                 tests/test_active_track_governance.py
+     newest track verified_at in source: 2026-07-17 -->
+
+**Active portfolio — declared intent only:** 10 co-equal track(s) (WIP warn 8, max 10; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy.
+
+**Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
+
+- **`loop-closure-2026-06`** — Cybernetic Loop Closure — wire all 13 loops with receipted closure checks (ACTIVE, serves `substrate-nativeness`, verified 2026-07-11, open blocker items: 3)
+  - owns: reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md, docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md, scripts/governance/loop1_consumption_check.py, tests/test_loop_supervisor_tristate.py, tests/test_loop1_consumption.py, tests/test_loop1_consumption_check.py
+- **`orchestration-arena-v1-2026-06`** — Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI (ACTIVE, serves `substrate-nativeness`, verified 2026-07-17, open blocker items: 1)
+  - owns: dharma_swarm/coordination/**, dharma_swarm/council/**, scripts/governance/arena_truth_report.py, reports/governance/arena/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py, tests/test_arena_truth_report.py
+- **`merge-master-mike-d4-2026-06`** — Merge Master Mike — D4 persistent always-on merge agent (ACTIVE, serves `substrate-nativeness`, verified 2026-07-16, open blocker items: 1)
+  - owns: scripts/runtime/pr_merge_control.py, scripts/runtime/merge_master_mike_daemon.py, .github/workflows/automerge.yml, .github/workflows/codex-mention-router.yml, .github/workflows/merge-master-mike-backlog.yml, tests/test_merge_master_mike_daemon.py, tests/test_pr_merge_control.py, tests/test_pr_merge_control_github_reviews.py
+- **`organism-rewire-2026-07`** — Organism Rewire — dormant organs to production, spine standing-on, external gradients (ACTIVE, serves `substrate-nativeness`, verified 2026-07-02, open blocker items: 2)
+  - owns: tools/world_scout_go/**, tools/world_signal_ingestor_go/**, tools/github_ingestor_go/**, tools/evidence_ingestor_go/**, dharma_swarm/world_radar/**, scripts/runtime/github_ingestor_runner.py, tests/test_github_ingestor_runner.py, tests/test_go_evidence_ingestor_bridge.py, tests/test_go_github_ingestor_bridge.py, tests/test_go_world_signal_bridge.py, tests/test_go_receipt_identity_verify.py, tests/test_go_adapter_contracts.py, tests/test_world_radar_go_bridge.py, dharma_swarm/organism.py, dharma_swarm/strange_loop.py, dharma_swarm/diversity_archive.py, dharma_swarm/archive.py, docker-compose.yml, Dockerfile.swarm
+- **`dharmagraph-engine-2026-07`** — DharmaGraph — sovereign durable graph runtime consolidation (ACTIVE, serves `substrate-nativeness`, verified 2026-07-05, open blocker items: 1)
+  - owns: dharma_swarm/graph/**, dharma_swarm/workflow.py, dharma_swarm/topology_genome.py, dharma_swarm/checkpoint.py, dharma_swarm/swarm.py, dharma_swarm/orchestrator.py, pyproject.toml, .github/workflows/langgraph-oracle.yml, tests/test_workflow.py, tests/test_topology_execution.py, tests/test_checkpoint.py, tests/test_graph_checkpoint.py, tests/test_graph_reconciler.py, tests/test_graph_durable_invoker.py, tests/test_langgraph_differential_oracle.py, tests/test_graph_neutral_langgraph_oracle.py, tests/test_graph_pregel_properties.py, docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md, scripts/governance/dharmagraph_parity_gauntlet.py, tests/oracle_support/dharmagraph_gauntlet.py, tests/test_dharmagraph_parity_gauntlet.py, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json, docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json, reports/governance/dharmagraph_parity/**, docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md, docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md, docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md, docs/governance/CAMPAIGN_KERNEL.md, tests/oracle_support/scenarios.py, tests/oracle_support/outcomes.py
+- **`helm-worldclass-terminal-2026-06`** — Helm — world-class operator terminal (Bun+Ink TUI) (ACTIVE, serves `substrate-nativeness`, verified 2026-07-07, open blocker items: 1)
+  - owns: terminal/**
+- **`sovereign-safety-tcb-2026-07`** — Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio (ACTIVE, serves `substrate-nativeness`, verified 2026-07-07, open blocker items: 1)
+  - owns: dharma_swarm/evolution_safety.py, scripts/governance/check_claim_evidence_binding.py, scripts/governance/pramana_probe.py, scripts/governance/branch_janitor.py, scripts/governance/verify_corral_findings.py, scripts/governance/hygiene/**, docs/governance/hygiene/patterns/AI-M1.yaml, packages/telos-kernel/**, packages/titanium-verify/**, .github/workflows/pudgala-rigor.yml, .github/workflows/pramana-probe.yml, .github/workflows/kernel-titanium-verify.yml, .github/workflows/kernel-tests.yml, .github/workflows/branch-janitor.yml, tests/test_evolution_safety.py, tests/test_claim_evidence_binding.py, tests/test_pramana_probe.py, tests/test_pramana.py, tests/test_branch_janitor.py, tests/test_verify_corral_findings.py
+- **`hyperbolic-time-chamber-2026-07`** — Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger (ACTIVE, serves `research-depth`, verified 2026-07-07, open blocker items: 1)
+  - owns: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md, docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md, docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md, docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md, scripts/governance/inward_ascent_baseline.py, scripts/governance/frontier_ledger.py, scripts/governance/transcendence_ledger.py, dharma_swarm/chamber/**, tests/test_chamber_traces.py, tests/test_chamber_gym_git_history.py, tests/test_chamber_daily_delta.py, tests/test_chamber_predictions.py, tests/test_chamber_sandbox.py, tests/test_chamber_ledger_history.py, tests/test_transcendence_ledger.py, reports/governance/inward_ascent/**, reports/governance/chamber/**
+- **`repository-titanium-hardening-2026-07`** — Titanium-grade repository hardening — truthful verification and clean-room closure (ACTIVE, serves `substrate-nativeness`, verified 2026-07-17, open blocker items: 13)
+  - owns: Makefile, Dockerfile, .github/workflows/hermetic.yml, .github/workflows/tests.yml, .github/workflows/ci-parity.yml, .github/workflows/docops.yml, .github/workflows/docops-reconcile-main.yml, .github/workflows/pr-dedupe.yml, .github/workflows/bot-pr-limit.yml, .github/workflows/a2a-agni-live-contact.yml, docs/governance/CI_TRUTH_CONTRACT.json, scripts/governance/ci_parity_manifest.json, scripts/governance/check_ci_parity.py, scripts/runtime/ci_truth.py, scripts/governance/run_semgrep_with_ca.sh, scripts/uplift_guards/shakti_warrant_guard.py, scripts/uplift_guards/run_pre_commit.py, scripts/governance/check_shakti_warrant.py, scripts/governance/check_nats_substrate_contract.py, scripts/governance/check_nats_live_production_evidence.py, scripts/governance/run_nats_live_production_matrix.py, scripts/docops/**, dharma_swarm/build_engine.py, dharma_swarm/autonomous_agent.py, dharma_swarm/diff_applier.py, dharma_swarm/sandbox.py, docs/docops/AUTO_INVENTORY.md, api/main.py, tests/test_api_auth.py, tests/test_verify_api.py, tests/test_bootstrap_contract.py, tests/test_verifier_selfcheck_contract.py, tests/test_semgrep_wrapper.py, tests/test_uplift_guard_subprocess.py, tests/test_fast_suite_isolation.py, tests/test_diff_applier.py, tests/test_sandbox.py, tests/test_nats_verification_split.py, tests/test_nats_substrate_contract.py, tests/test_nats_live_production_evidence.py, tests/test_nats_live_contact.py, tests/governance/test_ci_parity_guard.py, tests/test_ci_truth.py, tests/test_docops_integrity.py, tests/test_docops_reconcile_workflow.py, tests/test_pr_dedupe_workflow.py, tests/test_polyglot_ci_contract.py, tests/test_hermetic_supply_chain.py, docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md, docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md, reports/governance/titanium/**, dashboard/src/lib/operatorCoherence.ts, dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts, dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx, dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts
+- **`darshan-publication-2026-07`** — Darshan — publication venture cell (multi-disciplinary voice of clear seeing) (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-12, open blocker items: 2)
+  - owns: docs/plans/DARSHAN_CHARTER_2026-07-12.md, reports/darshan/**, reports/tam/**
+
+Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
+
+**Recently closed tracks:** `company-builder-parity-2026-07` (RETIRED, closed 2026-07-17) · `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17) · `onboard-session-status-2026-07` (SHIPPED, closed 2026-07-17)
+
+For machine-readable status, run `python3 scripts/governance/check_track_status.py` — it writes `reports/governance/active_track_evidence.md` (untracked; derived status is not committed). CI publishes the latest copy on the `generated/status` branch: `git show origin/generated/status:reports/governance/active_track_evidence.md`.
 
 <!-- ACTIVE_TRACK:END -->
+
+---
+
+## Telos Hierarchy
+
+This section is the registry-named owner of the highest invariant in the repository: **what the whole system is for, and how its objectives rank.** Per `docs/governance/CANONICAL_DOC_STACK.md`, this manifest owns axioms and invariants; the telos hierarchy is the invariant that every other doc's "why" is subordinate to. Downstream docs (`docs/vision_maps/NORTH_STAR.md`, `docs/doctrine/OPERATIONAL_DOCTRINE.md`, `docs/doctrine/LIVE_ROADMAP.md`, `docs/loomwork/**`, `docs/research/verified_nature_house/**`, `docs/MEGAFILE_INDEX.md`) carry the *why* and compressed pointers; when any of them disagrees with this section on the hierarchy, **this section wins.**
+
+**Provenance:** this section was first landed 2026-05-08 (commit `7ecf285`, logged in `docs/governance/REPO_GOVERNANCE_AUDIT.md` §"2026-05-08 — Telos Hierarchy Correction", entries C1–C10). That commit's branch never merged to `main`, so the manifest lost the section it is registry-named to own while ~30 downstream docs kept deferring to it — a dangling top authority. The text below restores the section from its own authoritative downstream descriptions: the audit's C1–C10 resolutions and the compressed hierarchy carried in `docs/doctrine/OPERATIONAL_DOCTRINE.md:9-24`. No new doctrine is introduced here; this is a recovery of the ratified invariant into the file that owns it.
+
+### The hierarchy
+
+```
+Jagat Kalyan (JK) — highest telos: welfare / salvation of the world on every level
+│                    (mental, spiritual, ecological, economic, focus, health,
+│                     people finding their highest calling, harmonizing AI,
+│                     human spirit, and nature — JK at full resolution)
+│
+├── DOMAINS — what we work on
+│   ├── Silicon Is Sand (SIS) — the material-body domain objective
+│   │   ├── GAIA / Reciprocity — accounting kernel under SIS
+│   │   └── Loomwork — evidence-weaving / media organ under SIS
+│   └── Attention Emancipation (AE) — separate JK-level domain, UNRESOLVED / not yet typed
+│
+└── METABOLISM — how we sustain the work
+    └── Shakti Ginko — wealth-metabolism organ under JK directly
+
+Dharma Swarm = the self-evolving VSM/cybernetic organism (S1–S5 + Kaizen + DGM)
+               that enacts all of the above. It is the body, not a layer of the telos.
+```
+
+### Layer definitions
+
+- **Jagat Kalyan (JK)** — the highest telos: universal welfare, the salvation of the world on every level. Everything below is a means to JK; nothing outranks it. Stated at full resolution in `docs/vision_maps/NORTH_STAR.md:12-16`.
+
+- **Dharma Swarm (the organism)** — the self-evolving VSM/cybernetic organism that *enacts* the hierarchy. It has S1–S5 anatomy (operations, coordination, control, intelligence, identity) plus Kaizen and DGM (Darwin–Gödel Machine) learning loops (`docs/doctrine/OPERATIONAL_DOCTRINE.md:30`). It is the body serving JK — **not** itself a domain or objective within the telos. Recursion, self-narration, and "papers about our own architecture" are the named anti-pattern (the Mirror Experiment / world-zero), not a telos (`docs/doctrine/OPERATIONAL_DOCTRINE.md:43`).
+
+- **Silicon Is Sand (SIS)** — a JK-level **domain objective**: material-body recognition covering the full material cost of compute — **energy, water, chips, minerals, fabs, labor, land, emissions, e-waste** (audit C3). SIS is the parent objective layer between JK and its accounting/media organs; it is not merely an adjective.
+
+- **GAIA / Reciprocity** — the **accounting kernel under SIS** (the welfare-ton ecological-restoration / carbon-attribution loop). GAIA is **not** a peer-level "deployment platform / operating system" alongside JK; it is a kernel *under* SIS that pays the material debt SIS names (audit C2, C10).
+
+- **Loomwork** — the **evidence-weaving / media organ under SIS**: ecological/material pattern surfacing (casefiles, alerts, maps, briefs, action intelligence for journalists, NGOs, regulators, citizens). Loomwork is a **domain organ under SIS**, **not** a peer of Shakti Ginko (audit C4). Current build status is DESIGN_ONLY (`docs/vision_maps/NORTH_STAR.md` §7). Note the owner boundary: **noosphere propagation is assigned to Darshan / SAB** (`docs/vision_maps/NORTH_STAR.md` §6), not to Loomwork.
+
+- **Attention Emancipation (AE)** — a **separate JK-level domain**, marked **UNRESOLVED / not yet typed** (audit C6). Anti-collapse guard: **AE is not SIS, not productivity tooling, and not generic focus work.** It is named here so it is not silently folded into another domain, but it carries no typed structure yet.
+
+- **Shakti Ginko** — the **wealth-metabolism organ under JK directly**, at peer *priority* to SIS but in a categorically distinct *position* (metabolism vs. domain) (audit C7). Function: **wealth-generation by all means possible**, in service of funding every other domain. Discipline: **trustee, not possessor** — internal trustee discipline is gate-enforced (`shakti.py` quadrature); outward function is unconstrained. Source authority: Sri Aurobindo, *The Mother*, Ch. IV.
+
+### Conditions of consistency (binding on downstream docs)
+
+1. **JK is the ceiling.** No doc may position any domain, organ, or the organism itself as peer to or above Jagat Kalyan.
+2. **SIS is a domain; Shakti Ginko is metabolism.** They may share priority but are never the same category. Do not collapse metabolism into domain or vice versa.
+3. **Loomwork is a child of SIS**, not a peer of Shakti Ginko. Any doc framing them as peers is superseded by this section.
+4. **GAIA is an accounting kernel under SIS**, not a peer-platform of JK.
+5. **AE stays separate and unresolved** until explicitly typed; it must not be collapsed into SIS, productivity tooling, or generic focus work.
+6. **Runtime scoring** (e.g. Loomwork's CompassRoom / `compass.py`) should score candidates against **SIS-fitness primarily, with JK as the ultimate telos** — not JK-fitness directly (audit C5, tracked as drift).
+7. **The organism is the body, not the telos.** Self-referential work that no external human transacts through is the named anti-pattern, not an objective.
+
+Operational grounding: `dharma_swarm/ontology.py:1-30` declares "Palantir built this pattern for supply chains and kill chains. We take the engineering and reforge it for Jagat Kalyan." This hierarchy is the constitutional statement of that reforging.
 
 ---
 
@@ -416,10 +119,10 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **419 files at its top level (53.4% of 785 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **29 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **8 orchestrators** (V), **26 adapter files across 8 locations** (V), and **16 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **32 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **29 adapter files** (V), and **19 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -455,41 +158,26 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-07-10 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
+One row per metric — refreshes REPLACE this table (never append; the 2026-06/07
+append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
-<!-- DOCOPS:START metric=sovereign_manifest_inventory -->
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **785** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **419 (53.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **333,077** | wc -l across dharma_swarm Python modules |
-| Test files | **758** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **12,170 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1,210** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| wc -l |
-| Markdown total lines | **308,101** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
-| Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f \| wc -l |
-| Adapter files | **26 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" \| wc -l |
-| Orchestrator files | **8** | find dharma_swarm -name "*orchestrat*" \| wc -l |
-| Router files | **16** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" \| wc -l |
-| Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
-| Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
-| Provider types (enum) | **18** | models.py ProviderType enum |
-| Provider classes | **19** (including LLMProvider base) | grep "class.*Provider" providers.py |
-| Kernel axioms | **25** (10 original + 15 foundations) | dharma_kernel.py MetaPrinciple enum |
-| Telos gates | **11** (2 Tier A, 1 Tier B, 8 Tier C) | telos_gates.py core gates |
-| SQLite-using modules | **49** | grep aiosqlite/sqlite3 |
-| JSONL-writing modules | **126** | grep .jsonl |
-| ~/.dharma/ subdirectories | **74** | ls ~/.dharma/ |
-| Circular dependency chains | **9 confirmed** | import tracing |
-| Files >500 lines | **148** | wc -l + awk |
-| Files >3000 lines | **7** | wc -l + awk |
-<!-- DOCOPS:END -->
-
----
+| Total Python modules | **1,032** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Top-level (flat) modules | **451 (44.2%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Total Python LOC | **369,176** | wc -l across dharma_swarm Python modules |
+| Test files | **926** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **13,882 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
+| Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
+| Markdown files | **1,448** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **304,643** | wc -l across all tracked .md |
+| Bridge files | **32** | find dharma_swarm -name "*bridge*.py" -type f |
+| Adapter files | **29** | find dharma_swarm -type f \| rg -i "adapter" |
+| Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY
 
@@ -573,7 +261,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**29 bridge files** (V), **14,866 total LOC**:
+**32 bridge files** (V), **13,299 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -706,6 +394,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 - Config: environment variables override defaults in `config.py`
 - **Known inconsistency**: "bridge" vs "adapter" vs "connector" all mean "interface between systems". "orchestrator" vs "orchestrate" vs "director" all mean "coordinate work". "routing" vs "router" vs "selector" all mean "choose where to send".
 
+### Forge / Pudgala Naming Boundary
+- **Dharma Forge** names the whole-swarm evolution, benchmark, external-receipt,
+  candidate-control, Hydra, and arena family.
+- **Pudgala Autopoiesis Protostar** names the anti-slop governance mechanism for
+  graded claim/evidence binding, `min_evidence_grade` floors,
+  `VerifiedMachineReceipt` chains, oracle-independence downgrades, and advisory
+  quality gates.
+- Do not use Forge names for anti-slop governance mechanisms. Historical
+  receipts may preserve old branch names, but live docs and tracked surfaces
+  must use the boundary above.
+
 ### Legacy Quarantine Rules
 - Files in `docs/archive/` are dead. Do not reference them as current.
 - `swarmlens_app.py` is the old TUI (zero importers) (V). The current TUI is Bun/Ink in `tui/`.
@@ -758,13 +457,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **29 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **32 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **29 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **32 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 

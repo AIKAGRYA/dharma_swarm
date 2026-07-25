@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-06-30T23:46:21Z",
+  "round_id": "phase-5-memory-live-retrieval-hardening",
+  "status": "completed_partial",
+  "target_gate": "Make stale-memory rejection and retrieval telemetry executable in live MemoryKernel context packs",
+  "score_after_round": 77,
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "implementation": {
+    "stale_rejection": {
+      "budget_field": "MemoryContextBudget.reject_stale",
+      "default_context_enabled": true,
+      "freshness_values_rejected": [
+        "snapshot",
+        "dormant",
+        "missing",
+        "unknown"
+      ],
+      "expired_valid_until_rejected": true,
+      "omission_reasons": [
+        "stale_memory_rejected",
+        "valid_until_expired"
+      ]
+    },
+    "retrieval_telemetry": {
+      "metadata_path": "bundle.metadata.memory_kernel_default.retrieval_telemetry",
+      "fields": [
+        "candidate_count",
+        "admitted_count",
+        "omitted_count",
+        "candidate_truncated",
+        "admitted_surface_ids",
+        "omitted_surface_ids",
+        "selection_reason_counts",
+        "omission_reason_counts",
+        "warning_counts"
+      ]
+    }
+  },
+  "files_touched": [
+    "dharma_swarm/memory_kernel/context_admission.py",
+    "dharma_swarm/memory_kernel/default_context.py",
+    "tests/test_context_compiler_memory_kernel.py",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+    "reports/langgraph_parity/allnight/memory_stale_rejection_telemetry_20260630T234621Z.json"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_rejects_stale_memory_with_retrieval_telemetry --tb=short",
+      "result": "1 passed in 0.38s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py",
+      "result": "30 passed in 0.63s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py",
+      "result": "55 passed in 0.80s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Memory curated-source coverage and full tool-exposure isolation remain incomplete or unproven.",
+    "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+    "Full live multi-process resume semantics remain unproven.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

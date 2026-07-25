@@ -1,7 +1,7 @@
 # DharmaVerifier-Ranker v0 Data Inventory
 
-Role: report
-Generated receipt: `DATA_INVENTORY_RECEIPT_20260701.json`
+Role: report  
+Generated receipt: `DATA_INVENTORY_RECEIPT_20260701.json`  
 Inventory mode: metadata-only, no raw private message body readout
 
 ## Summary

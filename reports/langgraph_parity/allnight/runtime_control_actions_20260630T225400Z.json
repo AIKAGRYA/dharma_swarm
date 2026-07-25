@@ -1,0 +1,102 @@
+{
+  "schema_version": "langgraph_parity_round_receipt.v1",
+  "generated_at": "2026-06-30T22:54:00Z",
+  "round_id": "runtime-control-action-endpoints",
+  "target_gate": "Phase 7 approve/reject/resume runtime control action endpoints",
+  "score_after_round": 75,
+  "status": "completed_partial",
+  "summary": {
+    "claim": "Runtime approve/reject/resume action endpoints now write canonical OperatorAction audit rows, emit follow-up operator_control session events, return refreshed interrupt snapshots, and best-effort write checkpoint interrupt responses when an interrupt_id is supplied.",
+    "rationale": "This closes the missing read/write API surface for runtime controls without creating dashboard-only state. It does not claim full production-grade live resume across every runtime transport; A2A strict readiness, memory hardening, and exhaustive provider proof remain incomplete."
+  },
+  "changes": [
+    "Added dharma_swarm/runtime_control_actions.py with RuntimeControlActions.runtime_control_action().",
+    "Kept dharma_swarm/runtime_platform_views.py under the ratchet threshold by delegating action writes to the new module.",
+    "Added OperatorViews.runtime_control_action().",
+    "Added FastAPI POST /api/runtime/interrupts/approve, /reject, and /resume.",
+    "Added dashboard TypeScript request/result types and typed API helpers for runtime control actions.",
+    "Extended tests/test_runtime_graph_api.py to prove operator-level action recording, checkpoint response writing, API endpoint behavior, and route registration."
+  ],
+  "files_touched": [
+    "dharma_swarm/runtime_control_actions.py",
+    "dharma_swarm/runtime_platform_views.py",
+    "dharma_swarm/operator_views.py",
+    "api/routers/runtime.py",
+    "dashboard/src/lib/types.ts",
+    "dashboard/src/lib/api.ts",
+    "tests/test_runtime_graph_api.py",
+    "reports/langgraph_parity/allnight/runtime_control_actions_20260630T225400Z.json",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py",
+      "result": "7 passed in 1.23s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/runtime_control_actions.py dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/runtime_control_actions.py dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": "node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts",
+      "cwd": "dashboard",
+      "result": "11 passed; Node emitted experimental type-stripping warnings only"
+    },
+    {
+      "command": "npm run lint -- --quiet",
+      "cwd": "dashboard",
+      "result": "pass"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "dashboard",
+      "result": "pass; /dashboard/runtime prerendered successfully"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+      "result": "60 passed in 29.29s"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass with existing warnings"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "pass; green=true; modules_over_500_lines remained 207 -> 207"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "expected fail exit 2; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": "make agent-build-preflight",
+      "result": "pass; compileall clean, F821 clean, 12349 tests collected, onboard OK, hygiene integrity OK"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "closed_or_improved_gates": [
+    "Phase 7 runtime control write surface now has operator, API, typed client, and test evidence.",
+    "Approve/reject/resume actions are persisted in canonical OperatorAction and session_events tables instead of dashboard-only state.",
+    "Checkpoint interrupt response files are written best-effort when an interrupt_id is present."
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Full live multi-process resume semantics for every runtime transport remain unproven.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain incomplete or unproven.",
+    "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

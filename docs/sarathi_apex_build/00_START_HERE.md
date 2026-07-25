@@ -1,67 +1,81 @@
-# Sarathi Apex Build — 00 START HERE
+# 00 — Start Here: Sarathi Holon System
 
-Status: **map + gate rescue pass, not a living Sarathi claim**.
+Status: **collapse base landed; effect and durable-service closure remain**.
+Do not use this document to claim a living Sarathi.
 
-Working checkout used for this receipt: `/Users/dhyana/dharma_swarm`, branch
-`agent/magpie-seed`, HEAD `eeb217b7758e`, `39` ahead / `381` behind
-`origin/main` at `0a26db0ee6f1` when verified on 2026-07-06.
+For the current holon-specific body synthesis, read
+[`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
-## The locked sentence
+## Locked sentence
 
-Sarathi is the apex holon that USES persistent-agent lineage + living-agent kernel + holon runtime + existing orchestrator, then ADDS deterministic reversibility gating and operator-facing continuity — not a parallel rewrite.
+Sarathi is intended to be the apex holon that **composes** persistent-agent
+lineage, the Living Agent Kernel, the direct holon runtime, canonical provider
+routing, existing orchestration/A2A, and deterministic authority gates, then
+adds operator-facing continuity. It is not a parallel rewrite and not identity
+documents alone.
 
-## Read order
+## Landed baseline
 
-**`README.md` is the front door.** The canonical numbered read order is:
+- PR #821 merged the clean collapse lane into main at `0beef7584`.
+- The duplicate repo-root `holon/` package was removed.
+- `load_holon` and `holon_wake_cycle` each have one canonical definition.
+- The reversibility primitive, runtime seam, thin `holon_system` facade, Sarathi
+  projections, and sprawl guard are present on main.
+- The facade's Sarathi gateway and pulse correctly emit
+  `wake_loop_active=false` and `alive_claim=false`
+  (`dharma_swarm/holon_system/sarathi/gateway.py:15-24`;
+  `dharma_swarm/holon_system/sarathi/pulse.py:12-25`).
 
-1. `00_START_HERE.md` — this file (orientation + locked sentence + "alive" definition).
-2. `01_CURRENT_STATE.md` — live snapshot (git, dgc, runtime counts, Sarathi surfaces).
-3. `02_CODEBASE_RUNTIME_BOUNDARY.md` — dharma_swarm/ vs ~/.dharma vs ~/.hermes, and the drift.
-4. `03_HOLON_SYSTEM_CODE_MAP.md` — Hermes-class organs -> our code (exists/partial/scattered/missing).
-5. `04_PERSISTENT_AGENT_RELATION.md` — the lineage ladder up to the apex.
-6. `05_SARATHI_APEX_MAP.md` — what Sarathi is + its target source package.
-7. `06_PROOF_GATES.md` — gate-ordered next work; what authorizes "alive".
-8. `07_BACKLOG.md` — safe-to-change, next steps, do-not-touch.
-9. `90_ANTI_SPRAWL_HARNESS.md` — the rules that stop the next map from scattering.
+Reproduce the merge/collapse claims with:
 
-Supporting/historical (linked from README, non-canonical): `11_PERSISTENT_AGENT_RELATION.md`
-(full file:line lineage), `12_LOAD_HOLON_COLLAPSE_PLAN.md`, `HOLON_SYSTEM_CODE_ORGANIZATION.md`,
-`91_SPRAWL_HARNESS_RUNBOOK.md`, `CURRENT_MAP_2026-07-06.md`, `SCRATCHPAD_2026-07-06.md`.
+```bash
+git show -s --format='%H %cs %s' 0beef7584
+test ! -d holon && echo 'root holon fork absent'
+PYTHONPATH=$PWD /Users/dhyana/dharma_swarm/.venv/bin/python \
+  scripts/governance/sprawl_guard.py
+```
 
-## Current proof status
+The original branch/worktree names and test counts in the dated subdocuments are
+historical evidence of that merge, not current deployment facts.
 
-| Claim | Current evidence | Status |
-|---|---|---|
-| Keystone gate exists | `dharma_swarm/operator_core/reversibility_gate.py` is 225 lines; `tests/test_reversibility_gate.py` is 90 lines; both are untracked in this checkout. | **Verified** |
-| Gate tests pass | `.venv/bin/python -m pytest tests/test_reversibility_gate.py -q` → `9 passed in 0.50s`. | **Verified under repo venv** |
-| Exact `python3` command passes | `python3 -m pytest tests/test_reversibility_gate.py -q` used `/usr/bin/python3` 3.9.6 and failed during collection on repo-wide `dict[str, Any] | None` annotations. | **Red due interpreter, not gate logic** |
-| Layer map is composition, not rewrite | Files and line anchors in `11_PERSISTENT_AGENT_RELATION.md`; `holon_orchestrate.py:1-7` explicitly says no second orchestrator/task store/model router/receipt spine. | **Verified** |
-| Holon runtime line count | `git ls-files 'dharma_swarm/holon*' ... | xargs wc -l` for runtime code files gives 18 files / 5,668 lines. | **Verified; file-count wording corrected** |
-| Sarathi executable body | `~/.dharma/agents/sarathi` has 37 files and 0 `.py/.sh/.ts/.js`; grep for `sarathi` in holon/wake code returned 0 hits. | **Mind/spec exists; body not breathing** |
-| Execution leases | `find ~/.dharma/a2a_bus/leases -maxdepth 2 -type f | wc -l` → `0`. | **Verified empty** |
-| Sprawl count | `/Users/dhyana` scan found 138 `holon_bridge.py` + 138 `holon_runtime.py` instances across 69 git roots; each root generally has both `dharma_swarm/` and `holon/` copies. | **Verified current scan; prior 136/68 is stale by +2/+1** |
+## Proposed proof level
 
-## What is allowed next
+```text
+IdentityPresent
+  -> DialogueProven
+  -> ProposalCycleProven
+  -> GovernedEffectProven
+  -> ReceiptBound
+  -> DurableServiceProven
+```
 
-Do **not** build a new Sarathi architecture. Do this sequence only:
+This build-history file does not assign a current promotion level; the estate
+map keeps the dated witness and exact re-run commands. The runner asks which
+action should happen next (`scripts/holon_run.py:32-62`) and does not pass
+`planned_action`, `spend_fn`, or an execution lease
+(`scripts/holon_run.py:66-87`). The six names above are proposed promotion types;
+current source still uses weaker booleans
+(`dharma_swarm/holon_system/observability/proof_gates.py:6-11`).
 
-1. Commit the deterministic reversibility gate and its tests on a clean branch off `origin/main` or explicitly port them there.
-2. Collapse `load_holon` to one canonical module path: `dharma_swarm/holon_bridge.py`.
-3. Delete or archive the `holon/` fork only after importers/tests are migrated.
-4. Register `sarathi` as a `WakeProfile` only after steps 1–3 are green on the canonical tree.
-5. Wrap `holon_wake_cycle()` with the reversibility gate.
-6. Run exactly one unattended overnight proof and write receipts.
-7. Flip `wake_loop_active=true` only after that proof.
+## Surface contract
 
-## Definition of "alive" for this slice
+```yaml
+surface: sarathi_apex_holon_system
+holon_body_reference: docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
+canonical_runtime_primitives:
+  - dharma_swarm/holon_bridge.py::load_holon
+  - dharma_swarm/holon_runtime.py::holon_wake_cycle
+  - dharma_swarm/operator_core/living_agent_kernel.py
+  - dharma_swarm/operator_core/execution_lease.py
+  - dharma_swarm/operator_core/reversibility_gate.py
+canonical_runtime_home: ~/.dharma/agents/sarathi
+forbidden:
+  - duplicate identity loader or wake-cycle body
+  - new provider router, orchestrator, task store, A2A bus, or receipt spine
+  - alive claim from PID, tmux, identity, heartbeat, or proposal alone
+proposed_promotion_gate: DurableServiceProven
+current_enforcement: not_composed
+current_candidate_helper: sprawl_guard_clean_and_wake_loop_active_booleans
+```
 
-A file named `SOUL.md`, `OPERATING_MAP.md`, or `identity.json` is not liveness.
-Sarathi becomes alive only when all of these exist and verify:
-
-- `load_holon("sarathi")` succeeds from the canonical code path;
-- the deterministic reversibility gate blocks irreversible/unreachable actions;
-- `holon_wake_cycle()` is wrapped by that gate;
-- a `sarathi` wake profile exists;
-- a wake receipt proves the loop ran unattended within its reversible-safe envelope;
-- operator-facing continuity exists as a receipt or phone/outbox artifact;
-- `wake_loop_active` is false until the above proof exists.
+The next work is specified in [`07_BACKLOG.md`](07_BACKLOG.md).

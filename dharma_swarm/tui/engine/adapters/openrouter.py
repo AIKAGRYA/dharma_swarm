@@ -8,6 +8,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.api_keys import OPENROUTER_API_KEY_ENV, env_value
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
@@ -22,6 +23,24 @@ OPENROUTER_CAPABILITIES = (
 )
 
 
+def _gemini_openrouter_id() -> str:
+    """The Gemini OpenRouter route id, sourced from the ONE pool at the FLOOR.
+
+    The Gemini lane used to hand-type the sub-floor ``google/gemini-2.5-pro``;
+    the floor is gemini-3-pro, owned by the pool. We project its OpenRouter
+    (``google/...``) route so the model-id literal lives only in the pool.
+    """
+    entry = _model_pool.get_entry("gemini-3-pro")
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.startswith("google/"):
+                return mid
+    raise AssertionError("model_pool has no google/ route for the gemini-3-pro floor")
+
+
+_GEMINI_OPENROUTER_ID = _gemini_openrouter_id()
+
+
 class OpenRouterAdapter(ProviderAdapter):
     """Provider adapter for OpenRouter chat completions."""
 
@@ -34,6 +53,7 @@ class OpenRouterAdapter(ProviderAdapter):
             default_model=DEFAULT_MODELS[ProviderType.OPENROUTER],
         )
         self._cancelled = False
+        self._active_request_task: asyncio.Task[httpx.Response] | None = None
         self._profiles: dict[str, ModelProfile] = {
             DEFAULT_MODELS[ProviderType.OPENROUTER]: ModelProfile(
                 provider_id=self.provider_id,
@@ -47,9 +67,9 @@ class OpenRouterAdapter(ProviderAdapter):
                 display_name="Codex 5.4 (OpenRouter)",
                 capabilities=OPENROUTER_CAPABILITIES,
             ),
-            "google/gemini-2.5-pro": ModelProfile(
+            _GEMINI_OPENROUTER_ID: ModelProfile(
                 provider_id=self.provider_id,
-                model_id="google/gemini-2.5-pro",
+                model_id=_GEMINI_OPENROUTER_ID,
                 display_name="Gemini 3 class (OpenRouter)",
                 capabilities=OPENROUTER_CAPABILITIES,
             ),
@@ -125,18 +145,34 @@ class OpenRouterAdapter(ProviderAdapter):
             "Content-Type": "application/json",
         }
 
+        if self._cancelled:
+            yield self._cancelled_session_end(session_id)
+            return
+
         try:
             timeout = float(request.provider_options.get("timeout_sec", 120))
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(url, headers=headers, json=payload)
-            if self._cancelled:
-                yield SessionEnd(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    success=False,
-                    error_code="cancelled",
-                    error_message="request cancelled",
+            request_task = asyncio.create_task(
+                self._post_completion(
+                    url=url,
+                    headers=headers,
+                    payload=payload,
+                    timeout=timeout,
                 )
+            )
+            self._active_request_task = request_task
+            try:
+                resp = await request_task
+            except asyncio.CancelledError:
+                if not self._cancelled:
+                    raise
+                yield self._cancelled_session_end(session_id)
+                return
+            finally:
+                if self._active_request_task is request_task:
+                    self._active_request_task = None
+
+            if self._cancelled:
+                yield self._cancelled_session_end(session_id)
                 return
 
             if resp.status_code >= 400:
@@ -213,12 +249,40 @@ class OpenRouterAdapter(ProviderAdapter):
 
     async def cancel(self) -> None:
         self._cancelled = True
-        # keep API parity with other adapters
-        await asyncio.sleep(0)
+        task = self._active_request_task
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        finally:
+            if self._active_request_task is task and task.done():
+                self._active_request_task = None
 
     async def close(self) -> None:
-        with contextlib.suppress(Exception):
-            await self.cancel()
+        await self.cancel()
+
+    async def _post_completion(
+        self,
+        *,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+        timeout: float,
+    ) -> httpx.Response:
+        """Own the client inside the cancellable task so cleanup is awaited."""
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            return await client.post(url, headers=headers, json=payload)
+
+    def _cancelled_session_end(self, session_id: str) -> SessionEnd:
+        return SessionEnd(
+            provider_id=self.provider_id,
+            session_id=session_id,
+            success=False,
+            error_code="cancelled",
+            error_message="request cancelled",
+        )
 
 
 def _extract_content(data: Any) -> str:

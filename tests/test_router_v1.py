@@ -142,7 +142,7 @@ def test_model_hint_for_provider_prefers_kimi_for_japanese() -> None:
         default_hint="openai/gpt-5-codex",
         signals=signals,
     )
-    assert hint == "moonshotai/kimi-k2.5"
+    assert hint == "moonshotai/kimi-k2.6"
 
 
 def test_model_hint_for_provider_prefers_glm_and_nemotron_for_reasoning() -> None:
@@ -164,7 +164,9 @@ def test_model_hint_for_provider_prefers_glm_and_nemotron_for_reasoning() -> Non
     )
 
     assert openrouter_hint == "z-ai/glm-5"
-    assert nim_hint == "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    # nemotron is BANISHED: the hosted NIM reasoning fallback now projects the
+    # pool's canonical glm-5 reasoning floor (same as the OpenRouter route).
+    assert nim_hint == "z-ai/glm-5"
 
 
 def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -> None:
@@ -180,7 +182,7 @@ def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -
         default_hint="meta/llama-3.3-70b-instruct",
         signals=signals,
     )
-    assert jp_hint == "moonshotai/kimi-k2.5"
+    assert jp_hint == "moonshotai/kimi-k2.6"
 
     reasoning_request = LLMRequest(
         model="x",
@@ -192,12 +194,16 @@ def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -
         default_hint="meta/llama-3.3-70b-instruct",
         signals=reasoning_signals,
     )
-    assert reasoning_hint == "zai-org/GLM-5"
+    # Self-hosted NIM glm-5 floor now projects the pool's canonical vendor id
+    # (the orphan ``zai-org/GLM-5`` literal is gone).
+    assert reasoning_hint == "z-ai/glm-5"
 
 
 def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
 
     jp_request = LLMRequest(
         model="x",
@@ -209,7 +215,7 @@ def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> N
         default_hint="llama3.2",
         signals=jp_signals,
     )
-    assert jp_hint == "kimi-k2.5:cloud"
+    assert jp_hint == "kimi-k2.6:cloud"
 
     reasoning_request = LLMRequest(
         model="x",

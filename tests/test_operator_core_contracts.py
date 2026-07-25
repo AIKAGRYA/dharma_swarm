@@ -154,6 +154,7 @@ def test_runtime_truth_packet_keeps_state_axes_separate() -> None:
     assert row["authority_state"] == "projection_only"
     assert row["mutation_state"] == "no_mutation_observed"
     assert row["external_state"] == "external_gated"
+    assert row["proof_grade"] == "MISSING"
     assert packet.heartbeat_state is not packet.progress_state
     assert packet.is_projection is True
     assert packet.is_authoritative is False

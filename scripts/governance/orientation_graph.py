@@ -22,34 +22,56 @@ Doctrine line that must hold (same as the reconciliation track's):
 Usage:
     python3 scripts/governance/orientation_graph.py          # human view
     python3 scripts/governance/orientation_graph.py --json   # machine packet
-    make orient
+    make organism-status                                   # deep read-only view
+    python3 scripts/governance/orientation_graph.py --write-context
+                                                            # explicit refresh
 
-Write behavior: never writes. Exit code: always 0 (informational).
+Write behavior: default and --json never write; --write-context writes only
+reports/orientation/repo_context.{json,md}. Exit code: always 0
+(informational).
 """
+
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.util
 import json
-import re
-import sqlite3
+import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# This projection is read-only by default, and its explicit refresh owns only
+# the two context artifacts below.  Disable bytecode before importing any
+# repository module so a pristine checkout never gains ignored __pycache__
+# files merely by invoking either route. `make organism-status` also exports the
+# interpreter-level switch so the policy applies from process start.
+sys.dont_write_bytecode = True
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOVERNANCE_DIR = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-if str(GOVERNANCE_DIR) not in sys.path:
-    sys.path.insert(0, str(GOVERNANCE_DIR))
-from dharma_swarm.operator_core.live_ops_census_contract import (
-    census_payload_freshness,
-    default_output_path,
-    validate_census_payload,
-)
-from check_track_status import readiness_score_cap
+
+from dharma_swarm.a2a.agent_presence import list_agent_presence  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
+
+
+def _load_broken_register_parser():
+    path = REPO_ROOT / "dharma_swarm/operator_core/onboarding/broken_register.py"
+    spec = importlib.util.spec_from_file_location("_dharma_broken_register_orientation", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load canonical broken-register parser: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.parse_broken_register
+
+
+parse_broken_register = _load_broken_register_parser()
 
 ORGANISM_DOC = REPO_ROOT / "foundations/THE_ORGANISM.md"
 NORTH_STAR_DOC = REPO_ROOT / "docs/vision_maps/NORTH_STAR.md"
@@ -58,18 +80,61 @@ PORTFOLIO = REPO_ROOT / "docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 ASSERTIONS = REPO_ROOT / "docs/docops/assertions.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
+REPO_CONTEXT_DIR = REPO_ROOT / "reports/orientation"
+REPO_CONTEXT_JSON = REPO_CONTEXT_DIR / "repo_context.json"
+REPO_CONTEXT_MD = REPO_CONTEXT_DIR / "repo_context.md"
+A2A_BUS = Path.home() / ".dharma/a2a_bus"
+DEPLOY_RECEIPT = Path.home() / ".dharma/ops/deploy_receipt.json"
+LANE_MAP = Path.home() / ".dharma/ops/parallel_lane_map.json"
+
+
+def _normalize_context_path(value: str) -> str:
+    """Normalize host-specific absolute paths for portable committed artifacts."""
+    if not value:
+        return ""
+    try:
+        path = Path(value).expanduser()
+    except Exception:
+        return value
+    if not path.is_absolute():
+        return value
+    try:
+        return f"$REPO_ROOT/{path.relative_to(REPO_ROOT)}"
+    except ValueError:
+        pass
+    try:
+        return f"~/{path.relative_to(Path.home())}"
+    except ValueError:
+        return "<absolute-path>"
+
+
+def _is_repo_root_context_path(value: str) -> bool:
+    if value in {"$REPO_ROOT", "$REPO_ROOT/."}:
+        return True
+    try:
+        return Path(value).expanduser().resolve() == REPO_ROOT.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return False
 
 
 def _census_receipt_path() -> Path | None:
-    """Receipt path declared by the live-ops census contract.
+    """Receipt path declared by the census owner (scripts/runtime/live_ops_census.py).
 
-    State-dir knowledge stays in the contract; this view only asks for the
-    configured output path, which honors DHARMA_STATE_DIR.
+    State-dir knowledge stays in the owner; this view only borrows its
+    DEFAULT_OUTPUT constant (which honors DHARMA_STATE_DIR).
     """
+    census_src = REPO_ROOT / "scripts/runtime/live_ops_census.py"
+    if not census_src.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("_live_ops_census", census_src)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
     try:
-        return Path(default_output_path())
+        spec.loader.exec_module(module)
     except Exception:
         return None
+    return Path(module.DEFAULT_OUTPUT)
 
 
 @dataclass
@@ -93,8 +158,9 @@ class Track:
     status: str
     serves: str
     owner: str
-    readiness: str = ""
     owned_surfaces: list[str] = field(default_factory=list)
+    complements: list[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -108,21 +174,7 @@ class CustodyReport:
 class Liveness:
     receipt: str
     generated_at: str = ""
-    surfaces: list[dict[str, Any]] = field(default_factory=list)
-    daemon_dispatch_launch: str = ""
-    daemon_dispatch_running: str = ""
-    daemon_receipt_head: str = ""
-    daemon_provider_model_coverage: str = ""
-    ds_goal_wrapper_contract: str = ""
-
-
-@dataclass
-class Loop1Closure:
-    live: bool
-    provider: str = ""
-    model: str = ""
-    started_at: str = ""
-    detail: str = ""
+    surfaces: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -133,23 +185,379 @@ class BrokenItem:
 
 
 @dataclass
+class Loop1Closure:
+    """Loop 1 (provider chain + dispatch) closure proof, projected read-only
+    from the latest delegation_runs receipt. LIVE only when that receipt
+    carries a non-empty provider AND model — the spine dispatch actually
+    recorded which brain answered. Owner of the fact: runtime_state's
+    delegation_runs.receipt_json; this view never writes."""
+    live: bool
+    provider: str = ""
+    model: str = ""
+    detail: str = ""
+
+
+@dataclass
+class Lane:
+    path: str
+    branch: str
+    head: str = ""
+    status: str = ""
+
+
+@dataclass
+class BodyState:
+    receipt: str
+    status: str = ""
+    worktree: str = ""
+    old_sha: str = ""
+    new_sha: str = ""
+    observed_at: str = ""
+    note: str = ""
+
+
+@dataclass
+class A2ABusState:
+    root: str
+    inbox_files: int
+    quarantine_files: int
+    node_registry: str = ""
+    task_log: str = ""
+    nats_e2e_receipt: str = ""
+
+
+@dataclass
+class ReceiptTail:
+    path: str
+    modified_at: str
+
+
+@dataclass
 class OrientationPacket:
     identity: Identity
     organs: list[Organ]
     tracks: list[Track]
     custody: CustodyReport
     liveness: Liveness
-    loop1: Loop1Closure
     broken: list[BrokenItem]
+    loop1: Loop1Closure
+    lanes: list[Lane] = field(default_factory=list)
+    agents: list[dict[str, Any]] = field(default_factory=list)
+    receipts_tail: list[ReceiptTail] = field(default_factory=list)
+    a2a_bus: A2ABusState | None = None
+    body: BodyState | None = None
+    context_hash: str = ""
+
+
+# ── Graph-shaped query layer ───────────────────────────────────────────
+#
+# Typed nodes + edges over the same owners the flat packet already reads.
+# Traversal: organ -> tracks -> surfaces -> liveness edges.
+# No new truth store; purely derived from the packet.
+
+
+@dataclass
+class GraphNode:
+    kind: str  # "organ", "track", "surface", "objective", "broken"
+    id: str
+    label: str
+    status: str = ""
+    attrs: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class GraphEdge:
+    source: str
+    target: str
+    relation: str  # "serves", "owns_surface", "complements", "depends_on",
+    #                 "liveness", "has_broken"
+
+
+@dataclass
+class SurfaceLiveness:
+    pattern: str
+    exists: bool
+    matched_paths: list[str] = field(default_factory=list)
+    newest_mtime: str = ""
+
+
+@dataclass
+class OrientationGraph:
+    nodes: list[GraphNode] = field(default_factory=list)
+    edges: list[GraphEdge] = field(default_factory=list)
+    surface_liveness: list[SurfaceLiveness] = field(default_factory=list)
+
+
+def _probe_surface(pattern: str) -> SurfaceLiveness:
+    """Check whether an owned-surface glob matches files in the worktree."""
+    if pattern.endswith("/**"):
+        directory = REPO_ROOT / pattern[:-3]
+        if directory.is_dir():
+            matched = [
+                str(p.relative_to(REPO_ROOT))
+                for p in sorted(directory.rglob("*"))
+                if p.is_file()
+            ][:5]
+            mtime = ""
+            if matched:
+                newest = max(
+                    (REPO_ROOT / m for m in matched),
+                    key=lambda p: p.stat().st_mtime,
+                )
+                mtime = _mtime_iso(newest)
+            return SurfaceLiveness(
+                pattern=pattern,
+                exists=bool(matched),
+                matched_paths=matched,
+                newest_mtime=mtime,
+            )
+        return SurfaceLiveness(pattern=pattern, exists=False)
+
+    if "*" in pattern or "?" in pattern:
+        parent = REPO_ROOT
+        parts = pattern.split("/")
+        glob_part = "/".join(parts)
+        matched = [
+            str(p.relative_to(REPO_ROOT))
+            for p in sorted(parent.glob(glob_part))
+            if p.is_file()
+        ][:5]
+        mtime = ""
+        if matched:
+            newest = max(
+                (REPO_ROOT / m for m in matched),
+                key=lambda p: p.stat().st_mtime,
+            )
+            mtime = _mtime_iso(newest)
+        return SurfaceLiveness(
+            pattern=pattern,
+            exists=bool(matched),
+            matched_paths=matched,
+            newest_mtime=mtime,
+        )
+
+    target = REPO_ROOT / pattern
+    if target.exists():
+        return SurfaceLiveness(
+            pattern=pattern,
+            exists=True,
+            matched_paths=[pattern],
+            newest_mtime=_mtime_iso(target),
+        )
+    return SurfaceLiveness(pattern=pattern, exists=False)
+
+
+def build_graph(packet: OrientationPacket) -> OrientationGraph:
+    """Build a typed graph from the flat orientation packet.
+
+    Node kinds: objective, organ, track, surface, broken.
+    Edge relations: serves, owns_surface, complements, depends_on,
+    liveness (surface -> surface_liveness probe), has_broken.
+    """
+    nodes: list[GraphNode] = []
+    edges: list[GraphEdge] = []
+    surface_probes: list[SurfaceLiveness] = []
+    seen_objectives: set[str] = set()
+
+    # Objective nodes (deduplicated from tracks)
+    for track in packet.tracks:
+        obj_id = track.serves
+        if obj_id and obj_id not in seen_objectives:
+            seen_objectives.add(obj_id)
+            nodes.append(
+                GraphNode(
+                    kind="objective",
+                    id=f"obj:{obj_id}",
+                    label=obj_id,
+                    status="declared",
+                )
+            )
+
+    # Organ nodes
+    for organ in packet.organs:
+        nodes.append(
+            GraphNode(
+                kind="organ",
+                id=f"organ:{organ.id}",
+                label=organ.id,
+                status=organ.status,
+                attrs={
+                    "instrument": organ.instrument,
+                    "external_name": organ.external_name,
+                },
+            )
+        )
+
+    # Track nodes + edges
+    for track in packet.tracks:
+        tid = f"track:{track.id}"
+        nodes.append(
+            GraphNode(
+                kind="track",
+                id=tid,
+                label=track.id,
+                status=track.status,
+                attrs={"owner": track.owner},
+            )
+        )
+        if track.serves:
+            edges.append(
+                GraphEdge(source=tid, target=f"obj:{track.serves}", relation="serves")
+            )
+        for comp in track.complements:
+            edges.append(
+                GraphEdge(source=tid, target=f"track:{comp}", relation="complements")
+            )
+        for dep in track.depends_on:
+            edges.append(
+                GraphEdge(source=tid, target=f"track:{dep}", relation="depends_on")
+            )
+
+        # Surface nodes + edges
+        for surface in track.owned_surfaces:
+            sid = f"surface:{surface}"
+            nodes.append(GraphNode(kind="surface", id=sid, label=surface, status=""))
+            edges.append(GraphEdge(source=tid, target=sid, relation="owns_surface"))
+            probe = _probe_surface(surface)
+            surface_probes.append(probe)
+            status = "live" if probe.exists else "missing"
+            nodes[-1].status = status
+            if probe.newest_mtime:
+                nodes[-1].attrs["newest_mtime"] = probe.newest_mtime
+
+    # Broken-register nodes
+    for item in packet.broken:
+        bid = f"broken:{item.id}"
+        nodes.append(
+            GraphNode(
+                kind="broken",
+                id=bid,
+                label=f"{item.id} — {item.title}",
+                status=item.status,
+            )
+        )
+
+    return OrientationGraph(nodes=nodes, edges=edges, surface_liveness=surface_probes)
+
+
+def query_neighbors(
+    graph: OrientationGraph,
+    node_id: str,
+    relation: str | None = None,
+) -> list[tuple[GraphEdge, GraphNode]]:
+    """Return (edge, target_node) pairs reachable from *node_id*.
+
+    If *relation* is given, only edges of that type are returned.
+    """
+    node_map = {n.id: n for n in graph.nodes}
+    results: list[tuple[GraphEdge, GraphNode]] = []
+    for edge in graph.edges:
+        if edge.source != node_id:
+            continue
+        if relation and edge.relation != relation:
+            continue
+        target = node_map.get(edge.target)
+        if target:
+            results.append((edge, target))
+    return results
+
+
+def query_subgraph(
+    graph: OrientationGraph,
+    root_id: str,
+    max_depth: int = 3,
+) -> OrientationGraph:
+    """BFS traversal from *root_id* up to *max_depth* hops."""
+    node_map = {n.id: n for n in graph.nodes}
+    visited: set[str] = set()
+    frontier = [root_id]
+    collected_nodes: list[GraphNode] = []
+    collected_edges: list[GraphEdge] = []
+    depth = 0
+
+    while frontier and depth <= max_depth:
+        next_frontier: list[str] = []
+        for nid in frontier:
+            if nid in visited:
+                continue
+            visited.add(nid)
+            node = node_map.get(nid)
+            if node:
+                collected_nodes.append(node)
+            for edge in graph.edges:
+                if edge.source == nid and edge.target not in visited:
+                    collected_edges.append(edge)
+                    next_frontier.append(edge.target)
+        frontier = next_frontier
+        depth += 1
+
+    liveness = [
+        sl for sl in graph.surface_liveness if f"surface:{sl.pattern}" in visited
+    ]
+    return OrientationGraph(
+        nodes=collected_nodes, edges=collected_edges, surface_liveness=liveness
+    )
+
+
+# ── Time-to-orientation measurement ───────────────────────────────────
+
+ORIENTATION_RECEIPT_DIR = dharma_state_dir("DHARMA_STATE_DIR") / "ops"
+ORIENTATION_RECEIPT = ORIENTATION_RECEIPT_DIR / "orientation_timing_receipt.json"
+
+
+def measure_orientation(write_receipt: bool = True) -> dict[str, Any]:
+    """Time a full build_packet + build_graph cycle.
+
+    Target: < 10 s for a fresh agent.  Returns the timing receipt dict.
+    """
+    t0 = time.monotonic()
+    packet = build_packet()
+    t_packet = time.monotonic() - t0
+
+    t1 = time.monotonic()
+    graph = build_graph(packet)
+    t_graph = time.monotonic() - t1
+
+    total = t_packet + t_graph
+    receipt = {
+        "event": "orientation_timing",
+        "packet_build_s": round(t_packet, 4),
+        "graph_build_s": round(t_graph, 4),
+        "total_s": round(total, 4),
+        "target_s": 10.0,
+        "meets_target": total < 10.0,
+        "node_count": len(graph.nodes),
+        "edge_count": len(graph.edges),
+        "surface_probes": len(graph.surface_liveness),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "context_hash": packet.context_hash,
+    }
+    if write_receipt:
+        ORIENTATION_RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
+        ORIENTATION_RECEIPT.write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return receipt
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
     try:
         import yaml  # type: ignore
+    except ImportError:
+        # Reuse the track checker's stdlib parser; do not grow a second YAML
+        # subset implementation merely to keep orientation dependency-light.
+        from scripts.governance.check_track_status import _parse_minimal_yaml
 
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
-        return {}
+        return _parse_minimal_yaml(text)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        from scripts.governance.check_track_status import _parse_minimal_yaml
+
+        return _parse_minimal_yaml(text)
+    return data if isinstance(data, dict) else {}
 
 
 def build_identity() -> Identity:
@@ -168,10 +576,11 @@ def build_identity() -> Identity:
                 one_line = stripped.lstrip("> ").strip().strip("*")
                 break
     if not one_line:
-        one_line = ("(identity owner missing — read docs/vision_maps/"
-                    "NORTH_STAR.md §1 for the telos)")
-    return Identity(one_line=one_line, read_first=read_first,
-                    missing_sources=missing)
+        one_line = (
+            "(identity owner missing — read docs/vision_maps/"
+            "NORTH_STAR.md §1 for the telos)"
+        )
+    return Identity(one_line=one_line, read_first=read_first, missing_sources=missing)
 
 
 def build_organs() -> list[Organ]:
@@ -180,43 +589,15 @@ def build_organs() -> list[Organ]:
     for cell in data.get("cells") or []:
         if not isinstance(cell, dict):
             continue
-        organs.append(Organ(
-            id=str(cell.get("id", "")),
-            instrument=str(cell.get("instrument", "")),
-            status=str(cell.get("status", "")),
-            external_name=str(cell.get("external_name", "") or ""),
-        ))
+        organs.append(
+            Organ(
+                id=str(cell.get("id", "")),
+                instrument=str(cell.get("instrument", "")),
+                status=str(cell.get("status", "")),
+                external_name=str(cell.get("external_name", "") or ""),
+            )
+        )
     return organs
-
-
-def _format_track_readiness(entry: dict[str, Any]) -> str:
-    baseline = entry.get("readiness_baseline")
-    hardening = entry.get("hardening_status")
-    if not isinstance(baseline, dict) and not isinstance(hardening, dict):
-        return ""
-    baseline = baseline if isinstance(baseline, dict) else {}
-    hardening = hardening if isinstance(hardening, dict) else {}
-    bits: list[str] = []
-    if baseline:
-        bits.append(f"baseline={baseline.get('score')}/{baseline.get('scale', 100)}")
-    if hardening:
-        bits.append(f"current={hardening.get('current_score')}/{hardening.get('scale', 100)}")
-        cap = readiness_score_cap(entry)
-        if cap:
-            cap_text = f"cap={cap.get('cap_score')}/{cap.get('scale', 100)}"
-            if not cap.get("within_cap"):
-                cap_text += " OVER_CAP"
-            bits.append(cap_text)
-            errors = cap.get("errors") or []
-            if errors:
-                bits.append("cap_errors=" + ",".join(str(error) for error in errors))
-        evidence_ref = hardening.get("evidence_ref")
-        if evidence_ref:
-            bits.append(f"evidence={evidence_ref}")
-    rejected = baseline.get("claim_rejected")
-    if rejected:
-        bits.append(f"rejected={rejected}")
-    return "; ".join(bits)
 
 
 def build_tracks() -> list[Track]:
@@ -225,14 +606,17 @@ def build_tracks() -> list[Track]:
     for entry in data.get("active_tracks") or []:
         if not isinstance(entry, dict):
             continue
-        tracks.append(Track(
-            id=str(entry.get("id", "")),
-            status=str(entry.get("status", "")),
-            serves=str(entry.get("serves", "")),
-            owner=str(entry.get("owner", "")),
-            readiness=_format_track_readiness(entry),
-            owned_surfaces=[str(s) for s in entry.get("owned_surfaces") or []],
-        ))
+        tracks.append(
+            Track(
+                id=str(entry.get("id", "")),
+                status=str(entry.get("status", "")),
+                serves=str(entry.get("serves", "")),
+                owner=str(entry.get("owner", "")),
+                owned_surfaces=[str(s) for s in entry.get("owned_surfaces") or []],
+                complements=[str(s) for s in entry.get("complements") or []],
+                depends_on=[str(s) for s in entry.get("depends_on") or []],
+            )
+        )
     return tracks
 
 
@@ -254,575 +638,355 @@ def build_custody() -> CustodyReport:
     )
 
 
-_DAEMON_SPINE_RUNTIME_PROOFS = {
-    "spine_enabled_self_report",
-    "daemon_default_receipt_proven",
-    "daemon_default_spine_receipt_proven",
-}
-
-
-def _surface_proof_gaps(surface: dict[str, Any]) -> list[str]:
-    proof_gaps = surface.get("proof_gaps")
-    if isinstance(proof_gaps, list):
-        return [str(item) for item in proof_gaps if item]
-    surface_id = str(surface.get("surface_id") or surface.get("id") or "")
-    status = str(surface.get("status") or "")
-    raw = surface.get("raw") if isinstance(surface.get("raw"), dict) else {}
-    gaps: list[str] = []
-    if surface_id == "substrate.dharma_daemon" and status == "live":
-        dispatch_launch = raw.get("dispatch_launch")
-        launch_state = (
-            str(dispatch_launch.get("state") or "")
-            if isinstance(dispatch_launch, dict)
-            else ""
-        )
-        if launch_state != "spine_enabled_launch_spec":
-            gaps.append("daemon_launch_not_spine_enabled")
-        running_proof = str(raw.get("running_dispatch_proof") or "")
-        if running_proof not in _DAEMON_SPINE_RUNTIME_PROOFS:
-            gaps.append("daemon_dispatch_runtime_unproven")
-        receipt_head = (
-            raw.get("runtime_receipt_active_head")
-            if isinstance(raw.get("runtime_receipt_active_head"), dict)
-            else {}
-        )
-        if receipt_head:
-            dirty = (
-                receipt_head.get("active_head_side_effect_key_clean") is False
-                and any(
-                    int(row.get("total", 0)) > 0
-                    and int(row.get("missing_side_effect_key", 0)) > 0
-                    for row in receipt_head.get("windows", [])
-                    if isinstance(row, dict)
-                )
-            )
-            if dirty:
-                gaps.append("daemon_runtime_receipts_active_head_dirty")
-            if (
-                receipt_head.get("latest_fresh") is False
-                and int(receipt_head.get("runtime_receipts_total") or 0) > 0
-            ):
-                gaps.append("daemon_runtime_receipts_stale")
-    if surface_id == "dashboard.local" and status == "live":
-        dashboard_probe = raw.get("control_surface_rows_probe")
-        probe_state = (
-            str(dashboard_probe.get("state") or "")
-            if isinstance(dashboard_probe, dict)
-            else ""
-        )
-        if probe_state and probe_state not in {"ok", "not_checked"}:
-            gaps.append("dashboard_control_surface_rows_unproven")
-    return gaps
-
-
-def _runtime_receipt_head_line(head: dict[str, Any]) -> str:
-    if not head:
-        return ""
-    clean = head.get("active_head_side_effect_key_clean")
-    clean_text = "unknown" if clean is None else str(bool(clean)).lower()
-    fresh = head.get("latest_fresh")
-    fresh_text = "unknown" if fresh is None else str(bool(fresh)).lower()
-    age = head.get("latest_age_hours")
-    age_text = "unknown" if age is None else str(age)
-    max_age = head.get("latest_max_age_hours")
-    max_age_text = "unknown" if max_age is None else str(max_age)
-    latest = str(head.get("latest_created_at") or "unknown")
-    total = str(head.get("runtime_receipts_total") or 0)
-    window_parts: list[str] = []
-    for row in head.get("windows") or []:
-        if not isinstance(row, dict):
-            continue
-        window_parts.append(
-            f"{row.get('window_minutes')}m:"
-            f"{row.get('missing_side_effect_key')}/{row.get('total')}"
-        )
-    windows = ",".join(window_parts) if window_parts else "none"
-    return (
-        f"clean={clean_text}; fresh={fresh_text}; "
-        f"age_hours={age_text}; max_age_hours={max_age_text}; "
-        f"total={total}; latest={latest}; windows={windows}"
-    )
-
-
-def _field_gap_summary_text(coverage: dict[str, Any]) -> str:
-    summary = coverage.get("field_gap_summary")
-    if not isinstance(summary, dict):
-        return ""
-    total = int(summary.get("total_missing") or 0)
-    if total <= 0:
-        return ""
-    freshness = summary.get("by_freshness_class")
-    freshness_counts = freshness if isinstance(freshness, dict) else {}
-    parts = [f"total:{total}"]
-    for key in ("active_head_60m", "recent_historical_24h", "older_historical"):
-        count = int(freshness_counts.get(key) or 0)
-        if count > 0:
-            parts.append(f"{key}:{count}")
-    quarantine_count = int(summary.get("quarantine_candidate_missing") or 0)
-    if quarantine_count > 0:
-        parts.append(f"quarantine_candidate:{quarantine_count}")
-    return "; field_gap_summary=" + "|".join(parts)
-
-
-def _field_gap_actions_text(coverage: dict[str, Any]) -> str:
-    queue = [
-        item
-        for item in coverage.get("field_gap_action_queue") or []
-        if isinstance(item, dict)
-    ]
-    if not queue:
-        return ""
-    parts = []
-    for item in queue[:7]:
-        label = item.get("short_label") or item.get("action") or "unknown"
-        parts.append(f"{label}:{int(item.get('missing') or 0)}")
-    return "; field_gap_actions=" + "|".join(parts)
-
-
-def _compact_fresh_proof_status(status: Any) -> str:
-    status_text = str(status or "")
-    statuses = {
-        "fresh_scoped_proof_recorded": "fresh",
-        "pin_mitigation_proof_recorded_default_still_broken": (
-            "pin_proved_default_dirty"
-        ),
-        "candidate_policy_recorded_not_applied": "policy_candidate",
-        "fresh_proof_not_recorded": "missing",
-    }
-    return statuses.get(status_text, status_text)
-
-
-def _field_gap_proofs_text(coverage: dict[str, Any]) -> str:
-    queue = [
-        item
-        for item in coverage.get("field_gap_action_queue") or []
-        if isinstance(item, dict)
-    ]
-    if not queue:
-        return ""
-    parts = []
-    for item in queue[:7]:
-        fresh_proof = (
-            item.get("fresh_proof")
-            if isinstance(item.get("fresh_proof"), dict)
-            else {}
-        )
-        status = _compact_fresh_proof_status(fresh_proof.get("status"))
-        if not status:
-            continue
-        label = item.get("short_label") or item.get("action") or "unknown"
-        parts.append(f"{label}:{status}")
-    if not parts:
-        return ""
-    return "; field_gap_proofs=" + "|".join(parts)
-
-
-def _gate_70_to_75_text(coverage: dict[str, Any]) -> str:
-    components = [
-        item
-        for item in coverage.get("gate_70_to_75_components") or []
-        if isinstance(item, dict)
-    ]
-    if not components:
-        return ""
-    parts = []
-    for item in components[:5]:
-        label = item.get("short_label") or item.get("id") or "unknown"
-        status = item.get("status")
-        if not status:
-            status = "pass" if item.get("passed") else "fail"
-        parts.append(f"{label}:{status}")
-    return "; gate_70_75=" + "|".join(parts)
-
-
-def _provider_model_coverage_line(coverage: dict[str, Any]) -> str:
-    if not coverage:
-        return ""
-    latest_sample = str(coverage.get("latest_sample_size") or 0)
-    provider_model = str(coverage.get("latest_with_provider_model_payload") or 0)
-    provider_model_proof = str(coverage.get("latest_with_provider_model_provenance") or 0)
-    provider_model_accounted = str(
-        coverage.get("latest_with_provider_model_accounted") or 0
-    )
-    terminal_sample = str(coverage.get("latest_terminal_sample_size") or 0)
-    terminal_provider_model = str(
-        coverage.get("latest_terminal_with_provider_model_payload") or 0
-    )
-    terminal_provider_model_proof = str(
-        coverage.get("latest_terminal_with_provider_model_provenance") or 0
-    )
-    terminal_provider_model_accounted = str(
-        coverage.get("latest_terminal_with_provider_model_accounted") or 0
-    )
-    pending = str(coverage.get("latest_provider_model_pending_execution") or 0)
-    percent = coverage.get("latest_major_task_receipts_provider_model_percent")
-    percent_text = "unknown" if percent is None else str(percent)
-    proof_percent = coverage.get(
-        "latest_major_task_receipts_provider_model_provenance_percent"
-    )
-    proof_percent_text = "unknown" if proof_percent is None else str(proof_percent)
-    terminal_percent = coverage.get(
-        "latest_terminal_major_task_receipts_provider_model_percent"
-    )
-    terminal_percent_text = "unknown" if terminal_percent is None else str(terminal_percent)
-    terminal_proof_percent = coverage.get(
-        "latest_terminal_major_task_receipts_provider_model_provenance_percent"
-    )
-    terminal_proof_percent_text = (
-        "unknown" if terminal_proof_percent is None else str(terminal_proof_percent)
-    )
-    accounted_percent = coverage.get(
-        "latest_major_task_receipts_provider_model_accounted_percent"
-    )
-    accounted_percent_text = (
-        "unknown" if accounted_percent is None else str(accounted_percent)
-    )
-    terminal_accounted_percent = coverage.get(
-        "latest_terminal_major_task_receipts_provider_model_accounted_percent"
-    )
-    terminal_accounted_percent_text = (
-        "unknown"
-        if terminal_accounted_percent is None
-        else str(terminal_accounted_percent)
-    )
-    complete = coverage.get("provider_model_latest_complete")
-    complete_text = "unknown" if complete is None else str(bool(complete)).lower()
-    field_gap_groups = [
-        group
-        for group in coverage.get("field_gap_producer_groups") or []
-        if isinstance(group, dict)
-    ]
-    field_gap_text = ""
-    if field_gap_groups:
-        parts = []
-        for group in field_gap_groups[:3]:
-            freshness = group.get("freshness_class") or "unknown"
-            parts.append(
-                f"{group.get('gap_type')}/"
-                f"{group.get('receipt_type')}/"
-                f"{group.get('producer_source')}/"
-                f"{group.get('producer_failure_code')}"
-                f"={group.get('missing')}@{freshness}"
-            )
-        field_gap_text = "; field_gap_producers=" + "|".join(parts)
-    return (
-        f"latest={provider_model}/{latest_sample}; "
-        f"percent={percent_text}; proof={provider_model_proof}/{latest_sample}; "
-        f"proof_percent={proof_percent_text}; accounted={provider_model_accounted}/"
-        f"{latest_sample}; accounted_percent={accounted_percent_text}; "
-        f"terminal={terminal_provider_model}/"
-        f"{terminal_sample}; terminal_percent={terminal_percent_text}; "
-        f"terminal_proof={terminal_provider_model_proof}/{terminal_sample}; "
-        f"terminal_proof_percent={terminal_proof_percent_text}; "
-        f"terminal_accounted={terminal_provider_model_accounted}/{terminal_sample}; "
-        f"terminal_accounted_percent={terminal_accounted_percent_text}; "
-        f"pending={pending}; complete={complete_text}"
-        f"{field_gap_text}"
-        f"{_field_gap_summary_text(coverage)}"
-        f"{_field_gap_actions_text(coverage)}"
-        f"{_field_gap_proofs_text(coverage)}"
-        f"{_gate_70_to_75_text(coverage)}"
-    )
-
-
-def _ds_goal_wrapper_contract_line(surface: dict[str, Any]) -> str:
-    raw = surface.get("raw") if isinstance(surface.get("raw"), dict) else {}
-    contract = (
-        raw.get("installed_wrapper_contract")
-        if isinstance(raw.get("installed_wrapper_contract"), dict)
-        else {}
-    )
-    default_target = (
-        raw.get("default_wrapper_target")
-        if isinstance(raw.get("default_wrapper_target"), dict)
-        else {}
-    )
-    hardening = (
-        raw.get("target_sync_receipt_hardening")
-        if isinstance(raw.get("target_sync_receipt_hardening"), dict)
-        else {}
-    )
-    decision = (
-        raw.get("convergence_decision_packet")
-        if isinstance(raw.get("convergence_decision_packet"), dict)
-        else {}
-    )
-    preflight = (
-        raw.get("longrun_preflight_gate")
-        if isinstance(raw.get("longrun_preflight_gate"), dict)
-        else {}
-    )
-    if not raw:
-        return ""
-    sha = str(contract.get("wrapper_sha256") or "")
-    sha_label = sha[:12] if sha else "<missing>"
-    safe = str(raw.get("safe_current_checkout_invocation") or "")
-    safe_text = (
-        f"; safe={safe}"
-        if safe and raw.get("target_matches_current_repo") is False
-        else ""
-    )
-    decision_state = str(decision.get("approval_state") or "")
-    decision_text = f"; decision={decision_state}" if decision_state else ""
-    preflight_status = str(preflight.get("status") or "")
-    preflight_text = f"; preflight={preflight_status}" if preflight_status else ""
-    return (
-        f"target={raw.get('target_repo') or '<blank>'}; "
-        f"source={raw.get('target_resolution_source') or '<blank>'}; "
-        f"default={default_target.get('target_repo') or '<blank>'}; "
-        f"matches_current={str(raw.get('target_matches_current_repo')).lower()}; "
-        f"wrapper_sha256={sha_label}; "
-        f"pin={str(contract.get('dharma_swarm_repo_pin_supported')).lower()}; "
-        f"hardening={hardening.get('state') or '<unknown>'}"
-        f"{decision_text}"
-        f"{preflight_text}"
-        f"{safe_text}"
-    )
-
-
-def _validate_live_ops_census_payload(payload: Any) -> list[str]:
-    try:
-        return [str(error) for error in validate_census_payload(payload)]
-    except Exception as exc:
-        return [f"unable to validate live ops census receipt: {exc}"]
-
-
-def _live_ops_census_freshness(payload: Any) -> dict[str, Any]:
-    try:
-        result = census_payload_freshness(payload)
-        return result if isinstance(result, dict) else {}
-    except Exception as exc:
-        return {
-            "state": "unknown",
-            "age_minutes": None,
-            "evidence": f"unable to check live ops census freshness: {exc}",
-        }
-
-
 def build_liveness() -> Liveness:
     receipt_path = _census_receipt_path()
     if receipt_path is None or not receipt_path.exists():
-        return Liveness(receipt=(
-            "no census receipt — run "
-            "python3 scripts/runtime/live_ops_census.py --write"))
+        return Liveness(
+            receipt=(
+                "no census receipt — run "
+                "python3 scripts/runtime/live_ops_census.py --write"
+            )
+        )
     try:
         payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     except Exception:
-        return Liveness(receipt=f"unreadable receipt at {receipt_path}")
-    validation_errors = _validate_live_ops_census_payload(payload)
-    if validation_errors:
-        return Liveness(
-            receipt=f"invalid receipt at {receipt_path}: {'; '.join(validation_errors)}"
-        )
-    generated_at = str(payload.get("generated_at", ""))
-    freshness = _live_ops_census_freshness(payload)
-    if str(freshness.get("state") or "") == "stale":
-        evidence = str(freshness.get("evidence") or "live ops census receipt is stale")
-        age = freshness.get("age_minutes")
-        if age is not None:
-            evidence = f"{evidence}; age_minutes={age}"
-        return Liveness(
-            receipt=f"stale receipt at {receipt_path}: {evidence}",
-            generated_at=generated_at,
-        )
+        return Liveness(receipt=f"unreadable receipt at {_normalize_context_path(str(receipt_path))}")
     surfaces = []
-    daemon_dispatch_launch = ""
-    daemon_dispatch_running = ""
-    daemon_receipt_head = ""
-    daemon_provider_model_coverage = ""
-    ds_goal_wrapper_contract = ""
     for surface in payload.get("surfaces") or []:
         if not isinstance(surface, dict):
             continue
-        surface_id = str(surface.get("surface_id") or surface.get("id") or "")
-        if surface_id == "substrate.dharma_daemon":
-            raw = surface.get("raw")
-            if isinstance(raw, dict):
-                dispatch_launch = raw.get("dispatch_launch")
-                if isinstance(dispatch_launch, dict):
-                    daemon_dispatch_launch = str(
-                        dispatch_launch.get("state", ""))
-                daemon_dispatch_running = str(
-                    raw.get("running_dispatch_proof", ""))
-                receipt_head = raw.get("runtime_receipt_active_head")
-                if isinstance(receipt_head, dict):
-                    daemon_receipt_head = _runtime_receipt_head_line(receipt_head)
-                receipt_coverage = raw.get("runtime_receipt_coverage")
-                if isinstance(receipt_coverage, dict):
-                    daemon_provider_model_coverage = _provider_model_coverage_line(
-                        receipt_coverage
-                    )
-        if surface_id == "cli.ds_goal":
-            ds_goal_wrapper_contract = _ds_goal_wrapper_contract_line(surface)
-        surfaces.append({
-            "id": surface_id,
-            "label": str(surface.get("label", "")),
-            "status": str(surface.get("status", "")),
-            "proof_gaps": _surface_proof_gaps(surface),
-        })
+        surfaces.append(
+            {
+                "id": str(surface.get("surface_id") or surface.get("id") or ""),
+                "label": str(surface.get("label", "")),
+                "status": str(surface.get("status", "")),
+            }
+        )
     return Liveness(
-        receipt=str(receipt_path),
-        generated_at=generated_at,
+        receipt=_normalize_context_path(str(receipt_path)),
+        generated_at=str(payload.get("generated_at", "")),
         surfaces=surfaces,
-        daemon_dispatch_launch=daemon_dispatch_launch,
-        daemon_dispatch_running=daemon_dispatch_running,
-        daemon_receipt_head=daemon_receipt_head,
-        daemon_provider_model_coverage=daemon_provider_model_coverage,
-        ds_goal_wrapper_contract=ds_goal_wrapper_contract,
     )
-
-
-def _coerce_utc_datetime(value: Any) -> datetime | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _default_runtime_db() -> Path:
-    try:
-        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
-
-        return Path(DEFAULT_RUNTIME_DB)
-    except Exception:
-        return Path("~/.dharma/state/runtime.db").expanduser()
-
-
-def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
-    """Project Loop 1 closure from delegation_runs.receipt_json.
-
-    This is read-only and owns no fact. LIVE requires the newest persisted
-    dispatch receipt to carry a non-empty actually-served provider/model pair,
-    runtime_provider.actual_served provenance, and a fresh timestamp.
-    """
-    resolved = Path(db_path).expanduser() if db_path is not None else _default_runtime_db()
-    if not resolved.exists():
-        return Loop1Closure(live=False, detail=f"runtime db missing: {resolved}")
-    try:
-        with sqlite3.connect(resolved) as db:
-            row = db.execute(
-                """
-                SELECT started_at, receipt_json
-                FROM delegation_runs
-                WHERE receipt_json IS NOT NULL AND receipt_json != ''
-                ORDER BY started_at DESC, rowid DESC
-                LIMIT 1
-                """
-            ).fetchone()
-    except sqlite3.Error as exc:
-        return Loop1Closure(live=False, detail=f"runtime db unreadable: {exc}")
-    if not row:
-        return Loop1Closure(live=False, detail="no delegation_runs receipt_json rows")
-    started_at, raw_receipt = row
-    try:
-        receipt = json.loads(str(raw_receipt))
-    except Exception:
-        return Loop1Closure(
-            live=False,
-            started_at=str(started_at or ""),
-            detail="latest receipt_json is not valid JSON",
-        )
-    if not isinstance(receipt, dict):
-        return Loop1Closure(
-            live=False,
-            started_at=str(started_at or ""),
-            detail="latest receipt_json is not an object",
-        )
-    provider = str(receipt.get("provider") or "").strip()
-    model = str(receipt.get("model") or "").strip()
-    attributes = receipt.get("attributes") if isinstance(receipt.get("attributes"), dict) else {}
-    source = str(
-        attributes.get("provider_model_truth_source")
-        or receipt.get("provider_model_truth_source")
-        or ""
-    ).strip()
-    if not provider or not model:
-        return Loop1Closure(
-            live=False,
-            provider=provider,
-            model=model,
-            started_at=str(started_at or ""),
-            detail="latest receipt missing provider and/or model",
-        )
-    if source != "runtime_provider.actual_served":
-        return Loop1Closure(
-            live=False,
-            provider=provider,
-            model=model,
-            started_at=str(started_at or ""),
-            detail=f"latest provider/model provenance is {source or 'missing'}",
-        )
-    stamped = _coerce_utc_datetime(started_at or receipt.get("started_at"))
-    if stamped is None:
-        return Loop1Closure(
-            live=False,
-            provider=provider,
-            model=model,
-            started_at=str(started_at or ""),
-            detail="latest receipt timestamp is unreadable",
-        )
-    age_seconds = (datetime.now(timezone.utc) - stamped).total_seconds()
-    if age_seconds > 24 * 60 * 60:
-        age_hours = round(age_seconds / 3600, 2)
-        return Loop1Closure(
-            live=False,
-            provider=provider,
-            model=model,
-            started_at=str(started_at or ""),
-            detail=f"latest actual-served receipt is stale ({age_hours}h old)",
-        )
-    return Loop1Closure(
-        live=True,
-        provider=provider,
-        model=model,
-        started_at=str(started_at or ""),
-        detail="latest dispatch receipt carries fresh actual-served provider/model",
-    )
-
-
-_BR_HEAD = re.compile(r"^###\s+(?P<id>BR-\d+)\s*[—-]\s*(?P<title>.+)$")
-_BR_STATUS = re.compile(r"^-\s*\*\*status:\*\*\s*(?:\*\*)?(?P<status>[A-Z]+)(?:\*\*)?")
 
 
 def build_broken() -> list[BrokenItem]:
-    items: list[BrokenItem] = []
-    if not BROKEN_REGISTER.exists():
-        return items
-    current: BrokenItem | None = None
-    for line in BROKEN_REGISTER.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## CLOSED"):
-            break
-        head = _BR_HEAD.match(stripped)
-        if head:
-            current = BrokenItem(id=head.group("id"), status="OPEN",
-                                 title=head.group("title").strip())
-            items.append(current)
+    result = parse_broken_register(BROKEN_REGISTER)
+    return [
+        BrokenItem(id=entry.id, status=entry.status, title=entry.title)
+        for entry in result.open_entries
+    ]
+
+
+def _runtime_db_path() -> Any:
+    """Resolve the runtime-state db path from its owner (runtime_state),
+    not a hardcoded literal. Borrows the owner's DEFAULT_RUNTIME_DB constant."""
+    try:
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
+        return DEFAULT_RUNTIME_DB
+    except Exception:
+        return Path.home() / ".dharma" / "state" / "runtime.db"
+
+
+
+def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
+    """Project Loop 1 closure from the latest delegation_runs receipt.
+
+    LIVE only when the most recent COMPLETED receipt (by started_at, then rowid)
+    carries a non-empty provider AND model. This view owns nothing — it reads the
+    receipt_json column the spine dispatch writes (runtime_state owner). Only
+    `completed` runs count: a stale `running`/in-flight receipt is not closure
+    evidence (it would otherwise let an orphaned dispatch outrank a real one)."""
+    import sqlite3
+
+    path = Path(db_path) if db_path is not None else _runtime_db_path()
+    if not Path(path).exists():
+        return Loop1Closure(live=False, detail=f"no runtime db at {path}")
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except Exception:
+        try:
+            conn = sqlite3.connect(str(path))
+        except Exception as exc:  # pragma: no cover - defensive
+            return Loop1Closure(live=False, detail=f"db unreadable: {exc}")
+    try:
+        # status filter is applied only when the column exists (older schemas omit it).
+        has_status = any(
+            r[1] == "status" for r in conn.execute("pragma table_info(delegation_runs)")
+        )
+        status_clause = "AND status = 'completed' " if has_status else ""
+        row = conn.execute(
+            "SELECT receipt_json FROM delegation_runs "
+            "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
+            f"{status_clause}"
+            "ORDER BY started_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+    except Exception as exc:
+        conn.close()
+        return Loop1Closure(live=False, detail=f"delegation_runs query failed: {exc}")
+    conn.close()
+    if not row or not row[0]:
+        return Loop1Closure(live=False, detail="no persisted EvidenceReceipt yet")
+    try:
+        blob = json.loads(row[0])
+    except Exception:
+        return Loop1Closure(live=False, detail="latest receipt_json unparseable")
+    provider = str(blob.get("provider", "") or "")
+    model = str(blob.get("model", "") or "")
+    live = bool(provider and model)
+    detail = (
+        "latest dispatch receipt carries provider+model"
+        if live
+        else "latest receipt missing provider and/or model"
+    )
+    return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
+
+
+def build_lanes() -> list[Lane]:
+    """Project parallel lane state from the ops lane map or git worktrees."""
+    lanes: list[Lane] = []
+    if LANE_MAP.exists():
+        try:
+            payload = json.loads(LANE_MAP.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        raw_lanes = payload.get("lanes") if isinstance(payload, dict) else None
+        if isinstance(raw_lanes, list):
+            for item in raw_lanes:
+                if not isinstance(item, dict):
+                    continue
+                lanes.append(
+                    Lane(
+                        path=_normalize_context_path(str(item.get("path") or item.get("worktree") or "")),
+                        branch=str(item.get("branch") or ""),
+                        head=str(item.get("head") or item.get("sha") or ""),
+                        status=str(item.get("status") or ""),
+                    )
+                )
+    if lanes:
+        return [_stable_lane(lane) for lane in lanes]
+
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        return []
+    current: dict[str, str] = {}
+    for line in result.stdout.splitlines() + [""]:
+        if not line.strip():
+            if current:
+                lanes.append(
+                    _stable_lane(
+                        Lane(
+                            path=_normalize_context_path(current.get("worktree", "")),
+                            branch=current.get("branch", "").removeprefix("refs/heads/")
+                            or "(detached)",
+                            head=current.get("HEAD", ""),
+                        )
+                    )
+                )
+                current = {}
             continue
-        status = _BR_STATUS.match(stripped)
-        if status and current is not None:
-            current.status = status.group("status")
-    return [i for i in items if i.status not in {"FIXED", "CLOSED"}]
+        key, _, value = line.partition(" ")
+        current[key] = value
+    return lanes
+
+
+def _stable_lane(lane: Lane) -> Lane:
+    """Avoid repo_context churn from moving lane SHAs."""
+    if _is_repo_root_context_path(lane.path):
+        return Lane(
+            path=lane.path,
+            branch=lane.branch,
+            head="CURRENT_CHECKOUT",
+            status=lane.status,
+        )
+    if lane.head:
+        return Lane(
+            path=lane.path,
+            branch=lane.branch,
+            head="LIVE_HEAD",
+            status=lane.status,
+        )
+    return lane
+
+
+def build_agents() -> list[dict[str, Any]]:
+    agents: list[dict[str, Any]] = []
+    for agent in list_agent_presence():
+        payload = agent.to_dict()
+        payload.pop("age_hours", None)
+        source_path = payload.get("source_path")
+        if isinstance(source_path, str):
+            payload["source_path"] = _normalize_context_path(source_path)
+        agents.append(payload)
+    return agents
+
+
+def build_receipts_tail(limit: int = 8) -> list[ReceiptTail]:
+    roots = [
+        Path.home() / ".dharma/ds_goals",
+        Path.home() / ".dharma/a2a_bus/inboxes",
+        Path.home() / ".dharma/onboarding",
+        REPO_CONTEXT_DIR,
+    ]
+    candidates: list[Path] = []
+    for root in roots:
+        if root == REPO_CONTEXT_DIR:
+            nats_receipt = root / "nats_e2e_receipt.json"
+            if nats_receipt.exists():
+                candidates.append(nats_receipt)
+        elif root.exists():
+            candidates.extend(
+                p
+                for p in root.rglob("*")
+                if p.is_file() and p.suffix in {".json", ".jsonl"}
+            )
+    candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+    tail: list[ReceiptTail] = []
+    for path in candidates[:limit]:
+        tail.append(ReceiptTail(path=_normalize_context_path(str(path)), modified_at=_mtime_iso(path)))
+    return tail
+
+
+def build_a2a_bus_state() -> A2ABusState:
+    inbox_root = A2A_BUS / "inboxes"
+    quarantine_root = A2A_BUS / "quarantine"
+    inbox_files = _count_files(inbox_root)
+    quarantine_files = _count_files(quarantine_root)
+    node_registry = Path.home() / ".dharma/a2a/nodes.json"
+    task_log = Path.home() / ".dharma/a2a/task_log.jsonl"
+    nats_receipt = REPO_CONTEXT_DIR / "nats_e2e_receipt.json"
+    return A2ABusState(
+        root=_normalize_context_path(str(A2A_BUS)),
+        inbox_files=inbox_files,
+        quarantine_files=quarantine_files,
+        node_registry=_normalize_context_path(str(node_registry)) if node_registry.exists() else "",
+        task_log=_normalize_context_path(str(task_log)) if task_log.exists() else "",
+        nats_e2e_receipt=_normalize_context_path(str(nats_receipt)) if nats_receipt.exists() else "",
+    )
+
+
+def build_body_state() -> BodyState:
+    if not DEPLOY_RECEIPT.exists():
+        return BodyState(receipt=_normalize_context_path(str(DEPLOY_RECEIPT)), status="missing")
+    try:
+        payload = json.loads(DEPLOY_RECEIPT.read_text(encoding="utf-8"))
+    except Exception:
+        return BodyState(receipt=_normalize_context_path(str(DEPLOY_RECEIPT)), status="unreadable")
+    return BodyState(
+        receipt=_normalize_context_path(str(DEPLOY_RECEIPT)),
+        status=str(payload.get("status") or ""),
+        worktree=_normalize_context_path(str(payload.get("worktree") or "")),
+        old_sha=str(payload.get("old_sha") or ""),
+        new_sha=str(payload.get("new_sha") or ""),
+        observed_at=str(payload.get("observed_at") or ""),
+        note=str(payload.get("note") or ""),
+    )
 
 
 def build_packet() -> OrientationPacket:
-    return OrientationPacket(
+    packet = OrientationPacket(
         identity=build_identity(),
         organs=build_organs(),
         tracks=build_tracks(),
         custody=build_custody(),
         liveness=build_liveness(),
-        loop1=build_loop1_closure(),
         broken=build_broken(),
+        loop1=build_loop1_closure(),
+        lanes=build_lanes(),
+        agents=build_agents(),
+        receipts_tail=build_receipts_tail(),
+        a2a_bus=build_a2a_bus_state(),
+        body=build_body_state(),
     )
+    payload = asdict(packet)
+    payload.pop("context_hash", None)
+    packet.context_hash = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    return packet
+
+
+def write_repo_context(packet: OrientationPacket) -> tuple[Path, Path]:
+    REPO_CONTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    data = asdict(packet)
+    REPO_CONTEXT_JSON.write_text(
+        json.dumps(data, indent=2, sort_keys=True, ensure_ascii=True) + "\n",
+        encoding="utf-8",
+    )
+    REPO_CONTEXT_MD.write_text(_repo_context_markdown(packet), encoding="utf-8")
+    return REPO_CONTEXT_JSON, REPO_CONTEXT_MD
+
+
+def _repo_context_markdown(packet: OrientationPacket) -> str:
+    lines = [
+        "# Repo Context",
+        "",
+        "Projection from existing owners. This file owns no facts.",
+        "",
+        f"- context_hash: `{packet.context_hash}`",
+        f"- identity: {packet.identity.one_line}",
+        f"- active_tracks: {len(packet.tracks)}",
+        f"- lanes: {len(packet.lanes)}",
+        f"- agents: {len(packet.agents)}",
+        f"- receipts_tail: {len(packet.receipts_tail)}",
+        f"- loop1_live: {packet.loop1.live}",
+        "",
+        "## Tracks",
+    ]
+    for track in packet.tracks:
+        lines.append(
+            f"- `{track.id}` [{track.status}] serves `{track.serves}` owner `{track.owner}`"
+        )
+    lines.append("")
+    lines.append("## Agents")
+    for agent in packet.agents:
+        lines.append(
+            f"- `{agent['agent_uid']}` status={agent['status']} "
+            f"heartbeat={agent['heartbeat_status']} last_seen={agent['last_seen_at'] or '(none)'}"
+        )
+    lines.append("")
+    lines.append("## A2A")
+    if packet.a2a_bus is not None:
+        lines.append(f"- root: `{packet.a2a_bus.root}`")
+        lines.append(f"- inbox_files: {packet.a2a_bus.inbox_files}")
+        lines.append(f"- quarantine_files: {packet.a2a_bus.quarantine_files}")
+        if packet.a2a_bus.nats_e2e_receipt:
+            lines.append(f"- nats_e2e_receipt: `{packet.a2a_bus.nats_e2e_receipt}`")
+    lines.append("")
+    lines.append("## Body")
+    if packet.body is not None:
+        lines.append(f"- status: `{packet.body.status}`")
+        lines.append(f"- worktree: `{packet.body.worktree}`")
+        lines.append(f"- old_sha: `{packet.body.old_sha}`")
+        lines.append(f"- new_sha: `{packet.body.new_sha}`")
+        lines.append(f"- note: {packet.body.note}")
+    lines.append("")
+    lines.append("## Broken Register")
+    for item in packet.broken:
+        lines.append(f"- `{item.id}` [{item.status}] {item.title}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _count_files(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(1 for item in path.rglob("*") if item.is_file())
+
+
+def _mtime_iso(path: Path) -> str:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+    except OSError:
+        return ""
 
 
 def _section(title: str) -> None:
@@ -840,22 +1004,30 @@ def render(packet: OrientationPacket) -> None:
         marker = "MISSING " if path in packet.identity.missing_sources else ""
         print(f"    - {marker}{path}")
 
-    _section(f"ORGANS ({len(packet.organs)}) — owner: docs/governance/VENTURE_CELL_PORTFOLIO.yaml")
+    _section(
+        f"ORGANS ({len(packet.organs)}) — owner: docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
+    )
     for organ in packet.organs:
         name = f" ({organ.external_name})" if organ.external_name else ""
         print(f"  [{organ.status:<18}] {organ.id}{name} — {organ.instrument}")
 
-    _section(f"ACTIVE TRACKS ({len(packet.tracks)}) — owner: docs/governance/ACTIVE_TRACK.yaml")
+    _section(
+        f"ACTIVE TRACKS ({len(packet.tracks)}) — owner: docs/governance/ACTIVE_TRACK.yaml"
+    )
     for track in packet.tracks:
-        print(f"  [{track.status}] {track.id} serves={track.serves} owner={track.owner}")
-        if track.readiness:
-            print(f"      readiness: {track.readiness}")
+        print(
+            f"  [{track.status}] {track.id} serves={track.serves} owner={track.owner}"
+        )
         for surface in track.owned_surfaces:
             print(f"      owns {surface}")
 
-    _section("CANON CUSTODY — owner: docs/docops/assertions.yaml canonical_guard.registered")
-    print(f"  Registered canon docs: {packet.custody.registered_total} "
-          f"(present in this checkout: {packet.custody.present})")
+    _section(
+        "CANON CUSTODY — owner: docs/docops/assertions.yaml canonical_guard.registered"
+    )
+    print(
+        f"  Registered canon docs: {packet.custody.registered_total} "
+        f"(present in this checkout: {packet.custody.present})"
+    )
     for path in packet.custody.missing:
         print(f"  MISSING: {path}")
 
@@ -863,33 +1035,16 @@ def render(packet: OrientationPacket) -> None:
     print(f"  Receipt: {packet.liveness.receipt}")
     if packet.liveness.generated_at:
         print(f"  Generated: {packet.liveness.generated_at}")
-    if packet.liveness.daemon_dispatch_launch or packet.liveness.daemon_dispatch_running:
-        launch = packet.liveness.daemon_dispatch_launch or "unknown"
-        running = packet.liveness.daemon_dispatch_running or "unknown"
-        print(f"  Daemon spine: launch={launch}; running={running}")
-    if packet.liveness.daemon_receipt_head:
-        print(f"  Receipt head: {packet.liveness.daemon_receipt_head}")
-    if packet.liveness.daemon_provider_model_coverage:
-        print(f"  Provider/model: {packet.liveness.daemon_provider_model_coverage}")
-    if packet.liveness.ds_goal_wrapper_contract:
-        print(f"  ds-goal CLI: {packet.liveness.ds_goal_wrapper_contract}")
     for surface in packet.liveness.surfaces:
-        proof_gaps = surface.get("proof_gaps") or []
-        proof = f"; proof_gaps={','.join(proof_gaps)}" if proof_gaps else ""
-        print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}{proof}")
+        print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
 
     _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
-    status = "LIVE" if packet.loop1.live else "NOT-LIVE"
-    print(f"  Loop 1 (provider chain + dispatch): {status}")
-    if packet.loop1.provider or packet.loop1.model:
-        print(
-            f"    latest receipt: provider={packet.loop1.provider!r} "
-            f"model={packet.loop1.model!r}"
-        )
-    if packet.loop1.started_at:
-        print(f"    started_at: {packet.loop1.started_at}")
-    if packet.loop1.detail:
-        print(f"    detail: {packet.loop1.detail}")
+    c = packet.loop1
+    print(f"  Loop 1 (provider chain + dispatch): {'LIVE' if c.live else 'NOT LIVE'}")
+    if c.provider or c.model:
+        print(f"    latest receipt: provider={c.provider!r} model={c.model!r}")
+    if c.detail:
+        print(f"    {c.detail}")
 
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:
@@ -900,13 +1055,108 @@ def render(packet: OrientationPacket) -> None:
     print("  This view writes nothing and owns nothing.")
 
 
+def render_graph(graph: OrientationGraph) -> None:
+    """Human-readable dump of the orientation graph."""
+    _section(f"ORIENTATION GRAPH ({len(graph.nodes)} nodes, {len(graph.edges)} edges)")
+    by_kind: dict[str, list[GraphNode]] = {}
+    for node in graph.nodes:
+        by_kind.setdefault(node.kind, []).append(node)
+
+    for kind in ("objective", "organ", "track", "surface", "broken"):
+        group = by_kind.get(kind, [])
+        if not group:
+            continue
+        print(f"\n  {kind.upper()} nodes ({len(group)}):")
+        for node in group:
+            print(f"    [{node.status or '-':<18}] {node.id}  {node.label}")
+
+    print(f"\n  EDGES ({len(graph.edges)}):")
+    for edge in graph.edges:
+        print(f"    {edge.source} --{edge.relation}--> {edge.target}")
+
+    live = [sl for sl in graph.surface_liveness if sl.exists]
+    missing = [sl for sl in graph.surface_liveness if not sl.exists]
+    print(f"\n  SURFACE LIVENESS: {len(live)} live, {len(missing)} missing")
+    for sl in missing:
+        print(f"    MISSING: {sl.pattern}")
+    for sl in live:
+        mtime_note = f"  newest={sl.newest_mtime}" if sl.newest_mtime else ""
+        print(f"    LIVE:    {sl.pattern} ({len(sl.matched_paths)} files){mtime_note}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Render the whole organism at once from its owners.")
-    parser.add_argument("--json", action="store_true", dest="as_json",
-                        help="print the machine packet JSON to stdout")
+        description="Render the whole organism at once from its owners.",
+        # No prefix abbreviation: `--write` must not silently resolve to
+        # `--write-context`, or the packet-runner positive-gate allowlist (which
+        # forbids the write flag) could be bypassed by an abbreviated form.
+        allow_abbrev=False,
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="print the machine packet JSON to stdout",
+    )
+    parser.add_argument(
+        "--write-context",
+        action="store_true",
+        help="write reports/orientation/repo_context.{json,md}",
+    )
+    parser.add_argument(
+        "--graph",
+        action="store_true",
+        help="render the orientation graph (nodes + edges)",
+    )
+    parser.add_argument(
+        "--graph-json", action="store_true", help="print the graph as JSON to stdout"
+    )
+    parser.add_argument(
+        "--query",
+        type=str,
+        default=None,
+        metavar="NODE_ID",
+        help="BFS subgraph from NODE_ID (e.g. track:loop-closure-2026-06)",
+    )
+    parser.add_argument(
+        "--measure",
+        action="store_true",
+        help="measure time-to-orientation and write receipt",
+    )
     args = parser.parse_args(argv)
+
+    if args.measure:
+        receipt = measure_orientation(write_receipt=True)
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        return 0
+
     packet = build_packet()
+
+    if args.write_context:
+        json_path, md_path = write_repo_context(packet)
+        render(packet)
+        print(f"  Wrote: {json_path}")
+        print(f"  Wrote: {md_path}")
+        return 0
+
+    graph = build_graph(packet)
+
+    if args.query:
+        sub = query_subgraph(graph, args.query)
+        if not sub.nodes:
+            print(f"  No node found for id={args.query!r}")
+            return 1
+        render_graph(sub)
+        return 0
+
+    if args.graph_json:
+        print(json.dumps(asdict(graph), sort_keys=True, indent=1))
+        return 0
+
+    if args.graph:
+        render_graph(graph)
+        return 0
+
     if args.as_json:
         print(json.dumps(asdict(packet), sort_keys=True, indent=1))
     else:

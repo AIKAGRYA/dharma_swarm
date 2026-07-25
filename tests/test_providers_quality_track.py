@@ -44,6 +44,13 @@ class _Dumpable:
         return self._payload
 
 
+def _force_ollama_cloud(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
+
+
 def _mk_resp(
     content: str | None = "ok",
     *,
@@ -402,6 +409,9 @@ def test_create_default_router_contains_expected_provider_types():
         ProviderType.CHUTES,
         ProviderType.NVIDIA_NIM,
         ProviderType.OLLAMA,
+        ProviderType.KIMI_CODE,
+        ProviderType.MOONSHOT,
+        ProviderType.ZHIPU,
     }
     assert set(router._providers.keys()) == expected
 
@@ -474,6 +484,49 @@ async def test_nvidia_nim_error_status_raises(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_nvidia_nim_retries_transient_429(monkeypatch):
+    provider = NVIDIANIMProvider(api_key="k", base_url="https://nim.example/v1")
+    req = LLMRequest(model="x", messages=[{"role": "user", "content": "hello"}])
+    sleeps: list[float] = []
+
+    class _Resp:
+        def __init__(self, status_code: int, text: str = "", headers: dict[str, str] | None = None):
+            self.status_code = status_code
+            self.text = text
+            self.headers = headers or {}
+
+        @staticmethod
+        def json():
+            return {
+                "model": "nim-model",
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {"total_tokens": 1},
+            }
+
+    responses = [
+        _Resp(429, '{"status":429,"title":"Too Many Requests"}', {"Retry-After": "0"}),
+        _Resp(200),
+    ]
+
+    class _Client:
+        async def post(self, url, json, headers):
+            return responses.pop(0)
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", lambda timeout: _Client())
+    monkeypatch.setattr("dharma_swarm.providers.asyncio.sleep", _sleep)
+
+    out = await provider.complete(req)
+
+    assert out.content == "ok"
+    assert out.model == "nim-model"
+    assert responses == []
+    assert sleeps == [0.0]
+
+
+@pytest.mark.asyncio
 async def test_ollama_complete_uses_chat_api(monkeypatch):
     provider = OllamaProvider(base_url="http://ollama.local", model="llama3.2")
     req = LLMRequest(
@@ -517,8 +570,7 @@ async def test_ollama_complete_uses_chat_api(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_complete_uses_auth_headers(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="kimi-k2.5:cloud",
@@ -557,8 +609,7 @@ async def test_ollama_cloud_complete_uses_auth_headers(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_glm5_applies_completion_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="glm-5:cloud",
@@ -594,8 +645,7 @@ async def test_ollama_cloud_glm5_applies_completion_token_floor(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_kimi_strips_cloud_suffix_and_applies_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="kimi-k2.5:cloud",
@@ -629,8 +679,7 @@ async def test_ollama_cloud_kimi_strips_cloud_suffix_and_applies_token_floor(mon
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_minimax_strips_cloud_suffix_and_applies_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="minimax-m2.7:cloud",
@@ -664,8 +713,7 @@ async def test_ollama_cloud_minimax_strips_cloud_suffix_and_applies_token_floor(
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="glm-5:cloud",
@@ -706,7 +754,13 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
 
     assert out.content == "fallback ok"
     assert out.model == "deepseek-v3.2"
-    assert attempts[:2] == ["glm-5", "deepseek-v3.2"]
+    # Requested model (glm-5) is tried first; on failure the provider falls
+    # through to the NEXT entry in the Ollama-Cloud frontier chain. That chain
+    # is now derived from the model pool (best-route-first, STEP 6), so the
+    # second attempt is kimi-k2.5 (next pool entry after glm-5), not the old
+    # hand-typed deepseek-v3.2 ordering. The mock returns OK on the 2nd attempt
+    # regardless, so out.model stays the fixture's deepseek-v3.2.
+    assert attempts[:2] == ["glm-5", "kimi-k2.5"]
 
 
 @pytest.mark.asyncio

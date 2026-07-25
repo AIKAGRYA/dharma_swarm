@@ -9,7 +9,9 @@ cd ~/dharma_swarm
 make onboard
 ```
 
-`make onboard` is read-only. It prints the live Codex/MCP toolbelt status, branch/dirty-tree state, and links to the highest-value docs.
+`make onboard` is read-only session status. It reports the current
+checkout/toolchain verdict and points to the relevant owners; it is not edit
+admission or whole-organism orientation.
 
 For Fable 5 / `fable_5_cursor`, read
 [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md) only after this
@@ -17,21 +19,22 @@ command and the first-read surfaces it names. That map is an operational
 route for a specific hub-coordinator identity; it is not a new authority
 surface.
 
-For a build session, use the explicit preflight and closeout targets around
-the actual implementation work:
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. A narrower lane or campaign contract may require them
+more broadly. When a packet is required or voluntarily used, use these targets
+around the actual implementation work:
 
 ```bash
-make agent-build-preflight
+make agent-build-preflight PACKET=<path>
 # make the smallest scoped change and run the task-specific test
-make offboard
-make agent-build-closeout
+make agent-build-closeout PACKET=<path>
 ```
 
-`make agent-build-preflight` runs onboarding plus hygiene integrity. `make
-offboard` writes a local handoff receipt for the next agent or auditor.
-`make agent-build-closeout` writes a no-worktree hygiene receipt to `/tmp` and
-runs the full governance bundle. `make onboard` alone is orientation, and
-`make offboard` alone is handoff evidence, not proof that the build is clean.
+Both commands require the same exact Session Entry packet. Preflight binds the
+baseline and allowed scope; closeout verifies the resulting scope and runs the
+governance bundle. `make onboard` alone is session status, not proof that the
+build is admitted or complete.
 
 GitHub-only agents cannot see local credentials, `dkeys`, or live process environment. Do not conclude "no LLM provider is configured" from repository contents alone; that claim requires a current local `make onboard`, `dkeys list`, `python -m dharma_swarm.api_key_audit --no-agentic`, or `/api/chat/status` check from the operator machine.
 
@@ -41,7 +44,7 @@ Read in this order:
 
 1. `make onboard` output: live branch, active tracks, dirty tree, stale docs, and next command.
 2. [`CLAUDE.md`](../../CLAUDE.md): repo behavior, engineering rules, architecture summary, build/test commands.
-3. [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md): architecture, axioms, and invariants.
+3. [`SWARM_GENOME.md`](../governance/SWARM_GENOME.md): compact first-token map and claim-language guard. Per [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md)'s first-read list, this is the forced first-read surface; `SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority but is depth-on-demand, not forced.
 4. [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml): current build portfolio and owned surfaces.
 5. [`ANTI_SLOP_RULES.md`](../governance/ANTI_SLOP_RULES.md): hard and advisory anti-slop gates.
 
@@ -68,6 +71,8 @@ Use this stack before inventing a new search/indexing path:
 
 Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgres MCPs were removed from global Codex config because they were unprovisioned and caused repeated scout startup warnings. Re-add them only through the gates in [`CODEX_TOOLBELT_ONBOARDING.md`](CODEX_TOOLBELT_ONBOARDING.md).
 
+GitNexus, Context+, Context7, Sourcebot, and the `/Users/dhyana/.local/bin/src` binary are Mac-operator-machine tools. They may be absent for cloud/web/GitHub-only agents; fall back to `rg`/`git grep`, official docs, or web search per the table above rather than treating their absence as a failure.
+
 ## Task Routes
 
 | Task | Read these first |
@@ -78,6 +83,7 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 | Current live state | [`LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md), [`BROKEN_REGISTER.md`](../state/BROKEN_REGISTER.md), `~/.dharma` evidence |
 | Active build track | [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml), [`active_track_evidence.md`](../../reports/governance/active_track_evidence.md), current `make onboard` output |
 | Persistent agents | Check the current branch for `docs/agents/` and `docs/research/persistent_agents*/`; if absent, ask the operator for the latest packet rather than inventing L4 readiness claims. |
+| Joining the A2A fleet as a NEW persistent identity | `make agent-register`, [`A2A_AGENT_ONBOARDING.md`](A2A_AGENT_ONBOARDING.md), [`A2A_QUICKSTART.md`](A2A_QUICKSTART.md) |
 | Fable 5 hub coordination | [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md), `examples/agents/fable_5_cursor.registration.json`, current `make onboard` output |
 | Docs or governance edits | [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md), [`REPO_GOVERNANCE_AUDIT.md`](../governance/REPO_GOVERNANCE_AUDIT.md) |
 | Doctrine/telos | [`OPERATIONAL_DOCTRINE.md`](../doctrine/OPERATIONAL_DOCTRINE.md), [`LIVE_ROADMAP.md`](../doctrine/LIVE_ROADMAP.md), [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md) |
@@ -101,21 +107,21 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 5. Before modifying a shared symbol, check impact/blast radius.
 6. Make the smallest scoped change.
 7. Run the relevant test or read-only status script.
-8. Run `make offboard` with task, verification, artifacts, claims not made,
-   risks, and next step.
-9. Run `make agent-build-closeout` before PR handoff.
-10. Update the owning doc only if the change alters durable truth.
+8. When a packet is required or voluntarily used, run
+   `make agent-build-closeout PACKET=<path>` before PR handoff.
+9. Update the owning doc only if the change alters durable truth.
 
 ## Handoff Prompt
 
 Use this for a new Codex agent:
 
 ```text
-Repo: /Users/dhyana/dharma_swarm
+Repo: <repo-root>
+(substitute the local checkout path, e.g. /Users/dhyana/dharma_swarm on the operator Mac)
 
 Start by running:
 
-cd /Users/dhyana/dharma_swarm
+cd <repo-root>
 make onboard
 
 Read `docs/ops/AGENT_ONBOARDING.md`, then follow the task route that matches the assignment.
@@ -123,6 +129,4 @@ Read `docs/ops/AGENT_ONBOARDING.md`, then follow the task route that matches the
 Use GitNexus + Context+ + rg as the default large-codebase context stack. Treat Sourcegraph, GDrive, and Postgres MCPs as optional and removed unless their gates in `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` are green.
 
 Never print secrets. Do not revert user or other-agent changes. Do not add new substrates before checking `docs/governance/BUILD_SESSION_ENTRYPOINT.md` and `reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`.
-
-When finished, run `make offboard ARGS='--task "..." --verification "..." --next-step "..."'` and include the receipt path in your final handoff. Run `make agent-build-closeout` before PR/merge handoff.
 ```

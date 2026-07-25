@@ -1,11 +1,17 @@
-# INDEX — Read this first
+# INDEX — Historical Design Read Order
+
+> **Authority notice (2026-07-13):** Use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> first for current code, runtime boundaries, a dated witness, and gaps. This
+> index preserves the June design sequence; its present-tense implementation
+> claims are historical.
 
 **Created:** 2026-06-08 · **Purpose:** The shortest path through the sovereign-holon initiative for someone arriving cold.
 
-If you read nothing else, read this file. It tells you what to read in what order and what each piece is for.
+Use this file when tracing the original research and design lane.
 
-> **Looking for "where does X live?"** → [MAP.md](MAP.md).
-> **Looking for "what do we build first?"** → §"Build sequence" below, then [05_RECONCILED_PLAN.md](05_RECONCILED_PLAN.md).
+> **Looking for where a June artifact lived?** → [MAP.md](MAP.md).
+> **Tracing the original build proposal?** → §"Original build sequence" below, then [05_RECONCILED_PLAN.md](05_RECONCILED_PLAN.md).
 
 ---
 
@@ -24,7 +30,7 @@ dharma_swarm has 46 registered agents on disk, a real wake-loop body (`Persisten
 6. **[01_BUILD_GUIDE.md](01_BUILD_GUIDE.md)** — the original organ-model walk-through. Subsumed by 02+05 but kept for the architecture diagram.
 7. **[03_REGISTER_AS_HYGIENE.md](03_REGISTER_AS_HYGIENE.md)** — only when you (or another agent) are about to commit anything in this lane: three patterns to add to `dharma_swarm_pr_review_control`.
 
-## Build sequence at a glance
+## Original build sequence at a glance
 
 | # | What | Where it's specified |
 |---|---|---|

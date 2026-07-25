@@ -2,7 +2,7 @@
 
 Two conductors that run autonomous wake loops:
 - conductor_claude: Opus-class, phenomenological + oversight focus
-- conductor_codex: Sonnet-class, infrastructure + code health focus
+- conductor_codex: Claude Code canonical default, infrastructure + code health focus
 
 Both compose PersistentAgent which composes AutonomousAgent.
 """

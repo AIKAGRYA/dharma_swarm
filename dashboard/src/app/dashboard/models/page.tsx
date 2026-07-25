@@ -23,14 +23,14 @@ import type { ModelProfileOut, TopModelOut, VerifyTop10Out } from "@/lib/types";
 type DraftMap = Record<string, { custom_label: string; short_name: string }>;
 
 function verificationTone(status: string): { color: string; border: string; bg: string } {
-  if (status === "ok") {
+  if (status === "ok" || status === "live_routable") {
     return {
       color: colors.rokusho,
       border: `color-mix(in srgb, ${colors.rokusho} 35%, transparent)`,
       bg: `color-mix(in srgb, ${colors.rokusho} 8%, transparent)`,
     };
   }
-  if (status === "error" || status === "unexpected") {
+  if (status === "error" || status === "unexpected" || status === "unavailable") {
     return {
       color: colors.bengara,
       border: `color-mix(in srgb, ${colors.bengara} 35%, transparent)`,
@@ -46,7 +46,12 @@ function verificationTone(status: string): { color: string; border: string; bg: 
 
 function VerificationBadge({ status }: { status: string }) {
   const tone = verificationTone(status);
-  const Icon = status === "ok" ? CheckCircle2 : status === "error" || status === "unexpected" ? XCircle : Loader2;
+  const Icon =
+    status === "ok" || status === "live_routable"
+      ? CheckCircle2
+      : status === "error" || status === "unexpected" || status === "unavailable"
+        ? XCircle
+        : Loader2;
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
@@ -105,6 +110,7 @@ export default function ModelsPage() {
 
   const verifiedCount = models.filter((model) => model.verification?.status === "ok").length;
   const availableCount = models.filter((model) => model.available).length;
+  const modelCount = models.length || 1;
 
   return (
     <div className="space-y-6">
@@ -126,15 +132,15 @@ export default function ModelsPage() {
                   Model Pool
                 </h1>
                 <p className="mt-1 max-w-3xl text-sm text-sumi-600">
-                  One ranked surface for the ten models you actually care about: live routes, official links,
+                  One ranked surface for the canonical floor models: live routes, unavailable reasons,
                   custom UI names, and verification evidence.
                 </p>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricPill label="Curated Top 10" value={String(models.length)} accent={colors.aozora} />
-              <MetricPill label="Callable Right Now" value={`${availableCount}/10`} accent={colors.rokusho} />
-              <MetricPill label="Verified Live" value={`${verifiedCount}/10`} accent={colors.kinpaku} />
+              <MetricPill label="Floor Models" value={String(models.length)} accent={colors.aozora} />
+              <MetricPill label="Callable Right Now" value={`${availableCount}/${modelCount}`} accent={colors.rokusho} />
+              <MetricPill label="Verified Live" value={`${verifiedCount}/${modelCount}`} accent={colors.kinpaku} />
             </div>
           </div>
 
@@ -168,7 +174,8 @@ export default function ModelsPage() {
           }}
         >
           Verification finished at {new Date(verifyMutation.data.verified_at).toLocaleString()} with{" "}
-          {verifyMutation.data.ok_count}/10 success.
+          {verifyMutation.data.ok_count}/{modelCount} success.
+          {verifyMutation.data.reason ? ` ${verifyMutation.data.reason}` : ""}
         </div>
       )}
 
@@ -198,7 +205,7 @@ export default function ModelsPage() {
                     >
                       #{model.rank}
                     </span>
-                    <VerificationBadge status={model.verification?.status ?? "unverified"} />
+                    <VerificationBadge status={model.status ?? model.verification?.status ?? "unverified"} />
                   </div>
                   <div>
                     <h2 className="font-heading text-xl font-semibold text-torinoko">{model.ui_label}</h2>
@@ -239,7 +246,11 @@ export default function ModelsPage() {
                     {model.available_routes?.[0] || model.routes?.[0] || model.provider}
                   </p>
                   <p className="mt-1 text-xs text-sumi-600">
-                    {model.available ? "Callable now" : "Configured but currently unavailable"}
+                    {model.available
+                      ? "Callable by current key oracle"
+                      : model.unavailable_reason
+                        ? `Unavailable: ${model.unavailable_reason.replaceAll("_", " ")}`
+                        : "Unverified by current key oracle"}
                   </p>
                   {model.verification?.verified_at && (
                     <p className="mt-2 text-[11px] text-sumi-600">

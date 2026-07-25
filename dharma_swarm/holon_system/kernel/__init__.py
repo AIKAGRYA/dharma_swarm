@@ -1,5 +1,5 @@
-"""Kernel organ — durable wake ledger, leases, proof ledger, closeback."""
+"""Kernel facades."""
 
-from __future__ import annotations
+from .living_kernel import LivingAgentKernel
 
-__all__ = ["living"]
+__all__ = ["LivingAgentKernel"]

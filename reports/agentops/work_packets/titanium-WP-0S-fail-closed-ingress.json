@@ -1,0 +1,217 @@
+{
+  "id": "titanium-WP-0S-fail-closed-ingress",
+  "base_ref": "2b97fe13df7e07932472a0631e7f8bb98c1751fd",
+  "branch": "claude/goal-pddxzg-wp0s",
+  "worktree": ".",
+  "intent": "WP-0S (TIT-010): minimum fail-closed ingress floor for the dashboard API. Add an explicit production-shaped vs local-development mode to the canonical auth/config module (dharma_swarm/api_keys.py), refuse production-shaped startup when DASHBOARD_API_KEY is absent or blank, replace the /api path-prefix bearer scope in api/main.py with a default-deny transport classification covering HTTP and WebSocket ASGI scopes (closing the /holon and /graphql bearer bypass), bind the keyless local-development escape hatch to loopback clients only, fail the public webhook route closed in production-shaped mode when its verification material is absent, and pin the whole matrix in a new tests/test_api_auth.py. The A2A gateway keeps its own X-A2A-Key authority and is not touched.",
+  "allowed_files": [
+    "api/main.py",
+    "dharma_swarm/api_keys.py",
+    "tests/test_api_auth.py",
+    "tests/test_verify_api.py",
+    "reports/agentops/work_packets/titanium-WP-0S-fail-closed-ingress.json"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/branch-janitor.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/kernel-tests.yml",
+    ".github/workflows/kernel-titanium-verify.yml",
+    ".github/workflows/langgraph-oracle.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    ".github/workflows/pramana-probe.yml",
+    ".github/workflows/pudgala-rigor.yml",
+    "CYBERNETIC_LOOP_MAP.md",
+    "Dockerfile.swarm",
+    "dharma_swarm/archive.py",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/checkpoint.py",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/diversity_archive.py",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/organism.py",
+    "dharma_swarm/strange_loop.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/topology_genome.py",
+    "dharma_swarm/workflow.py",
+    "dharma_swarm/world_radar/**",
+    "docker-compose.yml",
+    "docs/governance/hygiene/patterns/AI-M1.yaml",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+    "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+    "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md",
+    "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md",
+    "packages/telos-kernel/**",
+    "packages/titanium-verify/**",
+    "pyproject.toml",
+    "reports/darshan/**",
+    "reports/governance/arena/**",
+    "reports/governance/chamber/**",
+    "reports/governance/dharmagraph_parity/**",
+    "reports/governance/inward_ascent/**",
+    "reports/loop_closure/**",
+    "reports/tam/**",
+    "scripts/governance/arena_truth_report.py",
+    "scripts/governance/branch_janitor.py",
+    "scripts/governance/check_claim_evidence_binding.py",
+    "scripts/governance/dharmagraph_parity_gauntlet.py",
+    "scripts/governance/frontier_ledger.py",
+    "scripts/governance/hygiene/**",
+    "scripts/governance/inward_ascent_baseline.py",
+    "scripts/governance/loop1_consumption_check.py",
+    "scripts/governance/pramana_probe.py",
+    "scripts/governance/transcendence_ledger.py",
+    "scripts/governance/verify_corral_findings.py",
+    "scripts/runtime/github_ingestor_runner.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "terminal/**",
+    "tests/oracle_support/dharmagraph_gauntlet.py",
+    "tests/test_arena_truth_report.py",
+    "tests/test_arena_v1.py",
+    "tests/test_branch_janitor.py",
+    "tests/test_chamber_daily_delta.py",
+    "tests/test_chamber_gym_git_history.py",
+    "tests/test_chamber_ledger_history.py",
+    "tests/test_chamber_predictions.py",
+    "tests/test_chamber_sandbox.py",
+    "tests/test_chamber_traces.py",
+    "tests/test_checkpoint.py",
+    "tests/test_claim_evidence_binding.py",
+    "tests/test_coordination_closure_checks.py",
+    "tests/test_council_profiles.py",
+    "tests/test_dharmagraph_parity_gauntlet.py",
+    "tests/test_dpi.py",
+    "tests/test_evolution_safety.py",
+    "tests/test_github_ingestor_runner.py",
+    "tests/test_go_adapter_contracts.py",
+    "tests/test_go_evidence_ingestor_bridge.py",
+    "tests/test_go_github_ingestor_bridge.py",
+    "tests/test_go_receipt_identity_verify.py",
+    "tests/test_go_world_signal_bridge.py",
+    "tests/test_graph_checkpoint.py",
+    "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
+    "tests/test_graph_reconciler.py",
+    "tests/test_langgraph_differential_oracle.py",
+    "tests/test_loop1_consumption.py",
+    "tests/test_loop1_consumption_check.py",
+    "tests/test_loop_supervisor_tristate.py",
+    "tests/test_merge_master_mike_daemon.py",
+    "tests/test_orchestration_genome.py",
+    "tests/test_orchestrator_v1.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_github_reviews.py",
+    "tests/test_pramana.py",
+    "tests/test_pramana_probe.py",
+    "tests/test_topology_execution.py",
+    "tests/test_transcendence_ledger.py",
+    "tests/test_verify_corral_findings.py",
+    "tests/test_workflow.py",
+    "tests/test_world_radar_go_bridge.py",
+    "tools/evidence_ingestor_go/**",
+    "tools/github_ingestor_go/**",
+    "tools/world_scout_go/**",
+    "tools/world_signal_ingestor_go/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "api-auth-contract-test",
+      "command": "python3 -m pytest tests/test_api_auth.py -q",
+      "timeout_seconds": 600
+    },
+    {
+      "name": "touched-files-ruff",
+      "command": "python3 -m ruff check api/main.py dharma_swarm/api_keys.py tests/test_api_auth.py",
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "production-keyless-refusal-removed-detected",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('api/main.py'); t = p.read_text(); anchor = '            return 503, _PRODUCTION_KEYLESS_RESPONSE'; (anchor in t) or sys.exit(3); p.write_text(t.replace(anchor, '            pass', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_api_auth.py', '-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "default-deny-scope-regression-detected",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('api/main.py'); t = p.read_text(); anchor = '    if _is_gateway_path(path):'; (anchor in t) or sys.exit(3); p.write_text(t.replace(anchor, '    if True:', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_api_auth.py', '-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "loopback-optin-bypass-detected",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('api/main.py'); t = p.read_text(); anchor = '        return os.environ.get(_ALLOW_LOOPBACK_NOAUTH_ENV) == ' + chr(34) + '1' + chr(34); (anchor in t) or sys.exit(3); p.write_text(t.replace(anchor, '        return True', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_api_auth.py', '-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(api): WP-0S minimum fail-closed ingress floor (TIT-010)"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0S",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "2b97fe13df7e07932472a0631e7f8bb98c1751fd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "INTERFACE_MISMATCH_MAP.md IMM-26 (dkeys/api_keys.py key-name contract) is RESOLVED and is the only entry touching this packet's surfaces; no open mismatch for the api/main.py and api_keys.py pair at base 1e806bd."
+    ],
+    "closest_existing_implementation": [
+      "api/main.py",
+      "api/ws.py",
+      "dharma_swarm/a2a/node_gateway.py"
+    ],
+    "honest_blockers": [
+      "The operator has not yet recorded the FastAPI deployment exposure status (CONTAINED / PRIVATE_ONLY / NOT_DEPLOYED / BLOCKED_OPERATOR) required by the spec before Phase 0 closure; this packet establishes the code floor and its closure state remains gated on that recording.",
+      "The webhook signature handler dharma_swarm/verify/github_app.py:117-122 returns True when DHARMA_VERIFY_WEBHOOK_SECRET is unset; that file is outside this packet's allowed files, so this packet fails the webhook route closed at the ingress layer in production-shaped mode only, and the handler-level keyless fail-open remains a recorded residual for a follow-up packet.",
+      "The spec's ambiguous-mode language is implemented as: explicit production mode refuses startup without a key and fail-closes all non-public ingress; ambiguous (unset) mode with a key enforces everywhere, and without a key binds the open lane to loopback clients only. Full startup refusal in ambiguous mode would break every keyless local/test startup path (23 test files use TestClient), which is outside this packet's blast radius; recorded as an interpretation, not silently decided.",
+      "Packet pytest gates run under the runner-admitted system python3; repo dependencies were made importable to system python3 via a user-site editable install (python3 -m pip install --user -e .[dev]) because the runner's positive allowlist admits neither .venv/bin/python nor make bootstrap as a gate command.",
+      "make test-fast on this host fails only on tests/conformance/test_repo_ratchet_holds.py::test_repo_quality_ratchet_has_no_regressions via the 10s pytest-timeout under suite load; per-occurrence re-proof (isolation pass + identical failure on unmodified base) is recorded in the PR body.",
+      "tests/test_verify_api.py is excluded from the runner gates because running it writes repo-local runtime state (.dharma/**) through SwarmManager's relative state_dir default (dharma_swarm/swarm.py:118, a DharmaGraph-owned surface outside this packet), which the closeout scope walker rejects as untracked files; that suite runs in the manual .venv battery with its exit code recorded in the PR body."
+    ],
+    "rollback": "Revert api/main.py, dharma_swarm/api_keys.py, tests/test_api_auth.py, tests/test_verify_api.py, and reports/agentops/work_packets/titanium-WP-0S-fail-closed-ingress.json together. If rollback would re-open a reachable deployment, keep the service contained until a corrected packet lands (spec WP-0S rollback rule).",
+    "packet_digest": "8c5b4fba539a5232be9406d576263c9f5b0b016beed67c9cdf5f3da17c25517f",
+    "rebind_history": [
+      {
+        "from_base": "1e806bdc272cc61f983f42dd7577e58b39781a25",
+        "to_base": "41b7c4ac41b8b89c8aee576e7ef593887cf44821",
+        "reason": "operator armed ready-for-review; branch protection requires up-to-date; rebased onto current main and rebound base_ref to live merge base"
+      }
+    ]
+  }
+}

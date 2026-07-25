@@ -1,0 +1,106 @@
+#cloud-config
+# dharma_swarm organism host — cloud-init user-data
+# (organism-rewire-2026-07 item 4: VPS shift; docs/ops/RUNBOOK.md §3e)
+#
+# Paste this file as "user data" / "cloud-init" when creating the server in
+# your provider's console (Hetzner: Cloud-Init field; DigitalOcean: User data).
+# Target image: Ubuntu 24.04 LTS, 2 vCPU / 4 GB / 40 GB is plenty to start.
+#
+# What it does unattended: docker + compose, 2G swap, ufw (ssh only),
+# litestream, a GitHub deploy key, and a bootstrap script.
+# What it deliberately does NOT do: clone the private repo or write secrets —
+# those are the two operator acts printed in /root/DHARMA_NEXT_STEPS.txt.
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - ufw
+  - curl
+  - sqlite3
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  - path: /root/dharma_bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Run AFTER (1) deploy key added on GitHub, (2) /root/dharma.env filled.
+      set -euo pipefail
+      cd /opt
+      if [ ! -d dharma_swarm ]; then
+        GIT_SSH_COMMAND="ssh -i /root/.ssh/dharma_deploy -o IdentitiesOnly=yes" \
+          git clone git@github.com:AmitabhainArunachala/dharma_swarm.git
+      fi
+      cd dharma_swarm
+      if [ ! -f .env ]; then
+        if [ -f /root/dharma.env ]; then
+          cp /root/dharma.env .env
+        else
+          cp .env.example .env
+          echo "!! .env created from example — fill provider keys before the swarm can dispatch."
+        fi
+      fi
+      docker compose --profile vps up -d --build
+      echo "--- waiting for swarm health ---"
+      for i in $(seq 1 30); do
+        curl -sf localhost:7433/health >/dev/null 2>&1 && break || sleep 5
+      done
+      curl -s localhost:7433/health || true
+      echo
+      echo "--- felt proof: receipts should appear here as work flows ---"
+      docker compose exec swarm dgc spine tail --limit 5 || true
+      echo
+      echo "Done. Watch live: docker compose exec swarm dgc spine tail --follow"
+
+  - path: /root/write_next_steps.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      PUB=$(cat /root/.ssh/dharma_deploy.pub)
+      cat > /root/DHARMA_NEXT_STEPS.txt <<EOF
+      DHARMA ORGANISM HOST — two operator acts remain (no secrets ever in git):
+
+      1. DEPLOY KEY — add this READ-ONLY deploy key to the repo
+         (github.com/AmitabhainArunachala/dharma_swarm
+          -> Settings -> Deploy keys -> Add; leave write access OFF):
+
+         ${PUB}
+
+      2. SECRETS — create /root/dharma.env (copy of .env.example with real
+         values). ANY ONE live provider lane goes live (KIMI_API_KEY,
+         ZHIPU_API_KEY, OPENROUTER_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY,
+         ... — full list in .env.example; registry: dharma_swarm/api_keys.py).
+         Optional now: LITESTREAM_* for off-host state replication,
+         DEVIN_NATS_* to join the AGNI hub.
+
+      Then run:   bash /root/dharma_bootstrap.sh
+
+      Proof of life: docker compose exec swarm dgc spine tail --follow
+      Cockpit via tunnel: ssh -L 8080:localhost:8080 root@<this-host>  ->  http://localhost:8080/dashboard/cockpit
+      EOF
+      cat /root/DHARMA_NEXT_STEPS.txt
+
+runcmd:
+  # Docker + compose plugin (official convenience script)
+  - curl -fsSL https://get.docker.com | sh
+  # Litestream (state replication for ~/.dharma/state/runtime.db)
+  - curl -fsSL -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb
+  - dpkg -i /tmp/litestream.deb || true
+  # Firewall: ssh only; cockpit/health reached via ssh tunnel
+  - ufw allow OpenSSH
+  - ufw --force enable
+  # Read-only deploy key for the private repo
+  - ssh-keygen -t ed25519 -N "" -C "dharma-vps-deploy" -f /root/.ssh/dharma_deploy
+  - ssh-keyscan github.com >> /root/.ssh/known_hosts
+  - mkdir -p /opt
+  # Print the two remaining operator acts (also lands in cloud-init log)
+  - bash /root/write_next_steps.sh
+
+final_message: "dharma organism host base ready after $UPTIME seconds — read /root/DHARMA_NEXT_STEPS.txt (deploy key + secrets), then run /root/dharma_bootstrap.sh"

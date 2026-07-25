@@ -14,6 +14,11 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_has_value
+from dharma_swarm.evolution_roster import ModelTier
+from dharma_swarm.model_pool import (
+    provider_model_ids,
+    strong_vendor_model_ids,
+)
 from dharma_swarm.models import LLMRequest, ProviderType
 from dharma_swarm.ollama_config import (
     OLLAMA_CLOUD_FRONTIER_MODELS,
@@ -40,24 +45,58 @@ _PROVIDER_WIDE_TERMINAL_STATUSES = {
     "insufficient_credits",
     "missing_config",
 }
-_NIM_HOSTED_FRONTIER_MODELS = (
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
-)
-_NIM_SELF_HOSTED_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "zai-org/GLM-5",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
-)
-_OPENROUTER_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "z-ai/glm-5",
-    "openai/gpt-5-codex",
-    "deepseek/deepseek-r1",
-    "qwen/qwen3-235b-a22b",
-)
+# STEP 6 of the model-routing consolidation: these smoke catalogs are no longer
+# hand-typed frontier literals — they are GENERATORS over the ONE model_pool.
+# Model-id strings come from the pool (one source); only the smoke probe
+# *ordering* (a smoke-lane policy: lead with the high-stakes reasoning model) is
+# applied here. Pool order already leads OpenRouter STRONG with kimi-k2.5.
+
+
+def _ordered(prefer: tuple[str, ...], pool_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """Smoke probe order: preferred ids first (if the pool serves them), then the
+    rest of the pool ids in pool order, deduped. The preference list never
+    invents an id — it only re-orders ids the pool already owns."""
+    out: list[str] = [m for m in prefer if m in pool_ids]
+    out.extend(m for m in pool_ids if m not in out)
+    return tuple(out)
+
+
+def _nim_hosted_frontier_models() -> tuple[str, ...]:
+    """NVIDIA-NIM hosted-API smoke catalog — projected from the pool's NIM routes.
+
+    Lead with the NIM-native reasoning lane, then the re-hosted workhorses. The
+    lead is DERIVED from the pool, not a literal: among the pool's NIM routes,
+    the NIM-native (``nvidia/`` vendor namespace) ids come first — that is the
+    large dedicated reasoning model NVIDIA serves first-party — then the rest in
+    pool order. Every string is a pool route."""
+    nim_ids = provider_model_ids(ProviderType.NVIDIA_NIM)
+    nim_native = tuple(m for m in nim_ids if m.startswith("nvidia/"))
+    return _ordered(nim_native, nim_ids)
+
+
+def _nim_self_hosted_frontier_models() -> tuple[str, ...]:
+    """NVIDIA-NIM self-hosted smoke catalog — STRONG-tier open weights served via
+    their vendor namespace on a self-hosted OpenAI-compatible NIM endpoint.
+
+    Pure pool projection: :func:`strong_vendor_model_ids` already returns the
+    STRONG-tier vendor-namespaced ids in pool order (best-route-first), which
+    leads with the high-stakes reasoning model. No literal preference seed is
+    needed — the pool order is the smoke order. All strings are pool ids."""
+    return strong_vendor_model_ids()
+
+
+def _openrouter_frontier_models() -> tuple[str, ...]:
+    """OpenRouter smoke catalog — STRONG-tier OpenRouter routes from the pool,
+    pool order (which already leads with moonshotai/kimi-k2.5)."""
+    return provider_model_ids(
+        ProviderType.OPENROUTER,
+        tiers=(ModelTier.STRONG,),
+    )
+
+
+_NIM_HOSTED_FRONTIER_MODELS = _nim_hosted_frontier_models()
+_NIM_SELF_HOSTED_FRONTIER_MODELS = _nim_self_hosted_frontier_models()
+_OPENROUTER_FRONTIER_MODELS = _openrouter_frontier_models()
 _OLLAMA_NON_CHAT_MARKERS = (
     "embed",
     "embedding",
@@ -99,6 +138,21 @@ _DEFAULT_QWEN_DASHBOARD_TASK = (
     "3) one concrete mismatch or risk you see. "
     "Use at least two tools. Do not edit files."
 )
+
+
+async def _iter_qwen_dashboard_stream(
+    chat_router: Any,
+    api_messages: list[dict[str, Any]],
+    settings: Any,
+    *,
+    profile_id: str,
+):
+    async for chunk in chat_router._agentic_stream(
+        api_messages,
+        settings,
+        profile_id=profile_id,
+    ):
+        yield chunk
 
 
 def _classify_error(exc: Exception | str) -> str:
@@ -633,7 +687,8 @@ async def _probe_qwen_dashboard(provider_name: str, task: str) -> dict[str, Any]
     errors: list[str] = []
     raw_events: list[dict[str, Any]] = []
     try:
-        async for chunk in chat_router._agentic_stream(
+        async for chunk in _iter_qwen_dashboard_stream(
+            chat_router,
             api_messages,
             settings,
             profile_id=profile.profile_id,

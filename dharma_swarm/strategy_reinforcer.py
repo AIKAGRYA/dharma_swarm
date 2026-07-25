@@ -23,7 +23,6 @@ import json
 import logging
 import math
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -238,7 +237,6 @@ class StrategyReinforcer:
         # Extract the most informative prompt fragment
         # (the chunk with highest response quality, measured by length/density)
         best_chunk = max(chunks, key=lambda c: len(getattr(c, "response", "")))
-        prompt_fragment = getattr(best_chunk, "prompt", "")[:500]
         response_preview = getattr(best_chunk, "response", "")[:300]
 
         # Extract tool-use sequence
@@ -380,7 +378,11 @@ class StrategyReinforcer:
         try:
             with open(self._pattern_file, "w") as f:
                 for p in self._patterns.values():
-                    f.write(p.model_dump_json() + "\n")
+                    data = p.model_dump()
+                    ucb = data.get("ucb_score")
+                    if isinstance(ucb, (float, int)) and not math.isfinite(float(ucb)):
+                        data["ucb_score"] = 1.0e12
+                    f.write(json.dumps(data, sort_keys=True) + "\n")
         except OSError:
             logger.warning("Failed to save strategy patterns", exc_info=True)
 
@@ -395,7 +397,14 @@ class StrategyReinforcer:
                     if not line:
                         continue
                     try:
-                        p = StrategyPattern.model_validate_json(line)
+                        data = json.loads(line)
+                        if data.get("ucb_score") is None:
+                            data["ucb_score"] = ucb_score(
+                                avg_reward=float(data.get("avg_thinkodynamic") or 0.0),
+                                times_selected=int(data.get("times_used") or 0),
+                                total_rounds=max(self._cycle_count, 1),
+                            )
+                        p = StrategyPattern.model_validate(data)
                         self._patterns[p.name] = p
                     except Exception:
                         continue

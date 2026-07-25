@@ -5,6 +5,7 @@ import sqlite3
 
 from dharma_swarm.langgraph_parity.benchmark import (
     ProviderProfile,
+    REQUIRED_CASE_TAGS,
     default_benchmark_tasks,
     record_benchmark_runtime_receipt,
     run_benchmark,
@@ -110,8 +111,14 @@ def test_benchmark_suite_reports_required_metrics_and_multihop_comparison() -> N
     )
 
     assert report.distractor_domain_count >= 6
+    assert len(default_benchmark_tasks()) >= 25
     assert any(task.requires_multi_hop for task in default_benchmark_tasks())
     assert report.summary["multi_hop_task_count"] >= 1
+    assert report.summary["task_count"] >= 25
+    assert report.summary["case_tags_complete"] is True
+    assert set(report.summary["required_case_tags"]) == set(REQUIRED_CASE_TAGS)
+    coverage = report.summary["case_tag_coverage"]
+    assert all(coverage[tag] > 0 for tag in REQUIRED_CASE_TAGS)
 
     for result in report.results:
         assert 0.0 <= result.score <= 1.0

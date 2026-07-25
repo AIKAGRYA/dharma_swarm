@@ -45,18 +45,27 @@ logger = logging.getLogger(__name__)
 
 _MIN_CTX = 32_000  # Minimum context to be useful
 
-# Tier assignment rules: prefix → tier
+# Tier assignment rules: prefix → tier.
+#
+# This is a CLASSIFIER over whatever models live OpenRouter discovery returns —
+# a heuristic that buckets a live model-id into a capability tier, NOT a list of
+# models the swarm runs. The prefixes are vendor/family namespaces, not model
+# selections.
+#
+# Floor doctrine (2026-06 model-routing consolidation): sub-floor / BANISHED
+# families (nvidia/nemotron-*, google/gemma-3) are deliberately ABSENT here. If
+# live discovery still surfaces one, it falls through to the tier-3 default
+# rather than being promoted into a reasoning tier — the floor is never lifted by
+# elevating a banished model. The remaining prefixes are vendor namespaces (not
+# specific sub-floor model-ids), so no floor model-id literal lives in this map.
 _TIER_RULES: list[tuple[str, int]] = [
     # Tier 1: heavy reasoning
-    ("nvidia/nemotron-3-super", 1),
     ("nousresearch/hermes-3-llama-3.1-405b", 1),
     ("openai/gpt-oss-120b", 1),
     ("meta-llama/llama-3.3-70b", 1),
     # Tier 2: general purpose
     ("qwen/", 2),
-    ("nvidia/nemotron-3-nano", 2),
     ("minimax/", 2),
-    ("google/gemma-3-27b", 2),
     ("arcee-ai/trinity", 2),
     ("openai/gpt-oss-20b", 2),
     ("z-ai/", 2),
@@ -71,6 +80,47 @@ def _assign_tier(model_id: str) -> int:
         if model_id.startswith(prefix):
             return tier
     return 3
+
+
+# Hand-typed last-resort tiers if BOTH live discovery and the model pool are
+# unavailable. Kept minimal and known-good; the pool generator below is the real
+# offline source (STEP 6 of the model-routing consolidation).
+_FREE_FLEET_OFFLINE_FALLBACK: dict[int, list[str]] = {
+    1: ["meta-llama/llama-3.3-70b-instruct:free"],
+    2: ["google/gemma-3-27b-it:free"],
+    3: ["mistralai/mistral-small-3.1-24b-instruct:free"],
+}
+
+
+def _pool_free_tiers() -> dict[int, list[str]]:
+    """Tiered free-model fallback DERIVED from the ONE model pool.
+
+    Replaces the hand-typed fallback model-ids in :func:`discover_free_models_sync`
+    with the pool's OpenRouter-free routes, tiered through the existing
+    :func:`_assign_tier` prefix rules. The model-id strings live in exactly one
+    place (the pool); this module only re-tiers them. FAIL-OPEN: if the pool is
+    unavailable, fall back to the minimal hand-typed set so discovery never
+    strands the fleet with an empty roster.
+    """
+    try:
+        from dharma_swarm.model_pool import provider_model_ids  # noqa: PLC0415 (lazy)
+        from dharma_swarm.models import ProviderType  # noqa: PLC0415
+    except Exception:  # pragma: no cover - degenerate
+        return {k: list(v) for k, v in _FREE_FLEET_OFFLINE_FALLBACK.items()}
+
+    result: dict[int, list[str]] = {1: [], 2: [], 3: []}
+    for mid in provider_model_ids(ProviderType.OPENROUTER_FREE):
+        if mid.endswith(":free"):
+            result[_assign_tier(mid)].append(mid)
+
+    # A clean fleet is a PARTITION: each model lives in exactly one tier. If live
+    # discovery is too thin to fill all three tiers, copying a model into an empty
+    # tier (the old backfill) would duplicate it across tiers and break the
+    # ALL_FREE_MODELS no-duplicates + tier-isolation invariants. Fall back to the
+    # known-good disjoint offline partition instead of self-inflicting a duplicate.
+    if not all(result.values()):
+        return {k: list(v) for k, v in _FREE_FLEET_OFFLINE_FALLBACK.items()}
+    return result
 
 
 def discover_free_models_sync() -> dict[int, list[str]]:
@@ -103,19 +153,16 @@ def discover_free_models_sync() -> dict[int, list[str]]:
             tiers[t].sort(key=lambda x: -x[1])
             result[t] = [mid for mid, _ in tiers[t]]
 
-        # Ensure every tier has at least something
-        if not result[1] and result[2]:
-            result[1] = [result[2][0]]
-        if not result[2] and result[3]:
-            result[2] = [result[3][0]]
-
+        # A clean fleet is a PARTITION (each model in exactly one tier). If live
+        # discovery is too thin to fill all three tiers, fall back to the
+        # pool-derived tiers rather than copying a model into an empty tier — the
+        # old backfill duplicated a model across tiers and broke the
+        # no-duplicates / tier-isolation invariants.
+        if not all(result.values()):
+            return _pool_free_tiers()
         return result
     except Exception:
-        return {
-            1: ["meta-llama/llama-3.3-70b-instruct:free"],
-            2: ["google/gemma-3-27b-it:free"],
-            3: ["mistralai/mistral-small-3.1-24b-instruct:free"],
-        }
+        return _pool_free_tiers()
 
 
 # ---------------------------------------------------------------------------

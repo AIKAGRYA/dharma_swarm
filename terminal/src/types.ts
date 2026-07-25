@@ -68,7 +68,21 @@ export type ActivityFeedState = {
 
 export type BridgeStatus = "booting" | "connected" | "degraded" | "offline";
 
-export type RouteState = "ready" | "degraded" | "slow" | "unavailable" | "invalid";
+export type ActiveTurnState =
+  | {phase: "idle"}
+  | {phase: "running"; requestId: string; sessionId?: string}
+  | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string};
+
+export type RouteState = "ready" | "unverified" | "degraded" | "slow" | "unavailable" | "invalid";
+
+export type ProviderRouteReceipt = {
+  requestId: string;
+  sessionId: string;
+  provider: string;
+  model: string;
+  routeId: string;
+  evidenceKind: "provider_completion";
+};
 
 export type SupervisorControlState = {
   stateDir: string;
@@ -283,6 +297,9 @@ export type SessionCatalogEntry = {
 
 export type SessionCatalogPayload = {
   count: number;
+  returned_count?: number;
+  limit?: number;
+  has_more?: boolean;
   sessions: SessionCatalogEntry[];
 };
 
@@ -394,7 +411,16 @@ export type ApprovalQueueState = {
 export type SessionPaneState = {
   catalog?: SessionCatalogPayload;
   selectedSessionId?: string;
+  selectionProvenance: "follow_latest" | "operator_pinned";
   detailsBySessionId: Record<string, SessionDetailPayload>;
+  pendingDetailRequestsBySessionId: Record<
+    string,
+    {
+      requestId: string;
+      sessionId: string;
+      catalogUpdatedAt?: string;
+    }
+  >;
 };
 
 export type ContinuityMessage = {
@@ -444,17 +470,31 @@ export type ModelTarget = RouteTarget;
 export type UIModeOverlay =
   | {kind: "none"}
   | {kind: "modelPicker"; selectedIndex: number; returnTabId: string}
-  | {kind: "paneSwitcher"; selectedIndex: number};
+  | {kind: "paneSwitcher"; selectedIndex: number}
+  // The guided tour, shown in its own isolated full-screen box (never inline).
+  // Opens only via /tour or ^G; any key dismisses.
+  | {kind: "tour"};
 
 export type SidebarVisibility = "visible" | "collapsed" | "hidden";
+export type KeyboardFocus = "composer" | "navigation";
+
+// F-063: zen is the boot default; deck-focus carries the focused deck name.
+// FACE-3: "scroll" is the reading-first manuscript face (/scroll).
+export type LayoutMode = "zen" | "cockpit" | "scroll" | `deck-focus:${string}`;
 
 export type UIModeState = {
   activeTabId: string;
   activeOverlay: UIModeOverlay;
+  keyboardFocus: KeyboardFocus;
   sidebarVisible: SidebarVisibility;
   sidebarMode: SidebarMode;
   focusedPaneId: string;
   compactMode: boolean;
+  layoutMode: LayoutMode;
+  // Navigator copilot: a persistent chat rail docked in the cockpit pane row so
+  // the operator stays tethered to the agent while it drives the Helm. OFF by
+  // default (mirrors sidebarVisible); only meaningful in the cockpit face.
+  railVisible: boolean;
 };
 
 export type RoutePolicyState = {
@@ -501,9 +541,14 @@ export type CanonicalExecutionEvent = {
 export type AppState = {
   uiMode: UIModeState;
   bridgeStatus: BridgeStatus;
+  activeTurn: ActiveTurnState;
   routePolicy: RoutePolicyState;
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
+  chatTraceExpanded: boolean;
+  // Navigator head-band: the last few "what the agent just did" narration lines
+  // (newest last, capped). Empty until the agent drives the Helm.
+  navigatorNarration: string[];
   sessionContinuity: SessionContinuityState;
   prompt: string;
   tabs: TabSpec[];
@@ -527,10 +572,18 @@ export type AppAction =
   | {type: "prompt.clear"}
   | {type: "state.replace"; state: AppState}
   | {type: "bridge.status"; status: BridgeStatus}
+  | {type: "turn.start"; requestId: string}
+  | {type: "turn.ack"; requestId: string; sessionId?: string}
+  | {type: "turn.cancel.request"; requestId: string; cancelRequestId: string}
+  | {type: "turn.cancel.rejected"; requestId: string; cancelRequestId: string}
+  | {type: "turn.finish"; requestId: string}
+  | {type: "turn.reset"}
   | {type: "bridge.config"; provider: string; model: string; strategy?: string}
   | {type: "route.policy.set"; policy: RoutePolicyState}
   | {type: "execution.events.ingest"; events: CanonicalExecutionEvent[]}
   | {type: "ui.compact.set"; compact: boolean}
+  | {type: "ui.focus.set"; focus: KeyboardFocus}
+  | {type: "ui.focus.toggle"}
   | {type: "modelPicker.open"; returnTabId?: string}
   | {type: "modelPicker.close"}
   | {type: "modelPicker.move"; direction: 1 | -1}
@@ -538,10 +591,16 @@ export type AppAction =
   | {type: "paneSwitcher.open"}
   | {type: "paneSwitcher.close"}
   | {type: "paneSwitcher.set"; index: number}
+  | {type: "tour.open"}
+  | {type: "tour.close"}
+  | {type: "rail.toggle"}
+  | {type: "rail.set"; visible: boolean}
+  | {type: "navigator.narrate"; line: string}
   | {type: "status.set"; value: string}
   | {type: "footer.set"; value: string}
   | {type: "sidebar.toggle"}
   | {type: "sidebar.mode"; mode: SidebarMode}
+  | {type: "layout.mode.set"; mode: LayoutMode}
   | {type: "tab.activate"; tabId: string}
   | {type: "tab.cycle"; direction: 1 | -1}
   | {type: "pane.scroll"; tabId: string; delta: number; maxOffset: number}
@@ -565,11 +624,14 @@ export type AppAction =
   | {type: "approval.resolution.set"; resolution: CanonicalPermissionResolution; sourceEventType?: string}
   | {type: "approval.outcome.set"; outcome: CanonicalPermissionOutcome; sourceEventType?: string}
   | {type: "approval.select"; actionId: string}
-  | {type: "session.catalog.set"; catalog: SessionCatalogPayload; selectedSessionId?: string}
-  | {type: "session.detail.set"; detail: SessionDetailPayload}
+  | {type: "session.catalog.set"; catalog: SessionCatalogPayload}
+  | {type: "session.detail.requested"; requestId: string; sessionId: string}
+  | {type: "session.detail.received"; requestId: string; sessionId: string; detail: SessionDetailPayload}
+  | {type: "session.detail.failed"; requestId: string}
   | {type: "session.continuity.set"; continuity: SessionContinuityState}
   | {type: "session.select"; sessionId: string}
   | {type: "activity.ingest"; entries: ActivityEntry[]}
   | {type: "activity.visibility.toggle"}
   | {type: "activity.raw.toggle"}
+  | {type: "trace.toggle"}
   | {type: "outline.set"; outline: OutlineItem[]};

@@ -1,0 +1,39 @@
+{
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm"
+  ],
+  "blocker_count": 1,
+  "blockers": [
+    {
+      "age_hours": 733.284,
+      "claimed_at": "",
+      "claimed_by": "",
+      "classification": "open_stale_unclaimed_without_terminal_receipt",
+      "closed": false,
+      "flags": [],
+      "lifecycle_state": "open_unclaimed",
+      "reason": "Open row is unclaimed or non-terminal beyond the stale threshold.",
+      "receipt_id": "",
+      "receipt_path": "",
+      "receipt_pointer": null,
+      "receipt_validation_schema": "",
+      "recommended_action": "Claim and execute, or close blocked with evidence if the task is obsolete or externally gated.",
+      "required_receipt_schema": "",
+      "status": "pending",
+      "task_id": "forge-v0.1-001",
+      "verified": false
+    }
+  ],
+  "classification_counts": {
+    "open_stale_unclaimed_without_terminal_receipt": 1
+  },
+  "generated_at": "2026-07-01T06:47:01.375839Z",
+  "lifecycle_counts": {
+    "open_unclaimed": 1
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "stale_after_hours": 24.0,
+  "total_tasks": 44
+}

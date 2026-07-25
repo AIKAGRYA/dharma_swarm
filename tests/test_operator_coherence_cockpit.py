@@ -59,9 +59,11 @@ closed_tracks: []
         repo / "docs/state/BROKEN_REGISTER.md",
         """
 # Broken Register
+## OPEN ITEMS
 ### BR-001 — open real defect
 - **status:** OPEN — still broken
 
+## CLOSED ITEMS
 ### BR-002 — fixed defect with noisy words
 - **status:** **FIXED 2026-05-20** — mentioned PARTIAL and not stale in prose
 """,
@@ -110,6 +112,7 @@ closed_tracks: []
     assert [card["title"] for card in payload["cards"] if card["kind"] == "broken_register"] == [
         "BR-001 — open real defect"
     ]
+    assert payload["track_portfolio"]["broken_register"]["open_like_count"] == 1
     assert payload["readiness"]["score"] >= 0
 
     # Branch census enumerates ALL local branches, not just checked-out ones.
@@ -131,10 +134,26 @@ closed_tracks: []
     assert payload["onboarding"]["status"] == "missing_or_drifted"
     assert "runtime_receipts" in payload
     assert "runtime_dbs" in payload["runtime_receipts"]
-    assert payload["operating_loops"]["schema_version"] == "operator_loops_stub.v1"
-    assert any(loop["id"] == "de_bug_corral_sweep" for loop in payload["operating_loops"]["loops"])
-    assert any(card["kind"] == "operating_loop" for card in payload["cards"])
 
     markdown = render_markdown_report(payload)
     assert "Operator Coherence Cockpit" in markdown
     assert "Prod readiness estimate" in markdown
+
+
+def test_operator_coherence_api_envelope_contract() -> None:
+    """The /api/operator-coherence/report envelope wraps the cockpit projection.
+
+    The cockpit dashboard surface depends on this contract: the HTTP envelope
+    carries operator_coherence_api.v0.1 while the inner data payload carries
+    operator_coherence_cockpit.v0.1 (the version the dashboard v2 model expects).
+    """
+    from api.routers.operator_coherence import operator_coherence_report
+
+    result = operator_coherence_report(github=False, live_probes=False)
+
+    assert result["schema_version"] == "operator_coherence_api.v0.1"
+    assert result["status"] in ("ok", "partial")
+    assert result["request_id"]
+    assert result["generated_at"]
+    assert result["data"] is not None
+    assert result["data"]["schema_version"] == "operator_coherence_cockpit.v0.1"

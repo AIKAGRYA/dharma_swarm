@@ -1,33 +1,173 @@
-# Model & Key Routing — THE ONE WAY
+# Model & Key Routing - The One Way
 
-> **Read this, ignore everything else.** There is exactly **one** place keys live, **one** tool to manage them, and **one** door to pick a model/provider. If you are an agent (any model, any session) touching keys or model selection, follow this. **Do not invent a second way.** Every "why don't we have keys / why is it on a dead provider" spiral for months came from having many ways. Now there is one. (Canonical 2026-06-06.)
+Current as of 2026-07-05.
 
-## Keys — one home, one tool
-- **HOME:** `~/.dharma/agent_keys.env` — the *only* place provider keys live. Sourced by every shell (`~/.zshrc`). Every line is `export`ed.
-- **TOOL:** `dkeys` — the *only* way to manage keys.
-  - `dkeys` → status table · `dkeys test` → live-ping all · `dkeys add VAR=value` → writes here + tests · `dkeys find <term>` → scour.
-- **In code:** read a provider key *only* through `dharma_swarm/api_keys.py` constants. Never `os.environ["..._API_KEY"]` directly. Never read a project `.env`.
+Read this before any agent touches provider keys, model IDs, routing, or Forge
+benchmarks. This is the operational source of truth. Older architecture notes
+are background only.
 
-## Model / provider selection — one door
-- **THE DOOR:** `dharma_swarm.runtime_provider.resolve_runtime_provider_config(provider, …)` → `create_runtime_provider(config)`. Every provider/model resolution goes through here.
-- **ORDER:** `dharma_swarm.model_hierarchy` — power-ranked lanes (most-powerful-first; `CLAUDE_CODE`/Max ranked above the metered Anthropic API).
-- **Anthropic/Claude → Max plan:** an Anthropic request auto-routes to the `claude_code` CLI (Claude Max subscription, flat-fee). Escape hatch: `DHARMA_FORCE_ANTHROPIC_API=1` forces the raw API.
-- **Live-fallback:** if a provider has no live key, resolution/wake falls back to the best available provider — **never block on a dead brain.**
+## The Contract
 
-## The four rules that keep it one-way forever
-1. **Never hardcode a model string** (e.g. `"claude-sonnet-4-…"`) in a module. Ask the resolver / `model_hierarchy`.
-2. **Never read a provider key** except through `api_keys.py`.
-3. **Never add a key** anywhere but via `dkeys add` (→ `agent_keys.env`).
-4. **New provider** = add its adapter + a `DEFAULT_MODELS` entry; the resolver + router pick it up automatically. No parallel routing layer.
+- Keys live in one place: `~/.dharma/agent_keys.env`.
+- Keys are managed by one tool: `dkeys`.
+- Code reads keys through one module: `dharma_swarm/api_keys.py`.
+- Shell and launchd entrypoints source one loader:
+  `scripts/load_runtime_env.sh`.
+- Model/provider resolution enters through one door:
+  `dharma_swarm.runtime_provider.resolve_runtime_provider_config()` followed by
+  `create_runtime_provider()`.
+- Provider order and lane roles come from `dharma_swarm/model_hierarchy.py`.
+- Model-grain routes and the Kimi K2.6-class floor live in
+  `dharma_swarm/model_pool.py` and `dharma_swarm/evolution_roster.py`.
 
-## Deprecated — DO NOT USE (the old scattered routes; redirected, being burned down)
-- ❌ Hardcoded `claude-sonnet-4-20250514` literals in cognition modules (`planner`, `subconscious`, `witness`, `hypnagogic`, `thinkodynamic_director`, `guardian_crew`) → migrate to the resolver.
-- ❌ `AgentConfig` / `AgentSpec` provider/model defaults pinned to `ANTHROPIC` → resolve at runtime.
-- ❌ Reading keys from project `.env` / `.secrets` / `.hermes` / cutover/migration files → all consolidated into `agent_keys.env`.
-- ❌ The metered Anthropic API as a default → use the Max plan (`claude_code`).
-- ❌ OpenRouter as a primary → deprioritized (it charges a markup); direct providers first.
+Do not add project `.env` files, ad hoc key readers, provider-specific routers,
+or hardcoded model strings in unrelated modules.
 
-## Status (2026-06-06)
-- ✅ Keys consolidated into the one home — **6 live clusters** (Ollama Cloud → GLM-5/DeepSeek/Kimi/MiniMax, + DeepSeek, NVIDIA NIM, OpenAI, GLM/z.ai, gemini). `dkeys test` for the live board.
-- ✅ Anthropic → Max routing wired at the resolver. Brain-plug (no dead-provider wakes) + ollama default fixed.
-- ⬜ **REMAINING (the routing brain):** the *power-first, never-block cascade* — order by model strength, instant fallthrough to the next live brain on any failure. Plus burning down the hardcoded-literal stragglers (rule 1) so the deprecated routes are gone, not just forbidden.
+## Key Rules
+
+Use:
+
+```bash
+dkeys
+dkeys test
+dkeys add VAR=value
+dkeys find kimi
+```
+
+For the scheduled/operator refresh path, use:
+
+```bash
+make provider-check
+```
+
+That runs `scripts/refresh_provider_status.sh`, which sources
+`scripts/load_runtime_env.sh`, runs `dkeys test` when available, and refreshes
+`~/.dharma/logs/provider_credits_latest.json`.
+
+Then route through code like:
+
+```python
+from dharma_swarm.models import ProviderType
+from dharma_swarm.runtime_provider import (
+    create_runtime_provider,
+    resolve_runtime_provider_config,
+)
+
+config = resolve_runtime_provider_config(ProviderType.KIMI_CODE)
+provider = create_runtime_provider(config)
+```
+
+Never read `os.environ["..._API_KEY"]` outside `api_keys.py`.
+
+## Current First-Party Lanes
+
+Kimi Code:
+
+- Provider enum: `ProviderType.KIMI_CODE`
+- Key: `KIMI_API_KEY`
+- Alias accepted: `MOONSHOT_KIMI_API_KEY`
+- Base URL: `https://api.kimi.com/coding/v1`
+- Model ID: `k3`
+- Provider class: `KimiCodeProvider`
+- Note: Kimi Code forces `temperature=1`; the provider normalizes this.
+
+Z.ai Coding:
+
+- Provider enum: `ProviderType.ZHIPU`
+- Key: `ZHIPU_API_KEY`
+- Aliases accepted: `GLM_API_KEY`, `ZAI_API_KEY`, `ZHIPUAI_API_KEY`,
+  `BIGMODEL_API_KEY`
+- Base URL: `https://api.z.ai/api/coding/paas/v4`
+- Model ID: `glm-5.2`
+- Provider class: `ZhipuProvider`
+- Note: the coding-plan endpoint is intentional. The generic Z.ai endpoint can
+  reject coding-plan keys even when coding quota is live.
+
+Claude/OpenAI subscription lanes:
+
+- `ProviderType.CLAUDE_CODE` routes through the Claude CLI / Max plan.
+- `ProviderType.CODEX` routes through the Codex CLI / OpenAI subscription.
+- The metered Anthropic/OpenAI APIs are not the default escape hatch unless the
+  caller explicitly forces that route.
+
+## Routing Files
+
+- `dharma_swarm/api_keys.py`: canonical env var names, aliases, runtime env load.
+- `dharma_swarm/models.py`: `ProviderType` enum.
+- `dharma_swarm/model_defaults.py`: one per-provider default model map.
+- `dharma_swarm/model_hierarchy.py`: provider tiers, roles, intelligence seed.
+- `dharma_swarm/model_pool.py`: logical model pool, provider routes, power floor.
+- `dharma_swarm/key_oracle.py`: reads `dkeys test` status without key material.
+- `dharma_swarm/runtime_provider.py`: resolver and provider factory.
+- `dharma_swarm/providers.py`: concrete provider implementations.
+- `scripts/refresh_provider_status.sh`: one scheduled/manual refresh for
+  `keys_status.json` plus credit-health heuristics.
+
+## Forge Benchmark Entry Points
+
+Use these only after `dkeys test` shows the needed provider lanes are live.
+
+Roster/canonical measurement:
+
+```bash
+PYTHONPATH=$PWD python -m dharma_swarm.forge_v1.canonical census --strategy explore -n 12
+PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forge_v1.canonical run \
+  --instances django__django-12209 --budget 60000 --label smoke
+```
+
+Autoloop matrix:
+
+```bash
+PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forge_v1.autoloop matrix \
+  --instances django__django-12209,sympy__sympy-22914 \
+  --models k3,moonshotai/kimi-k3,glm-5.2,gemini-2.5-flash \
+  --label smoke
+```
+
+Verifier-role first slice:
+
+```bash
+PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forge_v1.forge_v2.runner \
+  --instances django__django-12209,sympy__sympy-22914 \
+  --generator glm-5.2 --verifier k3 \
+  --replicates 1 --budget 60000 --label smoke
+```
+
+## Host Boot & Liveness (audit-adjudicated 2026-07-05)
+
+One loader, one precedence. `dharma_swarm.api_keys.bootstrap_runtime_env()` is
+the only loader (never-overwrite, first writer wins); `scripts/load_runtime_env.sh`
+is its thin shell projection. Anything that boots a daemon must go through one
+of those two — never an inline `set -a; source ...` block in a launchd plist or
+wrapper script. Inline sourcing is how the same host ended up with daemons
+holding three different key environments at once.
+
+- Vault envelope rule: `~/.dharma/agent_keys.env` must never export
+  `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, or
+  `CLAUDE_CODE_SUBAGENT_MODEL`. Gateway lanes get their own namespaced vars
+  (`KIMI_*`, `AGNI_GLM_*`) plus an explicit opt-in wrapper (`claude-kimi`).
+  A global Anthropic-envelope override silently rewires every Anthropic-SDK
+  client on the host — including Claude Code's safety classifier.
+- Daemon restart rule: a vault edit changes nothing for already-running
+  daemons; their env snapshot is frozen at spawn. After `dkeys add`/`dkeys rm`,
+  kickstart the launchd jobs (or accept documented staleness).
+- Liveness is only real when probed through the same client the runtime uses
+  (`dharma_swarm` provider classes / `provider_smoke`). Raw curl probes get
+  bot-blocked (Groq 403s a bare urllib call that `GroqProvider` completes
+  in <1s) and light pings miss completion-path failures (NIM pinged "live"
+  while real completions timed out).
+- A provider chain must never lead with a lane in a known-exhausted state.
+  `key_oracle` reads `dkeys test` status; consult it (or recent 429 receipts)
+  before seeding the chain head. Ollama Cloud's weekly cap manifests as
+  `429 "weekly usage limit"` — quota language, not credit language, so
+  credit-error regexes must match rate/quota wordings too.
+
+## Deprecated
+
+- `MODEL_ROUTING_MAP.md` is archived.
+- `docs/architecture/MODEL_ROUTING_CANON.md` is architectural background.
+- OpenRouter-first routing is deprecated unless no first-party route is live.
+- Project `.env` key storage is deprecated.
+- Any hidden model literal outside routing/model-pool files is suspect.
+- Inline `set -a; source agent_keys.env` blocks in launchd plists / wrapper
+  scripts are deprecated boot paths — route through `load_runtime_env.sh`.

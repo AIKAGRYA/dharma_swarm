@@ -1,0 +1,47 @@
+{
+  "schema": "dharma.cockpit.canonicality_taxonomy.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "grounded_in_cockpit_schema": "operator_coherence_cockpit.v0.1",
+  "canonicality_labels": [
+    {"label": "CANONICAL_ORIGIN_MAIN", "authority": "origin/main", "drives_closure": true, "drives_forge": true, "ui_severity": "neutral"},
+    {"label": "CLEAN_RECONCILIATION_WORKTREE", "authority": "clean_detached_worktree_at_origin_main", "drives_closure": "advisory", "drives_forge": "read_only", "ui_severity": "neutral"},
+    {"label": "OPEN_PR_REMOTE", "authority": "github_pr", "drives_closure": false, "drives_forge": "candidate_only", "ui_severity": "info"},
+    {"label": "DIRTY_LOCAL_CANDIDATE", "authority": "working_tree", "drives_closure": false, "drives_forge": false, "ui_severity": "amber"},
+    {"label": "LOCAL_ONLY_BRANCH", "authority": "local_branch_no_remote", "drives_closure": false, "drives_forge": "candidate_only", "ui_severity": "amber"},
+    {"label": "UNPUSHED_LOCAL_BRANCH", "authority": "local_branch_ahead", "drives_closure": false, "drives_forge": "candidate_only", "ui_severity": "amber"},
+    {"label": "ORPHANED_UPSTREAM_GONE", "authority": "local_branch_upstream_gone", "drives_closure": false, "drives_forge": false, "ui_severity": "red"},
+    {"label": "STASHED_PRESERVED", "authority": "stash_or_preserve_ref", "drives_closure": false, "drives_forge": false, "ui_severity": "amber"},
+    {"label": "OFF_REPO_ARTIFACT", "authority": "filesystem_off_repo", "drives_closure": false, "drives_forge": false, "ui_severity": "amber"},
+    {"label": "UNAVAILABLE_UNCERTAIN", "authority": "source_errors", "drives_closure": false, "drives_forge": false, "ui_severity": "grey"}
+  ],
+  "proof_states": [
+    {"label": "LIVE_RUNTIME_PROOF", "meaning": "fresh runtime/ack receipt observed"},
+    {"label": "STATIC_CRITERIA_ONLY", "meaning": "file criteria pass, no runtime proof"},
+    {"label": "STALE_RECEIPT", "meaning": "receipt exists but exceeds freshness window"},
+    {"label": "INFERRED", "meaning": "estimated/derived, not directly observed"},
+    {"label": "CONTRADICTED", "meaning": "two sources disagree"}
+  ],
+  "derivation_rules": [
+    "origin_backed && tracked && !dirty -> CANONICAL_ORIGIN_MAIN",
+    "!origin_backed && local_only -> LOCAL_ONLY_BRANCH or DIRTY_LOCAL_CANDIDATE",
+    "kind in [stash, preservation_risk] -> STASHED_PRESERVED",
+    "risk == orphaned_upstream_gone -> ORPHANED_UPSTREAM_GONE",
+    "under /Users/dhyana/.dharma or off-repo tar -> OFF_REPO_ARTIFACT",
+    "source in source_errors -> UNAVAILABLE_UNCERTAIN",
+    "facets.live -> LIVE_RUNTIME_PROOF; facets.stale -> STALE_RECEIPT"
+  ],
+  "hard_invariants": [
+    "no canonical claim unless origin_backed == true",
+    "current cockpit JSON is generated from dirty checkout; its track_portfolio must be badged DIRTY_LOCAL_CANDIDATE until generated from a clean worktree",
+    "UNAVAILABLE_UNCERTAIN must render as uncertainty, never coerced",
+    "only CANONICAL_ORIGIN_MAIN (and read-only CLEAN_RECONCILIATION_WORKTREE) may feed Forge/Arena fitness"
+  ],
+  "current_state_facts": {
+    "origin_main": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "canonical_active_tracks": 7,
+    "canonical_max_active": 10,
+    "dirty_checkout_active_tracks": 11,
+    "dirty_checkout_max_active": 11,
+    "cockpit_generator_source": "dirty_checkout"
+  }
+}

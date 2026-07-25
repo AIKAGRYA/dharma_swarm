@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -63,6 +63,74 @@ class A2ATaskStatus(str, Enum):
     @classmethod
     def terminal_states(cls) -> frozenset[A2ATaskStatus]:
         return frozenset({cls.COMPLETED, cls.FAILED, cls.CANCELLED, cls.REJECTED})
+
+
+class A2ATransitionError(RuntimeError):
+    """Raised on an illegal A2A task-lifecycle transition.
+
+    In particular, any attempt to move a terminal task (completed, failed,
+    cancelled, rejected) to any other state -- the resurrection/re-billing
+    hole this guard closes.
+    """
+
+
+# Explicit lifecycle transition table (mirrors task_board.py:_TRANSITIONS).
+# The load-bearing invariant is TERMINAL ABSORPTION: every terminal state maps
+# to the empty frozenset, so no terminal task has an outgoing edge. Moves among
+# non-terminal states stay permissive to preserve existing A2A 1.0 behaviour.
+# Registered as INV-A2A-TERMINAL-ABSORBING.
+_A2A_TRANSITIONS: dict[A2ATaskStatus, frozenset[A2ATaskStatus]] = {
+    A2ATaskStatus.SUBMITTED: frozenset({
+        A2ATaskStatus.WORKING,
+        A2ATaskStatus.INPUT_REQUIRED,
+        A2ATaskStatus.AUTH_REQUIRED,
+        A2ATaskStatus.COMPLETED,
+        A2ATaskStatus.FAILED,
+        A2ATaskStatus.CANCELLED,
+        A2ATaskStatus.REJECTED,
+    }),
+    A2ATaskStatus.WORKING: frozenset({
+        A2ATaskStatus.INPUT_REQUIRED,
+        A2ATaskStatus.AUTH_REQUIRED,
+        A2ATaskStatus.COMPLETED,
+        A2ATaskStatus.FAILED,
+        A2ATaskStatus.CANCELLED,
+        A2ATaskStatus.REJECTED,
+    }),
+    A2ATaskStatus.INPUT_REQUIRED: frozenset({
+        A2ATaskStatus.WORKING,
+        A2ATaskStatus.AUTH_REQUIRED,
+        A2ATaskStatus.COMPLETED,
+        A2ATaskStatus.FAILED,
+        A2ATaskStatus.CANCELLED,
+        A2ATaskStatus.REJECTED,
+    }),
+    A2ATaskStatus.AUTH_REQUIRED: frozenset({
+        A2ATaskStatus.WORKING,
+        A2ATaskStatus.INPUT_REQUIRED,
+        A2ATaskStatus.COMPLETED,
+        A2ATaskStatus.FAILED,
+        A2ATaskStatus.CANCELLED,
+        A2ATaskStatus.REJECTED,
+    }),
+    A2ATaskStatus.COMPLETED: frozenset(),
+    A2ATaskStatus.FAILED: frozenset(),
+    A2ATaskStatus.CANCELLED: frozenset(),
+    A2ATaskStatus.REJECTED: frozenset(),
+}
+
+
+def a2a_transition_allowed(
+    current: A2ATaskStatus, new: A2ATaskStatus
+) -> bool:
+    """Return True if current -> new is a legal A2A lifecycle transition.
+
+    A same-state move is treated as an idempotent no-op (allowed). Any move
+    out of a terminal state is rejected regardless of the destination.
+    """
+    if new == current:
+        return True
+    return new in _A2A_TRANSITIONS.get(current, frozenset())
 
 
 class A2APartType(str, Enum):
@@ -310,6 +378,25 @@ class A2AServer:
 
     # -- task lifecycle ------------------------------------------------------
 
+    def _set_status(self, task: A2ATask, new: A2ATaskStatus) -> A2ATask:
+        """Apply a guarded lifecycle transition on task.
+
+        Validates current -> new against _A2A_TRANSITIONS. Raises
+        A2ATransitionError on any illegal move -- in particular any attempt to
+        leave a terminal state (the resurrection/re-billing hole). Bumps
+        updated_at when the status actually changes.
+        """
+        current = task.status
+        if not a2a_transition_allowed(current, new):
+            raise A2ATransitionError(
+                f"Illegal A2A transition: {current.value} -> {new.value} "
+                f"(task {task.id})"
+            )
+        if new != current:
+            task.status = new
+            task.updated_at = datetime.now(timezone.utc).isoformat()
+        return task
+
     def submit(self, task: A2ATask) -> A2ATask:
         """Submit a new task for processing.
 
@@ -320,9 +407,17 @@ class A2AServer:
 
         Returns:
             The task with updated status.
+
+        Raises:
+            A2ATransitionError: if the task is already in a terminal state
+                (resurrecting a completed/failed/cancelled/rejected task).
         """
-        task.status = A2ATaskStatus.SUBMITTED
-        task.updated_at = datetime.now(timezone.utc).isoformat()
+        if task.is_terminal():
+            raise A2ATransitionError(
+                f"Cannot submit terminal task {task.id}: status "
+                f"{task.status.value} is absorbing"
+            )
+        self._set_status(task, A2ATaskStatus.SUBMITTED)
 
         if not task.trace_id:
             task.trace_id = _inherit_trace_id()
@@ -483,24 +578,26 @@ class A2AServer:
             handler = self._default_handler
 
         if handler is None:
-            task.status = A2ATaskStatus.FAILED
+            self._set_status(task, A2ATaskStatus.FAILED)
             task.error = f"No handler registered for capability: {task.capability!r}"
-            task.updated_at = datetime.now(timezone.utc).isoformat()
             logger.warning("A2A task %s failed: no handler for %s", task.id, task.capability)
             return task
 
-        task.status = A2ATaskStatus.WORKING
-        task.updated_at = datetime.now(timezone.utc).isoformat()
+        self._set_status(task, A2ATaskStatus.WORKING)
 
         try:
             task = handler(task)
             if task.status == A2ATaskStatus.WORKING:
                 # Handler didn't set final status -- mark completed
-                task.status = A2ATaskStatus.COMPLETED
+                self._set_status(task, A2ATaskStatus.COMPLETED)
             task.updated_at = datetime.now(timezone.utc).isoformat()
             logger.info("A2A task %s completed (status=%s)", task.id, task.status.value)
         except Exception as exc:
-            task.status = A2ATaskStatus.FAILED
+            # Preserve terminal absorption: if the handler already drove the
+            # task to a terminal state before raising, keep it -- only record
+            # the error. A non-terminal task fails as usual.
+            if not task.is_terminal():
+                self._set_status(task, A2ATaskStatus.FAILED)
             task.error = str(exc)
             task.updated_at = datetime.now(timezone.utc).isoformat()
             logger.error("A2A task %s failed: %s", task.id, exc)
@@ -526,8 +623,7 @@ class A2AServer:
             return False
         if task.is_terminal():
             return False
-        task.status = A2ATaskStatus.CANCELLED
-        task.updated_at = datetime.now(timezone.utc).isoformat()
+        self._set_status(task, A2ATaskStatus.CANCELLED)
         safe_task_id = str(task_id).replace("\n", " ").replace("\r", " ")[:128]
         logger.info("A2A task %s cancelled", safe_task_id)
         return True
@@ -540,9 +636,8 @@ class A2AServer:
         if task.is_terminal():
             return False
         safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
-        task.status = A2ATaskStatus.REJECTED
+        self._set_status(task, A2ATaskStatus.REJECTED)
         task.error = safe_reason
-        task.updated_at = datetime.now(timezone.utc).isoformat()
         safe_task_id = str(task_id).replace("\n", " ").replace("\r", " ")[:128]
         logger.info("A2A task %s rejected: %s", safe_task_id, safe_reason)
         return True
@@ -555,9 +650,8 @@ class A2AServer:
         if task.is_terminal():
             return False
         safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
-        task.status = A2ATaskStatus.AUTH_REQUIRED
+        self._set_status(task, A2ATaskStatus.AUTH_REQUIRED)
         task.error = safe_reason
-        task.updated_at = datetime.now(timezone.utc).isoformat()
         logger.info("A2A task %s requires auth: %s", task_id, safe_reason)
         return True
 

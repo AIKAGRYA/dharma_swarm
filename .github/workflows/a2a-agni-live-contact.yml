@@ -1,0 +1,236 @@
+name: a2a-agni-live-contact
+
+# Live "who's active + how fast can I reach them" readout for the Agni NATS hub
+# (wss://157.245.193.15:8443, stream DHARMA_A2A).
+#
+# An interactive Claude Code sandbox cannot reach Agni (org egress blocks raw
+# TLS to the hub IP; creds live only as repo secrets). A GitHub Actions runner
+# has BOTH open egress and the NATS secrets, so it is the supported path to
+# connect, survey the live fleet, and measure reach latency.
+#
+# Roster is built by scanning recent stream messages with js.get_msg() (the
+# method Devin's a2a_doctor.py uses) — this works on a SCOPED account where the
+# JetStream management API ($js.api.*) is permission-denied. Prefers the devin
+# account (broadest stream read). Runs on push to the review/test branch.
+
+on:
+  push:
+    branches:
+      - claude/a2a-nats-review-test-ncol7c
+    paths:
+      - .github/workflows/a2a-agni-live-contact.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  survey:
+    runs-on: ubuntu-latest
+    env:
+      # Prefer the devin account (stream read works for get_msg roster), then Mike.
+      DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
+      DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
+      DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
+      DEVIN_NATS_CA_PEM: ${{ secrets.DEVIN_NATS_CA_PEM }}
+      DEVIN_NATS_TLS_HOSTNAME: ${{ vars.DEVIN_NATS_TLS_HOSTNAME || secrets.DEVIN_NATS_TLS_HOSTNAME }}
+      MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
+      MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
+      MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
+      MERGE_MASTER_MIKE_NATS_CA_PEM: ${{ secrets.MERGE_MASTER_MIKE_NATS_CA_PEM }}
+      MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME: ${{ vars.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME || secrets.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME }}
+      # How many recent stream messages to scan for the roster.
+      A2A_SCAN: "400"
+      # Seconds to listen for a live reply after the reach probe (kept short:
+      # Devin confirmed no peers are live on AGNI, only mirrored from local hub).
+      A2A_LISTEN_S: "15"
+    steps:
+      # No actions/checkout or actions/setup-python: this repo requires actions
+      # pinned to a full SHA, and this probe needs neither the repo tree nor a
+      # custom Python — the runner's system python3 is fine, script is self-contained.
+      - name: Install NATS client
+        run: python3 -m pip install --quiet 'nats-py>=2.9' 'aiohttp>=3.9'
+
+      - name: Survey live fleet + measure reach latency
+        run: |
+          python3 - <<'PY'
+          import asyncio, json, os, ssl, sys, time, uuid
+          from collections import defaultdict
+          from datetime import datetime, timezone
+
+          def pick(*names):
+              for n in names:
+                  v = os.environ.get(n)
+                  if v:
+                      return v
+              return ""
+
+          # devin account first (stream read for the roster scan), then mike.
+          endpoint = pick("DEVIN_NATS_URL", "MERGE_MASTER_MIKE_NATS_URL")
+          user     = pick("DEVIN_NATS_USER", "MERGE_MASTER_MIKE_NATS_USER")
+          pw       = pick("DEVIN_NATS_PW", "MERGE_MASTER_MIKE_NATS_PW")
+          ca_pem   = pick("DEVIN_NATS_CA_PEM", "MERGE_MASTER_MIKE_NATS_CA_PEM")
+          tls_host = pick("DEVIN_NATS_TLS_HOSTNAME", "MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
+          scan     = int(os.environ.get("A2A_SCAN", "400"))
+          listen_s = float(os.environ.get("A2A_LISTEN_S", "8"))
+
+          if not endpoint:
+              print("NATS_SECRETS_MISSING: no DEVIN_NATS_URL or MERGE_MASTER_MIKE_NATS_URL secret set")
+              sys.exit(78)
+
+          print(f"acct={'devin' if os.environ.get('DEVIN_NATS_URL') else 'mike'} "
+                f"scheme={endpoint.split('://',1)[0]} has_pw={bool(pw)} has_ca={bool(ca_pem)}")
+
+          def tls_kwargs():
+              kw = {}
+              if ca_pem:
+                  ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+                  ctx.load_verify_locations(cadata=ca_pem.replace("\\n", "\n"))
+                  kw["tls"] = ctx
+              if tls_host:
+                  kw["tls_hostname"] = tls_host
+              return kw
+
+          def age_str(iso):
+              try:
+                  t = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+                  if t.tzinfo is None:
+                      t = t.replace(tzinfo=timezone.utc)
+                  s = (datetime.now(timezone.utc) - t).total_seconds()
+              except Exception:
+                  return "?"
+              if s < 90:        return f"{int(s)}s"
+              if s < 5400:      return f"{int(s/60)}m"
+              if s < 172800:    return f"{int(s/3600)}h"
+              return f"{int(s/86400)}d"
+
+          async def main():
+              import nats
+              r = {"schema": "dharma.a2a.fleet_survey.v1"}
+
+              t0 = time.monotonic()
+              nc = await nats.connect(servers=[endpoint], user=user or None, password=pw or None,
+                                      connect_timeout=10, allow_reconnect=False,
+                                      max_reconnect_attempts=0, **tls_kwargs())
+              r["connect_ms"] = round((time.monotonic() - t0) * 1000)
+              info = getattr(nc, "_server_info", {}) or {}
+              print(f"CONNECTED in {r['connect_ms']}ms  server=agni v{info.get('version')} "
+                    f"jetstream={info.get('jetstream')} client_id={info.get('client_id')}")
+              try:
+                  js = nc.jetstream()
+
+                  # --- hub liveness ---
+                  si = await js.stream_info("DHARMA_A2A")
+                  first, last = si.state.first_seq, si.state.last_seq
+                  r["hub"] = {"stream": "DHARMA_A2A", "messages": si.state.messages,
+                              "first_seq": first, "last_seq": last}
+                  print(f"HUB  DHARMA_A2A: {si.state.messages} msgs, seq {first}-{last}")
+
+                  # --- devin inbox state ---
+                  try:
+                      ci = await js.consumer_info("DHARMA_A2A", "devin_inbox")
+                      r["devin_inbox"] = {"filter": ci.config.filter_subject,
+                                          "pending": ci.num_pending,
+                                          "ack_floor": ci.ack_floor.stream_seq}
+                      print(f"INBOX devin_inbox: filter={ci.config.filter_subject} "
+                            f"pending={ci.num_pending} ack_floor={ci.ack_floor.stream_seq}")
+                  except Exception as exc:
+                      r["devin_inbox"] = {"error": str(exc)}
+                      print(f"INBOX devin_inbox: ERROR {exc}")
+
+                  # --- live roster via message-history scan (works on scoped creds) ---
+                  # Concurrent batched get_msg: pipelines requests so the scan is
+                  # seconds not minutes (sequential get_msg is O(N x RTT)).
+                  agg = {}
+                  seqs = list(range(last, max(first - 1, last - scan), -1))
+                  async def fetch(s):
+                      try:
+                          return (await js.get_msg("DHARMA_A2A", s)).data
+                      except Exception:
+                          return None
+                  batch, n = 40, 0
+                  for i in range(0, len(seqs), batch):
+                      for data in await asyncio.gather(*[fetch(s) for s in seqs[i:i + batch]]):
+                          if not data:
+                              continue
+                          n += 1
+                          try:
+                              d = json.loads(data.decode())
+                          except Exception:
+                              continue
+                          frm = str(d.get("from") or d.get("agent") or "?")
+                          kind = str(d.get("kind") or d.get("schema_version") or "?")
+                          ts = str(d.get("timestamp") or d.get("sent_at") or "")
+                          e = agg.setdefault(frm, {"msgs": 0, "kinds": defaultdict(int), "last_ts": ""})
+                          e["msgs"] += 1
+                          e["kinds"][kind] += 1
+                          if ts > e["last_ts"]:
+                              e["last_ts"] = ts
+                  r["scanned"] = n
+                  roster = sorted(agg.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)
+                  r["roster"] = {k: {"msgs": v["msgs"], "last_ts": v["last_ts"],
+                                     "last_kind": max(v["kinds"], key=v["kinds"].get)} for k, v in roster}
+                  print(f"\nLIVE FLEET ROSTER (scanned last {n} msgs):")
+                  print(f"  {'agent':<22} {'msgs':>5}  {'last seen':>9}  active?  last kind")
+                  for k, v in roster:
+                      a = age_str(v["last_ts"])
+                      active = "ACTIVE" if a.endswith(("s", "m")) else "idle"
+                      print(f"  {k:<22} {v['msgs']:>5}  {a:>9}  {active:<7}  {max(v['kinds'], key=v['kinds'].get)}")
+
+                  # --- wake the team: ping every known lane, listen on our own reply space ---
+                  # Reply channel lives in OUR account namespace (devin may sub
+                  # dharma.a2a.devin.> but not other lanes' reply space). A live
+                  # peer replies to the reply_subject we embed in each wake.
+                  own_lane = "devin" if os.environ.get("DEVIN_NATS_URL") else "merge_master_mike"
+                  reply_wild = f"dharma.a2a.{own_lane}.reply.*"
+                  replies = []
+                  async def on_reply(msg):
+                      try:
+                          d = json.loads(msg.data.decode())
+                          replies.append({"subject": msg.subject, "from": d.get("from"), "kind": d.get("kind")})
+                      except Exception:
+                          replies.append({"subject": msg.subject, "raw": msg.data.decode("utf-8", "replace")[:200]})
+                  try:
+                      sub = await nc.subscribe(reply_wild, cb=on_reply)
+                  except Exception as exc:
+                      r["reply_listen"] = f"denied: {exc}"
+                      sub = None
+
+                  lanes = ["hermes", "devin", "codex", "fable_5_cursor", "merge_master_mike", "fleet"]
+                  acks, reach_ms = {}, None
+                  for lane in lanes:
+                      pid = uuid.uuid4().hex[:12]
+                      body = json.dumps({
+                          "from": "claude_code_ci", "kind": "presence_wake", "to": lane,
+                          "probe_id": pid, "reply_subject": f"dharma.a2a.{own_lane}.reply.{pid}",
+                          "content": ("Presence wake from claude_code (CI). NON-ACTIONABLE — "
+                                      "reply with your callsign to the reply_subject if you are live."),
+                          "timestamp": datetime.now(timezone.utc).isoformat(),
+                      }).encode()
+                      t1 = time.monotonic()
+                      try:
+                          ack = await js.publish(f"dharma.a2a.{lane}", body, timeout=10)
+                          ms = round((time.monotonic() - t1) * 1000)
+                          reach_ms = ms if reach_ms is None else reach_ms
+                          acks[lane] = {"ok": True, "seq": ack.seq, "ms": ms}
+                          print(f"WAKE -> dharma.a2a.{lane:<18} pub-ack seq={ack.seq} {ms}ms")
+                      except Exception as exc:
+                          acks[lane] = {"ok": False, "error": str(exc)}
+                          print(f"WAKE -> dharma.a2a.{lane:<18} DENIED {exc}")
+                  r["wake_acks"] = acks
+                  r["reach_ms"] = reach_ms
+
+                  if sub is not None:
+                      print(f"\nListening {listen_s:.0f}s on {reply_wild} for LIVE replies ...")
+                      await asyncio.sleep(listen_s)
+                      r["replies"] = replies
+                      print(f"LIVE REPLIES ({len(replies)}): {replies or 'none — no peer answered'}")
+                      await sub.unsubscribe()
+              finally:
+                  await nc.close()
+
+              r["status"] = "FLEET_SURVEY_OK"
+              print("\nSURVEY_RECEIPT:", json.dumps(r, sort_keys=True)[:3500])
+
+          asyncio.run(main())
+          PY

@@ -376,17 +376,17 @@ async def test_every_dispatch_emits_exactly_one_evidence_receipt(
     the return type. (The orchestrator surface has its own equivalent suite:
     tests/test_orchestrator_spine_dispatch.py.)
     """
-    from dharma_swarm.a2a import a2a_bridge as bridge_mod
+    from dharma_swarm.a2a import spine_adapter as adapter_mod
 
     traversals: list[EvidenceReceipt] = []
-    real_invoke = bridge_mod.invoke_agent
+    real_invoke = adapter_mod.invoke_agent
 
     async def counting_invoke(*args, **kwargs):
         receipt = await real_invoke(*args, **kwargs)
         traversals.append(receipt)
         return receipt
 
-    monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
+    monkeypatch.setattr(adapter_mod, "invoke_agent", counting_invoke)
 
     bridge, _ = _make_bridge(registry)
     n_dispatches = 3

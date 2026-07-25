@@ -24,7 +24,7 @@ must pass these gates before merge:
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
 | 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older trusted same-repo duplicates of `[automated]`/`[auto]` PRs, keeping the newest |
-| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
+| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + the manifest-required checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
 
 ### Local pre-flight
 
@@ -144,6 +144,37 @@ It runs on PR open/reopen, every 6 hours on a schedule, and on
 or trusted same-repo automation signal are never touched, and nothing is ever
 merged by this lane.
 
+### Ephemeral snapshot-report PRs (`pr-dedupe.yml`, Pass 1)
+
+An external ops automation (running under a maintainer PAT, not an in-repo
+workflow) opens a fresh draft PR every few hours that is a pure **status
+snapshot** rather than a change to merge:
+
+- `report(governance): PR lifecycle + spine adoption ops report <timestamp>`
+- `chore(governance): refresh spine adoption metric [automated] <timestamp>`
+
+Each title carries a unique timestamp, so the title-grouping dedupe above never
+collapses them and they accumulate (12+ at once), burying real PRs. Their data
+is a projection already rendered from owners (`make onboard`,
+`reports/governance/**`), so a snapshot report should be emitted as an
+artifact/comment, never as a standing PR.
+
+Pass 1 of `pr-dedupe.yml` therefore **closes every such snapshot PR outright**
+(not keep-newest), comments a governance explanation pointing at the rendered
+projection, and deletes the branch. The match is deliberately conservative — a
+PR is closed only when **all** hold:
+
+1. The PR head is in the same repository (repo owner).
+2. The title carries an automation marker (`[automated]` or `[auto]`).
+3. A known snapshot intent matches — either the title phrase (`PR lifecycle +
+   spine adoption ops report`, `refresh spine adoption metric`) or the headRef
+   lane (`pr-lifecycle-spine`, `spine-adoption-metric`).
+
+A PR that does not match a declared snapshot intent is never touched. If a real
+change is mis-titled into this set, reopen it and retitle so it no longer
+matches. Runs on PR open/reopen, the 6-hourly schedule, and `workflow_dispatch`
+(honors `dry_run`).
+
 ---
 
 ## 2b. Automerge Lane (`automerge.yml`)
@@ -180,6 +211,33 @@ Mike's required reviewer receipts are **`copilot,claude`**. Devin is a
 requiring a `devin` receipt left the gate permanently unclearable. If Devin
 gains a review surface later, add it back to `REQUIRED_REVIEWERS` in
 `codex-mention-router.yml` and the `merge-master-mike-backlog.yml` default.
+
+#### `bot-pr` waiver (trusted automation merges when green)
+
+A PR carrying the **`bot-pr`** label is produced by trusted automation
+(`automerge.yml` enrolls bot/automated PRs). For these — and **only** these —
+Mike's gate in `scripts/runtime/pr_merge_control.py` (`build_gate`) waives the
+human/agent reviewer-receipt requirement and ignores **advisory review-bot**
+comment threads, so a genuinely green automation PR can merge without a human
+in the loop:
+
+- **Reviewer receipts waived.** The `copilot,claude` receipt requirement is
+  dropped (these PRs never receive human reviews); the waiver is surfaced in
+  the gate's `bot_pr.waivers` output for transparency.
+- **Advisory-bot threads ignored.** Review threads whose every comment is
+  authored by an advisory review bot (`ADVISORY_REVIEW_BOTS`, e.g. Greptile's
+  `greptile-apps`) post perpetually-unresolved informational summaries that
+  never represent a human change request. They are not counted as blocking
+  unresolved threads for a `bot-pr`. A thread with **any** non-advisory
+  participant (a human, Copilot, Codex, Devin, …) still blocks.
+
+Everything else stays strict, for `bot-pr` and non-`bot-pr` alike: mergeability,
+failing/pending CI checks, `CHANGES_REQUESTED`, the Coherence Delta gate, CI
+truth, and HIGH/CRITICAL risk all still block. Non-`bot-pr` PRs are unaffected
+— they still require the full reviewer receipts and are still blocked by any
+unresolved thread, advisory or not. This neither silences Greptile nor relaxes
+substance for human reviewers; it only scopes a narrow waiver to trusted,
+labeled automation.
 
 ---
 
@@ -237,12 +295,16 @@ Every agent or contributor must:
 
 1. **Run `make onboard`** at session start to see the current operating
    reality (active track, live ops, broken register, PR hygiene summary)
-2. **Run `make agent-build-preflight`** before implementation work when the
-   session will edit code, docs, tests, workflows, or governance surfaces.
-3. **Run `make agent-build-closeout`** before opening any PR. This runs a
-   no-worktree hygiene scan plus `make governance-all`. You do not need to
-   hand-refresh DocOps counts — the `docops-autorefresh.yml` feeder reconciles
-   them on the first CI run (see §1, "Self-healing DocOps counts").
+2. **Apply the packet policy.** Packet-bound preflight and closeout are required
+   when changed paths match Merge Master Mike's `HOT_PATH_PATTERNS` in
+   `scripts/runtime/pr_merge_control.py`; they are optional otherwise. When
+   required, run `make agent-build-preflight PACKET=<path>` before
+   implementation work.
+3. **Run `make agent-build-closeout PACKET=<path>`** before opening the PR when
+   a packet is required or voluntarily used. This runs a no-worktree hygiene
+   scan plus `make governance-all`. You do not need to hand-refresh DocOps
+   counts — the `docops-autorefresh.yml` feeder reconciles them on the first CI
+   run (see §1, "Self-healing DocOps counts").
 4. **Check for existing open PRs** on the same topic before opening a new one:
    ```bash
    gh pr list --state open --search "<your topic keywords>"
@@ -289,7 +351,50 @@ An hourly cron workflow provides automated triage and healing:
 |--------|-------------|
 | **Report** | Classifies all open PRs into categories and updates a tracking issue |
 | **Re-run** | Re-triggers failed runs caused by transient infra (umbrella status flakes) |
-| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main` |
+| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main` via `pr_ci_safe_rebase.py`, except packet-bound / non-same-repo / race-failed PRs |
+
+### Session Entry branch preservation
+
+The rebase action must never rewrite a PR whose changed-file set contains a
+Session Entry packet under `reports/agentops/work_packets/*.json` (current
+`.filename` or rename-away `.previous_filename`). Those packets bind `base_ref`,
+collision evidence, and packet digest to a specific merge base; an automated
+rebase makes those claims stale even when the resulting source tree is
+byte-identical.
+
+`pr-ci-health.yml` delegates each candidate to
+`scripts/governance/pr_ci_safe_rebase.py` **before** any PR-head
+fetch/checkout/rebase/push. The helper is fail-closed and claims only:
+
+1. **Count-bound explicit page enumeration** — `?per_page=100&page=N` raw JSON
+   arrays; total entries must equal metadata `.changed_files`. Because the
+   endpoint hard-caps at 3000, `changed_files >= 3000` skips (equality is
+   ambiguous). When the expected final page is full
+   (`changed_files % 100 == 0`, including zero), one sentinel next page must
+   return a valid empty JSON array; API failure, malformed JSON, or a
+   nonempty sentinel skips. A short final page is proved by its length plus
+   exact metadata count.
+2. **Current and previous filenames** — both `.filename` and
+   `.previous_filename` are checked for the packet prefix + `.json` suffix.
+3. **Same-repo / head-SHA / race / lease / restore binding** — head must be
+   same-repo; inspected `head.sha` is re-checked after enumeration and before
+   push; fetch uses `refs/pull/<n>/head`; push uses explicit
+   `--force-with-lease=refs/heads/<ref>:<inspected_sha>`. A valid 40-hex
+   restore target (`--restore-to` or `$GITHUB_SHA`) is required before any
+   PR-head mutation; restore checkout failures surface as local `ERROR` and
+   never retain a `REBASED` success.
+4. **API / malformed / count failures skip** — API errors, malformed JSON,
+   malformed entries, count mismatch, premature empty pages, sentinel
+   failures, missing restore target, or head movement print `SKIP PR #N: …`
+   and perform no rewrite.
+5. **Owner append-only reseal required** — a packet-bound PR may remain behind
+   `main`; only the owner may append a governed reseal and rerun packet
+   scope/preflight/closeout. The hourly backstop has no authority to rewrite
+   that history.
+
+Branch names and draft status are not safety signals. Local AgentOps closeout
+reports are self-reported evidence only; GitHub packet-scope/CI handles are the
+external authority.
 
 Categories: `green`, `behind_main`, `merge_conflict`, `docops_drift`,
 `coherence_delta`, `fourfold_warrant`, `transient_infra`, `real_test_lint`.

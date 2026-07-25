@@ -122,18 +122,30 @@ class SwarmRouter:
         )
         roles = self.allocate_roles(request, collaboration=collaboration)
         blackboard = self.build_blackboard(request, roles=roles)
-        role_routes = tuple(
-            self._plan_role(
+        role_route_items: list[RoleRoutePlan] = []
+        used_providers: set[ProviderType] = set()
+        for role in roles:
+            role_available = available_providers
+            if available_providers:
+                unused = [
+                    provider
+                    for provider in available_providers
+                    if provider not in used_providers
+                ]
+                if unused:
+                    role_available = unused
+            role_route = self._plan_role(
                 request,
                 role=role,
                 dependency_roles=self._dependency_roles(role, roles=roles),
                 collaboration=collaboration,
                 roles=roles,
                 blackboard=blackboard,
-                available_providers=available_providers,
+                available_providers=role_available,
             )
-            for role in roles
-        )
+            used_providers.add(role_route.route.selected_provider)
+            role_route_items.append(role_route)
+        role_routes = tuple(role_route_items)
         execution_contract = self.build_execution_contract()
         return SwarmExecutionPlan(
             collaboration=collaboration,

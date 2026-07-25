@@ -2,7 +2,7 @@
 role: active_spec
 owner: loop-closure-2026-06
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-19
 ---
 
 # Cybernetics Codex Steward
@@ -37,6 +37,21 @@ Closure means: sense -> interpret -> constrain -> act -> adapt all fire on
 real data, each transition emits a receipt to its owner surface, and a fresh
 agent can replay an automated check. Proof-of-life, smoke tests, demos, and
 handoff prose do not count as production closure.
+
+Verdict tiers:
+
+- `HARNESS_PROVEN`: a bounded replay/regression harness passed. This is useful
+  regression evidence, but it may be scratch or self-seeded and is not a live
+  daemon closure claim.
+- `CLOSED_LIVE`: the loop's declared live owner surface proves the cycle and
+  later-cycle consumption without scratch-only or self-seeded evidence standing
+  in for production state.
+
+Surface split: `delegation_runs.receipt_json` is the orchestrator/spine-dispatch
+witness column. A2A-surface rows are allowed to leave it empty because their
+canonical witness path is `runtime_receipts` plus idempotency records. For Loop
+1 production closure, the missing proof is actual served provider/model truth
+and a bounded replay that shows tick N affects tick N+1.
 
 ## Authority
 
@@ -93,7 +108,8 @@ Expected runtime surfaces after `--write`:
 ~/.dharma/agents/cybernetics_codex/last_receipt.json
 ```
 
-Declared mailbox: `nats://dharma.a2a.cybernetics-codex`.
+Declared mailbox: `nats://dharma.agent.cybernetics_codex.inbox`
+using the Semantic Commons `A2AInboxRoute` / `agent-inbox`.
 Runtime status: `declared_not_started` unless a separate transport verifier
 proves a live NATS consumer.
 
@@ -102,7 +118,7 @@ proves a live NATS consumer.
 Daily read-only audit:
 
 1. Render active repo/runtime reality.
-2. Snapshot Loop 1 receipt coverage and latest failure modes.
+2. Snapshot Loop 1 served-provider/model truth, A2A runtime receipts, and latest failure modes.
 3. Check whether loop-supervisor state exists.
 4. Check One Wire quorum and archive-fitness risk.
 5. Mark every closure claim as SUPPORTED, PARTIAL, CONTRADICTED, or UNKNOWN.
@@ -119,7 +135,7 @@ Per-build gate:
 
 ```bash
 make onboard
-make orient
+make organism-status
 .venv/bin/dgc status
 .venv/bin/dgc loop-status
 bash scripts/runtime/codex_toolbelt_status.sh

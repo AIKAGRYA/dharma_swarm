@@ -13,10 +13,43 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Pool-sourced model ids (model-pool consolidation 2026-06)
+# ---------------------------------------------------------------------------
+# This catalog used to hand-type provider-specific model-id literals (including
+# the sub-floor ``kimi-k2.5:cloud`` and the BANISHED NIM ``meta/llama-3.3-70b``).
+# Every such id is now DERIVED from the ONE model pool at the FLOOR, so the
+# strings live in exactly one place (the roster -> pool) and no sub-floor or
+# banished literal can survive here.
+#   kimi-k2.5:cloud            -> _cloud_id("kimi-k2.6")  (K2.6 FLOOR)
+#   glm-5 / deepseek-v3.2 / minimax-m2.7: in-pool FLOOR entries, kept (their
+#     floor-map successors glm-5.1 / deepseek-v4-pro / minimax-m3 are not yet
+#     pool entries, so the pool entry IS the current floor).
+#   meta/llama-3.3-70b (BANISHED NIM) -> nearest free floor pool entry for the
+#     role (the free Ollama-Cloud glm-5 frontier lane).
+
+
+def _cloud_id(pool_id: str) -> str:
+    """The Ollama-Cloud route id the pool serves for ``pool_id`` (at the floor).
+
+    Raises at import if the pool has no Ollama-Cloud route for it — a catalog
+    row can never silently reference a model outside the pool/floor.
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.endswith(":cloud") or mid.endswith("-cloud"):
+                return mid
+    raise AssertionError(
+        f"model_manager references pool id {pool_id!r} with no Ollama-Cloud route"
+    )
 
 
 @dataclass
@@ -117,7 +150,7 @@ MODELS: dict[str, ModelInfo] = {
     ),
     # Free tier frontier models (from model_hierarchy.py)
     "glm-5": ModelInfo(
-        id="glm-5:cloud",
+        id=_cloud_id("glm-5"),
         name="GLM-5 (744B MoE)",
         provider=ProviderType.OLLAMA,
         description="Zhipu AI frontier model via Ollama Cloud, free",
@@ -128,7 +161,7 @@ MODELS: dict[str, ModelInfo] = {
         capability="high",
     ),
     "deepseek-v3.2": ModelInfo(
-        id="deepseek-v3.2:cloud",
+        id=_cloud_id("deepseek-v3.2"),
         name="DeepSeek V3.2",
         provider=ProviderType.OLLAMA,
         description="DeepSeek frontier model via Ollama Cloud, free",
@@ -138,9 +171,9 @@ MODELS: dict[str, ModelInfo] = {
         speed="medium",
         capability="high",
     ),
-    "kimi-k2.5": ModelInfo(
-        id="kimi-k2.5:cloud",
-        name="Kimi K2.5",
+    "kimi-k2.6": ModelInfo(
+        id=_cloud_id("kimi-k2.6"),  # K2.6 FLOOR (was sub-floor kimi-k2.5:cloud)
+        name="Kimi K2.6",
         provider=ProviderType.OLLAMA,
         description="Moonshot AI frontier model via Ollama Cloud, free",
         context_window=128_000,
@@ -150,7 +183,7 @@ MODELS: dict[str, ModelInfo] = {
         capability="high",
     ),
     "minimax-m2.7": ModelInfo(
-        id="minimax-m2.7:cloud",
+        id=_cloud_id("minimax-m2.7"),
         name="MiniMax M2.7",
         provider=ProviderType.OLLAMA,
         description="MiniMax frontier model via Ollama Cloud, free",
@@ -160,31 +193,30 @@ MODELS: dict[str, ModelInfo] = {
         speed="medium",
         capability="high",
     ),
-    "llama-3.3-70b": ModelInfo(
-        id="meta/llama-3.3-70b-instruct",
-        name="Llama 3.3 70B",
-        provider=ProviderType.NVIDIA_NIM,
-        description="Meta Llama via NVIDIA NIM, free (50 req/day)",
+    # BANISHED replacement (model-pool consolidation 2026-06): the NIM
+    # meta/llama-3.3-70b literal is a banished family. Its "free, fast,
+    # high-capability" role is reseated on the nearest free FLOOR pool entry
+    # (the free Ollama-Cloud qwen3-coder frontier lane), with the id derived
+    # from the pool so no banished literal survives here. The redundant second
+    # free slot (OpenRouter-free nvidia/nemotron-3-super-120b, also a banished
+    # family with no distinct free-floor successor in the pool) is dropped
+    # rather than duplicated onto an already-present free entry.
+    "qwen3-coder": ModelInfo(
+        id=_cloud_id("qwen3-coder:480b-cloud"),  # was BANISHED meta/llama-3.3-70b (NIM)
+        name="Qwen3 Coder 480B",
+        provider=ProviderType.OLLAMA,
+        description="Qwen3 Coder frontier model via Ollama Cloud, free",
         context_window=128_000,
         cost_per_1m_input=0.0,
         cost_per_1m_output=0.0,
         speed="fast",
         capability="high",
     ),
-    "nemotron-120b": ModelInfo(
-        id="nvidia/nemotron-3-super-120b-a12b:free",
-        name="Nemotron 3 Super 120B",
-        provider=ProviderType.OPENROUTER_FREE,
-        description="NVIDIA Nemotron via OpenRouter free tier",
-        context_window=128_000,
-        cost_per_1m_input=0.0,
-        cost_per_1m_output=0.0,
-        speed="medium",
-        capability="high",
-    ),
 }
 
-# Extra alias variants (normalized from user input)
+# Extra alias variants (normalized from user input). The minimax cloud-id alias
+# key is sourced from the pool (``_cloud_id("minimax-m2.7")``) so no model-id
+# literal lives here — the pool stays the single source.
 _ALIAS_VARIANTS: dict[str, str] = {
     "opus-4.6": "opus",
     "opus 4.6": "opus",
@@ -195,7 +227,7 @@ _ALIAS_VARIANTS: dict[str, str] = {
     "claude": "opus",  # generic "claude" → canonical primary Claude runner
     "minimax": "minimax-m2.7",
     "minimax m2.7": "minimax-m2.7",
-    "minimax-m2.7:cloud": "minimax-m2.7",
+    _cloud_id("minimax-m2.7"): "minimax-m2.7",  # full Ollama-Cloud id → canonical
 }
 
 

@@ -79,6 +79,42 @@ def test_comment_fallback_fails_when_no_source_valid() -> None:
     assert source == "PR body"
 
 
+def test_injected_html_comment_after_last_field_passes() -> None:
+    body = """
+## Coherence Delta
+- Organ touched: scripts/governance/check_pr_coherence_delta.py
+- Declared-vs-actual gap closed: none — gate hardening
+- Proof that re-reads the map: read COHERENCE_DELTA.md and ran the checker
+- New drift introduced: none
+
+Link to Devin session: https://example.invalid/session
+Requested by: @someone
+
+<!-- greptile_comment -->
+## Greptile overview
+some bot-rendered review prose that should not poison the last field
+<!-- /greptile_comment -->
+"""
+
+    results = checker.validate_body(body)
+
+    assert all(result.ok for result in results)
+
+
+def test_html_comment_only_answer_still_fails() -> None:
+    body = """
+- Organ touched: docs/governance
+- Declared-vs-actual gap closed: none
+- Proof that re-reads the map: read the map
+- New drift introduced: <!-- named drift, or 'none' -->
+"""
+
+    results = checker.validate_body(body)
+
+    failed = {result.name: result.reason for result in results if not result.ok}
+    assert failed == {"New drift introduced": "placeholder value"}
+
+
 def test_multiline_answer_is_accepted_until_next_field() -> None:
     body = """
 - Organ touched:

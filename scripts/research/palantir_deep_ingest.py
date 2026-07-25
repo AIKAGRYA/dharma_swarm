@@ -36,6 +36,10 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
 
 _CARDER_PATH = REPO_ROOT / "scripts" / "research" / "palantir_public_source_cards.py"
 _spec = importlib.util.spec_from_file_location("_ppsc_deep", str(_CARDER_PATH))
+if _spec is None or _spec.loader is None:
+    raise ModuleNotFoundError(
+        f"cannot load source-card module from {_CARDER_PATH} — file missing or unreadable"
+    )
 carder = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(carder)
 
@@ -96,11 +100,20 @@ def render_deep_card(
     return "\n".join(lines)
 
 
+# Exact Palantir-controlled hosts (mirrors palantir_public_source_cards.ALLOWED_HOSTS).
+# A bare endswith("palantir.com") would also match unrelated hosts like
+# evilpalantir.com — pin to the explicit set instead.
+ALLOWED_HOSTS = frozenset({"palantir.com", "www.palantir.com"})
+
+
 def allowed(url: str) -> bool:
-    host = urlparse(url).netloc.lower()
+    parsed = urlparse(url)
+    if parsed.scheme != "https":  # sanctioned public docs surface is https-only
+        return False
+    host = parsed.netloc.lower()
     if any(skip in host for skip in SKIP_HOST_SUBSTRINGS):
         return False
-    return host.endswith("palantir.com")
+    return host in ALLOWED_HOSTS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -134,11 +147,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit > 0:
         urls = urls[: args.limit]
 
-    done = skipped = failed = written = total_prose = 0
+    skipped = failed = written = total_prose = 0
     failures: list[dict[str, str]] = []
     for url in urls:
         slug = slugify(urlparse(url).path.strip("/") or url)
-        card_path = deep_dir / f"{slug}.md"
+        # slugify already strips path separators; resolve + contain anyway so a
+        # URL-derived slug can never write outside the deep-cards directory.
+        card_path = (deep_dir / f"{slug}.md").resolve()
+        if deep_dir.resolve() not in card_path.parents:
+            failed += 1
+            failures.append({"url": url, "error": "path_escape"})
+            continue
         if card_path.exists() and not args.refresh:
             skipped += 1
             continue
@@ -159,7 +178,6 @@ def main(argv: list[str] | None = None) -> int:
         card_path.write_text(card, encoding="utf-8")
         written += 1
         total_prose += sum(len(p) for p in paragraphs)
-        done += 1
         if args.delay:
             time.sleep(args.delay)
 

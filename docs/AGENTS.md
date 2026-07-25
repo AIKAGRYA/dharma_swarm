@@ -1,24 +1,14 @@
 # Documentation Agent Instructions
 
-This file governs AI agents working in the prose layer: `docs/`, `reports/`, `specs/`, `foundations/`, `lodestones/`, and root Markdown.
+**Scope:** AI agents (any brand) working in the prose layer — `docs/`,
+`reports/`, `specs/`, `foundations/`, `lodestones/`, root Markdown. Repo-wide
+behaviour, the onboarding status command, and its trust boundaries are
+owned by `CLAUDE.md`; this file adds only prose-layer rules. Root `/AGENTS.md`
+is the tracked minimal entrypoint; this file owns the prose-layer instructions.
 
-## Before Anything Else — the single remembered gate
-
-`make onboard` is the only command you need to remember. Run it before
-touching any doc:
-
-```bash
-make onboard
-```
-
-It shows the active track, live ops, open broken-register items, tooling
-hints, and the doc-ownership map. If any prose in this file or any other
-doc disagrees with that output, trust the onboarding output and update the
-stale prose.
-
-For memory/context work, Memory Kernel is the canonical front door. Older
-memory surfaces remain subordinate evidence, projection, adapter, backend, or
-promotion-feed layers unless the Memory Kernel production bar says otherwise.
+Run `make onboard` before touching any doc. Its output is a read-only projection over fact owners, never a replacement:
+on conflict, owner files win and the projection/generator must be repaired. Do not rewrite an owner to match generated output.
+Memory/context work goes through MemoryKernel — see `CLAUDE.md` §Key Abstractions.
 
 ## Authority Model
 
@@ -30,7 +20,8 @@ Only these files may make repo-level authority claims:
 - `CLAUDE.md` for agent behavior.
 - `docs/governance/SOVEREIGN_MANIFEST.md` for architecture, domains, invariants, and measured repo state.
 - `docs/governance/CANONICAL_DOC_STACK.md` for document hierarchy and ownership.
-- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for current build track and read order.
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for the stable boundary between
+  session status, edit admission, closeout, CI, and agent registration.
 - `docs/governance/REPO_GOVERNANCE_AUDIT.md` for contradictions and staleness.
 
 All other docs must declare a narrower role: reference, plan, report, witness, archive, research, or experiment.

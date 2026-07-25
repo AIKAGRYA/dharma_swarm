@@ -1,6 +1,7 @@
 """Tests for dharma_swarm.providers."""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,8 +14,10 @@ from dharma_swarm.providers import (
     CodexProvider,
     FireworksProvider,
     GroqProvider,
+    KimiCodeProvider,
     ModelRouter,
     NVIDIANIMProvider,
+    OllamaProvider,
     OpenAIProvider,
     OpenRouterFreeProvider,
     SiliconFlowProvider,
@@ -62,6 +65,34 @@ def test_build_messages():
     result = OpenAIProvider._build_messages(msgs, system="be helpful")
     assert len(result) == 2
     assert result[0]["role"] == "system"
+
+
+@pytest.mark.asyncio
+async def test_kimi_code_stream_forwards_tools():
+    captured: dict[str, object] = {}
+
+    class _Completions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+
+            async def _chunks():
+                yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="ok"))])
+
+            return _chunks()
+
+    provider = KimiCodeProvider(api_key="test-key")
+    provider._client = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
+    tools = [{"type": "function", "function": {"name": "lookup", "parameters": {}}}]
+    request = LLMRequest(
+        model="kimi-code",
+        messages=[{"role": "user", "content": "hi"}],
+        tools=tools,
+    )
+
+    chunks = [chunk async for chunk in provider.stream(request)]
+
+    assert chunks == ["ok"]
+    assert captured["tools"] == tools
 
 
 def test_model_router_missing():
@@ -207,7 +238,7 @@ async def test_claude_code_provider_timeout():
 
 @pytest.mark.asyncio
 async def test_claude_code_provider_error():
-    """Verify non-zero exit code with no stdout returns error content."""
+    """Verify non-zero exit code is a provider failure, not a fake completion."""
 
     async def fake_exec(*args, **kwargs):
         mock_proc = AsyncMock()
@@ -218,12 +249,31 @@ async def test_claude_code_provider_error():
 
     provider = ClaudeCodeProvider(timeout=10)
     with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
-        result = await provider.complete(
-            LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
-        )
+        with pytest.raises(RuntimeError, match="claude-code exited 1"):
+            await provider.complete(
+                LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
+            )
 
-    assert "ERROR (rc=1)" in result.content
-    assert "something broke" in result.content
+
+@pytest.mark.asyncio
+async def test_claude_code_provider_nonzero_stdout_is_failure():
+    """Auth errors can arrive on stdout; they must not complete a task."""
+
+    async def fake_exec(*args, **kwargs):
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(
+            return_value=(b"Failed to authenticate. API Error: 401", b"")
+        )
+        mock_proc.returncode = 1
+        mock_proc.terminate = AsyncMock()
+        return mock_proc
+
+    provider = ClaudeCodeProvider(timeout=10)
+    with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
+        with pytest.raises(RuntimeError, match="Failed to authenticate"):
+            await provider.complete(
+                LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
+            )
 
 
 @pytest.mark.asyncio
@@ -393,3 +443,51 @@ async def test_model_router_injects_survival_directive():
     await router.complete(ProviderType.ANTHROPIC, request)
     assert captured_request is not None
     assert "CONTEXT WILL BE DESTROYED" in captured_request.system
+
+
+@pytest.mark.asyncio
+async def test_ollama_keyless_local_degrades_cloud_model(monkeypatch):
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    p = OllamaProvider()
+    seen: dict[str, str] = {}
+
+    async def fake_native(model, messages, request):
+        seen["model"] = model
+        return SimpleNamespace(content="ok")
+
+    monkeypatch.setattr(p, "_complete_native", fake_native)
+    request = LLMRequest(
+        model="glm-5:cloud",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    await p.complete(request)
+    assert seen["model"] == p.default_model
+    assert not seen["model"].endswith(":cloud")
+
+
+def test_ollama_native_messages_coerce_string_tool_arguments():
+    messages = [
+        {"role": "user", "content": "hi"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"function": {"name": "f", "arguments": '{"x": 1}'}}],
+        },
+        {"role": "tool", "content": "42"},
+    ]
+    fixed = OllamaProvider._native_messages(messages)
+    assert fixed[1]["tool_calls"][0]["function"]["arguments"] == {"x": 1}
+    assert fixed[0] == messages[0]
+
+
+def test_ollama_native_messages_bad_json_arguments_become_empty_object():
+    messages = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"function": {"name": "f", "arguments": "{broken"}}],
+        }
+    ]
+    fixed = OllamaProvider._native_messages(messages)
+    assert fixed[0]["tool_calls"][0]["function"]["arguments"] == {}

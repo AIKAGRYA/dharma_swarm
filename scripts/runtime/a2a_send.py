@@ -52,9 +52,15 @@ from scripts.runtime.pr_merge_control import (  # noqa: E402
     _a2a_target_for_subject,
     _nats_config,
     _nats_tls_kwargs,
+    _is_publish_permission_violation,
     _redacted_nats_config,
     stamp,
     utc_now,
+)
+from dharma_swarm.a2a.agent_card import (  # noqa: E402
+    A2A_INBOX_ROUTE_ALIAS,
+    a2a_inbox_subject,
+    resolve_agent_uid,
 )
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore  # noqa: E402
@@ -67,6 +73,7 @@ DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 STATUS_SECRETS_MISSING = "NATS_SECRETS_MISSING"
 STATUS_NATS_CLIENT_MISSING = "NATS_CLIENT_MISSING"
 STATUS_PUBLISH_FAILED = "PUBLISH_FAILED"
+STATUS_PERMISSIONS_DENIED = "NATS_PERMISSIONS_DENIED"
 STATUS_PUBLISH_ACKED = "PUBLISH_ACKED"
 STATUS_PUBLISH_DEDUPED = "PUBLISH_DEDUPED"
 ACK_TIER_NO_CONTACT = "NO_CONTACT"
@@ -74,31 +81,24 @@ ACK_TIER_PUBLISH_ACCEPTED = "PUBLISH_ACCEPTED"
 ACK_TIER_CORE_FLUSH_ONLY = "CORE_FLUSH_ONLY"
 ACK_TIER_HANDLER_ACKED = "HANDLER_ACKED"
 ROUTE_A2A = "a2a"
-ROUTE_AGENT_INBOX = "agent-inbox"
+ROUTE_AGENT_INBOX = A2A_INBOX_ROUTE_ALIAS
 CANONICAL_RUNTIME_TRUTH_NATS_TASK_PATH = False
 COMPATIBILITY_NATS_BYPASS_CLASS = (
     "operator_contact_compatibility_only;"
     " cannot_satisfy_runtime_truth_nats_production_gate"
 )
 
-AGENT_UID_ALIASES = {
-    "devin": "devin-roaming-2987d222",
-    "hermes": "hermes-m5",
-}
-
 
 def _validate_subject_token(token: str, *, label: str) -> str:
+    return resolve_agent_uid(token) if label == "agent uid" else _validate_a2a_token(token, label=label)
+
+
+def _validate_a2a_token(token: str, *, label: str) -> str:
     cleaned = (token or "").strip()
     forbidden = {".", "*", ">", "/", "\\"}
     if not cleaned or any(char.isspace() or char in forbidden for char in cleaned):
         raise ValueError(f"invalid {label} for NATS subject: {cleaned!r}")
     return cleaned
-
-
-def resolve_agent_uid(to: str, *, agent_uid: str = "") -> str:
-    return _validate_subject_token(
-        agent_uid or AGENT_UID_ALIASES.get(to, to), label="agent uid"
-    )
 
 
 def subject_for_route(to: str, *, route: str, agent_uid: str = "") -> tuple[str, str]:
@@ -108,7 +108,7 @@ def subject_for_route(to: str, *, route: str, agent_uid: str = "") -> tuple[str,
         return subject, _a2a_target_for_subject(subject)
     if route == ROUTE_AGENT_INBOX:
         resolved_uid = resolve_agent_uid(to, agent_uid=agent_uid)
-        return f"dharma.agent.{resolved_uid}.inbox", resolved_uid
+        return a2a_inbox_subject(resolved_uid), resolved_uid
     raise ValueError(f"unsupported A2A send route: {route}")
 
 
@@ -119,6 +119,18 @@ def _status_agent_label(envelope: dict[str, Any]) -> str:
         raw = str(envelope.get("subject") or "agent").rsplit(".", 1)[-1]
     chars = [char.upper() if char.isalnum() else "_" for char in raw]
     return "".join(chars).strip("_") or "AGENT"
+
+
+def _permissions_denied_message(config: NATSConfig, subject: str) -> str:
+    user = config.user or "current"
+    return (
+        f"broker rejected publish to {subject}: the {user} NATS credential is "
+        "not authorized to publish to this lane (server-side ACL)"
+    )
+
+
+def _recorded_publish_permission_violation(message: str, subject: str) -> bool:
+    return _is_publish_permission_violation(message, subject)
 
 
 def build_envelope(
@@ -171,6 +183,7 @@ async def _publish_and_wait(
         "consumed": False,
         "replied": False,
         "reply_payload": None,
+        "permissions_denied_detail": None,
     }
     tls_kwargs = _nats_tls_kwargs(config)
     if insecure_tls and not config.ca_pem:
@@ -178,7 +191,15 @@ async def _publish_and_wait(
         insecure_ctx.check_hostname = False
         insecure_ctx.verify_mode = ssl.CERT_NONE
         tls_kwargs["tls"] = insecure_ctx
+    permission_violation = asyncio.Event()
+
     async def _quiet_error_cb(exc: Exception) -> None:
+        message = str(exc)
+        if _recorded_publish_permission_violation(message, envelope["subject"]):
+            result["permissions_denied_detail"] = _permissions_denied_message(
+                config, envelope["subject"]
+            )
+            permission_violation.set()
         result["last_connection_error"] = type(exc).__name__
 
     nc = await nats.connect(
@@ -194,6 +215,14 @@ async def _publish_and_wait(
     try:
         consumed_event: asyncio.Event = asyncio.Event()
         replied_event: asyncio.Event = asyncio.Event()
+
+        async def _safe_unsubscribe(subscription: Any) -> None:
+            try:
+                await subscription.unsubscribe()
+            except Exception as exc:
+                result.setdefault("cleanup_errors", []).append(
+                    f"unsubscribe:{type(exc).__name__}"
+                )
 
         async def on_ack(msg: Any) -> None:
             consumed_event.set()
@@ -222,8 +251,20 @@ async def _publish_and_wait(
             result["ack_tier"] = None
             result["transport_ack"] = "JETSTREAM_PUB_ACK_AMBIGUOUS"
             result["error"] = type(exc).__name__
-            await ack_sub.unsubscribe()
-            await reply_sub.unsubscribe()
+            if result["permissions_denied_detail"] is None:
+                try:
+                    await asyncio.wait_for(permission_violation.wait(), timeout=0.5)
+                except Exception as wait_exc:
+                    result["permission_wait_guard_error"] = type(wait_exc).__name__
+            if result["permissions_denied_detail"] is None and _recorded_publish_permission_violation(str(exc), envelope["subject"]):
+                result["permissions_denied_detail"] = _permissions_denied_message(
+                    config, envelope["subject"]
+                )
+            if result["permissions_denied_detail"] is not None:
+                result["status"] = STATUS_PERMISSIONS_DENIED
+                result["error"] = result["permissions_denied_detail"]
+            await _safe_unsubscribe(ack_sub)
+            await _safe_unsubscribe(reply_sub)
             return result
         result["status"] = STATUS_PUBLISH_ACKED
 
@@ -254,10 +295,13 @@ async def _publish_and_wait(
             result["consumed"] = True
             result["ack_tier"] = ACK_TIER_HANDLER_ACKED
             result["status"] = f"{agent}_REPLIED"
-        await ack_sub.unsubscribe()
-        await reply_sub.unsubscribe()
+        await _safe_unsubscribe(ack_sub)
+        await _safe_unsubscribe(reply_sub)
     finally:
-        await nc.close()
+        try:
+            await asyncio.wait_for(nc.close(), timeout=2.0)
+        except Exception as exc:
+            result["close_guard_error"] = type(exc).__name__
     return result
 
 
@@ -477,7 +521,7 @@ def _evidence_status_for_publish(receipt: dict[str, Any]) -> tuple[str, str, str
         return "dropped", "guardrail_blocked", error_detail, False
     if status == STATUS_NATS_CLIENT_MISSING:
         return "failed", "provider_unreachable", error_detail, False
-    if status == STATUS_PUBLISH_FAILED:
+    if status in {STATUS_PUBLISH_FAILED, STATUS_PERMISSIONS_DENIED}:
         return "failed", "provider_failed", error_detail, True
     if status == STATUS_PUBLISH_DEDUPED:
         return "dropped", "guardrail_blocked", "duplicate publish skipped by idempotency", False
@@ -551,7 +595,16 @@ def _complete_runtime_publish(dispatch: dict[str, Any], receipt: dict[str, Any])
     identity = dispatch["identity"]
     side_effect_key = str(dispatch["side_effect_key"])
     status = str(receipt.get("status") or STATUS_PUBLISH_FAILED)
-    final_state = "completed" if status not in {STATUS_PUBLISH_FAILED, STATUS_NATS_CLIENT_MISSING} else "failed"
+    final_state = (
+        "completed"
+        if status
+        not in {
+            STATUS_PUBLISH_FAILED,
+            STATUS_NATS_CLIENT_MISSING,
+            STATUS_PERMISSIONS_DENIED,
+        }
+        else "failed"
+    )
     receipt_id = f"rr_{identity.run_id}_a2a_send_{status.lower()}"
     evidence_receipt = _build_publish_evidence_receipt(dispatch, receipt)
     evidence_ref = _evidence_receipt_ref(evidence_receipt)
@@ -645,7 +698,12 @@ def classify_contact_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
             "collaboration_claim": "duplicate_publish_skipped",
             "operator_contact_note": "duplicate packet publish skipped by RuntimeStateStore idempotency",
         }
-    if status in {STATUS_SECRETS_MISSING, STATUS_NATS_CLIENT_MISSING, STATUS_PUBLISH_FAILED}:
+    if status in {
+        STATUS_SECRETS_MISSING,
+        STATUS_NATS_CLIENT_MISSING,
+        STATUS_PUBLISH_FAILED,
+        STATUS_PERMISSIONS_DENIED,
+    }:
         return {
             "contact_evidence_tier": ACK_TIER_NO_CONTACT,
             "live_contact_claim": False,
@@ -657,6 +715,20 @@ def classify_contact_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
         "live_contact_claim": False,
         "collaboration_claim": "unknown",
         "operator_contact_note": "receipt status is not enough to claim collaboration",
+    }
+
+
+def console_receipt() -> dict[str, Any]:
+    """Return an operator-facing receipt shape without persisted receipt fields."""
+    return {
+        "schema_version": "dharma.a2a.send_console.v1",
+        "packet_id": "<redacted>",
+        "status": "<recorded>",
+        "subject": "<redacted>",
+        "ack_subject": "<redacted>",
+        "reply_subject": "<redacted>",
+        "file": "<redacted>",
+        "receipt_path": "<written>",
     }
 
 
@@ -740,7 +812,6 @@ def main(argv: list[str] | None = None) -> int:
             "canonical_stream": "DS_TASKS",
         },
     }
-
     runtime_dispatch: dict[str, Any] | None = None
     if config.missing or not config.endpoint:
         receipt["status"] = STATUS_SECRETS_MISSING
@@ -817,15 +888,15 @@ def main(argv: list[str] | None = None) -> int:
             receipt["runtime_truth_error"] = type(exc).__name__
             receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if args.json:
-        print(json.dumps(receipt, indent=2, sort_keys=True))
+        print(json.dumps(console_receipt(), indent=2, sort_keys=True))
     else:
-        print(f"{receipt['status']} packet_id={packet_id} subject={envelope['subject']}")
-        print(f"receipt: {receipt_path}")
+        print("a2a_send: <recorded>")
+        print("receipt: <written>")
     if receipt["status"] == STATUS_SECRETS_MISSING:
         return 3
     if receipt["status"] == STATUS_NATS_CLIENT_MISSING:
         return 4
-    if receipt["status"] == STATUS_PUBLISH_FAILED:
+    if receipt["status"] in {STATUS_PUBLISH_FAILED, STATUS_PERMISSIONS_DENIED}:
         return 1
     return 0
 

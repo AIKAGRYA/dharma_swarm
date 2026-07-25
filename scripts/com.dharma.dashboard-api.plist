@@ -42,6 +42,8 @@
         <string>127.0.0.1</string>
         <key>OPERATOR_PORT</key>
         <string>8420</string>
+        <key>DHARMA_MODEL_LIVE_CALL_MATRIX_PATH</key>
+        <string>__HOME__/.dharma/model_live_call_matrix.json</string>
     </dict>
 </dict>
 </plist>

@@ -1,9 +1,5 @@
-"""API organ — HTTP holon surface.
+"""API facade package."""
 
-Canonical owner: api/routers/holon.py (declared in ACTIVE_SURFACE_MANIFEST.yaml).
-Status: EXISTS. No new router is created here.
-"""
+from .routes import route_names
 
-from __future__ import annotations
-
-__all__: list[str] = []
+__all__ = ["route_names"]

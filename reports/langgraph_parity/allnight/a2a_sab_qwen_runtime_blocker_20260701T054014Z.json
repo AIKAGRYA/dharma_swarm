@@ -1,0 +1,52 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-qwen-code-first-spark:4e3298789adb",
+      "age_hours": 82.954,
+      "reason": "related_sab_semantic_refusal_receipt_proves_runtime_blocker",
+      "row_index": 38,
+      "source_receipts": [
+        {
+          "claim": "The Qwen First Spark task is no longer blocked on operator approval, but it remains blocked on Qwen CLI/provider authentication.",
+          "kind": "runtime_blocked",
+          "path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark-runtime-blocked-20260628T1322Z.semantic_receipt.json",
+          "receipt_id": "sab.semantic_receipt.v1:sab-flywheel-d01-qwen-code-first-spark-runtime-blocked-20260628T1322Z.semantic_receipt",
+          "task_id": "sab-flywheel-d01-qwen-code-first-spark-runtime-blocked"
+        },
+        {
+          "claim": "Codex cannot honestly wake qwen_code for the First Spark task without explicit operator approval because the bounded Qwen CLI capture would transfer mission content to an external provider and may create a live AGNI moderation queue item.",
+          "kind": "capture_gate",
+          "path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark-capture-gate.semantic_receipt.json",
+          "receipt_id": "sab.semantic_receipt:sab-flywheel-d01-qwen-code-first-spark-capture-gate:20260627T1853Z",
+          "task_id": "sab-flywheel-d01-qwen-code-first-spark-capture-gate"
+        }
+      ],
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark"
+    }
+  ],
+  "applied": true,
+  "applied_count": 1,
+  "applied_rows": [
+    {
+      "receipt_id": "a2a-task-receipt:sab-flywheel-d01-qwen-code-first-spark:4e3298789adb",
+      "status": "blocked",
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark"
+    }
+  ],
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-sab-qwen-runtime-block-20260701T054014Z.bak",
+  "candidate_count": 1,
+  "generated_at": "2026-07-01T05:40:14Z",
+  "post_readiness": {
+    "open_tasks": 9,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": []
+}

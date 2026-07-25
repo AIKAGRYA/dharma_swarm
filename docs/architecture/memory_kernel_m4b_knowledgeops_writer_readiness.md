@@ -53,16 +53,16 @@ superseded paths do not produce promotion requests.
 
 ## Writer Sentinel Upgrade
 
-The 2026-05-14 CI profile reports:
+The current CI profile reports:
 
 ```text
-registered writer specs: 57
-present writers: 51
+registered writer specs: 58
+present writers: 52
 dormant missing writers: 6
 unregistered surfaces: 0
 action-required discoveries: 0
-discovered write sites: 122
-discovery roots: dharma_swarm, scripts, api
+discovered write sites: 137
+discovery roots: dharma_swarm, scripts
 ```
 
 Unregistered discoveries remain visible as generated artifacts, operational

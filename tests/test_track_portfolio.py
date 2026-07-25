@@ -8,24 +8,19 @@ fast and independent of the live ACTIVE_TRACK.yaml contents.
 """
 from __future__ import annotations
 
-import json
 import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
-    EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS,
-    check_gauntlet_verified,
-    evaluate_criterion,
     normalize_portfolio,
     validate_portfolio_graph,
-    validate_readiness_score_caps,
-    readiness_score_cap,
     detect_dependency_cycle,
     _parse_minimal_yaml,
+    _resolve_command_for_current_runtime,
+    check_command_passes,
     Finding,
 )
 
@@ -276,122 +271,100 @@ def test_scalar_nested_flow_list_degrades_gracefully() -> None:
     assert p["active_tracks"][0]["id"] == "a"
 
 
-# --- external acted receipt predicate --------------------------------------
+# --- executable criteria portability ---------------------------------------
 
-def _receipt_criterion(path: Path) -> dict[str, str]:
-    return {
-        "id": "first_external_receipt_exists",
-        "kind": "external_acted_receipt",
-        "file": str(path),
-    }
+def test_command_passes_resolves_pytest_to_current_interpreter() -> None:
+    resolved = _resolve_command_for_current_runtime(["pytest", "-q", "tests/test_nats_transport.py"])
 
-
-def test_external_acted_receipt_missing_fails(tmp_path: Path) -> None:
-    missing = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
-
-    result = evaluate_criterion(_receipt_criterion(missing))
-
-    assert result.id == "first_external_receipt_exists"
-    assert result.kind == "external_acted_receipt"
-    assert result.passed is False
-    assert "MISSING" in result.detail
+    assert resolved[:3] == [sys.executable, "-m", "pytest"]
+    assert resolved[3:] == ["-q", "tests/test_nats_transport.py"]
 
 
-def test_external_acted_receipt_rejects_operator_packet_or_template(tmp_path: Path) -> None:
-    fake = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
-    lines = [
-        "# Fake receipt",
-        "**Status:** operator handoff only; not an external acted receipt",
-        *[f"- `{field}`: filled" for field in EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS],
-    ]
-    fake.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def test_command_passes_resolves_bare_python_to_current_interpreter() -> None:
+    for executable in ("python", "python3"):
+        resolved = _resolve_command_for_current_runtime(
+            [executable, "scripts/governance/check_track_status.py", "--warn-only"]
+        )
 
-    result = evaluate_criterion(_receipt_criterion(fake))
-
-    assert result.passed is False
-    assert "forbidden non-receipt marker" in result.detail
+        assert resolved == [
+            sys.executable,
+            "scripts/governance/check_track_status.py",
+            "--warn-only",
+        ]
 
 
-def test_external_acted_receipt_accepts_minimal_redacted_receipt(tmp_path: Path) -> None:
-    receipt = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
-    lines = ["# First External Acted Receipt"]
-    lines.extend(f"{field}: redacted proof value" for field in EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS)
-    receipt.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def test_command_passes_resolves_missing_repo_venv(monkeypatch) -> None:
+    monkeypatch.setattr("check_track_status.Path.exists", lambda _path: False)
 
-    result = evaluate_criterion(_receipt_criterion(receipt))
+    resolved = _resolve_command_for_current_runtime(["./.venv/bin/python", "scripts/check.py"])
 
-    assert result.passed is True
-    assert "required acted-receipt fields" in result.detail
+    assert resolved == [sys.executable, "scripts/check.py"]
 
 
-# --- executable command predicate ------------------------------------------
-
-def test_command_passes_predicate_reports_exit_status() -> None:
-    passed = evaluate_criterion(
-        {
-            "id": "focused_gate",
-            "kind": "command_passes",
-            "command": [sys.executable, "-c", "print('ok')"],
-            "timeout_s": 10,
-        }
-    )
-    failed = evaluate_criterion(
-        {
-            "id": "focused_gate",
-            "kind": "command_passes",
-            "command": [sys.executable, "-c", "import sys; print('bad'); sys.exit(3)"],
-            "timeout_s": 10,
-        }
+def test_command_passes_exports_dharma_python(monkeypatch) -> None:
+    """Wrapper-routed criteria (run_python_with_repo_env.sh honors
+    DHARMA_PYTHON) must see this checker's dependency-complete interpreter,
+    not fall back to a checkout-local `.venv` or bare python3."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+    probe = (
+        "import os, sys; "
+        "sys.exit(0 if os.environ.get('DHARMA_PYTHON') == sys.executable else 1)"
     )
 
-    assert passed.passed is True
-    assert "exited 0" in passed.detail
-    assert failed.passed is False
-    assert "exited 3" in failed.detail
-    assert "bad" in failed.detail
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert result.passed
+    assert result.executed
 
 
-def test_command_passes_rejects_shell_string() -> None:
-    result = evaluate_criterion(
-        {
-            "id": "focused_gate",
-            "kind": "command_passes",
-            "command": f"{sys.executable} -c 'print(1)'",
-        }
+def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:
+    monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
+    probe = (
+        "import os, sys; "
+        "sys.exit(0 if os.environ.get('DHARMA_PYTHON') == '/operator/pinned/python' else 1)"
     )
 
-    assert result.passed is False
-    assert "list of strings" in result.detail
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert result.passed
 
 
-def test_hardening_score_at_least_blocks_flat_score() -> None:
-    track = {"hardening_status": {"current_score": 70, "scale": 100}}
-    result = evaluate_criterion(
-        {
-            "id": "score_gate",
-            "kind": "hardening_score_at_least",
-            "minimum": 75,
-        },
-        track=track,
+def test_command_passes_missing_third_party_module_is_unverified() -> None:
+    """A minimal-deps environment (the governance gate installs only pyyaml)
+    cannot RUN import-heavy criteria. That is `executed=False` — could not
+    observe — never a hard fail that publishes a fake regression baseline."""
+    result = check_command_passes(
+        [sys.executable, "-c", "import definitely_absent_third_party_xyz"]
     )
 
-    assert result.id == "score_gate"
-    assert result.kind == "hardening_score_at_least"
-    assert result.passed is False
-    assert "70/100" in result.detail
+    assert not result.passed
+    assert not result.executed
+    assert "definitely_absent_third_party_xyz" in result.detail
+    assert "not evidence of regression" in result.detail
 
 
-def test_hardening_score_at_least_passes_when_threshold_met() -> None:
-    track = {"hardening_status": {"current_score": 75, "scale": 100}}
-    result = evaluate_criterion(
-        {
-            "kind": "hardening_score_at_least",
-            "minimum": 75,
-        },
-        track=track,
-    )
+def test_command_passes_missing_repo_module_stays_a_real_failure() -> None:
+    """A repo-local module that fails to import is evidence about the code,
+    not the environment — it must remain an executed hard failure."""
+    probe = "import dharma_swarm.definitely_absent_internal_module"
 
-    assert result.passed is True
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert not result.passed
+    assert result.executed
+
+
+def test_command_passes_explicit_skip_is_unverified_never_pass(monkeypatch) -> None:
+    """DHARMA_TRACK_STATUS_SKIP_COMMANDS=1 (set by callers that own command
+    execution, e.g. the enclosing pytest suite) records the criterion as
+    UNVERIFIED — passed stays False so a skip can never mint a green."""
+    monkeypatch.setenv("DHARMA_TRACK_STATUS_SKIP_COMMANDS", "1")
+
+    result = check_command_passes([sys.executable, "-c", "raise SystemExit(0)"])
+
+    assert not result.passed
+    assert not result.executed
+    assert "caller owns command execution" in result.detail
 
 
 # --- closed_tracks shape validation -----------------------------------------
@@ -459,229 +432,3 @@ def test_track_policy_grace_enforced_default_is_false() -> None:
 def test_track_policy_grace_enforced_pass_through() -> None:
     p = _portfolio([_track("a")], policy={"min_active_grace_enforced": True})
     assert p["track_policy"]["min_active_grace_enforced"] is True
-
-
-# --- readiness score cap ----------------------------------------------------
-
-def _runtime_score_track(current_score: int, gates_passed: list[str]):
-    return _track(
-        "runtime-truth-spine-adoption-2026-06",
-        readiness_baseline={"score": 54, "scale": 100},
-        hardening_status={
-            "current_score": current_score,
-            "scale": 100,
-            "gates_passed": gates_passed,
-        },
-    )
-
-
-def test_readiness_score_cap_allows_current_score_at_declared_gate() -> None:
-    track = _runtime_score_track(
-        70,
-        [
-            "54_to_60: baseline visible in active governance",
-            "60_to_65: bypass list has no unknowns",
-            "65_to_70: dispatch strict gate passes",
-        ],
-    )
-
-    cap = readiness_score_cap(track)
-
-    assert cap is not None
-    assert cap["cap_score"] == 70
-    assert cap["current_score"] == 70
-    assert cap["within_cap"] is True
-
-
-def test_readiness_score_cap_blocks_current_score_above_declared_gate() -> None:
-    track = _runtime_score_track(
-        75,
-        [
-            "54_to_60: baseline visible in active governance",
-            "60_to_65: bypass list has no unknowns",
-            "65_to_70: dispatch strict gate passes",
-        ],
-    )
-    findings: list[Finding] = []
-
-    validate_readiness_score_caps([track], findings)
-
-    assert any(
-        f.severity == "ERROR"
-        and f.check == "score-cap:runtime-truth-spine-adoption-2026-06"
-        and "exceeds executable gate cap 70/100" in f.message
-        for f in findings
-    )
-
-
-def test_readiness_score_cap_ignores_scoped_post_gate_prose() -> None:
-    track = _runtime_score_track(
-        75,
-        [
-            "54_to_60: baseline visible in active governance",
-            "60_to_65: bypass list has no unknowns",
-            "65_to_70: dispatch strict gate passes",
-            (
-                "post_70_fresh_dropoff_field_gate: scoped proof mentions "
-                "the 70->75 receipt field gate but is not production readiness"
-            ),
-        ],
-    )
-
-    cap = readiness_score_cap(track)
-
-    assert cap is not None
-    assert cap["cap_score"] == 70
-    assert cap["within_cap"] is False
-
-
-def test_readiness_score_cap_advances_only_on_contiguous_gate_label() -> None:
-    track = _runtime_score_track(
-        75,
-        [
-            "54_to_60: baseline visible in active governance",
-            "60_to_65: bypass list has no unknowns",
-            "65_to_70: dispatch strict gate passes",
-            "70_to_75: strict receipt coverage gate passes",
-        ],
-    )
-
-    cap = readiness_score_cap(track)
-
-    assert cap is not None
-    assert cap["cap_score"] == 75
-    assert cap["within_cap"] is True
-
-
-# --- gauntlet_verified predicate -------------------------------------------
-
-def _write_gauntlet_receipt(path: Path, *, score=0.9, passed=4, total=4,
-                            tiers=(1, 2, 3, 4, 5), ts=None, **extra) -> Path:
-    receipt = {
-        "run_id": "gauntlet-test",
-        "timestamp": ts or datetime.now(timezone.utc).isoformat(),
-        "tiers_run": list(tiers),
-        "gauntlet_score": score,
-        "task_scores": [{"task_id": f"t{i}", "passed": i < passed} for i in range(total)],
-    }
-    receipt.update(extra)
-    path.write_text(json.dumps(receipt), encoding="utf-8")
-    return path
-
-
-def _gauntlet_criterion(path: Path, **kw) -> dict:
-    crit = {"id": "gauntlet_verified", "kind": "gauntlet_verified", "receipt": str(path)}
-    crit.update(kw)
-    return crit
-
-
-def test_gauntlet_verified_fresh_green_passes(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", score=0.9, passed=4, total=4)
-    res = evaluate_criterion(_gauntlet_criterion(receipt))
-    assert res.id == "gauntlet_verified"
-    assert res.kind == "gauntlet_verified"
-    assert res.passed is True
-
-
-def test_gauntlet_verified_missing_receipt_fails(tmp_path: Path) -> None:
-    res = evaluate_criterion(_gauntlet_criterion(tmp_path / "nope.json"))
-    assert res.passed is False
-    assert "MISSING" in res.detail
-
-
-def test_gauntlet_verified_stale_receipt_fails(tmp_path: Path) -> None:
-    old = (datetime.now(timezone.utc) - timedelta(hours=200)).isoformat()
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", ts=old)
-    res = evaluate_criterion(_gauntlet_criterion(receipt, max_age_hours=168))
-    assert res.passed is False
-    assert "stale" in res.detail
-
-
-def test_gauntlet_verified_failed_task_fails(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", passed=3, total=4)
-    res = evaluate_criterion(_gauntlet_criterion(receipt))
-    assert res.passed is False
-    assert "pass ratio" in res.detail
-
-
-def test_gauntlet_verified_low_score_fails(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", score=0.4, passed=4, total=4)
-    res = evaluate_criterion(_gauntlet_criterion(receipt, min_score=0.7))
-    assert res.passed is False
-    assert "min_score" in res.detail
-
-
-def test_gauntlet_verified_missing_required_tier_fails(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", tiers=(1, 2))
-    res = evaluate_criterion(_gauntlet_criterion(receipt, required_tiers=[1, 4]))
-    assert res.passed is False
-    assert "required tiers" in res.detail
-
-
-def test_gauntlet_verified_malformed_receipt_field() -> None:
-    res = evaluate_criterion({"id": "g", "kind": "gauntlet_verified"})
-    assert res.passed is False
-    assert "receipt" in res.detail
-
-
-def test_gauntlet_verified_independent_verifier_rejects_self_grade(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", verified_by="@owner")
-    res = evaluate_criterion(
-        _gauntlet_criterion(receipt, require_independent_verifier=True),
-        track={"owner": "@owner"},
-    )
-    assert res.passed is False
-    assert "worker must not judge" in res.detail
-
-
-def test_gauntlet_verified_independent_verifier_accepts_distinct(tmp_path: Path) -> None:
-    receipt = _write_gauntlet_receipt(
-        tmp_path / "g.json", verified_by="@verifier", produced_by="@owner")
-    res = evaluate_criterion(
-        _gauntlet_criterion(receipt, require_independent_verifier=True),
-        track={"owner": "@owner"},
-    )
-    assert res.passed is True
-
-
-def test_gauntlet_verified_now_injection_is_deterministic(tmp_path: Path) -> None:
-    ts = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
-    receipt = _write_gauntlet_receipt(tmp_path / "g.json", ts=ts.isoformat())
-    fresh = check_gauntlet_verified(str(receipt), max_age_hours=24,
-                                    now=ts + timedelta(hours=1))
-    stale = check_gauntlet_verified(str(receipt), max_age_hours=24,
-                                    now=ts + timedelta(days=10))
-    assert fresh.passed is True
-    assert stale.passed is False
-
-
-# --- shippable-requires-gauntlet portfolio invariant ------------------------
-
-def test_track_policy_require_gauntlet_default_false() -> None:
-    p = _portfolio([_track("a")])
-    assert p["track_policy"]["require_gauntlet_for_shippable"] is False
-
-
-def test_gauntlet_gate_missing_warns_by_default() -> None:
-    p = _portfolio([_track("a")])
-    findings: list[Finding] = []
-    validate_portfolio_graph(p, findings)
-    gm = [f for f in findings if f.check.startswith("gauntlet-gate-missing")]
-    assert gm and gm[0].severity == "WARN"
-
-
-def test_gauntlet_gate_missing_is_error_when_armed() -> None:
-    p = _portfolio([_track("a")], policy={"require_gauntlet_for_shippable": True})
-    findings: list[Finding] = []
-    validate_portfolio_graph(p, findings)
-    gm = [f for f in findings if f.check.startswith("gauntlet-gate-missing")]
-    assert gm and gm[0].severity == "ERROR"
-
-
-def test_gauntlet_gate_declared_is_silent() -> None:
-    t = _track("a", completion_criteria=[
-        {"id": "g", "kind": "gauntlet_verified", "receipt": "reports/x.json"}])
-    p = _portfolio([t])
-    findings: list[Finding] = []
-    validate_portfolio_graph(p, findings)
-    assert not any(f.check.startswith("gauntlet-gate-missing") for f in findings)

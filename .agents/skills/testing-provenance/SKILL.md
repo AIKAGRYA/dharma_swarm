@@ -5,43 +5,56 @@ description: Test telic seam provenance, ontology schema changes, and task board
 
 # Testing Provenance & Ontology Changes
 
+**Purpose:** prove that a change to the telic seam / ontology surface actually persists provenance — not just that the code imports. The #1 failure mode on this surface is silent: `OntologyRegistry.create_object()` returns `(None, [errors])` instead of raising, so a broken schema looks green unless you assert on the created object.
+
 ## Environment Setup
 
-```bash
-cd /home/ubuntu/dharma_swarm
-source .venv/bin/activate
-```
-
-## Key Testing Commands
+Always run from the repo root of the checkout under test. Never hardcode a home directory — checkouts live in different places on different hosts (Mac worktrees, `/home/ubuntu`, remote containers).
 
 ```bash
-# Core provenance/ontology tests (fast, ~2s)
-pytest tests/test_telic_seam.py tests/test_task_board.py tests/test_telos_graph.py -v --tb=short
-
-# Full suite (slow, ~60s, expect ~74 pre-existing failures on main)
-pytest tests/ -q
-
-# Pre-commit hooks (skip semgrep if binary not installed)
-SKIP=semgrep-local pre-commit run --all-files
-
-# Hot-path files (agent_runner.py, orchestrator.py, etc.) require ACK
-DHARMA_UPLIFT_ACK=impact-checked SKIP=semgrep-local git commit -m "msg [impact-checked]"
+cd "$(git rev-parse --show-toplevel)"
+[ -f .venv/bin/activate ] && source .venv/bin/activate   # else: python3 -m pip install -e ".[dev]"
 ```
+
+## Procedure
+
+1. **Targeted tests first** (fast, ~2s):
+   ```bash
+   pytest tests/test_telic_seam.py tests/test_task_board.py tests/test_telos_graph.py -v --tb=short
+   ```
+2. **If the change touches an ontology enum**, run the round-trip check in "Ontology Schema Enum Validation" below. This is mandatory, not optional.
+3. **Run the adversarial patterns** relevant to the change (see below) — at least one per changed behavior.
+4. **Full suite last**, as a regression sweep:
+   ```bash
+   pytest tests/ -q
+   ```
+   Compare failures against `git stash && pytest tests/ -q` (or a clean main checkout) — never against a remembered failure count. Pre-existing-failure tallies rot; only a same-session baseline diff is evidence.
+5. **Commit gates** (when committing from this checkout):
+   ```bash
+   SKIP=semgrep-local pre-commit run --all-files
+   # hot-path files (agent_runner.py, orchestrator.py, ...) require the ACK:
+   DHARMA_UPLIFT_ACK=impact-checked SKIP=semgrep-local git commit -m "msg [impact-checked]"
+   ```
 
 ## Critical: Ontology Schema Enum Validation
 
-When adding new enum values to ontology types (e.g., adding a new `action_type` to `ActionProposal`), you MUST update **both**:
+When adding an enum value to an ontology type (e.g. a new `action_type` on `ActionProposal`), you MUST update **both**:
 
-1. The code-level whitelist (e.g., `telic_seam.py` topology check)
-2. The ontology schema enum in `ontology.py` (e.g., `_ACTION_PROPOSAL` PropertyDef `enum_values`)
+1. The code-level whitelist (e.g. the `telic_seam.py` topology check)
+2. The ontology schema enum in `ontology.py` (e.g. `_ACTION_PROPOSAL` PropertyDef `enum_values`)
 
-If only the code whitelist is updated, `OntologyRegistry.create_object()` will **silently return `(None, [error_list])`** instead of raising. This is easy to miss because the telic_seam `record_dispatch` method catches the None and returns None, which callers may ignore.
+If only the code whitelist is updated, `create_object()` silently returns `(None, [error_list])`, `record_dispatch` swallows the None, and callers never notice. **Test it explicitly:**
 
-**Test this explicitly:** Create an `OntologyRegistry.create_dharma_registry()`, call `create_object` with the new enum value, and assert the result is not None.
+```python
+from dharma_swarm.ontology import OntologyRegistry
+registry = OntologyRegistry.create_dharma_registry()
+obj, errors = registry.create_object(..., action_type="<new-value>", ...)
+assert obj is not None, f"schema rejected new enum value: {errors}"
+```
 
 ## Test Fixture Construction
 
-The `TelicSeam` constructor needs a proper registry and lineage:
+The `TelicSeam` constructor needs a real registry and lineage:
 
 ```python
 from dharma_swarm.ontology import OntologyRegistry
@@ -50,38 +63,39 @@ from dharma_swarm.telic_seam import TelicSeam
 from dharma_swarm.models import Task, TaskPriority
 
 registry = OntologyRegistry.create_dharma_registry()
-lineage = LineageGraph(db_path="/tmp/test_lineage.db")
+lineage = LineageGraph(db_path=str(tmp_path / "test_lineage.db"))
 seam = TelicSeam(registry=registry, lineage=lineage)
 ```
 
-Do NOT use `TelicSeam(path=...)` for testing — the path-based constructor may not register all required ontology types.
-
-## TaskPriority Enum Values
-
-The enum is: `LOW`, `NORMAL`, `HIGH`, `URGENT` (not MEDIUM).
-
-## Task Model
-
-When constructing `Task` objects for tests, `status` is optional. The `id` field auto-generates if not provided.
-
-```python
-task = Task(title="test", description="desc", priority=TaskPriority.NORMAL)
-```
-
-## Test Class Paths
-
-- `tests/test_task_board.py` — top-level functions: `test_get_by_title`, `test_get_by_title_dedup`
-- `tests/test_telos_graph.py` — class-based: `TestCRUD::test_get_by_name`, `TestCRUD::test_get_by_name_dedup`
-- `tests/test_telic_seam.py` — class-based: `TestLifecycleIntegrity::test_detects_proposal_without_outcome`
+- Do NOT use `TelicSeam(path=...)` in tests — the path-based constructor may not register all required ontology types.
+- Use pytest `tmp_path`, not a shared `/tmp` file — parallel runs must not share a db.
+- `TaskPriority` values are `LOW`, `NORMAL`, `HIGH`, `URGENT` (there is no MEDIUM).
+- `Task(title=..., description=..., priority=...)` is enough; `status` is optional and `id` auto-generates.
 
 ## Adversarial Test Patterns
 
-1. **Topology whitelist test**: Record dispatch with a new topology value, then read the stored `action_type` property directly from the ontology object. Assert it equals the new value (not the fallback `"dispatch"`).
+1. **Topology whitelist round-trip:** record a dispatch with the new topology value, read the stored `action_type` property back off the ontology object, assert it equals the new value — not the silent fallback `"dispatch"`.
+2. **Orphan proposal:** create a dispatch, set `status="rejected"` on the proposal, run `lifecycle_integrity_report()`, assert `proposals_without_outcome` is empty; then create a second dispatch left at `"proposed"` and assert it IS flagged.
+3. **Method existence:** call the new method with a matching query (assert expected object) and a non-matching query (assert `None`).
 
-2. **Orphan proposal test**: Create a dispatch, set status to `"rejected"` directly on the proposal object, run `lifecycle_integrity_report()`, assert `proposals_without_outcome` is empty. Then create another dispatch (status stays `"proposed"`), assert it IS flagged.
+## Output Format
 
-3. **Method existence test**: Call the new method, assert it returns the expected object for a matching query and `None` for a non-matching query.
+End every run with this verdict block — every line backed by a command you actually ran:
 
-## Devin Secrets Needed
+```
+PROVENANCE TEST VERDICT: PASS | FAIL
+- targeted tests: <N passed / M failed> (exit <code>)
+- enum round-trip: <ok | not applicable | FAILED: created object was None>
+- adversarial patterns run: <which of 1/2/3, results>
+- full-suite delta vs baseline: <+N new failures | none>
+```
 
-No secrets required for provenance/ontology testing — all tests run against in-memory or temp-dir stores.
+A FAIL verdict must name the failing test/assert and the file:line it implicates.
+
+## Do NOT
+
+- Do not assert against remembered/frozen failure counts ("~74 pre-existing failures") — always diff against a same-session baseline.
+- Do not treat `record_dispatch` returning without exception as success — read the stored object back.
+- Do not construct `TelicSeam` via `path=` in fixtures.
+- Do not skip the schema-enum half of a whitelist change because "the code check passes".
+- No secrets are needed on this surface — if a test seems to need one, the test is wrong.

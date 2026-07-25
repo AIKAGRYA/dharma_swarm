@@ -35,6 +35,22 @@ class RuntimeTruthState(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class ProofGrade(StrEnum):
+    """Scoped proof verdict for a runtime truth — the read-only projection of the
+    graded claim/evidence binding (docs/governance/evidence_grades.yaml, enforced
+    by scripts/governance/check_track_status.py). This is NOT authority: it
+    reports the strongest evidence grade that a claim's truth currently rests on,
+    so an operator can see at a glance whether a packet is locally proven,
+    CI-proven, externally gated, unproven, or quarantined.
+    """
+
+    LOCAL_PROVEN = "LOCAL_PROVEN"          # verified machine receipt, locally
+    CI_PROVEN = "CI_PROVEN"                # proven by independent CI / verifier
+    EXTERNAL_GATED = "EXTERNAL_GATED"      # awaiting an external acted receipt
+    MISSING = "MISSING"                    # no evidence binding yet
+    QUARANTINED = "QUARANTINED"            # evidence present but tamper/stale -> distrust
+
+
 class RuntimeSourceKind(StrEnum):
     DIRECT_PROBE = "direct_probe"
     RECEIPT = "receipt"
@@ -132,6 +148,9 @@ class RuntimeTruthPacket:
     source_kind: str = RuntimeSourceKind.DERIVED_RECONCILIATION.value
     probe_truth: ProbeTruth = field(default_factory=ProbeTruth)
     missing_machine_fields: list[str] = field(default_factory=list)
+    # Read-only scoped proof verdict — strongest evidence grade this truth rests
+    # on. Projection only; never an authority surface (see ProofGrade docstring).
+    proof_grade: str = ProofGrade.MISSING.value
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -522,6 +541,7 @@ def _store_packet(
         probe_ok=ok,
         probe_error=probe_error,
         missing_machine_fields=missing,
+        proof_grade=ProofGrade.MISSING.value,
         metadata={
             "runtime_db": str(path),
             "tables": sorted(table_set),
@@ -638,6 +658,7 @@ def _packet_from_latest_runtime_receipt(
         last_receipt_at=str(receipt["created_at"] or "") or None,
         retry_intent_key=idempotency_key or None,
         missing_machine_fields=missing,
+        proof_grade=ProofGrade.MISSING.value,
         metadata={
             "runtime_db": str(path),
             "runtime_table_counts": counts,

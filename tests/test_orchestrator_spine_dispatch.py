@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import types
 
+import pytest
+
 from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.spine.receipt import EvidenceReceipt
 
@@ -22,168 +24,17 @@ def _stub_td(agent="agent-1", task_id="t-123"):
     return types.SimpleNamespace(
         agent_id=agent,
         task_id=task_id,
-        metadata={"execution_identity": {"trace_id": "trace-xyz", "session_id": "sess-1"}},
+        metadata={
+            "execution_identity": {
+                "trace_id": "trace-xyz",
+                "session_id": "sess-1",
+                "run_id": "run-xyz",
+                "claim_id": "claim-xyz",
+                "idempotency_key": "idem-xyz",
+            }
+        },
         topology=types.SimpleNamespace(value="dispatch"),
     )
-
-
-def test_runner_served_route_metadata_requires_explicit_served_fields():
-    runner = types.SimpleNamespace(
-        _config=types.SimpleNamespace(provider="openrouter", model="qwen3-coder-live")
-    )
-
-    assert Orchestrator._runner_served_route_metadata(runner) == {}
-
-
-def test_runner_served_route_metadata_preserves_actual_served_fields_only():
-    runner = types.SimpleNamespace(
-        actual_served_provider="openrouter",
-        actual_served_model="qwen3-coder-live",
-        provider_model_truth_source="runtime_provider.actual_served",
-    )
-
-    route = Orchestrator._runner_served_route_metadata(runner)
-
-    assert route["actual_served_provider"] == "openrouter"
-    assert route["actual_served_model"] == "qwen3-coder-live"
-    assert route["provider_model_truth_source"] == "runtime_provider.actual_served"
-    assert "selected_provider" not in route
-    assert "selected_model" not in route
-
-
-def test_runner_attempted_route_metadata_preserves_selected_fields_only():
-    runner = types.SimpleNamespace(
-        selected_provider="openrouter",
-        selected_model="gpt-5.5",
-        provider_model_truth_source="agent_runner.provider_chain_failure",
-    )
-
-    route = Orchestrator._runner_attempted_route_metadata(runner)
-
-    assert route["selected_provider"] == "openrouter"
-    assert route["selected_model"] == "gpt-5.5"
-    assert route["selected_model_hint"] == "gpt-5.5"
-    assert route["provider_model_truth_source"] == (
-        "agent_runner.provider_chain_failure"
-    )
-    assert route["provider_execution"] is True
-    assert route["provider_model_applicability"] == "failed_before_serve"
-    assert route["provider_model_missing_reason"] == (
-        "provider_chain_failed_before_actual_served_response"
-    )
-    assert "actual_served_provider" not in route
-    assert "actual_served_model" not in route
-
-
-def test_runner_failure_route_prefers_served_route_over_attempted_route():
-    runner = types.SimpleNamespace(
-        actual_served_provider="ollama",
-        actual_served_model="kimi-k2.5",
-        selected_provider="openrouter",
-        selected_model="gpt-5.5",
-        provider_model_truth_source="runtime_provider.actual_served",
-    )
-    task = types.SimpleNamespace(metadata={})
-    td = types.SimpleNamespace(metadata={})
-
-    route = Orchestrator._stamp_runner_failure_route(runner, task=task, td=td)
-
-    assert route["actual_served_provider"] == "ollama"
-    assert route["actual_served_model"] == "kimi-k2.5"
-    assert "selected_provider" not in route
-    assert td.metadata["actual_served_provider"] == "ollama"
-    assert task.metadata["actual_served_model"] == "kimi-k2.5"
-
-
-def test_runner_no_provider_execution_metadata_is_explicit():
-    runner = types.SimpleNamespace(
-        provider_execution=False,
-        provider_model_applicability="not_applicable",
-        provider_model_truth_source="agent_runner.no_provider_execution",
-        no_provider_model_reason="agent_runner_no_provider_attached",
-    )
-
-    route = Orchestrator._runner_no_provider_execution_metadata(runner)
-
-    assert route == {
-        "provider_execution": False,
-        "provider_model_applicability": "not_applicable",
-        "provider_model_truth_source": "agent_runner.no_provider_execution",
-        "no_provider_model_reason": "agent_runner_no_provider_attached",
-    }
-
-
-def test_runner_success_route_stamps_no_provider_execution_when_no_served_route():
-    runner = types.SimpleNamespace(
-        provider_execution=False,
-        provider_model_applicability="not_applicable",
-        provider_model_truth_source="agent_runner.no_provider_execution",
-        no_provider_model_reason="agent_runner_no_provider_attached",
-    )
-    task = types.SimpleNamespace(metadata={})
-    td = types.SimpleNamespace(metadata={})
-
-    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
-
-    assert route["provider_execution"] is False
-    assert route["provider_model_truth_source"] == "agent_runner.no_provider_execution"
-    assert td.metadata["provider_execution"] is False
-    assert task.metadata["no_provider_model_reason"] == (
-        "agent_runner_no_provider_attached"
-    )
-
-
-def test_runner_success_route_infers_no_provider_when_agent_runner_has_none():
-    runner = types.SimpleNamespace(_provider=None)
-    task = types.SimpleNamespace(metadata={})
-    td = types.SimpleNamespace(metadata={})
-
-    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
-
-    assert route == {
-        "provider_execution": False,
-        "provider_model_applicability": "not_applicable",
-        "provider_model_truth_source": "agent_runner.no_provider_execution",
-        "no_provider_model_reason": "agent_runner_no_provider_attached",
-    }
-    assert td.metadata["provider_execution"] is False
-    assert task.metadata["provider_model_truth_source"] == "agent_runner.no_provider_execution"
-
-
-def test_runner_success_route_marks_provider_execution_unproven_without_served_evidence():
-    runner = types.SimpleNamespace(_provider=object())
-    task = types.SimpleNamespace(metadata={})
-    td = types.SimpleNamespace(metadata={})
-
-    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
-
-    assert route == {
-        "provider_execution": True,
-        "provider_model_applicability": "actual_served_unproven",
-        "provider_model_truth_source": "orchestrator.provider_execution_unproven",
-        "provider_model_missing_reason": (
-            "provider_execution_completed_without_actual_served_runtime_evidence"
-        ),
-    }
-    assert td.metadata["provider_execution"] is True
-    assert task.metadata["provider_model_applicability"] == "actual_served_unproven"
-
-
-def test_runner_pending_provider_execution_metadata_requires_attached_provider():
-    assert Orchestrator._runner_pending_provider_execution_metadata(
-        types.SimpleNamespace(_provider=None)
-    ) == {}
-
-    route = Orchestrator._runner_pending_provider_execution_metadata(
-        types.SimpleNamespace(_provider=object())
-    )
-
-    assert route == {
-        "provider_execution": "pending",
-        "provider_model_applicability": "pending_execution",
-        "provider_model_truth_source": "orchestrator.provider_execution_pending",
-        "provider_model_pending_reason": "agent_task_started_provider_route_pending",
-    }
 
 
 def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
@@ -208,34 +59,89 @@ def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
     assert receipt.agent_id == "agent-1"
     assert receipt.task_id == "t-123"
     assert receipt.trace_id == "trace-xyz"
+    assert receipt.claim_id == "claim-xyz"
+    assert receipt.attributes["run_id"] == "run-xyz"
+    assert receipt.attributes["idempotency_key"] == "idem-xyz"
+    assert receipt.attributes["side_effect_key"] == "invoke_agent:t-123:agent-1"
+    assert receipt.attributes["topology"] == "dispatch"
+    assert receipt.attributes["agent_identity"] == "agent-1"
+    assert receipt.attributes["planned_provider"] == "orchestrator"
+    assert receipt.attributes["actual_provider"] == "orchestrator"
     assert td.metadata["evidence_receipt_id"] == str(receipt.receipt_id)
 
 
-def test_spine_dispatch_receipt_carries_actual_served_route_metadata():
-    class Runner:
+def test_spine_dispatch_receipt_records_actual_route_and_fallback_truth():
+    from dharma_swarm.decision_router import RoutePath
+    from dharma_swarm.models import LLMResponse, ProviderType
+    from dharma_swarm.provider_policy import ProviderRouteDecision, ProviderRouteRequest
+
+    class RoutedRunner:
+        _config = types.SimpleNamespace(
+            provider=ProviderType.ANTHROPIC,
+            model="claude-sonnet-4-20250514",
+        )
+
         async def run_task(self, task):
-            self.actual_served_provider = "ollama"
-            self.actual_served_model = "glm-5:cloud"
-            self.provider_model_truth_source = "runtime_provider.actual_served"
+            self._last_route_request = ProviderRouteRequest(
+                action_name="route_truth",
+                risk_score=0.2,
+                uncertainty=0.4,
+                novelty=0.3,
+                urgency=0.5,
+                expected_impact=0.4,
+                context={
+                    "preferred_provider": ProviderType.ANTHROPIC.value,
+                    "preferred_model": "claude-sonnet-4-20250514",
+                },
+            )
+            self._last_route_decision = ProviderRouteDecision(
+                path=RoutePath.DELIBERATIVE,
+                selected_provider=ProviderType.OPENROUTER,
+                selected_model_hint="moonshotai/kimi-k2.5",
+                fallback_providers=[ProviderType.CLAUDE_CODE, ProviderType.OPENAI],
+                fallback_model_hints=["claude-opus-4-6", "gpt-5"],
+                confidence=0.82,
+                requires_human=False,
+                reasons=["deliberative_route", "fallback_provider_selected"],
+            )
+            self._last_response = LLMResponse(
+                content="RUN_RESULT",
+                model="moonshotai/kimi-k2.5",
+                provider=ProviderType.OPENROUTER.value,
+                usage={"prompt_tokens": 12, "completion_tokens": 5},
+            )
+            self._last_usage = dict(self._last_response.usage)
             return "RUN_RESULT"
 
     me = _stub_self()
-    td = _stub_td(task_id="t-served")
-    task = types.SimpleNamespace(metadata={})
-
+    td = _stub_td(task_id="t-route-truth")
     result = asyncio.run(
-        Orchestrator._run_task_via_spine(me, Runner(), task, td, 5.0)
+        Orchestrator._run_task_via_spine(me, RoutedRunner(), object(), td, 5.0)
     )
 
     assert result == "RUN_RESULT"
     receipt = me._last_evidence_receipt
-    assert receipt.provider == "ollama"
-    assert receipt.model == "glm-5:cloud"
-    assert receipt.attributes["actual_served_provider"] == "ollama"
-    assert receipt.attributes["actual_served_model"] == "glm-5:cloud"
-    assert receipt.attributes["provider_model_truth_source"] == (
-        "runtime_provider.actual_served"
-    )
+    attrs = receipt.attributes
+    assert receipt.provider == ProviderType.OPENROUTER.value
+    assert receipt.model == "moonshotai/kimi-k2.5"
+    assert receipt.input_tokens == 12
+    assert receipt.output_tokens == 5
+    assert attrs["requested_provider"] == ProviderType.ANTHROPIC.value
+    assert attrs["planned_provider"] == ProviderType.ANTHROPIC.value
+    assert attrs["actual_provider"] == ProviderType.OPENROUTER.value
+    assert attrs["served_provider"] == ProviderType.OPENROUTER.value
+    assert attrs["planned_model"] == "claude-sonnet-4-20250514"
+    assert attrs["actual_model"] == "moonshotai/kimi-k2.5"
+    assert attrs["route_path"] == RoutePath.DELIBERATIVE.value
+    assert attrs["route_confidence"] == 0.82
+    assert attrs["route_reasons"] == ["deliberative_route", "fallback_provider_selected"]
+    assert attrs["route_fallback_plan"] == [
+        {"provider": ProviderType.CLAUDE_CODE.value, "model": "claude-opus-4-6"},
+        {"provider": ProviderType.OPENAI.value, "model": "gpt-5"},
+    ]
+    assert attrs["provider_truth_source"] == "llm_response"
+    assert attrs["fallback_used"] is True
+    assert attrs["actual_differs_from_requested"] is True
 
 
 def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
@@ -255,44 +161,6 @@ def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
     assert isinstance(receipt, EvidenceReceipt)
     assert receipt.status == "failed"
     assert receipt.error_source == "internal_error"
-
-
-def test_spine_dispatch_failure_stamps_runner_served_route_before_reraising():
-    class BoomAfterModelRunner:
-        actual_served_provider = ""
-        actual_served_model = ""
-        provider_model_truth_source = ""
-
-        async def run_task(self, task):
-            self.actual_served_provider = "ollama"
-            self.actual_served_model = "kimi-k2.5"
-            self.provider_model_truth_source = "runtime_provider.actual_served"
-            raise RuntimeError("local tool loop exceeded")
-
-    me = _stub_self()
-    td = _stub_td(task_id="t-route-fail")
-    task = types.SimpleNamespace(metadata={})
-
-    try:
-        asyncio.run(
-            Orchestrator._run_task_via_spine(
-                me,
-                BoomAfterModelRunner(),
-                task,
-                td,
-                5.0,
-            )
-        )
-    except RuntimeError:
-        pass
-    else:
-        raise AssertionError("exception must propagate to caller")
-
-    assert task.metadata["actual_served_provider"] == "ollama"
-    assert task.metadata["actual_served_model"] == "kimi-k2.5"
-    assert task.metadata["provider_model_truth_source"] == "runtime_provider.actual_served"
-    assert td.metadata["served_provider"] == "ollama"
-    assert td.metadata["served_model"] == "kimi-k2.5"
 
 
 def test_spine_dispatch_timeout_reraises_and_records_timeout_receipt():
@@ -331,9 +199,12 @@ def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
 
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
     conn.execute(
-        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-persist', 'running')"
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO delegation_runs (run_id, task_id, status)"
+        " VALUES ('run-xyz', 't-persist', 'running')"
     )
     conn.commit()
     conn.close()
@@ -361,47 +232,136 @@ def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
     assert blob["receipt_id"] == str(me._last_evidence_receipt.receipt_id)
 
 
-def test_spine_dispatch_persists_actual_served_provider_and_model(tmp_path):
-    import json
+def test_spine_dispatch_projects_receipt_to_exact_retry_only(tmp_path):
+    """Retries share task_id; receipt projection must remain run-scoped."""
     import sqlite3
 
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
     conn.execute(
-        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-served-persist', 'running')"
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT,"
+        " status TEXT, receipt_json TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO delegation_runs (run_id, task_id, status) VALUES (?, ?, 'running')",
+        (("run-old", "t-retry"), ("run-xyz", "t-retry")),
     )
     conn.commit()
     conn.close()
 
     class Runner:
         async def run_task(self, task):
-            self.actual_served_provider = "nvidia_nim"
-            self.actual_served_model = "meta/llama-3.3-70b-instruct"
-            self.provider_model_truth_source = "runtime_provider.actual_served"
             return "RUN_RESULT"
 
     me = _stub_self_with_store(db_path)
-    td = _stub_td(task_id="t-served-persist")
-    task = types.SimpleNamespace(metadata={})
-
-    result = asyncio.run(
-        Orchestrator._run_task_via_spine(me, Runner(), task, td, 5.0)
+    td = _stub_td(task_id="t-retry")
+    assert (
+        asyncio.run(Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0))
+        == "RUN_RESULT"
     )
 
-    assert result == "RUN_RESULT"
     conn = sqlite3.connect(db_path)
-    row = conn.execute(
-        "SELECT receipt_json FROM delegation_runs WHERE task_id='t-served-persist'"
-    ).fetchone()
-    conn.close()
-    assert row is not None and row[0], "receipt_json must be populated"
-    blob = json.loads(row[0])
-    assert blob["provider"] == "nvidia_nim"
-    assert blob["model"] == "meta/llama-3.3-70b-instruct"
-    assert blob["attributes"]["provider_model_truth_source"] == (
-        "runtime_provider.actual_served"
+    rows = dict(
+        conn.execute(
+            "SELECT run_id, receipt_json FROM delegation_runs WHERE task_id='t-retry'"
+        ).fetchall()
     )
+    conn.close()
+    assert rows["run-old"] is None
+    assert rows["run-xyz"]
+
+
+@pytest.mark.parametrize(
+    ("receipt_claim_id", "receipt_agent_id"),
+    (
+        ("claim-foreign", "agent-valid"),
+        ("claim-valid", "agent-foreign"),
+    ),
+)
+async def test_receipt_projection_rejects_foreign_authority_without_poisoning(
+    tmp_path, receipt_claim_id, receipt_agent_id
+):
+    """A task/run collision cannot replace its claim/agent-owned witness."""
+    import aiosqlite
+    import json
+    import sqlite3
+
+    from dharma_swarm.spine.persistence import persist_receipt
+
+    db_path = tmp_path / "runtime.db"
+    valid_witness = json.dumps({"receipt_id": "valid-authoritative-witness"})
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT,"
+            " claim_id TEXT, assigned_to TEXT, status TEXT, receipt_json TEXT)"
+        )
+        db.execute(
+            "INSERT INTO delegation_runs (run_id, task_id, claim_id, assigned_to,"
+            " status, receipt_json) VALUES (?, ?, ?, ?, 'completed', ?)",
+            ("run-xyz", "t-authority", "claim-valid", "agent-valid", valid_witness),
+        )
+
+    foreign = EvidenceReceipt(
+        task_id="t-authority",
+        claim_id=receipt_claim_id,
+        agent_id=receipt_agent_id,
+        status="ok",
+        attributes={"run_id": "run-xyz"},
+    )
+    async with aiosqlite.connect(db_path) as db:
+        with pytest.raises(RuntimeError, match="authoritative delegation_runs"):
+            await persist_receipt(foreign, db)
+
+    with sqlite3.connect(db_path) as db:
+        stored = db.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE run_id = 'run-xyz'"
+        ).fetchone()
+    assert stored == (valid_witness,)
+
+
+def test_spine_dispatch_ambiguous_run_projection_writes_nothing(tmp_path, caplog):
+    """Malformed duplicate run rows fail closed without partial projection."""
+    import logging
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE delegation_runs (run_id TEXT, task_id TEXT, status TEXT,"
+        " receipt_json TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO delegation_runs (run_id, task_id, status)"
+        " VALUES ('run-xyz', 't-ambiguous', 'running')",
+        ((), ()),
+    )
+    conn.commit()
+    conn.close()
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-ambiguous")
+    with caplog.at_level(logging.WARNING):
+        assert (
+            asyncio.run(
+                Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0)
+            )
+            == "RUN_RESULT"
+        )
+
+    conn = sqlite3.connect(db_path)
+    projections = [
+        row[0]
+        for row in conn.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE task_id='t-ambiguous'"
+        )
+    ]
+    conn.close()
+    assert projections == [None, None]
+    assert any("NOT persisted" in record.message for record in caplog.records)
 
 
 def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):
@@ -413,7 +373,9 @@ def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):
 
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
+    conn.execute(
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT)"
+    )
     conn.commit()
     conn.close()  # table exists, but NO row for this task
 

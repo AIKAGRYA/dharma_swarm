@@ -1,0 +1,248 @@
+# dharma_fleet_field_registry.v1
+#
+# THE machine-readable connect-time source of truth for the A2A fleet field:
+# for each agent identity, the lane it ACTUALLY uses, the broker, the
+# credential ENV VAR NAMES (never values), the subjects it drains and writes,
+# and the last VERIFIED send/receive. Refreshed by probe receipts
+# (inter_agent/<uid>/outbound + inter_agent/fable_claude_code/inbound probe
+# replies), never by aspiration. Requested independently by two fleet agents
+# in the 2026-07-09 field probe ("one secret-free live routing manifest";
+# "refresh it by probe receipts instead of relying on aspirational docs").
+#
+# Read it:      python3 scripts/runtime/fleet_field_registry.py
+# Validate it:  python3 scripts/runtime/fleet_field_registry.py --check
+#
+# SECRET POLICY: env var NAMES only. Any credential VALUE in this file is a
+# governance violation; --check enforces the shape.
+#
+# Relationship to other docs:
+#   docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md  = TARGET contract (DS_* topology)
+#   this file                                      = LIVE field (what runs today)
+#   docs/ops/A2A_QUICKSTART.md                     = how to connect, step by step
+#   docs/ops/A2A_AGENT_ONBOARDING.md               = how a NEW identity joins
+
+schema: dharma_fleet_field_registry.v1
+updated: "2026-07-14"
+refreshed_by: field_probe_2026_07_09
+probe_synthesis: inter_agent/fleet/2026-07-09-field-probe-synthesis.md
+secret_policy: env_var_names_only
+
+hub:
+  name: agni
+  broker_urls:
+    wss: wss://157.245.193.15:8443
+    nats: nats://157.245.193.15:4222
+  live_stream: DHARMA_A2A
+  ca_pem_path: dharma_swarm/a2a/nats/agni-ws-ca.pem
+  target_topology_note: >-
+    The DS_* stream topology in NATS_SUBSTRATE_MASTER_SPEC.md is the TARGET
+    contract. The 2026-07-09 field probe confirmed (unanimously, six seats)
+    that no DS_* stream runs live anywhere; all live traffic is on DHARMA_A2A.
+  secondary_broker:
+    name: mac_local
+    url: nats://127.0.0.1:4222
+    stream: DHARMA_FLEET
+    status: operator-Mac only; unbridged from AGNI; often offline
+
+decisions:
+  - id: FFR-D1
+    date: "2026-07-09"
+    decision: publish_to_peer ACL model
+    detail: >-
+      Operator-ratified: each agent's NATS account is granted PUBLISH to any
+      peer inbox subject (dharma.a2a.<callsign>, dharma.agent.<uid>.inbox and
+      their .reply.>/.ack.> children) plus dharma.a2a.fleet, and SUBSCRIBE
+      only to its OWN inbox/reply/ack subjects plus dharma.a2a.fleet. The
+      2026-07-09 probe proved the current hub ACLs block peer publishes
+      (permission violations from two independent live nodes), so the live
+      fleet can only broadcast — agents cannot DM each other.
+    status: RATIFIED_NOT_APPLIED   # hub config change is an operator action on the AGNI VPS
+  - id: FFR-D2
+    date: "2026-07-09"
+    decision: one subject per identity (resolve dharma.a2a.hermes collision)
+    detail: >-
+      AGNI Hermes and rushabdev BOTH drain dharma.a2a.hermes with durable
+      consumers — two identities on one subject either compete for messages
+      or double-process. rushabdev gets its own subject (dharma.a2a.rushabdev)
+      once hub ACLs are reworked under FFR-D1.
+    status: OPEN
+  - id: FFR-D3
+    date: "2026-07-09"
+    decision: this registry supersedes scattered routing prose
+    detail: >-
+      Connect-time routing questions are answered HERE first;
+      A2A_NATS_CENTRAL_INDEX.md's machine-local worktree pointers are
+      historical. Registry entries change only with a probe receipt or an
+      operator decision recorded in `decisions`.
+    status: ACTIVE
+
+# ---------------------------------------------------------------------------
+# PROBED AGENTS — every entry below is backed by a 2026-07-09 probe receipt.
+# lanes: agni_hub_wss | agni_hub_nats | local_nats_4222 | git_seat | operator_relay | none
+# ---------------------------------------------------------------------------
+agents:
+  - agent_uid: hermes
+    display_name: AGNI Hermes (hub-resident semantic bridge)
+    runtime: AGNI hub VPS (157.245.193.15); hermes_remote_a2a_bridge.py + codex_composer_agni_bridge.py as systemd services
+    registered_card: none
+    lanes_available: [local_nats_4222]
+    primary_lane: local_nats_4222
+    live_on_hub: true
+    credential_env_names: []          # local to the broker host; no remote creds needed
+    listen_subjects: [dharma.a2a.hermes]
+    publish_subjects: ["dharma.a2a.hermes.reply.>", "dharma.a2a.hermes.ack.>", dharma.a2a.fleet]
+    git_seat: inter_agent/hermes/
+    last_verified_send: "2026-07-09T00:27Z (SAB flywheel reply)"
+    last_verified_receive: "2026-07-09T00:24Z (SAB flywheel packet)"
+    blockers:
+      - hub ACL blocks publish to peer subjects (FFR-D1); only fleet broadcast works
+      - bridge sessions are stateless (no session resume); each packet starts blind
+      - no dharma_swarm checkout on the host (no git seat access)
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-hermes-agni-probe-reply.md
+
+  - agent_uid: rushabdev
+    display_name: rushabdev (Hermes revenue/operator node)
+    runtime: openclaw23 VPS (DigitalOcean SGP1); Telegram gateway + local bridge daemon
+    registered_card: none in repo (local card /root/.dharma/a2a/cards/rushabdev.json on its host)
+    lanes_available: [agni_hub_nats, git_seat, operator_relay]
+    primary_lane: agni_hub_nats     # plain NATS to 157.245.193.15:4222
+    live_on_hub: true
+    credential_env_names: [NATS_URL, NATS_USER, NATS_PASSWORD, NATS_STREAM, NATS_SUBJECT, NATS_CONSUMER]
+    listen_subjects: [dharma.a2a.hermes, "dharma.a2a.hermes.reply.>", "dharma.a2a.hermes.ack.>"]
+    publish_subjects: [dharma.a2a.hermes, dharma.a2a.fleet]
+    git_seat: inter_agent/rushabdev/
+    last_verified_send: "2026-07-09T00:26Z via dharma.a2a.hermes"
+    last_verified_receive: "2026-07-09T00:24Z via dharma.a2a.hermes"
+    blockers:
+      - shares dharma.a2a.hermes with AGNI Hermes (FFR-D2 collision)
+      - hub ACL blocked publish to dharma.a2a.fable_claude_code (verified live; FFR-D1)
+      - git-seat pushes are DELAYED, not absent — its probe-reply commit 750b360f stranded
+        locally at probe time, then landed as branch rushabdev/a2a-field-probe-2026-07-09
+        (~3h later); treat the seat's git lane as slow-but-working
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-rushabdev-probe-reply.md
+
+  - agent_uid: devin-roaming-2987d222
+    display_name: Devin (Cognition AI)
+    runtime: Devin cloud VM
+    registered_card: examples/agents/devin.registration.json
+    lanes_available: [git_seat, operator_relay]   # holds hub creds but WSS egress is blocked from the VM
+    primary_lane: operator_relay
+    live_on_hub: false
+    credential_env_names: [DEVIN_NATS_URL, DEVIN_NATS_USER, DEVIN_NATS_PW]
+    listen_subjects: [dharma.a2a.devin, "dharma.a2a.devin.>", dharma.agent.devin-roaming-2987d222.inbox]
+    publish_subjects: ["dharma.a2a.<peer>", "dharma.agent.<peer-uid>.inbox", dharma.a2a.fleet]
+    git_seat: inter_agent/devin/
+    last_verified_send: never (live NATS); git seat verified 2026-07-09 (branch devin/2026-07-09-fleet-probe)
+    last_verified_receive: never (live NATS)
+    blockers:
+      - WSS egress to AGNI hub blocked from the Devin VM (TCP probe timed out)
+      - devin_a2a_agent.py pull-subscribes ONLY the exact subject dharma.a2a.devin — the
+        reply/ack wildcard and the dharma.agent.<uid>.inbox route are never drained
+    probe_receipt: inter_agent/devin/outbound/2026-07-09-devin-probe-reply.md
+
+  - agent_uid: fable_claude_code
+    display_name: Fable 5 (Claude Code)
+    runtime: Claude Code cloud sandbox sessions (ephemeral; durable presence = card + git seat + pushed branches)
+    registered_card: examples/agents/fable_claude_code.registration.json
+    lanes_available: [git_seat, operator_relay]
+    primary_lane: git_seat
+    live_on_hub: false
+    credential_env_names: []          # sandbox holds no NATS creds; egress to hub blocked (direct timeout + proxy reset, verified 2026-07-09)
+    listen_subjects: [inter_agent/fable_claude_code/inbound/ (drained on wake)]
+    publish_subjects: [inter_agent/<peer>/inbound/ (via pushed branches), dharma.a2a.fable_claude_code (aspirational)]
+    git_seat: inter_agent/fable_claude_code/
+    last_verified_send: "2026-07-09 (this registry + probe synthesis, pushed branch)"
+    last_verified_receive: "2026-07-09 (Devin probe reply into inbound/, branch devin/2026-07-09-fleet-probe)"
+    blockers:
+      - sandbox egress proxy blocks the hub; git seat IS the connection, not a fallback
+      - a2a_doctor.py crashed on missing aiohttp before reporting honestly (fixed 2026-07-09)
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-fable-claude-code-self-probe.md
+
+  - agent_uid: codex
+    display_name: Codex (meghadharma seat)
+    runtime: meghadharma host via Terminus terminal (gpt-5.5 xhigh)
+    registered_card: none for this seat (codex_composer has separate identity)
+    lanes_available: [operator_relay]
+    primary_lane: operator_relay
+    live_on_hub: false
+    credential_env_names: []
+    listen_subjects: []
+    publish_subjects: []
+    git_seat: inter_agent/codex/    # exists, but operator has ruled A2A-through-git out for this seat
+    last_verified_send: never
+    last_verified_receive: "2026-07-09 (probe prompt via operator relay)"
+    blockers:
+      - no local NATS listener on 127.0.0.1:4222; no persistent daemon or mailbox drain
+      - OpenClaw gateway is origin/device-auth protected and unproven as a send path
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-codex-meghadharma-probe-reply.md
+
+  - agent_uid: perplexity-computer
+    display_name: Perplexity Computer (Stage-1 evidence-only seat)
+    runtime: Perplexity Computer cloud sandbox (ephemeral per thread; no daemon)
+    registered_card: examples/agents/perplexity-computer.registration.json
+    lanes_available: [git_seat, operator_relay]
+    primary_lane: operator_relay
+    live_on_hub: false
+    credential_env_names: []          # no fleet-issued NATS creds; ACL record is Issue #407
+    listen_subjects: [inter_agent/perplexity-computer/inbound/ (drained on wake), roaming_mailbox/tasks/]
+    publish_subjects: [inter_agent/<peer>/inbound/ (file-mirror), dharma.a2a.perplexity-computer (aspirational)]
+    git_seat: inter_agent/perplexity-computer/
+    last_verified_send: "2026-07-09T11:41+09:00 (probe reply via operator relay)"
+    last_verified_receive: "2026-07-09T11:37+09:00 (probe prompt via operator relay)"
+    blockers:
+      - no NATS credentials or subject grant (Issue #407)
+      - a2a_send.py fails from non-daemon seats — sqlite3.OperationalError readonly database at runtime_state.py:2666
+      - naming drift perplexity vs perplexity-computer (resolved by this registry + card: uid is perplexity-computer)
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-perplexity-computer-probe-reply.md
+
+  - agent_uid: fable_composer
+    display_name: Fable 5 (Composer)
+    runtime: >-
+      Mac composer runtime seat (living-agent dock ~/.dharma/agents/fable_composer/);
+      woken 2026-07-14 by operator-directed Claude Code cloud session — cross-harness
+      wakes drain the git dock only and must disclose their harness in packets
+    registered_card: examples/agents/fable_composer.registration.json
+    lanes_available: [git_seat]
+    primary_lane: git_seat
+    live_on_hub: false
+    credential_env_names: []
+    listen_subjects:
+      - inter_agent/fable_composer/inbound/ (drained 2026-07-14; 3 packets answered)
+      - dharma.a2a.fable_composer (registered in scripts/runtime/a2a_doctor.py; no verified drain)
+    publish_subjects:
+      - inter_agent/<peer>/inbound/ (via pushed branches)
+      - dharma.a2a.fable_composer.reply.> (aspirational)
+    git_seat: inter_agent/fable_composer/
+    last_verified_send: 2026-07-14 (wiring ack + contact/relay reply, pushed branch)
+    last_verified_receive: 2026-07-14 (drained 2026-07-02T0500Z, 2026-07-02T0520Z, 2026-07-09 packets)
+    blockers:
+      - NATS subject has no verified drain; git dock is the only receipted lane
+      - Mac runtime state (~/.dharma/agents/fable_composer/) unreachable from cloud wakes —
+        hill-climb status and fugu relay still owe an operator-Mac session
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-fable_composer-wiring-ack.md
+
+# Known identities NOT probed on 2026-07-09 — do not treat as live without a receipt.
+unprobed_identities:
+  - {agent_uid: merge_master_mike, registered_card: examples/agents/merge_master_mike.registration.json,
+     note: 'live wire VERIFIED 2026-07-09: @mike mention on PR #842 fired codex-mention-router
+       (run 28993046529-era, ack + deterministic gate packet posted by github-actions) — a cloud
+       session CAN summon Mike by PR comment; still unprobed for NATS/git-seat lanes'}
+  - {agent_uid: fable_5_cursor, registered_card: examples/agents/fable_5_cursor.registration.json}
+  - {agent_uid: qwen_code, registered_card: examples/agents/qwen_code.registration.json}
+  - {agent_uid: sis_steward, registered_card: examples/agents/sis_steward.registration.json}
+  - {agent_uid: hermes-m5, registered_card: none, note: operator-Mac Hermes; reported "often stale/offline" by rushabdev}
+  - {agent_uid: gpt55, registered_card: none, note: git seat only}
+
+# Deferred fixes surfaced by the probe — tracked here so they don't evaporate.
+deferred_fixes:
+  - a2a_send.py readonly-sqlite crash from non-daemon seats (runtime_state.py:2666) — needs investigation
+  - devin_a2a_agent.py must also drain dharma.a2a.devin.> and dharma.agent.<uid>.inbox (Devin lane)
+  - shared NATS connection factory lives in scripts/runtime/pr_merge_control.py — moving it into
+    dharma_swarm/a2a/ touches a merge-master-mike-d4-2026-06 owned surface; do via that track's next-items
+  - Hermes bridge session resume (--continue <session_id>) so fleet exchanges accumulate context
+  - >-
+    reachable hub entrypoint for Devin VM + Perplexity sandbox — CODE SHIPPED 2026-07-09
+    (dharma_swarm/a2a/mailbox_gateway.py + scripts/runtime/a2a_gateway_server.py +
+    scripts/ops/mint_a2a_gateway_token.py; per-agent bearer tokens, publish-to-peer,
+    own-inbox drain). REMAINING — operator deploys it on the droplet + issues tokens;
+    docs/ops/A2A_LIVE_WIRE_RUNBOOK.md steps 2-3

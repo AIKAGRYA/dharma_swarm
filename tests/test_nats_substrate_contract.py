@@ -12,6 +12,12 @@ _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 check_contract: Callable[[Path | str], list[str]] = _MODULE.check_contract
 
+_RUNNER_PATH = Path(__file__).resolve().parents[1] / "scripts" / "governance" / "run_nats_live_production_matrix.py"
+_RUNNER_SPEC = importlib.util.spec_from_file_location("run_nats_live_production_matrix_test", _RUNNER_PATH)
+assert _RUNNER_SPEC is not None and _RUNNER_SPEC.loader is not None
+_RUNNER_MODULE = importlib.util.module_from_spec(_RUNNER_SPEC)
+_RUNNER_SPEC.loader.exec_module(_RUNNER_MODULE)
+
 
 def test_contract_checker_rejects_marker_only_repo(tmp_path: Path) -> None:
     _write_contract_repo(tmp_path)
@@ -70,6 +76,17 @@ def test_contract_checker_fails_when_a2a_send_can_overclaim_production(tmp_path:
     assert any("a2a_send compatibility bypass can be mistaken for production evidence" in failure for failure in failures)
 
 
+def test_live_matrix_deterministic_probe_writes_semantic_receipt(tmp_path: Path) -> None:
+    probe = _RUNNER_MODULE.ModelProbe("deterministic", "local-deterministic", 1.0, tmp_path)
+
+    receipt = probe.call("prove live transport", "task-1", "trace-1")
+
+    assert receipt["provider"] == "deterministic"
+    assert receipt["response_model"] == "local-deterministic"
+    assert "deterministic_transport_probe" in receipt["content"]
+    assert Path(receipt["receipt_path"]).exists()
+
+
 def _write_contract_repo(root: Path) -> dict[str, Path]:
     paths = {
         "spec": root / "docs" / "governance" / "NATS_SUBSTRATE_MASTER_SPEC.md",
@@ -81,6 +98,7 @@ def _write_contract_repo(root: Path) -> dict[str, Path]:
         "a2a_reply_capture": root / "scripts" / "runtime" / "a2a_reply_capture.py",
         "nats_status": root / "dharma_swarm" / "operator_core" / "nats_substrate_status.py",
         "nats_transport": root / "dharma_swarm" / "a2a" / "nats_transport.py",
+        "nats_transport_support": root / "dharma_swarm" / "a2a" / "nats_transport_support.py",
         "a2a_cloud_contact": root / "dharma_swarm" / "a2a" / "a2a_cloud_contact.py",
         "nats_live_matrix": root / "scripts" / "governance" / "run_nats_live_production_matrix.py",
         "nats_live_evidence": root / "scripts" / "governance" / "check_nats_live_production_evidence.py",
@@ -173,6 +191,7 @@ NATS_MAX_DELIVER_EXHAUSTED
 requires A2AServer(require_execution_identity=True)
 ''',
     )
+    _write(paths["nats_transport_support"], "wire helpers\n")
     _write(paths["a2a_cloud_contact"], "A2ANatsTransport publish_task JETSTREAM_PUBLISH_CONTRACT operator_transport_required\n")
     _write(
         paths["nats_live_matrix"],

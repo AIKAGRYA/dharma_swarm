@@ -7,6 +7,11 @@
 **Replaces / subordinates to:** nothing — proposes work; owners stay where
 `docs/governance/CANONICAL_DOC_STACK.md` puts them.
 
+> Historical snapshot. Current command semantics are owned by
+> `docs/governance/BUILD_SESSION_ENTRYPOINT.md`: `make onboard` reports
+> session status, while exact edit admission and closeout require
+> `PACKET=<path>`.
+
 ---
 
 ## 0. Wake sequence (do this verbatim)
@@ -14,12 +19,12 @@
 ```bash
 cd "${DHARMA_SWARM_REPO:-$HOME/repos/dharma-swarm}" || cd "$HOME/dharma_swarm"
 git pull origin main
-make onboard                       # the single door; trust its output over any prose below
+make onboard                       # read-only session status; trust current owner docs over this snapshot
 cat docs/agents/devin-roaming-2987d222/MEMORY.md   # newest entry = your context
 ls inter_agent/devin/inbound/
 ```
 
-If onboard output disagrees with anything in this file, onboard wins.
+If current owner docs disagree with anything in this file, the owner docs win.
 
 ## 1. State of the repo as of HEAD `e1b9f839` (2026-06-11)
 
@@ -111,8 +116,10 @@ from owners; they do not become authority.*
   `docs/agents/INDEX.md`) — it must not touch either active track's surfaces.
 - No new root markdown (Rule 8). No frontmatter in governance docs (A8).
 - Prefer demoting/pointing over moving; archive only via DocOps lifecycle.
-- Every PR: `make onboard` → work → tests → `pre-commit run --all-files` →
-  `make agent-build-closeout` → PR with evidence.
+- Every PR: `make onboard` →
+  `make agent-build-preflight PACKET=<path>` → work → tests →
+  `pre-commit run --all-files` →
+  `make agent-build-closeout PACKET=<path>` → PR with evidence.
 
 ## 6. Definition of done for the next session
 

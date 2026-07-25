@@ -28,8 +28,6 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import nats
-
 from dharma_swarm.a2a.a2a_server import A2AMessage, A2AServer, A2ATask, A2ATaskStatus
 from dharma_swarm.a2a.nats_transport import (
     A2ANatsTransport,
@@ -53,6 +51,7 @@ CONSUMER_CLASS = "dharma_swarm.a2a.a2a_server.A2AServer"
 
 SOURCE_FRESHNESS_PATHS = [
     "dharma_swarm/a2a/nats_transport.py",
+    "dharma_swarm/a2a/nats_transport_support.py",
     "dharma_swarm/a2a/a2a_server.py",
     "dharma_swarm/a2a/a2a_bridge.py",
     "dharma_swarm/runtime_state.py",
@@ -77,6 +76,14 @@ SOURCE_FRESHNESS_PATHS = [
 
 class MatrixFailure(RuntimeError):
     """Raised when a required live matrix row cannot be proven."""
+
+
+def import_nats_client() -> Any:
+    try:
+        import nats
+    except ImportError as exc:
+        raise MatrixFailure("nats-py is required to run the live NATS production matrix") from exc
+    return nats
 
 
 def utc_now() -> str:
@@ -181,6 +188,31 @@ class ModelProbe:
         self.calls += 1
         started = utc_now()
         receipt_path = self.receipt_dir / f"{task_id}.semantic_receipt.json"
+        if self.provider in {"deterministic", "offline", "local-deterministic"}:
+            digest = hashlib.sha256(f"{task_id}\n{trace_id}\n{prompt}".encode("utf-8")).hexdigest()
+            receipt = {
+                "schema": "dharma.nats.live_matrix.semantic_receipt.v1",
+                "timestamp": utc_now(),
+                "provider": self.provider,
+                "requested_model": self.model,
+                "response_model": self.model,
+                "usage": {"prompt_chars": len(prompt), "completion_chars": 96},
+                "content": json.dumps(
+                    {
+                        "ok": True,
+                        "mode": "deterministic_transport_probe",
+                        "task_id": task_id,
+                        "digest": digest[:16],
+                    },
+                    sort_keys=True,
+                ),
+                "task_id": task_id,
+                "trace_id": trace_id,
+                "started_at": started,
+            }
+            write_json(receipt_path, receipt)
+            receipt["receipt_path"] = str(receipt_path)
+            return receipt
         result_box: dict[str, Any] = {}
 
         def target() -> None:
@@ -323,7 +355,8 @@ class MatrixRunner:
         self.js: Any = None
 
     async def connect(self) -> None:
-        self.nc = await nats.connect(self.endpoint)
+        nats_client = import_nats_client()
+        self.nc = await nats_client.connect(self.endpoint)
         self.js = self.nc.jetstream()
 
     async def close(self) -> None:

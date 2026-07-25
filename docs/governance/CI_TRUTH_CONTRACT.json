@@ -1,7 +1,8 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 1,
-  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands and may still block through GitHub's raw failing-check rollup.",
+  "version": 5,
+  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
+  "required_contexts_manifest": "scripts/governance/ci_parity_manifest.json",
   "required": [
     {
       "id": "docops_integrity",
@@ -12,15 +13,66 @@
       "autofix": "limited"
     },
     {
+      "id": "gitleaks",
+      "names": ["gitleaks"],
+      "owner": "security",
+      "local_command": "make gitleaks",
+      "failure_category": "secret_scan",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "tests_py311",
+      "names": ["pytest (3.11)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
+    {
+      "id": "tests_py312",
+      "names": ["pytest (3.12)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
+    {
       "id": "coherence_delta",
       "names": ["Coherence Delta PR body"],
       "owner": "governance",
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
-      "autofix": "forbidden"
+      "autofix": "limited"
+    },
+    {
+      "id": "onboarding_session_status",
+      "names": ["Onboarding admission parity"],
+      "owner": "onboarding",
+      "local_command": "make onboard && python3 -m pytest -q tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_onboarding_ci_contract.py",
+      "failure_category": "session_status",
+      "autofix": "manual"
     }
   ],
   "advisory": [
+    {
+      "id": "quality_ratchet",
+      "names": [
+        "Quality ratchet - repo-wide fitness function",
+        "Quality ratchet \u2014 whole-tree regression + baseline freshness"
+      ],
+      "owner": "governance",
+      "local_command": "make quality-ratchet-check",
+      "failure_category": "quality_ratchet",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "onboarding_macos_compatibility",
+      "names": ["Onboarding macOS 3.81 compatibility"],
+      "owner": "onboarding",
+      "local_command": "/usr/bin/make onboarding-macos-compatibility",
+      "failure_category": "host_compatibility",
+      "autofix": "manual"
+    },
     {
       "id": "active_track",
       "names": ["ACTIVE_TRACK governance gate"],
@@ -105,7 +157,7 @@
       "id": "dashboard",
       "names": ["dashboard"],
       "owner": "frontend",
-      "local_command": "make frontend-check",
+      "local_command": "npm --prefix dashboard ci --legacy-peer-deps && npm --prefix dashboard run lint -- --quiet && npm --prefix dashboard run build",
       "failure_category": "frontend_build",
       "autofix": "manual"
     },
@@ -124,14 +176,6 @@
       "local_command": "python3 -m pytest -q tests/test_telos_gates.py tests/test_stigmergy.py --tb=short",
       "failure_category": "runtime_correctness",
       "autofix": "manual"
-    },
-    {
-      "id": "gitleaks",
-      "names": ["gitleaks"],
-      "owner": "security",
-      "local_command": "make gitleaks",
-      "failure_category": "secret_scan",
-      "autofix": "forbidden"
     },
     {
       "id": "go_adapter_contracts",
@@ -155,22 +199,6 @@
       "owner": "runtime",
       "local_command": "make syntax-check",
       "failure_category": "syntax_or_import",
-      "autofix": "manual"
-    },
-    {
-      "id": "tests_py311",
-      "names": ["pytest (3.11)"],
-      "owner": "runtime",
-      "local_command": "make test",
-      "failure_category": "test_failure",
-      "autofix": "manual"
-    },
-    {
-      "id": "tests_py312",
-      "names": ["pytest (3.12)"],
-      "owner": "runtime",
-      "local_command": "make test",
-      "failure_category": "test_failure",
       "autofix": "manual"
     },
     {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_value
-from dharma_swarm.model_hierarchy import DEFAULT_MODELS
+from dharma_swarm.model_defaults import default_for_provider
 from dharma_swarm.models import ProviderType
 
 
@@ -15,15 +15,64 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 # default but is frequently not pulled (-> Ollama 404). Override with
 # OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
 OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
-OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
-# Frontier open lanes that Ollama Cloud actually serves. Kimi Code K3 uses
-# api.kimi.com directly and therefore does not belong in this Ollama roster.
-OLLAMA_CLOUD_FRONTIER_MODELS = (
-    "glm-5.2:cloud",
-    "deepseek-v4-pro:cloud",
-    "minimax-m3:cloud",
-    "qwen3-coder:480b-cloud",
-)
+OLLAMA_DEFAULT_CLOUD_MODEL = default_for_provider(ProviderType.OLLAMA)
+
+
+def _ollama_cloud_frontier_from_roster() -> tuple[str, ...]:
+    """Fail-open fallback for the Ollama Cloud frontier chain, with NO literals.
+
+    Used ONLY if the model pool cannot be imported at populate time (mid
+    import-cycle / partial init). The model-id strings live in exactly one place
+    — ``evolution_roster.EVOLUTION_ROSTER`` (the pool's seed, and the sanctioned
+    home for model-id literals). This derives the Ollama-Cloud routes directly
+    from that seed so the chain stays non-empty without re-typing any model-id.
+
+    Lazy import inside the function: at call time (bottom-of-module populate, or
+    a later degenerate retry) the roster is fully initialised even though the
+    ``model_pool`` projection may not be. Returns pool-equivalent order
+    (roster order), deduped, K2.6 floor included.
+    """
+    try:
+        from dharma_swarm.evolution_roster import EVOLUTION_ROSTER  # noqa: PLC0415 (lazy: cycle break)
+    except Exception:  # pragma: no cover - degenerate mid-cycle import
+        return ()
+    out: list[str] = []
+    for slot in EVOLUTION_ROSTER:
+        mid = slot.model_id
+        if (mid.endswith(":cloud") or mid.endswith("-cloud")) and mid not in out:
+            out.append(mid)
+    return tuple(out)
+
+
+def _generate_ollama_cloud_frontier_models() -> tuple[str, ...]:
+    """Derive the Ollama Cloud frontier chain from the ONE model pool.
+
+    STEP 6 of the model-routing consolidation: this REPLACES the hand-typed
+    frontier tuple. The chain is every Ollama route the pool serves over the
+    cloud endpoint (``:cloud`` / ``-cloud`` serving tag), in pool order
+    (best-route-first), deduped. The K2.6 floor model is included because the
+    pool carries it as an Ollama-Cloud route.
+
+    Lazy import: ``model_pool`` -> ``evolution_roster`` -> this module form an
+    import cycle. We import the pool *inside* the function so ``ollama_config``
+    stays importable on its own. FAIL-OPEN: any import/parse failure falls back
+    to the roster-derived chain (still no literals here) so the chain is never
+    empty.
+    """
+    try:
+        from dharma_swarm.model_pool import ollama_cloud_model_ids  # noqa: PLC0415 (lazy: cycle break)
+    except Exception:  # pragma: no cover - degenerate mid-cycle import
+        return _ollama_cloud_frontier_from_roster()
+
+    return ollama_cloud_model_ids() or _ollama_cloud_frontier_from_roster()
+
+
+#: Ollama Cloud frontier chain — a SNAPSHOT of the pool generator (no longer a
+#: hand-typed literal). Initialised empty and populated at the BOTTOM of this
+#: module (after the helper functions evolution_roster needs are defined) so the
+#: model_pool import cycle resolves cleanly. Consumers (providers.py hot path,
+#: startup_crew, smoke tests) keep reading this module constant unchanged.
+OLLAMA_CLOUD_FRONTIER_MODELS: tuple[str, ...] = ()
 
 _LOCAL_BASE_URLS = {
     OLLAMA_LOCAL_BASE_URL,
@@ -112,6 +161,12 @@ def resolve_ollama_model(
     return OLLAMA_DEFAULT_LOCAL_MODEL
 
 
+def is_ollama_cloud_model(model: str | None) -> bool:
+    """True if the model id targets Ollama Cloud (proxied by the local daemon)."""
+    name = (model or "").strip()
+    return name.endswith(":cloud") or name.endswith("-cloud")
+
+
 def build_ollama_headers(
     *,
     base_url: str | None = None,
@@ -130,10 +185,21 @@ def build_ollama_headers(
 def get_ollama_cloud_frontier_chain() -> tuple[str, ...]:
     """Return Ollama Cloud frontier models in priority order for fallback rotation.
 
-    When the primary model (GLM-5) fails, callers should try the next model
+    The chain is derived from the ONE model pool (Ollama-Cloud routes,
+    best-route-first). When the primary model fails, callers try the next model
     in this chain.  All models are FREE on Ollama Cloud.
     """
     return OLLAMA_CLOUD_FRONTIER_MODELS
+
+
+# Populate the snapshot from the pool now that every helper evolution_roster
+# needs is defined above — so the model_pool -> evolution_roster -> ollama_config
+# cycle re-enters this module cleanly. Fail-open: keeps the roster-derived chain
+# (no literals) on any error.
+try:  # pragma: no cover - exercised by import
+    OLLAMA_CLOUD_FRONTIER_MODELS = _generate_ollama_cloud_frontier_models()
+except Exception:  # pragma: no cover - degenerate
+    OLLAMA_CLOUD_FRONTIER_MODELS = _ollama_cloud_frontier_from_roster()
 
 
 __all__ = [

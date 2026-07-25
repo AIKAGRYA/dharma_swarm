@@ -8,7 +8,7 @@ hypothesis = pytest.importorskip("hypothesis", reason="hypothesis not installed"
 from hypothesis import given, strategies as st
 
 try:
-    from dharma_swarm.archive import FitnessScore
+    from dharma_swarm.archive import FITNESS_DIMENSIONS, FitnessScore
     ARCHIVE_AVAILABLE = True
 except ImportError:
     ARCHIVE_AVAILABLE = False
@@ -16,18 +16,16 @@ except ImportError:
 
 
 def fitness_score_strategy():
-    """Generate random but valid FitnessScore instances."""
+    """Generate random but valid FitnessScore instances.
+
+    Dimensions are derived from FITNESS_DIMENSIONS (the canonical weight keys)
+    so the strategy cannot silently drift out of sync with the model when a
+    new fitness dimension is added.
+    """
+    unit = st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
     return st.builds(
         FitnessScore,
-        correctness=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        dharmic_alignment=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        swabhaav_alignment=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        performance=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        utilization=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        economic_value=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        elegance=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        efficiency=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        safety=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+        **{dim: unit for dim in FITNESS_DIMENSIONS},
     )
 
 
@@ -35,15 +33,9 @@ if ARCHIVE_AVAILABLE:
     @given(fitness_score_strategy())
     def test_fitness_all_dimensions_bounded(fitness):
         """Property: All fitness dimensions must be in [0, 1]."""
-        assert 0.0 <= fitness.correctness <= 1.0
-        assert 0.0 <= fitness.dharmic_alignment <= 1.0
-        assert 0.0 <= fitness.swabhaav_alignment <= 1.0
-        assert 0.0 <= fitness.performance <= 1.0
-        assert 0.0 <= fitness.utilization <= 1.0
-        assert 0.0 <= fitness.economic_value <= 1.0
-        assert 0.0 <= fitness.elegance <= 1.0
-        assert 0.0 <= fitness.efficiency <= 1.0
-        assert 0.0 <= fitness.safety <= 1.0
+        values = fitness.model_dump(include=set(FITNESS_DIMENSIONS))
+        for dim, value in values.items():
+            assert 0.0 <= value <= 1.0, f"{dim}={value} out of bounds [0, 1]"
 
 
     @given(fitness_score_strategy())
@@ -63,7 +55,7 @@ if ARCHIVE_AVAILABLE:
 
 
     @given(fitness_score_strategy(), st.dictionaries(
-        st.sampled_from(['correctness', 'dharmic_alignment', 'swabhaav_alignment', 'performance', 'utilization', 'economic_value', 'elegance', 'efficiency', 'safety']),
+        st.sampled_from(FITNESS_DIMENSIONS),
         st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
         min_size=1
     ))
@@ -86,31 +78,15 @@ if ARCHIVE_AVAILABLE:
         json_str = fitness.model_dump_json()
         restored = FitnessScore.model_validate_json(json_str)
 
-        assert restored.correctness == fitness.correctness
-        assert restored.dharmic_alignment == fitness.dharmic_alignment
-        assert restored.swabhaav_alignment == fitness.swabhaav_alignment
-        assert restored.performance == fitness.performance
-        assert restored.utilization == fitness.utilization
-        assert restored.economic_value == fitness.economic_value
-        assert restored.elegance == fitness.elegance
-        assert restored.efficiency == fitness.efficiency
-        assert restored.safety == fitness.safety
+        assert restored.model_dump(include=set(FITNESS_DIMENSIONS)) == fitness.model_dump(
+            include=set(FITNESS_DIMENSIONS)
+        )
 
 
     @given(fitness_score_strategy())
     def test_fitness_perfect_score_is_one(fitness):
         """Property: If all dimensions are 1.0, weighted should be 1.0."""
-        perfect = FitnessScore(
-            correctness=1.0,
-            dharmic_alignment=1.0,
-            swabhaav_alignment=1.0,
-            performance=1.0,
-            utilization=1.0,
-            economic_value=1.0,  # Added in Phase 1
-            elegance=1.0,
-            efficiency=1.0,
-            safety=1.0
-        )
+        perfect = FitnessScore(**{dim: 1.0 for dim in FITNESS_DIMENSIONS})
         assert abs(perfect.weighted() - 1.0) < 0.001, \
             f"Perfect score weighted to {perfect.weighted()}, expected 1.0"
 
@@ -118,16 +94,6 @@ if ARCHIVE_AVAILABLE:
     @given(fitness_score_strategy())
     def test_fitness_zero_score_is_zero(fitness):
         """Property: If all dimensions are 0.0, weighted should be 0.0."""
-        zero = FitnessScore(
-            correctness=0.0,
-            dharmic_alignment=0.0,
-            swabhaav_alignment=0.0,
-            performance=0.0,
-            utilization=0.0,
-            economic_value=0.0,  # Added in Phase 1
-            elegance=0.0,
-            efficiency=0.0,
-            safety=0.0
-        )
+        zero = FitnessScore(**{dim: 0.0 for dim in FITNESS_DIMENSIONS})
         assert abs(zero.weighted() - 0.0) < 0.001, \
             f"Zero score weighted to {zero.weighted()}, expected 0.0"

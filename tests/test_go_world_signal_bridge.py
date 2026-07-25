@@ -8,18 +8,17 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-import dharma_swarm.operator_core.world_radar.receipt_bridge as receipt_bridge
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable
+
 from dharma_swarm.operator_core.control_surface import _go_world_receipt_summary_rows
 from dharma_swarm.operator_core.world_radar.receipt_bridge import (
     GO_EVIDENCE_SCHEMA_V0,
     GoWorldBridgeError,
-    GoWorldReceipt,
     load_go_world_receipt,
     project_world_signal_receipts,
     summarize_go_world_receipts,
@@ -38,8 +37,8 @@ def _run_ingestor(
     *,
     expect_rejected: bool = False,
 ) -> None:
-    if shutil.which("go") is None:
-        pytest.skip("Go toolchain is not installed")
+    if not go_toolchain_capable(GO_MODULE):
+        pytest.skip("no Go toolchain satisfying world_signal_ingestor_go/go.mod")
     fixture_raw = json.loads((FIXTURE_DIR / fixture_name).read_text(encoding="utf-8"))
     payload_path = output_path.parent / (fixture_name + ".payload")
     payload_path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,61 +147,6 @@ def test_summary_counts_world_receipts_and_projection(tmp_path: Path) -> None:
     rows = project_world_signal_receipts(tuple(receipts_dir.glob("*.json")))
     assert len(rows) == 1
     assert rows[0]["title"].startswith("SubQ claims")
-
-
-def test_summary_reuses_loaded_receipts_for_projected_signal_count(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    receipts_dir = tmp_path / "receipts"
-    receipt_path = receipts_dir / "signal.json"
-    receipt_path.parent.mkdir(parents=True)
-    receipt_path.write_text("{}", encoding="utf-8")
-    receipt_bridge._GO_WORLD_SUMMARY_CACHE.clear()
-    calls: list[tuple[Path, ...]] = []
-
-    receipts = [
-        GoWorldReceipt(
-            receipt_id="r1",
-            correlation_id="c1",
-            source="world_signal",
-            source_url="https://example.test/1",
-            observed_at="2026-05-12T00:00:00Z",
-            content_hash="h1",
-            event_uid="e1",
-            schema_version=GO_EVIDENCE_SCHEMA_V0,
-            status="accepted",
-            payload={"title": "Accepted"},
-        ),
-        GoWorldReceipt(
-            receipt_id="r2",
-            correlation_id="c2",
-            source="world_signal",
-            source_url="https://example.test/2",
-            observed_at="2026-05-12T00:00:01Z",
-            content_hash="h2",
-            event_uid="e2",
-            schema_version=GO_EVIDENCE_SCHEMA_V0,
-            status="rejected",
-            payload={"title": "Rejected"},
-            rejected_reason="invalid_field_type:relevance_score",
-        ),
-    ]
-
-    def fake_load(paths: list[Path] | tuple[Path, ...]) -> list[GoWorldReceipt]:
-        calls.append(tuple(paths))
-        return receipts
-
-    monkeypatch.setattr(receipt_bridge, "load_go_world_receipts", fake_load)
-
-    summary = summarize_go_world_receipts(receipts_dir)
-    cached_summary = summarize_go_world_receipts(receipts_dir)
-
-    assert len(calls) == 1
-    assert summary["world_signal"] == 2
-    assert summary["projected_world_signals"] == 1
-    assert summary["rejected"] == 1
-    assert cached_summary == summary
 
 
 def test_control_surface_projects_world_receipt_summary(

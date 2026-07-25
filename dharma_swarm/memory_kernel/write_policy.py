@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Iterable
 
@@ -374,15 +374,23 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('dharma_swarm/active_inference.py', 'ActiveInferenceEngine._log_prediction_error', 'path_open_write', '55d048f783d0', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/agent_install.py', 'execute_install_plan', 'path_write', '9c658af64661', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/artifact_manifest.py', 'ArtifactManifestStore.write_manifest', 'path_write', 'b276c0a735d8', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/capital_lab/broker_paper_membrane.py', 'run_goal_b_proof_loop', 'path_write', '4d4d8d8376ae', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/palace.py', 'render_palace', 'path_write', 'd9a1b85d4e72', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/tests/test_graph_unifier.py', 'test_query_finds_node_in_catalytic_graph', 'path_write', 'efe23a5663cc', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/tests/test_ingest_promote.py', 'test_ingest_session_jsonl_creates_atom_per_substantive_turn', 'path_write', 'ada18f938a44', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/codex_overnight.py', 'main', 'path_write', '9c7d7ac4d5fa', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/codex_overnight.py', 'write_morning_handoff', 'path_write', 'f6ad48708b8c', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/conversation_distiller.py', '_save_distill_time', 'path_write', '0dba4ef3bf6f', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/conversation_distiller.py', '_write_latest_synthesis', 'path_write', 'd33fd3fc3fea', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/capital_lab/broker_paper_membrane.py', 'run_goal_b_proof_loop', 'path_write', 'c25eb06c9a64', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/palace.py', 'render_palace', 'path_write', 'd9a1b85d4e72', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/tests/test_graph_unifier.py', 'test_query_finds_node_in_catalytic_graph', 'path_write', 'efe23a5663cc', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/chetana/tests/test_ingest_promote.py', 'test_ingest_session_jsonl_creates_atom_per_substantive_turn', 'path_write', 'ada18f938a44', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/custodians.py', 'install_launchd_service', 'path_write', '9c7f9f689336', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/dual_audit.py', 'DualAudit._persist', 'path_write', 'a8cfe9ea3a9d', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/economic_spine.py', 'EconomicSpine.__init__', 'sqlite_connect', '7f61bf97a3a8', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/ginko_orchestrator.py', 'save_state', 'path_write', '535ccc087541', 'operational_state', occurrences=1),
-        ReviewedWriteBaselineEntry('dharma_swarm/guardian_crew.py', '_create_issue_if_needed', 'path_write', 'e08815565330', 'operational_state', occurrences=2),
+        ReviewedWriteBaselineEntry('dharma_swarm/guardian_crew.py', '_create_issue_if_needed', 'path_write', 'e08815565330', 'operational_state', occurrences=3),
         ReviewedWriteBaselineEntry('dharma_swarm/identity.py', 'IdentityMonitor._issue_correction', 'path_write', '53e7798f503c', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/loop_supervisor.py', 'LoopSupervisor.save_state', 'path_write', 'c006db8e7f1d', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/ontology.py', 'OntologyRegistry.save', 'path_write', 'bab070f87b44', 'operational_state', occurrences=1),
@@ -404,9 +412,21 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/algedonic_triage.py', 'save_state', 'path_write', '09c8535fac12', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/allout_autopilot.py', 'execute_single_step', 'path_write', '9d58935c034b', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/allout_autopilot.py', 'execute_single_step', 'path_write', 'c77238abb207', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '0ade2c85a8ba', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '99c83aa2bd78', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/governance/run_nats_live_production_matrix.py', 'MatrixRunner.run', 'path_write', 'c5b7b9f59aa9', 'generated_artifact', occurrences=1, review_note='NATS live matrix success path updates repo evidence latest.json pointer only.'),
+        ReviewedWriteBaselineEntry('scripts/governance/run_nats_live_production_matrix.py', 'async_main', 'path_write', '92e4ec17921e', 'generated_artifact', occurrences=1, review_note='NATS live matrix failure path updates repo evidence latest.json pointer only.'),
+        ReviewedWriteBaselineEntry('scripts/governance/hygiene/scan.py', 'main', 'path_write', 'ca40bd1a2c8e', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'build_lattice_db', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'main', 'path_write', 'e7f43d056757', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop2_heartbeat_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', '_prepare_state_dir', 'path_write', 'fff3e82d4cdf', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_loop10', 'path_write', '51891e41d1c9', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_replay', 'path_write', '84f88386c2bb', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop5_zeitgeist_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop5b_world_radar_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop6_witness_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop8_recognition_closure_run.py', '_write_interpreted_history', 'path_write', '3efe0bf9f8c6', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/merge_snapshot.py', 'write_canonical_outputs', 'path_write', 'b75b71c07cd1', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/mirror_test.py', 'build_sqlite_graph', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/onboard_cybernetics_stewards.py', 'main', 'path_write', '46fbb16ffdbd', 'operational_state', occurrences=1),
@@ -414,6 +434,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/overnight_autopilot.py', 'main', 'path_write', 'bb376ba4fa8b', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/rebind_cybernetics_directive.py', '_amain', 'path_write', '9cf7924d9d6d', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/regression_guard.py', 'main', 'path_write', '332dd97b1a0f', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/runtime/codex_composer_semantic_inbox_drain.py', 'drain_semantic_inbox', 'path_write', 'cee8def16f72', 'generated_artifact', occurrences=1, review_note='Semantic drain writes one task-scoped prompt file under its operator-provided temporary work directory; it does not write canonical memory or claim publication.'),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_directive.py', '_amain', 'path_write', '405197978dba', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_population_cycle.py', '_amain', 'path_write', '1596e5fe1cc1', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_population_cycle.py', '_amain', 'path_write', '3dce95c52e97', 'operational_state', occurrences=1),

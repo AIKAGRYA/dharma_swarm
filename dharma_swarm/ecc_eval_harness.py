@@ -11,10 +11,13 @@ returns PASS/FAIL + metrics.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -67,6 +70,26 @@ DHARMA_SWARM_DIR = Path.home() / "dharma_swarm"
 PACKAGE_DIR = DHARMA_SWARM_DIR / "dharma_swarm"
 
 
+@contextlib.contextmanager
+def _isolated_probe_dir():
+    """Yield a throwaway state dir for round-trip smoke probes.
+
+    The task / message-bus / stigmergy round-trip evals only prove the machinery
+    persists-and-reads-back; they must NEVER write into the production state
+    stores under ``~/.dharma``. Pointing them at a temp dir (deleted on exit) is
+    what stops the harness from injecting an ``eval_probe_task`` into the live
+    TaskBoard queue on every run — the root cause of the pending-queue
+    contamination observed 2026-07-13. Read-only production observations
+    (``eval_evolution_archive``, ``eval_bus_schema``) deliberately do NOT use
+    this and keep looking at the real stores.
+    """
+    tmp = tempfile.mkdtemp(prefix="dharma_eval_probe_")
+    try:
+        yield Path(tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Capability evals
 # ---------------------------------------------------------------------------
@@ -78,24 +101,26 @@ async def eval_task_roundtrip() -> EvalResult:
         from dharma_swarm.models import TaskPriority
         from dharma_swarm.task_board import TaskBoard
 
-        db_path = STATE_DIR / "db" / "tasks.db"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        board = TaskBoard(db_path)
-        await board.init_db()
+        with _isolated_probe_dir() as probe_dir:
+            db_path = probe_dir / "db" / "tasks.db"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            board = TaskBoard(db_path)
+            await board.init_db()
 
-        task = await board.create(
-            title="eval_probe_task",
-            description="Probe task for eval harness",
-            priority=TaskPriority.LOW,
-            created_by="eval_harness",
-        )
-        retrieved = await board.get(task.id)
-        ok = retrieved is not None and retrieved.title == "eval_probe_task"
+            task = await board.create(
+                title="eval_probe_task",
+                description="Probe task for eval harness",
+                priority=TaskPriority.LOW,
+                created_by="eval_harness",
+            )
+            retrieved = await board.get(task.id)
+            ok = retrieved is not None and retrieved.title == "eval_probe_task"
+            task_id = task.id
         return EvalResult(
             name="task_roundtrip",
             passed=ok,
             duration_seconds=time.monotonic() - t0,
-            metrics={"task_id": task.id},
+            metrics={"task_id": task_id},
         )
     except Exception as e:
         return EvalResult(
@@ -112,22 +137,25 @@ async def eval_fitness_signal_flow() -> EvalResult:
     try:
         from dharma_swarm.message_bus import MessageBus
 
-        db_path = STATE_DIR / "db" / "messages.db"
-        bus = MessageBus(db_path)
-        await bus.init_db()
+        with _isolated_probe_dir() as probe_dir:
+            db_path = probe_dir / "db" / "messages.db"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            bus = MessageBus(db_path)
+            await bus.init_db()
 
-        event_id = await bus.emit_event(
-            "EVAL_PROBE",
-            agent_id="eval_harness",
-            payload={"probe": True, "ts": datetime.now(timezone.utc).isoformat()},
-        )
-        events = await bus.consume_events("EVAL_PROBE", limit=10)
-        found = any(e.get("payload", {}).get("probe") is True for e in events)
+            event_id = await bus.emit_event(
+                "EVAL_PROBE",
+                agent_id="eval_harness",
+                payload={"probe": True, "ts": datetime.now(timezone.utc).isoformat()},
+            )
+            events = await bus.consume_events("EVAL_PROBE", limit=10)
+            found = any(e.get("payload", {}).get("probe") is True for e in events)
+            events_consumed = len(events)
         return EvalResult(
             name="fitness_signal_flow",
             passed=found,
             duration_seconds=time.monotonic() - t0,
-            metrics={"event_id": event_id, "events_consumed": len(events)},
+            metrics={"event_id": event_id, "events_consumed": events_consumed},
         )
     except Exception as e:
         return EvalResult(
@@ -201,23 +229,25 @@ async def eval_stigmergy_roundtrip() -> EvalResult:
     try:
         from dharma_swarm.stigmergy import StigmergyStore, StigmergicMark
 
-        store = StigmergyStore()
-        probe_observation = f"eval_probe_{int(time.time())}"
-        mark = StigmergicMark(
-            agent="eval_harness",
-            file_path="eval/probe",
-            observation=probe_observation,
-            salience=0.1,
-        )
-        mark_id = await store.leave_mark(mark)
-        # Read back
-        marks = await store.read_marks(file_path="eval/probe", limit=5)
-        found = any(m.observation == probe_observation for m in marks)
+        with _isolated_probe_dir() as probe_dir:
+            store = StigmergyStore(base_path=probe_dir / "stigmergy")
+            probe_observation = f"eval_probe_{int(time.time())}"
+            mark = StigmergicMark(
+                agent="eval_harness",
+                file_path="eval/probe",
+                observation=probe_observation,
+                salience=0.1,
+            )
+            mark_id = await store.leave_mark(mark)
+            # Read back
+            marks = await store.read_marks(file_path="eval/probe", limit=5)
+            found = any(m.observation == probe_observation for m in marks)
+            marks_read = len(marks)
         return EvalResult(
             name="stigmergy_roundtrip",
             passed=found,
             duration_seconds=time.monotonic() - t0,
-            metrics={"mark_id": mark_id, "marks_read": len(marks)},
+            metrics={"mark_id": mark_id, "marks_read": marks_read},
         )
     except Exception as e:
         return EvalResult(

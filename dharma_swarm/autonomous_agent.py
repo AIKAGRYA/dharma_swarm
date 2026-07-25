@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.agent_memory import AgentMemoryBank
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMResponse, Message, MessagePriority, ProviderType
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
@@ -35,6 +36,7 @@ from dharma_swarm.runtime_provider import (
 )
 
 logger = logging.getLogger(__name__)
+_DEFAULT_AGENT_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +284,7 @@ class AgentIdentity:
     name: str
     role: str
     system_prompt: str
-    model: str = "claude-sonnet-4-20250514"
+    model: str = _DEFAULT_AGENT_MODEL
     provider: str = "anthropic"
     max_turns: int = 25
     allowed_tools: list[str] = field(default_factory=lambda: [
@@ -422,6 +424,10 @@ class AutonomousAgent:
         self._openai_client: Any = None
         self._message_bus: Any = None
         self._stigmergy: Any = None
+        # Ids of inbox messages fetched into the current wake's prompt but not
+        # yet acknowledged; marked read only after the wake completes (see
+        # _check_inbox / _ack_inbox).
+        self._inbox_pending_ack: list[str] = []
 
     # -- Public API ----------------------------------------------------------
 
@@ -456,6 +462,11 @@ class AutonomousAgent:
 
         # 6. Write run report
         await self._save_run_report(task, result)
+
+        # 7. Wake completed: acknowledge the inbox messages delivered into this
+        #    wake's prompt. Reached only if steps 4-6 did not raise, so a failed
+        #    wake leaves the messages unread for the next cycle to retry.
+        await self._ack_inbox()
 
         logger.info(
             "[%s] wake done: %d turns, %d tokens, %d tools, %.1fs",
@@ -622,12 +633,25 @@ class AutonomousAgent:
     ) -> dict[str, Any]:
         from dharma_swarm.models import LLMRequest
 
+        # The same Claude model serves via the metered Anthropic API OR — keyless —
+        # via the claude_code Max-plan lane (live only when headless `claude -p`
+        # smokes green). Order ANTHROPIC first, then fall back to the KEYLESS claude_code
+        # lane, so this never dies with "configure ANTHROPIC_API_KEY" when dispatch
+        # is actually available with zero keys.
         configs = preferred_runtime_provider_configs(
-            provider_order=(ProviderType.ANTHROPIC,),
-            model_overrides={ProviderType.ANTHROPIC: self.identity.model},
+            provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+            model_overrides={
+                ProviderType.ANTHROPIC: self.identity.model,
+                ProviderType.CLAUDE_CODE: self.identity.model,
+            },
         )
         if not configs:
-            raise RuntimeError("Anthropic provider unavailable; configure ANTHROPIC_API_KEY")
+            raise RuntimeError(
+                "No Claude provider available. claude_code is KEYLESS only when "
+                "headless `claude -p` dispatch smokes green — check "
+                "key_oracle.dispatchable_now(); set "
+                "ANTHROPIC_API_KEY only for the metered API path."
+            )
 
         routed_order = (
             _providers_registered_on_router(
@@ -933,8 +957,14 @@ class AutonomousAgent:
                 gate = check_action(action=action_desc, content=str(inputs))
                 if gate.decision == GateDecision.BLOCK:
                     return f"GATE BLOCKED: {gate.reason}"
-            except Exception:
-                pass  # gate failure should not prevent tool execution
+            except Exception as exc:
+                # Fail CLOSED (operator directive 2026-07-07): a crashed gate
+                # must not silently authorize a side-effect tool.
+                logger.error(
+                    "telos gate unavailable for %s; refusing side-effect tool: %s",
+                    name, exc)
+                return (f"GATE UNAVAILABLE: refusing side-effect tool '{name}' — "
+                        f"telos gate raised {exc.__class__.__name__}: {exc}")
 
         handler = {
             "read_file": self._tool_read_file,
@@ -1213,17 +1243,53 @@ class AutonomousAgent:
     # -- Infrastructure wiring -----------------------------------------------
 
     async def _check_inbox(self) -> list[str]:
+        # A fresh wake starts with no deferred acknowledgements.
+        self._inbox_pending_ack = []
         try:
             bus = await self._get_message_bus()
             if bus:
                 messages = await bus.receive(self.identity.name, limit=5)
-                return [
+                inbox = [
                     f"From {m.from_agent}: {m.subject} — {m.body[:200]}"
                     for m in messages
                 ]
+                # Defer acknowledgement: each fetched message is delivered into
+                # the system-prompt inbox, but we mark it read only after the
+                # wake's reason+act loop completes successfully (_ack_inbox).
+                # Marking read here would permanently hide up to 5 messages if
+                # the wake later fails (provider/tool/memory error) before it
+                # could act on them; leaving them unread lets the next cycle
+                # retry. Mirrors the consumer pattern in
+                # contracts/runtime_adapters.py.
+                self._inbox_pending_ack = [m.id for m in messages]
+                return inbox
         except Exception:
             logger.debug("Message bus read failed", exc_info=True)
         return []
+
+    async def _ack_inbox(self) -> None:
+        """Mark this wake's fetched inbox messages read.
+
+        Called only on the wake success path so a failed wake leaves the
+        messages unread for a later retry. No-op when nothing was fetched or
+        no message bus was available.
+        """
+        if not self._inbox_pending_ack:
+            return
+        bus = self._message_bus
+        if bus is None:
+            self._inbox_pending_ack = []
+            return
+        failed_acks: list[str] = []
+        for msg_id in self._inbox_pending_ack:
+            try:
+                await bus.mark_read(msg_id)
+            except Exception:
+                failed_acks.append(msg_id)
+                logger.warning("Message bus mark_read failed for %s; retained for retry", msg_id, exc_info=True)
+        # Failed acks stay pending so the next wake retries them instead of
+        # silently losing the acknowledgement (hygiene AS-09).
+        self._inbox_pending_ack = failed_acks
 
     async def _get_message_bus(self) -> Any:
         if self._message_bus is None:
@@ -1332,7 +1398,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "verify claims, and produce research insights. You work in the dharma_swarm "
             "ecosystem alongside other agents."
         ),
-        model="claude-sonnet-4-6",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1348,7 +1414,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "You follow existing patterns, run tests after changes, and keep code clean. "
             "You work in the dharma_swarm ecosystem."
         ),
-        model="claude-sonnet-4-6",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1364,7 +1430,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "opportunities, potential partners, carbon market news, and strategic intelligence. "
             "You save findings to structured files and flag urgent items."
         ),
-        model="claude-sonnet-4-6",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1380,7 +1446,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "and correctness. You find bugs, weak arguments, and potential improvements. "
             "Constructively critical, always specific."
         ),
-        model="claude-sonnet-4-6",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1398,7 +1464,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "connections, and what wants to emerge. Bhed Gnan — knowing through "
             "separation of the knower from the known."
         ),
-        model="claude-sonnet-4-6",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",

@@ -376,11 +376,29 @@ class TestBridge4SleepPhase:
 
     @pytest.mark.asyncio
     async def test_sleep_phase_runs(self, tmp_path: Path) -> None:
+        project_root = tmp_path / "project"
+        package_dir = project_root / "dharma_swarm"
+        package_dir.mkdir(parents=True)
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+        (package_dir / "sample_concepts.py").write_text(
+            '''"""Semantic test module with dharmic coordination claims."""
+
+
+class SemanticCoordinator:
+    """Ensures swarm memory remains coherent across retrieval cycles."""
+
+    def synthesize(self) -> str:
+        """Guarantee a bounded synthesis result for the sleep phase."""
+        return "bounded synthesis"
+''',
+            encoding="utf-8",
+        )
+
         graph_path = tmp_path / "graph.json"
         db = tmp_path / "mem.db"
 
         result = await run_semantic_sleep_phase(
-            project_root=Path(__file__).resolve().parent.parent,
+            project_root=project_root,
             graph_path=graph_path,
             db_path=db,
         )

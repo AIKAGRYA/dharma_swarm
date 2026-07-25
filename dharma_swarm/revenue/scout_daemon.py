@@ -40,7 +40,6 @@ from dharma_swarm.revenue.spine import (
     TargetStatus,
 )
 from dharma_swarm.revenue.intelligence import RevenueIntelligenceIngestor
-from dharma_swarm.revenue.intel_parser import IntelSource
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +202,6 @@ class RevenueScoutDaemon:
 
     def _scout_github_inline(self) -> dict[str, Any]:
         """Lightweight inline scouting when scripts.revenue is not importable."""
-        import json
         from urllib.parse import quote_plus
         from urllib.request import Request, urlopen
 

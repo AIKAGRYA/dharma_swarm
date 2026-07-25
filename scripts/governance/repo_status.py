@@ -11,15 +11,32 @@ Usage:
 """
 from __future__ import annotations
 
+import importlib.util
 import json
-import os
 import re
 import subprocess
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
+def _load_broken_register_parser():
+    path = REPO_ROOT / "dharma_swarm/operator_core/onboarding/broken_register.py"
+    spec = importlib.util.spec_from_file_location("_dharma_broken_register_status", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load canonical broken-register parser: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.parse_broken_register
+
+
+parse_broken_register = _load_broken_register_parser()
+
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
 HOTLIST = REPO_ROOT / "docs/state/HOTLIST.md"
@@ -98,34 +115,9 @@ def _parse_active_track() -> dict[str, str]:
 
 
 def _count_broken_register() -> tuple[int, int]:
-    """Return (total, open-like) from BROKEN_REGISTER.md.
-
-    Parses section-by-section: each BR heading (### BR-NNN) starts a
-    section, and we look for `**status:**` on subsequent lines to
-    determine if it's open-like.
-    """
-    if not BROKEN_REGISTER.exists():
-        return 0, 0
-    text = BROKEN_REGISTER.read_text()
-    # Split into sections by BR headings
-    sections = re.split(r"(?=^### BR-\d{3})", text, flags=re.MULTILINE)
-    seen: set[str] = set()
-    open_like: set[str] = set()
-    for section in sections:
-        m = re.match(r"### (BR-\d{3})", section)
-        if not m:
-            continue
-        br_id = m.group(1)
-        seen.add(br_id)
-        # Look for **status:** line within this section
-        status_m = re.search(
-            r"\*\*status:\*\*\s*(.+)", section, re.IGNORECASE
-        )
-        if status_m:
-            status_val = status_m.group(1).upper()
-            if any(kw in status_val for kw in ("OPEN", "PARTIAL", "DEGRADED", "BLOCKER", "INVESTIGATING")):
-                open_like.add(br_id)
-    return len(seen), len(open_like)
+    """Return canonical (distinct total, open-like) register counts."""
+    result = parse_broken_register(BROKEN_REGISTER)
+    return (result.total, result.open_count) if result.present else (0, 0)
 
 
 def _hotlist_summary() -> tuple[int, int, int]:
@@ -273,7 +265,8 @@ def main() -> None:
             print(f"   - {w}")
 
     print("\n" + "=" * 60)
-    print("  Run `make onboard` for full operating reality")
+    print("  Run `make onboard` for session status")
+    print("  Run `make organism-status` for whole-organism orientation")
     print("  Run `make status` for this quick snapshot")
     print("=" * 60)
 

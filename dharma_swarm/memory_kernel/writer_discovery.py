@@ -430,6 +430,7 @@ def _is_generated_artifact_source(source: str, target: str) -> bool:
         "merge_snapshot.py",
         "organism_council.py",
         "offline_training_bridge.py",
+        "governance/run_nats_live_production_matrix.py",
         "allout_autopilot.py",
         "scout_audit.py",
         "strange_loop.py",

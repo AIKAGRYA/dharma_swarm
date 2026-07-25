@@ -1,0 +1,56 @@
+{
+  "schema": "dharma.cockpit.consolidation_spec.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "verified_git_state": {
+    "origin_main": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "grading_branch": "claude/tracks-consolidation-grading-nb67lq",
+    "grading_branch_head": "ef7565a991636fd0ac6874b1aac52f5f42a0fd14",
+    "grading_ahead_of_main": 7,
+    "grading_behind_main": 0
+  },
+  "feeds": [
+    {"id": "presence", "path": "reports/governance/active_track_evidence.json", "canonicality": "CANONICAL_ORIGIN_MAIN", "projects": "deterministic presence grade per track"},
+    {"id": "health", "path": "reports/governance/track_health.json", "canonicality": "OPEN_PR_REMOTE", "projects": "5-axis quality grade + OVERSTATED flag + attestation"},
+    {"id": "audit", "path": "reports/governance/track_audits/opus-run-{A,B,C}.audit.json", "canonicality": "OPEN_PR_REMOTE", "projects": "audit_opinion + completion_claim_holds + flagged criteria"}
+  ],
+  "per_row_signal": ["presence_grade", "quorum_attestation", "claim_holds", "coverage_contribution", "staleness_ttl", "blockers"],
+  "loudest_flag": "presence==green AND claim_holds==false => OVERSTATED",
+  "ground_truth": {
+    "tracks": 7,
+    "all_serve": "substrate-nativeness",
+    "objective_coverage": 0.33,
+    "uncovered_objectives": ["revenue-external-humans-served", "research-depth"],
+    "attested_shippable": ["runtime-truth-reconciliation", "provider-routing-consolidation"],
+    "overstated": ["truth-graph-platform"],
+    "in_progress_branch_criteria": {"nats": "1/3", "spine-adoption": "6/9", "loop-closure": "9/11", "composer-holon": "6/7"},
+    "in_progress_canonical_criteria": {"nats": "2/2", "spine-adoption": "7/8", "loop-closure": "10/11", "composer-holon": "6/6"},
+    "criteria_count_note": "branch hardened/added criteria; counts differ by criterion set; cockpit must label source"
+  },
+  "umbrella_rollup": {
+    "A_runtime_truth_spine": ["spine-adoption", "runtime-truth-reconciliation", "nats", "truth-graph"],
+    "B_cybernetic_closure_routing": ["loop-closure", "provider-routing"],
+    "C_sovereign_holons": ["composer-holon"]
+  },
+  "criterion_id_remap": {
+    "nats_transport_landed": "nats_contact_module_exists",
+    "agent_runner_calls_spine": "agent_runner_invokes_agent",
+    "orchestrator_calls_spine": "orchestrator_invokes_agent",
+    "loop1_closure_receipt_exists": "loop1_closure_verdict_closed",
+    "new_ids": ["gate1_repo_checkable", "composer_wake_repo_checkable"],
+    "new_predicate": "file_not_contains",
+    "guidance": "detect ids dynamically from the feed; do not hardcode old ids"
+  },
+  "reviewer_floor": {
+    "policy": "only Opus 4.8+ sign-offs count",
+    "enforced_in": "scripts/governance/track_health_grade.meets_capability_floor",
+    "canonicality": "branch_only_today",
+    "cockpit_rule": "do not ingest lower-tier review as authoritative"
+  },
+  "doctrine": "project from owners; no new truth store/authority; cohere with 5-file live-status family",
+  "uncertainties": [
+    "grading branch unmerged: health/audit feeds non-canonical until it lands",
+    "criterion-count contradiction must be labeled by source, not reconciled",
+    "make track-health and track_health_grade.py are branch-only; degrade gracefully on origin/main",
+    "coverage 0.33 corroborated by independent make onboard run"
+  ]
+}

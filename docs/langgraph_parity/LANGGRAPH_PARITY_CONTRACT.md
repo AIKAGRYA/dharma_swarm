@@ -197,3 +197,31 @@ The contract is complete when future implementers can answer these questions fro
 4. Which tools and domains can each agent access?
 5. Which receipts prove the task, handoff, side effect, and final answer happened?
 6. Which benchmark metrics prove parity without confusing candidate scores for acted outcomes?
+
+## Adjudicated Deviations (Differential Oracle, Phase 1)
+
+Maintained by the dharmagraph-engine-2026-07 differential oracle
+(`tests/test_langgraph_differential_oracle.py`, spec §3 Phase 1). The oracle
+runs the parity scenario inventory through BOTH engines — the deterministic
+clone under `dharma_swarm/langgraph_parity/` and real langgraph 1.2.4 (the
+`test-oracle` extra) — and diffs semantic outcomes. Every entry below is a
+divergence the oracle actually observes; if a future run shows parity where
+a deviation is documented, the entry is stale and MUST be removed (the
+oracle enforces this in `test_rejection_receipt_deviation_is_found_and_adjudicated`).
+
+### DEV-1: Rejected handoffs produce durable receipts (deliberate deviation)
+
+- **Observed in:** `swarm_rejected_transfer_tool_not_visible`,
+  `swarm_rejected_transfer_unknown_agent`
+- **dharma:** an invalid transfer (tool not visible to the active agent, or
+  target agent unknown) records a durable `TransferReceipt` with
+  `status="rejected"` and the reason; the turn continues and activation
+  state is unchanged.
+- **langgraph 1.2.4:** such a handoff tool is never bound to the agent, so
+  the call surfaces as an unbound-tool error at the tool-dispatch layer —
+  no durable record of the rejected attempt exists.
+- **Adjudication:** deliberate deviation, dharma keeps its behavior. The
+  receipts-first doctrine (every attempted state transition leaves an
+  operator-witnessable record) outranks tool-surface fidelity here.
+  Activation-state parity is preserved: the final active agent is identical
+  in both engines, so the deviation is bounded to evidence, not behavior.

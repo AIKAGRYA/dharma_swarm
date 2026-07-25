@@ -255,7 +255,7 @@ def _needs_human_decision(row: ControlSurfaceRow) -> bool:
         return True
     if row.authority_role == "incubating" and row.desired_state == "live":
         return True
-    if row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
+    if row.kind == "broken_register" and row.raw.get("status") == "OPEN":
         return True
     if "go_world_receipt_rejections" in row.gap_codes:
         return True
@@ -295,7 +295,7 @@ def _build_human_decision_context(row: ControlSurfaceRow) -> HumanDecisionContex
     elif row.authority_role == "incubating" and row.desired_state == "live":
         why_now = "Incubating surface declared as desired=live"
         recommended_action = f"Implement or promote {row.label}"
-    elif row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
+    elif row.kind == "broken_register" and row.raw.get("status") == "OPEN":
         why_now = f"Open broken register entry: {row.label}"
         recommended_action = f"Fix root cause and close {row.id.replace('br.', 'BR-').replace('_', '-')}"
     elif row.kind == "recursive_discovery" and "human_promotion_required" in row.gap_codes:

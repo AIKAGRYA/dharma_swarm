@@ -20,13 +20,18 @@ from dharma_swarm.a2a.agent_card import (
     CardRegistry,
     _capabilities_for_role,
 )
+from itertools import product
+
 from dharma_swarm.a2a.a2a_server import (
+    _A2A_TRANSITIONS,
     A2AMessage,
     A2APart,
     A2APartType,
     A2AServer,
     A2ATask,
     A2ATaskStatus,
+    A2ATransitionError,
+    a2a_transition_allowed,
 )
 from dharma_swarm.a2a.a2a_client import A2AClient, DelegationResult
 from dharma_swarm.a2a.a2a_bridge import (
@@ -444,6 +449,101 @@ class TestA2AServer:
         summary = server.summary()
         assert summary["completed"] == 2
         assert summary["failed"] == 1
+
+
+# ===========================================================================
+# INV-A2A-TERMINAL-ABSORBING -- terminal states are absorbing
+# ===========================================================================
+
+
+class TestA2ATerminalAbsorbing:
+    """The A2A lifecycle transition table must make terminal states absorbing.
+
+    A terminal task (completed/failed/cancelled/rejected) must have no
+    outgoing edge, so it can never be resurrected to WORKING and re-billed.
+    """
+
+    def test_transition_table_covers_every_state(self):
+        assert set(_A2A_TRANSITIONS) == set(A2ATaskStatus)
+
+    def test_every_terminal_state_has_no_outgoing_edge(self):
+        for terminal in A2ATaskStatus.terminal_states():
+            assert _A2A_TRANSITIONS[terminal] == frozenset(), (
+                f"{terminal.value} is terminal but has outgoing edges "
+                f"{_A2A_TRANSITIONS[terminal]}"
+            )
+
+    def test_empty_out_edges_iff_terminal(self):
+        no_out = {s for s, dsts in _A2A_TRANSITIONS.items() if not dsts}
+        assert no_out == set(A2ATaskStatus.terminal_states())
+
+    @pytest.mark.parametrize(
+        "src,dst",
+        [
+            (s, d)
+            for s, d in product(A2ATaskStatus, A2ATaskStatus)
+            if s in A2ATaskStatus.terminal_states() and d != s
+        ],
+    )
+    def test_no_terminal_to_nonself_transition_allowed(self, src, dst):
+        # Full enumeration of the transition table: every terminal source
+        # rejects every other destination (self-move is a no-op, excluded).
+        assert not a2a_transition_allowed(src, dst)
+
+    @pytest.mark.parametrize("terminal", sorted(A2ATaskStatus.terminal_states()))
+    def test_set_status_raises_leaving_terminal(self, server, terminal):
+        task = A2ATask(capability="x", status=terminal)
+        server._tasks[task.id] = task
+        with pytest.raises(A2ATransitionError):
+            server._set_status(task, A2ATaskStatus.WORKING)
+        # Status is unchanged after the rejected transition.
+        assert task.status == terminal
+
+    def test_completed_to_working_rejected_end_to_end(self, server):
+        # The exact resurrection/re-billing scenario from the spec.
+        task = A2ATask(capability="x", status=A2ATaskStatus.COMPLETED)
+        server._tasks[task.id] = task
+        with pytest.raises(A2ATransitionError):
+            server._set_status(task, A2ATaskStatus.WORKING)
+
+    def test_resubmit_terminal_task_rejected(self, server):
+        def handler(task: A2ATask) -> A2ATask:
+            task.status = A2ATaskStatus.COMPLETED
+            return task
+
+        server.register_handler("x", handler)
+        task = A2ATask(capability="x")
+        done = server.submit(task)
+        assert done.status == A2ATaskStatus.COMPLETED
+        with pytest.raises(A2ATransitionError):
+            server.submit(done)
+
+    @pytest.mark.parametrize(
+        "status",
+        [A2ATaskStatus.WORKING, A2ATaskStatus.INPUT_REQUIRED, A2ATaskStatus.AUTH_REQUIRED],
+    )
+    def test_resubmit_in_flight_task_rejected(self, server, status):
+        calls = 0
+
+        def handler(task: A2ATask) -> A2ATask:
+            nonlocal calls
+            calls += 1
+            return task
+
+        server.set_default_handler(handler)
+        task = A2ATask(capability="x", status=status)
+        with pytest.raises(A2ATransitionError):
+            server.submit(task)
+
+        assert calls == 0
+        assert task.status == status
+
+    def test_terminal_task_cannot_be_cancelled(self, server):
+        for terminal in A2ATaskStatus.terminal_states():
+            task = A2ATask(capability="x", status=terminal)
+            server._tasks[task.id] = task
+            assert not server.cancel(task.id)
+            assert server.get_status(task.id) == terminal
 
 
 # ===========================================================================

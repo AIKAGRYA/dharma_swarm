@@ -17,19 +17,23 @@ Protocol: Embedder interface allows drop-in replacement with sentence-transforme
 
 from __future__ import annotations
 
-import hashlib
-import importlib
 import json
 import logging
-import os
 import re
 import sqlite3
 import struct
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
 import numpy as np
+
+from dharma_swarm.embedders import (
+    Embedder,
+    SentenceTransformerEmbedder as SentenceTransformerEmbedder,
+    TFIDFEmbedder,
+)
+from dharma_swarm.vector_fallback_guard import fallback_vector_scan_allowed
 
 logger = logging.getLogger(__name__)
 _FTS_TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
@@ -140,304 +144,64 @@ def _filter_and_rank_vector_results(
 
 def _memory_retrieval_prefilter_available(conn: sqlite3.Connection) -> bool:
     try:
-        conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
-        return True
+        row = conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
+        return row is not None
     except Exception:
         return False
 
 
-# ---------------------------------------------------------------------------
-# Embedder protocol — swappable TF-IDF now, sentence-transformers later
-# ---------------------------------------------------------------------------
+def _lexical_recovery_search(
+    conn: sqlite3.Connection,
+    db_path: Path,
+    query_text: str,
+    top_k: int,
+    include_invalid: bool,
+    *,
+    memory_prefilter: bool,
+) -> list[dict[str, Any]]:
+    """Recover small-store vector searches when embeddings are unavailable."""
 
-@runtime_checkable
-class Embedder(Protocol):
-    """Pluggable embedding interface.
+    if not fallback_vector_scan_allowed(db_path, conn):
+        return []
+    query_terms = _query_signal_terms(query_text)
+    if not query_terms:
+        return []
+    fts_query = " OR ".join(f'"{term}"' for term in sorted(query_terms))
+    validity_clause = "" if include_invalid else "AND d.valid_until IS NULL"
+    memory_clause = (
+        "AND d.id IN (SELECT vec_doc_id FROM memory_retrieval_docs)"
+        if memory_prefilter
+        else ""
+    )
+    try:
+        rows = conn.execute(f"""
+            SELECT d.id, d.content, d.source, d.layer,
+                   d.metadata_json, d.event_time, d.ingestion_time,
+                   d.valid_until, d.confidence, d.access_count,
+                   d.last_accessed,
+                   bm25(vec_fts) AS bm25_score
+            FROM vec_fts
+            JOIN vec_documents d ON d.id = vec_fts.rowid
+            WHERE vec_fts MATCH ?
+              {validity_clause}
+              {memory_clause}
+            ORDER BY bm25_score
+            LIMIT ?
+        """, (fts_query, max(top_k * 10, 50))).fetchall()
+    except Exception:
+        return []
 
-    TF-IDF now; sentence-transformers as drop-in replacement later.
-    Both must implement embed() and dim.
-    """
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed a list of texts into fixed-dimension dense vectors."""
-        ...
-
-    @property
-    def dim(self) -> int:
-        """Embedding dimensionality."""
-        ...
-
-
-class SentenceTransformerEmbedder:
-    """Neural embedder using sentence-transformers for real semantic similarity.
-
-    Drop-in replacement for TFIDFEmbedder via the Embedder protocol.
-    Loads model lazily on first embed() call to avoid slow startup.
-    Model and state are cached at state_path for fast restarts.
-
-    Default model: all-MiniLM-L6-v2 (384-dim, 22M params, fast on CPU).
-    For better quality at ~2x cost: all-mpnet-base-v2 (768-dim).
-    """
-
-    def __init__(
-        self,
-        model_name: str = "all-MiniLM-L6-v2",
-        dim: int = 384,
-        state_path: Path | None = None,
-    ) -> None:
-        self._model_name = model_name
-        self._dim = dim
-        self._state_path = state_path  # unused but matches protocol shape
-        self._model: Any = None
-
-    @property
-    def dim(self) -> int:
-        return self._dim
-
-    def _ensure_model(self) -> None:
-        if self._model is not None:
-            return
-        try:
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self._model_name)
-            actual_dim = self._model.get_sentence_embedding_dimension()
-            if actual_dim and actual_dim != self._dim:
-                logger.info(
-                    "SentenceTransformerEmbedder: model dim=%d, configured dim=%d — using model dim",
-                    actual_dim, self._dim,
-                )
-                self._dim = actual_dim
-        except ImportError:
-            logger.warning("sentence-transformers not installed, falling back to zero vectors")
-        except Exception as exc:
-            logger.warning("SentenceTransformerEmbedder model load failed: %s", exc)
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed texts using the sentence-transformer model."""
-        if not texts:
-            return []
-        self._ensure_model()
-        if self._model is None:
-            return [[0.0] * self._dim for _ in texts]
-        try:
-            embeddings = self._model.encode(
-                texts,
-                show_progress_bar=False,
-                normalize_embeddings=True,
-                batch_size=64,
-            )
-            return [list(map(float, vec)) for vec in embeddings]
-        except Exception as exc:
-            logger.debug("SentenceTransformerEmbedder.embed failed: %s", exc)
-            return [[0.0] * self._dim for _ in texts]
-
-    def fit_add(self, texts: list[str]) -> None:
-        """No-op for pre-trained model — vocabulary is fixed."""
-        pass
-
-
-class TFIDFEmbedder:
-    """Lightweight embedder using scikit-learn TF-IDF + TruncatedSVD.
-
-    Produces fixed-dimension dense vectors from TF-IDF sparse matrices.
-    Uses TruncatedSVD to reduce to `dim` dimensions (default 128).
-    Fits incrementally — call fit_add() to expand vocabulary.
-
-    Pickle-persisted alongside the SQLite database so vocab survives restarts.
-    """
-
-    def __init__(
-        self,
-        dim: int = 128,
-        state_path: Path | None = None,
-        fit_on_embed: bool = True,
-    ) -> None:
-        self._dim = dim
-        self._state_path = state_path  # Path for pickle persistence
-        self._fit_on_embed = fit_on_embed
-        self._vectorizer: Any = None   # TfidfVectorizer
-        self._svd: Any = None          # TruncatedSVD
-        self._corpus: list[str] = []
-        self._corpus_hash: str = ""
-        self._fitted = False
-        self._load_state()
-
-    @property
-    def dim(self) -> int:
-        return self._dim
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed texts. Fits on first call if not already fitted."""
-        if not texts:
-            return []
-        try:
-            importlib.import_module("sklearn.feature_extraction.text")
-            importlib.import_module("sklearn.decomposition")
-        except ImportError as exc:
-            logger.debug("scikit-learn not available: %s", exc)
-            # Fallback: zero vectors
-            return [[0.0] * self._dim for _ in texts]
-
-        try:
-            if not self._fitted or self._vectorizer is None:
-                if self._corpus:
-                    self._fit(self._corpus)
-                if not self._fitted or self._vectorizer is None:
-                    if not self._fit_on_embed:
-                        return [[0.0] * self._dim for _ in texts]
-                    self._fit(texts)
-                if not self._fitted or self._vectorizer is None:
-                    return [[0.0] * self._dim for _ in texts]
-
-            # Transform
-            tfidf_matrix = self._vectorizer.transform(texts)
-            if tfidf_matrix.shape[1] == 0:
-                if not self._fit_on_embed:
-                    return [[0.0] * self._dim for _ in texts]
-                # Empty vocabulary — refit with current texts only for standalone embedders.
-                self._fit(texts)
-                tfidf_matrix = self._vectorizer.transform(texts)
-
-            # Project to lower dimension via SVD
-            n_features = tfidf_matrix.shape[1]
-            if n_features == 0:
-                return [[0.0] * self._dim for _ in texts]
-
-            # SVD may need refit if feature count changed
-            actual_dim = min(self._dim, n_features)
-            if self._svd is None or self._svd.n_components != actual_dim:
-                if self._corpus:
-                    self._fit(self._corpus)
-                elif self._fit_on_embed:
-                    self._fit(texts)
-                else:
-                    return [[0.0] * self._dim for _ in texts]
-                if not self._fitted or self._vectorizer is None or self._svd is None:
-                    return [[0.0] * self._dim for _ in texts]
-                tfidf_matrix = self._vectorizer.transform(texts)
-                n_features = tfidf_matrix.shape[1]
-                actual_dim = min(self._dim, n_features)
-
-            dense = self._svd.transform(tfidf_matrix)
-
-            # Pad or trim to exactly self._dim
-            result: list[list[float]] = []
-            for row in dense:
-                vec = list(map(float, row))
-                if len(vec) < self._dim:
-                    vec = vec + [0.0] * (self._dim - len(vec))
-                else:
-                    vec = vec[:self._dim]
-                # L2-normalize
-                norm = (sum(v * v for v in vec) ** 0.5) or 1.0
-                result.append([v / norm for v in vec])
-            return result
-
-        except Exception as exc:
-            logger.debug("TFIDFEmbedder.embed failed: %s", exc)
-            return [[0.0] * self._dim for _ in texts]
-
-    def fit_add(self, texts: list[str]) -> None:
-        """Expand vocabulary with new texts and refit."""
-        if not texts:
-            return
-        self._corpus.extend(texts)
-        # Keep corpus bounded
-        if len(self._corpus) > 10000:
-            self._corpus = self._corpus[-10000:]
-        self._fit(self._corpus)
-
-    def fit_replace(self, texts: list[str]) -> None:
-        """Replace the persisted corpus and refit from trusted document text."""
-        self._corpus = []
-        self._corpus_hash = ""
-        self._fitted = False
-        self._vectorizer = None
-        self._svd = None
-        self._fit(texts[-10000:])
-
-    def _fit(self, texts: list[str]) -> None:
-        """Fit TF-IDF + SVD on provided texts."""
-        if not texts:
-            return
-        try:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            from sklearn.decomposition import TruncatedSVD
-
-            corpus = list(set(texts))  # Deduplicate
-            if not corpus:
-                return
-
-            vec = TfidfVectorizer(
-                max_features=5000,
-                sublinear_tf=True,
-                min_df=1,
-                token_pattern=r"(?u)\b\w+\b",
-            )
-            tfidf = vec.fit_transform(corpus)
-            n_features = tfidf.shape[1]
-
-            if n_features == 0:
-                return
-
-            actual_dim = min(self._dim, n_features, len(corpus) - 1)
-            if actual_dim < 1:
-                actual_dim = 1
-
-            svd = TruncatedSVD(n_components=actual_dim, random_state=42)
-            svd.fit(tfidf)
-
-            self._vectorizer = vec
-            self._svd = svd
-            self._fitted = True
-
-            # Update corpus and hash
-            self._corpus = list(corpus)
-            corpus_str = " ".join(sorted(corpus))
-            self._corpus_hash = hashlib.md5(corpus_str.encode()).hexdigest()[:16]
-
-            self._save_state()
-
-        except Exception as exc:
-            logger.debug("TFIDFEmbedder._fit failed: %s", exc)
-
-    def _save_state(self) -> None:
-        """Persist fitted state to disk."""
-        if self._state_path is None:
-            return
-        try:
-            import json as _json
-            state = {
-                # vectorizer/svd are sklearn objects — not JSON-serializable
-                # persist only the corpus and metadata; refit on next load
-                "corpus": self._corpus[-2000:],
-                "corpus_hash": self._corpus_hash,
-                "dim": self._dim,
-                "fitted": False,
-            }
-            with open(self._state_path, "w", encoding="utf-8") as fh:
-                _json.dump(state, fh)
-        except Exception as exc:
-            logger.debug("TFIDFEmbedder._save_state failed: %s", exc)
-
-    def _load_state(self) -> None:
-        """Load persisted state from disk."""
-        if self._state_path is None or not Path(self._state_path).exists():
-            return
-        try:
-            import json as _json
-            with open(self._state_path, "r", encoding="utf-8") as fh:
-                state = _json.load(fh)
-            # vectorizer and svd cannot be serialized to JSON — rebuild on next fit
-            self._vectorizer = None
-            self._svd = None
-            self._corpus = state.get("corpus", [])
-            self._corpus_hash = state.get("corpus_hash", "")
-            self._fitted = False
-            if self._corpus:
-                self._fit(self._corpus)
-        except Exception as exc:
-            logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        bm25 = float(row["bm25_score"] or 0.0)
+        distance = max(0.0, min(1.0, 1.0 + bm25 / 20.0))
+        results.append(VectorStore._row_to_dict_static(row, distance=distance))
+    return _filter_and_rank_vector_results(
+        query_text,
+        results,
+        degenerate_query=True,
+        memory_prefilter=memory_prefilter,
+    )[:top_k]
 
 
 # ---------------------------------------------------------------------------
@@ -458,11 +222,6 @@ class VectorStore:
     """
 
     _SCHEMA_VERSION = 1
-    _DEFAULT_FALLBACK_MAX_DB_BYTES = 256 * 1024 * 1024
-    _DEFAULT_FALLBACK_MAX_ROWS = 50_000
-    _DEFAULT_FTS_MAX_DB_BYTES = 2 * 1024 * 1024 * 1024
-    _DEFAULT_FTS_MAX_ROWS = 250_000
-
     def __init__(
         self,
         state_dir: Path,
@@ -611,84 +370,6 @@ class VectorStore:
             return True
         except Exception:
             return False
-
-    @staticmethod
-    def _env_int(name: str, default: int) -> int:
-        try:
-            return int(str(os.environ.get(name, default)).strip())
-        except (TypeError, ValueError):
-            return default
-
-    def _fallback_vector_scan_allowed(self, conn: sqlite3.Connection) -> bool:
-        """Return whether Python-side vector fallback may scan all embeddings.
-
-        Without sqlite-vec, fallback similarity is O(n): it loads every
-        embedding row and computes cosine similarity in Python. That is fine
-        for small local fixtures but catastrophic for live stores with millions
-        of rows. Large stores should degrade to FTS rather than freeze the
-        daemon's core dispatch loop.
-        """
-        max_bytes = self._env_int(
-            "DHARMA_VECTOR_FALLBACK_MAX_DB_BYTES",
-            self._DEFAULT_FALLBACK_MAX_DB_BYTES,
-        )
-        if max_bytes > 0:
-            try:
-                if self._db_path.exists() and self._db_path.stat().st_size > max_bytes:
-                    return False
-            except OSError:
-                return False
-
-        max_rows = self._env_int(
-            "DHARMA_VECTOR_FALLBACK_MAX_ROWS",
-            self._DEFAULT_FALLBACK_MAX_ROWS,
-        )
-        if max_rows > 0:
-            try:
-                row = conn.execute(
-                    "SELECT seq FROM sqlite_sequence WHERE name = 'vec_documents'"
-                ).fetchone()
-                if row is not None and int(row[0] or 0) > max_rows:
-                    return False
-            except Exception:
-                return False
-
-        return True
-
-    def _fts_search_allowed(self, conn: sqlite3.Connection) -> bool:
-        """Return whether FTS5 retrieval may run against the live projection.
-
-        FTS queries have SQL LIMITs, but on very large FTS5 stores SQLite can
-        still spend seconds or minutes in BM25/docsize scans before returning.
-        The daemon should degrade to no retrieval rather than block task
-        settlement on a projection table.
-        """
-        max_bytes = self._env_int(
-            "DHARMA_VECTOR_FTS_MAX_DB_BYTES",
-            self._DEFAULT_FTS_MAX_DB_BYTES,
-        )
-        if max_bytes > 0:
-            try:
-                if self._db_path.exists() and self._db_path.stat().st_size > max_bytes:
-                    return False
-            except OSError:
-                return False
-
-        max_rows = self._env_int(
-            "DHARMA_VECTOR_FTS_MAX_ROWS",
-            self._DEFAULT_FTS_MAX_ROWS,
-        )
-        if max_rows > 0:
-            try:
-                row = conn.execute(
-                    "SELECT seq FROM sqlite_sequence WHERE name = 'vec_documents'"
-                ).fetchone()
-                if row is not None and int(row[0] or 0) > max_rows:
-                    return False
-            except Exception:
-                return False
-
-        return True
 
     # ------------------------------------------------------------------
     # Public write API
@@ -954,11 +635,11 @@ class VectorStore:
                         results.append(self._row_to_dict(row, distance=row["distance"]))
                 except Exception as vec_exc:
                     logger.debug("vec0 search failed, falling back: %s", vec_exc)
-                    if not self._fallback_vector_scan_allowed(conn):
+                    if not fallback_vector_scan_allowed(self._db_path, conn):
                         return []
                     results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
             else:
-                if not self._fallback_vector_scan_allowed(conn):
+                if not fallback_vector_scan_allowed(self._db_path, conn):
                     return []
                 results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
 
@@ -968,6 +649,15 @@ class VectorStore:
                 degenerate_query=degenerate_query,
                 memory_prefilter=memory_prefilter,
             )
+            if not results:
+                results = _lexical_recovery_search(
+                    conn,
+                    self._db_path,
+                    query_text,
+                    top_k,
+                    include_invalid,
+                    memory_prefilter=memory_prefilter,
+                )
 
             # Update access tracking
             for r in results[:top_k]:
@@ -1047,9 +737,6 @@ class VectorStore:
             return []
         conn = self._connect()
         try:
-            if not self._fts_search_allowed(conn):
-                return []
-
             fts_query = _fts_match_query(query_text)
             if not fts_query:
                 return []
@@ -1208,6 +895,14 @@ class VectorStore:
 
     def _row_to_dict(
         self,
+        row: sqlite3.Row,
+        distance: float | None = None,
+    ) -> dict[str, Any]:
+        """Convert a sqlite3.Row to a plain dict."""
+        return self._row_to_dict_static(row, distance=distance)
+
+    @staticmethod
+    def _row_to_dict_static(
         row: sqlite3.Row,
         distance: float | None = None,
     ) -> dict[str, Any]:

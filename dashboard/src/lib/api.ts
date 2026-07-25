@@ -18,7 +18,13 @@ import type {
   LineageEdgeOut,
   ModuleTruthOut,
   OntologyTypeOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
+  RuntimeControlActionRequest,
+  RuntimeControlActionResult,
   ProvenanceOut,
+  RuntimeGraphSnapshot,
+  RuntimeInterruptsSnapshot,
   StigmergyMarkOut,
   SwarmOverview,
   TaskOut,
@@ -235,6 +241,99 @@ export function fetchHealth(options?: {
   if (options?.runtimeTruth) sp.set("runtime_truth", "true");
   const qs = sp.toString();
   return apiGet<HealthOut>(`/api/health${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeGraph(params?: {
+  session_id?: string;
+  task_id?: string;
+  topology?: string;
+  limit?: number;
+  receipt_limit?: number;
+}): Promise<ApiResponse<RuntimeGraphSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.task_id) sp.set("task_id", params.task_id);
+  if (params?.topology) sp.set("topology", params.topology);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.receipt_limit != null) sp.set("receipt_limit", String(params.receipt_limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeGraphSnapshot>(`/api/runtime/graph${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeInterrupts(params?: {
+  session_id?: string;
+  status?: string;
+  limit?: number;
+}): Promise<ApiResponse<RuntimeInterruptsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeInterruptsSnapshot>(`/api/runtime/interrupts${qs ? `?${qs}` : ""}`);
+}
+
+export function postRuntimeControlAction(
+  action: RuntimeControlActionResult["action"],
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return apiPost<RuntimeControlActionResult>(
+    `/api/runtime/interrupts/${encodeURIComponent(action)}`,
+    body,
+  );
+}
+
+export function approveRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("approve", body);
+}
+
+export function rejectRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("reject", body);
+}
+
+export function resumeRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("resume", body);
+}
+
+export function fetchRuntimeAssistants(params?: {
+  limit?: number;
+}): Promise<ApiResponse<RuntimeAssistantsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeAssistantsSnapshot>(`/api/runtime/assistants${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeBackgroundJobs(params?: {
+  limit?: number;
+}): Promise<ApiResponse<RuntimeBackgroundJobsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeBackgroundJobsSnapshot>(
+    `/api/runtime/background-jobs${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function runtimeEventsStreamPath(params?: {
+  session_id?: string;
+  ledger_kind?: string;
+  event_name?: string;
+  limit?: number;
+}): string {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.ledger_kind) sp.set("ledger_kind", params.ledger_kind);
+  if (params?.event_name) sp.set("event_name", params.event_name);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiPath(`/api/runtime/events/stream${qs ? `?${qs}` : ""}`);
 }
 
 export function backendLivenessPath(): string {

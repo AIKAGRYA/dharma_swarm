@@ -1,0 +1,169 @@
+{
+  "report_type": "ops_and_pr_lifecycle_report",
+  "generated_at": "2026-07-09T06:02:29Z",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "total_surfaces": 16,
+    "joined_count": 12,
+    "joined_pct": 75.0,
+    "adapter_ready_count": 3,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "status_vs_committed": "UNCHANGED — no commit/push required",
+    "open_spine_prs": [],
+    "spine_pr_comment": "No open spine PRs found — most recent spine PR #840 is CLOSED. No comment posted.",
+    "non_joined_surfaces": [
+      {
+        "id": "tool_registry_dispatch",
+        "label": "ToolRegistry side-effect dispatch",
+        "status": "adapter-ready",
+        "files": ["dharma_swarm/tool_registry.py"],
+        "missing_joined_patterns": [
+          {"key": "begin_idempotent", "description": "tool side effects are idempotency-gated", "regex": "try_begin_idempotent_side_effect"}
+        ]
+      },
+      {
+        "id": "self_modification_loop",
+        "label": "Self-modification propose/gate/apply/verify loop",
+        "status": "adapter-ready",
+        "files": ["dharma_swarm/diff_applier.py", "dharma_swarm/evolution.py", "dharma_swarm/self_improve.py"],
+        "missing_joined_patterns": [
+          {"key": "begin_idempotent", "description": "apply path is idempotency-gated", "regex": "try_begin_idempotent_side_effect"}
+        ]
+      },
+      {
+        "id": "mcp_tool_access",
+        "label": "MCP/tool access boundary",
+        "status": "adapter-ready",
+        "files": ["dharma_swarm/mcp_server.py", "dharma_swarm/dharma_context_mcp.py"],
+        "missing_joined_patterns": [
+          {"key": "identity_import", "description": "MCP tools receive execution identity", "regex": "ExecutionIdentity"},
+          {"key": "runtime_store", "description": "MCP tools write to runtime ledger", "regex": "RuntimeStateStore"},
+          {"key": "side_effect_receipt", "description": "MCP side effects emit receipts", "regex": "record_side_effect"}
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "label": "Legacy no-identity escape hatch",
+        "status": "legacy",
+        "files": ["dharma_swarm/runtime_state.py", "tests/test_runtime_state_invariants.py"],
+        "note": "Intentional legacy surface — bypass is explicit and invariant-covered"
+      }
+    ],
+    "top_saturation_targets": [
+      {
+        "priority": 1,
+        "id": "mcp_tool_access",
+        "label": "MCP/tool access boundary",
+        "missing_patterns_count": 3,
+        "note": "Highest gap — needs ExecutionIdentity import, RuntimeStateStore wiring, and side-effect receipts in mcp_server.py + dharma_context_mcp.py"
+      },
+      {
+        "priority": 2,
+        "id": "tool_registry_dispatch",
+        "label": "ToolRegistry side-effect dispatch",
+        "missing_patterns_count": 1,
+        "note": "Single missing pattern: add try_begin_idempotent_side_effect gate in tool_registry.py"
+      },
+      {
+        "priority": 3,
+        "id": "self_modification_loop",
+        "label": "Self-modification propose/gate/apply/verify loop",
+        "missing_patterns_count": 1,
+        "note": "Single missing pattern: add try_begin_idempotent_side_effect gate in diff_applier.py apply path"
+      }
+    ]
+  },
+  "mission_2_pr_lifecycle": {
+    "summary": {
+      "total_open_before": 8,
+      "total_open_after": 8,
+      "auto_closed_count": 0,
+      "mergeable_count": 7,
+      "conflicting_count": 1,
+      "duplicate_auto_grounding_flagged": 0
+    },
+    "auto_closed": [],
+    "conflicting_prs": [
+      {
+        "number": 773,
+        "title": "NĀGA-IR spec triple + receipt emission (combined PR #2 + PR #3)",
+        "created_at": "2026-07-04T08:46:18Z",
+        "age_hours": 117.3,
+        "threshold_hours": 168,
+        "action": "monitor — not yet 7 days old (threshold: 168h); eligible for auto-close 2026-07-11T08:46Z if still CONFLICTING",
+        "additions": 9859,
+        "deletions": 190,
+        "changed_files": 83
+      }
+    ],
+    "green_and_ready": [
+      {
+        "number": 842,
+        "title": "a2a: fleet field registry + 2026-07-09 probe receipts + honest doctor",
+        "created_at": "2026-07-09T04:00:20Z",
+        "additions": 2296,
+        "deletions": 3,
+        "changed_files": 40
+      },
+      {
+        "number": 841,
+        "title": "docs: add rushabdev A2A field probe reply",
+        "created_at": "2026-07-09T03:25:55Z",
+        "additions": 48,
+        "deletions": 0,
+        "changed_files": 2
+      },
+      {
+        "number": 839,
+        "title": "docs(handoff): remote-ops checklist + 24/7 Devin janitor prompt for operator travel",
+        "created_at": "2026-07-08T00:42:20Z",
+        "additions": 160,
+        "deletions": 0,
+        "changed_files": 1
+      },
+      {
+        "number": 838,
+        "title": "graph: DharmaGraph Neutral Graph Core — Candidate Slice A (builder/channels/state/scheduler/compiler + langgraph differential)",
+        "created_at": "2026-07-08T00:37:23Z",
+        "additions": 1877,
+        "deletions": 0,
+        "changed_files": 9
+      },
+      {
+        "number": 837,
+        "title": "chore(docops): reconcile generated counts",
+        "created_at": "2026-07-08T00:29:06Z",
+        "additions": 24,
+        "deletions": 24,
+        "changed_files": 2
+      },
+      {
+        "number": 832,
+        "title": "governance(tam): Transdimensional Abundance Machine — live Company-Builder Parity board",
+        "created_at": "2026-07-07T11:51:18Z",
+        "additions": 2031,
+        "deletions": 299,
+        "changed_files": 13
+      },
+      {
+        "number": 821,
+        "title": "Sarathi holon-system collapse base",
+        "created_at": "2026-07-06T15:57:41Z",
+        "additions": 5189,
+        "deletions": 829,
+        "changed_files": 79
+      }
+    ],
+    "duplicate_auto_grounding": [],
+    "recommended_actions": [
+      "PR #773 (NĀGA-IR spec triple) is CONFLICTING — eligible for auto-close on 2026-07-11T08:46Z if still conflicting. Track for rebase.",
+      "7 green-and-ready PRs await operator merge decision. Suggested order by size (smallest first): #841 (2 files), #839 (1 file), #837 (2 files), #832 (13 files), #842 (40 files), #838 (9 files), #821 (79 files).",
+      "Spine at 93.8% — 1.2pp gap to 95% target. Two single-pattern fixes (idempotency gate in tool_registry.py and diff_applier.py) plus full MCP identity wiring would push to 100% (all 16 surfaces joined). Prioritize mcp_tool_access (3 missing patterns) for highest impact."
+    ]
+  }
+}

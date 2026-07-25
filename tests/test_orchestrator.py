@@ -21,6 +21,7 @@ from dharma_swarm.models import (
     TopologyType,
 )
 from dharma_swarm.orchestrator import Orchestrator
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 
 class MockTaskBoard:
@@ -394,9 +395,247 @@ class DummyRunner:
         return self._result
 
 
+async def _drain_running_tasks(orch: Orchestrator, *, attempts: int = 500) -> None:
+    for _ in range(attempts):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+
+def _ledger_event_names(path):
+    if not path.exists():
+        return []
+    return [
+        json.loads(line)["event"]
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
+
+
+async def _drain_until_task_ledger_event(
+    orch,
+    task_path,
+    progress_path,
+    expected_event,
+    *,
+    attempts=100,
+    delay_seconds=0.01,
+):
+    terminal_progress_events = {
+        "result_persist_failed",
+        "task_blocked",
+        "task_failed",
+        "task_retry_scheduled",
+        "task_dead_lettered",
+    }
+    task_events = []
+    progress_events = []
+    for _ in range(attempts):
+        await orch._collect_completed()
+        task_events = _ledger_event_names(task_path)
+        progress_events = _ledger_event_names(progress_path)
+        if expected_event in task_events:
+            break
+        if terminal_progress_events.intersection(progress_events):
+            break
+        await asyncio.sleep(delay_seconds)
+
+    await orch._collect_completed()
+    return _ledger_event_names(task_path), _ledger_event_names(progress_path)
+
+
 # ---------------------------------------------------------------------------
 # New tests — coverage expansion
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_swarm_handoff_persists_restartable_topology_state(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-swarm-handoff",
+        title="Swarm handoff",
+        description="safe",
+        metadata={
+            "active_agent": "a1",
+            "allowed_handoffs": {"a1": ["a2"]},
+            "handoff_to_agent": "a2",
+            "handoff_reason": "specialist handoff",
+        },
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL),
+            AgentState(id="a2", name="agent-2", role=AgentRole.CODER),
+        ]
+    )
+    pool.set_runner("a2", DummyRunner(result="handoff ok"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_swarm_handoff",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SWARM)
+    await _drain_running_tasks(orch)
+
+    assert dispatches[0].agent_id == "a2"
+    restarted = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    latest = await restarted.get_latest_topology_state_for_task("t-swarm-handoff")
+    assert latest is not None
+    loaded = await restarted.get_topology_state(latest.run_id)
+    assert loaded is not None
+    assert loaded.topology == "swarm"
+    assert loaded.active_agent == "a2"
+    assert loaded.handoff_receipts[0]["status"] == "accepted"
+    assert loaded.handoff_receipts[0]["from_agent"] == "a1"
+    assert loaded.allowed_handoffs["a1"] == ["a2"]
+
+    receipts = await restarted.list_runtime_receipts(
+        run_id=latest.run_id,
+        receipt_type="topology_handoff",
+        limit=10,
+    )
+    assert any(receipt.payload.get("status") == "accepted" for receipt in receipts)
+
+
+@pytest.mark.asyncio
+async def test_supervisor_persists_restartable_final_output_policy_and_delegated_state(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-supervisor-final-output",
+        title="Supervisor final output",
+        description="safe",
+        metadata={"active_agent": "lead"},
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="lead", name="lead", role=AgentRole.GENERAL),
+            AgentState(id="child-a", name="child-a", role=AgentRole.CODER),
+            AgentState(id="child-b", name="child-b", role=AgentRole.TESTER),
+        ]
+    )
+    pool.set_runner("lead", DummyRunner(result="supervisor final answer"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_supervisor_final_output",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SUPERVISOR)
+    await _drain_running_tasks(orch)
+
+    supervisor_dispatch = dispatches[0]
+    supervisor_run_id = str(supervisor_dispatch.metadata["runtime_run_id"])
+    store = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    supervisor_run = await store.get_delegation_run(supervisor_run_id)
+    topology_state = await store.get_topology_state(supervisor_run_id)
+    detail = await store.describe_run(supervisor_run_id)
+
+    assert supervisor_run is not None
+    assert supervisor_run.assigned_to == "lead"
+    assert topology_state is not None
+    assert topology_state.topology == "supervisor"
+    assert topology_state.active_agent == "lead"
+    assert topology_state.current_node == "supervisor"
+    assert topology_state.state["delegated_agent_ids"] == ["child-a", "child-b"]
+    assert topology_state.state["supervisor_final_output_only"] is True
+    assert topology_state.state["user_visible_output"] == "supervisor_final"
+    assert detail is not None
+    assert detail["topology_state"].state["supervisor_final_output_only"] is True
+    assert detail["topology_state"].state["user_visible_output"] == "supervisor_final"
+
+    receipts = await store.list_runtime_receipts(
+        run_id=supervisor_run_id,
+        receipt_type="topology_state",
+        limit=10,
+    )
+    assert any(
+        receipt.payload.get("topology") == "supervisor"
+        and receipt.payload.get("state", {}).get("supervisor_final_output_only") is True
+        for receipt in receipts
+    )
+
+
+@pytest.mark.asyncio
+async def test_subagents_as_tools_persists_parent_and_child_runs(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-subagent-tools",
+        title="Subagents as tools",
+        description="safe",
+        metadata={"active_agent": "parent"},
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="parent", name="parent", role=AgentRole.GENERAL),
+            AgentState(id="child-a", name="child-a", role=AgentRole.CODER),
+            AgentState(id="child-b", name="child-b", role=AgentRole.TESTER),
+        ]
+    )
+    pool.set_runner("parent", DummyRunner(result="parent ok"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_subagent_tools",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SUBAGENTS_AS_TOOLS)
+    await _drain_running_tasks(orch)
+
+    parent_dispatch = dispatches[0]
+    parent_run_id = str(parent_dispatch.metadata["runtime_run_id"])
+    child_run_ids = parent_dispatch.metadata["parent_graph_state"]["child_run_ids"]
+    assert len(child_run_ids) == 2
+
+    store = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    parent_run = await store.get_delegation_run(parent_run_id)
+    children = await store.list_child_runs(parent_run_id)
+    topology_state = await store.get_topology_state(parent_run_id)
+
+    assert parent_run is not None
+    assert parent_run.assigned_to == "parent"
+    assert {child.run_id for child in children} == set(child_run_ids)
+    assert {child.parent_run_id for child in children} == {parent_run_id}
+    assert {child.assigned_to for child in children} == {"child-a", "child-b"}
+    assert topology_state is not None
+    assert topology_state.child_run_ids == child_run_ids
+
+    receipts = await store.list_runtime_receipts(
+        run_id=parent_run_id,
+        receipt_type="child_spawned",
+        limit=10,
+    )
+    assert {receipt.payload["child_run_id"] for receipt in receipts} >= set(child_run_ids)
 
 @pytest.mark.asyncio
 async def test_dispatch_pipeline_assigns_first_idle_only(agents, tasks):
@@ -589,6 +828,8 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
             assert kwargs.get("memory_kernel") is not None
 
         async def compile_bundle(self, **kwargs):
+            assert kwargs["metadata"]["agent_id"] == "a1"
+            assert kwargs["metadata"]["topology"] == "swarm"
             return ContextBundleRecord(
                 bundle_id="bnd_memory_kernel",
                 session_id=kwargs["session_id"],
@@ -607,6 +848,11 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
                         "admitted_count": 1,
                         "omitted_count": 2,
                         "warnings": ["preview_only_no_runtime_prompt_injection"],
+                        "isolation_applied": True,
+                        "isolation_agent_id": "a1",
+                        "allowed_agent_ids": ["a1"],
+                        "allowed_scopes": ["project", "agent", "swarm"],
+                        "allowed_memory_lanes": ["provenance", "semantic"],
                     }
                 },
             )
@@ -633,7 +879,7 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
         ledger_dir=tmp_path / "ledgers",
         runtime_db_path=tmp_path / "runtime.db",
     )
-    td = TaskDispatch(task_id=task.id, agent_id="a1")
+    td = TaskDispatch(task_id=task.id, agent_id="a1", topology=TopologyType.SWARM)
 
     meta = await orch._attach_context_bundle(task, td, {})
 
@@ -642,7 +888,13 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
     assert meta["memory_kernel_pack_id"] == "memory_context_pack:test"
     assert meta["memory_kernel_admitted_count"] == 1
     assert meta["memory_kernel_omitted_count"] == 2
+    assert meta["memory_kernel_isolation_applied"] is True
+    assert meta["memory_kernel_isolation_agent_id"] == "a1"
+    assert meta["memory_kernel_allowed_agent_ids"] == ["a1"]
+    assert meta["memory_kernel_allowed_scopes"] == ["project", "agent", "swarm"]
+    assert meta["memory_kernel_allowed_memory_lanes"] == ["provenance", "semantic"]
     assert td.metadata["memory_kernel_status"] == "used"
+    assert td.metadata["memory_kernel_isolation_applied"] is True
 
 
 @pytest.mark.asyncio
@@ -664,27 +916,88 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
         session_id="sess_test",
     )
 
-    await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
-
     task_path = tmp_path / "sess_test" / "task_ledger.jsonl"
     progress_path = tmp_path / "sess_test" / "progress_ledger.jsonl"
+    dispatches = await orch.route_next()
+    assert len(dispatches) == 1
+
+    task_events, progress_events = await _drain_until_task_ledger_event(
+        orch,
+        task_path,
+        progress_path,
+        "result_persisted",
+    )
+
     assert task_path.exists()
     assert progress_path.exists()
 
-    task_events = [json.loads(line)["event"] for line in task_path.read_text().splitlines() if line.strip()]
-    progress_events = [json.loads(line)["event"] for line in progress_path.read_text().splitlines() if line.strip()]
-
     assert "dispatch_assigned" in task_events
-    assert "result_persisted" in task_events
+    assert "result_persisted" in task_events, {
+        "task_events": task_events,
+        "progress_events": progress_events,
+    }
     assert "task_started" in progress_events
     assert "task_completed" in progress_events
     assert any(topic == "orchestrator.lifecycle" for topic, _ in bus.published)
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_spine_dispatch_is_default_and_persists_receipt(
+    tmp_path, monkeypatch
+):
+    """Unset DHARMA_SPINE_DISPATCH should use invoke_agent, not legacy direct."""
+    import sqlite3
+
+    monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-spine-default", title="Spine default", description="safe")]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(result="spine ok"))
+    runtime_db = tmp_path / "runtime.db"
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_spine_default",
+    )
+
+    await orch.route_next()
+    await _drain_running_tasks(orch)
+
+    receipt = orch._last_evidence_receipt
+    assert receipt.operation == "invoke_agent"
+    assert receipt.task_id == "t-spine-default"
+    assert receipt.status == "ok"
+
+    with sqlite3.connect(runtime_db) as db:
+        row = db.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE task_id = ?",
+            ("t-spine-default",),
+        ).fetchone()
+
+    assert row is not None and row[0]
+    persisted = json.loads(row[0])
+    assert persisted["operation"] == "invoke_agent"
+    assert persisted["receipt_id"] == str(receipt.receipt_id)
+    assert persisted["attributes"]["topology"] == "fan_out"
+    assert persisted["attributes"]["run_id"]
+    assert persisted["attributes"]["idempotency_key"]
+    assert persisted["attributes"]["side_effect_key"] == "invoke_agent:t-spine-default:a1"
+
+
+def test_orchestrator_spine_dispatch_false_like_env_values_opt_out(monkeypatch):
+    monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+    assert Orchestrator._spine_dispatch_enabled() is True
+
+    for value in ("0", "false", "False", "off", "legacy", "direct"):
+        monkeypatch.setenv("DHARMA_SPINE_DISPATCH", value)
+        assert Orchestrator._spine_dispatch_enabled() is False
+
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
+    assert Orchestrator._spine_dispatch_enabled() is True
 
 
 @pytest.mark.asyncio
@@ -717,12 +1030,7 @@ async def test_orchestrator_fail_closes_when_honors_checkpoint_missing(tmp_path)
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-honors-missing"
@@ -740,7 +1048,14 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     pool = MockAgentPool(
         [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
     )
-    pool.set_runner("a1", DummyRunner(error=RuntimeError("Timeout while reading provider stream 1234567890abcdef")))
+    pool.set_runner(
+        "a1",
+        DummyRunner(
+            error=RuntimeError(
+                "Timeout while reading provider stream 1234567890abcdef"
+            )
+        ),
+    )
 
     orch = Orchestrator(
         task_board=board,
@@ -750,12 +1065,7 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     progress_path = tmp_path / "sess_fail" / "progress_ledger.jsonl"
     assert progress_path.exists()
@@ -769,6 +1079,83 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     sig = failed[0].get("failure_signature", "")
     assert "timeout while reading provider stream" in sig
     assert "<id>" in sig
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_failure_progress_precedes_runtime_lifecycle(tmp_path, monkeypatch):
+    """Failure progress receipts should not wait on runtime-state persistence."""
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-fail-fast-ledger", title="Fail task", description="safe")]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner(
+        "a1",
+        DummyRunner(
+            error=RuntimeError(
+                "Timeout while reading provider stream 1234567890abcdef"
+            )
+        ),
+    )
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_fail_fast_ledger",
+    )
+    runtime_block = asyncio.Event()
+    runtime_write_started = asyncio.Event()
+
+    async def blocked_runtime_write(*_args, **kwargs):
+        if kwargs.get("status") != "failed":
+            return
+        runtime_write_started.set()
+        await runtime_block.wait()
+
+    monkeypatch.setattr(
+        orch._runtime_lifecycle,
+        "record_task_claim",
+        blocked_runtime_write,
+    )
+    monkeypatch.setattr(
+        orch._runtime_lifecycle,
+        "record_delegation_run",
+        blocked_runtime_write,
+    )
+
+    await orch.route_next()
+    progress_path = tmp_path / "sess_fail_fast_ledger" / "progress_ledger.jsonl"
+
+    try:
+        found = False
+        for _ in range(100):
+            await orch._collect_completed()
+            if progress_path.exists():
+                rows = [
+                    json.loads(line)
+                    for line in progress_path.read_text().splitlines()
+                    if line.strip()
+                ]
+                found = any(
+                    r.get("event") in {"task_failed", "task_retry_scheduled"}
+                    for r in rows
+                )
+                if found:
+                    break
+            await asyncio.sleep(0.01)
+
+        assert found, "Expected failure or retry event before runtime lifecycle finishes"
+        assert orch._running_tasks
+        assert runtime_write_started.is_set()
+    finally:
+        runtime_block.set()
+        for _ in range(100):
+            await orch._collect_completed()
+            if not orch._running_tasks:
+                break
+            await asyncio.sleep(0.01)
+        await orch._collect_completed()
 
 
 @pytest.mark.asyncio
@@ -795,12 +1182,7 @@ async def test_orchestrator_timeout_marks_failed_without_retry(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-timeout"
@@ -834,12 +1216,7 @@ async def test_orchestrator_timeout_requeues_with_retry_budget(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     failed_seen = any(
         task_id == "t-timeout-retry" and fields.get("status") == TaskStatus.FAILED
@@ -876,12 +1253,7 @@ async def test_orchestrator_connection_error_auto_requeues_transient_failure(tmp
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-conn-retry" and fields.get("status") == TaskStatus.PENDING
@@ -920,12 +1292,7 @@ async def test_orchestrator_long_timeout_auto_requeues_and_expands_timeout(tmp_p
     orch._long_timeout_retry_threshold_seconds = 0.0
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-long-timeout" and fields.get("status") == TaskStatus.PENDING
@@ -1193,3 +1560,59 @@ def test_retry_policy_for_failure_passthrough():
     )
     assert failure_class == "execution_error"
     assert retry_count == 0
+
+
+@pytest.mark.asyncio
+async def test_bsp_barrier_cancellation_releases_agent_and_requeues(tmp_path):
+    """Stragglers cancelled by the hard barrier must not remain ghost dispatches."""
+
+    class TrackingPool(MockAgentPool):
+        def __init__(self, agents):
+            super().__init__(agents)
+            self.released: list[str] = []
+
+        async def release(self, agent_id):
+            self.released.append(agent_id)
+
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-straggler",
+            title="Barrier straggler",
+            metadata={"active_claim": {"claim_id": "claim-straggler"}, "max_retries": 1},
+        )
+    ]
+    pool = TrackingPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_barrier_cancel",
+    )
+    orch._default_timeout_seconds = -60.0
+    dispatch = TaskDispatch(task_id="t-straggler", agent_id="a1")
+
+    async def never_finishes():
+        await asyncio.sleep(3600)
+
+    running = asyncio.create_task(never_finishes())
+    orch._running_tasks["t-straggler"] = running
+    orch._active_dispatches["t-straggler"] = dispatch
+
+    settled, recovered = await orch._collect_completed_with_barrier()
+
+    assert settled == 0
+    assert recovered == 1
+    assert running.cancelled()
+    assert "t-straggler" not in orch._running_tasks
+    assert "t-straggler" not in orch._active_dispatches
+    assert pool.released == ["a1"]
+    assert any(
+        task_id == "t-straggler"
+        and fields.get("status") == TaskStatus.PENDING
+        and "active_claim" not in fields.get("metadata", {})
+        and fields.get("metadata", {}).get("last_failure_source") == "bsp_barrier_timeout"
+        for task_id, fields in board.updates
+    )

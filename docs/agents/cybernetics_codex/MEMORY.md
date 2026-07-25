@@ -6,7 +6,7 @@ Newest entries first.
 
 - Created the repo-native nest at `docs/agents/cybernetics_codex/`.
 - Bound the steward to the existing Stage-1 external registration desk, not a new registry.
-- Declared `dharma.a2a.cybernetics-codex` as the NATS-facing subject, with `runtime_status: declared_not_started`.
+- Declared `A2AInboxRoute` / `agent-inbox` at `dharma.agent.cybernetics_codex.inbox`, with `runtime_status: declared_not_started`.
 - Authority remains `external_worker_evidence_only`; no source writes, provider calls, spend, live external account action, PR approval, or autonomous dispatch.
 - Primary verifier: `python3 scripts/governance/cybernetics_codex_audit.py --json`.
 

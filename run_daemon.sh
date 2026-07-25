@@ -46,18 +46,6 @@ if [[ "${MISSION_PREFLIGHT}" == "1" ]]; then
   }
 fi
 
-# --- Load secrets from daemon.env (preferred) or environment ---
-DAEMON_ENV="${STATE_DIR}/daemon.env"
-if [ -f "$DAEMON_ENV" ]; then
-  # shellcheck disable=SC1090
-  set -a
-  source "$DAEMON_ENV"
-  set +a
-  echo "[run_daemon] Loaded secrets from $DAEMON_ENV"
-else
-  echo "[run_daemon] WARNING: $DAEMON_ENV not found, using environment variables"
-fi
-
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) dharma_swarm daemon starting" | tee -a "$LOG_DIR/daemon.log"
 echo "  state_dir: $STATE_DIR"
 echo "  pid: $$"

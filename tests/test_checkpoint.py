@@ -269,3 +269,36 @@ class TestInterruptFilesystem:
         cleanup_interrupt("test123")
         assert not (tmp_path / "test123.request.json").exists()
         assert not (tmp_path / "test123.response.json").exists()
+
+
+def test_superstep_checkpoint_save_fsyncs_before_rename(tmp_path, monkeypatch):
+    """Crash-recovery durability: the temp file must be fsynced before rename."""
+    import os as _os
+
+    from dharma_swarm.checkpoint import SuperstepCheckpoint
+
+    synced_fds: list[int] = []
+    real_fsync = _os.fsync
+
+    def _recording_fsync(fd):
+        synced_fds.append(fd)
+        return real_fsync(fd)
+
+    monkeypatch.setattr(_os, "fsync", _recording_fsync)
+
+    checkpoint = SuperstepCheckpoint(
+        superstep_id=3,
+        running_task_ids=["task-a"],
+        active_dispatch_ids=["dispatch-b"],
+    )
+    target = tmp_path / "superstep.json"
+    checkpoint.save(target)
+
+    assert len(synced_fds) >= 2, (
+        "save() must fsync the temp file before renaming it and the parent"
+        " directory after the rename"
+    )
+    loaded = SuperstepCheckpoint.load(target)
+    assert loaded is not None
+    assert loaded.superstep_id == 3
+    assert loaded.running_task_ids == ["task-a"]

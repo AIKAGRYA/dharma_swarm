@@ -568,20 +568,20 @@ def sprint(
         gather_system_state,
         generate_evolved_prompt,
         generate_local_prompt,
-        _days_to_colm,
         _SHARED_DIR,
     )
+    from dharma_swarm.research_deadlines import deadline_line
 
     today = _date.today().strftime("%Y%m%d")
     out_path = Path(output) if output else _SHARED_DIR / f"SPRINT_8H_{today}.md"
 
     async def _sprint():
         system_state = gather_system_state()
-        colm_days, colm_paper = _days_to_colm()
+        research_line = deadline_line()
 
         live = system_state.get("live_signals", {})
         console.print(f"[cyan]Sprint generator — {today}[/cyan]")
-        console.print(f"  COLM abstract: {colm_days} days | paper: {colm_paper} days")
+        console.print(f"  Research deadline: {research_line}")
         console.print(f"  Morning brief: {'yes' if 'no morning' not in live.get('morning_brief','') else 'none'}")
         console.print(f"  Dream seeds: {'yes' if 'no dream' not in live.get('dream_seeds','') else 'none'}")
         console.print(f"  Sprint handoff: {'yes' if 'no handoff' not in live.get('sprint_handoff','') else 'none'}")
@@ -590,7 +590,7 @@ def sprint(
             prompt_text = generate_local_prompt(
                 test_summary=test_summary,
                 prev_todo=prev_todo,
-                colm_days=colm_days,
+                deadline_line=research_line,
             )
             mode = "local"
         else:
@@ -599,7 +599,7 @@ def sprint(
                     system_state=system_state,
                     test_summary=test_summary,
                     prev_todo=prev_todo,
-                    colm_days=colm_days,
+                    deadline_line=research_line,
                     llm_timeout_sec=llm_timeout_sec,
                 )
                 mode = "LLM"
@@ -608,7 +608,7 @@ def sprint(
                 prompt_text = generate_local_prompt(
                     test_summary=test_summary,
                     prev_todo=prev_todo,
-                    colm_days=colm_days,
+                    deadline_line=research_line,
                 )
                 mode = "local (fallback)"
 
@@ -616,7 +616,7 @@ def sprint(
         out_path.write_text(
             f"# 8-HOUR SPRINT — {today}\n"
             f"**Generated**: {_date.today().isoformat()} | **Mode**: {mode}\n"
-            f"**COLM**: {colm_days} days (abstract) / {colm_paper} days (paper)\n\n"
+            f"**Research deadline**: {research_line}\n\n"
             + prompt_text
         )
         console.print(f"[green]Sprint written to: {out_path}[/green]")

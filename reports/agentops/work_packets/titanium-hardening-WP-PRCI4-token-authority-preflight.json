@@ -1,0 +1,92 @@
+{
+  "id": "titanium-hardening-WP-PRCI4-token-authority-preflight",
+  "base_ref": "e7a17f8715285f502fb574b1b4ec00d07f404dd2",
+  "branch": "agent/pr-ci-token-authz-preflight-20260723",
+  "worktree": ".",
+  "intent": "Make PR CI-health rebase recovery fail closed on proven repository push authority and refuse workflow-file rebases when separate workflow-write authority is not proven.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "scripts/governance/pr_ci_safe_rebase.py",
+    "tests/test_pr_ci_health.py",
+    "tests/test_pr_ci_safe_rebase.py",
+    "reports/agentops/work_packets/titanium-hardening-WP-PRCI4-token-authority-preflight.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "pr-ci-health-token-authority-tests",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py tests/test_pr_ci_safe_rebase.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "pr-ci-health-token-authority-ruff",
+      "command": "python3 -m ruff check scripts/governance/pr_ci_safe_rebase.py tests/test_pr_ci_health.py tests/test_pr_ci_safe_rebase.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "removing-push-authority-query-breaks-binding-test",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); old='.permissions.push // false'; assert old in t; p.write_text(t.replace(old,'.permissions.admin // false',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_health.py::test_workflow_validates_push_authority_before_rebase'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "removing-workflow-path-guard-breaks-safe-rebase-test",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('scripts/governance/pr_ci_safe_rebase.py'); t=p.read_text(); old='WORKFLOW_PREFIX = \\\".github/workflows/\\\"'; assert old in t; p.write_text(t.replace(old,'WORKFLOW_PREFIX = \\\".github/workflow/\\\"',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_safe_rebase.py::test_workflow_path_and_rename_skip_before_git'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(ci-health): validate recovery token authority"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRCI4",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "e7a17f8715285f502fb574b1b4ec00d07f404dd2",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The workflow maps secret presence to trusted push authority, but live run 30018083147 proved the configured fallback token authenticates without repository write permission and every attempted rebase push fails with HTTP 403.",
+      "Repository push authority does not imply workflow-file write authority; an otherwise authorized credential can still receive HTTP 403 when a rebased PR changes .github/workflows/**."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_health.py",
+      "tests/test_pr_ci_safe_rebase.py",
+      "reports/agentops/work_packets/titanium-hardening-WP-PRCI3-trusted-pat-recovery.json"
+    ],
+    "honest_blockers": [
+      "A dedicated PR_CI_HEALTH_PUSH_TOKEN has been provisioned from the operator's valid OAuth keyring credential to restore the lane immediately; its repo/workflow scope is broader than the preferred fine-grained contents-write-only credential and should be replaced when that dedicated credential is available.",
+      "The repository API permission probe proves current repository push authorization, not future validity, workflow-trigger semantics, or least-privilege scope. Workflow-changing PRs are therefore always skipped by the automatic rebase helper instead of inferring workflow-write authority.",
+      "Hosted exact-head CI, a second live rebase run, independent review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the workflow, safe-rebase guard, regression tests, and this packet together. Secret presence would again become the recovery-authority signal and workflow-changing PRs could reach pushes without proven workflow-write authority.",
+    "packet_digest": "74e05245e0af8a82ea9385b4000b57e0c81351884e2527d04ca549e8a13e0692"
+  }
+}

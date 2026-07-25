@@ -608,7 +608,7 @@ class ArchaeologyIngestionDaemon:
     async def run_once(self) -> dict[str, int]:
         """Run one full ingestion cycle. Returns counts per stream."""
         try:
-            from dharma_swarm.memory_palace import MemoryPalace, PalaceQuery
+            from dharma_swarm.memory_palace import MemoryPalace
             palace = MemoryPalace(state_dir=self._state_dir)
         except Exception as exc:
             logger.error("ArchaeologyIngestionDaemon: MemoryPalace unavailable: %s", exc)

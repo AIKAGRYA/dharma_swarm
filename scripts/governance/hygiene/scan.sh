@@ -5,4 +5,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
-python3 scripts/governance/hygiene/scan.py "$@"
+scripts/governance/run_python_with_repo_env.sh scripts/governance/hygiene/scan.py "$@"

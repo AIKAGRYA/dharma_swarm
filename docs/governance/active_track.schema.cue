@@ -15,6 +15,35 @@
 // Python checker. Use both: CUE for shape, Python for the graph.
 
 #Id: =~"^[a-z0-9][a-z0-9-]*$"
+#ClosureKind: "VERIFIED_SLICE" | "CLOSED_NOT_PROD" | "RETIRED" | "SUPERSEDED" | "PRODUCTION_READY" | "SUBSTRATE_TRUSTED"
+#GraduationProfile: "generic" | "runtime_transport" | "runtime_truth" | "provider_routing" | "filesystem_substrate" | "agent_identity" | "governance_gate" | "orchestration" | "revenue_external" | "research_depth" | "truth_graph" | "holon_bridge"
+#FinalBossReview: {
+	dossier: string & !=""
+	council_receipt: string & !=""
+	council_receipts?: [...string]
+	council_coverage: [...{
+		round: int & >=1
+		dimension: string & !=""
+		council_receipt: string & !=""
+	}]
+	reviewer_count: int & >=6
+	score_min: 100
+	explicit_disagreements: 0
+	local_verifiers_passed: true
+	local_verifier_results: [...{
+		id: string & !=""
+		command: string & !=""
+		passed: true
+		returncode: 0
+		...
+	}]
+	rounds: int & >=2
+	dimensions: [...string]
+	runtime_evidence?: [...string]
+	failure_modes_tested?: [...string]
+	mock_only?: bool
+	...
+}
 
 #Criterion: {
 	id:   string & !=""
@@ -65,6 +94,9 @@
 	// The no-global-mutex coordination plane: overlap among ACTIVE tracks warns.
 	owned_surfaces?:    [...string]
 	moves_vital_signs?: [...string]
+	graduation_profile?: #GraduationProfile
+	target_closure_kind?: #ClosureKind
+	final_boss_review?: #FinalBossReview
 
 	description?:        string
 	prerequisites?:      [...#Criterion]
@@ -101,7 +133,13 @@ vital_signs?: {
 }
 active_tracks: [...#Track] & [_, ...] | *[]   // v2: list of tracks
 active_track?: #Track                          // v1 legacy singular (adapter)
-closed_tracks?: [...{id: #Id, ...}]
+closed_tracks?: [...{
+	id: #Id
+	closure_kind?: #ClosureKind
+	graduation_profile?: #GraduationProfile
+	final_boss_review?: #FinalBossReview
+	...
+}]
 living_axioms_ref?: string
 
 // At least one track must be declared (v1 singular OR v2 list).

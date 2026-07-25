@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-07-01T00:08:16Z",
+  "round_id": "phase-5-memory-curated-source-tool-isolation",
+  "status": "completed_partial",
+  "target_gate": "Prove curated-source coverage and full tool-exposure isolation in live MemoryKernel context packs",
+  "score_after_round": 80,
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "implementation": {
+    "curated_source_coverage": {
+      "budget_fields": [
+        "MemoryContextBudget.require_source_digest",
+        "MemoryContextBudget.require_source_row_key"
+      ],
+      "default_context_enabled": true,
+      "omission_reasons": [
+        "source_digest_required",
+        "source_row_key_required"
+      ],
+      "query_requirements_preserved": [
+        "MemoryQuery.require_source_digest",
+        "MemoryQuery.require_source_row_key"
+      ]
+    },
+    "tool_exposure_isolation": {
+      "budget_field": "MemoryContextBudget.block_tool_exposure",
+      "default_context_enabled": true,
+      "structured_metadata_blocked": [
+        "visible_tools",
+        "requested_tools",
+        "late_bound_tools",
+        "tool_calls",
+        "tool_results",
+        "tool_plan",
+        "tool_request",
+        "tool_registry",
+        "tool_schema",
+        "tool_schemas",
+        "denial_reasons"
+      ],
+      "flag_metadata_blocked": [
+        "tool_exposure",
+        "exposes_tools",
+        "contains_tool_exposure",
+        "contains_tool_plan"
+      ],
+      "omission_reason": "tool_exposure_blocked"
+    }
+  },
+  "files_touched": [
+    "dharma_swarm/memory_kernel/context_admission.py",
+    "dharma_swarm/memory_kernel/default_context.py",
+    "dharma_swarm/memory_kernel/tool_exposure.py",
+    "tests/test_context_compiler_memory_kernel.py",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+    "reports/langgraph_parity/allnight/memory_curated_source_tool_isolation_20260701T000816Z.json"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_enforces_curated_source_and_tool_exposure_isolation --tb=short",
+      "result": "1 passed in 0.22s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py",
+      "result": "31 passed in 0.60s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py",
+      "result": "55 passed in 0.65s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "passed; modules_over_500_lines 207 -> 207 after splitting tool exposure helper"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+    "Full live multi-process resume semantics remain unproven.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

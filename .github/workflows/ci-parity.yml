@@ -1,0 +1,60 @@
+name: ci-parity
+
+# Guards the required-check set against drift. Asserts the committed
+# expected-guard manifest (scripts/governance/ci_parity_manifest.json) still
+# equals the live branch-protection required contexts, that every required
+# context maps to a real producing job, and that no required job has become a
+# false-green sensor (job-level continue-on-error, a regression-sensitive job
+# that swallows errors, or a regression-sensitive job that self-skips on
+# merge_group). The hosted check fails closed unless a dedicated
+# Administration:read token can read live branch protection; structural-only
+# evidence is diagnostic and can never turn this job green by itself.
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  merge_group:
+
+concurrency:
+  group: ci-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci-parity:
+    name: CI parity guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Run CI parity guard (structural precheck)
+        run: |
+          python3 scripts/governance/check_ci_parity.py --allow-missing-live
+
+      - name: Fetch live branch protection
+        env:
+          GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error title=ci-parity::CI_PARITY_ADMIN_READ_TOKEN is required; structural-only evidence cannot verify live branch-protection parity."
+            exit 1
+          fi
+          branch="${{ github.event.repository.default_branch }}"
+          if [ -z "${branch}" ]; then branch="main"; fi
+          gh api "repos/${{ github.repository }}/branches/${branch}/protection" \
+            > protection.json
+
+      - name: Run CI parity guard (live)
+        run: |
+          python3 scripts/governance/check_ci_parity.py \
+            --protection-json protection.json

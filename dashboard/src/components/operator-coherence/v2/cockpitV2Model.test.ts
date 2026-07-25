@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -7,30 +8,25 @@ import {
   MODES,
   TRUTH_TAXONOMY,
   actionToInspect,
-  buildActionPackets,
   buildAuthorityInspect,
-  buildReportSourceSummary,
   buildHandoff,
   buildLaneAdmissionInspect,
+  buildTrackLifecycleReviews,
   buildTopPanels,
   cardFacetBadges,
   cardToInspect,
   classifyCardTruth,
+  deriveBranchRiskProjection,
+  deriveCheckoutAuthority,
   filterCards,
+  formatCount,
   humanKind,
   humanRisk,
+  metricNeedsAttention,
   modeMatches,
   readinessTone,
   sourceToInspect,
-  STATUS_TOKENS,
-  statusTone,
-  buildAnswerRibbon,
-  buildUncertainty,
-  buildTopology,
-  buildEventTape,
-  cardFreshness,
-  freshnessFromAge,
-  nodeMatchesFilter,
+  summarizeTrackLifecycleProjection,
 } from "./cockpitV2Model.ts";
 
 function card(overrides: Record<string, unknown> = {}) {
@@ -101,7 +97,7 @@ function report() {
       card({ id: "live:1", kind: "live_ops_surface", title: "Dharma daemon — stale", risk: "stale_liveness_claim", lane: "Needs Repair", branch: "" }),
       card({ id: "track:1", kind: "track", title: "Runtime Truth Reconciliation", risk: "stale_claim", lane: "Needs Repair", branch: "" }),
     ],
-    track_portfolio: { active_count: 11, closed_count: 4, tracks: [], proposed_tracks: [], broken_register: {} },
+    track_portfolio: { active_count: 10, closed_count: 4, policy: { max_active: 10 }, tracks: [], proposed_tracks: [], broken_register: {} },
     rogue_work_radar: {
       cards: [],
       dirty_worktree_count: 8,
@@ -114,7 +110,7 @@ function report() {
     },
     agent_terminal_census: {},
     branch_census: { total: 207, local_only: 107, unpushed_ahead: 40, orphaned_gone: 55, stale: 87 },
-    git: { main: { branch: "telos-ai-seed-v0-from-sandbox", branch_line: "## telos-ai-seed-v0-from-sandbox...origin/telos-ai-seed-v0-from-sandbox [ahead 2]" } },
+    git: { main: { branch: "main", branch_line: "## main...origin/main", head: "0123456789abcdef0123456789abcdef01234567", dirty_count: 0, ahead: 0, behind: 0 } },
     live_ops: { enabled: true, summary: { total: 17, by_status: { live: 4, stale: 2, blocked: 2, stopped: 9 } } },
     onboarding: { status: "wired", target: "make onboard" },
     runtime_receipts: { runtime_dbs: [], receipt_count: 19, recent_receipts: [] },
@@ -125,21 +121,9 @@ function report() {
   } as Parameters<typeof buildTopPanels>[0];
 }
 
-test("MODES exposes the operator board lenses incl. topology/recursive/errors", () => {
+test("MODES exposes the eight operator board lenses", () => {
   const ids = MODES.map((m) => m.id);
-  for (const expected of [
-    "overview",
-    "triage",
-    "topology",
-    "recursive",
-    "git",
-    "runtime",
-    "tracks",
-    "preservation",
-    "evidence",
-    "errors",
-    "design",
-  ]) {
+  for (const expected of ["overview", "triage", "git", "runtime", "tracks", "preservation", "evidence", "design"]) {
     assert.ok(ids.includes(expected as (typeof ids)[number]), `missing mode ${expected}`);
   }
 });
@@ -163,6 +147,9 @@ test("buildTopPanels yields six evidence-backed stat panels with inspect payload
   const readiness = panels.find((p) => p.id === "readiness");
   assert.ok(readiness, "readiness panel present");
   assert.equal(readiness?.value, "41.5%");
+  assert.equal(readiness?.title, "Evidence coherence");
+  assert.equal(readiness?.inspect.title, "Evidence coherence");
+  assert.doesNotMatch(`${readiness?.title} ${readiness?.inspect.title}`, /prod(?:uction)? readiness/i);
   assert.ok((readiness?.inspect.evidence ?? []).length >= 3, "readiness inspect carries category evidence");
 });
 
@@ -212,11 +199,15 @@ test("human labels and readiness tone are operator-friendly", () => {
   assert.equal(readinessTone(80), "ok");
   assert.equal(readinessTone(50), "warn");
   assert.equal(readinessTone(20), "danger");
+  assert.equal(metricNeedsAttention("Branches", 207, 207, 0.3), false);
+  assert.equal(metricNeedsAttention("Live", 4, 17, 0.3), false);
+  assert.equal(metricNeedsAttention("Local-only", 4, 10, 0.3), true);
+  assert.equal(formatCount(null), "—");
 });
 
 test("truth taxonomy and facet badges distinguish candidate/live/stale/local state", () => {
   assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "DIRTY_LOCAL_CANDIDATE"));
-  assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "CANONICAL_ORIGIN_MAIN"));
+  assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "CLEAN_LOCAL_MAIN"));
   assert.equal(classifyCardTruth(card()).code, "LOCAL_ONLY_BRANCH");
   assert.equal(classifyCardTruth(card({ facets: { ...card().facets, local_only: false, live: true } })).code, "LIVE_RUNTIME_PROOF");
   assert.equal(classifyCardTruth(card({ facets: { ...card().facets, local_only: false, stale: true } })).code, "STALE_RECEIPT");
@@ -226,12 +217,326 @@ test("truth taxonomy and facet badges distinguish candidate/live/stale/local sta
   }
 });
 
-test("authority inspect uses report fields and labels missing canonical proof as uncertainty", () => {
+test("checkout authority classifies a clean local main without claiming remote canonicality", () => {
+  const authority = deriveCheckoutAuthority(report());
+  assert.equal(authority.code, "CLEAN_LOCAL_MAIN");
+  assert.equal(authority.head, "0123456789abcdef0123456789abcdef01234567");
+  assert.equal(authority.dirtyCount, 0);
+  assert.equal(authority.maxActive, 10);
+  assert.match(authority.detail, /does not prove remote freshness/);
+
   const inspect = buildAuthorityInspect(report());
-  assert.equal(inspect.status, "local 11/— active tracks · report snapshot");
-  assert.match(inspect.subtitle ?? "", /telos-ai-seed-v0-from-sandbox/);
-  assert.match(inspect.risk ?? "", /missing canonical baseline evidence is uncertainty/);
-  assert.ok(inspect.evidence?.some((ev) => ev.source.includes("/api/operator-coherence/report")));
+  assert.equal(inspect.status, "10/10 active · HEAD 0123456789ab");
+  assert.match(inspect.subtitle ?? "", /CLEAN_LOCAL_MAIN/);
+  assert.match(inspect.nextAction ?? "", /verify fetched origin\/main freshness separately/);
+});
+
+test("checkout authority classifies a clean non-main branch", () => {
+  const cleanBranch = report();
+  cleanBranch.git = { main: { branch: "agent/titanium", head: "abc123", dirty_count: 0, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(cleanBranch).code, "CLEAN_LOCAL_BRANCH");
+});
+
+test("checkout authority classifies a dirty observation", () => {
+  const dirty = report();
+  dirty.git = { main: { branch: "main", head: "abc123", dirty_count: 3, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(dirty).code, "DIRTY_LOCAL_CHECKOUT");
+  assert.match(deriveCheckoutAuthority(dirty).detail, /3 local paths/);
+});
+
+test("checkout authority classifies incomplete git evidence as unavailable", () => {
+  const unavailable = report();
+  unavailable.git = { main: { branch: "main", dirty_count: 0 } };
+  assert.equal(deriveCheckoutAuthority(unavailable).code, "CHECKOUT_STATE_UNAVAILABLE");
+
+  const legacyBooleanOnly = report();
+  legacyBooleanOnly.git = { main: { branch: "main", branch_line: "## main...origin/main", head: "abc123", dirty: true, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(legacyBooleanOnly).code, "CHECKOUT_STATE_UNAVAILABLE");
+});
+
+test("checkout authority fails closed on contradictory dirty signals", () => {
+  const booleanConflict = report();
+  booleanConflict.git = {
+    main: {
+      branch: "main",
+      branch_line: "## main...origin/main",
+      head: "abc123",
+      dirty_count: 0,
+      tracked_dirty_count: 0,
+      untracked_count: 0,
+      dirty: true,
+      ahead: 0,
+      behind: 0,
+    },
+  };
+  assert.equal(deriveCheckoutAuthority(booleanConflict).code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.match(deriveCheckoutAuthority(booleanConflict).detail, /Dirty-state evidence is contradictory/);
+
+  const componentConflict = report();
+  componentConflict.git = {
+    main: {
+      branch: "main",
+      branch_line: "## main...origin/main",
+      head: "abc123",
+      dirty_count: 0,
+      tracked_dirty_count: 2,
+      untracked_count: 0,
+      ahead: 0,
+      behind: 0,
+    },
+  };
+  assert.equal(deriveCheckoutAuthority(componentConflict).code, "CHECKOUT_STATE_UNAVAILABLE");
+});
+
+test("checkout authority treats producer sentinel values as unavailable", () => {
+  const unavailable = report();
+  unavailable.git = { main: { branch: "unknown", branch_line: "unknown", head: "abc123", dirty_count: 0, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(unavailable).code, "CHECKOUT_STATE_UNAVAILABLE");
+
+  const detached = report();
+  detached.git = { main: { branch: "HEAD (no branch)", branch_line: "## HEAD (no branch)", head: "abc123", dirty_count: 0, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(detached).code, "CHECKOUT_STATE_UNAVAILABLE");
+
+  const dirtyDetached = report();
+  dirtyDetached.git = { main: { branch: "HEAD (no branch)", branch_line: "## HEAD (no branch)", head: "abc123", dirty_count: 2, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(dirtyDetached).code, "DIRTY_LOCAL_CHECKOUT");
+
+  const noUpstream = report();
+  noUpstream.git = { main: { branch: "main", branch_line: "## main", head: "abc123", dirty_count: 0, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(noUpstream).code, "CHECKOUT_STATE_UNAVAILABLE");
+
+  const goneUpstream = report();
+  goneUpstream.git = { main: { branch: "main", branch_line: "## main...origin/main [gone]", head: "abc123", dirty_count: 0, ahead: 0, behind: 0 } };
+  assert.equal(deriveCheckoutAuthority(goneUpstream).code, "CHECKOUT_STATE_UNAVAILABLE");
+});
+
+test("checkout authority exposes diverged local main without a clean-main claim", () => {
+  const diverged = report();
+  diverged.git = { main: { branch: "main", branch_line: "## main...origin/main [ahead 2, behind 1]", head: "abc123", dirty_count: 0, ahead: 2, behind: 1 } };
+  const authority = deriveCheckoutAuthority(diverged);
+  assert.equal(authority.code, "DIVERGED_LOCAL_MAIN");
+  assert.match(authority.detail, /ahead 2.*behind 1/);
+});
+
+test("checkout authority fails closed when branch-line and numeric divergence disagree", () => {
+  const contradictory = report();
+  contradictory.git = {
+    main: {
+      branch: "main",
+      branch_line: "## main...origin/main [ahead 2]",
+      head: "abc123",
+      dirty_count: 0,
+      ahead: 0,
+      behind: 0,
+    },
+  };
+  const authority = deriveCheckoutAuthority(contradictory);
+  assert.equal(authority.code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.match(authority.detail, /contradicts the observed branch status/);
+});
+
+test("checkout authority fails closed when branch field and branch status disagree", () => {
+  const contradictory = report();
+  contradictory.git = {
+    main: {
+      branch: "main",
+      branch_line: "## feature/titanium...origin/feature/titanium",
+      head: "abc123",
+      dirty_count: 0,
+      ahead: 0,
+      behind: 0,
+    },
+  };
+  const authority = deriveCheckoutAuthority(contradictory);
+  assert.equal(authority.code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.match(authority.detail, /branch=main but branch status reports feature\/titanium/);
+});
+
+test("checkout authority fails closed when the git.status probe reports a source error", () => {
+  const probeFailure = report();
+  probeFailure.source_errors = [{ source: "git.status", error: "probe failed" }];
+  const authority = deriveCheckoutAuthority(probeFailure);
+  assert.equal(authority.code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.notEqual(authority.code, "CLEAN_LOCAL_MAIN");
+  assert.match(authority.detail, /git\.status probe failed/);
+
+  const sameEvidenceWithoutError = report();
+  assert.equal(deriveCheckoutAuthority(sameEvidenceWithoutError).code, "CLEAN_LOCAL_MAIN");
+});
+
+test("branch-risk projection uses producer fallbacks for partial census reports", () => {
+  const partial = report();
+  partial.branch_census = { total: 207 };
+  partial.rogue_work_radar.local_only_branch_count = 91;
+  partial.rogue_work_radar.unpushed_branch_count = 31;
+  partial.rogue_work_radar.orphaned_branch_count = 17;
+  const projection = deriveBranchRiskProjection(partial);
+  assert.deepEqual(projection, {
+    total: 207,
+    localOnly: 91,
+    unpushed: 31,
+    orphaned: 17,
+    source: "mixed",
+    conflicts: [],
+  });
+
+  const fallbackOnly = report();
+  fallbackOnly.branch_census = undefined;
+  assert.equal(deriveBranchRiskProjection(fallbackOnly).source, "rogue_work_radar");
+  assert.equal(deriveBranchRiskProjection(fallbackOnly).total, 207);
+});
+
+test("branch-risk projection fails closed on probe errors and duplicated-count conflicts", () => {
+  const probeFailure = report();
+  probeFailure.source_errors = [{ source: "git.for_each_ref", error: "probe failed" }];
+  const unavailable = deriveBranchRiskProjection(probeFailure);
+  assert.equal(unavailable.source, "unavailable");
+  assert.equal(unavailable.total, null);
+  assert.match(unavailable.conflicts[0], /probe failed/);
+
+  const contradictory = report();
+  contradictory.branch_census = { total: 207, local_only: 0, unpushed_ahead: 40, orphaned_gone: 55 };
+  contradictory.rogue_work_radar.local_only_branch_count = 91;
+  const projection = deriveBranchRiskProjection(contradictory);
+  assert.equal(projection.source, "contradictory");
+  assert.equal(projection.localOnly, null);
+  assert.match(projection.conflicts[0], /branch_census=0.*rogue_work_radar=91/);
+});
+
+test("authority projection follows live portfolio counts", () => {
+  const changed = report();
+  changed.track_portfolio.active_count = 6;
+  changed.track_portfolio.policy = { max_active: 12 };
+  const inspect = buildAuthorityInspect(changed);
+  assert.equal(inspect.status, "6/12 active · HEAD 0123456789ab");
+});
+
+test("active-track lifecycle review is live-data driven and SHIPPABLE is not production readiness", () => {
+  const liveReport = report();
+  liveReport.track_portfolio.tracks = [
+    {
+      id: "live-shippable-track",
+      name: "Live shippable track",
+      lifecycle: "active",
+      status: "shippable",
+      shippable: true,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+      readiness: 100,
+    },
+    {
+      id: "live-stale-track",
+      name: "Live stale track",
+      lifecycle: "active",
+      status: "active",
+      stale: true,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+    },
+    { id: "closed-history", name: "Closed history", lifecycle: "closed", status: "retired" },
+  ];
+
+  const reviews = buildTrackLifecycleReviews(liveReport);
+  assert.deepEqual(reviews.map((review) => review.trackId), ["live-shippable-track", "live-stale-track"]);
+  assert.equal(reviews[0].code, "OPERATOR_CLOSURE_REVIEW");
+  assert.match(reviews[0].detail, /may reflect declared lifecycle state or generated checks/);
+  assert.doesNotMatch(reviews[0].detail, /completion criteria pass/);
+  assert.equal(reviews[0].reportedShippable, true);
+  assert.equal(reviews[1].code, "REFRESH_STALE_EVIDENCE");
+});
+
+test("track lifecycle review only honors boolean-true SHIPPABLE evidence", () => {
+  const stringShippable = report();
+  stringShippable.track_portfolio.active_count = 1;
+  stringShippable.track_portfolio.tracks = [
+    {
+      id: "string-shippable-track",
+      name: "String shippable track",
+      lifecycle: "active",
+      status: "active",
+      shippable: "false" as unknown as boolean,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+    },
+  ];
+  const reviews = buildTrackLifecycleReviews(stringShippable);
+  assert.equal(reviews.length, 1);
+  assert.notEqual(reviews[0].code, "OPERATOR_CLOSURE_REVIEW");
+  assert.equal(reviews[0].code, "CONTINUE_ACTIVE_WORK");
+  assert.equal(reviews[0].reportedShippable, false);
+});
+
+test("active-track lifecycle projection exposes missing rows and missing identities", () => {
+  const missingRows = report();
+  const missingSummary = summarizeTrackLifecycleProjection(missingRows);
+  assert.equal(missingSummary.code, "TRACK_ROWS_INCONSISTENT");
+  assert.match(missingSummary.detail, /declares 10 active tracks.*0 active rows/);
+
+  const noActive = report();
+  noActive.track_portfolio.active_count = 0;
+  assert.equal(summarizeTrackLifecycleProjection(noActive).code, "NO_ACTIVE_TRACKS");
+
+  const sourceFailure = report();
+  sourceFailure.track_portfolio.active_count = 1;
+  sourceFailure.track_portfolio.tracks = [
+    {
+      id: "residual-shippable-row",
+      name: "Residual shippable row",
+      lifecycle: "active",
+      status: "shippable",
+      shippable: true,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+    },
+  ];
+  sourceFailure.source_errors = [{ source: "docs/governance/ACTIVE_TRACK.yaml", error: "probe failed" }];
+  const sourceFailureReviews = buildTrackLifecycleReviews(sourceFailure);
+  assert.deepEqual(sourceFailureReviews, []);
+  const sourceFailureSummary = summarizeTrackLifecycleProjection(sourceFailure, sourceFailureReviews);
+  assert.equal(sourceFailureSummary.code, "TRACK_SOURCE_UNAVAILABLE");
+  assert.equal(sourceFailureSummary.renderedReviewCount, 0);
+
+  const missingIds = report();
+  missingIds.track_portfolio.active_count = 2;
+  missingIds.track_portfolio.tracks = [
+    { lifecycle: "active", name: "Unbound A" },
+    { lifecycle: "active", name: "Unbound B" },
+  ];
+  const reviews = buildTrackLifecycleReviews(missingIds);
+  assert.equal(summarizeTrackLifecycleProjection(missingIds, reviews).code, "TRACK_REVIEWS_AVAILABLE");
+  assert.deepEqual(reviews.map((review) => review.code), ["TRACK_ID_UNAVAILABLE", "TRACK_ID_UNAVAILABLE"]);
+  assert.equal(new Set(reviews.map((review) => review.trackId)).size, 2);
+
+  const duplicateIds = report();
+  duplicateIds.track_portfolio.active_count = 2;
+  duplicateIds.track_portfolio.tracks = [
+    { id: "duplicate", lifecycle: "active", name: "Duplicate A" },
+    { id: "duplicate", lifecycle: "active", name: "Duplicate B" },
+  ];
+  const duplicateReviews = buildTrackLifecycleReviews(duplicateIds);
+  assert.deepEqual(duplicateReviews.map((review) => review.code), ["TRACK_ID_DUPLICATE", "TRACK_ID_DUPLICATE"]);
+  assert.equal(new Set(duplicateReviews.map((review) => review.rowKey)).size, 2);
+});
+
+test("cockpit sources do not retain the stale June authority or verdict constants", () => {
+  const source = [
+    readFileSync(new URL("./cockpitV2Model.ts", import.meta.url), "utf8"),
+    readFileSync(new URL("./CockpitV2Board.tsx", import.meta.url), "utf8"),
+  ].join("\n");
+  for (const stale of [
+    "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "governance/operator-coherence-cockpit-20260623",
+    "canonicalActiveTracks",
+    "PRODUCTION_READINESS_VERDICTS",
+    "canonical baseline is 7/10",
+    "\"Prod readiness\"",
+    "const status = report.readiness.score >= 70 ? \"STABLE\"",
+    '["Branches", report.branch_census?.total ?? 0, 207]',
+    '["Stashes", report.rogue_work_radar.stash_count, 100]',
+    '["Dirty worktrees", report.rogue_work_radar.dirty_worktree_count, 12]',
+  ]) {
+    assert.ok(!source.includes(stale), `stale authority constant remains: ${stale}`);
+  }
 });
 
 test("lane admission contract exposes required packet fields for UI rendering", () => {
@@ -241,150 +546,4 @@ test("lane admission contract exposes required packet fields for UI rendering", 
   const inspect = buildLaneAdmissionInspect();
   assert.equal(inspect.status, "schema defined; live packets pending backplane ingestion");
   assert.ok(inspect.evidence?.[0]?.path?.includes("agent_lane_admission_packet.schema.json"));
-});
-
-test("buildAnswerRibbon answers the 8 under-60-second questions from definition_answers", () => {
-  const r = report() as Record<string, unknown>;
-  r.definition_answers = {
-    what_is_safe: [card({ id: "safe:1", title: "safe a" })],
-    what_is_dirty: [card({ id: "dirty:1", title: "dirty a" }), card({ id: "dirty:2", title: "dirty b" })],
-    what_is_abandoned: [card({ id: "ab:1", title: "abandoned a" })],
-    what_is_live: [],
-    what_is_blocked: [card({ id: "bl:1", title: "blocked a" })],
-    what_might_be_rogue: [card({ id: "rg:1", title: "rogue a" })],
-    what_should_i_do_next: [{ title: "do x", kind: "preservation_risk", risk: "local", next_action: "push", evidence: [] }],
-  };
-  const answers = buildAnswerRibbon(r as Parameters<typeof buildAnswerRibbon>[0]);
-  const byKey = Object.fromEntries(answers.map((a) => [a.key, a]));
-  for (const k of ["safe", "dirty", "abandoned", "live", "blocked", "rogue", "next", "readiness"]) {
-    assert.ok(byKey[k], `missing answer ${k}`);
-  }
-  assert.equal(byKey.dirty.value, "2");
-  // Empty live must read as uncertainty, never blank success.
-  assert.equal(byKey.live.tone, "warn");
-  assert.match(byKey.live.topEvidence, /uncertainty/);
-  assert.equal(byKey.readiness.value, "41.5%");
-});
-
-test("buildUncertainty surfaces gh/tmux/gcx and raw source errors, never hides them", () => {
-  const r = report() as Record<string, unknown>;
-  r.source_errors = [
-    { source: "tmux.ls", error: "no socket", timestamp: "2026-06-23T00:00:00Z" },
-    { source: "github.auth", error: "gh auth unavailable; PR/CI triage omitted", timestamp: "2026-06-23T00:00:00Z" },
-  ];
-  const items = buildUncertainty(r as Parameters<typeof buildUncertainty>[0]);
-  const labels = items.map((i) => i.id);
-  assert.ok(labels.some((l) => l.includes("tmux")), "tmux uncertainty missing");
-  assert.ok(labels.some((l) => l.includes("github") || l.includes("gh")), "gh uncertainty missing");
-  assert.ok(labels.includes("external:gcx"), "gcx uncertainty missing");
-  // No uncertainty item may ever read as a healthy/ok state.
-  for (const item of items) {
-    assert.ok(["unavailable", "partial", "degraded"].includes(item.state), `bad uncertainty state ${item.state}`);
-  }
-});
-
-test("buildTopology derives stable nodes/edges with readiness root and uncertain source-error edges", () => {
-  const r = report() as Record<string, unknown>;
-  r.source_errors = [{ source: "tmux.ls", error: "no socket" }];
-  (r as { live_ops: Record<string, unknown> }).live_ops = {
-    enabled: true,
-    summary: { total: 1, by_status: { live: 1 } },
-    surfaces: [{ id: "s.live", label: "Live surface", status: "live", desired_state: "live", age_hours: 1 }],
-  };
-  (r as { runtime_receipts: Record<string, unknown> }).runtime_receipts = {
-    receipt_count: 1,
-    runtime_dbs: [],
-    recent_receipts: [{ path: "reports/a/receipt.jsonl", age_hours: 2 }],
-  };
-  (r as { cards: ReturnType<typeof card>[] }).cards = [
-    card({ id: "branch:demo", kind: "branch" }),
-    card({ id: "wt:demo", kind: "worktree", title: "worktree demo", risk: "dirty_worktree" }),
-  ];
-  const graph = buildTopology(r as Parameters<typeof buildTopology>[0]);
-  assert.ok(graph.nodes.find((n) => n.id === "system:readiness"), "missing readiness root");
-  for (const kind of ["branch", "worktree", "receipt", "action"] as const) {
-    assert.ok(graph.nodes.some((n) => n.kind === kind), `missing ${kind} node`);
-  }
-  // stable IDs are unique
-  const ids = new Set(graph.nodes.map((n) => n.id));
-  assert.equal(ids.size, graph.nodes.length, "node ids must be unique/stable");
-  // every edge connects real nodes
-  for (const edge of graph.edges) {
-    assert.ok(ids.has(edge.source), `dangling edge source ${edge.source}`);
-    assert.ok(ids.has(edge.target), `dangling edge target ${edge.target}`);
-    assert.ok(Array.isArray(edge.evidence), `edge ${edge.id} lacks evidence array`);
-  }
-  // source-error nodes are always uncertain and never pulse
-  const errNodes = graph.nodes.filter((n) => n.kind === "source_error");
-  assert.ok(errNodes.length >= 1);
-  for (const n of errNodes) {
-    assert.equal(n.freshness, "unknown");
-    assert.equal(n.pulse, false);
-  }
-  // live+fresh surface may pulse; stale/unknown may not
-  const liveNode = graph.nodes.find((n) => n.kind === "surface" && n.status === "live");
-  assert.ok(liveNode, "missing live surface node");
-  assert.equal(liveNode?.pulse, true);
-  assert.ok(nodeMatchesFilter(liveNode!, "live surface"));
-});
-
-test("topology never pulses a stale or unknown surface (REQ-034)", () => {
-  const r = report() as Record<string, unknown>;
-  (r as { live_ops: Record<string, unknown> }).live_ops = {
-    enabled: true,
-    summary: { total: 2 },
-    surfaces: [
-      { id: "s.stale", label: "Stale claim", status: "live", desired_state: "live", age_hours: 5000 },
-      { id: "s.unknown", label: "Unknown", status: "unknown", desired_state: "live", age_hours: null },
-    ],
-  };
-  const graph = buildTopology(r as Parameters<typeof buildTopology>[0]);
-  for (const n of graph.nodes.filter((x) => x.kind === "surface")) {
-    assert.equal(n.pulse, false, `surface ${n.label} should not pulse when not live+fresh`);
-  }
-});
-
-test("buildEventTape includes report event + pr/ci unavailable, labeled honestly", () => {
-  const r = report() as Record<string, unknown>;
-  r.source_errors = [{ source: "tmux.ls", error: "no socket" }];
-  const events = buildEventTape(r as Parameters<typeof buildEventTape>[0]);
-  assert.ok(events.find((e) => e.kind === "report"), "missing report event");
-  assert.ok(events.find((e) => e.kind === "pr_ci"), "missing pr/ci unavailable event");
-  assert.ok(events.find((e) => e.kind === "source_error"), "missing source error event");
-});
-
-test("freshness: live wins, stale evidence reads stale, missing age is unknown", () => {
-  assert.equal(freshnessFromAge(1), "fresh");
-  assert.equal(freshnessFromAge(48), "aging");
-  assert.equal(freshnessFromAge(1000), "stale");
-  assert.equal(freshnessFromAge(null), "unknown");
-  assert.equal(cardFreshness(card({ facets: { ...card().facets, live: true } })), "fresh");
-  assert.equal(cardFreshness(card({ evidence: [] })), "unknown");
-});
-
-test("every status token maps to a visual tone (machine-readable coverage)", () => {
-  for (const token of STATUS_TOKENS) {
-    const tone = statusTone(token);
-    assert.ok(["ok", "warn", "danger", "info", "muted"].includes(tone), `status ${token} has no tone`);
-  }
-  // unknown/garbage falls back to muted, never throws
-  assert.equal(statusTone("garbage-status"), "muted");
-});
-
-test("buildActionPackets makes recommendations proposal-only and evidence-traceable", () => {
-  const packets = buildActionPackets(report());
-  assert.equal(packets.length, 1);
-  assert.equal(packets[0].allowedNow, false);
-  assert.equal(packets[0].rank, 1);
-  assert.equal(packets[0].operatorDecision, true);
-  assert.ok(packets[0].evidence.length > 0);
-});
-
-test("buildReportSourceSummary marks source errors and stale generated_at prominently", () => {
-  const r = report() as ReturnType<typeof report>;
-  const partial = buildReportSourceSummary({ ...r, source_errors: [{ source: "tmux.ls", error: "no socket" }] });
-  assert.equal(partial.mode, "partial");
-  assert.equal(partial.tone, "danger");
-  const stale = buildReportSourceSummary({ ...r, generated_at: "2026-06-01T00:00:00Z", source_errors: [] }, new Date("2026-06-23T00:00:00Z"));
-  assert.equal(stale.mode, "stale");
 });

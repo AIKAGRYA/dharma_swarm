@@ -1,0 +1,65 @@
+{
+  "schema_version": "langgraph_parity_round_receipt.v1",
+  "generated_at": "2026-07-01T00:34:44Z",
+  "round_id": "phase-7-runtime-multiprocess-resume-proof",
+  "target_gate": "Phase 7 runtime resume survives a fresh process boundary through canonical RuntimeStateStore state",
+  "score_after_round": 84,
+  "status": "completed_partial",
+  "summary": {
+    "claim": "Runtime resume control now has a fresh-process persistence proof: a subprocess calls the configured runtime resume API route against DHARMA_RUNTIME_DB, and the parent process reopens the same RuntimeStateStore to verify the persisted event, operator action, resume token, and checkpoint detail.",
+    "rationale": "This closes the previously unproven backend resume persistence gap without adding dashboard-only state. It does not claim A2A strict readiness, exhaustive live-provider matrix coverage, or full-history closeout governance are green."
+  },
+  "changes": [
+    "Added tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process.",
+    "The parent process seeds RuntimeStateStore with a runtime session, parent/child runs, topology state, receipt, and interrupt/human-approval events.",
+    "A fresh Python subprocess calls api.routers.runtime.runtime_interrupt_resume() with DHARMA_RUNTIME_DB pointed at the seeded SQLite database.",
+    "The parent process reopens RuntimeStateStore and verifies runtime_resume_requested state, runtime_control.resume audit state, resume token, and topology checkpoint detail from canonical tables."
+  ],
+  "files_touched": [
+    "tests/test_runtime_graph_api.py",
+    "reports/langgraph_parity/allnight/runtime_multiprocess_resume_20260701T003444Z.json",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short",
+      "result": "1 passed in 0.68s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py",
+      "result": "24 passed in 3.60s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/ruff check tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD",
+      "result": "pass; REGRESSIONS (0), no touched file added new violations"
+    },
+    {
+      "command": "jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "closed_or_improved_gates": [
+    "Phase 7 runtime resume backend persistence now has a fresh Python process proof.",
+    "Runtime resume is shown to cross process boundaries through DHARMA_RUNTIME_DB rather than in-memory operator state.",
+    "The same canonical store readback surfaces the resume event, action audit row, resume token, and topology checkpoint detail."
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

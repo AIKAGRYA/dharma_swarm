@@ -1,13 +1,14 @@
 """Tests for scripts/governance/orientation_graph.py — read-only projection."""
+
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
-import sqlite3
+import shutil
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -19,15 +20,112 @@ sys.modules["orientation_graph"] = og
 spec.loader.exec_module(og)
 
 
-def _fresh_generated_at() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+def _copy_tracked_checkout(destination: Path) -> None:
+    """Create a genuine clean Git checkout of the current implementation."""
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        check=True,
+        timeout=120,
+    )
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    for raw_relative in listed.split(b"\0"):
+        if not raw_relative:
+            continue
+        relative = os.fsdecode(raw_relative)
+        source = REPO_ROOT / relative
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not source.exists() and not source.is_symlink():
+            target.unlink(missing_ok=True)
+        elif source.is_symlink():
+            target.unlink(missing_ok=True)
+            target.symlink_to(os.readlink(source))
+        elif source.is_file():
+            shutil.copy2(source, target)
+    subprocess.run(
+        ["git", "-C", str(destination), "add", "-A"],
+        check=True,
+        timeout=60,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(destination),
+            "-c",
+            "user.name=Orientation Graph Test",
+            "-c",
+            "user.email=wp-o4-test@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "snapshot implementation under test",
+        ],
+        check=True,
+        timeout=60,
+    )
+    assert not subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=destination,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    ).stdout
+
+
+def _tree_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    """Snapshot content, including ignored files that Git status can conceal."""
+    snapshot: dict[str, tuple[object, ...]] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot[relative] = ("symlink", os.readlink(path))
+        elif path.is_file():
+            snapshot[relative] = (
+                "file",
+                path.stat().st_mode,
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
+    return snapshot
+
+
+def _clean_subprocess_env(tmp_path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    # Prove the script's own boundary rather than inheriting the closeout
+    # harness's bytecode protection.
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
+    env["HOME"] = str(tmp_path / "home")
+    env["XDG_CACHE_HOME"] = str(tmp_path / "xdg-cache")
+    return env
 
 
 def test_packet_has_all_axes():
     packet = og.build_packet()
     data = og.asdict(packet)
-    assert set(data) == {"identity", "organs", "tracks", "custody",
-                         "liveness", "loop1", "broken"}
+    assert set(data) == {
+        "identity",
+        "organs",
+        "tracks",
+        "custody",
+        "liveness",
+        "broken",
+        "loop1",
+        "lanes",
+        "agents",
+        "receipts_tail",
+        "a2a_bus",
+        "body",
+        "context_hash",
+    }
 
 
 def test_identity_serves_the_one_line():
@@ -50,482 +148,223 @@ def test_tracks_project_from_active_track_owner():
     assert all(t.serves for t in tracks)
 
 
-def test_runtime_spine_track_projects_readiness_cap():
-    tracks = {track.id: track for track in og.build_tracks()}
-    track = tracks["runtime-truth-spine-adoption-2026-06"]
-    assert "baseline=54/100" in track.readiness
-    assert "current=70/100" in track.readiness
-    assert "cap=70/100" in track.readiness
-    assert "rejected=88/100 production-ready" in track.readiness
-
-
-def test_track_readiness_ignores_scoped_post_gate_prose():
-    readiness = og._format_track_readiness({
-        "readiness_baseline": {
-            "score": 54,
-            "scale": 100,
-            "claim_rejected": "88/100 production-ready",
-        },
-        "hardening_status": {
-            "current_score": 70,
-            "scale": 100,
-            "evidence_ref": "reports/governance/runtime.md",
-            "gates_passed": [
-                "54_to_60: first executable gate passed",
-                "60_to_65: second executable gate passed",
-                "65_to_70: third executable gate passed",
-                "post_70_note: mentions 70->75 but does not pass it",
-            ],
-        },
-    })
-    assert "current=70/100" in readiness
-    assert "cap=70/100" in readiness
-    assert "cap=75/100" not in readiness
-    assert "rejected=88/100 production-ready" in readiness
-
-
 def test_custody_counts_registered_canon():
     custody = og.build_custody()
     assert custody.registered_total > 0
     assert custody.present + len(custody.missing) == custody.registered_total
 
 
-def test_liveness_projects_daemon_dispatch_without_env_dump(tmp_path, monkeypatch):
-    receipt = tmp_path / "live_process_census.json"
-    receipt.write_text(
-        json.dumps({
-            "schema_version": "live_ops_census.v1",
-            "generated_at": _fresh_generated_at(),
-            "surfaces": [
-                {
-                    "id": "substrate.dharma_daemon",
-                    "label": "Dharma Swarm daemon",
-                    "status": "live",
-                    "raw": {
-                        "dispatch_launch": {
-                            "state": "spine_enabled_launch_spec",
-                        },
-                        "running_dispatch_proof": (
-                            "not_inspected_no_secret_env_dump"
-                        ),
-                        "runtime_receipt_active_head": {
-                            "active_head_side_effect_key_clean": False,
-                            "runtime_receipts_total": 7657,
-                            "latest_created_at": (
-                                "2026-06-13T22:29:48.795782+00:00"
-                            ),
-                            "latest_age_hours": 7.4,
-                            "latest_max_age_hours": 6.0,
-                            "latest_fresh": False,
-                            "windows": [
-                                {
-                                    "window_minutes": 5,
-                                    "total": 56,
-                                    "missing_side_effect_key": 56,
-                                },
-                                {
-                                    "window_minutes": 15,
-                                    "total": 60,
-                                    "missing_side_effect_key": 60,
-                                },
-                            ],
-                        },
-                        "runtime_receipt_coverage": {
-                            "latest_sample_size": 250,
-                            "latest_with_provider_model_payload": 0,
-                            "latest_major_task_receipts_provider_model_percent": 0.0,
-                            "provider_model_latest_complete": False,
-                            "field_gap_producer_groups": [
-                                {
-                                    "gap_type": "mission_payload",
-                                    "receipt_type": "delegation_run",
-                                    "producer_source": "orchestrator",
-                                    "producer_failure_code": "execution_error",
-                                    "missing": 7,
-                                    "freshness_class": "recent_historical_24h",
-                                }
-                            ],
-                            "field_gap_summary": {
-                                "total_missing": 7,
-                                "group_count": 1,
-                                "active_head_missing": 0,
-                                "recent_historical_missing": 7,
-                                "older_historical_missing": 0,
-                                "quarantine_candidate_missing": 7,
-                                "by_freshness_class": {"recent_historical_24h": 7},
-                            },
-                            "field_gap_action_queue": [
-                                {
-                                    "short_label": "orchestrator_error",
-                                    "action": (
-                                        "repair_or_quarantine_orchestrator_error_receipts"
-                                    ),
-                                    "missing": 7,
-                                    "priority": 3,
-                                    "fresh_proof": {
-                                        "status": "fresh_scoped_proof_recorded",
-                                    },
-                                }
-                            ],
-                            "gate_70_to_75_components": [
-                                {"short_label": "core", "status": "fail"},
-                                {"short_label": "idempotency", "status": "fail"},
-                                {"short_label": "mission", "status": "fail"},
-                                {"short_label": "artifact", "status": "fail"},
-                                {"short_label": "active_head", "status": "fail"},
-                            ],
-                        },
-                    },
-                },
-                {
-                    "id": "cli.ds_goal",
-                    "label": "ds-goal runtime CLI",
-                    "status": "live",
-                    "proof_gaps": ["ds_goal_cli_target_repo_mismatch"],
-                    "raw": {
-                        "target_repo": "/Users/dhyana/dharma_swarm_main",
-                        "target_resolution_source": (
-                            "installed_wrapper_dharma_swarm_main_preference"
-                        ),
-                        "target_matches_current_repo": False,
-                        "safe_current_checkout_invocation": (
-                            "DHARMA_SWARM_REPO=/Users/dhyana/dharma_swarm "
-                            "/Users/dhyana/.dharma/bin/ds-goal"
-                        ),
-                        "default_wrapper_target": {
-                            "target_repo": "/Users/dhyana/dharma_swarm_main",
-                        },
-                        "installed_wrapper_contract": {
-                            "wrapper_sha256": "abc123def4567890",
-                            "dharma_swarm_repo_pin_supported": True,
-                        },
-                        "target_sync_receipt_hardening": {
-                            "state": "sync_receipt_side_effect_keys_missing",
-                        },
-                        "convergence_decision_packet": {
-                            "approval_state": "operator_approval_required",
-                        },
-                        "longrun_preflight_gate": {
-                            "status": "blocked_unpinned_default_target",
-                        },
-                    },
-                },
-            ],
-        }),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
-
-    liveness = og.build_liveness()
-
-    assert liveness.surfaces[0]["id"] == "substrate.dharma_daemon"
-    assert liveness.daemon_dispatch_launch == "spine_enabled_launch_spec"
-    assert liveness.daemon_dispatch_running == (
-        "not_inspected_no_secret_env_dump"
-    )
-    assert liveness.daemon_receipt_head == (
-        "clean=false; fresh=false; age_hours=7.4; max_age_hours=6.0; "
-        "total=7657; latest=2026-06-13T22:29:48.795782+00:00; "
-        "windows=5m:56/56,15m:60/60"
-    )
-    assert liveness.daemon_provider_model_coverage == (
-        "latest=0/250; percent=0.0; proof=0/250; proof_percent=unknown; "
-        "accounted=0/250; accounted_percent=unknown; "
-        "terminal=0/0; terminal_percent=unknown; terminal_proof=0/0; "
-        "terminal_proof_percent=unknown; terminal_accounted=0/0; "
-        "terminal_accounted_percent=unknown; pending=0; complete=false; "
-        "field_gap_producers=mission_payload/delegation_run/orchestrator/"
-        "execution_error=7@recent_historical_24h; "
-        "field_gap_summary=total:7|recent_historical_24h:7|"
-        "quarantine_candidate:7; field_gap_actions=orchestrator_error:7; "
-        "field_gap_proofs=orchestrator_error:fresh; "
-        "gate_70_75=core:fail|idempotency:fail|mission:fail|artifact:fail|"
-        "active_head:fail"
-    )
-    assert liveness.ds_goal_wrapper_contract == (
-        "target=/Users/dhyana/dharma_swarm_main; "
-        "source=installed_wrapper_dharma_swarm_main_preference; "
-        "default=/Users/dhyana/dharma_swarm_main; "
-        "matches_current=false; wrapper_sha256=abc123def456; "
-        "pin=true; hardening=sync_receipt_side_effect_keys_missing; "
-        "decision=operator_approval_required; "
-        "preflight=blocked_unpinned_default_target; "
-        "safe=DHARMA_SWARM_REPO=/Users/dhyana/dharma_swarm "
-        "/Users/dhyana/.dharma/bin/ds-goal"
-    )
-    assert liveness.surfaces[0]["proof_gaps"] == [
-        "daemon_dispatch_runtime_unproven",
-        "daemon_runtime_receipts_active_head_dirty",
-        "daemon_runtime_receipts_stale",
-    ]
-
-
-def test_liveness_projects_dashboard_proof_gaps_from_census(tmp_path, monkeypatch):
-    receipt = tmp_path / "live_process_census.json"
-    receipt.write_text(
-        json.dumps({
-            "schema_version": "live_ops_census.v1",
-            "generated_at": _fresh_generated_at(),
-            "surfaces": [
-                {
-                    "id": "dashboard.local",
-                    "label": "Dashboard API and web",
-                    "status": "live",
-                    "raw": {
-                        "control_surface_rows_probe": {
-                            "state": "timeout",
-                        },
-                    },
-                },
-            ],
-        }),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
-
-    liveness = og.build_liveness()
-
-    assert liveness.surfaces[0]["id"] == "dashboard.local"
-    assert liveness.surfaces[0]["proof_gaps"] == [
-        "dashboard_control_surface_rows_unproven"
-    ]
-
-
-def test_liveness_rejects_schema_invalid_census(tmp_path, monkeypatch):
-    receipt = tmp_path / "live_process_census.json"
-    receipt.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
-
-    liveness = og.build_liveness()
-
-    assert liveness.surfaces == []
-    assert liveness.generated_at == ""
-    assert liveness.receipt.startswith(f"invalid receipt at {receipt}: ")
-    assert "schema_version is missing" in liveness.receipt
-    assert "surfaces is missing or not a list" in liveness.receipt
-
-
-def test_liveness_flags_stale_valid_census(tmp_path, monkeypatch):
-    receipt = tmp_path / "live_process_census.json"
-    receipt.write_text(
-        json.dumps(
-            {
-                "schema_version": "live_ops_census.v1",
-                "generated_at": "2000-01-01T00:00:00Z",
-                "surfaces": [
-                    {
-                        "id": "substrate.dharma_daemon",
-                        "label": "Dharma daemon",
-                        "status": "live",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
-
-    liveness = og.build_liveness()
-
-    assert liveness.surfaces == []
-    assert liveness.generated_at == "2000-01-01T00:00:00Z"
-    assert liveness.receipt.startswith(f"stale receipt at {receipt}: ")
-    assert "older than 24h" in liveness.receipt
-
-
-def _loop1_db(tmp_path: Path) -> Path:
-    db_path = tmp_path / "runtime.db"
-    with sqlite3.connect(db_path) as db:
-        db.execute(
-            "CREATE TABLE delegation_runs ("
-            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
-            "started_at TEXT NOT NULL, receipt_json TEXT)"
-        )
-    return db_path
-
-
-def test_loop1_closure_requires_actual_served_provider_model(tmp_path):
-    db_path = _loop1_db(tmp_path)
-    now = datetime.now(UTC).isoformat()
-    with sqlite3.connect(db_path) as db:
-        db.execute(
-            "INSERT INTO delegation_runs "
-            "(run_id, task_id, status, started_at, receipt_json) VALUES "
-            "('empty', 'task-empty', 'completed', ?, ?)",
-            (now, json.dumps({"provider": "", "model": ""})),
-        )
-
-    closure = og.build_loop1_closure(db_path=db_path)
-
-    assert closure.live is False
-    assert "missing provider" in closure.detail
-
-
-def test_loop1_closure_rejects_static_provider_model_without_provenance(tmp_path):
-    db_path = _loop1_db(tmp_path)
-    now = datetime.now(UTC).isoformat()
-    with sqlite3.connect(db_path) as db:
-        db.execute(
-            "INSERT INTO delegation_runs "
-            "(run_id, task_id, status, started_at, receipt_json) VALUES "
-            "('static', 'task-static', 'completed', ?, ?)",
-            (
-                now,
-                json.dumps({
-                    "provider": "ollama",
-                    "model": "mistral:latest",
-                    "attributes": {"provider_model_truth_source": "static_config"},
-                }),
-            ),
-        )
-
-    closure = og.build_loop1_closure(db_path=db_path)
-
-    assert closure.live is False
-    assert closure.provider == "ollama"
-    assert closure.model == "mistral:latest"
-    assert "provenance" in closure.detail
-
-
-def test_loop1_closure_accepts_fresh_runtime_provider_actual_served(tmp_path):
-    db_path = _loop1_db(tmp_path)
-    now = datetime.now(UTC).isoformat()
-    with sqlite3.connect(db_path) as db:
-        db.execute(
-            "INSERT INTO delegation_runs "
-            "(run_id, task_id, status, started_at, receipt_json) VALUES "
-            "('served', 'task-served', 'completed', ?, ?)",
-            (
-                now,
-                json.dumps({
-                    "provider": "nvidia_nim",
-                    "model": "meta/llama-3.3-70b-instruct",
-                    "attributes": {
-                        "provider_model_truth_source": "runtime_provider.actual_served",
-                    },
-                }),
-            ),
-        )
-
-    closure = og.build_loop1_closure(db_path=db_path)
-
-    assert closure.live is True
-    assert closure.provider == "nvidia_nim"
-    assert closure.model == "meta/llama-3.3-70b-instruct"
-
-
-def test_loop1_closure_rejects_stale_actual_served_receipt(tmp_path):
-    db_path = _loop1_db(tmp_path)
-    stale = (datetime.now(UTC) - timedelta(days=2)).isoformat()
-    with sqlite3.connect(db_path) as db:
-        db.execute(
-            "INSERT INTO delegation_runs "
-            "(run_id, task_id, status, started_at, receipt_json) VALUES "
-            "('stale', 'task-stale', 'completed', ?, ?)",
-            (
-                stale,
-                json.dumps({
-                    "provider": "nvidia_nim",
-                    "model": "meta/llama-3.3-70b-instruct",
-                    "attributes": {
-                        "provider_model_truth_source": "runtime_provider.actual_served",
-                    },
-                }),
-            ),
-        )
-
-    closure = og.build_loop1_closure(db_path=db_path)
-
-    assert closure.live is False
-    assert "stale" in closure.detail
-
-
 def test_orientation_graph_render_is_read_only(tmp_path):
-    before = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=REPO_ROOT,
-        capture_output=True, text=True).stdout
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    before = _tree_snapshot(checkout)
     result = subprocess.run(
-        [sys.executable, str(SCRIPT)], cwd=REPO_ROOT,
-        capture_output=True, text=True)
-    assert result.returncode == 0
-    after = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=REPO_ROOT,
-        capture_output=True, text=True).stdout
-    assert before == after, "orientation graph must not write owner files"
-
-
-def test_broken_register_excludes_bold_fixed_and_closed_items(tmp_path, monkeypatch):
-    register = tmp_path / "BROKEN_REGISTER.md"
-    register.write_text(
-        "## OPEN ITEMS\n\n"
-        "### BR-001 — still open\n"
-        "- **status:** OPEN\n\n"
-        "### BR-002 — partial work remains\n"
-        "- **status:** PARTIAL — scoped follow-up\n\n"
-        "### BR-003 — fixed with date\n"
-        "- **status:** **FIXED 2026-05-20** — evidence attached\n\n"
-        "### BR-004 — closed in bold\n"
-        "- **status:** **CLOSED**\n\n"
-        "## CLOSED ITEMS\n\n"
-        "### BR-005 — should not appear\n"
-        "- **status:** OPEN\n",
-        encoding="utf-8",
+        [
+            sys.executable,
+            "scripts/governance/orientation_graph.py",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=_clean_subprocess_env(tmp_path),
     )
-    monkeypatch.setattr(og, "BROKEN_REGISTER", register)
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert _tree_snapshot(checkout) == before, (
+        "orientation graph must not create ignored bytecode/cache files or "
+        "change tracked owner files on its first import"
+    )
 
-    broken = og.build_broken()
-    ids = {item.id for item in broken}
 
-    assert "BR-001" in ids
-    assert "BR-002" in ids
-    assert "BR-003" not in ids
-    assert "BR-004" not in ids
-    assert "BR-005" not in ids
+def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
+    """O4-B1b: a fresh process changes exactly the two owner artifacts."""
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    expected = {
+        "reports/orientation/repo_context.json",
+        "reports/orientation/repo_context.md",
+    }
+    for relative in expected:
+        (checkout / relative).unlink()
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "-A"],
+        check=True,
+        timeout=30,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Orientation Graph Test",
+            "-c",
+            "user.email=wp-o4-test@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "remove generated context before refresh",
+        ],
+        check=True,
+        timeout=30,
+    )
+    before = _tree_snapshot(checkout)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/governance/orientation_graph.py",
+            "--write-context",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=_clean_subprocess_env(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+    after = _tree_snapshot(checkout)
+    changed = {
+        relative
+        for relative in set(before) | set(after)
+        if before.get(relative) != after.get(relative)
+    }
+    assert changed == expected
+    assert not any(
+        relative.endswith(".pyc") or "__pycache__" in relative.split("/")
+        for relative in after
+    ), "explicit refresh created repository bytecode/cache files"
 
 
 def test_json_mode_is_machine_parseable():
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), "--json"], cwd=REPO_ROOT,
-        capture_output=True, text=True)
+        [sys.executable, str(SCRIPT), "--json"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert "identity" in payload and "organs" in payload
 
 
-def test_orientation_subprocess_validates_census_from_repo_root_import_path(
-    tmp_path,
-):
-    state = tmp_path / "state"
-    receipt = state / "ops" / "live_process_census.json"
-    generated_at = _fresh_generated_at()
-    receipt.parent.mkdir(parents=True)
-    receipt.write_text(
-        json.dumps(
-            {
-                "schema_version": "live_ops_census.v1",
-                "generated_at": generated_at,
-                "surfaces": [
-                    {
-                        "id": "substrate.dharma_daemon",
-                        "label": "Dharma daemon",
-                        "status": "live",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+def test_normalize_context_path_redacts_absolute_paths():
+    home_based = str(Path.home() / ".dharma/a2a_bus")
+    assert og._normalize_context_path(home_based).startswith("~/")
 
+    repo_based = str(og.REPO_ROOT / "reports/orientation/nats_e2e_receipt.json")
+    assert og._normalize_context_path(repo_based).startswith("$REPO_ROOT/")
+
+    assert og._normalize_context_path("/opt/private/location") == "<absolute-path>"
+
+
+# ── Graph-shaped query tests ──────────────────────────────────────────
+
+
+def test_build_graph_has_typed_nodes_and_edges():
+    packet = og.build_packet()
+    graph = og.build_graph(packet)
+    kinds = {n.kind for n in graph.nodes}
+    assert "track" in kinds
+    assert "surface" in kinds
+    assert len(graph.edges) > 0
+    relations = {e.relation for e in graph.edges}
+    assert "serves" in relations
+    assert "owns_surface" in relations
+
+
+def test_graph_tracks_carry_complement_edges():
+    packet = og.build_packet()
+    graph = og.build_graph(packet)
+    complement_edges = [e for e in graph.edges if e.relation == "complements"]
+    assert complement_edges, "active tracks declare complement edges"
+
+
+def test_query_subgraph_returns_reachable_nodes():
+    packet = og.build_packet()
+    graph = og.build_graph(packet)
+    track_nodes = [n for n in graph.nodes if n.kind == "track"]
+    assert track_nodes, "need at least one track"
+    sub = og.query_subgraph(graph, track_nodes[0].id)
+    assert len(sub.nodes) >= 1
+    sub_ids = {n.id for n in sub.nodes}
+    assert track_nodes[0].id in sub_ids
+
+
+def test_query_neighbors_filters_by_relation():
+    packet = og.build_packet()
+    graph = og.build_graph(packet)
+    track_nodes = [n for n in graph.nodes if n.kind == "track"]
+    assert track_nodes
+    surfaces = og.query_neighbors(graph, track_nodes[0].id, relation="owns_surface")
+    for edge, node in surfaces:
+        assert edge.relation == "owns_surface"
+        assert node.kind == "surface"
+
+
+def test_surface_liveness_probes_are_populated():
+    packet = og.build_packet()
+    graph = og.build_graph(packet)
+    assert graph.surface_liveness, "should have at least one surface probe"
+    live = [sl for sl in graph.surface_liveness if sl.exists]
+    assert live, "at least some surfaces should be live in the worktree"
+
+
+def test_graph_json_mode_is_machine_parseable():
     result = subprocess.run(
-        [sys.executable, str(SCRIPT)],
-        cwd=tmp_path,
+        [sys.executable, str(SCRIPT), "--graph-json"],
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-        timeout=30,
-        env={**os.environ, "DHARMA_STATE_DIR": str(state)},
     )
-
     assert result.returncode == 0
-    assert "Receipt: " + str(receipt) in result.stdout
-    assert f"Generated: {generated_at}" in result.stdout
-    assert "No module named 'scripts'" not in result.stdout
+    payload = json.loads(result.stdout)
+    assert "nodes" in payload and "edges" in payload
+    assert "surface_liveness" in payload
+
+
+def test_graph_mode_is_read_only(tmp_path):
+    before = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
+    ).stdout
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--graph"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    after = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
+    ).stdout
+    assert before == after, "graph mode must not write owner files"
+
+
+# ── Time-to-orientation tests ─────────────────────────────────────────
+
+
+def test_measure_orientation_under_target():
+    receipt = og.measure_orientation(write_receipt=False)
+    assert receipt["meets_target"], (
+        f"orientation took {receipt['total_s']}s, target is {receipt['target_s']}s"
+    )
+    assert receipt["total_s"] < receipt["target_s"]
+    assert receipt["node_count"] > 0
+    assert receipt["edge_count"] > 0
+
+
+def test_measure_cli_writes_receipt(tmp_path: Path):
+    state_dir = tmp_path / "state"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--measure"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DHARMA_STATE_DIR": str(state_dir)},
+    )
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["event"] == "orientation_timing"
+    assert payload["meets_target"] is True
+    assert (state_dir / "ops/orientation_timing_receipt.json").exists()

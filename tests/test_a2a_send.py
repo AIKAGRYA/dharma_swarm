@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.runtime_state import RuntimeStateStore
+from scripts.runtime import pr_merge_control
 from scripts.runtime import a2a_send
 
 
@@ -184,6 +185,195 @@ def test_publish_and_wait_does_not_core_republish_after_ambiguous_jetstream_erro
     assert conn.closed is True
 
 
+def test_nats_config_leaves_plaintext_nats_without_bundled_ca(tmp_path, monkeypatch):
+    bundled = tmp_path / "agni-ws-ca.pem"
+    bundled.write_text("BUNDLED-CA", encoding="utf-8")
+    monkeypatch.setattr(pr_merge_control, "DEFAULT_NATS_CA_PEM_PATH", bundled)
+    monkeypatch.delenv("DEVIN_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("DHARMA_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("NATS_CA_PEM", raising=False)
+
+    config = pr_merge_control._nats_config(  # noqa: SLF001
+        {
+            "NATS_URL": "nats://127.0.0.1:4222",
+            "NATS_USER": "devin",
+            "NATS_PASSWORD": "secret",
+        },
+        require_devin_secrets=False,
+    )
+
+    assert config.ca_pem == ""
+    assert config.credential_family == "direct"
+
+
+def test_nats_config_uses_bundled_ca_fallback_for_tls_urls(tmp_path, monkeypatch):
+    bundled = tmp_path / "agni-ws-ca.pem"
+    bundled.write_text("BUNDLED-CA", encoding="utf-8")
+    monkeypatch.setattr(pr_merge_control, "DEFAULT_NATS_CA_PEM_PATH", bundled)
+    monkeypatch.delenv("DEVIN_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("DHARMA_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("NATS_CA_PEM", raising=False)
+
+    config = pr_merge_control._nats_config(  # noqa: SLF001
+        {
+            "NATS_URL": "wss://127.0.0.1:4222",
+            "NATS_USER": "devin",
+            "NATS_PASSWORD": "secret",
+        },
+        require_devin_secrets=False,
+    )
+
+    assert config.ca_pem == "BUNDLED-CA\n"
+
+
+def test_nats_config_prefers_explicit_ca_env_over_bundled(tmp_path, monkeypatch):
+    bundled = tmp_path / "agni-ws-ca.pem"
+    bundled.write_text("BUNDLED-CA", encoding="utf-8")
+    monkeypatch.setattr(pr_merge_control, "DEFAULT_NATS_CA_PEM_PATH", bundled)
+
+    config = pr_merge_control._nats_config(  # noqa: SLF001
+        {
+            "NATS_URL": "nats://127.0.0.1:4222",
+            "NATS_USER": "devin",
+            "NATS_PASSWORD": "secret",
+            "NATS_CA_PEM": "EXPLICIT-CA",
+        },
+        require_devin_secrets=False,
+    )
+
+    assert config.ca_pem == "EXPLICIT-CA\n"
+
+
+def test_publish_and_wait_marks_permissions_denied_and_closes_connection(monkeypatch):
+    class FakeSubscription:
+        def __init__(self):
+            self.unsubscribed = False
+
+        async def unsubscribe(self):
+            self.unsubscribed = True
+
+    class FakeJetStream:
+        def __init__(self, conn):
+            self.conn = conn
+
+        async def publish(self, subject, _data, timeout=None):
+            await self.conn.error_cb(
+                Exception(f"nats: permissions violation for publish to {subject}")
+            )
+            raise TimeoutError("pub ack timed out")
+
+    class FakeConnection:
+        def __init__(self):
+            self.closed = False
+            self.error_cb = None
+
+        async def subscribe(self, *_args, **_kwargs):
+            return FakeSubscription()
+
+        def jetstream(self):
+            return FakeJetStream(self)
+
+        async def close(self):
+            self.closed = True
+
+    conn = FakeConnection()
+
+    async def fake_connect(**kwargs):
+        conn.error_cb = kwargs["error_cb"]
+        return conn
+
+    monkeypatch.setitem(sys.modules, "nats", types.SimpleNamespace(connect=fake_connect))
+    envelope = {
+        "subject": "dharma.a2a.perplexity",
+        "ack_subject": "dharma.a2a.perplexity.ack.abc123",
+        "reply_subject": "dharma.a2a.perplexity.reply.abc123",
+        "packet_id": "abc123",
+    }
+    config = a2a_send.NATSConfig(
+        endpoint="nats://127.0.0.1:4222",
+        user="devin",
+        credential="secret",
+        missing=(),
+    )
+
+    result = asyncio.run(
+        a2a_send._publish_and_wait(  # noqa: SLF001
+            config,
+            envelope,
+            wait_s=0.0,
+            timeout_s=0.1,
+        )
+    )
+
+    assert result["status"] == a2a_send.STATUS_PERMISSIONS_DENIED
+    assert "broker rejected publish to dharma.a2a.perplexity" in result["error"]
+    assert result["permissions_denied_detail"] == result["error"]
+    assert conn.closed is True
+
+
+def test_publish_and_wait_ignores_subscribe_permission_violation(monkeypatch):
+    class FakeSubscription:
+        async def unsubscribe(self):
+            return None
+
+    class FakeJetStream:
+        async def publish(self, subject, _data, timeout=None):
+            await conn.error_cb(
+                Exception(
+                    f'nats: permissions violation for subscription to "{subject}.ack"'
+                )
+            )
+            raise TimeoutError("pub ack timed out")
+
+    class FakeConnection:
+        def __init__(self):
+            self.closed = False
+            self.error_cb = None
+
+        async def subscribe(self, *_args, **_kwargs):
+            return FakeSubscription()
+
+        def jetstream(self):
+            return FakeJetStream()
+
+        async def close(self):
+            self.closed = True
+
+    conn = FakeConnection()
+
+    async def fake_connect(**kwargs):
+        conn.error_cb = kwargs["error_cb"]
+        return conn
+
+    monkeypatch.setitem(sys.modules, "nats", types.SimpleNamespace(connect=fake_connect))
+    envelope = {
+        "subject": "dharma.a2a.perplexity",
+        "ack_subject": "dharma.a2a.perplexity.ack.abc123",
+        "reply_subject": "dharma.a2a.perplexity.reply.abc123",
+        "packet_id": "abc123",
+    }
+    config = a2a_send.NATSConfig(
+        endpoint="nats://127.0.0.1:4222",
+        user="devin",
+        credential="secret",
+        missing=(),
+    )
+
+    result = asyncio.run(
+        a2a_send._publish_and_wait(  # noqa: SLF001
+            config,
+            envelope,
+            wait_s=0.0,
+            timeout_s=0.1,
+        )
+    )
+
+    assert result["status"] == a2a_send.STATUS_PUBLISH_FAILED
+    assert result["permissions_denied_detail"] is None
+    assert result["error"] == "TimeoutError"
+    assert conn.closed is True
+
+
 def test_main_secrets_missing(tmp_path, monkeypatch, capsys):
     for name in list(os.environ):
         if "NATS" in name:
@@ -194,7 +384,11 @@ def test_main_secrets_missing(tmp_path, monkeypatch, capsys):
     )
     assert code == 3
     out = capsys.readouterr().out
-    assert "NATS_SECRETS_MISSING" in out
+    assert "a2a_send: <recorded>" in out
+    assert "packet_id=" not in out
+    assert "subject=" not in out
+    assert str(tmp_path) not in out
+    assert "receipt: <written>" in out
     receipts = list((tmp_path / "r").glob("*.json"))
     assert len(receipts) == 1
     body = json.loads(receipts[0].read_text(encoding="utf-8"))
@@ -210,6 +404,38 @@ def test_main_missing_file(tmp_path):
         ["--to", "devin", "--file", str(tmp_path / "nope.md"), "--receipt-dir", str(tmp_path)]
     )
     assert code == 2
+
+
+def test_main_json_console_redacts_subjects_and_paths(tmp_path, monkeypatch, capsys):
+    for name in list(os.environ):
+        if "NATS" in name:
+            monkeypatch.delenv(name, raising=False)
+    packet = _write_packet(tmp_path)
+    code = a2a_send.main(
+        [
+            "--to",
+            "devin",
+            "--file",
+            str(packet),
+            "--receipt-dir",
+            str(tmp_path / "r"),
+            "--json",
+        ]
+    )
+    assert code == 3
+    console_body = json.loads(capsys.readouterr().out)
+    assert console_body["packet_id"] == "<redacted>"
+    assert console_body["status"] == "<recorded>"
+    assert console_body["subject"] == "<redacted>"
+    assert console_body["ack_subject"] == "<redacted>"
+    assert console_body["reply_subject"] == "<redacted>"
+    assert console_body["file"] == "<redacted>"
+    assert console_body["receipt_path"] == "<written>"
+
+    receipts = list((tmp_path / "r").glob("*.json"))
+    assert len(receipts) == 1
+    stored_body = json.loads(receipts[0].read_text(encoding="utf-8"))
+    assert stored_body["subject"] == "dharma.a2a.devin"
 
 
 def test_main_nats_client_missing_is_specific(tmp_path, monkeypatch, capsys):
@@ -228,7 +454,12 @@ def test_main_nats_client_missing_is_specific(tmp_path, monkeypatch, capsys):
 
     assert code == 4
     out = capsys.readouterr().out
-    assert "NATS_CLIENT_MISSING" in out
+    assert "a2a_send: <recorded>" in out
+    assert "NATS_CLIENT_MISSING" not in out
+    assert "packet_id=" not in out
+    assert "subject=" not in out
+    assert str(tmp_path) not in out
+    assert "receipt: <written>" in out
     receipts = list((tmp_path / "r").glob("*.json"))
     assert len(receipts) == 1
     body = json.loads(receipts[0].read_text(encoding="utf-8"))
@@ -238,6 +469,41 @@ def test_main_nats_client_missing_is_specific(tmp_path, monkeypatch, capsys):
     assert body["live_contact_claim"] is False
     assert body["collaboration_claim"] == "none"
     assert "python_client_error" in body
+
+
+def test_main_permissions_denied_records_receipt_detail(tmp_path, monkeypatch):
+    monkeypatch.setenv("NATS_URL", "nats://127.0.0.1:4222")
+
+    async def denied(*_args, **_kwargs):
+        return {
+            "status": a2a_send.STATUS_PERMISSIONS_DENIED,
+            "ack_tier": None,
+            "consumed": False,
+            "replied": False,
+            "reply_payload": None,
+            "permissions_denied_detail": (
+                "broker rejected publish to dharma.a2a.perplexity: the devin NATS credential "
+                "is not authorized to publish to this lane (server-side ACL)"
+            ),
+            "error": (
+                "broker rejected publish to dharma.a2a.perplexity: the devin NATS credential "
+                "is not authorized to publish to this lane (server-side ACL)"
+            ),
+        }
+
+    monkeypatch.setattr(a2a_send, "_publish_and_wait", denied)
+    packet = _write_packet(tmp_path)
+
+    code = a2a_send.main(
+        ["--to", "perplexity", "--file", str(packet), "--receipt-dir", str(tmp_path / "r")]
+    )
+
+    assert code == 1
+    receipt = json.loads(next((tmp_path / "r").glob("*.json")).read_text(encoding="utf-8"))
+    assert receipt["status"] == a2a_send.STATUS_PERMISSIONS_DENIED
+    assert receipt["permissions_denied_detail"].startswith("broker rejected publish to dharma.a2a.perplexity")
+    assert receipt["contact_evidence_tier"] == "NO_CONTACT"
+    assert receipt["live_contact_claim"] is False
 
 
 def test_main_nats_client_missing_uses_cli_fallback(tmp_path, monkeypatch):

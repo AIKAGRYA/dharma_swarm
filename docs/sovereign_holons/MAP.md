@@ -1,14 +1,22 @@
-# MAP — Every Sovereign-Holon Artifact in the Repo
+# MAP — Historical Sovereign-Holon Artifact Index
 
-**Created:** 2026-06-08 · **Purpose:** One file to grep when you need to find anything related to the sovereign holon initiative — in or out of `docs/sovereign_holons/`.
+> **Authority notice (2026-07-13):** This is a June artifact index, not a current
+> source-of-truth map. Use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> for current implementation, runtime boundaries, recent work, and a dated
+> readiness witness.
 
-This file is the single source of truth for "where does it live?". When anyone (operator, agent, or future-you) asks _"where is X?"_, the answer is here. If a file is not in this map, it does not exist as part of the initiative.
+**Created:** 2026-06-08 · **Purpose:** Preserve the original initiative's artifact trail.
 
-> **Maintenance contract:** Any PR that adds, moves, or removes a sovereign-holon artifact MUST update this file in the same commit. The hygiene pattern that enforces this is **VC-N02-MAP** (proposed; see [03_REGISTER_AS_HYGIENE.md](03_REGISTER_AS_HYGIENE.md)).
+This file records where the original design artifacts lived. Its paths and
+status claims may be stale; current code and the estate map win on conflict.
+
+> **Historical maintenance contract:** The original lane required updates here.
+> New runtime work updates the current holon body reference instead.
 
 ---
 
-## In-folder artifacts (the single home)
+## In-folder artifacts (historical corpus)
 
 Path: `docs/sovereign_holons/`
 
@@ -100,7 +108,7 @@ Canonical location: `/Users/dhyana/dharma_swarm_pr_review_control/scripts/govern
 
 Branch: `worktree-holon-agent` · Path: `/Users/dhyana/.qwen/worktrees/holon-agent/` · Commit: `946e876e9`
 
-| Artifact in worktree | Status in our single home |
+| Artifact in worktree | Status in the historical corpus |
 |---|---|
 | `README.md` (reconciled plan) | Folded → `05_RECONCILED_PLAN.md` |
 | `docs/frontier_dossier/FRONTIER_AGENT_DOSSIER.md` | Folded → `04_FRONTIER_DOSSIER.md` |

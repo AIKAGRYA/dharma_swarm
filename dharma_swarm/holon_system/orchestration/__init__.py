@@ -1,5 +1,5 @@
-"""Orchestration organ — fan-out/fan-in over the EXISTING swarm orchestrator."""
+"""Orchestration facades over existing swarm substrate."""
 
-from __future__ import annotations
+from .fanout import Orchestrator
 
-__all__ = ["holon_orchestrate"]
+__all__ = ["Orchestrator"]

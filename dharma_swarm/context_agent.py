@@ -570,7 +570,7 @@ class Intelligence:
         if hum_path.exists():
             lines = hum_path.read_text().strip().split("\n")
             if lines:
-                ingredients.append(f"SUBCONSCIOUS HUM (last 3):\n" + "\n".join(lines[-3:]))
+                ingredients.append("SUBCONSCIOUS HUM (last 3):\n" + "\n".join(lines[-3:]))
 
         # Read top seeds
         seeds_path = self._base / "seeds" / "top_seeds.md"
@@ -582,7 +582,7 @@ class Intelligence:
         cascade_path = self._meta / "cascade_history.jsonl"
         if cascade_path.exists():
             lines = cascade_path.read_text().strip().split("\n")
-            ingredients.append(f"CASCADE STATE:\n" + "\n".join(lines[-3:]))
+            ingredients.append("CASCADE STATE:\n" + "\n".join(lines[-3:]))
 
         if len(ingredients) < 2:
             return None
@@ -596,7 +596,7 @@ class Intelligence:
                 "structure that connects these fragments. Most dreams are noise; "
                 "the good ones reveal something the waking mind missed."
             ),
-            prompt=f"Dream with these fragments:\n\n" + "\n\n---\n\n".join(ingredients),
+            prompt="Dream with these fragments:\n\n" + "\n\n---\n\n".join(ingredients),
         )
 
         if dream_text is None:
@@ -752,7 +752,7 @@ def _add_dharma_swarm(sections: list[str], shared: Path, distilled_dir: Path, st
     cascade_path = meta / "cascade_history.jsonl"
     if cascade_path.exists():
         lines = cascade_path.read_text().strip().split("\n")
-        sections.append(f"## Cascade State (last 5)\n```json\n" + "\n".join(lines[-5:]) + "\n```\n")
+        sections.append("## Cascade State (last 5)\n```json\n" + "\n".join(lines[-5:]) + "\n```\n")
 
 
 def _add_jagat_kalyan(sections: list[str], shared: Path) -> None:
@@ -965,6 +965,7 @@ CONTEXT_AGENT_INTERVAL = int(os.environ.get("DGC_CONTEXT_AGENT_INTERVAL", "180")
 async def run_context_agent_loop(
     shutdown_event: asyncio.Event,
     signal_bus: SignalBus | None = None,
+    supervisor: Any | None = None,
 ) -> None:
     """Run the context agent as a daemon loop.
 
@@ -974,6 +975,8 @@ async def run_context_agent_loop(
     logger.info("Context agent started (interval=%ds)", CONTEXT_AGENT_INTERVAL)
 
     while not shutdown_event.is_set():
+        if supervisor is not None:
+            supervisor.record_tick("context-agent")
         try:
             await agent.run_cycle()
         except Exception:

@@ -1,5 +1,7 @@
 # 000 Master Coherence Synthesis
 
+> **Re-verification 2026-06-15 (perplexity-computer, Stage 1 EVIDENCE_ONLY):** This audit is 50 days old but remains the canonical source for the "~10–15% ontology-native" estimate, cited verbatim by `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, `docs/ops/AGENT_ONBOARDING.md`, and `docs/governance/ACTIVE_TRACK.yaml`. **Retained as canonical until superseded by a fresh end-to-end audit.** The runtime-truth-* tracks landed since this audit have moved the spine to 7/8 SHIPPABLE; numeric estimate likely conservative now. A new end-to-end pass is the right way to refresh — do not silently update the number here.
+
 Date: 2026-04-26
 Branch: `promote/lf5-runtime-spine`
 Source reports: `10_RUNTIME_SPINE_MAP.md` through `100_DOCS_DRIFT_REGISTER.md`

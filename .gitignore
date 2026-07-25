@@ -12,8 +12,13 @@ build/
 .env
 
 # Local runtime state (machine-specific)
+terminal/.dharma-terminal-state.json
+terminal/.dharma-terminal-preview-cache.json
 .claude-flow/
-.claude/
+.claude/*
+# Keep the Claude Code on the web SessionStart hook + its registration tracked.
+!.claude/hooks/
+!.claude/settings.json
 .swarm/
 .dharma_baseline/
 .dharma_test/
@@ -100,7 +105,6 @@ terminal-v2/screenshots/
 # Generated session/audit artifacts (root-only).
 # Produced by claude-mem, audit hooks, and guardian crew.
 # CI Rule 9 already enforces GUARDIAN_REPORT.md must live under reports/.
-/AGENTS.md
 /AUDIT_*.md
 /GUARDIAN_REPORT.md
 
@@ -113,29 +117,54 @@ paper/
 .cursor/
 tools/world_scout_go/world_scout_go
 tools/evidence_ingestor_go/evidence_ingestor_go
+tools/github_ingestor_go/github_ingestor_go
+tools/world_signal_ingestor_go/world_signal_ingestor_go
 reports/capital_lab/goal_a_12h/session_logs/*.log
+_proof_state/
+prove_loop1_spine_ollama.py
+
+reports/model_routing/e2e/
+
+# Runtime receipts are loop-generated artifacts, not source.
+reports/a2a/*_receipts/
+reports/model_*/e2e/
+reports/model_pool/
+
+# Personal obey-plugin rule state belongs outside the repo.
+.claude/obey.rules.local.json
+xray_report.json
+xray_report.md
+
+# Derived governance status rollups — evicted from tracking 2026-07-04.
+# They are rewritten in place with a generated_at timestamp on every run, so
+# tracking them hard-conflicted every concurrent rebase train. Regenerate with
+# scripts/governance/check_track_status.py (first three) and
+# scripts/governance/trust_gate_status.py (fourth); CI publishes fresh copies
+# to the generated/status branch on every push to main (active-track.yml).
+reports/governance/active_track_evidence.json
+reports/governance/active_track_evidence.md
+reports/governance/track_portfolio.json
+reports/governance/trust_gate_status.json
+
+# Chamber chain-append advisory lock sidecars (ephemeral, never committed)
+reports/governance/chamber/**/*.lock
 
 # runtime receipts — loop-generated, never source (cleanup 2026-06-18)
-reports/a2a/palantir_pilot_worker_receipts/
-reports/a2a/inbox_bridge_receipts/
-reports/a2a/send_receipts/
+# (reports/a2a/*_receipts/, reports/model_*/e2e/ and reports/model_pool/ above
+# already cover the _receipts/e2e/model_pool entries from this cleanup.)
 reports/a2a/NATS_*_20260617.md
 reports/a2a/CODEX_HOLON_SEMANTIC_REPLY_P0_*.md
 reports/a2a/archive_20260617_canonicalized/
 reports/a2a/nats_connect_signoffs/
 reports/a2a/domain_reply_artifacts/
-reports/a2a/domain_reply_receipts/
 reports/a2a/launchd_plans/
 reports/a2a/nats_live_production_matrix/
 reports/a2a/phase_a/
-reports/a2a/reply_receipts/
 reports/a2a/semantic_inbox_drains/
 reports/agentops/decorrelated_review_council/
 reports/agentops/semantic_receipts/
 reports/agentops/work_packets/*/
 reports/sab_first_six_agent_flywheel/receipts/
-reports/model_pool/
-reports/model_routing/e2e/
 reports/sovereign_holons/verify_holon_harness_prod_*.json
 reports/sovereign_holons/verify_holon_harness_prod_*.md
 reports/governance/greptile_review_intake_*.json
@@ -144,6 +173,3 @@ reports/governance/name_drift_preflight_*.json
 reports/research/
 reports/runtime_truth/
 eval_probe_result.md
-
-# obey plugin (personal rules)
-.claude/obey.rules.local.json

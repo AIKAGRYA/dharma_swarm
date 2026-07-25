@@ -7,8 +7,10 @@ summaries, then returns typed ``ControlSurfaceRow`` instances.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.operator_core.control_surface_models import ControlSurfaceRow
 
 
@@ -107,7 +109,129 @@ def _go_receipt_rows(repo_root: Path | None = None) -> list[ControlSurfaceRow]:
     )
 
     rows.extend(_go_world_receipt_summary_rows())
+    rows.extend(_go_world_radar_health_rows())
     return rows
+
+
+def _go_world_radar_health_rows() -> list[ControlSurfaceRow]:
+    """Project the world-radar Go chain health file (per-source errors, mode).
+
+    Read-only view of ``~/.dharma/meta/world_radar/world_radar_health.json``,
+    written by ``dharma_swarm/world_radar/go_bridge.py`` on every radar pass.
+    Returns no row when the loop has never run on this host.
+    """
+    health_path = (
+        dharma_state_dir("DHARMA_STATE_DIR") / "meta" / "world_radar" / "world_radar_health.json"
+    )
+    if not health_path.exists():
+        return []
+    try:
+        health = json.loads(health_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        health = None
+    if not isinstance(health, dict):
+        row = ControlSurfaceRow(
+            id="go.world_radar_health",
+            kind="go_receipt",
+            label="Go World Radar Health",
+            authority_role="evidence",
+            declared_state="incubating",
+            desired_state="live",
+            observed_state="health file unreadable",
+            coherence_state="drifted",
+            priority="p1",
+            owner_module="dharma_swarm/world_radar/go_bridge.py",
+            truth_owner="go_sdk",
+            gap_codes=["go_world_radar_health_unreadable"],
+        )
+        row.add_evidence(
+            "go_receipt", f"health_path={health_path}",
+            status="error",
+            provenance_chain=["go_sdk", "world_radar", "health_file"],
+        )
+        return [row]
+
+    status = str(health.get("status") or ("ok" if health.get("ok") else "degraded"))
+    source_errors = (
+        health.get("source_errors") if isinstance(health.get("source_errors"), list) else []
+    )
+    failed_sources = int(float(health.get("failed_sources", 0) or 0))
+    needs_host = "needs_host" in {
+        str(health.get("scout_invocation_mode", "") or ""),
+        str(health.get("ingestor_invocation_mode", "") or ""),
+    }
+    gaps: list[str] = []
+    if needs_host:
+        gaps.append("go_world_radar_needs_host")
+    if status == "ok":
+        observed_state = "radar pass ok"
+        coherence_state = "bound"
+    else:
+        observed_state = (
+            "Go organs not runnable on this host (needs_host)"
+            if needs_host
+            else f"radar degraded ({failed_sources} failed sources)"
+        )
+        coherence_state = "partial"
+        gaps.append("go_world_radar_degraded")
+    if source_errors:
+        gaps.append("go_world_radar_source_errors")
+
+    row = ControlSurfaceRow(
+        id="go.world_radar_health",
+        kind="go_receipt",
+        label="Go World Radar Health",
+        authority_role="evidence",
+        declared_state="incubating",
+        desired_state="live",
+        observed_state=observed_state,
+        coherence_state=coherence_state,
+        priority="p1",
+        owner_module="dharma_swarm/world_radar/go_bridge.py",
+        truth_owner="go_sdk",
+        freshness=str(health.get("checked_at", "")),
+        gap_codes=gaps,
+        next_action=(
+            "Provision Go on this host: run `make go-build` (or install a Go toolchain)"
+            if needs_host
+            else ("Investigate per-source failures below" if source_errors else "")
+        ),
+        raw={
+            "health_path": str(health_path),
+            "status": status,
+            "successful_sources": health.get("successful_sources", 0),
+            "failed_sources": failed_sources,
+            "scout_invocation_mode": health.get("scout_invocation_mode", ""),
+            "ingestor_invocation_mode": health.get("ingestor_invocation_mode", ""),
+            "source_errors": source_errors,
+        },
+    )
+    row.add_evidence(
+        "go_receipt",
+        (
+            f"status={status} successful_sources={health.get('successful_sources', 0)} "
+            f"failed_sources={failed_sources} "
+            f"scout_mode={health.get('scout_invocation_mode', '') or 'unknown'} "
+            f"ingestor_mode={health.get('ingestor_invocation_mode', '') or 'unknown'}"
+        ),
+        status="present",
+        provenance_chain=["go_sdk", "world_radar", "health_file"],
+    )
+    for entry in source_errors[:10]:
+        if not isinstance(entry, dict):
+            continue
+        row.add_evidence(
+            "go_receipt",
+            (
+                f"source_error source={entry.get('source', '')} "
+                f"stage={entry.get('stage', '')} error={entry.get('error', '')}"
+            ),
+            status="error",
+            provenance_chain=["go_sdk", "world_radar", "source_errors"],
+        )
+    row.add_source_ref("file", str(health_path), exists=True)
+    row.add_source_ref("go_module", "dharma_swarm/world_radar/go_bridge.py", exists=True)
+    return [row]
 
 
 def _go_world_receipt_summary_rows() -> list[ControlSurfaceRow]:

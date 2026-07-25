@@ -1,0 +1,63 @@
+{
+  "provider": "ollama",
+  "model": "llama3.2:latest",
+  "spine_dispatch": "1",
+  "read_only_boot": "1",
+  "ollama_force_local": "1",
+  "agents": 1,
+  "tasks_requested": 3,
+  "tasks_completed": 3,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "served_provider_truth": {
+    "runtime_db": "$DHARMA_STATE/state/runtime.db",
+    "exists": true,
+    "completed_runs_with_truth": 999,
+    "delegation_receipts_with_truth": 26,
+    "runtime_receipts_with_truth": 7020,
+    "sample": {
+      "receipt_id": "rr_run_ds_goal_90a1b20964b59586d28f465d_ds_goal_completed",
+      "run_id": "run_ds_goal_90a1b20964b59586d28f465d",
+      "served_provider": "ollama",
+      "served_model": "glm-5:cloud"
+    }
+  },
+  "evidence_receipts": {
+    "5b30ffcd-e048-4d43-a970-8b1df6f1a983": "ok",
+    "c4365393-ea31-4163-aa02-6995a054561b": "ok",
+    "249cb3f4-2004-4b5a-8101-60dc21827fab": "ok"
+  },
+  "tick_errors": [],
+  "ticks": 107,
+  "stigmergy_marks_before": 4601,
+  "stigmergy_marks_after": 4606,
+  "stigmergy_marks_deposited": 5,
+  "stigmergy_marks_for_run": 3,
+  "adapt_fired": true,
+  "stigmergy_hot_paths": [],
+  "state_dir": "$DHARMA_STATE",
+  "canonical_state": true,
+  "tasks": [
+    {
+      "task_id": "2effb0d1da2b4048",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Task Summary\n\nFeedback loops need both sensing and acting because they require feedback to be effective. Sensing allows the loop to gather information about "
+    },
+    {
+      "task_id": "e1b16a48646d4936",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Task: loop1-closure-0002\n\n### Failure Modes of a Distributed Task Queue\n#### 1. **Session Status Failures**\n Failure Mode: The distributed task queue fails t"
+    },
+    {
+      "task_id": "ed8db7c037914472",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Task Summary\n\nFor retrying transient failures with exponential backoff, one concise principle is to use a backoff strategy that increases the delay between r"
+    }
+  ]
+}

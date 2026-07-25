@@ -1,0 +1,151 @@
+# evidence_grades.yaml — the graded evidence ladder (Pudgala Autopoiesis Protostar, Phase 1)
+#
+# THE PLACE where criterion *strength* is declared, declaratively, so the
+# rigorous bar in scripts/governance/check_track_status.py can become a GRADED
+# floor instead of a binary "any rigorous criterion suffices" check.
+#
+# Doctrine this serves (anti-slop):
+#   File-existence is never closure. A claim ships only when its strongest
+#   passing evidence meets the required grade — and an oracle the claimant
+#   controls is not independent evidence.
+#
+# This file is a PROJECTION CONFIG, not a new truth store: it maps the
+# criterion kinds that already exist in check_track_status.py onto an ordered
+# S0..S8 ladder. Adding a grade needs no code change here — only a new row plus
+# (for active grades) a matching criterion kind already implemented in the
+# checker. The checker reads this file once (module-level cache) via
+# grade_of_criterion(); an unmapped/unknown kind scores S0.
+#
+# ACTIVE vs RESERVED:
+#   - S0..S3 and S6 are ACTIVE — they map to criterion kinds the checker
+#     implements today (file_exists, file_contains/pr_merged, commit_on_main,
+#     test_passes, and mutation_score_gte — the S6 anti-gaming oracle, P3-09).
+#   - S4, S5, S7, S8 are RESERVED — declared-but-inactive slots so the ladder is
+#     forward-stable. They map to kinds the checker does NOT yet implement
+#     (Phases 4-9). A track that cites a reserved kind scores S0 until the
+#     kind lands, so reserving a slot can never silently inflate a grade.
+#
+# default_min_grade is the floor a track is held to when it does not declare
+# its own `min_evidence_grade:` (an integer 0..8). 2 = S2 (commit_on_main):
+# "the work must have LANDED on origin/main," the weakest defensible ship bar.
+
+schema_version: 1
+default_min_grade: 2          # S2 — landed on origin/main
+
+# Oracle independence: a green test authored/owned by the same identity that
+# owns the track is not independent evidence (it can be written to pass). When
+# a `test_passes` criterion declares no `oracle_source`, or declares one equal
+# to the track `owner`, its S3 is DOWNGRADED to this grade. Set a criterion's
+# `oracle_source:` to an independent verifier (signer != committer) to keep S3.
+oracle_dependent_downgrade_to: 2   # S3 -> S2 when oracle == track owner
+
+# ENFORCEMENT MODEL — ONE evaluator (check_track_status.py::evaluate_track),
+# TWO ratcheted enforcement rungs, read by multiple projection surfaces. Do NOT
+# collapse the two rungs into one strictness (that would break the advisory->
+# enforced ratchet and the light-governance/diversity constraint):
+#   Rung 1 (HARD, always-on, NARROW): the false-shippable-claim ERROR in run()
+#     fires only when a track DECLARES status:shippable yet lacks any rigorous
+#     criterion OR has an open blocker OR an *executed* failure. An UNVERIFIED
+#     (could-not-run-here) criterion NEVER blocks. This is #695's deliberate,
+#     fail-safe ratchet exception — it ships enforcing on merge by design.
+#   Rung 2 (STAGE-DRIVEN, fail-safe-advisory): the graded undergrade case
+#     (strongest passing grade < min_evidence_grade) blocks only when the AI-M1
+#     hygiene pattern is at stage 'enforced' (operator-promoted via promote.py).
+# A future editor must NOT "fix" the binary-vs-graded seam by making the graded
+# case hard-block unconditionally — that collapse is the PRIMARY documented risk.
+
+# Claim-MATURITY scale (0-7) — a DELIBERATELY DISTINCT scale from the evidence
+# `grade` below, CO-LOCATED here so the two cannot silently drift. (Prior split-
+# brain, caught by the convergence review: track_acceptance_strength_report.py
+# hard-coded its own ladder that disagreed with this file on receipt_valid /
+# pr_merged / mutation_score_gte.) The evidence GRADE answers "how strong is the
+# evidence?"; claim-MATURITY answers "does the evidence match the CLAIM's NAME?"
+# (a 'runtime'/'closure' claim implies an observed path). Same ordering, not every
+# value (a receipt is S2-landed evidence yet runtime-MATURITY 5) — intentional.
+# track_acceptance reads its strengths from HERE; it no longer hard-codes them.
+# RUBRIC: 0 file-present · 1 declaration-complete · 2 command-receipted ·
+# 3 behavior-verified · 4 adversarial-verified · 5 runtime-verified ·
+# 6 independently-reproduced · 7 promoted.
+kind_maturity:
+  file_exists: 0
+  file_contains: 1
+  json_collection_values_match: 2
+  json_count_equals: 2
+  json_count_greater_than: 2
+  json_mapping_keys_nonempty: 2
+  pr_merged: 2
+  commit_on_main: 2
+  test_passes: 3
+  receipt_valid: 5
+  mutation_score_gte: 4    # adversarial-verified — tests kill injected faults (was absent -> 0)
+
+grades:
+  - grade: 0
+    name: S0_EXISTS
+    status: active
+    kinds: [file_exists]
+    meaning: "A file/path is present. Existence only — never closure."
+
+  - grade: 1
+    name: S1_PRESENT
+    status: active
+    kinds: [file_contains, pr_merged]
+    meaning: "A pattern is present in a file, or a PR reached MERGED state."
+
+  - grade: 2
+    name: S2_LANDED
+    status: active
+    kinds: [commit_on_main, json_count_equals, json_count_greater_than, json_collection_values_match, json_mapping_keys_nonempty]
+    meaning: "A cited commit is an ancestor of origin/main, or a structured JSON
+              assertion matched an owned evidence artifact. Landed/structured
+              evidence, not independent runtime execution."
+
+  - grade: 3
+    name: S3_TESTED
+    status: active
+    kinds: [test_passes]
+    meaning: "A named pytest target was executed and PASSED. Downgraded to S2
+              when its oracle is not independent of the track owner."
+
+  # ---- RESERVED (inactive until the criterion kind lands; scores S0 today) ----
+  - grade: 4
+    name: S4_COVERED
+    status: reserved
+    phase: 4
+    kinds: [coverage_gte]
+    meaning: "Line/branch coverage over a threshold. Gameable — never
+              sufficient alone; bonus only above a passing correctness grade."
+
+  - grade: 5
+    name: S5_PROPERTY
+    status: reserved
+    phase: 4
+    kinds: [property_holds]
+    meaning: "A property-based / metamorphic invariant held across generated
+              inputs (not a single hand-picked example)."
+
+  - grade: 6
+    name: S6_MUTATION
+    status: active
+    phase: 4
+    kinds: [mutation_score_gte]
+    meaning: "Mutation score over a threshold — the primary anti-gaming oracle:
+              the tests actually kill injected faults. ACTIVE (P3-09): the gate
+              reads reports/governance/mutation_score.json, produced by
+              `make mutation-test`; a track cites it as `kind: mutation_score_gte`."
+
+  - grade: 7
+    name: S7_VERIFIED
+    status: reserved
+    phase: 7
+    kinds: [verifier_approved]
+    meaning: "An independent verifier (signer != committer) approved a machine
+              receipt — adversarial review, not self-attestation."
+
+  - grade: 8
+    name: S8_PROVEN
+    status: reserved
+    phase: 8
+    kinds: [formal_proof]
+    meaning: "A machine-checked formal proof / refinement obligation discharged.
+              Deferred; reserved for the highest-assurance claims."

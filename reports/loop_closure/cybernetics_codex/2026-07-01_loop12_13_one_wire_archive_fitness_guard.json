@@ -1,0 +1,48 @@
+{
+  "schema_version": "cybernetics_codex.loop12_13_guard_receipt.v1",
+  "generated_at": "2026-07-01T15:11:19Z",
+  "loop_id": ["self_improvement", "free_evolution_grind"],
+  "loop_numbers": [12, 13],
+  "verdict": "BLOCKED",
+  "do_not_close_loop": true,
+  "reason": "One Wire guardian quorum is below threshold and fitness authority is not granted.",
+  "one_wire_live_state": {
+    "guardian_receipt": "$DHARMA_STATE/forge_measurement_guardian/cycle-003-fitness-quorum-guard.json",
+    "confirmed": "3/5",
+    "domains": "1/3",
+    "eligible": false,
+    "fitness_authority_granted": false,
+    "archive_fitness_changed": false
+  },
+  "files_changed": [
+    "dharma_swarm/archive.py",
+    "tests/test_one_wire_archive_fitness_guard.py",
+    "reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json"
+  ],
+  "command_to_replay": ".venv/bin/python -m pytest -q tests/test_one_wire_archive_fitness_guard.py tests/test_cybernetics_codex.py",
+  "sense_evidence": "Live read of cycle-003-fitness-quorum-guard.json reports N=3/5, M=1/3, eligible=false, fitness_authority_granted=false, archive_fitness_changed=false.",
+  "interpret_evidence": "read_one_wire_fitness_authority() treats the guardian receipt as the only archive-fitness authority source; entry-local internal claims are ignored.",
+  "constrain_evidence": "EvolutionArchive.add_entry() raises OneWireFitnessAuthorityError before Merkle or JSONL writes when governed archive fitness is nonzero without One Wire authority.",
+  "act_evidence": "Focused tests prove missing guardian, N<5, M<3, missing authority flag, and internal-only self-claims fail closed; only an eligible synthetic temp guardian permits a nonzero archive fitness write; zero-fitness governed writes remain allowed because archive fitness does not move.",
+  "adapt_evidence": "update_status() and rollback_entry() both guard legacy positive-fitness rows before promotion into fitness-bearing states.",
+  "later_cycle_read_evidence": "build_audit(repo_root='.', state_dir='$DHARMA_STATE') reports loop 12 self_improvement=BLOCKED and loop 13 free_evolution_grind=BLOCKED with blocker 'guardian quorum below threshold: N=3/5, M=1/3'.",
+  "tests_run": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_one_wire_archive_fitness_guard.py tests/test_cybernetics_codex.py",
+      "result": "22 passed"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_archive.py tests/test_archive_merkle_integration.py tests/test_strategy_reinforcer.py",
+      "result": "60 passed"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/archive.py tests/test_one_wire_archive_fitness_guard.py",
+      "result": "All checks passed"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/cybernetics_codex_audit.py --json",
+      "result": "exit 0; loop 12 self_improvement=BLOCKED and loop 13 free_evolution_grind=BLOCKED; One Wire N=3/5, M=1/3"
+    }
+  ],
+  "residual_risk": "Historical archive rows are not rewritten by this guard. The change blocks new governed nonzero fitness writes and guarded status promotions unless a future guardian receipt reaches N>=5, M>=3 and explicitly grants fitness authority."
+}

@@ -13,15 +13,15 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from dharma_swarm.a2a.agent_card import AgentCapability, AgentCard, CardRegistry
-from dharma_swarm.a2a.a2a_server import A2AServer, A2ATask, A2ATaskStatus
-from dharma_swarm.a2a.a2a_client import A2AClient, DelegationResult, _is_remote
+from dharma_swarm.a2a.a2a_server import A2AServer
+from dharma_swarm.a2a.a2a_client import A2AClient, _is_remote
 from dharma_swarm.a2a.node_registry import (
     NodeRegistry,
     RemoteNode,
@@ -137,6 +137,93 @@ class TestNodeRegistry:
         assert loaded is not None
         assert loaded.node_id == "agni"
         assert loaded.ssh_alias == "agni"
+
+    def test_persistence_omits_plaintext_api_key(
+        self, nodes_path: Path, sample_node: RemoteNode
+    ) -> None:
+        reg = NodeRegistry(nodes_path=nodes_path)
+        reg.register(sample_node)
+
+        raw = nodes_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+
+        assert sample_node.api_key not in raw
+        assert "api_key" not in data[0]
+        assert data[0]["api_key_env"] == "DHARMA_NODE_KEY_AGNI"
+
+    def test_persistence_sanitizes_env_ref_and_metadata_secrets(
+        self, nodes_path: Path
+    ) -> None:
+        reg = NodeRegistry(nodes_path=nodes_path)
+        reg.register(RemoteNode(
+            node_id="agni.prod-1",
+            api_key="plain-runtime-secret",
+            metadata={
+                "label": "prod",
+                "headers": {"Authorization": "Bearer secret-token"},
+                "nested": [{"api_key": "nested-secret"}],
+            },
+        ))
+
+        raw = nodes_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+
+        assert "plain-runtime-secret" not in raw
+        assert "secret-token" not in raw
+        assert "nested-secret" not in raw
+        assert data[0]["api_key_env"] == "DHARMA_NODE_KEY_AGNI_PROD_1"
+        assert data[0]["metadata"]["headers"]["Authorization"] == "<redacted>"
+        assert data[0]["metadata"]["nested"][0]["api_key"] == "<redacted>"
+
+    def test_load_resolves_safe_env_reference(
+        self, nodes_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DHARMA_NODE_KEY_AGNI", "env-secret")
+        nodes_path.write_text(
+            json.dumps([
+                {
+                    "node_id": "agni",
+                    "endpoint": "http://example.test",
+                    "api_key_env": "DHARMA_NODE_KEY_AGNI",
+                }
+            ]),
+            encoding="utf-8",
+        )
+
+        reg = NodeRegistry(nodes_path=nodes_path)
+        loaded = reg.get("agni")
+
+        assert loaded is not None
+        assert loaded.api_key == ""
+        assert loaded.resolved_api_key() == "env-secret"
+
+    def test_load_legacy_plaintext_key_scrubs_next_persist(
+        self, nodes_path: Path
+    ) -> None:
+        nodes_path.write_text(
+            json.dumps([
+                {
+                    "node_id": "agni",
+                    "endpoint": "http://example.test",
+                    "api_key": "legacy-secret",
+                }
+            ]),
+            encoding="utf-8",
+        )
+
+        reg = NodeRegistry(nodes_path=nodes_path)
+        loaded = reg.get("agni")
+        assert loaded is not None
+        assert loaded.api_key == "legacy-secret"
+        assert loaded.resolved_api_key() == "legacy-secret"
+
+        reg.register(loaded)
+        raw = nodes_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+
+        assert "legacy-secret" not in raw
+        assert "api_key" not in data[0]
+        assert data[0]["api_key_env"] == "DHARMA_NODE_KEY_AGNI"
 
     def test_unregister(
         self, node_registry: NodeRegistry, sample_node: RemoteNode

@@ -1,0 +1,914 @@
+{
+  "a2a_bus": {
+    "inbox_files": 1831,
+    "nats_e2e_receipt": "$WORKTREE_ROOT/dw-worktrees/g/reports/orientation/nats_e2e_receipt.json",
+    "node_registry": "$DHARMA_STATE/a2a/nodes.json",
+    "quarantine_files": 35653,
+    "root": "$DHARMA_STATE/a2a_bus",
+    "task_log": "$DHARMA_STATE/a2a/task_log.jsonl"
+  },
+  "agents": [
+    {
+      "agent_uid": "agni",
+      "callsign": "agni",
+      "harness": "vps_ssh_hermes_nats_bridge",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T23:02:33Z",
+      "model": "hermes-agent/v0.17.0 on agni-openclaw",
+      "source_path": "a2a_bus/agents.json",
+      "status": "semantic_reachable_complex_coordination_proven"
+    },
+    {
+      "agent_uid": "claude-opus",
+      "callsign": "claude-opus",
+      "harness": "claude",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-27T14:20:09.955207+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "codex-hardening-smoke",
+      "callsign": "codex-hardening-smoke",
+      "harness": "hermes",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-27T13:37:51.273892+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "codex_composer",
+      "callsign": "codex_composer",
+      "harness": "codex_cli_tmux",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-30T06:17:34.588435+00:00",
+      "model": "openai/gpt-5.5",
+      "source_path": "$DHARMA_STATE/agents/codex_composer/living_agent.json",
+      "status": "active"
+    },
+    {
+      "agent_uid": "codex_composer_mac",
+      "callsign": "codex_composer_mac",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T18:34:00Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "codex_rushabdev",
+      "callsign": "codex_rushabdev",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T18:34:00Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "devin-roaming-2987d222",
+      "callsign": "devin-roaming-2987d222",
+      "harness": "devin_cognition_labs",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-30T06:17:34.588435+00:00",
+      "model": "cognition/devin",
+      "source_path": "$DHARMA_STATE/agents/devin-roaming-2987d222/living_agent.json",
+      "status": "active"
+    },
+    {
+      "agent_uid": "drishti",
+      "callsign": "drishti",
+      "harness": "inner-circle",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-22T11:10:36.925440+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "fable_5_cursor",
+      "callsign": "fable-5-cursor",
+      "harness": "cursor_ide",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-11T02:18:24.328568+00:00",
+      "model": "anthropic/claude-fable-5",
+      "source_path": "$DHARMA_STATE/agents/fable_5_cursor/living_agent.json",
+      "status": "starting"
+    },
+    {
+      "agent_uid": "fable_composer",
+      "callsign": "fable_composer",
+      "harness": "claude_code_headless",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-12T15:14:30.000000+00:00",
+      "model": "claude-fable-5",
+      "source_path": "$DHARMA_STATE/agents/fable_composer/identity.json",
+      "status": "session_alive_standing_loop_pending"
+    },
+    {
+      "agent_uid": "fleet-coordinator",
+      "callsign": "fleet-coordinator",
+      "harness": "hermes",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-27T14:23:54.749154+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "hermes-m5",
+      "callsign": "hermes-m5",
+      "harness": "hermes",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+      "model": "",
+      "source_path": "$DHARMA_STATE/agents/hermes-m5/living_agent.json",
+      "status": "active"
+    },
+    {
+      "agent_uid": "karya",
+      "callsign": "karya",
+      "harness": "inner-circle",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-22T11:10:36.949347+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "opus_composer",
+      "callsign": "opus_composer",
+      "harness": "claude-code",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-31T07:28:21.642040+00:00",
+      "model": "anthropic/claude-opus-4-7",
+      "source_path": "$DHARMA_STATE/agents/opus_composer/living_agent.json",
+      "status": "degraded"
+    },
+    {
+      "agent_uid": "qwen_code",
+      "callsign": "qwen-code",
+      "harness": "qwen_code_cli",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-06T04:16:42.237752+00:00",
+      "model": "alibaba/qwen-code-runtime",
+      "source_path": "$DHARMA_STATE/agents/qwen_code/living_agent.json",
+      "status": "active_evidence_only"
+    },
+    {
+      "agent_uid": "rushabdev",
+      "callsign": "rushabdev",
+      "harness": "vps_ssh_hermes_nats_bridge",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T23:02:33Z",
+      "model": "hermes-agent on rushabdev VPS",
+      "source_path": "a2a_bus/agents.json",
+      "status": "semantic_reachable_complex_coordination_proven"
+    },
+    {
+      "agent_uid": "sab_hardener",
+      "callsign": "sab_hardener",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T18:34:00Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "sab_recruiter_bridge",
+      "callsign": "sab_recruiter_bridge",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T18:34:00Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "sab_research_scout",
+      "callsign": "sab_research_scout",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-27T18:34:00Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "setu-sab-agni",
+      "callsign": "setu-sab-agni",
+      "harness": "sab-first-six-lane",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-28T15:39:50Z",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "mission_lane_day1_completed"
+    },
+    {
+      "agent_uid": "smriti",
+      "callsign": "smriti",
+      "harness": "inner-circle",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-22T11:10:36.973156+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "viveka",
+      "callsign": "viveka",
+      "harness": "inner-circle",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-05-22T11:10:36.902218+00:00",
+      "model": "",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    },
+    {
+      "agent_uid": "warp_fable_weaver",
+      "callsign": "warp_fable_weaver",
+      "harness": "warp_oz",
+      "heartbeat_status": "RED",
+      "last_seen_at": "2026-06-12T05:03:50.658024+00:00",
+      "model": "anthropic/claude-5-fable",
+      "source_path": "a2a_bus/agents.json",
+      "status": "missing"
+    }
+  ],
+  "body": {
+    "new_sha": "86418541a9",
+    "note": "no change",
+    "observed_at": "2026-06-20T10:15:57Z",
+    "old_sha": "86418541a9",
+    "receipt": "$DHARMA_STATE/ops/deploy_receipt.json",
+    "status": "current",
+    "worktree": "$HOME/dharma_swarm_main"
+  },
+  "broken": [
+    {
+      "id": "BR-003",
+      "status": "PARTIAL",
+      "title": "Apply gate present but closed (self-evolution loop)"
+    },
+    {
+      "id": "BR-021",
+      "status": "WORKAROUND",
+      "title": "WS4 Tier-C battery hard-rejects terse evolution-test proposals"
+    },
+    {
+      "id": "BR-022",
+      "status": "OPEN",
+      "title": "Center of gravity is inward: outward edge unowned + governance rent uninstrumented"
+    },
+    {
+      "id": "BR-004",
+      "status": "PARTIAL",
+      "title": "Cron split-brain (repo vs live)"
+    },
+    {
+      "id": "BR-005",
+      "status": "PARTIAL",
+      "title": "Algedonic stream in degenerate steady-state"
+    },
+    {
+      "id": "BR-009",
+      "status": "OPEN",
+      "title": "Roadmap is contested (3 docs claim primacy)"
+    },
+    {
+      "id": "BR-010",
+      "status": "OPEN",
+      "title": "`NAVIGATION.md` exists at non-canonical path; file itself stale"
+    },
+    {
+      "id": "BR-011",
+      "status": "OPEN",
+      "title": "`INTERFACE_MISMATCH_MAP.md` self-declared stale"
+    },
+    {
+      "id": "BR-012",
+      "status": "OPEN",
+      "title": "`CYBERNETIC_LOOP_MAP.md` stale (6 days)"
+    },
+    {
+      "id": "BR-013",
+      "status": "PARTIAL",
+      "title": "Agent contract fragmented across 8+ surfaces"
+    },
+    {
+      "id": "BR-014",
+      "status": "OPEN",
+      "title": "`BHED_GNAN` always passes"
+    },
+    {
+      "id": "BR-015",
+      "status": "OPEN",
+      "title": "`.FOCUS` writer with stale claim \"no reader\""
+    },
+    {
+      "id": "BR-016",
+      "status": "OPEN",
+      "title": "`SOVEREIGN_MANIFEST.md` count drift"
+    },
+    {
+      "id": "BR-018",
+      "status": "OPEN",
+      "title": "`MEGAFILE_INDEX.md` was not referenced from `CLAUDE.md` or `README.md` (discoverability gap)"
+    },
+    {
+      "id": "BR-017",
+      "status": "OPEN",
+      "title": "`BUILD_SESSION_ENTRYPOINT.md` exists on origin/main, missing from current checkout"
+    }
+  ],
+  "context_hash": "704f3fc0a04c5c22d8dee1474f78c3de733d8cd685e402a45f9601b6703fc758",
+  "custody": {
+    "missing": [
+      "AGENTS.md"
+    ],
+    "present": 109,
+    "registered_total": 110
+  },
+  "identity": {
+    "missing_sources": [],
+    "one_line": "dharma_swarm is a self-evolving emergent organism (Krishna); its outward action against the world's brokenness (Arjuna) flows from \u2014 and is only valid when rooted in \u2014 its inward coherence.",
+    "read_first": [
+      "foundations/THE_ORGANISM.md",
+      "docs/vision_maps/NORTH_STAR.md",
+      "reports/swarm_genome/2026-06-11/SYNTHESIS.md",
+      "docs/MEGAFILE_INDEX.md"
+    ]
+  },
+  "lanes": [
+    {
+      "branch": "agent/magpie-seed",
+      "head": "LIVE_HEAD",
+      "path": "$REPO_ROOT",
+      "status": ""
+    },
+    {
+      "branch": "main",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/dharma-lgp-pr",
+      "status": ""
+    },
+    {
+      "branch": "ratchet/loop-phases-1-3",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/ds_loop",
+      "status": ""
+    },
+    {
+      "branch": "(detached)",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/ds_pr727_merged_verify_20260630",
+      "status": ""
+    },
+    {
+      "branch": "claude/a2a-nats-review-test-ncol7c",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/ds_pr729_a2a_nats_review_20260630",
+      "status": ""
+    },
+    {
+      "branch": "devin/1782798202-formal-telos-gates",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/ds_pr731_telos_formal_repair_20260630",
+      "status": ""
+    },
+    {
+      "branch": "codex/worktree-readiness-closeout-20260702",
+      "head": "LIVE_HEAD",
+      "path": "$TMPDIR/ds_worktree_readiness_closeout_20260702",
+      "status": ""
+    },
+    {
+      "branch": "claude/debug-corral",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma-debug-corral",
+      "status": ""
+    },
+    {
+      "branch": "helm/worldclass-20260612",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_helm_build",
+      "status": ""
+    },
+    {
+      "branch": "worktree-langgraph-parity-verifier-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$REPO_ROOT/.claude/worktrees/langgraph-parity-verifier-20260701",
+      "status": ""
+    },
+    {
+      "branch": "worktree-verifier-ranker-v0-spike",
+      "head": "LIVE_HEAD",
+      "path": "$REPO_ROOT/.claude/worktrees/verifier-ranker-v0-spike",
+      "status": ""
+    },
+    {
+      "branch": "cashclaw/revenue-hydra-v1",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_cashclaw",
+      "status": ""
+    },
+    {
+      "branch": "organ/03-seat",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_live",
+      "status": ""
+    },
+    {
+      "branch": "(detached)",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_main",
+      "status": ""
+    },
+    {
+      "branch": "oz/integration-2026-06-25",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_oz_integration",
+      "status": ""
+    },
+    {
+      "branch": "slice/roast-skill",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_slice_roast",
+      "status": ""
+    },
+    {
+      "branch": "chore/render-on-demand-stop-churn-20260625",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_swarm_wt/render-on-demand",
+      "status": ""
+    },
+    {
+      "branch": "feat/operator-idea-spark-ingest",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/dharma_ws_idea_spark",
+      "status": ""
+    },
+    {
+      "branch": "codex/a2a-always-on-spine-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_a2a_always_on_spine_20260701",
+      "status": ""
+    },
+    {
+      "branch": "runtime-truth/nats-rebuild-preflight-20260618",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_a2a_nats_rebuild_preflight_20260618",
+      "status": ""
+    },
+    {
+      "branch": "codex/active-track-graduation-20260630",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_active_track_graduation_20260630",
+      "status": ""
+    },
+    {
+      "branch": "codex/governance-fitness-ci-20260625-225920",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_cleanup_convergence_20260625",
+      "status": ""
+    },
+    {
+      "branch": "codex/final-boss-operational-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_final_boss_operational_20260701",
+      "status": ""
+    },
+    {
+      "branch": "forge/nvidia-foundry-mvp-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_nvidia_foundry_mvp_20260701",
+      "status": ""
+    },
+    {
+      "branch": "codex/forge-prod-contracts-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_prod_contracts_20260701",
+      "status": ""
+    },
+    {
+      "branch": "codex/dharma-forge-proving-ground-10-10-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_proving_ground_10_10_20260626",
+      "status": ""
+    },
+    {
+      "branch": "droid/dharma-forge-proving-ground-10-10-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_proving_ground_droid_10_10_20260626",
+      "status": ""
+    },
+    {
+      "branch": "feat/rsi-lab",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_spine_v0",
+      "status": ""
+    },
+    {
+      "branch": "forge-v1/tokenbroker-scoreboard-20260620",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_forge_v1_scoreboard",
+      "status": ""
+    },
+    {
+      "branch": "codex/langgraph-orchestration-parity-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_langgraph_parity_20260701",
+      "status": ""
+    },
+    {
+      "branch": "codex/langgraph-prod-candidate-20260702",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_langgraph_prod_candidate_20260702",
+      "status": ""
+    },
+    {
+      "branch": "codex/mike-nonstop-dedupe-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_mike_nonstop_20260626",
+      "status": ""
+    },
+    {
+      "branch": "codex/pudgala-autopoiesis-protostar-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_pr704_pudgala_autopoiesis",
+      "status": ""
+    },
+    {
+      "branch": "claude/anti-slop-enforcement-2026-06",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_pr713_quality_ratchet",
+      "status": ""
+    },
+    {
+      "branch": "fix/pr716-sleep-cycle-graceful",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_pr716_sleep_cycle_fix",
+      "status": ""
+    },
+    {
+      "branch": "claude/monetization-strategy-team-rgn7g6",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_pr718_vnh_sis_seed",
+      "status": ""
+    },
+    {
+      "branch": "claude/sis-seed1-carbon-attribution",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_pr719_sis_seed1_carbon",
+      "status": ""
+    },
+    {
+      "branch": "codex/routing-canon-20260630",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_routing_canon_20260630",
+      "status": ""
+    },
+    {
+      "branch": "codex/runtime-truth-nats-live-evidence-20260701",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_runtime_truth_nats_clean_20260701",
+      "status": ""
+    },
+    {
+      "branch": "codex/semantic-commons-livingdock-composer-100",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_semantic_commons_100",
+      "status": ""
+    },
+    {
+      "branch": "loop-closure/supplychain-bronze-20260620",
+      "head": "LIVE_HEAD",
+      "path": "$HOME/ds_supplychain_slice",
+      "status": ""
+    },
+    {
+      "branch": "stream/a-vector-retention",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/a",
+      "status": ""
+    },
+    {
+      "branch": "stream/b-gitignore",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/b",
+      "status": ""
+    },
+    {
+      "branch": "stream/c-test-infra",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/c",
+      "status": ""
+    },
+    {
+      "branch": "stream/d-telos-lifecycle",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/d",
+      "status": ""
+    },
+    {
+      "branch": "codex/cybernetic-loop-closure-20260702",
+      "head": "CURRENT_CHECKOUT",
+      "path": "$WORKTREE_ROOT/dw-worktrees/g",
+      "status": ""
+    },
+    {
+      "branch": "stream/i-god-module-extraction",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/i",
+      "status": ""
+    },
+    {
+      "branch": "stream/substrate-off-magpie",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/dw-worktrees/mem",
+      "status": ""
+    },
+    {
+      "branch": "codex/a2a-governance-readiness-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/ds_a2a_governance_readiness_20260626",
+      "status": ""
+    },
+    {
+      "branch": "scratch/cockpit-grafana-static-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/ds_cockpit_grafana_static_20260626",
+      "status": ""
+    },
+    {
+      "branch": "governance/mike-trust-arbiter-2026-06",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/ds_mike_arbiter_20260626",
+      "status": ""
+    },
+    {
+      "branch": "repair/pr674-track-closure-gate-20260624",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/ds_pr674_rebase_20260624",
+      "status": ""
+    },
+    {
+      "branch": "codex/reconciliation-promotion-20260626",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/ds_reconciliation_promotion_20260626",
+      "status": ""
+    },
+    {
+      "branch": "pr-689-closure",
+      "head": "LIVE_HEAD",
+      "path": "$WORKTREE_ROOT/worktrees/pr689_closure",
+      "status": ""
+    }
+  ],
+  "liveness": {
+    "generated_at": "2026-06-29T18:11:36Z",
+    "receipt": "$DHARMA_STATE/ops/live_process_census.json",
+    "surfaces": [
+      {
+        "id": "substrate.dharma_daemon",
+        "label": "Dharma daemon",
+        "status": "live"
+      },
+      {
+        "id": "cli.ds_goal",
+        "label": "ds-goal runtime CLI",
+        "status": "live"
+      },
+      {
+        "id": "substrate.dharma_cron",
+        "label": "Dharma cron daemon",
+        "status": "live"
+      },
+      {
+        "id": "transport.nats",
+        "label": "Local NATS JetStream",
+        "status": "live"
+      },
+      {
+        "id": "transport.a2a_bridge",
+        "label": "A2A inbox delivery bridge",
+        "status": "live"
+      },
+      {
+        "id": "holon.codex_composer_l4",
+        "label": "codex_composer L4 HOLON",
+        "status": "live"
+      },
+      {
+        "id": "evidence.a2a_mirrors",
+        "label": "A2A filesystem mirrors",
+        "status": "live"
+      },
+      {
+        "id": "evidence.nats_receipts",
+        "label": "NATS receipts and logs",
+        "status": "live"
+      },
+      {
+        "id": "external.hermes_a2a",
+        "label": "Hermes A2A server",
+        "status": "live"
+      },
+      {
+        "id": "dashboard.local",
+        "label": "Dashboard API and web",
+        "status": "live"
+      },
+      {
+        "id": "tmux.cockpit",
+        "label": "Canonical tmux cockpit",
+        "status": "live"
+      },
+      {
+        "id": "mission.forge_reality_arena",
+        "label": "Forge Reality Arena Hydra",
+        "status": "blocked"
+      },
+      {
+        "id": "revenue.cashclaw_gate",
+        "label": "Revenue / CashClaw gate",
+        "status": "blocked"
+      },
+      {
+        "id": "remote.agni",
+        "label": "AGNI remote watcher / trading",
+        "status": "live"
+      },
+      {
+        "id": "agent.merge_master_mike",
+        "label": "Merge Master Mike",
+        "status": "live"
+      },
+      {
+        "id": "terminal.tui",
+        "label": "Terminal TUI",
+        "status": "stopped"
+      },
+      {
+        "id": "load.colima_openclaw",
+        "label": "Colima / OpenClaw VM",
+        "status": "stopped"
+      }
+    ]
+  },
+  "loop1": {
+    "detail": "latest dispatch receipt carries provider+model",
+    "live": true,
+    "model": "claude-code",
+    "provider": "claude_code"
+  },
+  "organs": [
+    {
+      "external_name": "Darshan",
+      "id": "darshan-publication",
+      "instrument": "publication",
+      "status": "ACTIVE_SEASON_0"
+    },
+    {
+      "external_name": "Campaign X-Ray",
+      "id": "campaign-xray",
+      "instrument": "advisory_diagnostic",
+      "status": "HELD"
+    },
+    {
+      "external_name": "",
+      "id": "revenue-wedge",
+      "instrument": "discovery_cell",
+      "status": "INCUBATING"
+    },
+    {
+      "external_name": "",
+      "id": "shakti-ginko",
+      "instrument": "wealth_metabolism",
+      "status": "INCUBATING"
+    },
+    {
+      "external_name": "",
+      "id": "loomwork",
+      "instrument": "publication",
+      "status": "DESIGN_ONLY"
+    },
+    {
+      "external_name": "",
+      "id": "goodworks-dgm",
+      "instrument": "verifiable_mrv_core",
+      "status": "ACTIVE_BUILD_TRACK"
+    }
+  ],
+  "receipts_tail": [
+    {
+      "modified_at": "2026-07-01T06:59:38.230082+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/opus_forge_architect/receipt_forge-v0.1-001_from_a2a_supervisor.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:59:38.229650+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/a2a_supervisor/receipt_forge-v0.1-001.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:46:50.549414+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/operator_via_oz_warp_session/receipt_holon-plan-review-cursor-20260612_from_a2a_supervisor.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:46:50.549190+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/a2a_supervisor/receipt_holon-plan-review-cursor-20260612.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:46:50.547521+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/operator_via_oz_warp_session/receipt_holon-plan-review-opus-20260612_from_a2a_supervisor.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:46:50.547306+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/a2a_supervisor/receipt_holon-plan-review-opus-20260612.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:37:57.856606+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/fable_composer/receipt_yatagarasu-10cceaa8_from_a2a_supervisor.json"
+    },
+    {
+      "modified_at": "2026-07-01T06:37:57.856469+00:00",
+      "path": "$DHARMA_STATE/a2a_bus/inboxes/a2a_supervisor/receipt_yatagarasu-10cceaa8.json"
+    }
+  ],
+  "tracks": [
+    {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [],
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "owned_surfaces": [
+        "dharma_swarm/spine/**",
+        "dharma_swarm/a2a/a2a_bridge.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/agent_runner.py",
+        "scripts/uplift_guards/check_spine_ownership.py"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
+      "id": "loop-closure-2026-06",
+      "owned_surfaces": [
+        "reports/loop_closure/**",
+        "CYBERNETIC_LOOP_MAP.md"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "provider-routing-consolidation-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "id": "orchestration-arena-v1-2026-06",
+      "owned_surfaces": [
+        "dharma_swarm/coordination/**",
+        "dharma_swarm/council/**",
+        "tests/test_arena_v1.py",
+        "tests/test_dpi.py",
+        "tests/test_orchestration_genome.py",
+        "tests/test_orchestrator_v1.py",
+        "tests/test_council_profiles.py",
+        "tests/test_coordination_closure_checks.py"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
+      "id": "merge-master-mike-d4-2026-06",
+      "owned_surfaces": [
+        "scripts/runtime/pr_merge_control.py",
+        "scripts/runtime/merge_master_mike_daemon.py",
+        ".github/workflows/automerge.yml",
+        ".github/workflows/codex-mention-router.yml",
+        ".github/workflows/merge-master-mike-backlog.yml",
+        "tests/test_pr_merge_control_github_reviews.py"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    }
+  ]
+}

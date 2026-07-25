@@ -6,7 +6,6 @@ Pure stdlib — updates in response to parsed events from :mod:`stream_parser`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from .event_types import (
     AssistantMessage,

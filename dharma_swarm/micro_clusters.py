@@ -16,9 +16,9 @@ import logging
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dharma_swarm.evolution import DarwinEngine, Proposal
-    from dharma_swarm.monitor import Anomaly, HealthReport
-    from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
+    from dharma_swarm.evolution import DarwinEngine
+    from dharma_swarm.monitor import Anomaly
+    from dharma_swarm.stigmergy import StigmergyStore
     from dharma_swarm.subconscious import SubconsciousAssociation
 
 logger = logging.getLogger(__name__)

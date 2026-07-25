@@ -23,7 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from api.chat_tools import TOOL_DEFINITIONS, execute_tool
-from api.ws import manager
+from api.ws import authenticate_dashboard_websocket, manager
 from dharma_swarm.api_keys import CHAT_PROVIDER_API_KEY_ENV_KEYS
 from dharma_swarm.certified_lanes import CERTIFIED_LANES, CertifiedLane
 from dharma_swarm.models import LLMRequest, ProviderType
@@ -1352,11 +1352,19 @@ async def chat_status():
 
 @ws_router.websocket("/ws/chat/session/{session_id}")
 async def ws_chat_session(websocket: WebSocket, session_id: str):
+    auth = await authenticate_dashboard_websocket(websocket)
+    if not auth.authorized:
+        return
+
     channel = _chat_channel(session_id)
-    await manager.connect(websocket, channel)
+    await manager.connect(
+        websocket,
+        channel,
+        subprotocol=auth.selected_subprotocol,
+    )
     try:
         events = _chat_session_event_snapshot(session_id)
-        await manager.send_personal(
+        sent = await manager.send_personal(
             websocket,
             {
                 "event": "chat_snapshot",
@@ -1366,8 +1374,11 @@ async def ws_chat_session(websocket: WebSocket, session_id: str):
                 "events": events,
             },
         )
+        if not sent:
+            return
         for event in events:
-            await manager.send_personal(websocket, event)
+            if not await manager.send_personal(websocket, event):
+                return
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:

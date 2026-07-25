@@ -176,19 +176,38 @@ def render_operator_snapshot_text(snapshot: dict[str, Any]) -> str:
 
 
 def render_model_policy_text(policy: dict[str, Any]) -> str:
+    targets = policy.get("targets", [])
+    fallback_chain = policy.get("fallback_chain", [])
     lines = [
         "# Model Policy",
         f"Provider: {policy.get('selected_provider', 'unknown')}",
         f"Model: {policy.get('selected_model', 'unknown')}",
         f"Strategy: {policy.get('strategy', 'unknown')}",
+        f"Route: {policy.get('selected_route', 'unknown')}",
+        f"Oracle: {policy.get('oracle_state', 'unknown')}",
         "",
-        "## Available providers",
+        "## Targets",
     ]
-    providers = policy.get("available_providers", [])
-    if isinstance(providers, list):
-        for p in providers:
-            if isinstance(p, dict):
-                lines.append(f"- {p.get('id', '?')}: models={p.get('model_count', '?')}")
+    if isinstance(targets, list):
+        for target in targets:
+            if not isinstance(target, dict):
+                continue
+            route = target.get("route_id") or f"{target.get('provider', '?')}:{target.get('model', '?')}"
+            state = target.get("route_state", "unknown")
+            reason = target.get("availability_reason")
+            suffix = f" [{state}]"
+            if reason:
+                suffix += f" {reason}"
+            lines.append(
+                f"- {target.get('alias', '?')} -> {target.get('label', '?')} "
+                f"({route}){suffix}"
+            )
+    if isinstance(fallback_chain, list):
+        lines.extend(["", "## Fallbacks"])
+        for item in fallback_chain:
+            if isinstance(item, dict):
+                route = item.get("route_id") or f"{item.get('provider', '?')}:{item.get('model', '?')}"
+                lines.append(f"- {item.get('label', route)} ({route})")
     return "\n".join(lines)
 
 

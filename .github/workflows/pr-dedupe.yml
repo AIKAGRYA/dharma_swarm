@@ -11,15 +11,31 @@ name: pr-dedupe
 #   lanes slip through and the backlog fills with byte-identical refresh PRs
 #   (#559 / #571 / #580 / #583 were one such pile).
 #
-# What this does (mechanical, non-judgmental):
-#   Groups open PRs by normalized title (lowercased, whitespace collapsed) and,
-#   for every group with 2+ PRs whose title carries an automation marker
+# What this does (mechanical, non-judgmental), in two passes:
+#
+#   Pass 1 — ephemeral snapshot reports (NEW): the external ops automation
+#   opens a fresh draft PR every few hours that is a pure *status snapshot* —
+#   "report(governance): PR lifecycle + spine adoption ops report …" and
+#   "chore(governance): refresh spine adoption metric …". Each carries a unique
+#   timestamp in its title, so Pass 2's title-grouping never collapses them and
+#   they pile up (12+ at a time, burying real PRs). These snapshots carry no
+#   merge value — their data is a projection already rendered from owners
+#   (`make onboard`, reports/governance/**) — so this pass CLOSES every such
+#   snapshot PR outright (not keep-newest) with a governance comment + branch
+#   cleanup. The match is conservative: same-repo owner AND a known snapshot
+#   intent, plus either an automation marker or a declared snapshot-only branch.
+#
+#   Pass 2 — duplicate consolidation: groups remaining open PRs by normalized
+#   title (lowercased, whitespace collapsed, timestamps stripped) and, for
+#   every group with 2+ PRs whose title carries an automation marker
 #   ("[automated]" or "[auto]"), keeps ONLY the newest PR (highest number) and
 #   closes the rest with a governance comment + branch cleanup.
 #
 # What this does NOT do:
 #   - It never touches PRs without an automation marker in the title.
 #   - It never merges anything (Merge Master Mike owns merges).
+#   - Pass 1 never touches a PR that is not from the repo owner, nor one whose
+#     title/headRef does not match a declared snapshot intent.
 #
 # Drafts: duplicate automated PRs are closed even when draft — automation
 # lanes that open refresh PRs as drafts otherwise pile up forever (the
@@ -55,6 +71,86 @@ jobs:
       GH_REPO: ${{ github.repository }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
+      - name: Close ephemeral snapshot-report PRs
+        run: |
+          set -euo pipefail
+
+          repo_owner="${GH_REPO%%/*}"
+
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
+            > /tmp/open_prs.json
+
+          # A snapshot-report PR is a pure status projection that should never
+          # have been a PR. The external Oz lane historically omitted
+          # [automated] while using the dedicated timestamped
+          # chore/ops-report-<YYYYMMDD…> branch shape, so accept either a title
+          # marker or that exact automation branch shape — never a bare
+          # chore/ops-report-* prefix, which a human topic branch (e.g.
+          # chore/ops-report-parser) could legitimately use. The
+          # same-repo-owner check remains mandatory because this workflow
+          # runs with pull_request_target write credentials.
+          SNAPSHOT_FILTER="$(cat <<'JQ'
+            def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
+            def snapshot_intent:
+              ((.title // "") | ascii_downcase) as $t
+              | ((.headRefName // "") | ascii_downcase) as $h
+              | (
+                  ($t | test("\\[automated\\]|\\[auto\\]"))
+                  or ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$"))
+                )
+                and (
+                  ($t | test("pr lifecycle \\+ spine adoption ops report"))
+                  or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
+                  or ($t | test("refresh spine adoption metric"))
+                  or ($h | test("pr-lifecycle-spine"))
+                  or ($h | test("spine-adoption-metric"))
+                );
+            [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
+            | sort_by(.number) | .[]
+          JQ
+          )"
+          jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
+            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl || true
+
+          closed_count=0
+          summary="## Ephemeral Snapshot-Report PR Cleanup\n\n"
+          if [ ! -s /tmp/snapshot_prs.jsonl ]; then
+            summary+="No snapshot-report PRs open.\n"
+          fi
+
+          while IFS= read -r entry; do
+            number="$(echo "$entry" | jq -r '.number')"
+            title="$(echo "$entry" | jq -r '.title')"
+            head_ref="$(echo "$entry" | jq -r '.headRefName')"
+            summary+="- **CLOSED** #${number} (branch \`${head_ref}\`) — ${title}\n"
+            if [ "$DRY_RUN" = "false" ]; then
+              close_msg="## 🗂️ Auto-closed: ephemeral snapshot report
+
+          This PR is a **status snapshot** (PR-lifecycle / spine-adoption metric),
+          not a change to merge. The same data is a projection already rendered
+          from its owners — run \`make onboard\` or read \`reports/governance/**\`.
+
+          Per \`docs/governance/PR_QUALITY_GATES.md\`, snapshot reports are emitted
+          as artifacts/comments, never as standing PRs, so they are closed on
+          sight to keep the PR list readable. No action needed.
+
+          If this was a real change, reopen and retitle so it no longer matches a
+          snapshot intent."
+              gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
+              if gh pr close "$number" --repo "$GH_REPO"; then
+                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                closed_count=$((closed_count + 1))
+              else
+                echo "::warning::close of #${number} was rejected — not counted as closed"
+              fi
+            fi
+          done < /tmp/snapshot_prs.jsonl
+
+          summary+="\n**Summary:** ${closed_count} snapshot PR(s) closed (dry_run=${DRY_RUN})\n"
+          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "Snapshot closed: $closed_count"
+
       - name: Find and close duplicate automated PRs
         run: |
           set -euo pipefail
@@ -83,7 +179,13 @@ jobs:
                 or (label_names | any(. == "bot-pr" or . == "automerge"))
               );
             [ .[]
-              | . + {norm: (.title | ascii_downcase | gsub("\\s+"; " ") | gsub("^ | $"; ""))}
+              | . + {norm: (
+                  .title | ascii_downcase
+                  | gsub("[0-9]{4}-[0-9]{2}-[0-9]{2}t?[0-9:]*z?"; "")
+                  | gsub("[0-9]{8}-?[0-9]{4}z?"; "")
+                  | gsub("[0-9]{1,2}:[0-9]{2}z?"; "")
+                  | gsub("\\s+"; " ") | gsub("^ | $"; "")
+                )}
               | select(.norm | test("\\[automated\\]|\\[auto\\]"))
               | select(trusted($repo_owner; $trusted_head_re))
             ]
@@ -118,9 +220,12 @@ jobs:
           If this close is wrong, reopen and rename the title so it no longer
           matches the duplicate group."
                 gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-                gh pr close "$number" --repo "$GH_REPO" || true
-                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
-                closed_count=$((closed_count + 1))
+                if gh pr close "$number" --repo "$GH_REPO"; then
+                  gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                  closed_count=$((closed_count + 1))
+                else
+                  echo "::warning::close of #${number} was rejected — not counted as closed"
+                fi
               fi
             done < <(echo "$group" | jq -c '.[:-1][]')
           done < /tmp/dupe_groups.jsonl

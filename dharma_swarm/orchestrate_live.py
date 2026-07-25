@@ -28,7 +28,6 @@ import logging
 import os
 import signal
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,9 +38,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-from dharma_swarm.config import DEFAULT_CONFIG  # noqa: E402
-from dharma_swarm.pending_proposals import append_pending_proposals  # noqa: E402
-from dharma_swarm.runtime_artifacts import (  # noqa: E402
+from dharma_swarm.config import DEFAULT_CONFIG
+from dharma_swarm.pending_proposals import append_pending_proposals
+from dharma_swarm.runtime_artifacts import (
     freshest_pulse_log_path,
     write_dgc_health_snapshot,
 )
@@ -49,6 +48,56 @@ from dharma_swarm.runtime_artifacts import (  # noqa: E402
 HOME = Path.home()
 STATE_DIR = HOME / ".dharma"
 LOG_DIR = STATE_DIR / "logs"
+LIVENESS_LEDGER_INTERVAL_SECONDS = 3600.0
+
+
+def append_liveness_ledger_row(
+    *,
+    running: list[str],
+    restart_counts: dict[str, int],
+    abandoned: list[str],
+    path: Path | None = None,
+) -> Any:
+    """Append one digest-chained liveness row to the durable run ledger.
+
+    The ops/loop_liveness.json snapshot is overwritten in place by
+    ``_write_loop_liveness``, so an unattended run leaves no replayable
+    uptime evidence — this ledger is the durable producer closing that gap.
+    Rows reuse the spine ``VerifiedMachineReceipt`` chain (one receipt
+    format, one digest formula) and carry the process ``boot_id`` so
+    receipts on either side of a restart are distinguishable (P4). The
+    read-only replay verifier is scripts/governance/liveness_ledger_check.py.
+    Returns the persisted receipt, or None on any failure — liveness
+    evidence must never take down the supervision loop it witnesses.
+
+    The default sink resolves from ``STATE_DIR`` at call time (like
+    ``_write_loop_liveness``), so tests that repoint ``STATE_DIR`` can never
+    leak fixture rows into the real evidence chain.
+    """
+    try:
+        from dharma_swarm.spine.identity import process_boot_id
+        from dharma_swarm.spine.receipt import (
+            VerifiedMachineReceipt,
+            append_machine_receipt,
+        )
+
+        row = VerifiedMachineReceipt(
+            generated_by="dharma_swarm.orchestrate_live.append_liveness_ledger_row",
+            attributes={
+                "kind": "loop_liveness",
+                "boot_id": process_boot_id(),
+                "pid": os.getpid(),
+                "running": sorted(running),
+                "restart_counts": dict(restart_counts),
+                "abandoned": sorted(abandoned),
+            },
+        )
+        return append_machine_receipt(
+            row, path=path or STATE_DIR / "ops" / "liveness_ledger.jsonl"
+        )
+    except Exception:
+        logger.warning("liveness ledger append failed", exc_info=True)
+        return None
 
 # Orchestrator defaults — sourced from central config (env overrides baked in)
 _ll = DEFAULT_CONFIG.live_loop
@@ -58,20 +107,10 @@ EVOLUTION_INTERVAL = _ll.evolution_interval_seconds
 HEALTH_INTERVAL = _ll.health_interval_seconds
 LIVING_INTERVAL = _ll.living_interval_seconds
 MAX_DAILY = _ll.max_daily_tasks
-NON_CONTRIBUTION_PULSE_PREFIXES = ("PAUSED", "QUIET", "CIRCUIT", "TELOS", "HEALTH PULSE")
-HEALTH_MONITOR_TIMEOUT_SECONDS = min(30.0, max(1.0, HEALTH_INTERVAL / 2))
-DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL = 60.0
 _RUNTIME_HEALTH_STATE: dict[str, int] = {
     "agent_count": 0,
     "task_count": 0,
 }
-DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION = (
-    "dharma.daemon.runtime_dispatch_self_report.v1"
-)
-
-
-def _pulse_result_counts_toward_daily_limit(result: str) -> bool:
-    return not result.startswith(NON_CONTRIBUTION_PULSE_PREFIXES)
 
 
 def _update_runtime_health_state(*, agent_count: int | None = None, task_count: int | None = None) -> None:
@@ -81,119 +120,17 @@ def _update_runtime_health_state(*, agent_count: int | None = None, task_count: 
         _RUNTIME_HEALTH_STATE["task_count"] = max(0, int(task_count))
 
 
-def _runtime_dispatch_status() -> dict[str, Any]:
-    enabled = os.environ.get("DHARMA_SPINE_DISPATCH") == "1"
-    return {
-        "spine_dispatch_enabled": enabled,
-        "dispatch_mode": "spine" if enabled else "legacy",
-        "env_key_present": "DHARMA_SPINE_DISPATCH" in os.environ,
-        "source": "process_env_non_secret_boolean",
-    }
-
-
-def _write_daemon_runtime_dispatch_self_report(state_dir: Path = STATE_DIR) -> Path:
-    path = state_dir / "ops" / "daemon_runtime_dispatch_self_report.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION,
-        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-        "pid": os.getpid(),
-        "source": "dharma_swarm.orchestrate_live",
-        "runtime_dispatch": _runtime_dispatch_status(),
-    }
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
-    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    tmp.replace(path)
-    return path
-
-
-def _daemon_runtime_dispatch_self_report_thread(
-    shutdown_event: asyncio.Event,
-    *,
-    state_dir: Path = STATE_DIR,
-    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
-) -> None:
-    _log("runtime-dispatch", f"Starting self-report thread (interval={interval_seconds}s)")
-    interval = max(0.1, float(interval_seconds))
-    while not shutdown_event.is_set():
-        try:
-            _write_daemon_runtime_dispatch_self_report(state_dir)
-        except Exception as exc:
-            _log("runtime-dispatch", f"Self-report write failed: {exc}")
-
-        deadline = time.monotonic() + interval
-        while not shutdown_event.is_set():
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            time.sleep(min(0.5, remaining))
-
-
-def start_daemon_runtime_dispatch_self_report_thread(
-    shutdown_event: asyncio.Event,
-    *,
-    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
-    state_dir: Path = STATE_DIR,
-) -> threading.Thread:
-    thread = threading.Thread(
-        target=_daemon_runtime_dispatch_self_report_thread,
-        kwargs={
-            "shutdown_event": shutdown_event,
-            "state_dir": state_dir,
-            "interval_seconds": interval_seconds,
-        },
-        name="dharma-runtime-dispatch-self-report",
-        daemon=True,
-    )
-    thread.start()
-    return thread
-
-
-def _pause_file_present(state_dir: Path = STATE_DIR) -> bool:
-    return (state_dir / ".PAUSE").exists()
-
-
-async def _detect_health_anomalies_bounded(
-    monitor: Any,
-    *,
-    timeout_seconds: float = HEALTH_MONITOR_TIMEOUT_SECONDS,
-) -> list[Any]:
-    try:
-        anomalies = await asyncio.wait_for(
-            monitor.detect_anomalies(),
-            timeout=timeout_seconds,
-        )
-    except TimeoutError:
-        _log("health", f"Monitor timed out after {timeout_seconds:.1f}s")
-        return []
-    return list(anomalies or [])
-
-
-async def run_daemon_runtime_dispatch_self_report_loop(
-    shutdown_event: asyncio.Event,
-    *,
-    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
-) -> None:
-    _log("runtime-dispatch", f"Starting self-report loop (interval={interval_seconds}s)")
-    while not shutdown_event.is_set():
-        try:
-            _write_daemon_runtime_dispatch_self_report(STATE_DIR)
-        except Exception as exc:
-            _log("runtime-dispatch", f"Self-report write failed: {exc}")
-        try:
-            await asyncio.wait_for(
-                shutdown_event.wait(),
-                timeout=max(0.1, float(interval_seconds)),
-            )
-        except TimeoutError:
-            continue
-
-
 def _log(system: str, msg: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     line = f"[{ts}] [{system}] {msg}"
     print(line, flush=True)
     logger.info("[%s] %s", system, msg)
+
+
+def _tick_loop(supervisor: Any | None, name: str) -> None:
+    """WP-LC1 per-iteration liveness tick; no-op when unsupervised."""
+    if supervisor is not None:
+        supervisor.record_tick(name)
 
 
 async def _drain_frontier_queue(board: Any, *, limit: int = 20) -> int:
@@ -302,36 +239,6 @@ def _enqueue_shakti_escalations(
     return append_pending_proposals(payloads, path=proposals_path)
 
 
-async def _run_pending_evolution_proposals(
-    engine: Any,
-    *,
-    limit: int = 5,
-    log_system: str = "evolution",
-) -> Any | None:
-    """Drain Darwin's pending queue into an eval-only/sandboxed cycle."""
-    pending = engine.load_pending_proposals()
-    if not pending:
-        return None
-    selected = pending[: max(0, int(limit))]
-    if not selected:
-        return None
-    _log(log_system, f"Evaluating {len(selected)} pending proposal candidate(s)")
-    return await engine.run_cycle(selected)
-
-
-def _evolution_shadow_mode_from_env(env: Any | None = None) -> tuple[bool, str]:
-    """Return whether self-evolution must run shadowed under current gates."""
-    source = env if env is not None else os.environ
-    shadow = source.get("DHARMA_EVOLUTION_SHADOW", "1") != "0"
-    try:
-        autonomy = int(source.get("DGC_AUTONOMY_LEVEL", "1"))
-    except (TypeError, ValueError):
-        autonomy = 1
-    if not shadow and autonomy < 2:
-        return True, "DGC_AUTONOMY_LEVEL < 2"
-    return shadow, "DHARMA_EVOLUTION_SHADOW"
-
-
 async def _wait_or_shutdown(shutdown_event: asyncio.Event, delay: float) -> bool:
     """Sleep for a backoff window unless shutdown is requested first."""
     if delay <= 0:
@@ -348,7 +255,6 @@ async def run_swarm_loop(
     signal_bus: "Any | None" = None,
     supervisor: "Any | None" = None,
     room_registry: "Any | None" = None,
-    ready_event: asyncio.Event | None = None,
 ) -> None:
     """Primary loop: SwarmManager.tick() -- the ONE control path.
 
@@ -363,32 +269,21 @@ async def run_swarm_loop(
     cfg.heartbeat_interval = float(SWARM_TICK)
     cfg.max_daily_contributions = MAX_DAILY
 
-    paused_at_boot = _pause_file_present(STATE_DIR)
-    if paused_at_boot:
-        _log("swarm", "Pause file present at boot; startup side effects disabled")
-
-    swarm = SwarmManager(
-        state_dir=str(STATE_DIR),
-        daemon_config=cfg,
-        read_only_boot=paused_at_boot,
-    )
+    swarm = SwarmManager(state_dir=str(STATE_DIR), daemon_config=cfg)
     await swarm.init()
     if room_registry is not None:
         swarm._room_registry = room_registry
         if swarm._orchestrator is not None:
             swarm._orchestrator._room_registry = room_registry
         _log("swarm", f"Room registry attached: {len(room_registry.active_rooms())} active rooms")
-    if paused_at_boot:
-        _log("swarm", "Cybernetics crew assertion skipped during paused boot")
-    else:
-        try:
-            from dharma_swarm.startup_crew import spawn_cybernetics_crew
+    try:
+        from dharma_swarm.startup_crew import spawn_cybernetics_crew
 
-            cyber_crew = await spawn_cybernetics_crew(swarm)
-            if cyber_crew:
-                _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
-        except Exception as exc:
-            _log("swarm", f"Cybernetics crew assertion failed: {exc}")
+        cyber_crew = await spawn_cybernetics_crew(swarm)
+        if cyber_crew:
+            _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
+    except Exception as exc:
+        _log("swarm", f"Cybernetics crew assertion failed: {exc}")
 
     # MessageBus for instinct signal consumption
     from dharma_swarm.message_bus import MessageBus as _MBus
@@ -407,53 +302,44 @@ async def run_swarm_loop(
         ),
     )
     _log("swarm", f"Ready: {len(agents)} agents, thread={swarm.current_thread}")
-    ready_released = False
 
     # Auto-seed missions from ThinkodynamicDirector if task board is empty.
     # The director derives missions from TelosGraph + recognition_seed + ecosystem.
     # This replaces static SEED_TASKS with telos-derived, philosophically grounded work.
-    if paused_at_boot:
-        _log("swarm", "Mission auto-seed skipped during paused boot")
-    else:
-        try:
-            _board = swarm._orchestrator._board
-            _board_stats = await _board.stats()
-            _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
-            if _pending == 0:
-                from dharma_swarm.mission_contract import load_latest_mission
-                _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
-                _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
-                if _contract_path.exists():
-                    try:
-                        mission = load_latest_mission(_contract_path)
-                        if mission and hasattr(mission, 'task_titles') and mission.task_titles:
-                            _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
-                            for title in mission.task_titles[:10]:  # cap at 10 per mission
-                                await _board.create(
-                                    title=title,
-                                    description=(
-                                        f"Mission: {mission.mission_title}.\n"
-                                        f"Use web_search, fetch_url, read_file, and write_file "
-                                        f"to complete this task. Write results to "
-                                        f"~/.dharma/shared/ with a descriptive filename."
-                                    ),
-                                    priority="high",
-                                )
-                    except Exception as e:
-                        _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
-                else:
-                    _log("swarm", "No director mission found — using default SEED_TASKS")
-        except Exception as e:
-            _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
+    try:
+        _board = swarm._orchestrator._board
+        _board_stats = await _board.stats()
+        _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
+        if _pending == 0:
+            from dharma_swarm.mission_contract import load_latest_mission
+            _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
+            _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
+            if _contract_path.exists():
+                try:
+                    mission = load_latest_mission(_contract_path)
+                    if mission and hasattr(mission, 'task_titles') and mission.task_titles:
+                        _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
+                        for title in mission.task_titles[:10]:  # cap at 10 per mission
+                            await _board.create(
+                                title=title,
+                                description=(
+                                    f"Mission: {mission.mission_title}.\n"
+                                    f"Use web_search, fetch_url, read_file, and write_file "
+                                    f"to complete this task. Write results to "
+                                    f"~/.dharma/shared/ with a descriptive filename."
+                                ),
+                                priority="high",
+                            )
+                except Exception as e:
+                    _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
+            else:
+                _log("swarm", "No director mission found — using default SEED_TASKS")
+    except Exception as e:
+        _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
 
     try:
         while not shutdown_event.is_set():
             try:
-                if _pause_file_present(STATE_DIR):
-                    _log("swarm", "Paused (.PAUSE file)")
-                    await asyncio.sleep(30)
-                    continue
-
                 # Drain signal bus before tick -- respond to inter-loop signals
                 if signal_bus is not None:
                     anomaly_signals = signal_bus.drain(["ANOMALY_DETECTED"])
@@ -507,6 +393,11 @@ async def run_swarm_loop(
                     for alert in alerts:
                         _log("watchdog", f"{alert.severity.upper()} [{alert.loop_name}]: "
                              f"{alert.message} → {alert.intervention}")
+                    try:
+                        supervisor.save_state()
+                    except (OSError, TypeError, ValueError) as exc:
+                        _log("watchdog", "Loop supervisor state save failed; continuing")
+                        logger.warning("Swarm: loop supervisor state save failed: %s", exc)
 
                 swarm_state = await swarm.status()
                 _update_runtime_health_state(
@@ -528,12 +419,6 @@ async def run_swarm_loop(
                     await asyncio.sleep(60)
                     continue
 
-                if not ready_released:
-                    ready_released = True
-                    if ready_event is not None:
-                        ready_event.set()
-                    _log("swarm", "First core tick complete; ancillary loops may start")
-
                 dispatched = activity.get("dispatched", 0)
                 settled = activity.get("settled", 0)
                 rescued = activity.get("rescued", 0)
@@ -552,7 +437,7 @@ async def run_swarm_loop(
         _log("swarm", "Shutdown complete")
 
 
-async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
+async def run_pulse_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Pulse heartbeat — runs claude -p with thread rotation.
 
     Skips if running inside a Claude Code session (nested sessions not allowed).
@@ -572,9 +457,16 @@ async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
     daily_count = 0
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "pulse")
         if daily_count >= MAX_DAILY:
+            # Tick through the capped hour in interval-sized chunks so a
+            # healthy daily-limit pause never renders as LOOP_STALL.
             _log("pulse", f"Daily limit ({MAX_DAILY}) reached")
-            await asyncio.sleep(3600)
+            idle = 0.0
+            while idle < 3600 and not shutdown_event.is_set():
+                await asyncio.sleep(min(float(PULSE_INTERVAL), 3600 - idle))
+                idle += float(PULSE_INTERVAL)
+                _tick_loop(supervisor, "pulse")
             continue
 
         try:
@@ -584,7 +476,7 @@ async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
             short = result[:120].replace("\n", " ")
             _log("pulse", f"Result: {short}")
 
-            if _pulse_result_counts_toward_daily_limit(result):
+            if not result.startswith(("PAUSED", "QUIET", "CIRCUIT", "TELOS")):
                 daily_count += 1
         except Exception as e:
             _log("pulse", f"Error: {e}")
@@ -727,25 +619,6 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             except Exception:
                 pass
 
-            if _evo_allowed:
-                try:
-                    pending_result = await _run_pending_evolution_proposals(
-                        engine,
-                        limit=5,
-                        log_system="evolution",
-                    )
-                    if pending_result is not None:
-                        meta_cycle_result = pending_result
-                        meta_cycle_source = "pending proposals"
-                        _log(
-                            "evolution",
-                            f"Pending result: fitness={pending_result.best_fitness:.3f}, "
-                            f"submitted={pending_result.proposals_submitted}, "
-                            f"archived={pending_result.proposals_archived}",
-                        )
-                except Exception as exc:
-                    _log("evolution", f"Pending proposal evaluation error: {exc}")
-
             # Feed meta-evolution with observed fitness.
             # Only submit a synthetic result on cycles where auto_evolve
             # does NOT run (every 3rd cycle calls auto_evolve which feeds
@@ -754,11 +627,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             # mismatch where meta-adaptation triggered within one evolution
             # cycle instead of after two separate cycles.
             _auto_evolve_will_run = (cycle_count % 3 == 0) and _evo_allowed
-            if (
-                meta_cycle_result is None
-                and (avg_fitness > 0 or fitness_events)
-                and not _auto_evolve_will_run
-            ):
+            if (avg_fitness > 0 or fitness_events) and not _auto_evolve_will_run:
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
                 else:
@@ -794,10 +663,9 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             except Exception:
                 pass
 
-            # Auto-evolve: propose improvements via LLM every 3rd cycle
-            # (_evo_allowed computed by the EVAL VERDICT GATE above)
-            # Shadow mode controlled by env var (default: ON for safety)
-            # Set DHARMA_EVOLUTION_SHADOW=0 + DGC_AUTONOMY_LEVEL>=2 for real mutation
+            # Auto-evolve: propose improvements via LLM every 3rd cycle.
+            # Live mutation is disabled here; Forge verify_promotion is the
+            # sole live-apply door for RSI Lab work.
             if cycle_count % 3 == 0 and _evo_allowed:
                 try:
                     from dharma_swarm.providers import OpenRouterProvider
@@ -813,10 +681,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                         if targets:
                             selected = _evo_rng.sample(targets, min(2, len(targets)))
 
-                            # Determine shadow mode: real mutation requires explicit opt-in
-                            _shadow, _shadow_reason = _evolution_shadow_mode_from_env(_evo_os.environ)
-                            if _shadow_reason == "DGC_AUTONOMY_LEVEL < 2":
-                                _log("evolution", "Shadow forced: DGC_AUTONOMY_LEVEL < 2")
+                            _shadow = True
 
                             # Eval verdict override: HOLD forces shadow mode
                             try:
@@ -828,24 +693,13 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                             except Exception:
                                 pass
 
-                            # Pending bridge proposals are evaluated above via
-                            # _run_pending_evolution_proposals(); do not drain
-                            # the shared queue here without submitting them.
+                            # Merge any pending proposals from consolidation/skill bridge
+                            _pending = engine.load_pending_proposals()
+                            if _pending:
+                                _log("evolution", f"Loaded {len(_pending)} pending proposals from consolidation/bridge")
 
                             mode_label = "shadow" if _shadow else "LIVE"
                             _log("evolution", f"Auto-evolve ({mode_label}): {[s.name for s in selected]}")
-
-                            # Create darwin branch for live mutation
-                            if not _shadow:
-                                _branch = f"darwin/cycle-{cycle_count}"
-                                _br_proc = await asyncio.create_subprocess_exec(
-                                    "git", "checkout", "-b", _branch,
-                                    cwd=str(_src_root.parent),
-                                    stdout=asyncio.subprocess.PIPE,
-                                    stderr=asyncio.subprocess.PIPE,
-                                )
-                                await _br_proc.communicate()
-                                _log("evolution", f"Created branch {_branch}")
 
                             result = await engine.auto_evolve(
                                 provider=provider,
@@ -863,49 +717,9 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                 f"gated={result.proposals_gated}",
                             )
 
-                            # For live mode: commit worthy proposals, then return to main branch
-                            if not _shadow and result.proposals_archived > 0:
-                                _committed = 0
-                                _best_entries = await engine.archive.get_best(n=3)
-                                for entry in _best_entries:
-                                    # Build a Proposal from ArchiveEntry for commit_if_worthy
-                                    from dharma_swarm.evolution import Proposal
-                                    _p = Proposal(
-                                        id=entry.id,
-                                        component=entry.component,
-                                        change_type=entry.change_type,
-                                        description=entry.description,
-                                        diff=entry.diff,
-                                        actual_fitness=entry.fitness,
-                                    )
-                                    sha = await engine.commit_if_worthy(_p)
-                                    if sha:
-                                        _committed += 1
-                                        _log("evolution", f"Committed {sha[:8]} for {entry.component}")
-                                if _committed == 0:
-                                    # No commits — delete the branch
-                                    _del_proc = await asyncio.create_subprocess_exec(
-                                        "git", "checkout", "-",
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                    await _del_proc.communicate()
-                                    await asyncio.create_subprocess_exec(
-                                        "git", "branch", "-D", _branch,
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                else:
-                                    # Return to previous branch, keep darwin branch
-                                    await asyncio.create_subprocess_exec(
-                                        "git", "checkout", "-",
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
+                            # Live commits are intentionally absent here. A live
+                            # mutation must enter through forge_v2.verify_promotion
+                            # and a signed promotion packet.
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:
@@ -944,7 +758,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
         await asyncio.sleep(EVOLUTION_INTERVAL)
 
 
-async def run_health_loop(shutdown_event: asyncio.Event) -> None:
+async def run_health_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Health monitoring — detect anomalies, report status."""
     _log("health", f"Starting (interval={HEALTH_INTERVAL}s)")
     await asyncio.sleep(15)  # Let swarm init first
@@ -963,9 +777,8 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
     signal_bus = SignalBus.get()
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "health")
         try:
-            _write_daemon_runtime_dispatch_self_report(STATE_DIR)
-
             # Drain WITNESS_AUDIT signals — close the S3* feedback loop
             witness_signals = signal_bus.drain(["WITNESS_AUDIT"])
             for ws in witness_signals:
@@ -977,7 +790,7 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
                 elif warnings:
                     _log("health", f"WITNESS: {warnings} warning(s), {total} total in cycle {ws.get('cycle', '?')}")
 
-            anomalies = await _detect_health_anomalies_bounded(monitor)
+            anomalies = await monitor.detect_anomalies()
             if anomalies:
                 for a in anomalies[:3]:
                     _log("health", f"ANOMALY: {a.anomaly_type} severity={a.severity} — {a.description[:80]}")
@@ -1167,7 +980,7 @@ REPLICATION_INTERVAL = 3600  # 1 hour between replication checks
 RECOGNITION_INTERVAL = 7200  # 2 hours between recognition synthesis
 
 
-async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_recognition_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Periodic recognition synthesis — the strange loop's self-model.
 
     Every 2 hours, synthesizes signals from all subsystems into a recognition
@@ -1199,6 +1012,7 @@ async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
 
     # Then run on the normal 2-hour cycle
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "recognition")
         await asyncio.sleep(RECOGNITION_INTERVAL)
         if shutdown_event.is_set():
             break
@@ -1226,7 +1040,7 @@ async def _run_recognition_loop_UNUSED(shutdown_event: asyncio.Event) -> None:
     return  # pragma: no cover
 
 
-async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_witness_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """S3* Sporadic Audit — random direct audit of agent behavior.
 
     Implements Beer's S3* function: the Witness samples recent traces,
@@ -1242,6 +1056,7 @@ async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
     auditor = WitnessAuditor(cycle_seconds=WITNESS_INTERVAL)
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "witness")
         try:
             findings = await auditor.run_cycle()
             actionable = [f for f in findings if f.is_actionable]
@@ -1269,15 +1084,26 @@ async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
     _log("witness", "S3* Witness auditor stopped")
 
 
-async def _run_consolidation_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_consolidation_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Consolidation Cycle — system-wide sleep/backpropagation.
 
     Two consolidator agents (Alpha/Beta) read ALL agents' state, have a
     structured contrarian debate, and modify behavioral DNA based on
     observed "loss". Mirrors sleep consolidation in the brain.
     """
-    # Wait 2 hours after boot to let other systems produce traces
-    await asyncio.sleep(7200)
+    # Wait 2 hours after boot to let other systems produce traces.  Tick
+    # through the declared delay in interval-sized chunks: with a configured
+    # DGC_CONSOLIDATION_INTERVAL below 3600 the delay exceeds 2x the loop
+    # interval and would otherwise false-alarm as LOOP_NEVER_STARTED.
+    _boot_delay_left = 7200.0
+    while _boot_delay_left > 0:
+        _tick_loop(supervisor, "consolidation")
+        _chunk = min(_boot_delay_left, CONSOLIDATION_INTERVAL / 2)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=_chunk)
+            return
+        except asyncio.TimeoutError:
+            _boot_delay_left -= _chunk
     _log("consolidation", f"Sleep cycle starting (interval={CONSOLIDATION_INTERVAL}s)")
 
     from dharma_swarm.consolidation import ConsolidationCycle
@@ -1297,6 +1123,7 @@ async def _run_consolidation_loop(shutdown_event: asyncio.Event) -> None:
         _log("consolidation", f"Neural consolidator init failed: {_ne}")
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "consolidation")
         # Neural pass first (algorithmic, fast, no LLM cost)
         if _neural is not None:
             try:
@@ -1362,41 +1189,6 @@ _FREE_CODING_MODELS = (
     "meta-llama/llama-3.3-70b-instruct:free",
     "deepseek/deepseek-chat-v3-0324:free",
 )
-
-
-async def _generate_grind_probe_proposal(
-    engine: DarwinEngine,
-    *,
-    source_root: Path,
-    target: str,
-    hunger: float,
-    provider: Any,
-    model: str,
-) -> Proposal | None:
-    """Generate a real grind-probe proposal with a concrete diff.
-
-    The grind loop used to construct placeholder ``Proposal`` objects with the
-    default empty ``diff`` field and pass them straight into
-    :meth:`DarwinEngine.run_cycle`. That path never invokes the LLM proposal
-    generator, so the archive filled with evaluated no-op entries. This helper
-    forces grind probes through ``generate_proposal()`` and drops any proposal
-    that still lacks a concrete diff.
-    """
-
-    proposal = await engine.generate_proposal(
-        provider=provider,
-        source_file=source_root / target,
-        model=model,
-        allow_unchanged=True,
-        context=(
-            f"Grind probe target for autonomous evolution. "
-            f"Hunger={hunger:.2f}. Return one concrete, minimal change with a real unified diff."
-        ),
-    )
-    if proposal is None or not proposal.diff.strip():
-        return None
-    proposal.spec_ref = "grind_probe"
-    return proposal
 
 # Core Python modules to target for evolution — actual testable source
 _GRIND_EVOLUTION_TARGETS = (
@@ -1468,7 +1260,7 @@ def _hunger_to_interval(hunger: float) -> float:
     return _GRIND_INTERVAL_SLOW - (ratio * (_GRIND_INTERVAL_SLOW - _GRIND_INTERVAL_FAST))
 
 
-async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
+async def run_free_evolution_grind(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Nonstop free-tier evolution loop with adaptive hunger signal.
 
     Runs AutoProposer → DarwinEngine → MetaEvolution using ONLY free providers.
@@ -1510,6 +1302,7 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
     last_best_fitness = 0.0
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "free-grind")
         cycle_count += 1
 
         # Compute hunger
@@ -1558,76 +1351,23 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                 except Exception as exc:
                     _log("grind", f"Observation read error: {exc}")
 
-            # Phase 3: Try to include one real grind-probe mutation.
-            # Placeholder proposals with empty diffs create archive theater, so
-            # only append a grind probe when we have a concrete generated diff.
+            # Phase 3: Always include a random core Python module target
+            # This ensures every cycle has at least one testable proposal
             available_targets = [
                 t for t in _GRIND_EVOLUTION_TARGETS
                 if (_src_root / t).exists()
             ]
             if available_targets:
                 target = _grng.choice(available_targets)
-                from dharma_swarm.providers import NVIDIANIMProvider, OllamaProvider, OpenRouterProvider
-                import os as _gos
-
-                _grind_lanes: list[tuple[str, str, Any]] = [
-                    ("ollama", "glm-5.2:cloud", OllamaProvider(model="glm-5.2:cloud")),
-                    ("nvidia_nim", "meta/llama-3.3-70b-instruct", NVIDIANIMProvider(default_model="meta/llama-3.3-70b-instruct")),
-                ]
-                if _gos.environ.get("OPENROUTER_API_KEY"):
-                    _grind_lanes.append(
-                        ("openrouter", _grng.choice(_FREE_CODING_MODELS), OpenRouterProvider())
-                    )
-
-                _generated_grind = False
-                for _lane_name, _grind_model, _provider in _grind_lanes:
-                    try:
-                        _grind_proposal = await _generate_grind_probe_proposal(
-                            engine,
-                            source_root=_src_root,
-                            target=target,
-                            hunger=hunger,
-                            provider=_provider,
-                            model=_grind_model,
-                        )
-                        if _grind_proposal is None:
-                            _log(
-                                "grind",
-                                f"Lane {_lane_name} returned no real diff for {target}",
-                            )
-                            continue
-                        proposals.append(_grind_proposal)
-                        _generated_grind = True
-                        _log(
-                            "grind",
-                            f"Generated grind probe via {_lane_name}/{_grind_model}: {target} "
-                            f"({len(_grind_proposal.diff.splitlines())} diff lines)",
-                        )
-                        break
-                    except Exception as exc:
-                        _log(
-                            "grind",
-                            f"Grind proposal generation error via {_lane_name} for {target}: {exc}",
-                        )
-                    finally:
-                        _close = getattr(_provider, "close", None)
-                        if callable(_close):
-                            try:
-                                import inspect as _inspect
-
-                                _close_result = _close()
-                                if _inspect.isawaitable(_close_result):
-                                    await _close_result
-                            except Exception:
-                                pass
-                if not _generated_grind:
-                    _log(
-                        "grind",
-                        f"Skipped grind probe for {target}: no real diff generated across providers",
-                    )
+                proposals.append(Proposal(
+                    component=target,
+                    change_type="mutation",
+                    description=f"Grind probe: evolve {target} (hunger={hunger:.2f})",
+                    spec_ref="grind_probe",
+                ))
 
             # Phase 4: Run evolution cycle via DarwinEngine.run_cycle
-            # (pending proposals may already contain diffs; grind probes now do)
+            # (takes proposals directly — no LLM needed for proposal gen)
             result = await engine.run_cycle(proposals)
 
             # Phase 4b: LLM-powered evolution via Qwen3-coder:free (every 5th cycle)
@@ -1635,28 +1375,40 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
             if cycle_count % 5 == 0 and hunger > 0.4:
                 try:
                     import os as _gos
-                    if _gos.environ.get("OPENROUTER_API_KEY"):
+                    from dharma_swarm import evolution_safety as _esafe
+
+                    # PR-001: free-grind may NEVER call auto_evolve(shadow=False)
+                    # by default. Live mutation requires an explicit opt-in AND a
+                    # valid live-mutation lease; absent either, force shadow.
+                    _budget_ok, _budget_reason = _esafe.model_spend_allowed()
+                    _live_lease = _esafe.load_live_mutation_lease()
+                    _grind_shadow = not (
+                        _esafe.allow_live_mutation_env() and _live_lease is not None
+                    )
+                    if _gos.environ.get("OPENROUTER_API_KEY") and _budget_ok:
                         from dharma_swarm.providers import OpenRouterProvider
                         _free_provider = OpenRouterProvider()
                         _llm_targets = _grng.sample(available_targets, min(2, len(available_targets)))
                         _llm_files = [_src_root / t for t in _llm_targets]
                         _model = _grng.choice(_FREE_CODING_MODELS)
-                        _shadow, _shadow_reason = _evolution_shadow_mode_from_env(_gos.environ)
-                        mode_label = "shadow" if _shadow else "LIVE"
-                        if _shadow_reason == "DGC_AUTONOMY_LEVEL < 2":
-                            _log("grind", "Shadow forced: DGC_AUTONOMY_LEVEL < 2")
-                        _log("grind", f"LLM evolve ({mode_label}) via {_model}: {_llm_targets}")
+                        _log(
+                            "grind",
+                            f"LLM evolve via {_model}: {_llm_targets} "
+                            f"(shadow={_grind_shadow})",
+                        )
                         llm_result = await engine.auto_evolve(
                             provider=_free_provider,
                             source_files=_llm_files,
                             model=_model,
-                            shadow=_shadow,
+                            shadow=True,  # one-door: grind lane is shadow-only; live apply exists only via verify_promotion sealed packets
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
                         )
                         if llm_result.best_fitness > result.best_fitness:
                             result = llm_result  # Use the better result
                             _log("grind", f"LLM result: fitness={llm_result.best_fitness:.3f} (better)")
+                    elif _gos.environ.get("OPENROUTER_API_KEY") and not _budget_ok:
+                        _log("grind", f"LLM evolve skipped: no budget gate ({_budget_reason})")
                 except Exception as _llm_err:
                     _log("grind", f"LLM evolve error: {_llm_err}")
 
@@ -1696,7 +1448,7 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
     _log("grind", f"Free Evolution Grind stopped after {cycle_count} cycles")
 
 
-async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_replication_monitor_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Loop 9: Replication monitor -- process proposals, manage child lifecycles.
 
     Waits for consolidation to run first (initial delay = consolidation interval
@@ -1708,15 +1460,22 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
     is spawned as a new asyncio task. Probation and apoptosis checks run
     on every tick for all tracked agents.
     """
-    # Let consolidation produce proposals before we start consuming them
+    # Let consolidation produce proposals before we start consuming them.
+    # Tick through the declared delay in interval-sized chunks so the
+    # supervisor sees "alive, in declared boot delay" instead of a false
+    # NEVER_STARTED/STALLED alarm (the delay exceeds 2x the loop interval).
     initial_delay = CONSOLIDATION_INTERVAL + 3600
     _log("replication", f"Waiting {initial_delay}s for consolidation to run first...")
-    try:
-        await asyncio.wait_for(shutdown_event.wait(), timeout=initial_delay)
-        _log("replication", "Shutdown during initial delay, exiting")
-        return
-    except asyncio.TimeoutError:
-        pass
+    _delay_left = float(initial_delay)
+    while _delay_left > 0:
+        _tick_loop(supervisor, "replication")
+        _chunk = min(_delay_left, REPLICATION_INTERVAL / 2)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=_chunk)
+            _log("replication", "Shutdown during initial delay, exiting")
+            return
+        except asyncio.TimeoutError:
+            _delay_left -= _chunk
 
     _log("replication", f"Replication monitor starting (interval={REPLICATION_INTERVAL}s)")
 
@@ -1731,6 +1490,7 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
     child_tasks: list[asyncio.Task[None]] = []
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "replication")
         try:
             pending = protocol.get_pending_proposals()
             if pending:
@@ -1821,7 +1581,7 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
     _log("replication", "Replication monitor stopped")
 
 
-async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_zeitgeist_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """S4 external-world intelligence — normalize public signal receipts.
 
     The live network scout is cron-gated. The orchestrator pass only drains
@@ -1831,14 +1591,12 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
     # Initial delay to let other systems boot first
     await asyncio.sleep(30)
 
-    from dharma_swarm.insight_evolution_bridge import promote_insights_to_pending_proposals
-    from dharma_swarm.shakti_zeitgeist_executive import ShaktiZeitgeistExecutive
     from dharma_swarm.zeitgeist import ZeitgeistScanner
     from dharma_swarm.world_radar.go_bridge import run_world_radar_go_once
     scanner = ZeitgeistScanner(state_dir=STATE_DIR)
-    executive = ShaktiZeitgeistExecutive(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "zeitgeist")
         try:
             radar = run_world_radar_go_once(
                 state_dir=STATE_DIR,
@@ -1859,17 +1617,6 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
             _log("zeitgeist", f"S4 scan failed: {e}")
 
         try:
-            executive_state = await executive.cycle()
-            promotion = promote_insights_to_pending_proposals(state_dir=STATE_DIR)
-            _log(
-                "zeitgeist",
-                f"Shakti executive: {len(executive_state.opportunities)} opportunities, "
-                f"queued={promotion.queued}, duplicates={promotion.skipped_duplicate}",
-            )
-        except Exception as e:
-            _log("zeitgeist", f"Insight promotion failed: {e}")
-
-        try:
             await asyncio.wait_for(
                 shutdown_event.wait(), timeout=ZEITGEIST_INTERVAL
             )
@@ -1878,7 +1625,7 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
             pass
 
 
-async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_internal_pressure_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """S4/S3 internal pressure monitor for witness, shared notes, and stigmergy."""
 
     await asyncio.sleep(30)
@@ -1887,6 +1634,7 @@ async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
     scanner = InternalPressureScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "internal-pressure")
         try:
             signals = await scanner.scan()
             threats = [signal for signal in signals if signal.category == "threat"]
@@ -1906,25 +1654,22 @@ async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
             pass
 
 
-async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
+async def run_conductor_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Run persistent conductor agents alongside the orchestrator.
 
     Each conductor has its own wake interval and restart logic.
     If one crashes, the other keeps running.
     """
-    from dharma_swarm.api_keys import bootstrap_runtime_env
     from dharma_swarm.persistent_agent import PersistentAgent
-    from dharma_swarm.conductors import CONDUCTOR_CONFIGS, materialize_conductor_config
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
     from dharma_swarm.providers import create_default_router
 
-    bootstrap_runtime_env()
     conductor_router = create_default_router()
 
     _log("conductors", f"Initializing {len(CONDUCTOR_CONFIGS)} conductors...")
 
     conductors: list[PersistentAgent] = []
-    for template in CONDUCTOR_CONFIGS:
-        cfg = materialize_conductor_config(template)
+    for cfg in CONDUCTOR_CONFIGS:
         agent = PersistentAgent(
             name=cfg["name"],
             role=cfg["role"],
@@ -1952,18 +1697,32 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
                 except asyncio.TimeoutError:
                     pass
 
+    async def _heartbeat() -> None:
+        # Conductor iteration bodies live in PersistentAgent.run_loop; this
+        # supervision heartbeat asserts "conductor tasks alive", not "wake
+        # cycle completed".
+        while not shutdown_event.is_set():
+            _tick_loop(supervisor, "conductors")
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=60)
+                return
+            except asyncio.TimeoutError:
+                pass
+
     await asyncio.gather(
         _run_with_restart(conductors[0], 10),   # Claude starts +10s
         _run_with_restart(conductors[1], 30),   # Codex starts +30s
+        _heartbeat(),
     )
 
 
-async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
-    """World Model: living Forrester-style world state, updated every 6h by research agents.
+async def _run_world_model_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
+    """World Model: living Forrester-style world state, snapshot-persisted every 6h.
 
-    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional trust...),
-    8 flows, 6 feedback loops. Each cycle: update stocks via web_search, assess
-    telos pressure, emit algedonic signal if any stock crosses critical threshold.
+    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional
+    trust...), 8 flows, 6 feedback loops. Stock research via web_search is not
+    built yet — a cycle currently refreshes state and persists a versioned
+    snapshot (see WorldModelAgent.run_cycle).
     """
     try:
         from dharma_swarm.world_model import WorldModelAgent, WorldModelStore
@@ -1971,12 +1730,13 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
         agent = WorldModelAgent(store=store, search_tool=None, arxiv_tool=None)
         # Seed on first boot
         try:
-            await asyncio.wait_for(agent.initialize(), timeout=60.0)
+            await asyncio.wait_for(agent.boot(), timeout=60.0)
             _log("world-model", "World model initialized and seeded")
         except Exception as exc:
             _log("world-model", f"World model init failed (non-fatal): {exc}")
         # Run update loop every 6 hours
         while not shutdown_event.is_set():
+            _tick_loop(supervisor, "world-model")
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=21600)
                 break
@@ -1994,7 +1754,7 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
         _log("world-model", f"World model loop crashed: {exc}")
 
 
-async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_gauntlet_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Gauntlet: run adversarial eval pressure on a schedule, feed scores into DGM.
 
     Tier 1+2 (correctness + research): every 2 hours.
@@ -2005,6 +1765,7 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
     _log("gauntlet", "Gauntlet loop starting")
     _cycle = 0
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "gauntlet")
         try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=7200)
             break
@@ -2044,60 +1805,35 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
             _log("gauntlet", f"Gauntlet cycle failed: {exc}")
 
 
-async def _run_health_api(shutdown_event: asyncio.Event) -> None:
+async def _run_health_api(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Health API: serves http://localhost:7433/health|metrics|loops|providers|telos"""
     try:
         from dharma_swarm.swarm_health_api import run_health_api
-        await run_health_api(shutdown_event)
+        server_task = asyncio.ensure_future(run_health_api(shutdown_event))
+        stop_task = asyncio.ensure_future(shutdown_event.wait())
+        # Supervision heartbeat: a tick asserts "server task alive", not
+        # "request served" — the serve loop itself lives in swarm_health_api.
+        # Waking on server_task completion keeps a dead server (e.g. port
+        # bind failure) from being reported alive for up to a full beat.
+        try:
+            while not shutdown_event.is_set() and not server_task.done():
+                _tick_loop(supervisor, "health-api")
+                await asyncio.wait(
+                    {server_task, stop_task}, timeout=60,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+        finally:
+            stop_task.cancel()
+        await server_task
     except Exception as exc:
         _log("health-api", f"Health API crashed: {exc}")
-
-
-async def _run_health_api_process_watchdog(shutdown_event: asyncio.Event) -> None:
-    """Keep the health API sidecar alive for operator truth probes."""
-    from dharma_swarm.swarm_health_api import start_health_api_process
-
-    handle = None
-    restart_count = 0
-    try:
-        while not shutdown_event.is_set():
-            if handle is None or not handle.process.is_alive():
-                if handle is not None:
-                    _log(
-                        "health-api",
-                        "Process exited "
-                        f"(pid={handle.process.pid}, exitcode={handle.process.exitcode}); "
-                        "restarting",
-                    )
-                    handle.close(timeout=1.0)
-                try:
-                    handle = start_health_api_process(
-                        daemon_pid=os.getpid(),
-                        startup_timeout=20.0,
-                    )
-                    restart_count += 1
-                    _log(
-                        "health-api",
-                        "Process started "
-                        f"(pid={handle.process.pid}, port={handle.port}, "
-                        f"restart_count={restart_count})",
-                    )
-                except Exception as exc:
-                    _log("health-api", f"Process failed to start: {exc}")
-                    if await _wait_or_shutdown(shutdown_event, 15.0):
-                        break
-                    continue
-            if await _wait_or_shutdown(shutdown_event, 5.0):
-                break
-    finally:
-        if handle is not None:
-            handle.close(timeout=2.0)
 
 
 async def _run_room_health_loop(
     shutdown_event: asyncio.Event,
     registry: Any,
     bridge: Any,
+    supervisor: Any | None = None,
 ) -> None:
     """Fractal room health monitor — evaluates kill/spinout conditions.
 
@@ -2110,6 +1846,7 @@ async def _run_room_health_loop(
     from dharma_swarm.fractal.room_health import room_runtime_kpis
 
     while not shutdown_event.is_set():
+        _tick_loop(supervisor, "room-health")
         try:
             active = registry.active_rooms()
             now = datetime.now(timezone.utc)
@@ -2165,6 +1902,7 @@ async def _run_room_health_loop(
 async def _run_guardian_loop(
     shutdown_event: asyncio.Event,
     room_registry: Any | None = None,
+    supervisor: Any | None = None,
 ) -> None:
     """Guardian Crew: continuous interface + loop + router health checking.
 
@@ -2178,49 +1916,32 @@ async def _run_guardian_loop(
     """
     try:
         from dharma_swarm.guardian_crew import start_guardian_loop
-        await start_guardian_loop(
+        crew_task = asyncio.ensure_future(start_guardian_loop(
             state_dir=STATE_DIR,
             github_repo="AmitabhainArunachala/dharma_swarm",
             shutdown_event=shutdown_event,
             room_registry=room_registry,
-        )
+        ))
+        stop_task = asyncio.ensure_future(shutdown_event.wait())
+        # Supervision heartbeat: a tick asserts "guardian task alive", not
+        # "audit cycle completed" — the crew's loop lives in guardian_crew.
+        # Waking on crew_task completion keeps a dead crew from being
+        # reported alive for up to a full beat.
+        try:
+            while not shutdown_event.is_set() and not crew_task.done():
+                _tick_loop(supervisor, "guardian")
+                await asyncio.wait(
+                    {crew_task, stop_task}, timeout=60,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+        finally:
+            stop_task.cancel()
+        await crew_task
     except Exception as exc:
         _log("guardian", f"Guardian loop crashed: {exc}")
 
 
-ARCHAEOLOGY_INGESTION_ENV = "DGC_ARCHAEOLOGY_INGESTION"
-_ARCHAEOLOGY_DISABLED_VALUES = {"0", "false", "no", "off"}
-
-
-def _archaeology_ingestion_enabled() -> bool:
-    value = os.environ.get(ARCHAEOLOGY_INGESTION_ENV, "1").strip().lower()
-    return value not in _ARCHAEOLOGY_DISABLED_VALUES
-
-
-async def _run_archaeology_once_bounded(
-    daemon: Any,
-    *,
-    timeout_seconds: float = 120.0,
-) -> dict[str, int]:
-    """Run archaeology ingestion without blocking the orchestrator event loop.
-
-    The ingestion coroutine performs synchronous file/vector-store work before it
-    yields. Wrapping ``daemon.run_once()`` directly in ``asyncio.wait_for`` does
-    not protect the shared live loop from that CPU-bound section; the timeout can
-    only fire after the event loop gets control back. Running the ingestion pass
-    in a worker thread preserves pulse liveness even when archaeology stalls.
-    """
-
-    def _run_in_thread() -> dict[str, int]:
-        return asyncio.run(daemon.run_once())
-
-    return await asyncio.wait_for(
-        asyncio.to_thread(_run_in_thread),
-        timeout=timeout_seconds,
-    )
-
-
-async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_archaeology_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Fang 7: Self-Reading Archaeology loop.
 
     Runs ArchaeologyIngestionDaemon on a 30-minute cycle.
@@ -2229,21 +1950,14 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
     Agents gain query_archaeology tool access to all ingested institutional memory.
     """
     _log("archaeology", "Starting archaeology ingestion loop (interval=1800s)")
-    if not _archaeology_ingestion_enabled():
-        _log(
-            "archaeology",
-            f"Ingestion disabled by {ARCHAEOLOGY_INGESTION_ENV}={os.environ.get(ARCHAEOLOGY_INGESTION_ENV)!r}",
-        )
-        await shutdown_event.wait()
-        return
     try:
         from dharma_swarm.archaeology_ingestion import ArchaeologyIngestionDaemon
         daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
 
-        # Run once immediately at boot. Keep it off the shared event loop so a
-        # synchronous LanceDB/filesystem pass cannot starve pulse writes.
+        # Run once immediately at boot
+        _tick_loop(supervisor, "archaeology")
         try:
-            counts = await _run_archaeology_once_bounded(daemon, timeout_seconds=120.0)
+            counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
             _log("archaeology", f"Boot ingestion complete: {counts}")
         except asyncio.TimeoutError:
             _log("archaeology", "Boot ingestion timed out (120s) — continuing")
@@ -2252,6 +1966,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
 
         # Then loop every 30 minutes
         while not shutdown_event.is_set():
+            _tick_loop(supervisor, "archaeology")
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=1800)
                 break  # shutdown
@@ -2260,7 +1975,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
             if shutdown_event.is_set():
                 break
             try:
-                counts = await _run_archaeology_once_bounded(daemon, timeout_seconds=120.0)
+                counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
                 _log("archaeology", f"Ingestion cycle complete: {counts}")
             except asyncio.TimeoutError:
                 _log("archaeology", "Ingestion cycle timed out (120s) — continuing")
@@ -2359,7 +2074,7 @@ def _wire_signal_subscribers(bus: Any) -> None:
     _log("signal-bus", f"Wired {sub_count} signal subscribers")
 
 
-async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_revenue_scout_loop(shutdown_event: asyncio.Event, supervisor: Any | None = None) -> None:
     """Revenue scout loop — autonomous target scouting every 6 hours.
 
     Also subscribes to REVENUE_SCOUT_TRIGGER on the signal bus so LLM
@@ -2384,6 +2099,7 @@ async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
             _log("revenue-scout", f"Boot cycle failed (non-fatal): {exc}")
 
         while not shutdown_event.is_set():
+            _tick_loop(supervisor, "revenue-scout")
             try:
                 await asyncio.wait_for(
                     shutdown_event.wait(), timeout=REVENUE_SCOUT_INTERVAL,
@@ -2416,23 +2132,14 @@ async def orchestrate(background: bool = False) -> None:
     _log_dir = STATE_DIR / "logs"
     _log_dir.mkdir(parents=True, exist_ok=True)
     _root = logging.getLogger()
-    _root.setLevel(logging.INFO)
     if not _root.handlers:
+        _root.setLevel(logging.INFO)
         _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
         _ch = logging.StreamHandler()
         _ch.setFormatter(_fmt)
         _root.addHandler(_ch)
-    _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    log_path = (_log_dir / "swarm.log").resolve()
-    has_swarm_file_handler = any(
-        isinstance(handler, logging.FileHandler)
-        and Path(getattr(handler, "baseFilename", "")).resolve() == log_path
-        for handler in _root.handlers
-    )
-    if not has_swarm_file_handler:
         from logging.handlers import RotatingFileHandler as _RFH
-
-        _fh = _RFH(log_path, maxBytes=10 * 1024 * 1024, backupCount=5)
+        _fh = _RFH(_log_dir / "swarm.log", maxBytes=10 * 1024 * 1024, backupCount=5)
         _fh.setFormatter(_fmt)
         _root.addHandler(_fh)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -2445,7 +2152,6 @@ async def orchestrate(background: bool = False) -> None:
     # Write PID -- use daemon.pid for consistency with _stop_old_daemon()
     pid_file = STATE_DIR / "daemon.pid"
     pid_file.write_text(str(os.getpid()))
-    _write_daemon_runtime_dispatch_self_report(STATE_DIR)
 
     shutdown_event = asyncio.Event()
 
@@ -2455,10 +2161,7 @@ async def orchestrate(background: bool = False) -> None:
 
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
-    runtime_dispatch_thread = start_daemon_runtime_dispatch_self_report_thread(
-        shutdown_event,
-        state_dir=STATE_DIR,
-    )
+
     # Enable subscription auth for Claude when not nested inside Claude Code
     if "CLAUDECODE" not in os.environ:
         os.environ.setdefault("DHARMA_CLAUDE_AUTH_MODE", "subscription")
@@ -2519,95 +2222,145 @@ async def orchestrate(background: bool = False) -> None:
 
     # Strange Loop Phase 0: unified swarm tick handles evolution + living layers + health
     # Only genuinely independent loops remain as separate tasks
-    from dharma_swarm.context_agent import run_context_agent_loop
+    from dharma_swarm.context_agent import CONTEXT_AGENT_INTERVAL, run_context_agent_loop
     from dharma_swarm.training_flywheel import run_training_flywheel_loop
     from dharma_swarm.self_improve import run_self_improvement_loop
 
-    # Auto-enable self-improvement when autonomy >= 1
-    _auto_level = int(os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-    if _auto_level >= 1 and not os.environ.get("DHARMA_SELF_IMPROVE"):
-        os.environ["DHARMA_SELF_IMPROVE"] = "1"
-        _log("orchestrator", "Auto-enabled DHARMA_SELF_IMPROVE (autonomy >= 1)")
+    # PR-001 fail-closed: self-improvement is NEVER auto-enabled by autonomy.
+    # It requires an explicit DHARMA_SELF_IMPROVE=1 opt-in AND, to mutate, a
+    # scratch worktree + live-mutation lease (see evolution_safety). Emit the
+    # startup safety summary so the daemon's true posture is on the record.
+    try:
+        from dharma_swarm import evolution_safety as _esafe
+        _summary = _esafe.safety_summary()
+        _log(
+            "orchestrator",
+            "SAFETY: mode=%s source_writable=%s shadow=%s autonomy=%s "
+            "self_improve=%s live_mutation_allowed=%s (%s) budget_gate=%s"
+            % (
+                _summary["code_identity"].get("mode"),
+                _summary["source_writable"],
+                _summary["evolution_shadow"],
+                _summary["autonomy_level"],
+                _summary["self_improve_enabled"],
+                _summary["live_mutation_allowed"],
+                _summary["live_mutation_denied_reason"] or "ok",
+                _summary["budget_gate_ok"],
+            ),
+        )
+    except Exception as _exc:  # safety logging must never block startup
+        _log("orchestrator", f"SAFETY summary unavailable: {_exc}")
 
     # Liveness watchdog — the #1 convergent finding from the 20-agent audit.
     # Detects "alive but not progressing" loops before they compound.
     from dharma_swarm.loop_supervisor import LoopSupervisor
     _supervisor = LoopSupervisor()
+    # WP-LC1: every launched loop is registered with its HONEST iteration
+    # cadence — record_tick silently no-ops for unregistered names, so a
+    # missing entry makes a loop invisible even as NEVER_STARTED.
     _loop_intervals = {
-        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "evolution": EVOLUTION_INTERVAL,
-        "health": 120,
+        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "health": HEALTH_INTERVAL,
         "zeitgeist": ZEITGEIST_INTERVAL, "internal-pressure": ZEITGEIST_INTERVAL,
         "witness": WITNESS_INTERVAL,
-        "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
-        "replication": 3600, "self-improve": 3600, "free-grind": 600,
-        "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "consolidation": CONSOLIDATION_INTERVAL, "recognition": RECOGNITION_INTERVAL,
+        "replication": REPLICATION_INTERVAL, "self-improve": 3600, "free-grind": 600,
+        # flywheel iterates every REINFORCE_INTERVAL (training_flywheel.py),
+        # context-agent every CONTEXT_AGENT_INTERVAL (context_agent.py) — the
+        # old 300/60 entries would render both permanently false-STALLED.
+        "flywheel": 1800, "conductors": 120,
+        "context-agent": CONTEXT_AGENT_INTERVAL,
         "revenue-scout": REVENUE_SCOUT_INTERVAL,
+        # The five formerly factory-only loops (invisible pre-WP-LC1).
+        # guardian/health-api/conductors tick via a supervision heartbeat in
+        # their wrappers (their iteration bodies live in other modules): a
+        # tick asserts "delegated task alive", not "work cycle completed".
+        "archaeology": 1800,
+        "guardian": 60,
+        "health-api": 60,
+        "gauntlet": 7200,
+        "world-model": 21600,
     }
     if room_registry is not None and room_bridge is not None:
         _loop_intervals["room-health"] = 1800
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
+    if os.environ.get("CLAUDECODE"):
+        # pulse's guard is a pre-loop early return (see run_pulse_loop):
+        # decidable at registration, so surface it as DISABLED instead of
+        # letting it alarm as NEVER_STARTED.  Never tick a pre-loop-return
+        # body — that would manufacture a permanent false STALLED.
+        _supervisor.mark_disabled("pulse", "CLAUDECODE session: nested pulse not allowed")
 
-    swarm_ready_event = asyncio.Event()
     task_factories: dict[str, Any] = {
-        "swarm": lambda: run_swarm_loop(
-            shutdown_event,
-            signal_bus=bus,
-            supervisor=_supervisor,
-            room_registry=room_registry,
-            ready_event=swarm_ready_event,
-        ),
-        "health-api": lambda: _run_health_api_process_watchdog(shutdown_event),
-        "pulse": lambda: run_pulse_loop(shutdown_event),
-        "evolution": lambda: run_evolution_loop(shutdown_event),
-        "recognition": lambda: _run_recognition_loop(shutdown_event),
-        "conductors": lambda: run_conductor_loop(shutdown_event),
-        "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
-        "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event),
-        "internal-pressure": lambda: _run_internal_pressure_loop(shutdown_event),
-        "witness": lambda: _run_witness_loop(shutdown_event),
-        "consolidation": lambda: _run_consolidation_loop(shutdown_event),
-        "replication": lambda: _run_replication_monitor_loop(shutdown_event),
-        "flywheel": lambda: run_training_flywheel_loop(shutdown_event),
-        "health": lambda: run_health_loop(shutdown_event),
-        "self-improve": lambda: run_self_improvement_loop(shutdown_event, interval=3600),
-        "free-grind": lambda: run_free_evolution_grind(shutdown_event),
+        "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor, room_registry=room_registry),
+        "pulse": lambda: run_pulse_loop(shutdown_event, supervisor=_supervisor),
+        "recognition": lambda: _run_recognition_loop(shutdown_event, supervisor=_supervisor),
+        "conductors": lambda: run_conductor_loop(shutdown_event, supervisor=_supervisor),
+        "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor),
+        "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event, supervisor=_supervisor),
+        "internal-pressure": lambda: _run_internal_pressure_loop(shutdown_event, supervisor=_supervisor),
+        "witness": lambda: _run_witness_loop(shutdown_event, supervisor=_supervisor),
+        "consolidation": lambda: _run_consolidation_loop(shutdown_event, supervisor=_supervisor),
+        "replication": lambda: _run_replication_monitor_loop(shutdown_event, supervisor=_supervisor),
+        "flywheel": lambda: run_training_flywheel_loop(shutdown_event, supervisor=_supervisor),
+        "health": lambda: run_health_loop(shutdown_event, supervisor=_supervisor),
+        "self-improve": lambda: run_self_improvement_loop(shutdown_event, interval=3600, supervisor=_supervisor),
+        "free-grind": lambda: run_free_evolution_grind(shutdown_event, supervisor=_supervisor),
         # ── Fang 7: Self-Reading Archaeology ──
         # Ingests evolution archive, shared research, stigmergy marks, task
         # completions into MemoryPalace every 30 minutes. Produces
         # lessons_learned.md at ~/.dharma/meta/ — the anti-amnesia mechanism.
-        "archaeology": lambda: _run_archaeology_loop(shutdown_event),
+        "archaeology": lambda: _run_archaeology_loop(shutdown_event, supervisor=_supervisor),
         # ── Guardian Crew: continuous interface + loop + router health checks ──
         # Runs at boot + every 4 hours. Writes state-local GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
-        "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
+        "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry, supervisor=_supervisor),
+        # ── Health API: curl http://localhost:7433/health ──
+        "health-api": lambda: _run_health_api(shutdown_event, supervisor=_supervisor),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
-        "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
+        "gauntlet": lambda: _run_gauntlet_loop(shutdown_event, supervisor=_supervisor),
         # ── World Model: living Forrester-style world state updated by research ──
-        "world-model": lambda: _run_world_model_loop(shutdown_event),
+        "world-model": lambda: _run_world_model_loop(shutdown_event, supervisor=_supervisor),
         # ── Revenue Scout: autonomous target scouting + intelligence ingestion ──
-        "revenue-scout": lambda: _run_revenue_scout_loop(shutdown_event),
+        "revenue-scout": lambda: _run_revenue_scout_loop(shutdown_event, supervisor=_supervisor),
     }
     if room_registry is not None and room_bridge is not None:
         task_factories["room-health"] = lambda: _run_room_health_loop(
             shutdown_event,
             room_registry,
             room_bridge,
+            supervisor=_supervisor,
         )
     optional_clean_exit = {"pulse"}
-    core_loop_names = {"swarm", "health-api", "pulse"}
     tasks = {
-        name: asyncio.create_task(task_factories[name](), name=name)
-        for name in core_loop_names
+        name: asyncio.create_task(factory(), name=name)
+        for name, factory in task_factories.items()
     }
-    ancillary_started = False
 
-    _log(
-        "orchestrator",
-        f"Core systems launched ({len(tasks)} loops); ancillary loops wait for swarm readiness",
-    )
+    _log("orchestrator", f"All {len(tasks)} systems launched ({len(tasks)} loops incl. free-grind)")
 
     abandoned_loops: set[str] = set()
+    _ledger_state: dict[str, Any] = {"last_monotonic": 0.0, "abandoned": ()}
+
+    def _tick_liveness_ledger(restart_counts: dict[str, int]) -> None:
+        """Durable ledger row: hourly, plus immediately on abandonment change."""
+        now = time.monotonic()
+        abandoned = tuple(sorted(abandoned_loops))
+        due = (
+            not _ledger_state["last_monotonic"]
+            or now - _ledger_state["last_monotonic"] >= LIVENESS_LEDGER_INTERVAL_SECONDS
+            or abandoned != _ledger_state["abandoned"]
+        )
+        if not due:
+            return
+        appended = append_liveness_ledger_row(
+            running=sorted(tasks.keys()),
+            restart_counts=restart_counts,
+            abandoned=list(abandoned),
+        )
+        if appended is not None:
+            _ledger_state["last_monotonic"] = now
+            _ledger_state["abandoned"] = abandoned
 
     def _write_loop_liveness(restart_counts: dict[str, int]) -> None:
         """Project loop liveness for read-only operator surfaces (dgc status).
@@ -2639,28 +2392,16 @@ async def orchestrate(background: bool = False) -> None:
         max_restarts = 5
         restart_counts: dict[str, int] = {}
         _write_loop_liveness(restart_counts)
+        _tick_liveness_ledger(restart_counts)
 
         while tasks and not shutdown_event.is_set():
-            if (
-                not ancillary_started
-                and swarm_ready_event.is_set()
-                and not shutdown_event.is_set()
-            ):
-                for name, factory in task_factories.items():
-                    if name in tasks or name in core_loop_names:
-                        continue
-                    tasks[name] = asyncio.create_task(factory(), name=name)
-                ancillary_started = True
-                _log(
-                    "orchestrator",
-                    f"Ancillary systems launched after swarm readiness ({len(tasks)} total loops)",
-                )
-                _write_loop_liveness(restart_counts)
-
             done, pending = await asyncio.wait(
-                list(tasks.values()), return_when=asyncio.FIRST_COMPLETED, timeout=0.25,
+                list(tasks.values()), return_when=asyncio.FIRST_COMPLETED, timeout=60.0,
             )
             if not done:
+                # Steady state hits only this branch, so the hourly durable
+                # ledger row must tick here, not just on task exit events.
+                _tick_liveness_ledger(restart_counts)
                 continue  # timeout, check shutdown flag
 
             restart_queue: list[str] = []
@@ -2701,6 +2442,7 @@ async def orchestrate(background: bool = False) -> None:
                     abandoned_loops.add(name)
 
             _write_loop_liveness(restart_counts)
+            _tick_liveness_ledger(restart_counts)
 
     except asyncio.CancelledError:
         pass
@@ -2709,7 +2451,6 @@ async def orchestrate(background: bool = False) -> None:
         for t in tasks.values():
             t.cancel()
         await asyncio.gather(*tasks.values(), return_exceptions=True)
-        runtime_dispatch_thread.join(timeout=2.0)
         pid_file.unlink(missing_ok=True)
         _log("orchestrator", "All systems stopped")
 

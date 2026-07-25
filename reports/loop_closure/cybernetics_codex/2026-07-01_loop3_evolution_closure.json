@@ -1,0 +1,155 @@
+{
+  "act_evidence": {
+    "archive_entry_id": "711b67ef16364515",
+    "archive_status": "evaluated",
+    "fitness": {
+      "correctness": 0.666667,
+      "dharmic_alignment": 0.5,
+      "economic_value": 0.5,
+      "efficiency": 0.989,
+      "elegance": 0.5,
+      "performance": 0.5,
+      "safety": 1.0,
+      "swabhaav_alignment": 0.0,
+      "utilization": 0.5,
+      "weighted": 0.5689
+    },
+    "live_archive_used": false,
+    "predictor_history_path": "$TMPDIR/loop3_evolution_closure/evolution/predictor_data.jsonl",
+    "predictor_outcomes_after_archive": 1,
+    "scratch_archive_is_live_archive": false,
+    "scratch_archive_path": "$TMPDIR/loop3_evolution_closure/evolution/archive.jsonl"
+  },
+  "adapt_evidence": {
+    "later_proposal_id": "42a456ddd0a54ae0",
+    "later_proposal_predicted_fitness": 0.6189,
+    "prediction_after": 0.6189,
+    "prediction_before": 0.55,
+    "predictor_outcomes_after": 1,
+    "predictor_outcomes_before": 0,
+    "selected_parent_id": "711b67ef16364515"
+  },
+  "adapt_proof": {
+    "after": {
+      "archive_entries": 1,
+      "prediction": 0.6189,
+      "predictor_outcomes": 1
+    },
+    "archive_entry_id": "711b67ef16364515",
+    "before": {
+      "archive_entries": 0,
+      "prediction": 0.55,
+      "predictor_outcomes": 0
+    },
+    "fed_forward": true,
+    "field": "scratch Darwin predictor history + archive parent selection read by the later proposal cycle"
+  },
+  "constrain_evidence": {
+    "bounded_change": {
+      "change_type": "bounded_replay",
+      "component": "loop3_evolution_policy",
+      "diff_lines": 11,
+      "max_diff_lines": 32,
+      "passed": true,
+      "paths": [
+        "reports/loop_closure/cybernetics_codex/loop3_evolution_policy.json"
+      ],
+      "protected_hits": [],
+      "scratch_only": true
+    },
+    "gate_decision": "review",
+    "gate_reason": "Advisory: Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s); Insufficient epistemological diversity: only 0 frame(s)",
+    "gate_results": {
+      "AHIMSA": "PASS",
+      "ANEKANTA": "FAIL",
+      "BHED_GNAN": "PASS",
+      "CONSENT": "PASS",
+      "DOGMA_DRIFT": "PASS",
+      "REVERSIBILITY": "PASS",
+      "SATYA": "PASS",
+      "STEELMAN": "PASS",
+      "SVABHAAVA": "FAIL",
+      "VYAVASTHIT": "PASS",
+      "WITNESS": "PASS"
+    },
+    "gate_status": "gated"
+  },
+  "cycle_detail": [
+    {
+      "archive_entry_id": "711b67ef16364515",
+      "cycle": 1,
+      "gate_decision": "review",
+      "pass_rate": 0.666667,
+      "phase": "sense_interpret_constrain_act",
+      "task_count": 3,
+      "weighted_fitness": 0.5689
+    },
+    {
+      "cycle": 2,
+      "later_proposal_predicted_fitness": 0.6189,
+      "phase": "later_cycle_read",
+      "prediction_after": 0.6189,
+      "prediction_before": 0.55,
+      "selected_parent_id": "711b67ef16364515"
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "deficits": [
+      "loop3-probe-predictor-history-before-adapt"
+    ],
+    "pass_rate": 0.666667,
+    "score_total": 2.0,
+    "selected_change": "record the evaluated bounded replay in the scratch Darwin archive so the predictor has a real outcome before the later proposal",
+    "task_count": 3
+  },
+  "later_cycle_read_evidence": {
+    "later_proposal_read_after_prediction": true,
+    "parent_selection_read_archive_entry": true,
+    "prediction_changed": true
+  },
+  "loop": 3,
+  "loop_id": "evolution_loop",
+  "observed_at": "2026-07-01T15:16:39.161004Z",
+  "real_data": true,
+  "sense_evidence": {
+    "source": "local DarwinEngine behavioral replay",
+    "task_outcomes": [
+      {
+        "expected": "gated",
+        "observed": "gated",
+        "real_execution": true,
+        "score": 1.0,
+        "source": "DarwinEngine.gate_check",
+        "task_id": "loop3-probe-gate-observation"
+      },
+      {
+        "expected": "rejected",
+        "observed": "rejected",
+        "real_execution": true,
+        "score": 1.0,
+        "source": "DarwinEngine.gate_check",
+        "task_id": "loop3-probe-self-mod-review-guard"
+      },
+      {
+        "expected": "existing outcome history for loop3 replay candidate",
+        "observed": {
+          "outcome_count": 0,
+          "prediction": 0.55
+        },
+        "real_execution": true,
+        "score": 0.0,
+        "source": "FitnessPredictor.predict/outcome_count",
+        "task_id": "loop3-probe-predictor-history-before-adapt"
+      }
+    ]
+  },
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  }
+}

@@ -158,17 +158,6 @@ export function V2FilterBar({
             className="h-10 w-full rounded-md border border-sumi-800/70 bg-sumi-950/80 pl-9 pr-3 text-sm text-torinoko outline-none placeholder:text-sumi-600 focus:border-aozora/60"
           />
         </div>
-        <label className="flex h-10 items-center gap-2 rounded-md border border-sumi-800/70 bg-sumi-950/80 px-3 text-[10px] uppercase tracking-[0.12em] text-sumi-500">
-          window
-          <select
-            value="snapshot"
-            onChange={() => undefined}
-            className="bg-transparent font-mono text-xs normal-case tracking-normal text-sumi-300 outline-none"
-            aria-label="Time window"
-          >
-            <option value="snapshot">Current snapshot</option>
-          </select>
-        </label>
         <div className="flex flex-wrap gap-1">
           {modes.map((mode) => (
             <button

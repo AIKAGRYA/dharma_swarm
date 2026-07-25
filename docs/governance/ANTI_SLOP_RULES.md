@@ -131,7 +131,7 @@ parallel `STATE_DIR_OWNERS.md` doc.
 ### Rule 8: root markdown allowlist
 `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `LICENSE.md`,
 `INTERFACE_MISMATCH_MAP.md`, `SWARM_HOT_ITEMS.md`, `MODEL_ROUTING_MAP.md`,
-`CYBERNETIC_LOOP_MAP.md`, `AGENT_IDENTITY_UNIFICATION.md`.
+`CYBERNETIC_LOOP_MAP.md`, `AGENT_IDENTITY_UNIFICATION.md`, `AGENTS.md`.
 
 To add a new root-level `.md`: edit
 `.github/workflows/structure.yml` `allow=(...)` and justify in PR.

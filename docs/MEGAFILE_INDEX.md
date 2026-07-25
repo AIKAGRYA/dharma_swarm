@@ -8,15 +8,24 @@ This file is the **stable shape** for dharma_swarm onboarding. Only this file is
 
 ## How To Use This File
 
-The single door into the current operating reality is the onboarding command:
+Start with the current session:
 
 ```bash
 make onboard
 ```
 
-It surfaces the active track, live ops, broken register, and depth pointers. Run that first. **Then** use this index as a depth reference — it reserves the 10 onboarding-megafile slots so future agents find them. Where status is **CANONICAL**, read the file. Where **STUB**, read the pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked caveat.
+`make onboard` is read-only session status. For the deeper whole-organism
+projection, run `make organism-status`. Packet-bound preflight and closeout are
+required when changed paths match Merge Master Mike's `HOT_PATH_PATTERNS` in
+`scripts/runtime/pr_merge_control.py`; they are optional otherwise. When a
+packet is required or voluntarily used, bind the exact task with
+`make agent-build-preflight PACKET=<path>`. **Then** use this index as a depth
+reference — it reserves the 10 onboarding-megafile slots so future agents find
+them. Where status is **CANONICAL**, read the file. Where **STUB**, read the
+pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the
+marked caveat.
 
-If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts. Do not create a new megafile to track convergence — the onboarding command already does that.
+If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts or a new megafile to track convergence; use the named owner and the existing status commands.
 
 ---
 
@@ -107,13 +116,15 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 **Known gap:** 47% of in-flight branches have no anchor in any plan doc. Strategy is ~10x ahead of code (`dharma_swarm/loomwork/` package does not exist). Roadmap-vs-design contestation between `LOOMWORK_v0_MASTER.md` and `2026-05-07-loomwork-design.md` is logged in `governance/REPO_GOVERNANCE_AUDIT.md` as a separate convergence track and is not blocked by this slot's seeding.
 
 ### Slot 4 — Limbs Atlas
-**Path:** `dharma_swarm/docs/architecture/LIMBS_ATLAS.md` (STUB — points to existing NAVIGATION.md + ACTIVE_SURFACE_MANIFEST.yaml)
-**Status:** STUB (substrate exists; static map stale — see BR-010)
+**Path:** `docs/architecture/LIMBS_ATLAS.md` (SEEDED 2026-07-01 — thin index over NAVIGATION.md + ACTIVE_SURFACE_MANIFEST.yaml + capability lenses)
+**Status:** SEEDED (thin index file created; static module map still stale — see BR-010)
 **Audience:** Engineer, Agent
-**Read for:** the dependency graph, module map, "what calls what."
+**Read for:** the dependency graph, module map, "what calls what," and capability lenses (e.g. the agentic-pattern coverage map).
+**Capability lenses (new 2026-07-01):**
+- `docs/architecture/AGENTIC_PATTERNS_ATLAS.md` — Gulli's 21 agentic design patterns mapped to implementing modules (STRONG/PARTIAL/OUT-OF-SCOPE).
 **Substrate (corrected 2026-05-07 18:00):**
-- **`dharma_swarm/docs/architecture/NAVIGATION.md`** — the actual static map file (`CLAUDE.md` pointer patched 2026-05-07; file itself remains stale; BR-010 revised)
-- **`dharma_swarm/ACTIVE_SURFACE_MANIFEST.yaml`** — machine-readable authority for which API routes / dashboard surfaces are active / projection / adapter / research / frozen
+- **`docs/architecture/NAVIGATION.md`** — the actual static map file (`CLAUDE.md` pointer patched 2026-05-07; file itself remains stale; BR-010 revised)
+- **`ACTIVE_SURFACE_MANIFEST.yaml`** — machine-readable authority for which API routes / dashboard surfaces are active / projection / adapter / research / frozen
 - `~/.dharma/audit/system_inventory_2026-05-07.md` (out-of-repo; 330 subsystems, 14 LaunchAgents, 100 skills, 521 test files)
 - `dharma_swarm/CLAUDE.md` Key Abstractions section (9 abstractions; tip-of-iceberg)
 - `~/.claude/cabinet/systems/dharma_swarm.md`, `connections.md`, `repo_map.md` (topical maps)

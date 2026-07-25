@@ -1,0 +1,29 @@
+{
+  "schema": "dharma.goal_requirements_trace.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "objective": "Canonicalize the Operator Coherence Cockpit backplane as Dharma Swarm's multi-agent control-tower substrate",
+  "overall_status": "PARTIAL_OPERATOR_GATED_NOT_COMPLETE",
+  "authoritative_state": {
+    "origin_main": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "grading_branch_head": "bfaaae350ca784355ac1829898f23aa7dceb8813",
+    "grading_branch_ahead": 9,
+    "grading_branch_behind": 0,
+    "cockpit_location": "/Users/dhyana/dharma_swarm dirty checkout",
+    "active_track_yaml_edited_by_this_work": false
+  },
+  "requirements": [
+    {"requirement": "extract_plan_dirty_cockpit_without_destructive_cleanup", "status": "PLAN_COMPLETE_EXTRACTION_OPERATOR_GATED", "evidence": ["COCKPIT_ADMISSION_RECOMMENDATION_2026-06-23.md", "OPERATOR_COHERENCE_COCKPIT_LANE_PACKET_2026-06-23.json"]},
+    {"requirement": "define_truth_admission_schemas", "status": "DONE", "evidence": ["COCKPIT_CANONICALITY_TAXONOMY_2026-06-23.json", "AGENT_LANE_ADMISSION_SCHEMA_2026-06-23.json"]},
+    {"requirement": "canonical_vs_candidate_semantics", "status": "DONE", "evidence": ["COCKPIT_CONSOLIDATION_SPEC_2026-06-23.json", "TRACK_COHERENCE_UNIFIED_FEED_CONTRACT_2026-06-23.json"]},
+    {"requirement": "integrate_production_readiness_results", "status": "DONE", "evidence": ["PROD_READINESS_BACKPLANE_CONTRACT_2026-06-23.md"]},
+    {"requirement": "verify_ui_backplane_contract", "status": "DONE_CONTRACT_VERIFIED_PRIOR_BUILD_PASS", "evidence": ["UI_BACKPLANE_CONTRACT_2026-06-23.md"]},
+    {"requirement": "durable_handoff_for_arena_forge", "status": "DONE", "evidence": ["FORGE_ARENA_INPUT_CONTRACT_2026-06-23.md", "INDEX_2026-06-23.md"]},
+    {"requirement": "canonicalize_control_tower", "status": "NOT_COMPLETE_OPERATOR_GATED", "evidence": ["grading feeds branch-only", "cockpit dirty-local only"]}
+  ],
+  "operator_gates": [
+    "provide gh auth or off-machine preservation",
+    "approve landing grading branch",
+    "approve cockpit extraction branch/PR",
+    "rerun cockpit generator from clean worktree after landing"
+  ]
+}

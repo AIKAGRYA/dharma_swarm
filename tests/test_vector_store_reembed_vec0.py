@@ -6,6 +6,16 @@ from dharma_swarm.vector_store import VectorStore
 from scripts.vector_store_reembed_vec0 import reembed_queries
 
 
+def _delete_embedding_for_doc(store: VectorStore, doc_id: int) -> None:
+    conn = store._connect()
+    try:
+        table = "vec_embeddings" if store._has_vec0(conn) else "vec_embeddings_fallback"
+        conn.execute(f"DELETE FROM {table} WHERE rowid = ?", (doc_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def test_reembed_queries_updates_vec0_for_matching_rows(tmp_path):
     store = VectorStore(state_dir=tmp_path, dim=32)
     doc_id = store.upsert(
@@ -14,12 +24,7 @@ def test_reembed_queries_updates_vec0_for_matching_rows(tmp_path):
     )
     store.upsert("Unrelated GAIA restoration packet", source="doc:gaia")
 
-    conn = store._connect()
-    try:
-        conn.execute("DELETE FROM vec_embeddings WHERE rowid = ?", (doc_id,))
-        conn.commit()
-    finally:
-        conn.close()
+    _delete_embedding_for_doc(store, doc_id)
 
     receipt = reembed_queries(
         state_dir=tmp_path,

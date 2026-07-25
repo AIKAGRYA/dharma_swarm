@@ -1,23 +1,4 @@
-"""Canonical model hierarchy — the single source of truth.
-
-Every file that needs provider ordering, tier definitions, or model hints
-imports from HERE.  Not from runtime_provider.  Not from smart_router.
-Not from provider_policy.  HERE.
-
-The seed ordering below is the Day 1 default.  After ~100 routing events,
-EWMA scores from routing_memory.py dominate and the system self-orders
-based on real performance data.
-
-Architecture (Tiny Dancer inspired):
-    REQUEST → router_v1 classify (50µs) → routing_memory EWMA lookup (1ms)
-    → circuit_breaker filter (10µs) → RANKED TOP 3 → asyncio race
-    → first good response wins → heuristic_score → EWMA update → RETURN
-
-References:
-    - Tiny Dancer (ruvnet/RuVector): sub-ms neural routing, EWMA, circuit breakers
-    - RouteLLM (LMSYS): 72% cost savings at 95% quality via learned routing
-    - Not Diamond: awesome-ai-model-routing curated patterns
-"""
+"""Canonical provider hierarchy and model defaults."""
 
 from __future__ import annotations
 
@@ -27,6 +8,10 @@ import re
 from typing import TYPE_CHECKING, Mapping
 
 from dharma_swarm.models import LLMResponse, ProviderType
+from dharma_swarm.model_defaults import default_for_provider
+
+# Re-export the roster/pool power-floor line for provider-grain callers.
+__all_floor__ = ("MODEL_POWER_FLOOR",)
 
 if TYPE_CHECKING:
     from dharma_swarm.resilience import CircuitBreakerRegistry
@@ -55,26 +40,27 @@ class LaneRole(str, Enum):
     GENERAL_SUPPORT = "general_support"
 
 
-# ─── Tier Definitions ────────────────────────────────────────────────────
-# Which providers belong to which cost tier.
-# Within each tier, ordering is the Day 1 seed.  EWMA scores override this
-# after sufficient routing events (~100 calls).
-
+# Tier order is the Day-1 seed; EWMA scores refine after enough routing events.
+# Defaults stay power-first. Small models are explicit local/fast-path fallbacks,
+# never lane defaults.
 TIER_FREE: tuple[ProviderType, ...] = (
-    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5
-    ProviderType.NVIDIA_NIM,     # Llama 3.3 70B  (50 req/day)
-    ProviderType.GROQ,           # Qwen3-32B      (3000 tok/s)
+    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5 (cloud)
+    ProviderType.GROQ,           # Kimi K2 1T (fast inference)
     ProviderType.CEREBRAS,       # Qwen3 235B / GPT-OSS 120B (3000 tok/s)
+    ProviderType.SAMBANOVA,      # DeepSeek V3 671B
     ProviderType.SILICONFLOW,    # Qwen3-Coder 480B
-    ProviderType.SAMBANOVA,      # Llama 3.3 70B
     ProviderType.TOGETHER,       # Qwen3-Coder 480B
     ProviderType.FIREWORKS,      # Qwen3-Coder 480B
+    ProviderType.NVIDIA_NIM,     # Nemotron Ultra 253B (50 req/day — quota-poor, so late)
 )
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
-    ProviderType.MISTRAL,        # mistral-small (1B tok/mo free tier)
-    ProviderType.GOOGLE_AI,      # gemini-2.5-flash (1M ctx free)
+    ProviderType.KIMI_CODE,      # Kimi Code membership API (K3)
+    ProviderType.MOONSHOT,       # Kimi Open Platform / Moonshot global API
+    ProviderType.ZHIPU,          # glm-5.2 direct (z.ai/Zhipu first-party lane)
+    ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
+    ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
     ProviderType.OPENROUTER_FREE,  # Nemotron 120B, GLM-4.5-Air, etc.
 )
 
@@ -100,20 +86,12 @@ ALL_TIERS: dict[str, tuple[ProviderType, ...]] = {
     "paid": TIER_PAID,
 }
 
-# The canonical seed ordering: SUSTAINABLE FIRST.
-# 1. Free frontier (Ollama Cloud, Groq, Cerebras, etc.) — $0, high quality
-# 2. Cheap (Mistral, Google AI, etc.) — ~$0
-# 3. Subscription (Claude Max, Codex) — unlimited via active plans
-# 4. Paid API (Anthropic, OpenAI credits) — LAST RESORT, runs dry
-# After ~100 routing events, EWMA scores override this seed order.
+# Canonical provider registry. ProviderPolicyRouter applies power-first
+# reranking; this seed is the historical fallback and EWMA starting point.
 CANONICAL_SEED_ORDER: tuple[ProviderType, ...] = (
     TIER_FREE + TIER_CHEAP + TIER_SUBSCRIPTION + TIER_PAID_API
 )
 
-
-# ─── Canonical Lane Roles ────────────────────────────────────────────────
-# Codex + Opus are the sovereign drivers. Open/cheap lanes do the bulk of
-# delegated search, challenge, and implementation work.
 
 PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
     ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
@@ -123,6 +101,8 @@ PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,      # Kimi Code direct API
+    ProviderType.MOONSHOT,       # Kimi Open Platform direct API
     ProviderType.OPENROUTER,     # Kimi / GLM / Qwen router
     ProviderType.OLLAMA,         # GLM-5 / Kimi cloud
     ProviderType.NVIDIA_NIM,     # MiniMax / Nemotron frontier support
@@ -139,6 +119,8 @@ DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
     ProviderType.NVIDIA_NIM,
     ProviderType.OPENROUTER,
     ProviderType.OLLAMA,
@@ -147,6 +129,8 @@ CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
     ProviderType.OPENROUTER,
     ProviderType.OPENROUTER_FREE,
     ProviderType.OLLAMA,
@@ -219,6 +203,8 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
     ProviderType.CLAUDE_CODE: LaneRole.PRIMARY_DRIVER,
     ProviderType.ANTHROPIC: LaneRole.PRIMARY_DRIVER,
     ProviderType.OPENROUTER: LaneRole.RESEARCH_DELEGATE,
+    ProviderType.KIMI_CODE: LaneRole.RESEARCH_DELEGATE,
+    ProviderType.MOONSHOT: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OLLAMA: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OPENROUTER_FREE: LaneRole.RESEARCH_DELEGATE,
     ProviderType.NVIDIA_NIM: LaneRole.CHALLENGER,
@@ -242,34 +228,19 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 
 # ─── Default Models ──────────────────────────────────────────────────────
 # Default model per provider (used when request.model is empty).
-# Moved here from runtime_provider.py as the single source.
+#
+# STEP 3 of the model-pool consolidation: the per-provider default STRINGS now
+# live in exactly ONE place — ``model_pool._PROVIDER_DEFAULTS`` — and this dict
+# is a thin PROJECTION of the pool (``model_pool.default_for_provider``). This
+# file keeps the PROVIDER-grain authority (tiers, lane roles, priority tuples);
+# only the model-id literals moved to the pool. Every provider in
+# ``CANONICAL_SEED_ORDER`` is projected, so the seed-order coverage invariant
+# (``test_default_models_dict_matches_all_seed_order``) holds without literals.
 
+# Doctrine: the default per lane is the most powerful model the lane offers
+# at $0/near-$0 — see MODEL PREFERENCE DOCTRINE above the tier definitions.
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free-tier Ollama fallback. Kimi Code K3 is a direct provider route and
-    # must not be represented as an Ollama tag (Ollama exposes no K3 route).
-    ProviderType.OLLAMA: "glm-5.2:cloud",
-    ProviderType.NVIDIA_NIM: "deepseek-ai/deepseek-v4-pro",
-    ProviderType.GROQ: "qwen/qwen3-32b",
-    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
-    ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
-    ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-    # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
-    ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
-    # Paid tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k3",
-    ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
-    ProviderType.CODEX: "gpt-5.4",
-    # External-only field-ops lane. The dharma_swarm runtime does not own a
-    # Sakana/Fugu adapter yet; keep the identity valid without pretending it is
-    # a local provider route.
-    ProviderType.SAKANA: "sakana/fugu-ultra",
+    p: default_for_provider(p) for p in CANONICAL_SEED_ORDER
 }
 
 
@@ -291,6 +262,67 @@ def default_model(provider: ProviderType) -> str:
     return DEFAULT_MODELS.get(provider, "")
 
 
+# ─── Model Intelligence Seed ──────────────────────────────────────────
+# Relative capability of each lane's DEFAULT model (0–100, ordinal seed —
+# the RANKING matters, not the absolute number). Grounded in public
+# benchmark standings of the model classes the lanes serve. This is the
+# Day 1 prior only: EWMA scores from routing_memory override it with real
+# measured quality after ~100 events. Update this table when a lane's
+# DEFAULT_MODELS entry changes — nowhere else.
+
+MODEL_INTELLIGENCE: dict[ProviderType, int] = {
+    # Paid / subscription frontier
+    ProviderType.ANTHROPIC: 72,        # Opus-class
+    ProviderType.OPENAI: 71,           # GPT-5
+    ProviderType.CLAUDE_CODE: 70,      # Opus-class via subscription
+    ProviderType.CODEX: 70,            # GPT-5-class via subscription
+    # Free / cheap frontier
+    ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
+    ProviderType.KIMI_CODE: 72,        # Kimi K3 coding membership lane
+    ProviderType.MOONSHOT: 71,         # Kimi K3 global API
+    ProviderType.ZHIPU: 67,            # glm-5.2 direct (z.ai/Zhipu)
+    ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
+    ProviderType.GROQ: 64,             # Kimi K2 1T MoE
+    ProviderType.CEREBRAS: 63,         # Qwen3 235B
+    ProviderType.SAMBANOVA: 62,        # DeepSeek V3 671B
+    ProviderType.CHUTES: 61,           # DeepSeek-R1
+    ProviderType.SILICONFLOW: 60,      # Qwen3-Coder 480B
+    ProviderType.TOGETHER: 60,         # Qwen3-Coder 480B
+    ProviderType.FIREWORKS: 60,        # Qwen3-Coder 480B
+    ProviderType.OPENROUTER: 59,       # paid OR default
+    ProviderType.NVIDIA_NIM: 58,       # Nemotron Ultra 253B
+    ProviderType.MISTRAL: 56,          # Mistral Large
+    ProviderType.OPENROUTER_FREE: 55,  # Nemotron 120B
+}
+
+
+def intelligence_score(provider: ProviderType) -> int:
+    """Seed intelligence score for a provider's default model (0–100)."""
+    return MODEL_INTELLIGENCE.get(provider, 0)
+
+
+def intelligence_order(
+    candidates: tuple[ProviderType, ...] | list[ProviderType] | None = None,
+    *,
+    respect_cost_tiers: bool = True,
+) -> list[ProviderType]:
+    """Order providers most-intelligent-first.
+
+    With respect_cost_tiers=True (default), the cost ladder picks the tier
+    (free → cheap → subscription → paid API) and intelligence ranks within
+    each tier — powerful free frontier before anything paid. With
+    respect_cost_tiers=False, raw intelligence wins regardless of cost.
+    """
+    pool = list(candidates if candidates is not None else CANONICAL_SEED_ORDER)
+    if not respect_cost_tiers:
+        return sorted(pool, key=lambda p: -intelligence_score(p))
+    tier_rank = {"free": 0, "cheap": 1, "subscription": 2, "paid_api": 3, "paid": 3}
+    return sorted(
+        pool,
+        key=lambda p: (tier_rank.get(get_tier(p), 4), -intelligence_score(p)),
+    )
+
+
 # ─── Live Ordering (EWMA + Circuit Breakers) ─────────────────────────────
 
 def get_live_order(
@@ -308,7 +340,8 @@ def get_live_order(
 
     Providers with open circuit breakers are moved to the end.
 
-    Falls back to CANONICAL_SEED_ORDER if no EWMA data exists.
+    Falls back to intelligence_order() of the candidates (most intelligent
+    available model first within the cost ladder) if no EWMA data exists.
 
     Args:
         routing_memory: EWMA score store. If None, returns seed order.
@@ -319,7 +352,7 @@ def get_live_order(
     Returns:
         Ordered list of ProviderType, best first.
     """
-    pool = list(candidates or CANONICAL_SEED_ORDER)
+    pool = intelligence_order(candidates or CANONICAL_SEED_ORDER)
 
     # Phase 1: EWMA ranking (if data exists)
     if routing_memory is not None:

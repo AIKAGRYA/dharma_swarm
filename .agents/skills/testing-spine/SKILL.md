@@ -5,86 +5,86 @@ description: Test the Runtime Truth Spine (EvidenceReceipt, RoutingDecision, inv
 
 # Testing the Runtime Truth Spine
 
+**Purpose:** verify changes to the spine's core types (`EvidenceReceipt`, `RoutingDecision`), the `invoke_agent` dispatch seam, and the anti-accretion gate (`tools/spine_check.py`). The spine is the repo's truth layer — a regression here corrupts every downstream receipt, so both directions get tested: the happy path AND that the gate still rejects violations.
+
 ## Environment Setup
 
 ```bash
-cd /home/ubuntu/repos/dharma-swarm
+cd "$(git rev-parse --show-toplevel)"
 ```
 
-No special dependencies needed beyond the project's standard pytest setup.
+No dependencies beyond the project's standard pytest setup. No secrets — all spine tests run against in-memory stores and dataclass instantiation.
 
-## Key Testing Commands
+## Procedure
+
+1. **Spine acceptance tests** (fast, <1s):
+   ```bash
+   pytest tests/test_dispatch_dropoff_sources.py -v --tb=short
+   ```
+   These cover the five doctrine §11 scenarios (see Doctrine Reference below). All must pass.
+2. **Anti-accretion gate, both directions** (see next section):
+   ```bash
+   python3 tools/spine_check.py
+   ```
+3. **Type invariants** (frozen-ness, OTel shape, JSON round-trip — snippets below).
+4. **Regression sweeps** for adjacent surfaces the spine feeds:
+   ```bash
+   pytest tests/test_telic_seam.py tests/test_task_board.py tests/test_telos_graph.py -v
+   pytest tests/test_authority_revenue_loop.py -v
+   pytest tests/test_a2a.py tests/test_a2a_spec_conformance.py -q   # NOTE: test_a2a.py, not test_a2a_e2e.py
+   ```
+   Judge these by diff against a same-session clean baseline, not remembered counts. (Known documented skip: the orphan ValueEvent test in test_authority_revenue_loop.py.)
+
+## Anti-Accretion Gate: test REJECT, not just PASS
+
+The gate enforces that files importing `sqlite3`/`aiosqlite` declare a `# spine:` header. Enforcement scope grows over time via the shrinking `_is_grandfathered()` list — **read `tools/spine_check.py` in your checkout to see the current scope** before assuming where enforcement applies. A gate change that only gets a PASS-side test is untested: prove it still rejects.
 
 ```bash
-# Spine acceptance tests (11 tests, <1s)
-pytest tests/test_dispatch_dropoff_sources.py -v --tb=short
-
-# Anti-accretion CI gate
-python3 tools/spine_check.py
-
-# Provenance regression (tests task dispatch area)
-pytest tests/test_telic_seam.py tests/test_task_board.py tests/test_telos_graph.py -v
-
-# Opportunity loop regression
-pytest tests/test_authority_revenue_loop.py -v
-
-# A2A regression (NOTE: file is test_a2a.py, NOT test_a2a_e2e.py)
-pytest tests/test_a2a.py tests/test_a2a_spec_conformance.py -q
-```
-
-## Anti-Accretion Gate Behavior
-
-The gate (`tools/spine_check.py`) enforces that files importing `sqlite3` or `aiosqlite` must declare a `# spine:` header comment. **Critical detail:** In PR A, the gate only enforces on files under `dharma_swarm/spine/`. All other files are grandfathered via `_is_grandfathered()`. Future PRs will shrink the grandfather list.
-
-To test REJECT behavior, create a violation file under `dharma_swarm/spine/` (not `dharma_swarm/` root):
-
-```bash
-# REJECT case: no declaration
+# REJECT case — must exit 1
 cat > dharma_swarm/spine/test_violation_temp.py << 'EOF'
 import sqlite3
 def bad(): pass
 EOF
-python3 tools/spine_check.py  # Should exit 1
+python3 tools/spine_check.py; echo "exit=$?"
+rm -f dharma_swarm/spine/test_violation_temp.py
 
-# PASS case: proper declaration
+# PASS case — must exit 0
 cat > dharma_swarm/spine/test_declared_temp.py << 'EOF'
 # spine: writes EvidenceReceipt
 import sqlite3
 def good(): pass
 EOF
-python3 tools/spine_check.py  # Should exit 0 (after removing violation file)
-
-# Cleanup
-rm -f dharma_swarm/spine/test_violation_temp.py dharma_swarm/spine/test_declared_temp.py
+python3 tools/spine_check.py; echo "exit=$?"
+rm -f dharma_swarm/spine/test_declared_temp.py
 ```
+
+Cleanup is part of the test — a leftover `test_violation_temp.py` breaks the next person's gate run.
 
 ## Spine Type Verification
 
 ```python
-# Frozen immutability check
 from dharma_swarm.spine import EvidenceReceipt, RoutingDecision
-r = EvidenceReceipt(agent_id="test")
-try:
-    r.agent_id = "mutated"  # Must raise FrozenInstanceError
-except Exception as e:
-    assert "frozen" in str(type(e)).lower() or "FrozenInstanceError" in str(type(e))
+import json, pytest
 
-# OTel export shape
+r = EvidenceReceipt(agent_id="test")
+
+# 1. Frozen immutability — mutation must raise (FrozenInstanceError or equivalent)
+with pytest.raises(Exception):
+    r.agent_id = "mutated"
+
+# 2. OTel export shape
 span = r.to_otel_span()
 assert "gen_ai.operation.name" in span["attributes"]
 assert "dharma.receipt_id" in span["attributes"]
 
-# JSON round-trip
-import json
-d = r.to_dict()
-json_str = json.dumps(d, default=str)
-parsed = json.loads(json_str)
+# 3. JSON round-trip
+parsed = json.loads(json.dumps(r.to_dict(), default=str))
 assert parsed["agent_id"] == "test"
 ```
 
 ## invoke_agent Protocol
 
-The `invoke_agent` function is a thin pass-through in PR A. It calls the provided `AgentInvoker` and returns whatever receipt the invoker returns. Testing it requires creating an async invoker:
+`invoke_agent` is a thin pass-through: it calls the provided `AgentInvoker` and returns the invoker's receipt. Test with an async stub:
 
 ```python
 import asyncio
@@ -93,27 +93,35 @@ from dharma_swarm.spine import invoke_agent, EvidenceReceipt, RoutingDecision
 async def test_invoker(task, agent_id, context_id, routing):
     return EvidenceReceipt(agent_id=agent_id, context_id=context_id, task_id=task.get("id", ""))
 
-routing = RoutingDecision(agent_id="a1", provider="anthropic", model="claude-4")
+routing = RoutingDecision(agent_id="a1", provider="anthropic", model="claude-fable-5")
 result = asyncio.run(invoke_agent({"id": "t1"}, "a1", "ctx1", routing, invoker=test_invoker))
 assert result.agent_id == "a1"
 ```
 
-## Known Test Expectations
-
-- `test_authority_revenue_loop.py`: Expect 22 passed, 1 skipped (orphan ValueEvent test is a documented pre-existing skip)
-- `test_a2a_spec_conformance.py`: ~76 tests
-- `test_a2a.py`: ~59 tests
-- `test_dispatch_dropoff_sources.py`: 11 tests covering all 5 doctrine §11 scenarios
-
 ## Doctrine Reference
 
-The spine is defined in `docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md` (commit 325cd02c). §11 lists the 5 acceptance scenarios:
-1. Normal path → status="ok", error_source="none"
-2. Task missing → status="failed", error_source="task_missing"
-3. Runner missing → status="failed", error_source="runner_missing"
-4. Both missing → status="failed", error_source="task_and_runner_missing"
-5. Provider failure → error_source="provider_failed" (not confused with dispatch dropoff)
+The spine is defined in `docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md`. §11's five acceptance scenarios:
 
-## Devin Secrets Needed
+1. Normal path → `status="ok"`, `error_source="none"`
+2. Task missing → `status="failed"`, `error_source="task_missing"`
+3. Runner missing → `status="failed"`, `error_source="runner_missing"`
+4. Both missing → `status="failed"`, `error_source="task_and_runner_missing"`
+5. Provider failure → `error_source="provider_failed"` (never conflated with dispatch dropoff)
 
-No secrets required — all spine tests run against in-memory stores and dataclass instantiation.
+## Output Format
+
+```
+SPINE TEST VERDICT: PASS | FAIL
+- acceptance (dropoff sources): <N passed> (all 5 §11 scenarios covered)
+- gate REJECT case: exit=<1?>   gate PASS case: exit=<0?>   temp files removed: <yes>
+- type invariants: frozen=<ok> otel=<ok> json-roundtrip=<ok>
+- regression sweeps: <delta vs baseline per file>
+```
+
+## Do NOT
+
+- Do not test only the gate's PASS side — the REJECT case is the point of a gate.
+- Do not leave temp violation files behind.
+- Do not assert on frozen test counts from this doc — re-derive from a same-session baseline.
+- Do not "fix" a gate failure by widening `_is_grandfathered()` or deleting a `# spine:` requirement; that's weakening the gate, which is doctrine-forbidden.
+- Do not add new sqlite stores to dodge the gate — extend existing spine owners.

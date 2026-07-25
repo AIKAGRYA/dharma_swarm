@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
@@ -36,7 +38,9 @@ class TestConstants:
         assert OLLAMA_CLOUD_BASE_URL == "https://ollama.com"
 
     def test_default_local_model(self):
-        assert OLLAMA_DEFAULT_LOCAL_MODEL == "mistral:latest"
+        assert OLLAMA_DEFAULT_LOCAL_MODEL == os.getenv(
+            "OLLAMA_LOCAL_MODEL", "mistral:latest"
+        )
 
     def test_default_cloud_model(self):
         assert OLLAMA_DEFAULT_CLOUD_MODEL == DEFAULT_MODELS[ProviderType.OLLAMA]
@@ -44,8 +48,7 @@ class TestConstants:
     def test_frontier_models_tuple(self):
         assert isinstance(OLLAMA_CLOUD_FRONTIER_MODELS, tuple)
         assert len(OLLAMA_CLOUD_FRONTIER_MODELS) >= 2
-        assert OLLAMA_CLOUD_FRONTIER_MODELS[0] == "glm-5.2:cloud"
-        assert all("kimi-k2.7" not in model for model in OLLAMA_CLOUD_FRONTIER_MODELS)
+        assert "minimax-m2.7:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
 
 
 # ---------------------------------------------------------------------------
@@ -310,3 +313,12 @@ class TestBuildOllamaHeaders:
             api_key="sk-explicit",
         )
         assert headers["Authorization"] == "Bearer sk-explicit"
+
+
+def test_is_ollama_cloud_model_variants():
+    from dharma_swarm.ollama_config import is_ollama_cloud_model
+
+    assert is_ollama_cloud_model("glm-5:cloud")
+    assert is_ollama_cloud_model("qwen3-coder:480b-cloud")
+    assert not is_ollama_cloud_model("llama3.2")
+    assert not is_ollama_cloud_model(None)

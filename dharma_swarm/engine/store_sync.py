@@ -26,7 +26,6 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
 

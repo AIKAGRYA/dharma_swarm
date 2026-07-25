@@ -1,5 +1,5 @@
-"""Authority organ — leases (permission) + reversibility gate (deterministic ceiling)."""
+"""Authority and safety facades."""
 
-from __future__ import annotations
+from .reversibility_gate import ActionClass, ReversibilityGate, classify_action
 
-__all__ = ["leases", "reversibility"]
+__all__ = ["ActionClass", "ReversibilityGate", "classify_action"]

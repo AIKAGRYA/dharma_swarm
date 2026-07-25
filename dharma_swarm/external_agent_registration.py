@@ -41,6 +41,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.dgm_loop import DGM_PROTECTED_FILES
 from dharma_swarm.operator_core.identity_invariant import build_identity_invariant, canonical_serial
 from dharma_swarm.roaming_onboarding import (
@@ -49,6 +50,23 @@ from dharma_swarm.roaming_onboarding import (
     _dharma_home as _roaming_dharma_home,
     onboard_roaming_agent,
 )
+
+
+def _kimi_2_6_model_identity() -> str:
+    """The Kimi 2.6 registration model_identity string, sourced from the pool.
+
+    This is registration metadata, not a router binding (see the module
+    docstring), but the model-id string still lives in exactly ONE place: the
+    ONE model pool, at the K2.6 FLOOR. ``_model_pool`` owns the vendor-prefixed
+    ``moonshotai/kimi-k2.6`` route; we project it so this record can never drift
+    from (or sink below) the floor the pool defines.
+    """
+    entry = _model_pool.get_entry("kimi-k2.6")
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.startswith("moonshotai/"):
+                return mid
+    raise AssertionError("model_pool has no moonshotai route for the K2.6 floor")
 
 
 # ---------------------------------------------------------------------------
@@ -472,7 +490,7 @@ def kimi_2_6_registration(
         callsign="kimi-claw-phone",
         display_name="Kimi 2.6 (Claw, returning roaming embodiment)",
         harness="moonshot_kimi_2_6",
-        model_identity="moonshotai/kimi-k2.6",
+        model_identity=_kimi_2_6_model_identity(),
         department="research",
         role="external_evidence_worker",
         squad_id="transit",

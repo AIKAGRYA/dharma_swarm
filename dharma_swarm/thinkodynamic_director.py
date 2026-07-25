@@ -52,8 +52,76 @@ from dharma_swarm.spine.invoke import invoke_agent
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.task_board import TaskBoard
+from dharma_swarm import model_pool as _model_pool
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Model-pool FLOOR projections (2026-06 routing consolidation)
+# ---------------------------------------------------------------------------
+# This director previously hard-typed sub-floor / BANISHED provider-specific
+# ids in two places: the provider-fallback vision cascade and the council
+# support-mind specs. Those literals were the routing drift the model pool
+# exists to kill. Every helper below derives the FLOOR id from the ONE pool
+# (``dharma_swarm.model_pool``) so no deployable model-id string lives here:
+#   - kimi-k2.5 (sub-floor) -> K2.6 floor entry.
+#   - glm-5 is the in-pool reasoning floor (glm-5.1 is not yet a pool entry).
+#   - deepseek-r1 reasoning lane -> the in-pool deepseek strong floor.
+#   - mistral-small-2411 (sub-floor) -> the in-pool mistral strong floor.
+#   - minimax-m2.5 -> the in-pool minimax floor (minimax-m2.7).
+#   - qwen3-coder -> the in-pool qwen3-coder floor.
+#   - BANISHED meta/llama-3.3 + nvidia/nemotron NIM lanes -> the nearest
+#     STRONG floor pool entries for the role (kimi-k2.6 / glm-5), served under
+#     their vendor namespace (the same open weights a self-hosted NIM endpoint
+#     serves), collapsing the banished default-NIM lane onto the floor.
+
+
+def _pool_route_id(pool_id: str, *, predicate) -> str:
+    """Return the first pool route id for ``pool_id`` matching ``predicate``."""
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for mid in entry.model_ids:
+            if predicate(mid):
+                return mid
+    raise AssertionError(
+        f"model_pool has no matching route for {pool_id!r} floor projection"
+    )
+
+
+def _vendor_floor(pool_id: str) -> str:
+    """Vendor-namespaced (``vendor/model``) floor id for ``pool_id``."""
+    return _pool_route_id(pool_id, predicate=lambda m: "/" in m and ":" not in m)
+
+
+def _kimi_floor_vendor() -> str:
+    """OpenRouter / self-hosted-NIM vendor id for the K2.6 floor."""
+    return _vendor_floor(_model_pool.K2_FLOOR_ID)
+
+
+def _glm_floor_vendor() -> str:
+    """Vendor id for the glm-5 reasoning floor."""
+    return _vendor_floor("glm-5")
+
+
+def _deepseek_floor_vendor() -> str:
+    """Vendor id for the deepseek reasoning floor (deepseek-r1 strong lane)."""
+    return _vendor_floor("deepseek-r1")
+
+
+def _mistral_floor_vendor() -> str:
+    """Vendor id for the mistral strong floor (uplifts mistral-small-2411)."""
+    return _vendor_floor("mistral-large-2411")
+
+
+def _qwen_floor_vendor() -> str:
+    """Vendor id for the qwen-coder strong floor."""
+    return _vendor_floor("qwen3-235b-a22b")
+
+
+def _minimax_floor_cloud() -> str:
+    """Ollama-Cloud id for the minimax floor (uplifts minimax-m2.5)."""
+    return _pool_route_id("minimax-m2.7", predicate=lambda m: m.endswith(":cloud"))
 
 ROOT = Path.home() / "dharma_swarm"
 STATE = dharma_state_dir()
@@ -1727,7 +1795,6 @@ async def _vision_via_provider(
     """
     from dharma_swarm.models import LLMRequest, ProviderType
     from dharma_swarm.runtime_provider import (
-        NVIDIA_NIM_BASE_URL,
         create_runtime_provider,
         resolve_runtime_provider_config,
     )
@@ -1763,20 +1830,16 @@ async def _vision_via_provider(
 
     if not tiny_budget:
         try:
-            nim_base_url = (
-                resolve_runtime_provider_config(ProviderType.NVIDIA_NIM).base_url
-                or NVIDIA_NIM_BASE_URL
-            ).rstrip("/")
+            # BANISHED literals (meta/llama-3.3, nvidia/nemotron) lifted to the
+            # FLOOR: a NIM-compatible endpoint (hosted or self-hosted) can serve
+            # the floor strong open weights under their vendor namespace, so both
+            # NIM branches now collapse onto the same pool-derived floor lanes.
+            _kimi_v = _kimi_floor_vendor()
+            _glm_v = _glm_floor_vendor()
             nim_attempts: list[tuple[str, str, float]] = [
-                ("NIM/llama-70b", "meta/llama-3.3-70b-instruct", 25.0),
-                ("NIM/nemotron-ultra-253b", "nvidia/llama-3.1-nemotron-ultra-253b-v1", 35.0),
+                ("NIM/kimi-floor", _kimi_v, 30.0),
+                ("NIM/glm-floor", _glm_v, 30.0),
             ]
-            if nim_base_url != NVIDIA_NIM_BASE_URL:
-                nim_attempts = [
-                    ("NIM/kimi-k2.5", "moonshotai/kimi-k2.5", 30.0),
-                    ("NIM/glm-5", "zai-org/GLM-5", 30.0),
-                    *nim_attempts,
-                ]
 
             for label, model, max_t in nim_attempts:
                 result = await _attempt(
@@ -1800,13 +1863,16 @@ async def _vision_via_provider(
         except Exception as exc:
             logger.debug("NVIDIANIMProvider setup failed: %s", exc)
 
+    # Sub-floor literals (mistral-small, kimi-k2.5, glm-5, deepseek-r1) lifted to
+    # the pool FLOOR; the BANISHED meta-llama/llama-3.3 cheap lane is dropped
+    # rather than duplicated onto an already-present floor lane (kimi/glm/mistral
+    # /deepseek cover the role).
     openrouter_attempts: list[tuple[str, str, float]] = [
-        ("OpenRouter/mistral-24b", "mistralai/mistral-small-3.1-24b-instruct", 20.0),
-        ("OpenRouter/llama-70b", "meta-llama/llama-3.3-70b-instruct", 25.0),
-        ("OpenRouter/kimi-k2.5", "moonshotai/kimi-k2.5", 30.0),
-        ("OpenRouter/glm-5", "z-ai/glm-5", 30.0),
+        ("OpenRouter/mistral-floor", _mistral_floor_vendor(), 20.0),
+        ("OpenRouter/kimi-floor", _kimi_floor_vendor(), 30.0),
+        ("OpenRouter/glm-floor", _glm_floor_vendor(), 30.0),
         ("OpenRouter/gpt-5-codex", "openai/gpt-5-codex", 35.0),
-        ("OpenRouter/deepseek-r1", "deepseek/deepseek-r1", 35.0),
+        ("OpenRouter/deepseek-floor", _deepseek_floor_vendor(), 35.0),
     ]
 
     try:
@@ -2135,7 +2201,7 @@ class ThinkodynamicDirector:
                 name="glm-researcher",
                 role="researcher",
                 provider=ProviderType.OPENROUTER.value,
-                model=os.getenv("DGC_DIRECTOR_GLM_MODEL", "").strip() or "z-ai/glm-5",
+                model=os.getenv("DGC_DIRECTOR_GLM_MODEL", "").strip() or _glm_floor_vendor(),
                 backend="provider-fallback",
                 purpose="Reasoning-heavy synthesis and contradiction hunting at lower cost than primary lanes.",
                 focus=("researcher", "architect", "validator"),
@@ -2144,8 +2210,11 @@ class ThinkodynamicDirector:
             DirectorMindSpec(
                 name="minimax-challenger",
                 role="researcher",
-                provider=ProviderType.NVIDIA_NIM.value,
-                model=os.getenv("DGC_DIRECTOR_MINIMAX_MODEL", "").strip() or "minimaxai/minimax-m2.5",
+                # minimax-m2.5 (sub-floor) lifts to the pool minimax floor, whose
+                # only route is Ollama Cloud — so the provider follows the floor
+                # route home (NIM carries no minimax floor route in the pool).
+                provider=ProviderType.OLLAMA.value,
+                model=os.getenv("DGC_DIRECTOR_MINIMAX_MODEL", "").strip() or _minimax_floor_cloud(),
                 backend="provider-fallback",
                 purpose="Counterargument mining, failure-mode pressure, and long-context challenge generation with a cheap frontier lane.",
                 focus=("researcher", "validator", "architect"),
@@ -2155,7 +2224,7 @@ class ThinkodynamicDirector:
                 name="qwen-builder",
                 role="general",
                 provider=ProviderType.OPENROUTER.value,
-                model=os.getenv("DGC_DIRECTOR_QWEN_MODEL", "").strip() or "qwen/qwen3-coder",
+                model=os.getenv("DGC_DIRECTOR_QWEN_MODEL", "").strip() or _qwen_floor_vendor(),
                 backend="provider-fallback",
                 purpose="Commodity implementation, mechanical coding, and parallel draft execution.",
                 focus=("surgeon", "general"),

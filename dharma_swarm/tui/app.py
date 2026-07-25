@@ -69,6 +69,7 @@ from .model_routing import (
     fallback_chain,
     format_model_list,
     format_model_status,
+    is_routable,
     route_key,
     resolve_model_target,
     resolve_strategy,
@@ -1681,6 +1682,17 @@ class DGCApp(App):
                     f"[{BENGARA}]Unknown model '{raw}'. Use /model list.[/{BENGARA}]"
                 )
                 return
+            # Unroutable (zero live provider keys) => non-selectable. Refuse the
+            # switch instead of flapping onto a dead provider. FAIL-OPEN: a blind
+            # key oracle never blocks a switch (is_routable returns True).
+            if not is_routable(target):
+                output.write_error(
+                    f"[{BENGARA}]Model '{target.alias}' is unroutable "
+                    f"(no live key for {target.provider_id}). "
+                    f"Run `dkeys test` or pick a live model with /model list."
+                    f"[/{BENGARA}]"
+                )
+                return
             self._set_active_model(
                 provider_id=target.provider_id,
                 model_id=target.model_id,
@@ -1740,6 +1752,17 @@ class DGCApp(App):
             re.IGNORECASE,
         ):
             return False
+
+        # Unroutable target => refuse the inline switch (no flapping onto a dead
+        # provider). FAIL-OPEN: a blind oracle never blocks the switch.
+        if not is_routable(target):
+            main = self._get_main_screen()
+            if main is not None:
+                main.stream_output.write_error(
+                    f"[{BENGARA}]Cannot switch to '{target.alias}': unroutable "
+                    f"(no live key for {target.provider_id}).[/{BENGARA}]"
+                )
+            return True
 
         self._set_active_model(
             provider_id=target.provider_id,

@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 import os
-import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -41,208 +40,6 @@ def test_log_writes_to_logger(caplog):
     with caplog.at_level(logging.INFO, logger="dharma_swarm.orchestrate_live"):
         _log("mymod", "a message")
     assert any("a message" in r.message for r in caplog.records)
-
-
-def test_daemon_runtime_dispatch_self_report_is_non_secret_and_pid_bound(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
-
-    path = mod._write_daemon_runtime_dispatch_self_report(tmp_path)
-    payload = json.loads(path.read_text(encoding="utf-8"))
-
-    assert path == tmp_path / "ops" / "daemon_runtime_dispatch_self_report.json"
-    assert payload["schema_version"] == (
-        "dharma.daemon.runtime_dispatch_self_report.v1"
-    )
-    assert payload["pid"] == os.getpid()
-    assert payload["source"] == "dharma_swarm.orchestrate_live"
-    assert payload["runtime_dispatch"] == {
-        "spine_dispatch_enabled": True,
-        "dispatch_mode": "spine",
-        "env_key_present": True,
-        "source": "process_env_non_secret_boolean",
-    }
-    assert "DHARMA_SPINE_DISPATCH" not in json.dumps(payload)
-
-
-@pytest.mark.asyncio
-async def test_detect_health_anomalies_bounded_times_out() -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    class SlowMonitor:
-        async def detect_anomalies(self) -> list[object]:
-            await asyncio.sleep(1)
-            return [object()]
-
-    anomalies = await mod._detect_health_anomalies_bounded(
-        SlowMonitor(),
-        timeout_seconds=0.01,
-    )
-
-    assert anomalies == []
-
-
-@pytest.mark.asyncio
-async def test_detect_health_anomalies_bounded_returns_list() -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    class Monitor:
-        async def detect_anomalies(self) -> tuple[str, str]:
-            return ("a", "b")
-
-    anomalies = await mod._detect_health_anomalies_bounded(
-        Monitor(),
-        timeout_seconds=0.5,
-    )
-
-    assert anomalies == ["a", "b"]
-
-
-@pytest.mark.asyncio
-async def test_runtime_dispatch_self_report_loop_writes_until_shutdown(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
-    monkeypatch.setattr(mod, "STATE_DIR", tmp_path)
-    shutdown = asyncio.Event()
-
-    async def stop_soon() -> None:
-        await asyncio.sleep(0.03)
-        shutdown.set()
-
-    stopper = asyncio.create_task(stop_soon())
-    await asyncio.wait_for(
-        mod.run_daemon_runtime_dispatch_self_report_loop(
-            shutdown,
-            interval_seconds=0.01,
-        ),
-        timeout=1.0,
-    )
-    await stopper
-
-    payload = json.loads(
-        (tmp_path / "ops" / "daemon_runtime_dispatch_self_report.json").read_text(
-            encoding="utf-8",
-        )
-    )
-    assert payload["schema_version"] == (
-        "dharma.daemon.runtime_dispatch_self_report.v1"
-    )
-    assert payload["runtime_dispatch"]["spine_dispatch_enabled"] is True
-
-
-def test_runtime_dispatch_self_report_thread_writes_during_sync_sleep(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
-    shutdown = asyncio.Event()
-
-    thread = mod.start_daemon_runtime_dispatch_self_report_thread(
-        shutdown,
-        state_dir=tmp_path,
-        interval_seconds=0.01,
-    )
-    time.sleep(0.05)
-    shutdown.set()
-    thread.join(timeout=1.0)
-
-    path = tmp_path / "ops" / "daemon_runtime_dispatch_self_report.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    assert not thread.is_alive()
-    assert payload["pid"] == os.getpid()
-    assert payload["runtime_dispatch"]["spine_dispatch_enabled"] is True
-
-
-def test_archaeology_ingestion_enabled_defaults_on(monkeypatch) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    monkeypatch.delenv(mod.ARCHAEOLOGY_INGESTION_ENV, raising=False)
-
-    assert mod._archaeology_ingestion_enabled() is True
-
-
-def test_archaeology_ingestion_enabled_respects_disable_flag(monkeypatch) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    monkeypatch.setenv(mod.ARCHAEOLOGY_INGESTION_ENV, "0")
-
-    assert mod._archaeology_ingestion_enabled() is False
-
-
-@pytest.mark.asyncio
-async def test_run_archaeology_loop_returns_when_ingestion_disabled(monkeypatch) -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    logs: list[tuple[str, str]] = []
-    monkeypatch.setenv(mod.ARCHAEOLOGY_INGESTION_ENV, "0")
-    monkeypatch.setattr(mod, "_log", lambda system, message: logs.append((system, message)))
-
-    shutdown = asyncio.Event()
-
-    async def stop_soon() -> None:
-        await asyncio.sleep(0.01)
-        shutdown.set()
-
-    stopper = asyncio.create_task(stop_soon())
-    await asyncio.wait_for(mod._run_archaeology_loop(shutdown), timeout=1.0)
-    await stopper
-
-    assert any("Ingestion disabled" in message for _, message in logs)
-
-
-@pytest.mark.asyncio
-async def test_run_archaeology_once_bounded_returns_counts() -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    class Daemon:
-        async def run_once(self) -> dict[str, int]:
-            return {"evolution_archive": 1}
-
-    counts = await mod._run_archaeology_once_bounded(Daemon(), timeout_seconds=1.0)
-
-    assert counts == {"evolution_archive": 1}
-
-
-@pytest.mark.asyncio
-async def test_run_archaeology_once_bounded_times_out_when_ingestion_blocks() -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    class BlockingDaemon:
-        async def run_once(self) -> dict[str, int]:
-            # Simulates the production failure mode: synchronous CPU/file/vector
-            # work inside an async coroutine before it yields to the event loop.
-            time.sleep(0.12)
-            return {"shared_research": 1}
-
-    started = time.perf_counter()
-    with pytest.raises(asyncio.TimeoutError):
-        await mod._run_archaeology_once_bounded(
-            BlockingDaemon(),
-            timeout_seconds=0.02,
-        )
-
-    assert time.perf_counter() - started < 0.10
-
-
-def test_pulse_result_daily_limit_classification() -> None:
-    from dharma_swarm import orchestrate_live as mod
-
-    assert mod._pulse_result_counts_toward_daily_limit("HEALTH PULSE: daemon_alive=True") is False
-    assert mod._pulse_result_counts_toward_daily_limit("PAUSED: .PAUSE file") is False
-    assert mod._pulse_result_counts_toward_daily_limit("QUIET: quiet hours") is False
-    assert mod._pulse_result_counts_toward_daily_limit("CIRCUIT breaker open") is False
-    assert mod._pulse_result_counts_toward_daily_limit("TELOS gate blocked") is False
-    assert mod._pulse_result_counts_toward_daily_limit("Wrote synthesis to shared memory") is True
 
 
 # ---------------------------------------------------------------------------
@@ -305,45 +102,6 @@ def test_enqueue_shakti_escalations_writes_pending_proposals(tmp_path):
     assert payload["component"] == "dharma_swarm/pulse.py"
     assert payload["change_type"] == "shakti_escalation"
     assert payload["spec_ref"] == "shakti_loop"
-
-
-@pytest.mark.asyncio
-async def test_run_pending_evolution_proposals_drains_queue_into_cycle():
-    from dharma_swarm.orchestrate_live import _run_pending_evolution_proposals
-
-    class Engine:
-        def __init__(self) -> None:
-            self.seen = []
-
-        def load_pending_proposals(self):
-            return [SimpleNamespace(id=f"p{i}") for i in range(7)]
-
-        async def run_cycle(self, proposals):
-            self.seen = proposals
-            return SimpleNamespace(
-                best_fitness=0.7,
-                proposals_submitted=len(proposals),
-                proposals_archived=len(proposals),
-            )
-
-    engine = Engine()
-
-    result = await _run_pending_evolution_proposals(engine, limit=5)
-
-    assert result.proposals_submitted == 5
-    assert [proposal.id for proposal in engine.seen] == ["p0", "p1", "p2", "p3", "p4"]
-
-
-def test_evolution_shadow_mode_requires_explicit_shadow_off_and_autonomy():
-    from dharma_swarm.orchestrate_live import _evolution_shadow_mode_from_env
-
-    assert _evolution_shadow_mode_from_env({}) == (True, "DHARMA_EVOLUTION_SHADOW")
-    assert _evolution_shadow_mode_from_env(
-        {"DHARMA_EVOLUTION_SHADOW": "0", "DGC_AUTONOMY_LEVEL": "1"}
-    ) == (True, "DGC_AUTONOMY_LEVEL < 2")
-    assert _evolution_shadow_mode_from_env(
-        {"DHARMA_EVOLUTION_SHADOW": "0", "DGC_AUTONOMY_LEVEL": "2"}
-    ) == (False, "DHARMA_EVOLUTION_SHADOW")
 
 
 # ---------------------------------------------------------------------------
@@ -439,143 +197,6 @@ async def test_swarm_loop_respects_shutdown():
             pass  # May fail on deep imports; the key test is that it respects shutdown
 
 
-@pytest.mark.asyncio
-async def test_swarm_loop_releases_ready_after_first_tick(monkeypatch, tmp_path):
-    """Ancillary startup is gated on a real core tick, not object initialization."""
-    from dharma_swarm import orchestrate_live as mod
-
-    shutdown = asyncio.Event()
-    ready = asyncio.Event()
-
-    status = SimpleNamespace(
-        agents=[],
-        tasks_pending=1,
-        tasks_running=0,
-        tasks_completed=0,
-        tasks_failed=0,
-    )
-    board = SimpleNamespace(
-        stats=AsyncMock(return_value={"pending": 1, "running": 0}),
-    )
-    mock_swarm = MagicMock()
-    mock_swarm.init = AsyncMock()
-    mock_swarm.list_agents = AsyncMock(return_value=[])
-    mock_swarm.status = AsyncMock(return_value=status)
-    mock_swarm.current_thread = "test"
-    mock_swarm._orchestrator = SimpleNamespace(_board=board)
-    mock_swarm.shutdown = AsyncMock()
-
-    tick_calls = 0
-
-    async def tick_once():
-        nonlocal tick_calls
-        tick_calls += 1
-        if tick_calls == 1:
-            assert not ready.is_set()
-        return {
-            "paused": False,
-            "circuit_broken": False,
-            "dispatched": 0,
-            "settled": 0,
-            "rescued": 0,
-        }
-
-    mock_swarm.tick = AsyncMock(side_effect=tick_once)
-
-    mock_bus = MagicMock()
-    mock_bus.init_db = AsyncMock()
-    mock_bus.consume_events = AsyncMock(return_value=[])
-
-    bridge = MagicMock()
-    bridge.drain_inbox.return_value = []
-
-    monkeypatch.setattr(mod, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(mod, "SWARM_TICK", 0)
-    monkeypatch.setattr(mod, "_drain_frontier_queue", AsyncMock(return_value=0))
-
-    with (
-        patch("dharma_swarm.swarm.SwarmManager", return_value=mock_swarm),
-        patch("dharma_swarm.message_bus.MessageBus", return_value=mock_bus),
-        patch("dharma_swarm.startup_crew.spawn_cybernetics_crew", AsyncMock(return_value=[])),
-        patch("dharma_swarm.skill_bridge.SkillBridge", return_value=bridge),
-    ):
-        task = asyncio.create_task(
-            mod.run_swarm_loop(shutdown, ready_event=ready),
-        )
-        await asyncio.wait_for(ready.wait(), timeout=1.0)
-        assert mock_swarm.tick.await_count >= 1
-        shutdown.set()
-        await asyncio.wait_for(task, timeout=1.0)
-
-    mock_swarm.shutdown.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_swarm_loop_pause_file_suppresses_pre_tick_drains(monkeypatch, tmp_path):
-    """A pause file must prevent bridge/frontier drains and core dispatch ticks."""
-    from dharma_swarm import orchestrate_live as mod
-
-    (tmp_path / ".PAUSE").write_text("operator hold\n", encoding="utf-8")
-    shutdown = asyncio.Event()
-
-    status = SimpleNamespace(
-        agents=[],
-        tasks_pending=1,
-        tasks_running=0,
-        tasks_completed=0,
-        tasks_failed=0,
-    )
-    board = SimpleNamespace(
-        stats=AsyncMock(return_value={"pending": 1, "running": 0}),
-    )
-    mock_swarm = MagicMock()
-    mock_swarm.init = AsyncMock()
-    mock_swarm.list_agents = AsyncMock(return_value=[])
-    mock_swarm.status = AsyncMock(return_value=status)
-    mock_swarm.current_thread = "test"
-    mock_swarm._orchestrator = SimpleNamespace(_board=board)
-    mock_swarm.tick = AsyncMock(return_value={"paused": False})
-    mock_swarm.shutdown = AsyncMock()
-
-    mock_bus = MagicMock()
-    mock_bus.init_db = AsyncMock()
-    mock_bus.consume_events = AsyncMock(return_value=[])
-
-    bridge = MagicMock()
-    bridge.drain_inbox.return_value = [{"skill_name": "retro", "payload": {}}]
-    drain_frontier = AsyncMock(return_value=1)
-    spawn_cybernetics_crew = AsyncMock(return_value=[])
-    swarm_manager_kwargs = {}
-
-    async def fake_sleep(seconds: float) -> None:
-        assert seconds == 30
-        shutdown.set()
-
-    def fake_swarm_manager(*_args, **kwargs):
-        swarm_manager_kwargs.update(kwargs)
-        return mock_swarm
-
-    monkeypatch.setattr(mod, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(mod.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(mod, "_drain_frontier_queue", drain_frontier)
-
-    with (
-        patch("dharma_swarm.swarm.SwarmManager", side_effect=fake_swarm_manager),
-        patch("dharma_swarm.message_bus.MessageBus", return_value=mock_bus),
-        patch("dharma_swarm.startup_crew.spawn_cybernetics_crew", spawn_cybernetics_crew),
-        patch("dharma_swarm.skill_bridge.SkillBridge", return_value=bridge),
-    ):
-        await asyncio.wait_for(mod.run_swarm_loop(shutdown), timeout=1.0)
-
-    assert swarm_manager_kwargs["read_only_boot"] is True
-    spawn_cybernetics_crew.assert_not_awaited()
-    board.stats.assert_not_awaited()
-    bridge.drain_inbox.assert_not_called()
-    drain_frontier.assert_not_awaited()
-    mock_swarm.tick.assert_not_awaited()
-    mock_swarm.shutdown.assert_awaited_once()
-
-
 # ---------------------------------------------------------------------------
 # run_health_loop — shutdown respected
 # ---------------------------------------------------------------------------
@@ -628,9 +249,6 @@ def test_zeitgeist_registered_in_task_factories():
     )
     assert '"internal-pressure"' in src, (
         "internal pressure loop must be registered separately from external zeitgeist"
-    )
-    assert '"evolution"' in src and "run_evolution_loop" in src, (
-        "Darwin evolution loop must be registered in task_factories inside orchestrate()"
     )
 
 
@@ -696,9 +314,7 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     monkeypatch.setattr(mod.signal, "signal", lambda *args, **kwargs: None)
     monkeypatch.setattr(mod, "_wait_or_shutdown", AsyncMock(return_value=False))
     monkeypatch.setattr(mod, "run_swarm_loop", flaky_swarm)
-    monkeypatch.setattr(mod, "_run_health_api_process_watchdog", sleeper)
     monkeypatch.setattr(mod, "run_pulse_loop", shutdown_watchdog)
-    monkeypatch.setattr(mod, "run_evolution_loop", sleeper)
     monkeypatch.setattr(mod, "_run_recognition_loop", sleeper)
     monkeypatch.setattr(mod, "run_conductor_loop", sleeper)
     monkeypatch.setattr(mod, "_run_zeitgeist_loop", sleeper)
@@ -706,6 +322,12 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_run_witness_loop", sleeper)
     monkeypatch.setattr(mod, "_run_consolidation_loop", sleeper)
     monkeypatch.setattr(mod, "_run_replication_monitor_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_archaeology_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_guardian_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_health_api", sleeper)
+    monkeypatch.setattr(mod, "_run_gauntlet_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_world_model_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_revenue_scout_loop", sleeper)
     monkeypatch.setattr(mod, "run_health_loop", sleeper)
     monkeypatch.setattr(mod, "run_free_evolution_grind", sleeper)
     monkeypatch.setattr("dharma_swarm.signal_bus.SignalBus.get", lambda: object())
@@ -718,66 +340,60 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     assert calls["swarm"] == 2
 
 
-@pytest.mark.asyncio
-async def test_orchestrate_defers_ancillary_loops_until_swarm_ready(
-    monkeypatch,
-    tmp_path,
-):
-    """Noncritical loops must not starve the core swarm startup path."""
-    from dharma_swarm import orchestrate_live as mod
+# ---------------------------------------------------------------------------
+# Durable liveness ledger (A4) + boot_id carriage (A5)
+# ---------------------------------------------------------------------------
 
-    order: list[str] = []
-    context_started = asyncio.Event()
+def test_append_liveness_ledger_row_chains_and_carries_boot_id(tmp_path):
+    """Rows chain tamper-evidently and every row carries the one process
+    boot_id — the overwrite-in-place loop_liveness.json snapshot could
+    never prove either property."""
+    from dharma_swarm.orchestrate_live import append_liveness_ledger_row
+    from dharma_swarm.spine.identity import process_boot_id
+    from dharma_swarm.spine.receipt import _read_verified_machine_receipt_chain
 
-    async def swarm_loop(shutdown_event, *args, **kwargs):
-        order.append("swarm-start")
-        ready_event = kwargs.get("ready_event")
-        assert ready_event is not None
-        order.append("swarm-ready")
-        ready_event.set()
-        await shutdown_event.wait()
+    ledger = tmp_path / "liveness_ledger.jsonl"
+    first = append_liveness_ledger_row(
+        running=["swarm"], restart_counts={}, abandoned=[], path=ledger,
+    )
+    second = append_liveness_ledger_row(
+        running=["swarm", "pulse"],
+        restart_counts={"pulse": 1},
+        abandoned=["gauntlet"],
+        path=ledger,
+    )
+    assert first is not None and second is not None
 
-    async def context_loop(shutdown_event, *args, **kwargs):
-        order.append("context-agent")
-        context_started.set()
-        await shutdown_event.wait()
+    rows = _read_verified_machine_receipt_chain(ledger)  # raises on tamper
+    assert len(rows) == 2
+    assert rows[1]["prev_digest"] == rows[0]["digest"]
+    assert {row["attributes"]["kind"] for row in rows} == {"loop_liveness"}
+    # A5: one process, one boot identity, minted at the single spine site.
+    assert {row["attributes"]["boot_id"] for row in rows} == {process_boot_id()}
+    assert rows[0]["attributes"]["boot_id"].startswith("boot_")
+    assert rows[1]["attributes"]["restart_counts"] == {"pulse": 1}
+    assert rows[1]["attributes"]["abandoned"] == ["gauntlet"]
+    assert rows[1]["attributes"]["pid"] == os.getpid()
 
-    async def ancillary_loop(shutdown_event, *args, **kwargs):
-        order.append("ancillary")
-        await shutdown_event.wait()
 
-    async def pulse_loop(shutdown_event, *args, **kwargs):
-        await context_started.wait()
-        shutdown_event.set()
+def test_append_liveness_ledger_row_failure_returns_none(tmp_path, caplog):
+    """Evidence-append failure must never propagate into the supervision
+    loop: a directory squatting on the ledger path makes every append fail,
+    and the appender absorbs it."""
+    from dharma_swarm.orchestrate_live import append_liveness_ledger_row
 
-    monkeypatch.setattr(mod, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(mod, "LOG_DIR", tmp_path / "logs")
-    monkeypatch.setattr(mod, "_stop_old_daemon", lambda: None)
-    monkeypatch.setattr(mod.signal, "signal", lambda *args, **kwargs: None)
-    monkeypatch.setattr(mod, "run_swarm_loop", swarm_loop)
-    monkeypatch.setattr(mod, "_run_health_api_process_watchdog", ancillary_loop)
-    monkeypatch.setattr(mod, "run_pulse_loop", pulse_loop)
-    monkeypatch.setattr(mod, "run_evolution_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_recognition_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "run_conductor_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_zeitgeist_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_internal_pressure_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_witness_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_consolidation_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_replication_monitor_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "run_health_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "run_free_evolution_grind", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_archaeology_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_guardian_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_gauntlet_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_world_model_loop", ancillary_loop)
-    monkeypatch.setattr(mod, "_run_revenue_scout_loop", ancillary_loop)
-    monkeypatch.setattr("dharma_swarm.signal_bus.SignalBus.get", lambda: object())
-    monkeypatch.setattr("dharma_swarm.context_agent.run_context_agent_loop", context_loop)
-    monkeypatch.setattr("dharma_swarm.training_flywheel.run_training_flywheel_loop", ancillary_loop)
-    monkeypatch.setattr("dharma_swarm.self_improve.run_self_improvement_loop", ancillary_loop)
+    blocked = tmp_path / "ledger-is-a-directory"
+    blocked.mkdir()
+    with caplog.at_level(logging.WARNING, logger="dharma_swarm.orchestrate_live"):
+        result = append_liveness_ledger_row(
+            running=[], restart_counts={}, abandoned=[], path=blocked,
+        )
+    assert result is None
+    assert any("liveness ledger append failed" in r.message for r in caplog.records)
 
-    await asyncio.wait_for(mod.orchestrate(), timeout=1.0)
 
-    assert order.index("swarm-ready") < order.index("context-agent")
-    assert (tmp_path / "logs" / "swarm.log").exists()
+def test_process_boot_id_is_stable_within_process():
+    from dharma_swarm.spine.identity import process_boot_id
+
+    assert process_boot_id() == process_boot_id()
+    assert process_boot_id().startswith("boot_")

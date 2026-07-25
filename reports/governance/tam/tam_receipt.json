@@ -1,0 +1,255 @@
+{
+  "authority": "projection_only",
+  "baseline": "Polsia (polsia.com) + Cofounder (cofounder.co) \u2014 2026-06-10 world triangulation (reports/anatomy_altitude_2026-06-10/lane_F_world.md) refreshed 2026-07-07 by the adversarially-verified blueprint/genealogy dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md; 20 confirmed / 5 refuted claims \u2014 incl. the retired 4.4x ARR-gap framing)",
+  "digest": "38645a80984c4e882269e24f39131d40358b1a74d435e1d815c5f3281d29c6cc",
+  "efferent_action": "none \u2014 afferent measurement only (no outreach, no publishing, no benchmark claims)",
+  "generated_at": "2026-07-07T14:18:22Z",
+  "headline_differentiator": "honest_arr",
+  "lane_counts": {
+    "AHEAD": 1,
+    "AT_PARITY": 3,
+    "BEHIND": 6,
+    "NO_EQUIVALENT": 2,
+    "UNMEASURED": 0
+  },
+  "machine": "Transdimensional Abundance Machine (TAM)",
+  "metric": "Company-Builder Parity %",
+  "naming": {
+    "organ": "TAM = Transdimensional Abundance Machine (operator-resolved 2026-07-07)",
+    "untouched": "TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and the Darshan-owned reports/tam/ are deliberately not overloaded"
+  },
+  "parity_math": {
+    "denominator": 10,
+    "numerator": 4.5,
+    "scoring": {
+      "AHEAD": 1.5,
+      "AT_PARITY": 1.0,
+      "BEHIND": 0.0,
+      "NO_EQUIVALENT": "excluded from denominator; exceed-vector watch lane",
+      "UNMEASURED": "0.0 and counted in the denominator (cannot inflate)"
+    }
+  },
+  "parity_pct": 45.0,
+  "portfolio_live_read": {
+    "active_class": [
+      "darshan-publication",
+      "goodworks-dgm"
+    ],
+    "cells": 11
+  },
+  "rows": [
+    {
+      "bucket": "BEHIND",
+      "capability": "Org-shaped multi-agent orchestration (departments, roster, routing)",
+      "comp_claim": "departmentalized agents (Engineering/Sales/Marketing/...) with managers and shared context ('superoptimizer' doctrine; engine internals UNKNOWN). Polsia's verified equivalent is shallower: scheduled Claude-CLI subprocesses, orchestrator itself just one scheduled agent (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a72)",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co",
+        "https://github.com/PolsiaAI/Polsia"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "org_orchestration",
+      "ours_note": "deeper than the department metaphor, but live spine-dispatch persistence on the daemon host is still operator-pending (organism-rewire-2026-07 D1)",
+      "ours_owner": "dharma_swarm/orchestrator.py + dharma_swarm/spine/invoke.py (reports/anatomy_altitude_2026-06-10/lane_F_world.md:21)",
+      "ours_status": "WIRED_BUT_DORMANT",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "AT_PARITY",
+      "capability": "Exception-based human-in-the-loop approval of dangerous actions",
+      "comp_claim": "approval required when potentially dangerous actions are taken",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "hitl_approval",
+      "ours_note": "",
+      "ours_owner": "dharma_swarm/telos_gates.py + evolution gate PEP (reports/anatomy_altitude_2026-06-10/lane_F_world.md:22)",
+      "ours_status": "RUNS",
+      "score": 1.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "AHEAD",
+      "capability": "Typed, witnessed decision gates (auditable approval records)",
+      "comp_claim": "'potentially dangerous' vibes-based approval; no typed or witnessed decision record published",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "typed_gate_audit",
+      "ours_note": "",
+      "ours_owner": "dharma_swarm/telos_gates.py (GateRegistry/TelosGatekeeper) + ~/.dharma/witness/ (reports/anatomy_altitude_2026-06-10/lane_F_world.md:28)",
+      "ours_status": "RUNS",
+      "score": 1.5,
+      "structural_exceed_cite": "reports/anatomy_altitude_2026-06-10/lane_F_world.md:28 \u2014 'auditable in a way Cofounder structurally is not'"
+    },
+    {
+      "bucket": "BEHIND",
+      "capability": "Customer-facing execution (inbox warming, outbound, Stripe, support)",
+      "comp_claim": "inbox warming, outbound, paid marketing, Stripe, support automation",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "customer_execution",
+      "ours_note": "",
+      "ours_owner": "clean negative \u2014 reports/anatomy_altitude_2026-06-10/lane_F_world.md:25 (venture_cell/ holds only darshan/ + operator_os/)",
+      "ours_status": "ABSENT",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "BEHIND",
+      "capability": "Go-to-market milestone scaffold (incorporation -> product -> sales -> scale)",
+      "comp_claim": "milestone scaffold from incorporation to scale",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "gtm_scaffold",
+      "ours_note": "",
+      "ours_owner": "clean negative \u2014 reports/anatomy_altitude_2026-06-10/lane_F_world.md:26 (no staged GTM state machine in the repo)",
+      "ours_status": "ABSENT",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "AT_PARITY",
+      "capability": "Extensibility: MCP, custom APIs, skills, custom codebase",
+      "comp_claim": "connect MCP, custom APIs, custom skills, or an entire custom codebase",
+      "comp_name": "Cofounder",
+      "comp_sources": [
+        "https://cofounder.co"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "extensibility",
+      "ours_note": "",
+      "ours_owner": "dharma_swarm/skills.py (SkillRegistry) + the four tracked skill registries (CLAUDE.md \u00a7Skills & Agent Role Registries)",
+      "ours_status": "RUNS",
+      "score": 1.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "BEHIND",
+      "capability": "Public pricing + billing surface (revenue-share alignment)",
+      "comp_claim": "$49/mo + 20% revenue share, publicly priced",
+      "comp_name": "Polsia",
+      "comp_sources": [
+        "https://polsia.com/",
+        "https://www.contextstudios.ai/blog/polsia-how-a-solo-founder-hit-1m-arr-in-30-days-with-ai-agents"
+      ],
+      "comp_status": "SHIPPED",
+      "comp_verification": "vendor-claim",
+      "key": "pricing_billing",
+      "ours_note": "",
+      "ours_owner": "clean negative \u2014 reports/anatomy_altitude_2026-06-10/lane_F_world.md:42 (no billing surface, customer object, or funnel)",
+      "ours_status": "ABSENT",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "BEHIND",
+      "capability": "Distribution, paying customers, ARR",
+      "comp_claim": "~$10M 'ARR' claimed around the $30M raise at $250M (round itself verified). 36kr decomposition: ~$4.6M true subscription ARR (~7,600 x $49/mo) + ~$2M one-time task packages + ~$2M pass-through ad spend counted as revenue (~2.2x headline-vs-recurring); best-case customer company ~$50/mo gross MRR; all figures founder-dominated, no independent audit. (Prior 4.4x-gap framing REFUTED 2026-07-07 \u2014 see docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a75)",
+      "comp_name": "Polsia",
+      "comp_sources": [
+        "https://eu.36kr.com/en/p/3825813697565316",
+        "https://gtmnow.com/gtm-192-inside-the-company-that-raised-30m-at-a-250m-valuation-with-0-employees-ben-cera-polsia/",
+        "https://en.ain.ua/2026/05/25/ai-startup-polsia-with-no-employees-raised-30m-in-funding/"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "source-pending",
+      "key": "distribution_arr",
+      "ours_note": "",
+      "ours_owner": "$0 revenue across every economic surface \u2014 reports/anatomy_altitude_2026-06-10/lane_F_world.md:199 (clean negative #1); docs/governance/VENTURE_CELL_PORTFOLIO.yaml revenue_usd: 0",
+      "ours_status": "ABSENT",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "BEHIND",
+      "capability": "End-to-end company operation by agents (research -> code -> ads -> support -> sales)",
+      "comp_claim": "nine AI agents end-to-end (research, code, ads, support, sales)",
+      "comp_name": "Polsia",
+      "comp_sources": [
+        "https://polsia.com/"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "e2e_company",
+      "ours_note": "one externally-serving publication cell; no full-company loop",
+      "ours_owner": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml (live cell statuses read at render time; see portfolio_live_read)",
+      "ours_status": "ASPIRATION",
+      "score": 0.0,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "NO_EQUIVALENT",
+      "capability": "Verifiable (receipted) revenue \u2014 'honest ARR' a third party can check",
+      "comp_claim": "no incumbent publishes third-party-verifiable revenue \u2014 confirmed 2026-07-07: Polsia's figures are founder-dominated and decomposition-disputed (36kr: ~$10M claimed vs ~$4.6M true subscription ARR), Cofounder publishes none; no audit of any incumbent figure exists (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a74-5)",
+      "comp_name": "Polsia + Cofounder",
+      "comp_sources": [
+        "https://eu.36kr.com/en/p/3825813697565316",
+        "https://github.com/PolsiaAI/Polsia"
+      ],
+      "comp_status": "ABSENT",
+      "comp_verification": "third-party-report",
+      "key": "honest_arr",
+      "ours_note": "THE HEADLINE DIFFERENTIATOR: incumbents structurally cannot publish receipted revenue without exposing their claims gap; unrealized until real dollars flow through the receipt spine",
+      "ours_owner": "dharma_swarm/spine/receipt.py (EvidenceReceipt) RUNS at the dispatch chokepoint; $0 receipted revenue to date (reports/anatomy_altitude_2026-06-10/lane_F_world.md:28,44)",
+      "ours_status": "WIRED_BUT_DORMANT",
+      "score": null,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "NO_EQUIVALENT",
+      "capability": "Governed self-evolution of the operating substrate (DGM-class)",
+      "comp_claim": "no public evidence either system self-modifies its own substrate under governance (public surfaces checked 2026-06-10, reports/anatomy_altitude_2026-06-10/lane_F_world.md)",
+      "comp_name": "Polsia + Cofounder",
+      "comp_sources": [
+        "https://cofounder.co",
+        "https://polsia.com/"
+      ],
+      "comp_status": "ABSENT",
+      "comp_verification": "vendor-claim",
+      "key": "self_evolution",
+      "ours_note": "",
+      "ours_owner": "dharma_swarm/evolution.py + dgm_loop.py \u2014 'Semi-working / dangerous overclaim risk' (reports/swarm_genome/2026-06-11/SYNTHESIS.md \u00a7Organ Health Table)",
+      "ours_status": "WIRED_BUT_DORMANT",
+      "score": null,
+      "structural_exceed_cite": ""
+    },
+    {
+      "bucket": "AT_PARITY",
+      "capability": "Substrate architecture depth (orchestration engine, durability, memory)",
+      "comp_claim": "Polsia (repo self-description, one-shot 2-commit dump, core app/ package missing, production parity unproven): nine agents shelling out to Claude Code CLI on Celery Beat schedules over Next.js/FastAPI/PostgreSQL/Redis/ChromaDB \u2014 commodity assembly, no framework or Temporal-class durability. Cofounder: 'superoptimizer' departments + MemGPT-lineage 3-tier memory (vendor doctrine; engine internals UNKNOWN). docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a72-4",
+      "comp_name": "Polsia + Cofounder",
+      "comp_sources": [
+        "https://github.com/PolsiaAI/Polsia",
+        "https://www.generalintelligencecompany.com/writing/introducing-cofounder-our-state-of-the-art-memory-system-in-an-agent"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
+      "key": "internal_architecture",
+      "ours_note": "was UNMEASURED until 2026-07-07: Polsia's own GitHub dump made the competitor cell citable (measurement improved, not us)",
+      "ours_owner": "repo-inspectable: 770+ modules (python3 xray.py), spine receipts, crash-resume graph engine lane (dharmagraph track), docs/architecture/NAVIGATION.md",
+      "ours_status": "RUNS",
+      "score": 1.0,
+      "structural_exceed_cite": ""
+    }
+  ],
+  "schema": "tam_ledger.v1",
+  "verdict": "AMBER"
+}

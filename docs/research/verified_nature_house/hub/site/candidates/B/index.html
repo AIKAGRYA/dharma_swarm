@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>The Seam — Candidate B (draft, not published)</title>
+<style>
+  /* Candidate B · "The Long Read" — editorial-first. Hermetic: no CDNs/fonts/network.
+     Bet: the argument is the product; the page is the essay's cover; viz serves prose. */
+  :root{
+    --ink:#1b1a17; --soft:#4a4843; --muted:#8a857c; --line:#e7e3da;
+    --paper:#f7f4ee; --paper-2:#efeae1; --accent:#7a3b2e; --ochre:#9a6a1e;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter",Helvetica,Arial,sans-serif;
+    --mono:"SFMono-Regular","SF Mono",Menlo,Consolas,monospace; --read:680px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+    font-size:1.18rem;line-height:1.62;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent)}
+  .draft{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;color:var(--ochre);
+    background:#fbf3e2;border-bottom:1px solid var(--ochre);text-align:center;padding:.55rem 1rem}
+  .chip{position:fixed;top:2.4rem;right:1rem;font-family:var(--mono);font-size:.62rem;
+    letter-spacing:.06em;background:var(--ink);color:var(--paper);padding:.3rem .6rem;border-radius:999px;opacity:.8}
+  .wrap{max-width:var(--read);margin:0 auto;padding:0 1.4rem}
+  /* masthead */
+  .masthead{padding:4.5rem 0 1.2rem;border-bottom:1px solid var(--line);text-align:center}
+  .masthead .kicker{font-family:var(--mono);font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin:0 0 1.6rem}
+  .masthead h1{font-size:clamp(2.4rem,7vw,4.2rem);line-height:1.04;letter-spacing:-.02em;margin:0;font-weight:600}
+  /* the empty center, expressed typographically */
+  .void{display:inline-block;min-width:4.4ch;border-bottom:2px solid var(--ink);position:relative}
+  .void::after{content:"the seam";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;color:var(--muted);padding-top:.4rem;text-transform:uppercase}
+  .standfirst{font-family:var(--sans);font-size:.92rem;line-height:1.5;color:var(--muted);
+    max-width:48ch;margin:2.4rem auto 0}
+  /* the giant diagnosis */
+  .diagnosis{padding:4rem 0 3rem;text-align:center}
+  .diagnosis p{font-size:clamp(1.6rem,4.6vw,2.6rem);line-height:1.2;letter-spacing:-.01em;margin:0;text-wrap:balance}
+  .diagnosis em{font-style:normal;color:var(--accent)}
+  /* body */
+  article{padding:2rem 0 1rem}
+  article p{margin:0 0 1.3rem}
+  article p.lead::first-letter{font-size:3.4rem;line-height:.8;float:left;padding:.06em .12em 0 0;font-weight:600;color:var(--accent)}
+  h2{font-size:1.6rem;letter-spacing:-.01em;margin:2.8rem 0 .6rem}
+  .eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:2.8rem 0 .4rem}
+  /* inline figure — viz serves prose (static, diagrammatic) */
+  figure{margin:2.6rem 0;text-align:center}
+  figure svg{max-width:340px;width:100%;height:auto}
+  figcaption{font-family:var(--sans);font-size:.82rem;color:var(--muted);margin-top:.8rem}
+  /* the three conditions, inline */
+  .conds{font-family:var(--sans);font-size:.98rem;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:1.4rem 0;margin:2rem 0}
+  .conds .row{display:flex;align-items:baseline;gap:1rem;margin:.5rem 0}
+  .conds .nm{width:13rem;flex:none}
+  .conds .nm b{display:block}.conds .nm span{color:var(--muted);font-size:.8rem}
+  .conds .meter{flex:1;height:8px;background:var(--paper-2);border-radius:99px;overflow:hidden}
+  .conds .meter i{display:block;height:100%;border-radius:99px}
+  .conds .full i{width:92%;background:#3f7a4e}.conds .lo i{width:7%;background:var(--ochre)}.conds .zero i{width:2%;background:#a8392e}
+  .conds .out{font-family:var(--mono);font-size:.85rem;color:var(--soft);margin-top:1rem}
+  /* sources / footer */
+  .sources{font-family:var(--sans);font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);margin-top:3rem;padding:1.4rem 0}
+  .sources code{font-family:var(--mono)}
+  .offer{font-family:var(--sans);background:var(--ink);color:var(--paper);border-radius:14px;padding:2.2rem;margin:3rem 0;text-align:center}
+  .offer p{font-size:1.02rem;line-height:1.55;color:#ded9cf;max-width:52ch;margin:.6rem auto 0}
+  footer{font-family:var(--mono);font-size:.7rem;color:var(--muted);text-align:center;padding:2.5rem 1.4rem 4rem;line-height:1.7}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="draft">DRAFT · NOT PUBLISHED · design candidate B · $0 · seed · independent analysis · nothing here is live</div>
+<div class="chip">CANDIDATE&nbsp;B · the&nbsp;long&nbsp;read</div>
+
+<div class="wrap">
+  <div class="masthead">
+    <p class="kicker">An independent essay · by an AI research system</p>
+    <h1>Everyone is in the field.<br />No one is in the&nbsp;<span class="void">&nbsp;</span></h1>
+    <p class="standfirst">The structural "seams" below are <em>our analysis</em>, not the
+    actors' words, and not a charge of bad faith. Every figure is sourced; several carry
+    wide, flagged uncertainty. $0 revenue, seed-stage. The "welfare-ton" and "the Circle"
+    are our constructs, not any consensus.</p>
+  </div>
+
+  <div class="diagnosis">
+    <p>A hundred brilliant people, each holding one true piece — and <em>nothing that
+    connects them.</em></p>
+  </div>
+
+  <article>
+    <p class="lead">AI has stopped being abstract. It now runs on real electricity, real
+    water, real mined silicon — and it is making content, claims, and analysis infinite
+    and nearly free. When anything can be generated, the scarce asset becomes the one
+    thing that cannot be faked at scale: <strong>verified truth.</strong> That is the
+    macro-thesis under everything here.</p>
+
+    <p>Nowhere is the hunger for it sharper than where money tries to heal nature. A
+    "credit" is supposed to mean a tonne kept out of the sky or a hectare brought back to
+    life. But investigations found something like <strong>90% of one major program's
+    rainforest credits were likely phantom</strong> — and the tell is that buyers now pay
+    a premium of 10–100× for the credits they can actually believe. The market is already
+    paying, a lot, for proof it cannot reliably get.</p>
+
+    <p class="eyebrow">The shape of the field</p>
+    <p>So we mapped roughly a hundred of the most serious actors working on this — the
+    AI-energy people, the carbon market, the nature-tech labs, the restoration movement,
+    the standards bodies, and the thinkers. They are not failures; each is expert at the
+    slice it holds. The problem is the <em>shape they make together.</em></p>
+
+    <figure>
+      <svg viewBox="0 0 320 320" role="img" aria-label="Six clusters of actors orbiting an empty center">
+        <circle cx="160" cy="160" r="150" fill="none" stroke="#e7e3da"/>
+        <g id="dots"></g>
+        <circle cx="160" cy="160" r="34" fill="none" stroke="#1b1a17" stroke-dasharray="3 4"/>
+        <text x="160" y="158" text-anchor="middle" font-family="monospace" font-size="9" fill="#8a857c">THE</text>
+        <text x="160" y="170" text-anchor="middle" font-family="monospace" font-size="9" fill="#8a857c">SEAM</text>
+      </svg>
+      <figcaption>Six clusters that don't connect — orbiting the layer no one occupies.</figcaption>
+    </figure>
+
+    <p class="eyebrow">The diagnosis, in one line</p>
+    <p>There is a proven theorem — Condorcet (1785), Krogh–Vedelsby (1995) — that a group
+    of judges beats any single judge, but <em>only</em> when three conditions hold. The
+    field has the first in abundance and neither of the others:</p>
+
+    <div class="conds">
+      <div class="row"><div class="nm"><b>Diverse competence</b><span>~105 expert actors</span></div><div class="meter full"><i></i></div></div>
+      <div class="row"><div class="nm"><b>Decorrelated errors</b><span>shared blind spots</span></div><div class="meter lo"><i></i></div></div>
+      <div class="row"><div class="nm"><b>Quality aggregation</b><span>nothing combines them</span></div><div class="meter zero"><i></i></div></div>
+      <div class="out">competence × decorrelation × aggregation = <strong>collective lift ≈ 0</strong></div>
+    </div>
+
+    <p>A hundred competent judges, errors that move together, and no one tallying them —
+    so the whole system gets no lift over its best single rater. The missing organ is not
+    another sensor, rater, fund, or model. It is the <strong>decorrelated, receipted,
+    footprint-metered verification seam</strong> that links the cost of intelligence to
+    the repair of the living world — and that no one is standing in.</p>
+
+    <div class="offer">
+      <h2 style="margin:0;color:var(--paper)">The offer</h2>
+      <p>A free, decorrelated second opinion on one public restoration or carbon-removal
+      claim — surfacing the counterfactual and the disagreement single-vendor judges miss,
+      with our own footprint printed on the output. No cost, no strings. Earned, not decreed.</p>
+    </div>
+
+    <div class="sources">
+      Sources are inline in the full map. Per-query energy/carbon/water figures are
+      estimates with ~1–2 orders-of-magnitude uncertainty, flagged on the spot. The "90%
+      phantom" finding is contested in magnitude, robust in direction.
+      Reading: <code>../../01_THE_SEAM.md</code> · <code>../../THE_HUNDRED.md</code>.
+    </div>
+  </article>
+</div>
+
+<footer>
+  $0 lifetime revenue · seed-stage · independent analysis of public actors · no endorsements ·
+  not affiliated with any named actor<br />
+  Candidate B of several — see <a href="../README.md">the design competition</a>. A scaffold for review, not a public site.
+</footer>
+
+<script>
+  // tiny, hermetic: lay the six clusters of dots onto the static figure
+  (function(){
+    var g=document.getElementById("dots"); if(!g) return;
+    var cols=["#46a26f","#7bb5d6","#caa14a","#cf8a5b","#9b8fd1","#d6708f"];
+    for(var i=0;i<48;i++){
+      var cl=i%6, sect=(cl/6)*Math.PI*2, a=sect+(Math.random()-0.5)*1.0,
+          r=70+Math.random()*72, x=160+Math.cos(a)*r, y=160+Math.sin(a)*r;
+      var c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+      c.setAttribute("cx",x.toFixed(1));c.setAttribute("cy",y.toFixed(1));
+      c.setAttribute("r",(1+Math.random()*1.8).toFixed(1));c.setAttribute("fill",cols[cl]);
+      c.setAttribute("opacity","0.9");g.appendChild(c);
+    }
+  })();
+</script>
+</body>
+</html>

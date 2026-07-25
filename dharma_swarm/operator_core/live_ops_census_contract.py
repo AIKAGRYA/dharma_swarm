@@ -7,10 +7,11 @@ and writer remain in scripts/runtime/live_ops_census.py.
 
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from dharma_swarm.daemon_config import dharma_state_dir
 
 
 LIVE_OPS_CENSUS_SCHEMA_VERSION = "live_ops_census.v1"
@@ -18,7 +19,7 @@ LIVE_OPS_CENSUS_MAX_AGE_HOURS = 24.0
 
 
 def default_state_root() -> Path:
-    return Path(os.environ.get("DHARMA_STATE_DIR", "~/.dharma")).expanduser()
+    return dharma_state_dir("DHARMA_STATE_DIR").expanduser()
 
 
 def default_output_path() -> Path:

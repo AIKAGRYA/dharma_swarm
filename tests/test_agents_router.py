@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import base64
+import time
+
 from fastapi import FastAPI
+from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 import pytest
 
 from api.routers import agents as agents_router
+from api.ws import manager
 from dharma_swarm.models import AgentRole, AgentState, AgentStatus, ProviderType
 from dharma_swarm.ontology_runtime import get_shared_registry, reset_shared_registry
 
@@ -91,6 +96,9 @@ class _EmptyAgentRegistry:
 def _client() -> TestClient:
     app = FastAPI()
     app.include_router(agents_router.router)
+    ws_router = getattr(agents_router, "ws_router", None)
+    if ws_router is not None:
+        app.include_router(ws_router)
     return TestClient(app)
 
 
@@ -121,6 +129,48 @@ def test_list_agents_includes_identity_fields(monkeypatch, isolated_shared_ontol
     assert len(identities) == 1
     assert identities[0].properties["agent_id"] == "agent-1"
     assert identities[0].properties["status"] == "idle"
+
+
+@pytest.mark.parametrize("path", ["/ws/agents", "/api/ws/agents"])
+def test_agents_websocket_requires_configured_dashboard_credential(
+    monkeypatch,
+    path: str,
+) -> None:
+    monkeypatch.setenv("DASHBOARD_API_KEY", "fixture-token-not-live")
+    monkeypatch.setattr(agents_router, "_get_swarm", lambda: _DummySwarm())
+    client = _client()
+
+    with pytest.raises(WebSocketDisconnect) as rejected:
+        with client.websocket_connect(path):
+            pass
+
+    assert rejected.value.code == 4401
+
+
+@pytest.mark.parametrize("path", ["/ws/agents", "/api/ws/agents"])
+def test_agents_websocket_accepts_dashboard_subprotocol_credential(
+    monkeypatch,
+    path: str,
+) -> None:
+    credential = "fixture-token-not-live"
+    encoded = base64.urlsafe_b64encode(credential.encode()).decode().rstrip("=")
+    monkeypatch.setenv("DASHBOARD_API_KEY", credential)
+    monkeypatch.setattr(agents_router, "_get_swarm", lambda: _DummySwarm())
+    client = _client()
+    assert manager.count("agents") == 0
+
+    with client.websocket_connect(
+        path,
+        subprotocols=["dharma-auth", f"dharma-bearer.{encoded}"],
+    ) as websocket:
+        assert websocket.accepted_subprotocol == "dharma-auth"
+        assert credential not in websocket.accepted_subprotocol
+        assert websocket.receive_json()["event"] == "agents_update"
+
+    deadline = time.monotonic() + 1
+    while manager.count("agents") and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert manager.count("agents") == 0
 
 
 def test_spawn_agent_passes_provider_and_model(monkeypatch, isolated_shared_ontology) -> None:

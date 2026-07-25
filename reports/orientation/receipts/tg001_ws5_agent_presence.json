@@ -1,0 +1,19 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS5 adds agent presence projection from existing A2A roster, heartbeat, and agent dock owners; >2h stale heartbeats render RED.",
+  "evidence": [
+    {"kind": "path", "value": "dharma_swarm/a2a/agent_presence.py"},
+    {"kind": "path", "value": "tests/test_agent_registry_presence.py"},
+    {"kind": "command", "value": "pytest -q tests/test_agent_registry_presence.py"}
+  ],
+  "verdict": "verified",
+  "next_action": "Use existing onboarding/roaming registration for live roster mutations; this track only projects.",
+  "files_changed": [
+    "dharma_swarm/a2a/agent_presence.py",
+    "dharma_swarm/a2a/__init__.py",
+    "tests/test_agent_registry_presence.py",
+    "reports/orientation/receipts/tg001_ws5_agent_presence.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS5"
+}

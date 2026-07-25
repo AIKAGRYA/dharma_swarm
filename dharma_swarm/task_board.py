@@ -6,9 +6,10 @@ finite-state machine so illegal moves (e.g. COMPLETED -> PENDING) raise.
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 import aiosqlite
 
@@ -29,6 +30,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.COMPLETED: set(),
     TaskStatus.FAILED: {TaskStatus.PENDING},
     TaskStatus.CANCELLED: {TaskStatus.PENDING},
+    TaskStatus.QUARANTINED_FAKE_RESULT: set(),
 }
 
 _CREATE_TASKS = """
@@ -56,14 +58,9 @@ SELECT t.* FROM tasks t
 WHERE t.status = ?
   AND NOT EXISTS (
       SELECT 1 FROM task_dependencies d
-      JOIN tasks dep ON dep.id = d.depends_on_id
+      LEFT JOIN tasks dep ON dep.id = d.depends_on_id
       WHERE d.task_id = t.id
-        AND dep.status NOT IN (?, 'failed', 'dead_letter')
-        AND NOT (
-            -- Treat RUNNING tasks stuck >15min as satisfied (timed-out dependency)
-            dep.status = 'running'
-            AND dep.updated_at < datetime('now', '-15 minutes')
-        )
+        AND (dep.id IS NULL OR dep.status != ?)
   )
 ORDER BY CASE t.priority
     WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
@@ -91,9 +88,36 @@ class TaskBoard:
         self._runtime_state = runtime_state
         self._require_identity = require_identity
 
-    def _open(self) -> aiosqlite.Connection:
-        """Open connection with busy_timeout to prevent 'database is locked'."""
-        return aiosqlite.connect(self._db_path, timeout=self._BUSY_TIMEOUT_S)
+    @asynccontextmanager
+    async def _open(self) -> AsyncIterator[aiosqlite.Connection]:
+        """Open a connection with contention and referential-integrity guards."""
+        db = await aiosqlite.connect(self._db_path, timeout=self._BUSY_TIMEOUT_S)
+        try:
+            await db.execute("PRAGMA foreign_keys=ON")
+            yield db
+        finally:
+            await db.close()
+
+    @staticmethod
+    async def _require_existing_task_ids(
+        db: aiosqlite.Connection,
+        task_ids: list[str],
+        *,
+        label: str,
+    ) -> None:
+        """Raise a stable TaskBoardError when referenced task IDs do not exist."""
+        requested = sorted(set(task_ids))
+        if not requested:
+            return
+        placeholders = ",".join("?" for _ in requested)
+        cur = await db.execute(
+            f"SELECT id FROM tasks WHERE id IN ({placeholders})",
+            requested,
+        )
+        found = {str(row[0]) for row in await cur.fetchall()}
+        missing = [task_id for task_id in requested if task_id not in found]
+        if missing:
+            raise TaskBoardError(f"missing {label}: {', '.join(missing)}")
 
     async def init_db(self) -> None:
         """Create tasks and task_dependencies tables.  Enables WAL for concurrency."""
@@ -298,7 +322,14 @@ class TaskBoard:
         """Create a new task and persist it."""
         task_id = _new_id()
         now = _utc_now()
-        dep_ids: list[str] = depends_on or []
+        dep_ids: list[str] = list(depends_on or [])
+        if dep_ids:
+            async with self._open() as db:
+                await self._require_existing_task_ids(
+                    db,
+                    dep_ids,
+                    label="dependency",
+                )
         meta = dict(metadata or {})
         effective_require = self._require_identity if require_identity is None else require_identity
         identity = self._resolve_identity(
@@ -373,6 +404,19 @@ class TaskBoard:
         """
         if not tasks:
             return []
+
+        dependency_ids = [
+            str(dep_id)
+            for spec in tasks
+            for dep_id in (spec.get("depends_on") or [])
+        ]
+        if dependency_ids:
+            async with self._open() as db:
+                await self._require_existing_task_ids(
+                    db,
+                    dependency_ids,
+                    label="dependency",
+                )
 
         now = _utc_now()
         created_tasks: list[Task] = []
@@ -509,6 +553,10 @@ class TaskBoard:
         """
         status = fields.pop("status", None)
         if status is not None:
+            try:
+                status = TaskStatus(status)
+            except (TypeError, ValueError) as exc:
+                raise TaskBoardError(f"Invalid task status: {status!r}") from exc
             if status == TaskStatus.ASSIGNED:
                 await self.assign(
                     task_id,
@@ -536,6 +584,10 @@ class TaskBoard:
                     task_id,
                     reason=fields.get("result", ""),
                     metadata=fields.get("metadata"),
+                )
+            elif status == TaskStatus.QUARANTINED_FAKE_RESULT:
+                raise TaskBoardError(
+                    "quarantined_fake_result is an audit-only terminal status"
                 )
         elif fields:
             # Raw column update (no status change)
@@ -690,6 +742,12 @@ class TaskBoard:
     async def add_dependency(self, task_id: str, depends_on_id: str) -> None:
         """Add a dependency edge: task_id depends on depends_on_id."""
         async with self._open() as db:
+            await self._require_existing_task_ids(db, [task_id], label="task")
+            await self._require_existing_task_ids(
+                db,
+                [depends_on_id],
+                label="dependency",
+            )
             await db.execute(
                 "INSERT OR IGNORE INTO task_dependencies VALUES (?,?)",
                 (task_id, depends_on_id),

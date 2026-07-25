@@ -5,8 +5,8 @@
       "sha256": "sha256:b8972e8b651f561afe29239b6e02bdc9a663d3dc94ebd1e3596949dc6702e1f4"
     },
     "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DATA_INVENTORY_20260701.md": {
-      "bytes": 6630,
-      "sha256": "sha256:066ba4f198cb6ed0ad4afe208164bcb84a1f5d87985ccfbed60edc7874bbb1e0"
+      "bytes": 6634,
+      "sha256": "sha256:1f03e638a73bee3455740d7327888b2816b113eccde09b51b76f04707f2ec85f"
     },
     "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DATA_INVENTORY_RECEIPT_20260701.json": {
       "bytes": 15003,
@@ -41,12 +41,12 @@
       "sha256": "sha256:33a453aa6d9a445489090659092f6cf625b335bd8d2169cec375a5a75fe4d476"
     },
     "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/README.md": {
-      "bytes": 3224,
-      "sha256": "sha256:acf056acaa3944c810454622dea246c27b7486e493e72dcd6638e5d6207f44b2"
+      "bytes": 3228,
+      "sha256": "sha256:b124072abbde7bb4e957f6d59c6bb0b2df6d43f53ef9aa077863fb65597b0f83"
     },
     "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/REDACTION_AND_PRIVACY_RULES_20260701.md": {
-      "bytes": 3809,
-      "sha256": "sha256:2e1194af9d34f88ef42caa4f3002894b847b0a1f5ee298a6d2b3ec5d18788723"
+      "bytes": 3811,
+      "sha256": "sha256:683d3ee8469d511df973e2b13c0e124c010f56827f0460dbc31b91a7a32096e7"
     },
     "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/TOOL_RESOURCE_RESEARCH_20260701.md": {
       "bytes": 3209,

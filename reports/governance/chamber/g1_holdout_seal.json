@@ -1,0 +1,11 @@
+{
+  "digest": "f4fcc18aee970eb9ed845954ddc07ff6b9b922bb52fb3a543236c8c0be05ddce",
+  "held_out_ids": [
+    "g1-665c90c35c29",
+    "g1-6c8abd25f974",
+    "g1-b490fe1a1513",
+    "g1-c4af75162daf"
+  ],
+  "schema": "chamber_g1_holdout_seal.v1",
+  "taskpack_sha": "28a47b9f92a3e7e064bdb4d309af9271227830396e6dabe413c33f30903cf984"
+}

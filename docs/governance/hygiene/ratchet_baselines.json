@@ -1,0 +1,17 @@
+{
+  "schema_version": "quality_ratchet_baseline.v1",
+  "tightened_on": "2026-07-15",
+  "counters": {
+    "boundary_contract_violations": 1,
+    "boundary_unfrozen_records": 7,
+    "boundary_unsupervised_spawns": 0,
+    "boundary_unwitnessed_swallows": 10,
+    "hygiene_patterns_enforced_or_resolved": 2,
+    "largest_module_lines": 5255,
+    "modules_over_500_lines": 207,
+    "property_test_files": 6,
+    "ruff_undefined_or_redefined": 0,
+    "silent_exception_swallows": 241,
+    "spine_bypass_entries": 0
+  }
+}

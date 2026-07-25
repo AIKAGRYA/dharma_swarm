@@ -1,0 +1,55 @@
+# import-provenance allowlist — third-party top-level import roots the
+# tree uses today. A new root fails check_import_provenance.py until it
+# is declared in the dependency manifest and added here. Regenerate with:
+#   python3 scripts/governance/check_import_provenance.py --update-baseline
+aiofiles
+aiosqlite
+anthropic
+arch
+croniter
+cryptography
+fastapi
+fasttext
+gemma_scope_feature_install
+grimp
+hmmlearn
+httpx
+huggingface_hub
+hypothesis
+icontract
+lancedb
+langfuse
+langgraph
+mcp
+nats
+numpy
+ollama
+openai
+playwright
+pydantic
+pytest
+pytest_asyncio
+qdrant_client
+redis
+rich
+run_agent
+scipy
+sentence_transformers
+sklearn
+sqlite_vec
+starlette
+strawberry
+textual
+torch
+transformers
+tree_sitter
+tree_sitter_go
+tree_sitter_java
+tree_sitter_javascript
+tree_sitter_python
+tree_sitter_rust
+tree_sitter_typescript
+typer
+yaml
+yfinance
+z3

@@ -370,29 +370,64 @@ class SelfImprovementCycle:
                     self._save_report(report)
                     return report
 
-            # Apply proposal diffs to the actual codebase
+            # Apply proposal diffs — PR-001 fail-closed. SelfImprovementCycle may
+            # NEVER mutate the live checkout (DHARMA_SWARM_DIR). It applies only
+            # into a marked scratch worktree, and only shadow unless a valid live
+            # mutation lease exists. Absent that, every proposal is denied and a
+            # receipt is written. Default posture: no diff ever lands on source.
             apply_results: list[Any] = []
             applier = None
             try:
+                from dharma_swarm import evolution_safety as _esafe
                 from dharma_swarm.diff_applier import DiffApplier
-                applier = DiffApplier(workspace=DHARMA_SWARM_DIR)
+
+                _target = Path(
+                    os.environ.get("DHARMA_EVOLUTION_WORKSPACE", str(DHARMA_SWARM_DIR))
+                )
+                # Lightweight identity for the receipt — full RuntimeCodeIdentity
+                # (with git metadata) is captured once at daemon startup, not per
+                # proposal, to keep this hot loop subprocess-free.
+                _code_ident = {"repo_path": str(DHARMA_SWARM_DIR)}
+                _rs_available = getattr(self, "_runtime_state", None) is not None
+                applier = DiffApplier(workspace=_target)
                 for p in gated:
                     diff_text = getattr(p, "diff", "")
-                    if diff_text and diff_text.strip():
-                        apply_result = await applier.apply(diff_text)
-                        if apply_result.success:
-                            apply_results.append(apply_result)
-                            logger.info(
-                                "Applied diff for %s: %s",
-                                getattr(p, "component", "?"),
-                                apply_result.files_changed,
-                            )
-                        else:
-                            logger.warning(
-                                "Failed to apply diff for %s: %s",
-                                getattr(p, "component", "?"),
-                                apply_result.error,
-                            )
+                    if not (diff_text and diff_text.strip()):
+                        continue
+                    decision = _esafe.evaluate_mutation(
+                        target_workspace=_target,
+                        requested_live=True,
+                        runtime_state_available=_rs_available,
+                    )
+                    _esafe.write_mutation_receipt(
+                        decision,
+                        actor="self_improve",
+                        patch_hash=_esafe.patch_hash(diff_text),
+                        code_identity=_code_ident,
+                        experiment_id=cycle_id,
+                    )
+                    if not decision.allowed or decision.effective_shadow:
+                        report.proposals_blocked += 1
+                        logger.warning(
+                            "self_improve mutation blocked/shadowed for %s: %s",
+                            getattr(p, "component", "?"),
+                            decision.denial_reason,
+                        )
+                        continue
+                    apply_result = await applier.apply(diff_text)
+                    if apply_result.success:
+                        apply_results.append(apply_result)
+                        logger.info(
+                            "Applied diff for %s: %s",
+                            getattr(p, "component", "?"),
+                            apply_result.files_changed,
+                        )
+                    else:
+                        logger.warning(
+                            "Failed to apply diff for %s: %s",
+                            getattr(p, "component", "?"),
+                            apply_result.error,
+                        )
             except Exception as exc:
                 logger.warning("DiffApplier integration failed: %s", exc)
 
@@ -715,6 +750,7 @@ class SelfImprovementCycle:
 async def run_self_improvement_loop(
     shutdown_event: Any,
     interval: float = SELF_IMPROVE_INTERVAL,
+    supervisor: Any | None = None,
 ) -> None:
     """Async loop for integration into orchestrate_live.
 
@@ -723,6 +759,10 @@ async def run_self_improvement_loop(
     import asyncio
 
     while not shutdown_event.is_set():
+        # WP-LC1: tick BEFORE the is_enabled() skip so alive-but-
+        # intentionally-idle is visible to the loop supervisor.
+        if supervisor is not None:
+            supervisor.record_tick("self-improve")
         if is_enabled():
             try:
                 cycle = SelfImprovementCycle()
@@ -753,7 +793,7 @@ def cmd_self_improve_status() -> int:
     enabled = is_enabled()
     latest = SelfImprovementCycle.load_latest()
 
-    print(f"Self-Improvement Cycle")
+    print("Self-Improvement Cycle")
     print(f"{'=' * 45}")
     print(f"  Enabled: {enabled} (DHARMA_SELF_IMPROVE={os.environ.get('DHARMA_SELF_IMPROVE', '0')})")
 

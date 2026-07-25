@@ -20,23 +20,6 @@ NOT cover the full A2A 1.0 transport surface.  Specifically:
     - gRPC / NATS transport bindings (Tier 2)
     - OAuth2 / mTLS / JWS enforcement (Tier 2)
 
-Spec-standard endpoints (A2A 1.0):
-  - GET  /.well-known/agent-card.json  — Agent card discovery
-  - POST /tasks                         — submit a task
-  - GET  /tasks/{task_id}               — poll task status + result
-  - POST /tasks/{task_id}:cancel        — cancel a running task
-  - POST /tasks/{task_id}:reject        — reject a task (A2A 1.0)
-  - GET  /tasks/{task_id}:stream        — SSE streaming (A2A 1.0)
-  - GET  /health                        — heartbeat / node status
-  - GET  /skills                        — list skills (A2A 1.0 name)
-
-Legacy endpoints (backward compat):
-  - POST /a2a/tasks
-  - GET  /a2a/tasks/{task_id}
-  - POST /a2a/tasks/{task_id}/cancel
-  - GET  /a2a/health
-  - GET  /a2a/capabilities
-
 Four-question discipline (Contemplative Spine §11):
   1. Which loop?  Central metabolic: opportunity → dispatch → outcome → feedback
   2. Which membrane?  Network boundary between Dharma hub and remote nodes
@@ -66,13 +49,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
     A2AServer,
     A2ATask,
     A2ATaskStatus,
 )
+from dharma_swarm.a2a.spine_adapter import submit_task_via_spine
 from dharma_swarm.a2a.agent_card import AgentCard, CardRegistry
 from dharma_swarm.daemon_config import dharma_state_dir
 
@@ -93,6 +76,18 @@ _node_card: AgentCard | None = None
 _allowed_keys: set[str] = set()
 _node_id: str = "unknown"
 _started_at: str = ""
+_initialization_error: str = ""
+
+
+def mark_gateway_degraded(error_type: str) -> None:
+    """Record a safe startup failure class without exposing exception details."""
+    global _server, _registry, _node_card, _node_id, _started_at, _initialization_error  # noqa: PLW0603
+    _server = None
+    _registry = None
+    _node_card = None
+    _node_id = "unknown"
+    _started_at = ""
+    _initialization_error = str(error_type or "GatewayInitializationError")
 
 
 def init_gateway(
@@ -112,28 +107,19 @@ def init_gateway(
         node_card: This node's AgentCard (served at /.well-known/).
         node_id: Unique identifier for this node in the fleet.
     """
-    global _server, _registry, _node_card, _node_id, _started_at  # noqa: PLW0603
+    global _server, _registry, _node_card, _node_id, _started_at, _initialization_error  # noqa: PLW0603
+    try:
+        _load_allowed_keys()
+    except Exception as exc:
+        mark_gateway_degraded(type(exc).__name__)
+        raise
     _server = server
     _registry = registry
     _node_card = node_card
     _node_id = node_id
     _started_at = datetime.now(timezone.utc).isoformat()
-    _load_allowed_keys()
+    _initialization_error = ""
     logger.info("Node gateway initialized: node_id=%s", node_id)
-
-
-async def _submit_task_via_spine(task: A2ATask) -> A2ATask:
-    """Submit through the A2A spine adapter while preserving gateway responses."""
-    if _server is None or _registry is None:
-        raise HTTPException(status_code=503, detail="Gateway not initialized")
-    bridge = A2ABridge(server=_server, registry=_registry)
-    result, receipt = await bridge.submit_via_spine(task)
-    result.metadata = {
-        **dict(result.metadata or {}),
-        "spine_receipt_id": str(receipt.receipt_id),
-        "spine_trace_id": receipt.trace_id,
-    }
-    return result
 
 
 def _load_allowed_keys() -> None:
@@ -206,32 +192,16 @@ def _task_to_dict(task: A2ATask) -> dict[str, Any]:
 
 
 def _strip_internal_fields(obj: Any) -> None:
-    """Recursively remove internal fields and normalize JSON primitives."""
+    """Recursively remove internal fields (prefixed with _) from dicts."""
     if isinstance(obj, dict):
         for key in list(obj.keys()):
             if key.startswith("_"):
                 del obj[key]
             else:
-                obj[key] = _json_safe_value(obj[key])
+                _strip_internal_fields(obj[key])
     elif isinstance(obj, list):
-        for idx, item in enumerate(obj):
-            obj[idx] = _json_safe_value(item)
-
-
-def _json_safe_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        _strip_internal_fields(value)
-        return value
-    if isinstance(value, list):
-        _strip_internal_fields(value)
-        return value
-    if isinstance(value, tuple):
-        return [_json_safe_value(item) for item in value]
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, uuid.UUID):
-        return str(value)
-    return value
+        for item in obj:
+            _strip_internal_fields(item)
 
 
 def _utc_now() -> str:
@@ -271,7 +241,7 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
         to_agent=body.get("to_agent", ""),
         capability=body.get("capability", ""),
         context_id=body.get("context_id", ""),
-        trace_id=body.get("trace_id", "") or f"trc_{uuid.uuid4().hex[:16]}",
+        trace_id=body.get("trace_id", ""),
         history=messages,
         metadata=metadata,
     )
@@ -280,6 +250,10 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
 
 def _health_payload() -> dict[str, Any]:
     """Build health check response payload."""
+    initialized = _server is not None and _registry is not None and _node_card is not None
+    health_status = (
+        "online" if initialized else ("degraded" if _initialization_error else "uninitialized")
+    )
     task_counts: dict[str, int] = {}
     if _server is not None:
         for status in A2ATaskStatus:
@@ -293,7 +267,9 @@ def _health_payload() -> dict[str, Any]:
 
     return {
         "node_id": _node_id,
-        "status": "online",
+        "status": health_status,
+        "initialized": initialized,
+        "initialization_error": _initialization_error,
         "started_at": _started_at,
         "checked_at": _utc_now(),
         "task_counts": task_counts,
@@ -345,20 +321,29 @@ async def get_agent_card() -> JSONResponse:
 
 @router.post("/tasks", dependencies=[Depends(_verify_api_key)])
 async def submit_task_v1(request: Request) -> JSONResponse:
-    """Submit a task (A2A 1.0 spec path)."""
+    """Submit a task (A2A 1.0 spec path).
+
+    Spine-adopted: dispatches through the Runtime Truth Spine
+    (invoke_agent + exactly one EvidenceReceipt per submit).
+    """
     if _server is None:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = await _submit_task_via_spine(task)
+    result, receipt = await submit_task_via_spine(
+        _server, task, router_name="node_gateway",
+    )
+    if receipt.status == "failed" and not receipt.provider_attempted:
+        # Pre-spine contract: an internal submit() error surfaced as a 500,
+        # not a FAILED task payload. Preserve that boundary.
+        raise HTTPException(status_code=500, detail=receipt.error_detail or "submit failed")
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
     )
 
 
-# Colon-action routes MUST be registered before the generic /tasks/{task_id}
-# so FastAPI's route matching doesn't greedily capture the suffix.
+# Register colon-action routes before generic /tasks/{task_id} to avoid suffix capture.
 
 
 @router.post("/tasks/{task_id}:cancel", dependencies=[Depends(_verify_api_key)])
@@ -437,7 +422,8 @@ async def get_task_v1(task_id: str) -> JSONResponse:
 @router.get("/health")
 async def health_check_v1() -> JSONResponse:
     """Heartbeat (A2A 1.0 spec path)."""
-    return JSONResponse(content=_health_payload())
+    payload = _health_payload()
+    return JSONResponse(content=payload, status_code=200 if payload["initialized"] else 503)
 
 
 @router.get("/skills", dependencies=[Depends(_verify_api_key)])
@@ -455,12 +441,20 @@ async def list_skills_v1() -> JSONResponse:
 
 @router.post("/a2a/tasks", dependencies=[Depends(_verify_api_key)])
 async def submit_task_legacy(request: Request) -> JSONResponse:
-    """Submit a task (legacy path)."""
+    """Submit a task (legacy path).
+
+    Spine-adopted: dispatches through the Runtime Truth Spine
+    (invoke_agent + exactly one EvidenceReceipt per submit).
+    """
     if _server is None:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = await _submit_task_via_spine(task)
+    result, receipt = await submit_task_via_spine(
+        _server, task, router_name="node_gateway",
+    )
+    if receipt.status == "failed" and not receipt.provider_attempted:
+        raise HTTPException(status_code=500, detail=receipt.error_detail or "submit failed")
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
@@ -494,7 +488,8 @@ async def cancel_task_legacy(task_id: str) -> JSONResponse:
 @router.get("/a2a/health")
 async def health_check_legacy() -> JSONResponse:
     """Heartbeat (legacy path)."""
-    return JSONResponse(content=_health_payload())
+    payload = _health_payload()
+    return JSONResponse(content=payload, status_code=200 if payload["initialized"] else 503)
 
 
 @router.get("/a2a/capabilities", dependencies=[Depends(_verify_api_key)])

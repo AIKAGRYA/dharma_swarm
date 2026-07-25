@@ -13,7 +13,12 @@ import json
 import pytest
 
 from dharma_swarm import holon_bridge
-from dharma_swarm.holon_bridge import load_holon, guard_outcome_claim
+from dharma_swarm.holon_bridge import (
+    HolonDialogueProviderError,
+    build_livingdock_dialogue_context,
+    guard_outcome_claim,
+    load_holon,
+)
 from dharma_swarm.models import LLMRequest
 
 
@@ -172,6 +177,98 @@ def test_get_holon_provider_returns_real_provider(tmp_path):
     assert isinstance(provider, ClaudeCodeProvider)  # claude_code -> ClaudeCodeProvider (Max plan)
 
 
+def test_dialogue_provider_refuses_agentic_owner_without_safe_override(tmp_path):
+    root = _make_agent(tmp_path, provider="anthropic_max")
+    h = load_holon("opus_composer", agents_root=root)
+
+    with pytest.raises(HolonDialogueProviderError, match="agentic and unsafe"):
+        holon_bridge.get_holon_dialogue_provider(h, env={})
+
+
+def test_dialogue_provider_checks_anthropic_transport_before_factory(tmp_path, monkeypatch):
+    from dharma_swarm import runtime_provider
+
+    root = _make_agent(tmp_path, provider="anthropic")
+    h = load_holon("opus_composer", agents_root=root)
+    monkeypatch.setattr(runtime_provider, "_resolve_cli_binary", lambda _name: "/fixture/claude")
+
+    def fail_if_created(_config):
+        pytest.fail("unsafe subprocess provider was instantiated before the dialogue gate")
+
+    monkeypatch.setattr(runtime_provider, "create_runtime_provider", fail_if_created)
+    with pytest.raises(HolonDialogueProviderError, match="claude_code.*unsafe"):
+        holon_bridge.get_holon_dialogue_provider(h, env={})
+
+
+def test_dialogue_provider_safe_override_resolves_runtime_provider(tmp_path, monkeypatch):
+    from dharma_swarm import runtime_provider
+    from dharma_swarm.models import ProviderType
+    from dharma_swarm.runtime_provider import RuntimeProviderConfig
+
+    root = _make_agent(tmp_path, provider="anthropic_max")
+    h = load_holon("opus_composer", agents_root=root)
+    resolved: dict[str, object] = {}
+
+    def fake_resolve(ptype, *, model=None, env=None, **kwargs):
+        resolved["provider"] = ptype
+        resolved["model"] = model
+        return RuntimeProviderConfig(provider=ptype, default_model=model, available=True)
+
+    class StubDialogueProvider:
+        runtime_provider_type = "ollama"
+        runtime_default_model = "dialogue-model"
+
+    monkeypatch.setattr(runtime_provider, "resolve_runtime_provider_config", fake_resolve)
+    monkeypatch.setattr(runtime_provider, "create_runtime_provider", lambda config: StubDialogueProvider())
+
+    provider = holon_bridge.get_holon_dialogue_provider(
+        h,
+        env={
+            "DHARMA_HOLON_DIALOGUE_PROVIDER": "ollama",
+            "DHARMA_HOLON_DIALOGUE_MODEL": "dialogue-model",
+        },
+    )
+
+    assert isinstance(provider, StubDialogueProvider)
+    assert getattr(provider, "holon_dialogue_provider_override") is True
+    assert resolved == {"provider": ProviderType.OLLAMA, "model": "dialogue-model"}
+
+
+def test_dialogue_provider_refuses_unsafe_override(tmp_path):
+    root = _make_agent(tmp_path, provider="ollama")
+    h = load_holon("opus_composer", agents_root=root)
+
+    with pytest.raises(HolonDialogueProviderError, match="unsafe read-only dialogue provider override"):
+        holon_bridge.get_holon_dialogue_provider(
+            h,
+            env={"DHARMA_HOLON_DIALOGUE_PROVIDER": "codex"},
+        )
+
+
+def test_livingdock_context_is_bounded_and_evidence_backed(tmp_path):
+    root = _make_agent(tmp_path, provider="ollama")
+    agent_dir = root / "opus_composer"
+    (agent_dir / "living_agent.json").write_text(
+        json.dumps({"agent_uid": "opus_composer", "wake_loop_active": False, "status": "idle"}),
+        encoding="utf-8",
+    )
+    (agent_dir / "dialogue").mkdir()
+    (agent_dir / "dialogue" / "operator_sessions.jsonl").write_text(
+        "\n".join([json.dumps({"event": "session", "note": "bounded context " + ("x" * 500)}) for _ in range(5)]),
+        encoding="utf-8",
+    )
+    h = load_holon("opus_composer", agents_root=root)
+
+    ctx = build_livingdock_dialogue_context(h, agents_root=root, max_chars=420)
+
+    assert "read_only_dialogue_no_privileged_action" in ctx.content
+    assert "protected_actions_allowed: false" in ctx.content
+    assert len(ctx.content) <= 420
+    assert "truncated" in ctx.content
+    assert str(agent_dir / "identity.json") in ctx.evidence_paths
+    assert str(agent_dir / "living_agent.json") in ctx.evidence_paths
+
+
 def test_holon_talk_declared_first_uses_identity_model(tmp_path, monkeypatch):
     """The explicit declared-first CLI mode must preserve the identity-declared model."""
     from scripts import holon_talk
@@ -296,6 +393,33 @@ async def test_stub_model_routing(tmp_path):
     assert recorded["model"] == "claude-opus-4-8"  # the holon's OWN model, not a global default
     assert recorded["system"] == h.system_prompt
     assert out == "hello world"
+
+
+async def test_holon_reply_can_include_livingdock_context_and_request_model(tmp_path):
+    root = _make_agent(tmp_path)
+    h = load_holon("opus_composer", agents_root=root)
+    recorded: dict = {}
+
+    class StubProvider:
+        async def stream(self, request: LLMRequest):
+            recorded["model"] = request.model
+            recorded["system"] = request.system
+            yield "ok"
+
+    out = "".join([
+        c
+        async for c in holon_bridge.holon_reply(
+            h,
+            "hi",
+            StubProvider(),
+            livingdock_context="## Current LivingDock Context\nprotected_actions_allowed: false",
+            request_model="dialogue-model",
+        )
+    ])
+
+    assert out == "ok"
+    assert recorded["model"] == "dialogue-model"
+    assert "protected_actions_allowed: false" in recorded["system"]
 
 
 async def test_holon_reply_streams_and_does_not_refuse_conversation(tmp_path):

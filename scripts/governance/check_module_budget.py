@@ -19,11 +19,14 @@ In CI, the workflow passes the PR base/head SHAs.
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+SELF_PATH = "scripts/governance/check_module_budget.py"
 
 # Hot-path modules already over the 1000-line budget at 2026-04-26.
 # Each entry: file path -> grandfathered line count at install time.
@@ -99,6 +102,57 @@ def file_at_ref(ref: str, path: str) -> str | None:
     return result.stdout
 
 
+def merge_base(base: str, head: str) -> str:
+    """Return the merge-base commit of ``base`` and ``head`` (fail-closed).
+
+    Raises on failure: a grandfather map read from the merge-base is the
+    immutable fork-point ceiling, and silently falling back to the working
+    tree would reopen the self-raise hole the flag exists to close.
+    """
+    result = subprocess.run(
+        ["git", "merge-base", base, head],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(
+            f"git merge-base {base} {head} failed (rc={result.returncode}): "
+            f"{result.stderr.strip()}. Needs full history (fetch-depth: 0)."
+        )
+    return result.stdout.strip()
+
+
+def grandfathered_at_ref(ref: str) -> dict[str, int]:
+    """Extract the GRANDFATHERED dict from this script as it existed at ``ref``.
+
+    Reads the file content via ``git show`` and parses out the module-level
+    ``GRANDFATHERED`` assignment with the stdlib AST, so the grandfather
+    ceiling is graded from an immutable baseline the PR cannot edit. A PR
+    that adds its own oversized file to GRANDFATHERED in the same diff is
+    judged as if that entry did not exist.
+    """
+    content = file_at_ref(ref, SELF_PATH)
+    if content is None:
+        raise RuntimeError(
+            f"{SELF_PATH} did not exist at {ref}; cannot read an immutable "
+            "grandfather baseline."
+        )
+    tree = ast.parse(content, filename=f"{ref}:{SELF_PATH}")
+    for node in tree.body:
+        targets = (
+            node.targets if isinstance(node, ast.Assign)
+            else [node.target] if isinstance(node, ast.AnnAssign)
+            else []
+        )
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id == "GRANDFATHERED":
+                if node.value is None:
+                    raise RuntimeError("GRANDFATHERED at ref has no value")
+                return dict(ast.literal_eval(node.value))
+    raise RuntimeError(f"GRANDFATHERED not found in {SELF_PATH} at {ref}")
+
+
 def changed_files(base: str, head: str) -> list[str]:
     out = subprocess.check_output(
         ["git", "diff", "--name-only", "--diff-filter=AM", base, head],
@@ -111,6 +165,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-ref", default="origin/main")
     parser.add_argument("--head-ref", default="HEAD")
+    parser.add_argument(
+        "--grandfather-base-ref",
+        default=None,
+        metavar="REF",
+        help="read the GRANDFATHERED map from the merge-base of REF and the head "
+        "ref, not this working-tree file. A PR cannot grandfather its own "
+        "oversized module by editing GRANDFATHERED in the same diff. "
+        "Fail-closed if the merge-base cannot be resolved.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(
@@ -119,6 +182,15 @@ def main() -> int:
         ).strip()
     )
     os.chdir(repo_root)
+
+    grandfathered = GRANDFATHERED
+    if args.grandfather_base_ref is not None:
+        try:
+            mb = merge_base(args.grandfather_base_ref, args.head_ref)
+            grandfathered = grandfathered_at_ref(mb)
+        except (RuntimeError, ValueError, SyntaxError) as exc:
+            print(f"::error::module-budget grandfather baseline unreadable: {exc}")
+            return 1
 
     files = [p for p in changed_files(args.base_ref, args.head_ref) if is_target_file(p)]
     if not files:
@@ -135,18 +207,18 @@ def main() -> int:
         base_content = file_at_ref(args.base_ref, path)
         base_lines = base_content.count("\n") + 1 if base_content else 0
 
-        if path in GRANDFATHERED:
-            ceiling = int(GRANDFATHERED[path] * (1 + GROWTH_TOLERANCE))
+        if path in grandfathered:
+            ceiling = int(grandfathered[path] * (1 + GROWTH_TOLERANCE))
             if head_lines > ceiling:
                 failures.append(
                     f"  {path}: {head_lines} lines exceeds grandfathered "
-                    f"ceiling {ceiling} (grandfather={GRANDFATHERED[path]} "
+                    f"ceiling {ceiling} (grandfather={grandfathered[path]} "
                     f"+{int(GROWTH_TOLERANCE * 100)}%). "
                     f"Open a decomposition issue or shrink the file."
                 )
-            elif head_lines > GRANDFATHERED[path]:
+            elif head_lines > grandfathered[path]:
                 warnings.append(
-                    f"  {path}: {head_lines} lines (grandfather={GRANDFATHERED[path]}, "
+                    f"  {path}: {head_lines} lines (grandfather={grandfathered[path]}, "
                     f"ceiling={ceiling}). Approaching the budget."
                 )
             continue

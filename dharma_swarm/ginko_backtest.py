@@ -38,7 +38,6 @@ except ImportError:
 from dharma_swarm.ginko_regime import ReturnSeries, analyze_regime
 from dharma_swarm.ginko_signals import (
     Signal,
-    SignalReport,
     compute_indicators,
     synthesize_signal,
 )

@@ -14,8 +14,8 @@ cd "$(dirname "$0")"
 if [ -f "$PWD/scripts/load_runtime_env.sh" ]; then
     # shellcheck disable=SC1091
     source "$PWD/scripts/load_runtime_env.sh"
-elif [ -f "$HOME/.zshrc" ]; then
-    eval "$(grep -E '^export (ANTHROPIC_API_KEY|OPENROUTER_API_KEY)=' "$HOME/.zshrc" 2>/dev/null || true)"
+else
+    echo "[run_garden] WARNING: scripts/load_runtime_env.sh not found; continuing with current environment" >&2
 fi
 
 # Ensure output dirs

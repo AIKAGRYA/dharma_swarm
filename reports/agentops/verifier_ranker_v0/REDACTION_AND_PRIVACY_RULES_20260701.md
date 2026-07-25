@@ -1,6 +1,6 @@
 # Redaction and Privacy Rules
 
-Role: active report for `DharmaVerifier-Ranker v0` data prep
+Role: active report for `DharmaVerifier-Ranker v0` data prep  
 Implementation: `dharma_swarm/verifier_ranker_v0/redaction.py`
 
 ## Policy

@@ -27,6 +27,8 @@ GOOGLE_AI_API_KEY_ENV = "GOOGLE_AI_API_KEY"
 SAMBANOVA_API_KEY_ENV = "SAMBANOVA_API_KEY"
 MISTRAL_API_KEY_ENV = "MISTRAL_API_KEY"
 CHUTES_API_KEY_ENV = "CHUTES_API_KEY"
+ZHIPU_API_KEY_ENV = "ZHIPU_API_KEY"
+KIMI_API_KEY_ENV = "KIMI_API_KEY"
 MOONSHOT_API_KEY_ENV = "MOONSHOT_API_KEY"
 NGC_API_KEY_ENV = "NGC_API_KEY"
 NVIDIA_API_KEY_ENV = "NVIDIA_API_KEY"
@@ -34,6 +36,33 @@ NVIDIA_API_KEY_ENV = "NVIDIA_API_KEY"
 DASHBOARD_API_KEY_ENV = "DASHBOARD_API_KEY"
 FRED_API_KEY_ENV = "FRED_API_KEY"
 FINNHUB_API_KEY_ENV = "FINNHUB_API_KEY"
+
+# Dashboard API ingress mode (WP-0S, TIT-010). Explicit production values
+# select production-shaped fail-closed enforcement; explicit local values
+# select the loopback-bound development lane; anything else is ambiguous and
+# the ingress layer must pick the safer behavior.
+DASHBOARD_API_MODE_ENV = "DHARMA_API_MODE"
+API_MODE_PRODUCTION = "production"
+API_MODE_LOCAL_DEV = "local-development"
+API_MODE_AMBIGUOUS = "ambiguous"
+_API_MODE_PRODUCTION_VALUES = frozenset({"production", "production-shaped", "prod"})
+_API_MODE_LOCAL_DEV_VALUES = frozenset({"local-development", "local-dev", "dev"})
+
+
+def dashboard_api_mode(env: Mapping[str, str] | None = None) -> str:
+    """Resolve the declared dashboard API ingress mode.
+
+    Returns API_MODE_PRODUCTION, API_MODE_LOCAL_DEV, or API_MODE_AMBIGUOUS.
+    Unset, blank, and unrecognized values are ambiguous by design so the
+    consumer cannot mistake a typo for an explicit mode selection.
+    """
+    source = os.environ if env is None else env
+    raw = str(source.get(DASHBOARD_API_MODE_ENV, "") or "").strip().lower()
+    if raw in _API_MODE_PRODUCTION_VALUES:
+        return API_MODE_PRODUCTION
+    if raw in _API_MODE_LOCAL_DEV_VALUES:
+        return API_MODE_LOCAL_DEV
+    return API_MODE_AMBIGUOUS
 
 # Search backends
 EXA_API_KEY_ENV = "EXA_API_KEY"
@@ -58,6 +87,8 @@ GOOGLE_AI_BASE_URL_ENV = "GOOGLE_AI_BASE_URL"
 SAMBANOVA_BASE_URL_ENV = "SAMBANOVA_BASE_URL"
 MISTRAL_BASE_URL_ENV = "MISTRAL_BASE_URL"
 CHUTES_BASE_URL_ENV = "CHUTES_BASE_URL"
+ZHIPU_BASE_URL_ENV = "ZHIPU_BASE_URL"
+KIMI_BASE_URL_ENV = "KIMI_BASE_URL"
 MOONSHOT_BASE_URL_ENV = "MOONSHOT_BASE_URL"
 
 
@@ -88,6 +119,9 @@ PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "sambanova": SAMBANOVA_API_KEY_ENV,
     "mistral": MISTRAL_API_KEY_ENV,
     "chutes": CHUTES_API_KEY_ENV,
+    "zhipu": ZHIPU_API_KEY_ENV,
+    "kimi_code": KIMI_API_KEY_ENV,
+    "moonshot": MOONSHOT_API_KEY_ENV,
 }
 
 CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
@@ -99,6 +133,9 @@ CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "together": TOGETHER_API_KEY_ENV,
     "fireworks": FIREWORKS_API_KEY_ENV,
     "nvidia_nim": NVIDIA_NIM_API_KEY_ENV,
+    "zhipu": ZHIPU_API_KEY_ENV,
+    "kimi_code": KIMI_API_KEY_ENV,
+    "moonshot": MOONSHOT_API_KEY_ENV,
 }
 
 PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
@@ -116,6 +153,9 @@ PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
     "sambanova": SAMBANOVA_BASE_URL_ENV,
     "mistral": MISTRAL_BASE_URL_ENV,
     "chutes": CHUTES_BASE_URL_ENV,
+    "zhipu": ZHIPU_BASE_URL_ENV,
+    "kimi_code": KIMI_BASE_URL_ENV,
+    "moonshot": MOONSHOT_BASE_URL_ENV,
 }
 
 GINKO_API_KEY_ENV_VARS: dict[str, str] = {
@@ -169,6 +209,14 @@ ENV_ALIASES: dict[str, str] = {
     "NIM_API_KEY": NVIDIA_NIM_API_KEY_ENV,
     # some tools use PERPLEXITY_API_KEY; dharma expects PPLX_API_KEY
     "PERPLEXITY_API_KEY": PPLX_API_KEY_ENV,
+    # z.ai / Zhipu / GLM export under several names; dharma expects ZHIPU_API_KEY
+    "GLM_API_KEY": ZHIPU_API_KEY_ENV,
+    "ZAI_API_KEY": ZHIPU_API_KEY_ENV,
+    "ZHIPUAI_API_KEY": ZHIPU_API_KEY_ENV,
+    "BIGMODEL_API_KEY": ZHIPU_API_KEY_ENV,
+    # Kimi Code membership API. This is not the pay-as-you-go Moonshot
+    # Platform lane; callers should prefer KIMI_API_KEY for Kimi Code.
+    "MOONSHOT_KIMI_API_KEY": KIMI_API_KEY_ENV,
     # dkeys may export DEEPSEEK_API_KEY; no first-class provider yet but
     # OpenRouter is the canonical lane — alias for forward-compat
     "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
@@ -285,6 +333,19 @@ def bootstrap_runtime_env(
         os.environ["DHARMA_RUNTIME_ENV_LOADED"] = "1"
         if include_files:
             load_runtime_env_files(env_paths or runtime_env_paths())
+        # Unified-loader steps (keychain fallback, split-key-store guard).
+        # Late import breaks the module cycle; failure here must never take
+        # down provider resolution.
+        try:
+            from dharma_swarm.runtime_env_loader import post_file_bootstrap_hook
+
+            post_file_bootstrap_hook()
+        except Exception:  # pragma: no cover - defensive
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "runtime_env_loader post-bootstrap hook failed", exc_info=True
+            )
 
     return normalize_env_aliases()
 
@@ -368,6 +429,11 @@ def provider_available(provider: str, env: Mapping[str, str] | None = None) -> b
 __all__ = [
     "ALL_API_KEY_ENV_KEYS",
     "ANTHROPIC_API_KEY_ENV",
+    "API_MODE_AMBIGUOUS",
+    "API_MODE_LOCAL_DEV",
+    "API_MODE_PRODUCTION",
+    "DASHBOARD_API_MODE_ENV",
+    "dashboard_api_mode",
     "apply_env_assignment",
     "bootstrap_runtime_env",
     "CEREBRAS_API_KEY_ENV",
@@ -375,6 +441,8 @@ __all__ = [
     "CHAT_PROVIDER_API_KEY_ENV_KEYS",
     "CHUTES_API_KEY_ENV",
     "CHUTES_BASE_URL_ENV",
+    "ZHIPU_API_KEY_ENV",
+    "ZHIPU_BASE_URL_ENV",
     "DASHBOARD_API_KEY_ENV",
     "ENV_ALIASES",
     "DGC_DATA_FLYWHEEL_API_KEY_ENV",
@@ -390,6 +458,8 @@ __all__ = [
     "GROQ_API_KEY_ENV",
     "GROQ_BASE_URL_ENV",
     "has_any_llm",
+    "KIMI_API_KEY_ENV",
+    "KIMI_BASE_URL_ENV",
     "MISTRAL_API_KEY_ENV",
     "MISTRAL_BASE_URL_ENV",
     "MOONSHOT_API_KEY_ENV",

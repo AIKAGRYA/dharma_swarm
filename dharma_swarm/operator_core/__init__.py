@@ -6,82 +6,6 @@ shells must agree on when they talk about sessions, runtime truth, entities,
 permissions, and orchestration state.
 """
 
-from .adapters import (
-    event_envelope_from_legacy_event,
-    permission_decision_from_tool_call,
-    routing_decision_from_policy,
-    runtime_snapshot_from_operator_snapshot,
-    session_from_meta,
-)
-from .permissions import GovernanceFilter, GovernancePolicy
-from .permission_payloads import (
-    build_permission_decision_payload,
-    build_permission_history_payload,
-    build_permission_outcome_payload,
-    build_permission_resolution_payload,
-    permission_decision_payload_from_decision,
-    permission_outcome_payload_from_outcome,
-    permission_resolution_payload_from_resolution,
-)
-from .operating_facts import (
-    AgentOpsRunFact,
-    BurnReportFact,
-    HumanQualityRatingFact,
-    KaizenReviewFact,
-    OperatingFactBundle,
-    OperatingFactInputs,
-    OrganBoundary,
-    OrganStateFact,
-    RevenueSignalFact,
-    append_human_yds_rating,
-    build_operating_fact_bundle,
-    bundle_to_dict,
-    coherence_map_to_dict,
-    load_agentops_run_facts,
-    load_burn_report_facts,
-    load_human_yds_rating_facts,
-    load_kaizen_review_facts,
-    load_revenue_signal_facts,
-    organ_boundary_map,
-    organ_state_facts,
-    rust_membrane_candidates,
-)
-from .routing_payloads import build_agent_routes_payload, build_routing_decision_payload
-from .runtime_payloads import build_runtime_snapshot_payload
-from .runtime_truth import (
-    connect_runtime_db_read_only,
-    runtime_db_path_from_env,
-    runtime_truth_packets_from_runtime_db,
-    summarize_runtime_truth_packets,
-)
-from .workspace_payloads import build_workspace_snapshot_payload
-from .session_payloads import build_session_catalog_payload, build_session_detail_payload
-from .session_store import SessionStore, cwd_matches
-from .session_views import build_session_catalog, build_session_detail
-from .contracts import (
-    CanonicalEntity,
-    CanonicalEventEnvelope,
-    CanonicalPermissionDecision,
-    CanonicalPermissionResolution,
-    CanonicalRelation,
-    CanonicalRoutingDecision,
-    CanonicalRuntimeSnapshot,
-    CanonicalSession,
-    CanonicalWorkflowState,
-    EntityBadge,
-    EntityRef,
-    EventAudience,
-    EventSource,
-    EventTransport,
-    PermissionDecisionKind,
-    PermissionResolutionKind,
-    PermissionRisk,
-    RuntimeHealth,
-    RuntimeTruthPacket,
-    RuntimeTruthState,
-    WorkflowExecutionMode,
-)
-
 __all__ = [
     "AgentOpsRunFact",
     "BurnReportFact",
@@ -154,3 +78,91 @@ __all__ = [
     "rust_membrane_candidates",
     "session_from_meta",
 ]
+
+_EXPORT_MODULES = {
+    "AgentOpsRunFact": "operating_facts",
+    "BurnReportFact": "operating_facts",
+    "CanonicalEntity": "contracts",
+    "CanonicalEventEnvelope": "contracts",
+    "CanonicalPermissionDecision": "contracts",
+    "CanonicalPermissionResolution": "contracts",
+    "CanonicalRelation": "contracts",
+    "CanonicalRoutingDecision": "contracts",
+    "CanonicalRuntimeSnapshot": "contracts",
+    "CanonicalSession": "contracts",
+    "CanonicalWorkflowState": "contracts",
+    "EntityBadge": "contracts",
+    "EntityRef": "contracts",
+    "EventAudience": "contracts",
+    "EventSource": "contracts",
+    "EventTransport": "contracts",
+    "GovernanceFilter": "permissions",
+    "GovernancePolicy": "permissions",
+    "HumanQualityRatingFact": "operating_facts",
+    "KaizenReviewFact": "operating_facts",
+    "OperatingFactBundle": "operating_facts",
+    "OperatingFactInputs": "operating_facts",
+    "OrganBoundary": "operating_facts",
+    "OrganStateFact": "operating_facts",
+    "PermissionDecisionKind": "contracts",
+    "PermissionResolutionKind": "contracts",
+    "PermissionRisk": "contracts",
+    "RevenueSignalFact": "operating_facts",
+    "RuntimeHealth": "contracts",
+    "RuntimeTruthPacket": "contracts",
+    "RuntimeTruthState": "contracts",
+    "SessionStore": "session_store",
+    "WorkflowExecutionMode": "contracts",
+    "append_human_yds_rating": "operating_facts",
+    "build_agent_routes_payload": "routing_payloads",
+    "build_operating_fact_bundle": "operating_facts",
+    "build_permission_decision_payload": "permission_payloads",
+    "build_permission_history_payload": "permission_payloads",
+    "build_permission_outcome_payload": "permission_payloads",
+    "build_permission_resolution_payload": "permission_payloads",
+    "build_routing_decision_payload": "routing_payloads",
+    "build_runtime_snapshot_payload": "runtime_payloads",
+    "build_session_catalog": "session_views",
+    "build_session_catalog_payload": "session_payloads",
+    "build_session_detail": "session_views",
+    "build_session_detail_payload": "session_payloads",
+    "build_workspace_snapshot_payload": "workspace_payloads",
+    "bundle_to_dict": "operating_facts",
+    "coherence_map_to_dict": "operating_facts",
+    "connect_runtime_db_read_only": "runtime_truth",
+    "cwd_matches": "session_store",
+    "event_envelope_from_legacy_event": "adapters",
+    "load_agentops_run_facts": "operating_facts",
+    "load_burn_report_facts": "operating_facts",
+    "load_human_yds_rating_facts": "operating_facts",
+    "load_kaizen_review_facts": "operating_facts",
+    "load_revenue_signal_facts": "operating_facts",
+    "organ_boundary_map": "operating_facts",
+    "organ_state_facts": "operating_facts",
+    "permission_decision_from_tool_call": "adapters",
+    "permission_decision_payload_from_decision": "permission_payloads",
+    "permission_outcome_payload_from_outcome": "permission_payloads",
+    "permission_resolution_payload_from_resolution": "permission_payloads",
+    "routing_decision_from_policy": "adapters",
+    "runtime_db_path_from_env": "runtime_truth",
+    "runtime_snapshot_from_operator_snapshot": "adapters",
+    "runtime_truth_packets_from_runtime_db": "runtime_truth",
+    "rust_membrane_candidates": "operating_facts",
+    "session_from_meta": "adapters",
+    "summarize_runtime_truth_packets": "runtime_truth",
+}
+
+
+def __getattr__(name: str):
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    value = getattr(import_module(f".{module_name}", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted({*globals(), *__all__})

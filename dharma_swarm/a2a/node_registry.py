@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -32,11 +33,44 @@ from dharma_swarm.daemon_config import dharma_state_dir
 logger = logging.getLogger(__name__)
 
 _LOG_SANITIZE_RE = re.compile(r"[\r\n\x00-\x1f\x7f]")
+_ENV_SANITIZE_RE = re.compile(r"[^A-Za-z0-9]+")
+_CREDENTIAL_KEY_RE = re.compile(
+    r"(api[_-]?key|token|secret|password|credential|private[_-]?key|authorization)",
+    re.IGNORECASE,
+)
+_REDACTED_SECRET = "<redacted>"
 
 
 def _sanitize(value: object) -> str:
     """Strip control characters from a value before logging."""
     return _LOG_SANITIZE_RE.sub("_", str(value))
+
+
+def _default_api_key_env(node_id: str) -> str:
+    """Return the canonical env-var reference for a node's gateway key."""
+    sanitized = _ENV_SANITIZE_RE.sub("_", str(node_id)).strip("_").upper()
+    return f"DHARMA_NODE_KEY_{sanitized or 'NODE'}"
+
+
+def _is_credential_field(key: object) -> bool:
+    return bool(_CREDENTIAL_KEY_RE.search(str(key)))
+
+
+def _redact_credential_fields(value: Any) -> Any:
+    """Recursively redact values stored under credential-looking field names."""
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, item in value.items():
+            if _is_credential_field(key):
+                redacted[key] = _REDACTED_SECRET
+            else:
+                redacted[key] = _redact_credential_fields(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_credential_fields(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_credential_fields(item) for item in value)
+    return value
 
 
 _STATE_DIR = dharma_state_dir("DHARMA_HOME")
@@ -72,7 +106,8 @@ class RemoteNode:
         status: Current status: online, degraded, offline, unknown.
         last_heartbeat: ISO timestamp of last successful health check.
         capabilities: List of capability names fetched from the remote agent card.
-        api_key: API key for authenticating to this node's gateway.
+        api_key: Runtime-only API key for authenticating to this node's gateway.
+        api_key_env: Environment variable that should hold the gateway API key.
         metadata: Arbitrary extra data.
     """
 
@@ -84,14 +119,29 @@ class RemoteNode:
     capabilities: list[str] = field(default_factory=list)
     api_key: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    api_key_env: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.api_key_env:
+            self.api_key_env = _default_api_key_env(self.node_id)
 
     def is_reachable(self) -> bool:
         """Whether the node is considered reachable for task dispatch."""
         return self.status in ("online", "degraded")
 
+    def resolved_api_key(self) -> str:
+        """Return the active API key from runtime memory or its env reference."""
+        if self.api_key:
+            return self.api_key
+        if self.api_key_env:
+            return os.getenv(self.api_key_env, "")
+        return ""
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d.pop("api_key", None)
+        d["api_key_env"] = self.api_key_env or _default_api_key_env(self.node_id)
+        d["metadata"] = _redact_credential_fields(d.get("metadata", {}))
         return d
 
 
@@ -131,9 +181,25 @@ class NodeRegistry:
             return
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                data = data.get("nodes", [])
+            if not isinstance(data, list):
+                raise ValueError("node registry JSON must be a list or object with a nodes list")
             for item in data:
+                if not isinstance(item, dict):
+                    continue
                 known = {f.name for f in RemoteNode.__dataclass_fields__.values()}
                 filtered = {k: v for k, v in item.items() if k in known}
+                node_id = str(filtered.get("node_id", ""))
+                if not node_id:
+                    continue
+                api_key_env = str(filtered.get("api_key_env") or _default_api_key_env(node_id))
+                filtered["api_key_env"] = api_key_env
+
+                legacy_api_key = str(filtered.get("api_key") or "")
+                # Prefer the env reference. Only keep legacy plaintext in memory
+                # when no referenced env var is available, and never write it back.
+                filtered["api_key"] = "" if os.getenv(api_key_env) else legacy_api_key
                 node = RemoteNode(**filtered)
                 self._nodes[node.node_id] = node
         except Exception as exc:
@@ -142,7 +208,7 @@ class NodeRegistry:
     def _persist(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            data = [asdict(n) for n in self._nodes.values()]
+            data = [n.to_dict() for n in self._nodes.values()]
             self._path.write_text(
                 json.dumps(data, indent=2, default=str) + "\n",
                 encoding="utf-8",
@@ -215,8 +281,9 @@ class NodeRegistry:
 
         url = f"{node.endpoint.rstrip('/')}/a2a/health"
         headers = {}
-        if node.api_key:
-            headers["X-A2A-Key"] = node.api_key
+        api_key = node.resolved_api_key()
+        if api_key:
+            headers["X-A2A-Key"] = api_key
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -335,8 +402,9 @@ async def dispatch_remote_task(
     """
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks"
     headers = {"Content-Type": "application/json"}
-    if node.api_key:
-        headers["X-A2A-Key"] = node.api_key
+    api_key = node.resolved_api_key()
+    if api_key:
+        headers["X-A2A-Key"] = api_key
 
     body: dict[str, Any] = {
         "from_agent": from_agent,
@@ -372,8 +440,9 @@ async def poll_remote_task(
     """
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks/{task_id}"
     headers = {}
-    if node.api_key:
-        headers["X-A2A-Key"] = node.api_key
+    api_key = node.resolved_api_key()
+    if api_key:
+        headers["X-A2A-Key"] = api_key
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.get(url, headers=headers)

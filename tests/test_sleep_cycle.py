@@ -159,11 +159,14 @@ async def test_wake_writes_report(cycle: SleepCycle, tmp_path: Path) -> None:
 
 
 async def test_is_quiet_hours_true() -> None:
-    fake_now = datetime(2026, 3, 8, 3, 15)  # 3:15 AM -- quiet
+    from dharma_swarm.daemon_config import DaemonConfig
+
+    cfg = DaemonConfig(quiet_hours=[2, 3, 4, 5])
+    fake_now = datetime(2026, 3, 8, 3, 15)  # 3:15 AM -- inside configured quiet hours
     with patch("dharma_swarm.sleep_cycle.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-        assert SleepCycle.is_quiet_hours() is True
+        assert SleepCycle.is_quiet_hours(cfg) is True
 
 
 # ---------------------------------------------------------------------------
@@ -172,11 +175,14 @@ async def test_is_quiet_hours_true() -> None:
 
 
 async def test_is_quiet_hours_false() -> None:
-    fake_now = datetime(2026, 3, 8, 10, 0)  # 10 AM -- not quiet
+    from dharma_swarm.daemon_config import DaemonConfig
+
+    cfg = DaemonConfig(quiet_hours=[2, 3, 4, 5])
+    fake_now = datetime(2026, 3, 8, 10, 0)  # 10 AM -- outside configured quiet hours
     with patch("dharma_swarm.sleep_cycle.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-        assert SleepCycle.is_quiet_hours() is False
+        assert SleepCycle.is_quiet_hours(cfg) is False
 
 
 # ---------------------------------------------------------------------------

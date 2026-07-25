@@ -1,0 +1,108 @@
+# Anti-Slop Pudgala Autopoiesis Protostar track block — DRAFT for operator promotion.
+#
+# Status: DRAFT — ACTIVE_TRACK.yaml is NOT hand-edited. Drop this entry under
+# `active_tracks:` only when the operator promotes it (and bump WIP if needed;
+# the portfolio already sits at 8 of warn_active=5).
+#
+# This block is itself a demonstration of the graded claim/evidence binding it
+# proposes: it declares a min_evidence_grade floor, an oracle-independent
+# test_passes, and a chained+fresh receipt_valid criterion. Existence checks
+# alone would leave it UNDERGRADED — exactly the slop the track exists to stop.
+
+- id: anti-slop-pudgala-autopoiesis-protostar-2026-06
+  name: Anti-Slop Pudgala Autopoiesis Protostar — graded claim/evidence binding
+  status: ACTIVE
+  opened_at: "2026-06-25"
+  verified_at: "2026-06-25"
+  ttl_days: 21
+  owner: "@AmitabhainArunachala"
+  serves: substrate-nativeness
+  # Floor: a claim under this track must rest on evidence at least S2 (landed).
+  min_evidence_grade: 2
+  complements:
+    - runtime-truth-reconciliation-2026-06
+    - runtime-truth-spine-adoption-2026-06
+  owned_surfaces:
+    - docs/governance/evidence_grades.yaml
+    - scripts/governance/check_claim_evidence_binding.py
+    - scripts/governance/run_mutation_score.py
+    - docs/governance/hygiene/patterns/AI-M1.yaml
+    - scripts/workflows/antislop-evolve.js
+    - tests/test_claim_evidence_binding.py
+  moves_vital_signs:
+    - quality_gates
+    - eval_coverage
+
+  description: |
+    Authority lives in a GRADED claim->evidence binding, not in file-existence.
+    The keystone gate (check_track_status.py) already enforces a rigorous bar;
+    this track turns that binary bar into a graded floor (min_evidence_grade)
+    with oracle independence, gives EvidenceReceipt a hash-chained machine
+    sibling (VerifiedMachineReceipt), and exposes a scoped proof verdict on the
+    runtime truth packet. P3-09 activates the S6 mutation-score criterion as a
+    read-only report gate produced by `make mutation-test`. It creates NO new
+    truth store, daemon, or authority surface — it extends existing owners and
+    projects from them.
+
+    Doctrine line that must hold:
+      A claim ships only when its strongest evidence meets the required grade,
+      and an oracle the claimant owns is not independent evidence.
+
+  prerequisites:
+    - id: keystone_gate_exists
+      kind: file_exists
+      file: scripts/governance/check_track_status.py
+    - id: spine_receipt_exists
+      kind: file_exists
+      file: dharma_swarm/spine/receipt.py
+
+  completion_criteria:
+    # S1 — the ladder + wrapper + ratchet are present.
+    - id: evidence_ladder_present
+      kind: file_contains
+      file: docs/governance/evidence_grades.yaml
+      pattern: "default_min_grade"
+    - id: graded_conjunct_present
+      kind: file_contains
+      file: scripts/governance/check_track_status.py
+      pattern: "grade_of_criterion"
+    - id: machine_receipt_present
+      kind: file_contains
+      file: dharma_swarm/spine/receipt.py
+      pattern: "class VerifiedMachineReceipt"
+    # S3 — the binding kernel is TESTED by an independent oracle (not the owner).
+    - id: binding_kernel_tested
+      kind: test_passes
+      test: "tests/test_claim_evidence_binding.py"
+      oracle_source: "ci"   # independent of track owner -> keeps S3 (not downgraded)
+    # S6 — optional high-assurance local oracle produced by explicit operator run.
+    - id: mutation_oracle_available
+      kind: mutation_score_gte
+      file: reports/governance/mutation_score.json
+      threshold: 0.60
+      fresh_ttl_days: 14
+
+  non_goals:
+    - Do not create a new truth store, daemon, receipt system, or authority surface.
+    - Do not change the EvidenceReceipt schema; add the machine sibling alongside it.
+    - Do not build property oracle, SBOM, Dharma Forge adapters, dashboard, verifier
+      signatures, or formal proof here; those grade slots remain reserved.
+    - Do not flip any new gate to enforced; all land advisory until the operator promotes.
+
+  next_items:
+    - id: 1
+      what: "SHIPPED: graded ladder + min_evidence_grade conjunct in check_track_status.py."
+      kind: code
+      blocker: false
+    - id: 2
+      what: "SHIPPED: VerifiedMachineReceipt (hash-chained) + append helper in spine/receipt.py."
+      kind: code
+      blocker: false
+    - id: 3
+      what: "SHIPPED: S6 mutation_score_gte checker + explicit make mutation-test producer."
+      kind: code
+      blocker: false
+    - id: 4
+      what: "Operator: promote AI-M1 from advisory to enforced once the ladder is socialised."
+      kind: governance
+      blocker: false

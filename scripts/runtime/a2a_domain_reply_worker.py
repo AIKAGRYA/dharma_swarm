@@ -28,6 +28,7 @@ from dharma_swarm.operator_core.semantic_receipt import (  # noqa: E402
     SemanticReceiptValidationError,
     validate_semantic_receipt,
 )
+from scripts.runtime.a2a_topology import DEFAULT_COMPATIBILITY_STREAM  # noqa: E402
 from scripts.runtime.pr_merge_control import (  # noqa: E402
     NATSConfig,
     _nats_config,
@@ -53,7 +54,14 @@ ACK_TIER_DOMAIN_RECEIPTED = "DOMAIN_RECEIPTED"
 
 
 class PublisherLike(Protocol):
-    async def publish(self, subject: str, payload: bytes) -> Any:
+    async def publish(
+        self,
+        subject: str,
+        payload: bytes,
+        *,
+        timeout: float | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
         ...
 
     async def flush(self, timeout: float | None = None) -> Any:
@@ -102,6 +110,14 @@ def sha256_file(path: Path) -> str:
 
 def _json_bytes(value: dict[str, Any]) -> bytes:
     return json.dumps(value, ensure_ascii=True, sort_keys=True).encode("utf-8")
+
+
+def _pub_ack_payload(pub_ack: Any) -> dict[str, Any]:
+    stream = str(getattr(pub_ack, "stream", "") or "")
+    seq = getattr(pub_ack, "seq", None)
+    if not stream or not isinstance(seq, int):
+        raise RuntimeError("JetStream publish did not return a durable puback")
+    return {"transport_ack": "JETSTREAM_PUB_ACK", "stream": stream, "seq": seq}
 
 
 def default_outbox_dir(agent_uid: str, *, outbox_root: Path | str = DEFAULT_OUTBOX_ROOT) -> Path:
@@ -370,7 +386,16 @@ async def publish_domain_reply(
         "reply_evidence_tier": ACK_TIER_NO_CONTACT,
     }
     try:
-        await publisher.publish(target.reply_subject, payload_bytes)
+        message_id = "domain_reply_" + hashlib.sha256(
+            f"{target.reply_subject}|{receipt['payload_sha256']}".encode("utf-8")
+        ).hexdigest()[:32]
+        pub_ack = await publisher.publish(
+            target.reply_subject,
+            payload_bytes,
+            headers={"Nats-Msg-Id": message_id},
+            timeout=flush_timeout_s,
+        )
+        durable_pub_ack = _pub_ack_payload(pub_ack)
         await publisher.flush(timeout=flush_timeout_s)
         receipt.update(
             {
@@ -379,6 +404,8 @@ async def publish_domain_reply(
                 "reply_evidence_tier": ACK_TIER_DOMAIN_RECEIPTED,
                 "semantic_reply_claim": bool(payload.get("semantic_reply_claim", False)),
                 "domain_receipt_claim": True,
+                "message_id": message_id,
+                "transport_ack": durable_pub_ack,
                 "domain_receipt_payload": payload,
                 "operator_contact_note": (
                     "typed domain receipt was published to the recorded reply_subject; "
@@ -386,8 +413,7 @@ async def publish_domain_reply(
                 ),
             }
         )
-        if transport_ack:
-            receipt["transport_ack"] = transport_ack
+
     except Exception as exc:
         receipt.update(
             {
@@ -407,8 +433,21 @@ class _JetStreamPublisher:
         self.js = nc.jetstream()
         self.last_ack: Any = None
 
-    async def publish(self, subject: str, payload: bytes) -> None:
-        self.last_ack = await self.js.publish(subject, payload)
+    async def publish(
+        self,
+        subject: str,
+        payload: bytes,
+        *,
+        timeout: float | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        self.last_ack = await self.js.publish(
+            subject,
+            payload,
+            timeout=timeout,
+            headers=headers,
+        )
+        return self.last_ack
 
     async def flush(self, timeout: float | None = None) -> None:
         await self.nc.flush(timeout=timeout)
@@ -503,9 +542,6 @@ async def publish_domain_reply_with_nats(
             flush_timeout_s=flush_timeout_s,
             nats=_redacted_nats_config(config),
         )
-        if publisher.last_ack is not None:
-            receipt["transport_ack"] = publisher.transport_ack()
-            _write_json(Path(receipt["receipt_path"]), receipt)
         return receipt
     finally:
         await nc.close()
@@ -549,7 +585,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--agent-uid", default="", help="target agent uid; defaults to send receipt target_uid/to")
     parser.add_argument("--outbox-root", default=str(DEFAULT_OUTBOX_ROOT))
     parser.add_argument("--receipt-dir", default=str(DEFAULT_RECEIPT_DIR))
-    parser.add_argument("--stream", default="DHARMA_FLEET")
+    parser.add_argument("--stream", default=DEFAULT_COMPATIBILITY_STREAM)
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--flush-timeout", type=float, default=2.0)
     parser.add_argument("--json", action="store_true")

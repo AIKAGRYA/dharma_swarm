@@ -286,7 +286,6 @@ def cmd_provider_matrix(
 
 def cmd_gateway(config_path: str | None = None) -> None:
     """Start the messaging gateway."""
-    from pathlib import Path
 
     async def _run_gateway() -> None:
         from dharma_swarm.gateway.runner import GatewayRunner, load_gateway_config

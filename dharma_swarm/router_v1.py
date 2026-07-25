@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import LLMRequest, ProviderType
 from dharma_swarm.ollama_config import (
     OLLAMA_DEFAULT_CLOUD_MODEL,
@@ -21,6 +22,52 @@ from dharma_swarm.ollama_config import (
 )
 from dharma_swarm.provider_policy import ProviderRouteRequest
 from dharma_swarm.tiny_router_shadow import infer_tiny_router_shadow_from_messages
+
+
+# ---------------------------------------------------------------------------
+# Floor model-id projections (model-pool consolidation, 2026-06).
+#
+# This HOT router previously hard-typed provider-specific frontier ids
+# (``moonshotai/kimi-k2.5``, ``z-ai/glm-5``, ``zai-org/GLM-5``, the banished
+# ``nvidia/llama-3.1-nemotron-…`` and the ``*:cloud`` forms). Those literals are
+# the drift the model pool exists to kill. Each helper below derives the FLOOR
+# id from the ONE pool (dharma_swarm.model_pool) so no deployable model-id
+# string lives in this module:
+#   - kimi-k2.5 (sub-floor) is uplifted to the K2.6 floor entry.
+#   - glm-5 is the in-pool reasoning floor; both NIM reasoning branches and the
+#     banished nemotron fallback now project the pool's canonical glm-5 vendor id.
+# ---------------------------------------------------------------------------
+
+
+def _pool_route_id(pool_id: str, *, predicate) -> str:
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for mid in entry.model_ids:
+            if predicate(mid):
+                return mid
+    raise AssertionError(
+        f"model_pool has no matching route for {pool_id!r} floor projection"
+    )
+
+
+def _kimi_floor_openrouter() -> str:
+    """OpenRouter (vendor-namespaced) id for the K2.6 floor, from the pool."""
+    return _pool_route_id("kimi-k2.6", predicate=lambda m: m.startswith("moonshotai/"))
+
+
+def _kimi_floor_cloud() -> str:
+    """Ollama-Cloud id for the K2.6 floor, from the pool."""
+    return _pool_route_id("kimi-k2.6", predicate=lambda m: m.endswith(":cloud"))
+
+
+def _glm_floor_vendor() -> str:
+    """Vendor-namespaced id for the glm-5 reasoning floor, from the pool."""
+    return _pool_route_id("glm-5", predicate=lambda m: "/" in m)
+
+
+def _glm_floor_cloud() -> str:
+    """Ollama-Cloud id for the glm-5 reasoning floor, from the pool."""
+    return _pool_route_id("glm-5", predicate=lambda m: m.endswith(":cloud"))
 
 
 _RE_CODE = re.compile(r"```|`[^`]+`|\b(def|class|import|api|sql|json)\b", re.IGNORECASE)
@@ -430,23 +477,23 @@ def model_hint_for_provider(
         if provider == ProviderType.ANTHROPIC:
             return "claude-sonnet-4-6"
         if provider == ProviderType.OPENROUTER:
-            return "moonshotai/kimi-k2.5"
+            return _kimi_floor_openrouter()
         if provider == ProviderType.NVIDIA_NIM and nim_self_hosted:
-            return "moonshotai/kimi-k2.5"
+            return _kimi_floor_openrouter()
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "kimi-k2.5:cloud"
+            return _kimi_floor_cloud()
         if provider == ProviderType.GOOGLE_AI:
             return "gemini-2.5-flash"
 
     if signals.language_code in {"ja", "en_ja_mixed"}:
         if provider == ProviderType.OPENROUTER:
-            return "moonshotai/kimi-k2.5"
+            return _kimi_floor_openrouter()
         if provider == ProviderType.ANTHROPIC:
             return "claude-sonnet-4-6"
         if provider == ProviderType.NVIDIA_NIM and nim_self_hosted:
-            return "moonshotai/kimi-k2.5"
+            return _kimi_floor_openrouter()
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "kimi-k2.5:cloud"
+            return _kimi_floor_cloud()
 
     if signals.complexity_tier == "REASONING":
         if provider == ProviderType.ANTHROPIC:
@@ -454,20 +501,22 @@ def model_hint_for_provider(
         if provider == ProviderType.OPENAI:
             return "gpt-5"
         if provider == ProviderType.OPENROUTER:
-            return "z-ai/glm-5"
+            return _glm_floor_vendor()
         if provider == ProviderType.NVIDIA_NIM:
-            if nim_self_hosted:
-                return "zai-org/GLM-5"
-            return "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+            # Both NIM reasoning routes project the pool's glm-5 reasoning floor:
+            # the self-hosted ``zai-org/GLM-5`` orphan and the banished hosted
+            # ``nvidia/llama-3.1-nemotron-…`` fallback are both lifted to the
+            # canonical pool glm-5 vendor id (nemotron is BANISHED).
+            return _glm_floor_vendor()
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "glm-5:cloud"
+            return _glm_floor_cloud()
         if provider == ProviderType.GROQ:
-            return "llama-3.3-70b-versatile"
+            return _model_pool.default_for_provider(ProviderType.GROQ)
         if provider == ProviderType.CEREBRAS:
-            return "llama-3.3-70b"
+            return "qwen-3-235b-a22b-instruct-2507"
         if provider == ProviderType.SILICONFLOW:
             return "Qwen/Qwen3-Coder-480B-A35B-Instruct"
         if provider == ProviderType.GOOGLE_AI:
-            return "gemini-2.5-flash"
+            return "gemini-2.5-pro"
 
     return effective_default_hint

@@ -22,19 +22,16 @@ Ground: Beer (PILLAR_08), Ashby (requisite variety), Dada Bhagwan (witness).
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import random
-import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
-from typing import Any, Callable, Awaitable, Protocol
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
 from dharma_swarm.models import (
-    GateDecision,
     GateResult,
     _new_id,
     _utc_now,

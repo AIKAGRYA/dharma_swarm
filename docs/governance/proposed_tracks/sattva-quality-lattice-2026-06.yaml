@@ -1,0 +1,86 @@
+# Sattva Quality Lattice track block — DRAFT, not active
+#
+# Source: fable_composer (master-composer seat), 2026-06-12, at operator
+# (Dhyana) direction following the senior strategic review of the Grok
+# "Sattva Quality Lattice" proposal.
+# Status: DRAFT — the 2026-06-12 review verdict was Modify-and-Go:
+#   NO to a 7th co-equal ACTIVE track today (portfolio is 6 ACTIVE vs
+#   warn_active 5, all six serving substrate-nativeness; Q-002/Q-003/Q-008
+#   of the original proposal collide with owned surfaces of spine-adoption,
+#   reconciliation, and loop-closure), YES to the direction.
+#   The seed shipped WITHOUT a track slot: SATTVA_STYLE.md canon,
+#   ratchet.py + 7 live counters + QL-R1, first lifecycle promotion (VC-C4),
+#   F821/F811 floor at zero. This draft exists so the REMAINING work has a
+#   reviewable shape when (a) a track slot frees up, or (b) the operator
+#   decides the lattice outranks a revenue/research-depth track — that
+#   comparison is the real promotion decision.
+#
+# Promotion preconditions (all three):
+#   (1) QL-R1 has banked >= 2 clean review cycles in dated hygiene baselines.
+#   (2) At least one ACTIVE substrate-nativeness track has closed (stay <= 6).
+#   (3) Operator has explicitly weighed this against opening a
+#       revenue-external-humans-served or research-depth track.
+
+- id: sattva-quality-lattice-2026-06
+  name: Sattva Quality Lattice — mechanized positive quality canon
+  status: DRAFT
+  opened_at: "2026-06-12"
+  verified_at: "2026-06-12"
+  ttl_days: 30
+  owner: "@AmitabhainArunachala"
+  serves: substrate-nativeness
+  moves_vital_signs: [quality_gates]
+
+  description: |
+    Complete the positive-attractor quality layer seeded on 2026-06-12:
+    widen the one-way ratchet from 7 counters to the 17-invariant
+    SATTVA_STYLE.md canon, drive the highest-leverage debt counters
+    down (244 silent exception swallows; 194 over-budget modules), and
+    promote the ratchet itself to enforced via the hygiene lifecycle.
+
+    Doctrine line: the lattice never prescribes how an agent solves a
+    problem; it only forbids the substrate's verifiable floor to sink.
+    Every new counter ships with its diversity bill written down.
+
+  owned_surfaces:
+    - scripts/governance/hygiene/ratchet.py
+    - scripts/governance/hygiene/ratchet_counters.py
+    - scripts/governance/assurance_boundary.py
+    - docs/governance/hygiene/ratchet_baselines.json
+    - docs/quality/SATTVA_STYLE.md
+    - tests/test_quality_ratchet.py
+    - tests/test_assurance_boundary.py
+    - tests/properties/test_ratchet_properties.py
+
+  completion_criteria:
+    - id: ratchet_enforced_in_lifecycle
+      kind: file_contains
+      file: docs/governance/hygiene/patterns/QL-R1.yaml
+      pattern: '"stage": "enforced"'
+    - id: ratchet_in_governance_all
+      kind: file_contains
+      file: Makefile
+      pattern: 'governance-all:.*quality-ratchet'
+    - id: swallow_sites_halved
+      kind: file_contains
+      file: docs/governance/hygiene/ratchet_baselines.json
+      pattern: '"silent_exception_swallows": (1[0-1][0-9]|[0-9]{1,2})\b'
+    - id: spine_layer_contract_drained
+      kind: file_contains
+      file: docs/governance/hygiene/ratchet_baselines.json
+      pattern: '"boundary_contract_violations": 0'
+    - id: boundary_swallows_drained
+      kind: file_contains
+      file: docs/governance/hygiene/ratchet_baselines.json
+      pattern: '"boundary_unwitnessed_swallows": 0'
+
+  non_goals:
+    - Do not gate on judgment qualities (naming, design depth); counters
+      stay deterministic numbers with evidence.
+    - Do not touch surfaces owned by spine-adoption, reconciliation, NATS,
+      or loop-closure tracks; bypass-drain and receipt-joinability work
+      stays theirs (this lattice only forbids growth via its counters).
+    - Do not add a new CI workflow; enforcement rides existing planes
+      (Makefile, hygiene lifecycle, scan baselines) until promotion.
+    - Do not loosen any baseline except by reviewed manual edit with
+      written justification.

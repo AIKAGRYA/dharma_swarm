@@ -1,6 +1,6 @@
 name: active-track-governance
 
-# Self-healing gate for the ACTIVE_TRACK governance system.
+# Advisory signal for the ACTIVE_TRACK governance system.
 #
 # This workflow exists because of the 2026-05-19 operator-brief pointer-rot
 # incident: prose pointers in CLAUDE.md / SOVEREIGN_MANIFEST.md /
@@ -8,8 +8,8 @@ name: active-track-governance
 # but no automated check noticed. The structural fix (see
 # docs/governance/REPO_GOVERNANCE_AUDIT.md §2026-05-19) declares the active
 # track in exactly one place — docs/governance/ACTIVE_TRACK.yaml — and
-# renders managed blocks into the prose docs via markers. This gate enforces
-# both invariants on every PR:
+# renders managed blocks into the prose docs via markers. This workflow reports
+# both invariants on every PR, but only the scheduled sweep hard-fails:
 #
 #   1. ACTIVE_TRACK.yaml is well-formed and its criteria can be evaluated
 #      against the live tree (check_track_status.py).
@@ -20,6 +20,10 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
   merge_group:
+  push:
+    # Publish-only trigger: regenerate the derived status rollups and push
+    # them to the generated/status orphan branch (see publish-status job).
+    branches: [main]
   schedule:
     # Weekly TTL freshness check on docs/governance/ACTIVE_TRACK.yaml verified_at.
     - cron: "23 13 * * 1"
@@ -36,9 +40,26 @@ permissions:
 jobs:
   active-track-governance:
     name: ACTIVE_TRACK governance gate
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Confine checker state outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap="${RUNNER_TEMP}/dharma-active-track-bootstrap"
+          mkdir -p "${bootstrap}"/{pycache,xdg,ruff,pip,hypothesis}
+          printf '%s\n' \
+            'PYTHONDONTWRITEBYTECODE=1' \
+            "PYTHONPYCACHEPREFIX=${bootstrap}/pycache" \
+            'PYTEST_ADDOPTS=-p no:cacheprovider' \
+            "XDG_CACHE_HOME=${bootstrap}/xdg" \
+            "RUFF_CACHE_DIR=${bootstrap}/ruff" \
+            "PIP_CACHE_DIR=${bootstrap}/pip" \
+            "HYPOTHESIS_STORAGE_DIRECTORY=${bootstrap}/hypothesis" \
+            >> "${GITHUB_ENV}"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -49,17 +70,36 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal deps
+      - name: Install package + test deps
         run: |
+          set -euo pipefail
           python3 -m pip install --upgrade pip
-          python3 -m pip install pyyaml
+          install_source="${RUNNER_TEMP}/dharma-active-track-bootstrap/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}[dev]"
 
       - name: Evaluate ACTIVE_TRACK.yaml against tree
         run: |
           set -euo pipefail
           mkdir -p reports/governance
-          python3 scripts/governance/check_track_status.py
+          # TTL staleness blocks only on the weekly freshness sweep (schedule),
+          # never on per-PR runs — a stale unrelated track must not block every
+          # open PR (the checker emits TTL as WARN, exit 0, on the per-PR path).
+          # Structural / regression / false-shippable-claim findings are ERROR
+          # and now BLOCK on PRs too (this step is no longer continue-on-error):
+          # a track that declares status: shippable without rigorous evidence is
+          # a false-closure claim and must fail CI, not merely inform.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python3 scripts/governance/check_track_status.py --enforce-ttl
+          else
+            python3 scripts/governance/check_track_status.py
+          fi
 
+      # Blocking on PRs as of 2026-07-07 (was continue-on-error off-schedule,
+      # which let rendered-block drift merge and live for up to 7 days — the
+      # adjacent Evaluate step was already hardened; this applies the same
+      # standard). Verified in sync on main before the flip.
       - name: Verify managed blocks are in sync (no drift)
         run: |
           set -euo pipefail
@@ -71,3 +111,384 @@ jobs:
         with:
           name: active-track-evidence
           path: reports/governance/active_track_evidence.*
+
+  # CI runs the same strict-default, read-only session-status command as local
+  # sessions, then exercises the focused onboarding contracts. Edit admission
+  # remains a separate, explicitly packet-bound preflight; this status job does
+  # not discover, bind, execute, or upload work-packet evidence.
+  onboarding-status:
+    name: Onboarding session status
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # `runner` is unavailable while GitHub evaluates job-level `env`. Resolve
+      # the assigned runner's temporary root in a step, then export it for all
+      # later steps through the runner-owned environment file.
+      - name: Confine tool state outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap="${RUNNER_TEMP}/dharma-agentops-bootstrap"
+          mkdir -p "${bootstrap}"/{pycache,xdg,ruff,pip}
+          printf '%s\n' \
+            'PYTHONDONTWRITEBYTECODE=1' \
+            "PYTHONPYCACHEPREFIX=${bootstrap}/pycache" \
+            'PYTEST_ADDOPTS=-p no:cacheprovider' \
+            "XDG_CACHE_HOME=${bootstrap}/xdg" \
+            "RUFF_CACHE_DIR=${bootstrap}/ruff" \
+            "PIP_CACHE_DIR=${bootstrap}/pip" \
+            >> "${GITHUB_ENV}"
+
+      - name: Checkout declared head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.13"
+
+      - name: Install package + test deps
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          install_source="${RUNNER_TEMP}/dharma-agentops-bootstrap/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}[dev]"
+
+      - name: Run session status (same command as local)
+        env:
+          DHARMA_OPS_DIR: ${{ runner.temp }}/dharma-agentops/onboarding
+        run: |
+          set -euo pipefail
+          make onboard
+
+      - name: Run focused onboarding contract tests
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q \
+            tests/test_agent_onboard.py \
+            tests/test_onboarding_cli.py \
+            tests/test_onboarding_readiness.py \
+            tests/test_onboarding_ci_contract.py
+
+  # Phase-1 compatibility bridge for the live branch-protection context. This
+  # job cannot pass unless the accurately named session-status job passed. Once
+  # main carries both contexts and branch protection requires the new name, the
+  # bridge can be removed without opening a false-green interval.
+  onboarding-admission-parity-compat:
+    name: Onboarding admission parity
+    needs: onboarding-status
+    if: >-
+      always() &&
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require the session-status result
+        env:
+          SESSION_STATUS_RESULT: ${{ needs.onboarding-status.result }}
+        run: |
+          set -euo pipefail
+          test "${SESSION_STATUS_RESULT}" = "success"
+
+  # Phase-1 packet-scope signal. The first PR that introduces the checker
+  # cannot honestly enforce a policy that did not exist at its declared base,
+  # so that range emits an explicit bootstrap receipt. Every later PR / merge
+  # group runs the checker fail-closed against its declared event range.
+  agentops-packet-scope:
+    name: AgentOps packet scope
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout declared head with full history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 0
+
+      # Classify the one honest bootstrap exception before installing candidate
+      # dependencies. Thus a first-introduction range cannot fail before it
+      # records why enforcement was impossible, while every base that already
+      # contains the checker proceeds to the fail-closed path below.
+      - name: Classify packet-scope enforcement boundary
+        id: packet-scope-boundary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          CHECKER_PATH: scripts/governance/check_agentops_packet_scope.py
+          REPORT_PATH: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${REPORT_PATH}")"
+
+          # Seed an honest failure receipt before validation. If any declared
+          # event identity is malformed or unavailable, the job fails and the
+          # always-run artifact step still has a machine-readable explanation.
+          python3 - <<'PY' > "${REPORT_PATH}"
+          import json
+          import os
+
+          report = {
+              "schema": "dharma.agentops_packet_scope.v1",
+              "status": "CONFIG_ERROR",
+              "required": None,
+              "passed": False,
+              "enforced": False,
+              "event_name": os.environ.get("EVENT_NAME", ""),
+              "event_base": os.environ.get("EVENT_BASE", ""),
+              "event_head": os.environ.get("EVENT_HEAD", ""),
+              "checker_path": os.environ.get("CHECKER_PATH", ""),
+              "claim": (
+                  "configuration failure only; no packet-scope, packet-validity, "
+                  "preflight/closeout, human-approval, or merge-authority claim"
+              ),
+              "errors": ["workflow boundary validation or enforcement did not complete"],
+          }
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+          case "${EVENT_NAME}" in
+            pull_request|merge_group) ;;
+            *) echo "unsupported event: ${EVENT_NAME}" >&2; exit 2 ;;
+          esac
+          [[ "${EVENT_BASE}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${EVENT_HEAD}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse --verify "${EVENT_BASE}^{commit}")" = "${EVENT_BASE}"
+          test "$(git rev-parse --verify "${EVENT_HEAD}^{commit}")" = "${EVENT_HEAD}"
+          test "$(git rev-parse HEAD)" = "${EVENT_HEAD}"
+
+          base_checker_path="$(
+            git ls-tree -r --name-only "${EVENT_BASE}" -- "${CHECKER_PATH}"
+          )"
+          if [ -z "${base_checker_path}" ]; then
+            python3 - <<'PY' > "${REPORT_PATH}"
+          import json
+          import os
+
+          report = {
+              "schema": "dharma.agentops_packet_scope.v1",
+              "status": "BOOTSTRAP_NOT_ENFORCED",
+              "required": None,
+              "passed": True,
+              "enforced": False,
+              "event_name": os.environ["EVENT_NAME"],
+              "event_base": os.environ["EVENT_BASE"],
+              "event_head": os.environ["EVENT_HEAD"],
+              "checker_path": os.environ["CHECKER_PATH"],
+              "claim": (
+                  "bootstrap provenance only; no packet-scope, packet-validity, "
+                  "preflight/closeout, human-approval, or merge-authority claim"
+              ),
+              "reason": (
+                  "the checker is absent at the declared event base; "
+                  "enforcement begins only after the checker lands on the base branch"
+              ),
+              "errors": [],
+          }
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+            cat "${REPORT_PATH}"
+            echo "enforce=false" >> "${GITHUB_OUTPUT}"
+          else
+            test "${base_checker_path}" = "${CHECKER_PATH}"
+            git cat-file -e "${EVENT_BASE}:${CHECKER_PATH}"
+            echo "enforce=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Set up Python
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      # The enforcement code (checker script, its first-party imports, and the
+      # installed package) comes from the trusted event base, never the
+      # candidate head: a PR that edits the checker must not attest its own
+      # packet scope.
+      - name: Install base-declared checker dependencies
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        env:
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          install_source="${RUNNER_TEMP}/dharma-agentops-packet-scope/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar "${EVENT_BASE}" | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}"
+
+      - name: Enforce declared event packet scope
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          CHECKER_PATH: scripts/governance/check_agentops_packet_scope.py
+          REPORT_PATH: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
+        run: |
+          set -euo pipefail
+          # The checker CODE still comes from the trusted event base: the script
+          # file is executed from the base worktree, and its first-party imports
+          # resolve to the base-installed package (-I keeps the head checkout's
+          # dharma_swarm/ tree, the script directory, and PYTHON* env vars off
+          # sys.path). It RUNS against the head checkout, whose git HEAD equals
+          # the declared event head — the checker itself asserts exactly that
+          # (check_agentops_packet_scope.py evaluate(): checked-out HEAD must
+          # equal the declared event head, and main() takes repo_root from cwd).
+          # Both pinned event SHAs resolve from this checkout's full history.
+          trusted_base="${RUNNER_TEMP}/dharma-agentops/packet-scope/trusted-base"
+          git worktree add --detach "${trusted_base}" "${EVENT_BASE}"
+          checker_report="${REPORT_PATH}.checker"
+          checker_exit=0
+          if (python3 -I "${trusted_base}/${CHECKER_PATH}" \
+              --event-name "${EVENT_NAME}" \
+              --event-base "${EVENT_BASE}" \
+              --event-head "${EVENT_HEAD}") \
+              | tee "${checker_report}"; then
+            :
+          else
+            checker_exit="$?"
+          fi
+          test -s "${checker_report}"
+          python3 - "${checker_report}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if report.get("schema") != "dharma.agentops_packet_scope.v1":
+              raise SystemExit("checker emitted an unexpected report schema")
+          if not isinstance(report.get("passed"), bool):
+              raise SystemExit("checker report lacks a boolean passed field")
+          PY
+          mv "${checker_report}" "${REPORT_PATH}"
+          if [ "${checker_exit}" -ne 0 ]; then
+            exit "${checker_exit}"
+          fi
+
+      - name: Upload AgentOps packet-scope evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agentops-packet-scope-evidence
+          path: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          if-no-files-found: error
+
+  # Stock macOS ships GNU Make 3.81, whose parser rejects target-specific
+  # assignments with multiple modifiers (for example `override export`). Keep
+  # this host proof separate from the required Linux admission context so its
+  # stable name does not change when the compatibility matrix grows.
+  onboarding-macos-compatibility:
+    name: Onboarding macOS 3.81 compatibility
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - name: Checkout declared head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          # macos-14 is arm64 and does not publish every CPython patch.
+          python-version: "3.12"
+
+      - name: Install repository-declared proof dependencies
+        run: |
+          set -euo pipefail
+          install_source="${RUNNER_TEMP}/dharma-agentops-bootstrap/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}[dev]"
+
+      - name: Execute the governed macOS compatibility reproducer
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/pycache
+          PYTEST_ADDOPTS: -p no:cacheprovider
+        run: /usr/bin/make onboarding-macos-compatibility
+
+  # Derived status rollups (active_track_evidence.{json,md},
+  # track_portfolio.json, trust_gate_status.json) are NOT tracked on main —
+  # they are rewritten in place with a generated_at timestamp on every run and
+  # hard-conflicted every concurrent rebase train. This job regenerates them
+  # from the merged tree on every push to main and force-pushes them to the
+  # unprotected generated/status orphan branch, which serves as:
+  #   1. the regression baseline for check_track_status._load_prior_passed
+  #      on fresh checkouts (git show origin/generated/status:<path>);
+  #   2. the stable read surface for humans and agents
+  #      (git show origin/generated/status:reports/governance/<file>).
+  publish-status:
+    name: Publish derived status branch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Raised from 10 with the full dev install below: the checker now actually
+    # executes the pytest-battery criteria (wp_o4's batch alone runs ~2.5 min).
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      # Install the same dev environment as tests.yml so pytest-backed track
+      # criteria can execute instead of rendering as unverified. Fail-safe: a
+      # dev-install failure degrades to the previous minimal (pyyaml-only)
+      # environment — the checker still runs --warn-only and unexecuted
+      # criteria render honestly unverified — rather than killing the job
+      # and leaving generated/status silently stale. Only the minimal
+      # fallback failing fails the job.
+      - name: Install package + test deps
+        run: |
+          python3 -m pip install --upgrade pip
+          if ! python3 -m pip install -e ".[dev]"; then
+            echo "::warning::dev install failed; publishing minimal projection with unverified criteria"
+            python3 -m pip install pyyaml
+          fi
+
+      - name: Regenerate derived status rollups
+        run: |
+          set -euo pipefail
+          mkdir -p reports/governance
+          # --warn-only: publishing status must reflect reality even when the
+          # gate has blocking findings; the findings ride inside the payload.
+          python3 scripts/governance/check_track_status.py --warn-only
+          python3 scripts/governance/trust_gate_status.py
+
+      - name: Push rollups to generated-status branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Build an orphan commit holding ONLY the four rollups (temp index so
+          # the main checkout state is untouched), then force-push: the branch
+          # is a latest-only publish surface, not history.
+          export GIT_INDEX_FILE="$(mktemp)"
+          git read-tree --empty
+          git add -f \
+            reports/governance/active_track_evidence.json \
+            reports/governance/active_track_evidence.md \
+            reports/governance/track_portfolio.json \
+            reports/governance/trust_gate_status.json
+          TREE="$(git write-tree)"
+          COMMIT="$(git commit-tree "${TREE}" -m "status: derived governance rollups @ ${GITHUB_SHA}")"
+          git push --force origin "${COMMIT}:refs/heads/generated/status"

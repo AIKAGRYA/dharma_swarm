@@ -1,6 +1,14 @@
 # Handoff — Ontology-Native Operator Brief, First Implementation
 
-**Status:** ready for the next code agent to pick up.
+> **DEPRECATED — retained as historical reference** (re-verified 2026-06-15 by perplexity-computer).
+> Per `docs/governance/ACTIVE_TRACK.yaml`, the underlying master spec is superseded by the `cockpit-control-surface-2026-05` lane. Implementation paths described here have either shipped (commits `695f149`, `e0cdb79`) or been re-routed through the cockpit lane. Retained for citation only. Do not pick this up as a fresh hand-off.
+>
+> Deprecated: 2026-06-15
+> Reason: Superseded by `cockpit-control-surface-2026-05` lane (SHIPPED); implementation paths shipped or re-routed.
+> Replacement: `docs/governance/ACTIVE_TRACK.yaml` (current build portfolio)
+> Review / removal date: 2026-09-15
+
+**Status:** **DEPRECATED — historical reference** (was: ready for the next code agent to pick up)
 **Scope:** implements [`ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md) item 5 and (separately) item 6 from [`NEXT_10_SUBSTRATE_TODO.md`](NEXT_10_SUBSTRATE_TODO.md).
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md). All of it. Then the master spec linked above.
 

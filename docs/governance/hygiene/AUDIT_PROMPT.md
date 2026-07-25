@@ -116,6 +116,24 @@ Audit questions:
 - Does this AI-generated issue or PR include reproduction steps, affected version, and minimal concrete trace?
 - Is review burden lower after this change than before it?
 
+## Cluster M - Graded Claim/Evidence Binding
+
+### AI-M1 - Claim shipped on existence evidence below required grade
+A track or claim is treated as shippable when its strongest passing evidence is below the required grade -- file_exists or file_contains (S0/S1) standing in for landed, tested, or independently verified work -- or when its only green test is owned by the same identity that owns the claim, so the oracle is not independent.
+
+Audit questions:
+- What is the strongest evidence grade this claim rests on, and does it meet the required min_evidence_grade?
+- If the binding evidence is a passing test, is its oracle independent of the claim owner (signer is not the committer), or was it downgraded?
+
+## Cluster R - Quality Ratchet
+
+### QL-R1 - Quality ratchet regression
+A repo-wide quality counter moved against its permitted direction: debt counters (undefined names, over-budget modules, silent exception swallows, spine bypasses) may only fall; asset counters (property-test files, enforced hygiene patterns) may only rise. Baselines live in docs/governance/hygiene/ratchet_baselines.json and tighten automatically on green runs.
+
+Audit questions:
+- Did this change move any ratchet counter against its direction, and if intentional, was the baseline edit reviewed as a deliberate loosening?
+- Did an improving change commit the tightened ratchet_baselines.json alongside the improvement so the gain is banked?
+
 ## Cluster A - Test Theater
 
 ### VC-A1 - Happy-path tunnel vision

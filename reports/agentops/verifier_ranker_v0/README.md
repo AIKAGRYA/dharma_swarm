@@ -1,7 +1,7 @@
 # DharmaVerifier-Ranker v0 Starter Package
 
-Date: 2026-07-01 JST
-Role: report / witness / training-readiness package
+Date: 2026-07-01 JST  
+Role: report / witness / training-readiness package  
 Authority: advisory only, no dispatch, no promotion, no public-claim approval
 
 ## Status

@@ -1,0 +1,212 @@
+name: docops-reconcile-main
+
+# Reconciles the generated DocOps count files on main after every merge.
+#
+# Why this exists:
+#   The "DocOps integrity gate" (docops.yml) treats generated counts as advisory
+#   (--counts-advisory). PRs therefore no longer hand-commit AUTO_INVENTORY.md /
+#   SOVEREIGN_MANIFEST.md counts, so they never collide in the merge queue (that
+#   was the O(n^2) "counter cascade"). The cost of that is the two files go stale
+#   on main the moment a file/test/line-adding PR merges. This job closes that
+#   gap: right after each merge it recomputes the counts from the tree and commits
+#   them back to main.
+#
+# Loop avoidance:
+#   The reconcile commit carries [skip ci], and pushes made with GITHUB_TOKEN do
+#   not trigger new workflow runs — so this job never re-triggers itself.
+#
+# Delivery (two tiers, honest failure):
+#   Tier 1 — direct push to main. Requires a bypass-capable token as the
+#   DOCOPS_RECONCILE_TOKEN secret (fine-grained PAT or GitHub App installation
+#   token with contents:write, on the ruleset bypass list). The default
+#   GITHUB_TOKEN CANNOT push to protected main — between 2026-06 and 2026-07-03
+#   this job "succeeded" 102 consecutive times while every single push was
+#   rejected (GH006) and downgraded to a ::warning nobody read, leaving the
+#   counts stale on main the whole time. Never again: a rejected delivery is a
+#   FAILED job, not a warning.
+#   Tier 2 — fallback when no bypass token exists: push the rolling
+#   chore/docops-autorefresh branch (a lane already registered in
+#   bot-pr-limit.yml, max 1 open) and open/refresh a bot PR. The automerge
+#   workflow auto-enrolls bot-authored PRs (bot-pr label) and merges through
+#   the normal gate. If BOTH tiers fail, the job exits non-zero — visible red.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: docops-reconcile-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    name: Reconcile DocOps counts on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+          # Prefer a bypass-capable token (PAT / GitHub App) so the reconcile
+          # push clears the merge-queue ruleset; fall back to GITHUB_TOKEN.
+          token: ${{ secrets.DOCOPS_RECONCILE_TOKEN || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate generated count files
+        run: |
+          set -euo pipefail
+          # Reuse the existing writer. --write-auto-sections rewrites the
+          # AUTO_INVENTORY DOCOPS:START/END sections; --write-manifest-counts
+          # rewrites the asserted SOVEREIGN_MANIFEST count tokens. Both are
+          # idempotent and driven by docs/docops/assertions.yaml.
+          #
+          # The overall exit code is tolerated (unrelated strict checks — TTL,
+          # path guards — may fail here and belong to docops.yml), but a WRITE
+          # failure is THIS job's purpose failing and must go red: a crashed
+          # writer leaves no diff, the next step says "already in sync", and we
+          # are back to silently-stale counts (the 102-run disease).
+          python3 scripts/docops/check_docops_integrity.py \
+            --write-auto-sections --write-manifest-counts \
+            --report-json /tmp/reconcile-check.json || true
+          python3 - <<'PY'
+          import json, sys
+          findings = json.load(open("/tmp/reconcile-check.json"))["findings"]
+          write_failures = [f for f in findings
+                            if f["check"] in ("assertion-write", "auto-section")
+                            and f["severity"] == "FAIL"]
+          for f in write_failures:
+              print(f"::error::count writer failed: {f['message']}")
+          sys.exit(1 if write_failures else 0)
+          PY
+
+      - name: Commit and deliver reconciled counts (only if changed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HAS_BYPASS_TOKEN: ${{ secrets.DOCOPS_RECONCILE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- \
+              docs/docops/AUTO_INVENTORY.md \
+              docs/governance/SOVEREIGN_MANIFEST.md; then
+            echo "DocOps counts already in sync — nothing to reconcile."
+            exit 0
+          fi
+
+          # Tier 2 uses one rolling PR. A new main parent changes the commit
+          # identity even when the two canonical files are byte-identical to
+          # that PR's current head; do not force-push and retrigger all CI in
+          # that case.
+          BRANCH="chore/docops-autorefresh"
+          if [ "$HAS_BYPASS_TOKEN" != "true" ]; then
+            existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open \
+              --json number --jq '.[0].number // empty')"
+            if [ -n "$existing" ] \
+                && git fetch --no-tags origin "refs/heads/${BRANCH}" \
+                && git diff --quiet "FETCH_HEAD" -- \
+                  docs/docops/AUTO_INVENTORY.md \
+                  docs/governance/SOVEREIGN_MANIFEST.md; then
+              # Byte-identical canonical files are not enough on their own: if
+              # anything else ever lands on the rolling branch, skipping here
+              # would preserve those extra files indefinitely. Only skip when
+              # the rolling PR's own delta (merge-base..head) is confined to
+              # the two canonical paths; otherwise fall through and let the
+              # force-push reset the branch to a pure reconcile.
+              merge_base="$(git merge-base HEAD FETCH_HEAD || true)"
+              extra_paths="$(git diff --name-only "${merge_base:-HEAD}" FETCH_HEAD -- \
+                | grep -v -x -e 'docs/docops/AUTO_INVENTORY.md' \
+                            -e 'docs/governance/SOVEREIGN_MANIFEST.md' || true)"
+              if [ -z "$extra_paths" ]; then
+                echo "Canonical DocOps bytes already match the open rolling PR #${existing}; no refresh needed."
+                exit 0
+              fi
+              echo "Rolling PR #${existing} carries noncanonical paths; resetting via force-push:"
+              printf '%s\n' "$extra_paths"
+            fi
+          fi
+
+          echo "DocOps counts drifted; committing reconcile:"
+          git --no-pager diff --stat -- \
+            docs/docops/AUTO_INVENTORY.md \
+            docs/governance/SOVEREIGN_MANIFEST.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage only the two governed count files — never a blanket `git add -A`
+          # (respects local rule dharma.scripts-no-git-add-all).
+          git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md
+          git commit \
+            -m "chore(docops): reconcile generated counts [skip ci]" \
+            -m "Mechanical post-merge reconcile of the generated DocOps count files (AUTO_INVENTORY.md, SOVEREIGN_MANIFEST.md) from the tree. Generated by docops-reconcile-main.yml. No hand-authored content changed."
+
+          # ---- Tier 1: direct push (only when a bypass-capable token is wired).
+          # If another merge moved main between checkout and push, don't rebase
+          # stale derived counts onto a newer tree — the newer push triggers its
+          # own reconcile run (serialized by this job's concurrency group).
+          if [ "$HAS_BYPASS_TOKEN" = "true" ]; then
+            if git push origin HEAD:main; then
+              echo "Reconcile delivered by direct push (bypass token)."
+              exit 0
+            fi
+            if ! git merge-base --is-ancestor "$(git rev-parse HEAD~1)" "$(git ls-remote origin -q refs/heads/main | cut -f1)"; then
+              echo "main moved during the run — the newer reconcile run recomputes; done."
+              exit 0
+            fi
+            echo "::error::bypass token present but the direct push was rejected — fix the token's bypass grant."
+            exit 1
+          fi
+
+          # ---- Tier 2: rolling bot PR through the normal merge gate.
+          # Lane chore/docops-autorefresh is registered in bot-pr-limit.yml
+          # (max 1 open); automerge.yml auto-enrolls bot-authored PRs.
+          git push --force origin "HEAD:refs/heads/${BRANCH}"
+          # WP-0G (TIT-008): delivery is not success — an actionable PR must
+          # have CHECKS on the delivered head. Events caused by GITHUB_TOKEN
+          # never trigger workflows, so a Tier-2 force-push can silently
+          # produce a checkless head ("the rolling repair PR can lose
+          # checks"). Verify, and go red with the operator fix when no check
+          # run appears on the new head within the wait budget.
+          verify_head_checks() {
+            head_sha="$(git rev-parse HEAD)"
+            for _attempt in 1 2 3 4; do
+              sleep 15
+              count="$(gh api "repos/${GH_REPO}/commits/${head_sha}/check-runs" \
+                --jq '.total_count' 2>/dev/null || echo 0)"
+              if [ "${count:-0}" -gt 0 ]; then
+                echo "Delivered head ${head_sha} has ${count} check run(s)."
+                return 0
+              fi
+            done
+            echo "::error::reconcile head ${head_sha} received no CI checks after force-update — pushes made with GITHUB_TOKEN cannot trigger workflows, so this rolling PR is not actionable. Provision the DOCOPS_RECONCILE_TOKEN bypass secret (fine-grained PAT or GitHub App token) so reconcile events trigger checks, or merge the rolling PR manually."
+            return 1
+          }
+          existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Refreshed open PR #${existing} on ${BRANCH}; verifying the new head has checks."
+            verify_head_checks
+            exit $?
+          fi
+          if gh pr create --repo "$GH_REPO" \
+              --head "$BRANCH" --base main \
+              --title "chore(docops): reconcile generated counts" \
+              --body "Mechanical post-merge reconcile of the generated DocOps count files (AUTO_INVENTORY.md, SOVEREIGN_MANIFEST.md) from the tree. Generated by docops-reconcile-main.yml (Tier 2 delivery: no DOCOPS_RECONCILE_TOKEN bypass secret is provisioned, so direct push to protected main is impossible). No hand-authored content changed. Rolling branch — force-updated by later reconciles until merged."; then
+            echo "Reconcile delivered as a bot PR on ${BRANCH}; verifying the head has checks."
+            verify_head_checks
+            exit $?
+          fi
+          # Neither tier delivered. This job's one purpose failed — say so in red.
+          # (Historical: the pre-2026-07-03 version warned-and-succeeded here; the
+          # push was rejected on 102 consecutive runs without anyone noticing.)
+          echo "::error::reconcile could not be delivered: direct push needs the DOCOPS_RECONCILE_TOKEN bypass secret, and PR creation failed (is 'Allow GitHub Actions to create pull requests' enabled in repo settings?)."
+          exit 1

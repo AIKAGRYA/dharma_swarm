@@ -1,650 +1,343 @@
----
-title: Learned Auditable Orchestrator Spec
-path: docs/architecture/LEARNED_AUDITABLE_ORCHESTRATOR_SPEC.md
-slug: learned-auditable-orchestrator-spec
-doc_type: reference
-status: draft
-summary: Verified primary-source engineering details from TRINITY, Conductor, VentureBeat, and Sakana Fugu artifacts for learned/auditable orchestration build planning.
-source:
-  provenance: external_research_synthesis
-  kind: reference
-  origin_signals:
-    - https://arxiv.org/abs/2512.04695
-    - https://arxiv.org/pdf/2512.04695
-    - https://arxiv.org/abs/2512.04388
-    - https://openreview.net/forum?id=U23A2BUKYt
-    - https://openreview.net/pdf?id=U23A2BUKYt
-    - https://venturebeat.com/orchestration/how-sakana-trained-a-7b-model-to-orchestrate-gpt-5-claude-sonnet-4-and-gemini-2-5-pro
-    - https://github.com/SakanaAI/fugu
-  cited_urls:
-    - https://arxiv.org/abs/2512.04695
-    - https://arxiv.org/pdf/2512.04695
-    - https://arxiv.org/abs/2512.04388
-    - https://openreview.net/forum?id=U23A2BUKYt
-    - https://openreview.net/pdf?id=U23A2BUKYt
-    - https://venturebeat.com/orchestration/how-sakana-trained-a-7b-model-to-orchestrate-gpt-5-claude-sonnet-4-and-gemini-2-5-pro
-    - https://github.com/SakanaAI/fugu
-  generated_hint: human_or_agent_authored_repo_doc
-  fetched_at: '2026-06-22T00:00:00+09:00'
-disciplines:
-  - multi_agent_systems
-  - software_architecture
-  - research_synthesis
-  - verification
-inspiration:
-  - learned_orchestration
-  - sakana_trinity
-  - sakana_conductor
-  - sakana_fugu
-connected_relevant_files:
-  - dharma_swarm/evolution.py
-  - docs/architecture/DARWIN_ENGINE_QUICK_START_GUIDE.md
-  - docs/architecture/MODEL_ROUTING_CANON.md
-  - docs/architecture/ORCHESTRATOR_LEDGERS.md
-improvement:
-  room_for_improvement:
-    - Convert these verified deltas into an implementation ADR before runtime authority.
-    - Replace temp artifact paths with repo-pinned receipts if this becomes a build contract.
+# Auditable Evolutionary Orchestration Substrate — MASTER BUILD PLAN (LOCKED)
+
+**Status:** LOCKED THESIS · TRACK PROPOSAL (not yet admitted — see Governance).
+**Serves spine objective:** `substrate-nativeness`.
+**Converged:** 2026-06-22 by Claude (Lane B, remote), Codex (local), and Fugu (architect),
+at ~95% on a sharpened thesis. **Drafted by:** Claude remote.
+
+> **Reconciliation note.** An egress collaborator produced a richer local copy of the
+> *Verified paper details* at `/Users/dhyana/dharma_swarm` (sources + SHA-256 under
+> `/private/tmp/fugu_sources/`). This document is the build plan; merge that copy's
+> `## Verified paper details (collaborator handoff)` section in before first commit so the
+> exact constants aren't stranded. Committing this file will require a docops inventory regen.
+
 ---
 
-# Learned Auditable Orchestrator Spec
+## 0. Locked thesis
 
-Role: reference / collaborator handoff. This file is not runtime authority until promoted by ADR or active build spec.
+> **Dharma Swarm becomes an auditable evolutionary orchestration substrate. A zero-weight v1
+> coordinator emits `OrchestrationGenome`s; one decorrelated Council (multi-profile) verifies;
+> a two-layer arena — frozen hermetic scorer + evolving task curator — scores *verified
+> capability delta under budget parity*, where success means beating the best single model at
+> equal compute; a MAP-Elites archive promotes winning genomes (including newly-ingested
+> research techniques as genes); and only after enough arena-labeled traces exist do we distill
+> a small learned coordinator. The moat is not a model — it is the receipt-backed,
+> corruption-resistant flywheel that learns to compose many models, tools, organs, and world
+> signals without lying to itself about fitness.**
 
-## Verified paper details (collaborator handoff)
+**The product is the substrate, not the coordinator.** The learned model is one replaceable
+organ. Build the environment (frozen arena, strict receipts, decorrelated verification, budget
+parity, external truth boundaries, evolution archive) and even a small coordinator becomes
+powerful; without it, any coordinator is a vibes router.
 
-### Fetch receipt
+**Power claim, precisely:** *not* 2–10× on a benchmark (Fugu is already ~93–95; no room).
+2–10× on **verified system-power over time** — value-per-decision × trust × self-improvement ×
+breadth — on the axes Fugu structurally cannot follow: reward grounded in verified reality,
+self-modification under telos gates, real-time research integration, and orchestration of our
+own organs. All receipted where Fugu is opaque.
 
-Primary-source artifacts fetched to `/private/tmp/fugu_sources/` on 2026-06-22 Asia/Tokyo.
+---
 
-| Artifact | Local path | SHA-256 |
-|---|---|---|
-| TRINITY PDF | `/private/tmp/fugu_sources/trinity.pdf` | `54f1e8dc1a4735a947743cd4aaf473c804becc42a12145cc297967b4796e56b7` |
-| TRINITY arXiv source | `/private/tmp/fugu_sources/trinity_src.tar` | `7974dcefa9992d07751e94a2f8f883b69d40775caf8cc04160cdf05af08f2543` |
-| Conductor arXiv PDF | `/private/tmp/fugu_sources/conductor_arxiv.pdf` | `db4dca59a25206cc94da1b491d082e01bcd849e3756ee164e3cfb8aac6772a6b` |
-| Conductor arXiv source | `/private/tmp/fugu_sources/conductor_src.tar` | `bf625b73037f2a6ad9290ef83262f28b3095df1b951d97074fafa4fca5ff4cf4` |
-| Conductor OpenReview PDF | `/private/tmp/fugu_sources/conductor_openreview.pdf` | `26004a6dfe21737c0a69638ce6483ddde352003dba81227404da607ee05ebf7e` |
-| Fugu technical report | `/private/tmp/fugu_sources/fugu_report.pdf` | `00a0e5065551c80c12a019018e18d8365cc3da229303f1765aa49fdf22876ce2` |
-| Fugu repo archive/configs | `/private/tmp/fugu_sources/fugu_configs.zip` and `/private/tmp/fugu_sources/fugu_zip/fugu-main/configs/` | `1303b7e1828e349697032a80508c5a881f7708420e18c720febc257c7a9b6b5f` |
-| VentureBeat article snapshot | `/private/tmp/fugu_sources/venturebeat_jina.md` | `ef35bbaebe91a444f17551ef68239c178c5284e6502940a4656a4a37ab12f12b` |
+## 1. `OrchestrationGenome` — the central abstraction (EXTENDS existing `TopologyGenome`)
 
-Note: direct `venturebeat.com` fetch returned a Vercel security checkpoint / 429. The readable article text was fetched through a Jina Reader snapshot and cross-checked against the Conductor paper where it reported benchmark numbers.
+Every arena attempt is a genome. Evolution mutates genomes; the arena scores genomes; the
+Council verifies genome outcomes; the DPI ranks genome-level techniques; the learned coordinator
+(later) learns to *emit* genomes. This is what makes the system DGM-like instead of a pile of
+prompt experiments.
 
-### A. Conductor — exact engineering details
+**Do not create a parallel abstraction (honors the SSOT naming rule).** `OrchestrationGenome`
+**extends/wraps the existing `TopologyGenome`** with a conversion from current topology-genome
+dispatch metadata → orchestration-genome metadata. Codex (local) confirms `TopologyGenome` exists.
+**Lane B caveat:** `TopologyGenome` is **NOT on `origin/main`** — it is local-only work in the
+dirty tree, so the genome contract is **gated on reconciliation preserving and landing it.** If
+that work is lost, "extend not replace" loses its base; preserve it explicitly (Phase 0).
 
-#### A1. Workflow-step schema and serialization
-
-The Conductor does **not** serialize the plan as JSON in the paper. It emits text after its reasoning, then the workflow is parsed as three same-length Python lists:
-
-```python
-model_id = [2, 0]
-subtasks = [
-  "Develop an efficient algorithm to count the number of complete subarrays of an array",
-  "Implement the algorithm described by the previous agent in Python"
-]
-access_list = [[], ["all"]]
+```
+OrchestrationGenome  (extends TopologyGenome):
+  genome_id:            str                # stable hash/id; backward-compatible with TopologyGenome
+  task_decomposition:   [subtask, ...]
+  role_graph:           communication topology (who talks to whom, in what order)
+  roster:               [model|tool|organ|human, ...]   # drawn from existing model_pool
+  prompt_fragments:     per-role NL instructions / program fragments
+  context_plan:         retrieval / what each role sees ("access_list": [] | "all" | [idx,...])
+  budget_allocation:    per-role token/compute/latency budget (must sum within parity cap)
+  verification_plan:    which Council profile(s) gate which steps
+  adjudication_rule:    how candidate outputs combine (vote / debate / moat-gate / synthesize)
+  stop_condition:       accept-on-Council-ACCEPT | max-turns | budget-exhausted
+  fallback_rules:       what to do on role failure / timeout / refusal
+  permissions:          per-role tool/data permissions (least-privilege)
+  # refinement B — quality-diversity, not top-k:
+  lineage:              {parent_genome_id, mutation_op}
+  behavioral_descriptors: [...]   # MAP-Elites bins (decomposition depth, roster diversity, topology shape, ...)
 ```
 
-Published schema facts:
+Every arena attempt is **keyed by `genome_id`** and emits route, trace, Council, score, and
+decision receipts. A **newly-ingested research technique is just a candidate gene** (a prompt
+fragment, a roster member, a topology, an adjudication rule). Research ingestion and orchestration
+evolution are the *same flywheel*. (Refinement D.)
 
-- `model_id`: integer worker IDs in step order.
-- `subtasks`: natural-language prompts/instructions in step order.
-- `access_list`: per-step visibility over prior routing messages.
-- `[]`: current worker sees no previous routing steps.
-- `["all"]`: current worker sees all previous routing messages.
-- Alternate fine-grained topology ablation: `[0,2,3]` can make visible outputs at specific prior positions; this generalized form did **not** materially beat the simple `[]` / `"all"` scheme in reported ablations.
+---
 
-The prompt-format contract shown in the paper includes these required names exactly:
+## 2. One Council substrate (multi-profile)
 
-```text
-model_id
-subtasks
-access_list
+Do **not** build five partial stomachs. One verifier substrate, multiple profiles:
+`world_signal_verification`, `orchestration_trace_verification`, `code_patch_verification`,
+`external_receipt_verification`, `research_claim_verification`, `promotion_gate`.
+
+**Shared invariants (all profiles):** quarantine untrusted input; require **≥2 decorrelated
+evaluator families AND ≥2 decorrelated source families** to corroborate; replayable receipts;
+**no hidden action authority** — Council receipts preserve `dispatch_authority=False` **unless
+explicitly transformed by a later warrant layer**; explicit verdicts
+(corroborated/refuted/insufficient/quarantined). **The Council verifies and quarantines; it does
+NOT become the scorer, the planner, or the dispatcher** (that conflation is a fitness-corruption
+vector — see §6). **Correctness-authority split (Codex's G sharpening):** for Arena v1's
+verifiable tasks the **deterministic scorer / test-oracle is the SOLE correctness authority**; the
+Council verifies *trace integrity, contamination boundaries, evidence sufficiency, and the "this
+genome beat controls" promotion claim* — **never correctness itself.** Different profiles differ
+only in schema + thresholds. **Adopt the MINIMAL Council interface (the
+`orchestration_trace_verification` profile) from #662 first — Arena v1 is NOT gated on full #662
+or the world-ingestion seam.**
+
+---
+
+## 3. The two-layer arena (the keystone) — UPGRADE Forge Arena v0, don't build fresh
+
+Forge Arena v0 already exists on `origin/main`
+(`scripts/runtime/forge_swarm_evolution_arena_v0_{measurement_runner,preflight,taskpack_builder}.py`,
+spec `docs/specs/forge_packets/FORGE_SWARM_EVOLUTION_ARENA_V0_MEASUREMENT_10H_LAUNCH.md`, plus the
+`reports/agentops/work_packets/forge-reality-arena-*` corpus). **Reuse its runner/scorer**; add
+genome-aware arms + outputs. We already learned the closeout discipline from Forge v0 — keep it.
+
+Split the arena into two layers, with a hard boundary between them, so the system can never
+improve at its own moving target:
+
+- **(A) Scorer — frozen, hermetic, replayable.** Sealed labels where possible, baseline controls,
+  **budget parity**, scorer_hash + task_manifest_hash, candidate-visible / scorer-only split,
+  anti-contamination checks. The scored slice is **frozen per evaluation epoch.**
+- **(B) Task curator — evolving, world-fed** (eventually via the throat/Bronze ingestion). May
+  expand freely, but cannot mutate the frozen slice mid-epoch.
+
+**Success is defined by the existence test (refinement A):** a genome is `positive_lift_candidate`
+**only if it beats `best_single_full_budget` at equal total compute, with significance.** This is
+the Krogh-Vedelsby claim made falsifiable. Beating best-single by spending more is theater.
+
+**Arena v1 = ONLY programmatically-verifiable tasks** (code passing tests, math with known
+answers) so correctness is objective and the "Council judges instead of verifies" corruption
+vector is eliminated at cold start (refinement C). Open-ended / Council-adjudicated tasks → v2.
+
+**Arena v1 MVP** (keep it small; we learned this from Forge v0):
+- 10–30 tasks · 3 controls · 1 candidate · strict receipts · budget parity · replayable scorer · bootstrap CI
+- **Controls:** `best_single_full_budget` (the GATE), `same_budget_self_moa`, `random_or_static_ensemble`
+- **Candidate:** prompted/evolved coordinator genome
+- **Outputs:** `arena_run.json`, `scorecard.json`, `trace_receipts.jsonl`, `route_receipts.jsonl`,
+  `council_receipts.jsonl`, `power_index.json`, `decision_packet.md`
+- **Closeout states:** `positive_lift_candidate` · `measured_negative` · `inconclusive_low_power`
+  · `contaminated_quarantine` · `blocked_with_evidence`
+
+---
+
+## 4. Decorrelation reward — *decorrelated correctness*, not disagreement (refinement, Fugu+Claude)
+
+Reward error-covariance reduction, never debate theater:
+```
+decorrelated_correctness_bonus =
+    leave_one_out_marginal_contribution(role)      # did adding it help the FINAL answer?
+  × nonredundancy(role.evidence / error_mode)      # is its error decorrelated from the others?
+  × final_correctness_gate                         # 0 if the final outcome is wrong
+if final_outcome_wrong: decorrelation_bonus <= 0
+```
+Folded into `VerifiedCapabilityDelta`. This is where we structurally out-*think* Fugu (it rewards
+correctness only); not just out-integrate it.
+
+---
+
+## 5. Dharma Power Index (capability in the numerator, trust as multiplier)
+
+```
+DPI = VerifiedCapabilityDelta × Trust × ReuseOrLearningValue
+      / (Cost × Latency × Fragility × Complexity)
+```
+- **VerifiedCapabilityDelta:** error-reduction vs best-single-at-budget · value-per-decision ·
+  task-family breadth · research-integration velocity · self-improvement rate. (Tricks.)
+- **Trust** (multiplier, never the headline): receipt coverage · replay pass rate · corroboration
+  strength · auditability.
+- **ReuseOrLearningValue (refinement F): retroactive-only.** Counts when a promoted,
+  arena-verified reusable artifact *actually results later* — never self-declared at runtime
+  (else it becomes a failure-laundering loophole). Log it before activating it.
+
+---
+
+## 6. Anti-corruption invariants — THE moat (biggest risk is fitness corruption, not model quality)
+
+These are load-bearing. Every one closes a way the system could lie to itself:
+1. Frozen scored slice per epoch — tasks never move after results are seen.
+2. Council **verifies**, never judges-for-reward; v1 correctness comes from sealed labels.
+3. Budget parity enforced and logged on every run.
+4. **External truth boundary:** internal receipts never count as external proof — only
+   countersigned external acted receipts above the One-Wire quorum touch archive fitness.
+5. No verbose-debate reward — reward error-covariance reduction, correctness-gated (§4).
+6. Trust is a multiplier, never the numerator (§5).
+7. Routing cannot hide failures — every failure is receipted.
+8. The local dirty checkout is never truth — `origin/main` + receipts are.
+9. `LearningValue` is retroactive-only (§5).
+
+---
+
+## 7. Cold-start flywheel + training-example schema
+
+```
+prompted v1 generates OrchestrationGenome attempts
+  → arena scores them (objective, verifiable tasks)
+  → winners enter the MAP-Elites archive (quality-diversity, not top-k)
+  → archive becomes the SFT corpus
+  → small coordinator is distilled, then generates better genomes
+  → repeat;  research techniques enter as candidate genes throughout
+```
+Early labels are **arena outcomes, not model judgments.** Training example:
+```json
+{ "task_id":"...", "orchestration_genome":{...}, "trace":[...], "outcome":{...},
+  "score":0.73, "baseline_scores":{...}, "capability_delta":0.18, "trust_multiplier":0.91,
+  "cost":1.42, "latency":38.0, "fragility":0.2, "receipt_refs":[...] }
+```
+The M5 fills the arena with local rollouts immediately; no GPU needed for the flywheel to start.
+
+---
+
+## 8. Optimizer + model ladder (Darwin-first; GRPO surgical; small-before-large)
+
+- **DarwinEngine / MAP-Elites is the daily optimizer** — topology/routing/roster are discrete,
+  sparse, cheap to search; evolution beats RL here (TRINITY's own sep-CMA-ES finding).
+- **GRPO is a surgical scalpel**, valid the moment the arena produces real labels (M5 local +
+  rented-GPU bursts). Not the default; not "someday" either.
+- **Model ladder:** 0.6–1.7B TRINITY-style reactive head (cheap routing) → 8–14B Conductor-style
+  planner for first SFT/GRPO → **30B-A3B / 32B = serious sweet spot once labels exist** → 70B as
+  apex teacher/critic/distiller only, never the always-on router. Candidates: Qwen3 8/14/32B,
+  Qwen3 30B-A3B, Qwen2.5-Coder-32B. Our own corpus = orientation/self-modeling data only; the
+  training core is orchestration traces, receipts, arena outcomes, failures, promotion decisions.
+
+---
+
+## 9. Verified paper constants (from egress; merge richer copy before commit)
+
+**TRINITY (2512.04695):** ~0.6B coordinator SLM + lightweight head (<20K trainable); hidden-state →
+**L model-logits + 3 role-logits** (Thinker/Executor/Verifier); for 7 agents = 10 logits; head
+adapted via SVF (Transformer²); **sep-CMA-ES** population λ=`ceil(4+3·ln n)` (≈32 for n≈10k),
+budget ~1.5k–40k evals; accept-driven termination; sep-CMA-ES beats RL/imitation under high-dim,
+sparse-terminal-reward, tight-budget.
+**Conductor (2512.04388):** Qwen2.5-7B + **GRPO**, 200 iterations, 4 questions × 64 rollouts =
+batch 256, conductor temp 1.0, AdamW lr 1e-6 cosine warmup 0.03, **KL penalty 0**, up to 5 workflow
+steps; output = **three Python lists `model_id`, `subtasks`, `access_list`**; `access_list` ∈
+`[] | "all" | [idx,...]` (binary chosen — fine-grained didn't materially help). **Correction:**
+the paper has **no explicit correctness−λ·cost reward**; cost is handled by rollout budgets/limits.
+Any cost term in our DPI is *our* extension, not copied.
+
+---
+
+## 10. Locked build order (Refinement G RESOLVED — Claude proposed, Codex ratified + sharpened)
+
+G is locked: **the throat and the Arena are sibling consumers of the Council, not parent/child.**
+Arena v1's critical path is *only*: reconcile → minimal shared Council interface → genome → frozen
+Arena scorer/controls. The throat is for world-signal ingestion / research curation / Arena-v2 task
+generation, and runs **in parallel** — it does not gate Arena v1.
+
+0. **Reconciliation / preservation / off-machine backup** (Lane C + Fugu) — *step zero, underway;
+   the orchestrator is gated on a trustworthy `origin/main`.* **Preserve the local-only
+   `TopologyGenome` work explicitly** — the genome contract (§1) extends it.
+1. **Extract/adopt the MINIMAL Council interface** — the `orchestration_trace_verification`
+   profile from **#662** (not a blind merge; *not* gated on full #662 or the world-ingestion seam).
+   This is the smallest verifier interface Arena v1 needs.
+2. **Genome contract.** `OrchestrationGenome` as an extension/wrapper of `TopologyGenome` (§1):
+   serialization, validation, stable hash/id, receipt refs, topology→orchestration conversion,
+   backward-compatible with existing topology-genome tests.
+3. **Arena v1** — **upgrade Forge Arena v0** (§3) on **frozen verifiable taskpacks**. Authority
+   split: **deterministic scorer/test-oracle = correctness authority; Council = trace/contamination/
+   "beat-controls" claim verifier, never correctness.** Best-single gate; genome-aware arms +
+   outputs + closeout states.
+4. **Zero-weight orchestrator v1** emits `OrchestrationGenome` (prompted generator + simple mutation
+   ops + bandit/routing-memory roster choice + Darwin archive selection + route receipts). **No
+   SFT/GRPO/GPU; no production-router mutation.** **Run controls** incl. the best-single gate →
+   first `decision_packet.md`.
+5. **Throat seam — IN PARALLEL** (Bronze→Council→warrant, no dispatch authority). Adopt/fix **#663's**
+   document ingest *only if* part of world/research ingestion (repair its MCP-ingest gap,
+   MarkItDown-executable check, dependency extras, stale DocOps). Feeds the **v2 task curator** +
+   research-genes — **off the Arena v1 critical path.**
+6. **Flywheel** — promote winning genomes to the MAP-Elites archive; turn on the research-ingestion
+   loop (ingest → Council verify → Darwin proposes integration trial as a genome → arena scores →
+   promote only with receipts).
+7. **Unify** the arena and throat under the same Council profiles.
+8. **Distill the small coordinator** (TRINITY-style head) on arena-labeled genome traces.
+9. **Surgical GRPO** spike (4–14B) once labels are real → scale to 30/32B after proof → 70B apex-only.
+
+## 10a. Test plan (from codex's plan)
+
+- **Unit:** `OrchestrationGenome` validation / serialization / stable hash-id / **backward-compat
+  with `TopologyGenome`**; Council profiles preserve no-action-authority + domain thresholds; DPI
+  including the correctness-gated decorrelation bonus; arena closeout-state selection.
+- **Integration:** one genome runs orchestrator → spine receipt → Council verification → arena
+  score → decision packet; **candidate cannot read sealed labels / scorer-only files**; budget
+  parity logged for candidate *and* controls; winning genome archives **without mutating
+  production routing**; contaminated/high-risk input → quarantine closeout.
+- **Regression:** existing topology-genome, spine-receipt, and Forge Arena v0 tests stay green;
+  adopted #662/#663 code gets targeted tests for quarantine, replay, document/MCP ingest, DocOps.
+
+**Standing assumptions:** no model trained until arena-labeled traces exist; no blind merge of
+#662/#663 (adopt/rebase/fix); `TopologyGenome` is the base, `OrchestrationGenome` extends it;
+capability is the headline, receipts are proof/replay; the Council verifies, it is not the reward
+model by itself; **frozen-arena integrity outranks rapid self-improvement.**
+
+---
+
+## 11. Owned surfaces + track declaration
+
+New, non-colliding surfaces. **Extend, don't own:** `TopologyGenome` (local-only, preserve+land
+first), Forge Arena v0 (`scripts/runtime/forge_swarm_evolution_arena_v0_*.py`). **Consult/reuse,
+don't own:** `provider_policy`, `model_hierarchy`, `orchestrator.py`, `evolution.py`,
+`diversity_archive.py`, `ginko_brier.py`. The **Council is shared substrate** with the seeing-organ
+track; coordinate (single substrate, not two).
+
+```yaml
+- id: orchestration-substrate-2026-06
+  name: Auditable Evolutionary Orchestration Substrate — genome arena + one Council + flywheel
+  status: ACTIVE
+  opened_at: "2026-06-22"
+  verified_at: "2026-06-22"
+  ttl_days: 21
+  owner: "@AmitabhainArunachala"
+  serves: substrate-nativeness
+  complements:
+    - provider-routing-consolidation-2026-06   # feeds the genome roster (dozens of models)
+    - seeing-organ-2026-06                      # shares the one Council substrate
+    - runtime-truth-spine-adoption-2026-06      # EvidenceReceipt = route/trace receipts
+    - loop-closure-2026-06
+  owned_surfaces:
+    - dharma_swarm/coordination/**              # genome.py, arena/, dpi.py, flywheel/, routing_receipt.py
+    - dharma_swarm/council/**                   # shared multi-profile Council (adopts #662's frontier_council as profile 1)
+    - scripts/governance/check_arena_replay.py
+    - scripts/governance/check_routing_receipt.py
+    - scripts/governance/check_council_invariants.py
+    - tests/test_orchestration_genome.py
+    - tests/test_arena_v1.py
+    - tests/test_council_profiles.py
+    - tests/test_dpi.py
+    - docs/architecture/LEARNED_AUDITABLE_ORCHESTRATOR_SPEC.md
+  moves_vital_signs: [quality_gates, tool_coverage, eval_coverage, cost_efficiency]
 ```
 
-Execution semantics:
-
-- The first selected model receives the user question plus its assigned subtask.
-- Later models receive the prior subtask/assistant-response message history selected by that step's `access_list`.
-- The final model's answer is returned to the user.
-- Available models are passed as ordinal entries such as `Model 0`, `Model 1`, not by provider name, to reduce prior-name bias during exploration.
-
-Recursive prompt termination convention:
-
-```python
-model_id = []
-subtasks = []
-access_list = []
-```
-
-This means the previous final response is accepted and returned as-is.
-
-#### A2. GRPO objective, reward, baseline, KL, and credit assignment
-
-The paper uses the GRPO objective exactly in this form:
-
-```tex
-J(\theta)=
-\mathbb{E}_{q\sim D,\, \{o\}^G_1\sim\pi_\theta(\cdot\mid q)}
-\left[
-\frac{1}{G}\sum_{i=1}^G
-\Big(
-\min\!\big(
-r_i A_i,\;
-\mathrm{clip}(r_i,\,1-\epsilon,\,1+\epsilon)\,A_i
-\big)
--\beta\,\mathbb{D}_{\mathrm{KL}}(\pi_\theta\,\|\,\pi_{\text{ref}})
-\Big)
-\right]
-```
-
-Advantage normalization:
-
-```tex
-A_i=\frac{r_i-\mathrm{mean}(\{r_1,\dots,r_G\})}{\mathrm{std}(\{r_1,\dots,r_G\})}.
-```
-
-Conductor-specific reward is terminal/final, not per-step:
-
-| Condition | Reward |
-|---|---:|
-| Cannot parse Python lists of `subtasks`, worker IDs, and `access_list` | `0` |
-| Well-formatted workflow final output matches solution `s_i` | `1` |
-| Well-formatted workflow final output does not match `s_i` | `0.5` |
-
-Training hyperparameters published for the arXiv Conductor:
-
-| Field | Value |
-|---|---|
-| Base model | `Qwen2.5-7B` |
-| Max Conductor completion length | `1024` |
-| Iterations | `200` |
-| Questions per iteration | `4` |
-| Rollouts per question / GRPO group size | `64` |
-| Effective batch size | `256` |
-| Temperature | `1.0` |
-| Optimizer | `AdamW` |
-| AdamW β1 / β2 | `0.9` / `0.999` |
-| GRPO clip epsilon as reported | `0.2` |
-| Base LR | `0.000001` |
-| LR schedule | cosine, warmup ratio `0.03` |
-| Reference-model sync | disabled |
-| KL penalty | `0` |
-| Entropy term | not published / not present in objective |
-| GPUs | `2 NVIDIA H100 80GB GPUs` |
-
-Cost penalty finding: the fetched arXiv/OpenReview paper and Fugu technical report do **not** publish an explicit reward term of the form `correctness - λ * cost`. Cost is handled operationally through max workflow length, constrained evaluation settings, token/reasoning budgets, and efficiency reporting. If our GRPO planner plan includes a cost penalty, that is a local extension, not a copied Conductor objective.
-
-Recursive credit assignment:
-
-| Field | Value |
-|---|---|
-| Recursive finetune iterations | `20` |
-| Recursive finetune data | `350` samples: `175 LiveCodeBench` + `175 RLPR` |
-| Rollouts per sample | `64` |
-| Batch size | `256` |
-| KL / reference sync | none |
-| Initial non-recursive round discount | `0.25` |
-| Round handling | rewards normalized across rounds |
-
-#### A3. Randomized-agent-pool procedure
-
-Published algorithmic procedure:
-
-```text
-randomly sampled k-model subset from the larger total pool of n workers
-```
-
-Exact `k` is not specified in the paper text/source beyond `k <= n`. The main full pool has `n = 7` workers. Evaluation user cases restrict to closed-only and open-only subsets after finetuning.
-
-Main Conductor worker pool (`n=7`):
-
-1. `Gemini-2.5-Pro`
-2. `Claude-Sonnet-4`
-3. `GPT-5`
-4. `DeepSeek-R1-Distill-Qwen-32B`
-5. `Gemma3-27B-instruct`
-6. `Qwen3-32B`
-7. `Qwen3-32B` reasoning / thinking mode
-
-#### A4. Context format and inference/synthesis loop
-
-Worker-agent settings in constrained evaluation:
-
-| Field | Value |
-|---|---|
-| Worker max completion tokens | `4096` |
-| Worker decode temperature | `0.2` |
-| Gemini reasoning minimum | `128` tokens |
-| Claude reasoning minimum | `0` |
-| GPT-5 reasoning | `minimal` |
-| Qwen3-32B top-p | `0.8` |
-| Qwen3-32B top-k | `20` |
-| Qwen3-32B presence penalty | `1.0` |
-
-Unconstrained evaluation budgets:
-
-| Model | Max completion tokens | Reasoning budget |
-|---|---:|---|
-| Gemini Pro 2.5 | `65535` | `32768` |
-| Claude Sonnet 4 | `64000` | `32768` |
-| GPT 5 | `128000` | `high` |
-| R1-Distill-Qwen-32B | `20480` | `N.A` |
-| gemma-3-27b-it | `20480` | `N.A` |
-| Qwen3-32B (thinking) | `20480` | `enabled` |
-| Qwen3-32B | `20480` | `N.A` |
-
-Inference loop:
-
-1. Conductor receives user question and available numbered model list/metadata.
-2. Conductor emits up to 5 workflow steps as `model_id`, `subtasks`, `access_list`.
-3. Runtime parses those Python lists.
-4. Runtime executes steps sequentially.
-5. Each worker gets only the user question plus its subtask plus allowed prior subtask/assistant response messages.
-6. Final worker output is returned, unless recursive mode makes another Conductor call.
-7. Recursive mode caps recursion depth; empty lists return previous answer.
-
-Fugu-Ultra engineering extension from the technical report: intra-workflow function-call trajectories are isolated by agent; an agent observes another agent's actions/outputs only through the `access_list`, while inter-workflow shared memory persists across the multi-turn conversation.
-
-#### A5. Conductor benchmark numbers and ablations
-
-Unconstrained Conductor comparison:
-
-| Model | M500 | MMLU | RLPR | LCB | AIME25 | BCB | GPQA-D | Avg. |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| gemma-3-27b-it | 39.8 | 81.3 | 16.67 | 13.14 | 20.7 | 14.86 | 38.4 | 32.12 |
-| Qwen3-32B | 73.5 | 83.5 | 31.00 | 21.21 | 20.0 | 30.41 | 64.1 | 53.81 |
-| Qwen3-32B (thinking) | 80.7 | 84.1 | 37.25 | 25.86 | 72.9 | 28.38 | 66.8 | 56.57 |
-| R1-Distill-Qwen-32B | 82.5 | 84.4 | 33.50 | 26.86 | 63.0 | 33.07 | 58.1 | 54.49 |
-| Claude Sonnet 4 | 96.0 | 91.4 | 36.70 | 46.54 | 74.3 | 37.16 | 77.7 | 65.69 |
-| Gemini 2.5 Pro | 96.0 | 92.4 | 40.55 | 67.24 | 78.3 | 37.51 | 84.8 | 70.97 |
-| GPT 5 | 99.0 | 93.5 | 42.20 | 82.90 | 90.8 | 32.75 | 82.3 | 74.78 |
-| Conductor | 99.4 | 94.1 | 44.75 | 83.93 | 93.3 | 37.86 | 87.5 | 77.27 |
-
-Controlled in-distribution comparison:
-
-| Model / baseline | MATH500 | MMLU | RLPR | LiveCodeBench | Avg. |
-|---|---:|---:|---:|---:|---:|
-| Gemini Pro 2.5 (4K/128) | 85.30 ± 1.42 | 91.53 ± 0.26 | 39.57 ± 1.50 | 40.14 ± 2.20 | 64.14 |
-| Claude Sonnet 4 | 82.90 ± 1.59 | 90.66 ± 1.01 | 32.60 ± 0.35 | 38.00 ± 1.50 | 61.04 |
-| GPT 5 (4K/minimal) | 74.45 ± 2.19 | 89.79 ± 0.65 | 33.13 ± 1.29 | 57.50 ± 2.32 | 63.72 |
-| MASRouter | 80.60 ± 0.89 | 86.28 ± 2.77 | 32.80 ± 4.77 | 27.86 ± 3.24 | 56.89 |
-| MoA | 83.10 ± 2.65 | 88.46 ± 0.76 | 38.37 ± 0.95 | 38.57 ± 3.50 | 62.13 |
-| RouterDC | 59.25 ± 4.22 | 87.52 ± 0.06 | 27.53 ± 2.22 | 35.33 ± 2.34 | 52.41 |
-| Smoothie (Independent) | 76.85 ± 1.74 | 83.28 ± 0.16 | 34.35 ± 0.80 | 31.21 ± 2.02 | 56.42 |
-| Smoothie (Dependent) | 76.95 ± 2.06 | 83.56 ± 0.27 | 34.45 ± 0.67 | 31.00 ± 2.04 | 56.48 |
-| Conductor | 89.33 ± 0.58 | 93.14 ± 0.36 | 42.63 ± 0.65 | 64.29 ± 2.01 | 72.35 |
-
-Cost-efficiency tables:
-
-| Model | Performance | Token usage | Avg. cost / cost |
-|---|---:|---:|---:|
-| Conductor vs 5× consensus/reflect on MMLU | 93.14 | 735.2 | 0.009 |
-| MoA | 62.13 | 11203 | 0.04855 |
-| Smoothie | 56.48 | 9909 | 0.03929 |
-| RDC | 52.41 | 840 | 0.00561 |
-| MasRouter | 56.89 | 4970 | 0.01345 |
-| Conductor | 72.35 | 1820 | 0.02384 |
-
-VentureBeat engineering writeup cross-check: it reports the same average `77.27%`, AIME25 `93.3%`, GPQA-Diamond `87.5%`, LiveCodeBench `83.93%`, MoA `11,203` tokens, Conductor `1,820` tokens, and average `three steps per workflow`.
-
-OOD under cost constraints:
-
-| Model | AIME25 | BigCodeBench | GPQA-D | Avg. |
-|---|---:|---:|---:|---:|
-| R1-Distill-Qwen-32B | 30.00 | 24.3 | 51.01 | 35.10 |
-| gemma-3-27b-it | 6.67 | 10.8 | 33.33 | 16.93 |
-| Qwen3-32B (thinking) | 23.33 | 20.9 | 59.09 | 34.44 |
-| Qwen3-32B | 23.33 | 23.0 | 54.05 | 33.46 |
-| Gemini Pro 2.5 | 46.67 | 35.1 | 75.25 | 52.34 |
-| Claude Sonnet 4 | 35.33 | 35.8 | 67.30 | 46.14 |
-| GPT 5 | 46.67 | 33.8 | 72.73 | 51.07 |
-| Conductor | 66.67 | 37.8 | 81.31 | 61.93 |
-
-Recursion:
-
-| Model | AIME25 | BigCodeBench | GPQA-D | Average score |
-|---|---:|---:|---:|---:|
-| Conductor | 66.67 | 37.8 | 81.31 | 61.93 |
-| Conductor-Recursive | 66.67 | 40.0 | 82.32 | 63.00 |
-
-Ablations:
-
-| Ablation | MATH500 | MMLU | RLPR | LiveCodeBench |
-|---|---:|---:|---:|---:|
-| fine-grained access | 88.67 | 93.55 | 42.28 | 61.24 |
-| w/o few-shot | 82.00 | 92.69 | 41.50 | 54.86 |
-| w/o subtasks | 88.5 | 92.75 | 41.95 | 58.62 |
-| Conductor | 89.33 | 93.14 | 42.63 | 64.29 |
-
-Agent-selection ablation:
-
-| Model | AIME | BigCodeBench | GPQA-D | Avg. |
-|---|---:|---:|---:|---:|
-| Claude Sonnet 4 | 74.30 | 37.16 | 77.70 | 63.0533 |
-| Gemini 2.5 Pro | 78.30 | 37.51 | 84.80 | 66.8700 |
-| GPT-5 | 90.80 | 32.75 | 82.30 | 68.6167 |
-| Conductor w/ all GPT-5 | 93.33 | 33.50 | 82.60 | 69.8100 |
-| Conductor | 93.30 | 37.86 | 87.50 | 72.8867 |
-
-Replacing trained Conductor with frontier-model conductor:
-
-| Model | LCB | AIME | BigCodeBench | GPQA-D | Avg. |
-|---|---:|---:|---:|---:|---:|
-| GPT-5 conduct 7 models | 50.86 | 76.67 | 34.50 | 77.78 | 59.9525 |
-| GPT-5 conduct | 67.43 | 93.30 | 33.10 | 86.36 | 70.0475 |
-| Gemini 2.5 Pro conduct | 70.29 | 93.30 | 35.13 | 87.62 | 71.5850 |
-| Conductor | 83.93 | 93.30 | 37.86 | 87.50 | 75.6475 |
-
-Debate-round finding: no primary-source table isolates `with debate rounds` vs `without debate rounds`. The paper reports emergent verification/refinement/debate-style strategies, compares against 5× self-reflection baselines, and separately ablates subtasks, few-shot conditioning, fine-grained access, all-GPT-5 agent selection, recursive scaling, and frontier-model-as-conductor.
-
-### B. TRINITY — exact engineering details
-
-#### B1. Problem formulation and CoordinationHead dimensions
-
-TRINITY objective and policy:
-
-```tex
-f_\theta:\ \mathcal{H}\to\R^{|\mathcal{A}|},\qquad 
-\pi_\theta(a\mid s)\ \propto\ \exp\!\big(f_\theta(h(s))_a\big),\ a\in\mathcal{A}.
-```
-
-```tex
-J(\theta)\ :=\ \E_{\tau\sim\pi_\theta}[R(\tau)]
-```
-
-Representation / action facts:
-
-| Field | Published value/detail |
-|---|---|
-| Coordinator SLM | `Qwen3-0.6B` |
-| Hidden size | `d_h = 1024` inferred from parameter table and source text |
-| Agent pool size | `L = 7` |
-| Role logits | `3` (`Thinker`, `Worker`, `Verifier`) |
-| Output size | `L + 3 = 10` logits |
-| Default head | single linear layer, no bias: `z = W h`, `W ∈ R^{n_a × d_h}` |
-| Linear head params | `10240` (`10 × 1024`) |
-| SVF trainable params | `9216` |
-| Total trainable default | `19456` (`10240 + 9216`), under 20K |
-| SLM layer selected for SVF | second-to-last layer of Qwen3-0.6B |
-| Head input position | penultimate output-token hidden state by default |
-
-Head architecture exact forms:
-
-```tex
-\mathbf{z}=\mathbf{W}\mathbf{h}, \qquad \mathbf{W}\in\mathbb{R}^{n_a\times d_h}.
-```
-
-```tex
-\mathbf{u}=\mathrm{ELU}(\mathbf{U}\mathbf{h}), \qquad
-\mathbf{z}=\mathbf{V}\mathbf{u}\cdot \sigma
-```
-
-```tex
-\mathbf{z}=\mathbf{W}\,(\mathbf{h}\odot \boldsymbol{\alpha})
-```
-
-Block-diagonal-10 exact output form:
-
-```tex
-z_j=\mathbf{w}_j^\top \mathbf{h}_j,\qquad
-h_j=\begin{cases}
-\left\lfloor \tfrac{d_h}{10}\right\rfloor+1,& j\le (d_h\bmod 10)\\[2pt]
-\left\lfloor \tfrac{d_h}{10}\right\rfloor,& \text{otherwise}
-\end{cases}.
-```
-
-Parameter table:
-
-| Component | Params |
-|---|---:|
-| SVF | 9216 |
-| linear | 10240 |
-| low-rank | 20680 |
-| sparse | 11266 |
-| block-diagonal-2 | 5120 |
-| block-diagonal-10 | 1024 |
-
-#### B2. sep-CMA-ES config and fitness
-
-Published sep-CMA-ES state and sampling equation:
-
-```tex
-D_t=\mathrm{diag}(\sqrt{s_{1,t}},\ldots,\sqrt{s_{n,t}})\succ0,
-\qquad
-y \;=\; m_t+\sigma_t D_t z,\ \ z\sim\mathcal N(0,I_n).
-```
-
-Population and replication:
-
-```tex
-\lambda=\lceil 4+3\ln n\rceil
-```
-
-Study-specific instantiation:
-
-```tex
-n\approx 10000,
-\lambda=\lceil 4+3\ln 10000\rceil=32,
-m_{\mathrm{CMA}}=16,
-m_{\mathrm{RS}}=32
-```
-
-Budget equations:
-
-```tex
-B_{\mathrm{env}}=m_{\mathrm{CMA}}\lambda T
-```
-
-```tex
-N=\big\lfloor (m_{\mathrm{CMA}}\lambda/m_{\mathrm{RS}})\,T\big\rfloor
-=\big\lfloor (16\cdot 32/32)\,T\big\rfloor\approx \lfloor 16\,T\rfloor
-```
-
-Published iteration/budget references:
-
-- Proposition range: `T ∈ [2,60]`.
-- REINFORCE comparison ran `60` iterations with batch size equal to sep-CMA-ES per-iteration evaluation size.
-- If using `n≈10000`, `λ=32`, `m_CMA=16`, `T=60`, then the budget implied by the paper's formula is `16 × 32 × 60 = 30,720` Bernoulli terminal evaluations.
-- Introduction frames the regime as `1.5k--40k evaluations for a 10k-dimensional problem`.
-
-Fitness definition:
-
-- `R(τ) ∈ {0,1}` terminal reward at the end of a full multi-turn trajectory.
-- Each trajectory run is an atomic Bernoulli evaluation.
-- Candidate fitness is estimated by averaging terminal reward over replicated end-to-end runs.
-
-The fetched paper does **not** publish a concrete initial `σ_0` value or initial parent vector beyond the sep-CMA-ES variables `m_t`, `σ_t`, and `D_t`. It does publish Xavier-uniform initialization for the low-rank head, but that is a head-ablation initialization, not the sep-CMA-ES sigma/init config.
-
-#### B3. Per-turn protocol and termination
-
-Per-turn transcript and selection:
-
-```tex
-\mathcal{C}_{k-1} = \big(Q, O_1, \ldots, O_{k-1}\big)
-```
-
-```tex
-R_k \in \{\text{Thinker (T)}, \text{Worker (W)}, \text{Verifier (V)}\}
-```
-
-Termination rule:
-
-```tex
-\tau = \min\{\,k \le K : R_k=\mathrm{V}\ \text{and}\ u_k=\texttt{ACCEPT}\,\}
-```
-
-Fallback if no acceptance:
-
-```tex
-\tau = K
-```
-
-Verifier output contract:
-
-```tex
-u_k \in \{\texttt{ACCEPT}, \texttt{REVISE}\}
-```
-
-Maximum turns in experiments: `K = 5`.
-
-Published role contracts (exact prompts are not included in the fetched source/PDF):
-
-| Role | Published contract |
-|---|---|
-| Thinker | strategy / high-level plans / decompositions / critiques; may propose subgoals and next role |
-| Worker | concrete task progress: derivation, code snippet, numerical result, etc. |
-| Verifier | check correctness/completeness/responsiveness; output `ACCEPT` or `REVISE` plus optional diagnosis |
-
-#### B4. Why sep-CMA-ES beats RL/imitation in the paper
-
-Published argument:
-
-- The coordination head is about `10K` parameters.
-- Rewards are binary terminal rewards.
-- Each atomic evaluation requires multiple LLM calls, so the evaluation budget is tight.
-- Parameter correlations are weak / nearly block-separable; inter-block interference is low.
-- REINFORCE sees noisy global returns, weak inter-block signal, poor credit assignment, and unstable learning.
-- SFT can label direct single-step agent selection, but multi-turn label generation becomes intractable.
-
-SFT label-cost derivation:
-
-```tex
-3 \times 7\text{k} \times 7 = 147\text{k}
-```
-
-```tex
-7^4 \cdot 3^5 = 583{,}443 \approx 5.8 \times 10^5
-```
-
-```tex
-1.5 \times 10^5 \times 5.8 \times 10^5 \approx 8.7 \times 10^{10}
-```
-
-sep-CMA-ES vs RS gain ratio:
-
-```tex
-\frac{\text{CMA gain in }J}{\text{RS gain in }J}
-\ \gtrsim\
-\frac{\bar\kappa_{\mu,\lambda}}{2}\cdot
-\frac{T}{\ln\!\big(\max\{e,\lfloor (m_{\mathrm{CMA}}\lambda/m_{\mathrm{RS}})\,T\rfloor\}\big)}\cdot \eta^2
-\ -\ \frac{C}{\ln\!\big(\max\{e,\lfloor (m_{\mathrm{CMA}}\lambda/m_{\mathrm{RS}})\,T\rfloor\}\big)} .
-```
-
-Steady-regime contraction:
-
-```tex
-\frac{\bar\kappa_{\mu,\lambda}}{n}\,(1-O(\varepsilon_H))
-```
-
-#### B5. TRINITY benchmark and ablation numbers
-
-Head ablation:
-
-| Head | LiveCodeBench | MATH500 | MMLU | RLPR |
-|---|---:|---:|---:|---:|
-| linear | 0.615 | 0.880 | 0.916 | 0.401 |
-| low-rank | 0.597 | 0.770 | 0.914 | 0.344 |
-| sparse | 0.400 | 0.811 | 0.917 | 0.372 |
-| block-diagonal-2 | 0.336 | 0.776 | 0.897 | 0.378 |
-| block-diagonal-10 + argmax | 0.551 | 0.812 | 0.802 | 0.376 |
-
-Component ablation:
-
-| Method | LiveCodeBench | MATH500 | MMLU | RLPR | Average |
-|---|---:|---:|---:|---:|---:|
-| TRINITY | 61.46 | 88.00 | 91.56 | 40.72 | 70.44 |
-| w/o Singular value fine-tuning | 55.68 | 85.85 | 90.10 | 39.77 | 67.85 |
-| w/o Thinker-role selection | 57.80 | 86.20 | 92.75 | 38.00 | 68.69 |
-| w/o Tri-role selection | 58.28 | 82.00 | 91.64 | 36.15 | 67.02 |
-| w/ Last token | 50.85 | 87.00 | 82.19 | 38.60 | 64.66 |
-| Claude-4-Sonnet only | 39.09 | 82.25 | 88.23 | 34.90 | 61.12 |
-| Gemini Pro 2.5 only | 46.51 | 83.05 | 79.41 | 43.00 | 62.99 |
-| GPT-5 only | 59.54 | 75.66 | 90.74 | 37.87 | 65.95 |
-
-Learning algorithm comparison:
-
-| Method | LiveCodeBench | MATH500 | MMLU | RLPR |
-|---|---:|---:|---:|---:|
-| REINFORCE | 0.253 | 0.459 | 0.500 | 0.266 |
-| RS | 0.374 | 0.794 | 0.897 | 0.345 |
-| SFT | 0.592 | 0.786 | 0.906 | 0.360 |
-| sep-CMA-ES | 0.615 | 0.880 | 0.916 | 0.401 |
-
-Hold-out tasks:
-
-| Model | AIME | BigCodeBench | MT-Bench | GPQA-D | Average |
-|---|---:|---:|---:|---:|---:|
-| Gemini Pro 2.5 | 46.67 | 35.10 | 9.37 | 75.25 | 52.34 |
-| GPT-5 | 46.67 | 33.80 | 9.35 | 72.73 | 51.07 |
-| Claude-4-Sonnet | 35.33 | 35.80 | 9.28 | 67.30 | 46.14 |
-| Qwen3-32B (reasoning) | 23.33 | 20.90 | 8.99 | 59.09 | 34.44 |
-| DeepSeek-R1-Qwen-32B | 30.00 | 24.30 | 8.43 | 51.01 | 35.10 |
-| Qwen3-32B (direct) | 20.00 | 23.00 | 9.03 | 54.05 | 33.46 |
-| Gemma-3-27B-IT | 20.00 | 20.30 | 8.76 | 33.33 | 21.38 |
-| TRINITY | 50.00 | 35.80 | 9.60 | 76.82 | 54.21 |
-
-Unbounded LiveCodeBench result called out in text: pass@1 `0.862` on LiveCodeBench V6, vs GPT-5 `0.838`, Gemini 2.5-Pro `0.672`, Claude-4-Sonnet `0.465`; max collaboration turns from 2 to 6 improve `0.823` to `0.863`.
-
-### C. Sakana Fugu technical report and config details
-
-Fugu technical report architecture distinctions:
-
-| Variant | Reported design |
-|---|---|
-| Fugu | latency-aware; selects a single worker per input; no role assignment; logits-only decision head; designed for low latency |
-| Fugu-Ultra | performance-oriented; scales Conductor-style multi-agent workflows; up to 5 workflow steps; function-calling support and shared memory |
-
-Fugu model card:
-
-| Benchmark | Fugu-Ultra | Fugu | Claude Opus 4.8 | Gemini 3.1 | GPT-5.5 |
-|---|---:|---:|---:|---:|---:|
-| SWE Bench Pro | 73.7 | 59.0 | 69.2 | 54.2 | 58.6 |
-| Terminal Bench 2.1 | 82.1 | 80.2 | 74.6 | 70.3 | 78.2 |
-| LiveCodeBench | 93.2 | 92.9 | 87.8 | 88.5 | 85.3 |
-| LiveCodeBench Pro | 90.8 | 87.8 | 84.8 | 82.9 | 88.4 |
-| Humanity's Last Exam | 50.0 | 47.2 | 49.8 | 44.4 | 41.4 |
-| CharXiv Reasoning | 86.6 | 85.1 | 84.2 | 83.3 | 84.1 |
-| GPQA Diamond | 95.5 | 95.5 | 92.0 | 94.3 | 93.6 |
-| SciCode | 58.7 | 60.1 | 53.5 | 58.9 | 56.1 |
-| τ3 Banking | 20.6 | 21.7 | 20.6 | 8.4 | 20.6 |
-| Long Context Reasoning | 73.3 | 74.7 | 67.7 | 72.7 | 74.3 |
-| MRCRv2 | 93.6 | 86.6 | 87.9 | 84.9 | 94.8 |
-
-Fetched `/configs/` directory contents are preserved verbatim at `/private/tmp/fugu_sources/fugu_zip/fugu-main/configs/`. Operationally relevant exact config fields:
-
-| File | Exact fields |
-|---|---|
-| `configs/bundle.sh` | `BUNDLE_CODEX_VERSION="0.141.0"`; env key regex `^fish_[0-9a-f]{64}$`; hint `codex-fugu` |
-| `configs/files/fugu.json` | model slugs `fugu`, `fugu-ultra`; context window `1000000`; provider API support true; `fugu-ultra` supports reasoning summaries, `fugu` does not; truncation limit `10000`; parallel tool calls true |
-| `configs/formats/legacy/injects/profiles.fugu.toml` | `[profiles.fugu] model = "fugu"`, effort `high`, provider `sakana`, catalog `{{CODEX_HOME}}/fugu.json` |
-| `configs/formats/modern/files/fugu.config.toml` | default model `fugu`, effort `high`, provider `sakana`, catalog `{{CODEX_HOME}}/fugu.json` |
-| `configs/injects/model_providers.sakana.toml` | `base_url = "https://api.sakana.ai/v1"`; `env_key = "SAKANA_API_KEY"`; `wire_api = "responses"`; `stream_idle_timeout_ms = 7200000`; `stream_max_retries = 5`; `request_max_retries = 4` |
-
-### Stage 1 build deltas — TRINITY specifics for CoordinationHead / CMA-ES-via-DarwinEngine
-
-1. **Use a logits-only coordinator, not a text-generating router.** The coordinator SLM may generate internally, but its decoded text is discarded for routing; the build should expose `h(s)` and route from head logits.
-2. **Default head should be linear `W ∈ R^{10×1024}` for a 7-agent pool + 3 roles.** If we keep exactly 7 workers, this is `10,240` head params. Do not start with a generic MLP unless an ablation requires it.
-3. **SVF is part of the default winning setup.** Add `9,216` singular-value-scale parameters on the selected Qwen3-0.6B second-to-last layer if we want to match the paper; if DarwinEngine only evolves head weights, document that as a deliberate simplification.
-4. **If evolving head-only, use TRINITY's `n≈10000` CMA constants.** Set `λ = ceil(4 + 3 ln n) = 32`, candidate replications `m_CMA = 16`, and budget around the paper's `T≤60` regime. For `T=60`, expected terminal evaluations are `30,720`.
-5. **If evolving head + SVF (`n=19,456`), recompute λ.** The paper's explicit `λ=32` is tied to `n≈10000`; using all `19,456` trainable params changes the formula and must be called out.
-6. **Fitness must be terminal and Bernoulli first.** DarwinEngine should score full trajectories with `R(τ) ∈ {0,1}`, average replicated end-to-end runs per candidate, then rank/recombine. Avoid per-token/per-step proxy rewards unless separately ablated.
-7. **Implement the tri-role protocol exactly enough to test the ablation.** Roles are Thinker, Worker, Verifier; max turns `K=5`; terminate only when selected role is Verifier and verifier emits `ACCEPT`; otherwise stop at `K`.
-8. **Keep penultimate-token hidden state as the baseline.** The `w/ Last token` ablation collapses LiveCodeBench from `61.46` to `50.85`; last/EOS token routing should be marked unsafe until proven.
-9. **Favor sep-CMA-ES over REINFORCE for Stage 1.** TRINITY's algorithm table is decisive in this regime: sep-CMA-ES beats REINFORCE on all four ID tasks, e.g. LiveCodeBench `0.615` vs `0.253`.
-10. **Do not invent exact role prompts.** The paper publishes role contracts but not full role prompt strings; our prompts must be treated as local implementation choices.
-
-### Stage 2 build deltas — Conductor specifics for GRPO planner plan
-
-1. **Planner output format should be Python-list serialization, not JSON.** The paper parses `model_id`, `subtasks`, and `access_list` as Python lists after the model's chain-of-thought. JSON can be an internal safer format, but it would be a deviation.
-2. **Use the simple `access_list` first.** Implement `[]` and `["all"]` exactly before adding `[0,2,3]` position lists; fine-grained access underperformed the simple scheme on LiveCodeBench (`61.24` vs `64.29`) despite slightly improving MMLU.
-3. **Reward should initially be terminal parse/correctness only.** Published Conductor reward is `0` for parse failure, `1` for correct final workflow output, `0.5` otherwise. No explicit cost penalty is published. If we need cost-aware optimization, add it as a repo-local extension with a separate ablation.
-4. **GRPO group size should be 64 per question.** The exact training loop is 4 questions/iteration × 64 rollouts/question = batch 256, 200 iterations.
-5. **Disable KL for the baseline reproduction.** The paper disables reference-model sync and sets KL penalty to `0`; no entropy bonus is published.
-6. **Constrain workflow length to 5.** Efficiency arises despite no explicit cost regularizer: average workflow length is ~3 steps, while allowed max is 5.
-7. **Represent available workers ordinally.** Feed `Model 0`, `Model 1`, etc. plus metadata, not provider names, to reduce prior/model-name bias.
-8. **Train randomized-pool robustness as a finetune, not from scratch.** Procedure is pretrained Conductor → randomly sampled `k`-model subset from `n` workers per question → modified input instructions. Since exact `k` is unpublished, make `k` configurable and log it in receipts.
-9. **Recursion is a second finetune.** Match the published recipe: 20 iterations, 350 samples (`175 LCB` + `175 RLPR`), 64 rollouts/sample, no KL, `0.25` discount on the initial non-recursive round, normalize rewards across rounds.
-10. **Recursive termination must be parseable.** Empty `model_id`, `subtasks`, and `access_list` means return previous answer. Non-empty lists launch another workflow under max recursion/call budget.
-11. **Function-calling orchestration needs isolation.** Fugu-Ultra's technical report says same-workflow agent trajectories are isolated except through `access_list`; shared memory applies across workflows/conversation, not as an all-agent shared scratchpad inside the current workflow.
-12. **Benchmark acceptance should include efficiency and ablations.** Minimum reproduction table should include unconstrained/constrained score, average calls/steps, token/cost, no-subtask, no-few-shot, fine-grained access, all-GPT-5, recursive, and frontier-model-as-conductor ablations.
+---
+
+## 12. Governance
+
+- **Do not admit this track yet.** The portfolio is mid-reconciliation and over the WIP cap
+  (`max_active: 10`). Admit only after a slot frees — the clean baton-pass is closing
+  `provider-routing-consolidation` (substantially landed on `origin/main`), with
+  `orientation-graph` reactivation dropped and `cybernetics-codex-stewardship` folded into
+  loop-closure as two further free slots.
+- The Council is co-owned with `seeing-organ`; treat it as one substrate (coordinate, don't fork).
+- Committing this file changes the tracked markdown count → run docops inventory regen.
+
+## Sources
+TRINITY arXiv 2512.04695 · Conductor arXiv 2512.04388 (OpenReview U23A2BUKYt) · Sakana Fugu
+(sakana.ai/fugu, SakanaAI/fugu) · Graph-GRPO 2603.02701 · AgentConductor 2602.17100 ·
+Krogh-Vedelsby 1995 · Zhang et al. NeurIPS 2024 · Abreu et al. 2025. Convergence record: Claude
+(Lane B) ↔ Codex ↔ Fugu, 2026-06-22 (codex's implementation plan + test plan integrated:
+extend `TopologyGenome`, upgrade Forge Arena v0, Council-not-scorer invariant).

@@ -1,0 +1,176 @@
+{
+  "act_evidence": {
+    "dataset_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
+    "dataset_file_sha256": "174410c24fab9c4fa87857c24949fa0266c2fdbc3f6630dbcc51cf899b84db36",
+    "dataset_lines_after": 5,
+    "dataset_lines_before": 0,
+    "dataset_stats": {
+      "avg_quality": 0.7,
+      "build_time_seconds": 0.0,
+      "by_source": {
+        "trajectory": 5
+      },
+      "output_path": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
+      "total_samples": 5,
+      "total_tokens_approx": 985
+    },
+    "flywheel_state": {
+      "dataset_builds": 0,
+      "last_dataset_path": "",
+      "readiness_checks": 0,
+      "recommended_budget": 0.0,
+      "recommended_gpu": "",
+      "reinforce_cycles": 1,
+      "total_patterns_extracted": 5,
+      "total_trajectories_scored": 5,
+      "training_ready": false
+    },
+    "pattern_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/strategies/patterns.jsonl",
+    "pattern_file_sha256": "fd7bd42c19e9d6f6148a940fa1b99648edbd0f2e3a0ba8842d96f96ca0d90511",
+    "pattern_lines_after": 1,
+    "pattern_lines_before": 0,
+    "reinforcement_result": {
+      "cycle": 1,
+      "evaluated": 5,
+      "patterns_extracted": 5,
+      "skipped": false,
+      "top_pattern": "strategy-loop7-training-flywheel-closur",
+      "total_patterns": 1
+    }
+  },
+  "adapt_evidence": {
+    "after": {
+      "pattern_count": 1,
+      "prompt_sha256": "6c9dd6eeccc99f8700e4007056ad7e66e514a4591efc04a458bd4bf86614f759",
+      "reinforced_section": true
+    },
+    "before": {
+      "pattern_count": 0,
+      "prompt_sha256": "1f82c6bffde8d4cb12a87a1e01cf2ebadd66e2a8ed7244e13989aeac06e12e0a",
+      "reinforced_section": false
+    },
+    "fed_forward": true,
+    "field": "StrategyReinforcer persisted patterns -> fresh later-cycle build_reinforced_prompt() strategy injection"
+  },
+  "adapt_proof": {
+    "after": {
+      "pattern_count": 1,
+      "prompt_sha256": "6c9dd6eeccc99f8700e4007056ad7e66e514a4591efc04a458bd4bf86614f759",
+      "reinforced_section": true
+    },
+    "before": {
+      "pattern_count": 0,
+      "prompt_sha256": "1f82c6bffde8d4cb12a87a1e01cf2ebadd66e2a8ed7244e13989aeac06e12e0a",
+      "reinforced_section": false
+    },
+    "fed_forward": true,
+    "field": "StrategyReinforcer persisted patterns -> fresh later-cycle build_reinforced_prompt() strategy injection"
+  },
+  "closed": true,
+  "command_to_replay": ".venv/bin/python scripts/loop7_training_flywheel_closure_run.py --report reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+  "constrain_evidence": {
+    "dataset_eligible": [
+      "loop7-traj-0001",
+      "loop7-traj-0002",
+      "loop7-traj-0003",
+      "loop7-traj-0004",
+      "loop7-traj-0005"
+    ],
+    "dataset_threshold": 0.7,
+    "reinforcement_eligible": [
+      "loop7-traj-0001",
+      "loop7-traj-0002",
+      "loop7-traj-0003",
+      "loop7-traj-0004",
+      "loop7-traj-0005"
+    ],
+    "reinforcement_threshold": 0.3
+  },
+  "cycles": 1,
+  "interpret_evidence": {
+    "min_composite": 0.8774,
+    "scorer": "dharma_swarm.thinkodynamic_scorer.ThinkodynamicScorer",
+    "scores": [
+      {
+        "composite": 0.8774,
+        "reinforcement_eligible": true,
+        "training_eligible": true,
+        "trajectory_id": "loop7-traj-0001"
+      },
+      {
+        "composite": 0.8774,
+        "reinforcement_eligible": true,
+        "training_eligible": true,
+        "trajectory_id": "loop7-traj-0002"
+      },
+      {
+        "composite": 0.8774,
+        "reinforcement_eligible": true,
+        "training_eligible": true,
+        "trajectory_id": "loop7-traj-0003"
+      },
+      {
+        "composite": 0.8774,
+        "reinforcement_eligible": true,
+        "training_eligible": true,
+        "trajectory_id": "loop7-traj-0004"
+      },
+      {
+        "composite": 0.8774,
+        "reinforcement_eligible": true,
+        "training_eligible": true,
+        "trajectory_id": "loop7-traj-0005"
+      }
+    ]
+  },
+  "later_cycle_read_evidence": {
+    "fresh_instance": true,
+    "fresh_reinforcer_loaded_patterns": 1,
+    "injected_fragment": true,
+    "prompt_changed": true,
+    "top_pattern": {
+      "avg_thinkodynamic": 0.8774,
+      "name": "strategy-loop7-training-flywheel-closur",
+      "prompt_fragment_sha256": "5d4cadc7b17519fa61ced58994b79c302ed79e45e17737f727ea1669a4dff7bd",
+      "source_trajectories": [
+        "loop7-traj-0001",
+        "loop7-traj-0002",
+        "loop7-traj-0003",
+        "loop7-traj-0004",
+        "loop7-traj-0005"
+      ],
+      "times_used": 0
+    }
+  },
+  "loop": 7,
+  "loop_id": "training_flywheel",
+  "observed_at": "2026-07-01T15:16:39.224440Z",
+  "provider_truth": {
+    "external_provider_invoked": false,
+    "note": "bounded local replay only; provider/model fields are local replay metadata, not served-provider truth",
+    "provider_truth_claimed": false
+  },
+  "real_data": true,
+  "sense_evidence": {
+    "loaded_successful_trajectories": 5,
+    "seeded_trajectory_ids": [
+      "loop7-traj-0001",
+      "loop7-traj-0002",
+      "loop7-traj-0003",
+      "loop7-traj-0004",
+      "loop7-traj-0005"
+    ],
+    "trajectory_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/trajectories/trajectories.jsonl",
+    "trajectory_file_sha256": "13b79ba576e88007d5d5787f767fd6d37ca9d332721db0b218fb282a5565dfc3",
+    "trajectory_jsonl_lines": 5
+  },
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  },
+  "work_dir": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure"
+}

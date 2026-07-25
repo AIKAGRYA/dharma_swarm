@@ -1,0 +1,31 @@
+{
+  "id": "QL-R1",
+  "title": "Quality ratchet regression",
+  "cluster": "R",
+  "cluster_title": "Quality Ratchet",
+  "severity": "structural",
+  "stage": "enforced",
+  "created": "2026-06-12",
+  "last_verified": "2026-06-25",
+  "next_review": "2026-07-12",
+  "definition": "A repo-wide quality counter moved against its permitted direction: debt counters (undefined names, over-budget modules, silent exception swallows, spine bypasses) may only fall; asset counters (property-test files, enforced hygiene patterns) may only rise. Baselines live in docs/governance/hygiene/ratchet_baselines.json and tighten automatically on green runs.",
+  "why_it_hurts": "Without a one-way bound, quality oscillates: every improvement can be silently undone by the next change, so the repo pays for the same cleanup repeatedly and never banks progress.",
+  "detector": {
+    "type": "command",
+    "command": "python3 scripts/governance/hygiene/ratchet.py --json",
+    "target": "exit 0 green; exit 1 names the regressed counter; exit 2 means a counter could not measure (blocking)"
+  },
+  "enforcement": {
+    "rule": ".github/workflows/quality-ratchet.yml; tests/conformance/test_repo_ratchet_holds.py",
+    "promoted_on": "2026-06-25"
+  },
+  "sources": [
+    "helm-theme-proto ratchet.sh F-008..F-012 (auto-tightening baselines, verified green 2026-06-12)",
+    "docs/quality/SATTVA_STYLE.md",
+    "reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md section 4 (architecture ratchet spec)"
+  ],
+  "audit_questions": [
+    "Did this change move any ratchet counter against its direction, and if intentional, was the baseline edit reviewed as a deliberate loosening?",
+    "Did an improving change commit the tightened ratchet_baselines.json alongside the improvement so the gain is banked?"
+  ]
+}

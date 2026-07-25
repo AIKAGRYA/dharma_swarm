@@ -1,0 +1,9 @@
+{
+  "attempted_at": "2026-07-07T09:21:09Z",
+  "digest": "08c801955da64a8f05ae9dd0b0833d932649acb7308ad2036ddb79ea060fca70",
+  "error": "URLError: <urlopen error Tunnel connection failed: 403 Forbidden>",
+  "host": "ccr-session",
+  "note": "afferent egress blocked/unavailable on this host \u2014 zeitgeist cadence needs the daemon host (decision queue item 3; BR-004 rides organism-rewire D1)",
+  "outcome": "needs_host",
+  "schema": "chamber_zeitgeist_attempt.v1"
+}

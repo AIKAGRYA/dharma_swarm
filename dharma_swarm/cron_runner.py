@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.cron_algedonic_handlers import (
+    run_algedonic_triage,
+    run_provider_starvation_alert,
+)
 from dharma_swarm.cron_job_runtime import CronJobExecutionResult, CronJobRunStatus
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.context import (
@@ -46,6 +50,8 @@ _ALLOWED_SHELL_COMMAND_PREFIXES = (
     ("python3", "scripts/check_provider_credits.py"),
     ("python3", "scripts/governance/name_drift_preflight.py"),
     (".venv/bin/python", "scripts/governance/name_drift_preflight.py"),
+    ("bash", "scripts/refresh_provider_status.sh"),
+    ("python3", "scripts/runtime/github_ingestor_runner.py"),
 )
 
 
@@ -712,120 +718,6 @@ def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
-def _run_algedonic_triage(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Drain algedonic pain signals into the triage cursor and alert flag."""
-
-    import subprocess
-    import sys
-
-    repo_root = Path(__file__).resolve().parent.parent
-    script = repo_root / "scripts" / "algedonic_triage.py"
-    if not script.exists():
-        error = f"missing script: {script}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=error,
-            error=error,
-        )
-
-    env = os.environ.copy()
-    state_dir = str(job.get("state_dir") or "").strip()
-    if state_dir:
-        env["DHARMA_STATE_DIR"] = str(Path(state_dir).expanduser())
-
-    timeout = _as_int(job.get("timeout_sec"), 60)
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(repo_root),
-            env=env,
-        )
-    except subprocess.TimeoutExpired:
-        error = f"algedonic_triage timed out after {timeout}s"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output="",
-            error=error,
-        )
-
-    output = (proc.stdout or "").strip()
-    err = (proc.stderr or "").strip()
-    if proc.returncode != 0:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=output or err or f"algedonic_triage exited {proc.returncode}",
-            error=err or output[:500],
-        )
-    return CronJobExecutionResult(
-        status=CronJobRunStatus.COMPLETED,
-        output=output or "algedonic_triage: no new signals",
-        error="",
-    )
-
-
-def _run_provider_starvation_alert(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Emit algedonic P0 signal when provider-chain failures dominate."""
-
-    import subprocess
-    import sys
-
-    repo_root = Path(__file__).resolve().parent.parent
-    script = repo_root / "scripts" / "runtime" / "provider_starvation_alert.py"
-    if not script.exists():
-        error = f"missing script: {script}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=error,
-            error=error,
-        )
-
-    args = [sys.executable, str(script)]
-    state_dir = str(job.get("state_dir") or "").strip()
-    if state_dir:
-        args.extend(["--state-dir", state_dir])
-    since_date = str(job.get("since_date") or "").strip()
-    if since_date:
-        args.extend(["--since-date", since_date])
-    if job.get("threshold") is not None:
-        args.extend(["--threshold", str(job.get("threshold"))])
-    if job.get("min_count") is not None:
-        args.extend(["--min-count", str(job.get("min_count"))])
-
-    timeout = _as_int(job.get("timeout_sec"), 30)
-    try:
-        proc = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(repo_root),
-        )
-    except subprocess.TimeoutExpired:
-        error = f"provider_starvation_alert timed out after {timeout}s"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output="",
-            error=error,
-        )
-
-    output = (proc.stdout or "").strip()
-    err = (proc.stderr or "").strip()
-    if proc.returncode != 0:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=output or err or f"provider_starvation_alert exited {proc.returncode}",
-            error=err or output[:500],
-        )
-    return CronJobExecutionResult(
-        status=CronJobRunStatus.COMPLETED,
-        output=output or "provider_starvation_alert: no output",
-        error="",
-    )
-
-
 def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
     """Run the external world radar and canonicalize promoted signals."""
 
@@ -859,20 +751,47 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 state_dir=Path(str(state_dir)).expanduser() if state_dir else None
             ).scan()
         )
+        # Read-only follow-on: turn promotion-ready zeitgeist signals into
+        # MemoryKernel promotion PROPOSALS (READY_FOR_REVIEW, human-gated).
+        # Never mutates memory; defensively wrapped so it can't break the scout.
+        promotion_summary: dict[str, Any] = {}
+        try:
+            from dharma_swarm.knowledge_ops.zeitgeist_promotion import (
+                run_zeitgeist_promotion,
+            )
+
+            promotion_state = (
+                Path(str(state_dir)).expanduser()
+                if state_dir
+                else dharma_state_dir()
+            )
+            promotion_summary = run_zeitgeist_promotion(promotion_state)
+        except Exception as promo_exc:  # noqa: BLE001
+            promotion_summary = {"error": str(promo_exc)[:200]}
+        promotion_error = str(promotion_summary.get("error", ""))
         output = (
             "world_scout: "
             f"raw={result.raw_observations} signals={result.emitted_signals} "
             f"promotion_ready={result.promotion_ready} "
             f"incubations={result.incubations_written} "
             f"zeitgeist={len(canonical_signals)} "
+            f"promotion_proposals={promotion_summary.get('proposal_count', 0)} "
             f"brief={result.brief_path} health={result.health_path}"
         )
+        # Surface a promotion-hook failure so it is not reported identically to a
+        # clean run with zero proposals (the follow-on is non-fatal to the scout,
+        # but a silent write/import failure must be visible to the operator).
+        if promotion_error:
+            output = f"{output} promotion_error={promotion_error}"
         if result.errors:
             output = f"{output} errors={list(result.errors)}"
+        combined_error = "; ".join(result.errors)[:500] if result.errors else ""
+        if promotion_error and not combined_error:
+            combined_error = f"promotion_hook: {promotion_error}"
         return CronJobExecutionResult(
             status=CronJobRunStatus.COMPLETED if result.ok else CronJobRunStatus.FAILED,
             output=output,
-            error="; ".join(result.errors)[:500] if result.errors else "",
+            error=combined_error,
             metadata={
                 "fetch_enabled": True,
                 "raw_observations": result.raw_observations,
@@ -880,6 +799,9 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 "promotion_ready": result.promotion_ready,
                 "incubations_written": result.incubations_written,
                 "canonical_zeitgeist_signals": len(canonical_signals),
+                "promotion_proposals": promotion_summary.get("proposal_count", 0),
+                "promotion_error": promotion_error,
+                "promotion_review_md": promotion_summary.get("review_md", ""),
                 "board_path": result.board_path,
                 "brief_path": result.brief_path,
                 "health_path": result.health_path,
@@ -952,9 +874,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         tcs_heartbeat   — local IdentityMonitor time-series sample
         world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
-        memory_common_metabolism — ingest promoted memory and gate retrieval
         provider_starvation_alert — emit algedonic signal for provider-chain starvation
         algedonic_triage — drain pain-signal cursor and write P0 alert summary
+        memory_common_metabolism — ingest promoted memory and gate retrieval
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -998,14 +920,19 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_revenue_scout(job)
     if handler == "world_scout":
         return _run_world_scout(job)
+    if handler == "signal_deep_sweep":
+        from dharma_swarm.cron_signal_deep_sweep import run_signal_deep_sweep_job
+
+        return run_signal_deep_sweep_job(job)
     if handler == "store_sync":
         return _run_store_sync(job)
     if handler == "provider_starvation_alert":
-        return _run_provider_starvation_alert(job)
+        return run_provider_starvation_alert(job)
     if handler == "algedonic_triage":
-        return _run_algedonic_triage(job)
+        return run_algedonic_triage(job)
     if handler == "memory_common_metabolism":
         from dharma_swarm.memory_common import memory_common_cron_run_fn
+
         return _result_from_legacy(*memory_common_cron_run_fn(job))
     if handler == "shell":
         return _run_shell_command(job)

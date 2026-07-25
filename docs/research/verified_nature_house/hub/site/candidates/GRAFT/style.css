@@ -1,0 +1,100 @@
+/* The Seam — THE GRAFT (aggregated winner: A hero + B reader + C proof-grid + honesty system).
+   Hermetic: no external fonts/CDNs/network. SEED · $0 · DRAFT / NOT PUBLISHED.
+   Fixes baked in: no fabricated "real actors"; Seam Index as BANDS not decimals; no
+   live-"telemetry" cosplay; ledger ships with in-row sources + redaction note; the aha is
+   taught on the hero; green demoted from eco-cliche. */
+
+:root{
+  --ink:#15191a; --soft:#414a4a; --muted:#7a8281; --line:#e6e2d8;
+  --paper:#f7f5f0; --paper-2:#efebe1; --accent:#1f6f5c; /* restrained deep teal-green */
+  --accent-2:#3a8f78; --ochre:#b9802b; --clay:#b8463a; --void:#0a0e10;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter",Helvetica,Arial,sans-serif;
+  --mono:"SFMono-Regular","SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --read:700px; --max:1080px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.62;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)} a:hover{color:var(--accent-2)}
+
+/* chrome */
+.draft{background:#fbf3e2;border-bottom:1px solid var(--ochre);color:#7a571a;font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;text-align:center;padding:.55rem 1rem}
+.chip{position:fixed;top:2.5rem;right:1rem;z-index:30;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;padding:.32rem .62rem;border-radius:999px;opacity:.85}
+nav.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.4rem;padding:.85rem 1.4rem;background:color-mix(in srgb,var(--paper) 84%,transparent);backdrop-filter:saturate(1.3) blur(8px);border-bottom:1px solid var(--line)}
+nav.top .brand{font-family:var(--serif);font-weight:600;font-size:1.05rem;letter-spacing:-.01em}
+nav.top .brand b{color:var(--accent)} nav.top .spacer{flex:1}
+nav.top a.link{color:var(--soft);font-size:.9rem;text-decoration:none} nav.top a.link:hover{color:var(--accent)}
+
+/* HERO (from A) — dark, animated empty center, with the aha taught on the visual */
+.hero{position:relative;height:clamp(560px,88vh,880px);overflow:hidden;background:var(--void)}
+#field{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:1.5rem;pointer-events:none}
+.hero .kicker{color:var(--accent-2);font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;margin:0 0 1.1rem}
+.hero h1{font-family:var(--serif);color:var(--paper);font-size:clamp(2.1rem,6vw,4rem);line-height:1.04;letter-spacing:-.02em;margin:0;text-wrap:balance;text-shadow:0 2px 44px rgba(0,0,0,.55)}
+.hero h1 .dim{color:#90a39c}
+.hero .sub{color:#bcccc4;font-size:clamp(1rem,2.3vw,1.22rem);margin:1.3rem auto 0;max-width:42ch}
+.hero .teach{margin-top:1.8rem;color:#7f938b;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;max-width:46ch;line-height:1.5}
+.hero .scroll-cue{position:absolute;bottom:1.1rem;left:50%;transform:translateX(-50%);color:#7f938b;font-size:.7rem;letter-spacing:.1em;font-family:var(--mono)}
+
+/* sections */
+section{max-width:var(--max);margin:0 auto;padding:4.5rem 1.4rem}
+section.read{max-width:var(--read)}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 .8rem}
+h2{font-family:var(--serif);font-size:clamp(1.5rem,4vw,2.2rem);letter-spacing:-.015em;margin:0 0 .6rem}
+
+/* DIAGNOSIS (from B) — the giant statement */
+.diagnosis{text-align:center;background:var(--paper-2);max-width:none;padding:4.5rem 1.4rem}
+.diagnosis p{font-family:var(--serif);font-size:clamp(1.6rem,4.6vw,2.7rem);line-height:1.18;letter-spacing:-.01em;margin:0 auto;max-width:22ch;text-wrap:balance}
+.diagnosis em{font-style:normal;color:var(--accent)}
+
+/* READER (from B) — editorial column, hedge-in-the-claim */
+.reader{font-family:var(--serif);font-size:1.18rem}
+.reader p{margin:0 0 1.3rem;color:var(--ink)}
+.reader p.lead::first-letter{font-size:3.4rem;line-height:.8;float:left;padding:.06em .12em 0 0;font-weight:600;color:var(--accent)}
+.reader .hedge{color:var(--muted);font-family:var(--sans);font-size:.96rem}
+
+/* SEAM INDEX — BANDS, not decimals (fix #2). Qualitative + sourced. */
+.index-panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:1.8rem}
+.factor{display:grid;grid-template-columns:13rem 1fr 4rem;gap:.9rem;align-items:center;margin:.9rem 0}
+@media(max-width:620px){.factor{grid-template-columns:1fr;gap:.3rem}}
+.factor .label b{display:block} .factor .label span{color:var(--muted);font-size:.8rem}
+.bar{height:12px;background:var(--paper-2);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;border-radius:999px;transition:width 1.3s cubic-bezier(.2,.7,.2,1)}
+.bar.full>i{background:var(--accent)} .bar.near0>i{background:var(--ochre)} .bar.zero>i{background:var(--clay)}
+.factor .v{font-family:var(--mono);font-size:.82rem;color:var(--soft);text-align:right}
+.product{display:flex;align-items:baseline;gap:.8rem;margin-top:1.3rem;padding-top:1.3rem;border-top:1px dashed var(--line)}
+.product .eq{font-family:var(--mono);color:var(--muted);font-size:.86rem}
+.product .out{font-family:var(--serif);font-size:clamp(1.7rem,6vw,2.4rem);color:var(--clay)}
+.product .out small{font-size:.85rem;color:var(--muted);font-family:var(--sans)}
+.src{font-family:var(--mono);font-size:.66rem;letter-spacing:.04em;color:var(--accent);margin-top:1rem}
+.tag{display:inline-block;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;padding:.08rem .4rem;border-radius:4px;vertical-align:middle}
+.tag.band{background:#f6ecd9;color:var(--ochre)} .tag.ind{background:#e2efe9;color:var(--accent)} .tag.con{background:#f1e7e5;color:var(--clay)}
+
+/* LEDGER (from C, de-faked) — a static field ledger, bands + in-row sources, NOT telemetry */
+.ledger{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:660px}
+th{text-align:left;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line);padding:.7rem .8rem}
+td{padding:.7rem .8rem;border-bottom:1px solid var(--paper-2);vertical-align:top}
+td.cl{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em}
+td.seam{color:var(--muted)} td .s{font-family:var(--mono);font-size:.62rem;color:var(--accent)}
+.c0{color:#2f8f64}.c1{color:#3f7fa6}.c2{color:#a07e2c}.c3{color:#a3623c}.c4{color:#6a5fa1}.c5{color:#a3506b}
+tr.unocc td{background:#fbf3e2;border-top:2px solid var(--ochre);border-bottom:2px solid var(--ochre)}
+tr.unocc td.cl{color:var(--ochre)} tr.unocc .hl{color:#7a571a;font-weight:600}
+.ledger-note{font-family:var(--mono);font-size:.66rem;color:var(--muted);padding:.7rem .9rem}
+
+/* WEAVE — clearly a COMING preview (fix #6) */
+.coming{display:inline-block;font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;background:var(--ink);color:var(--paper);padding:.12rem .5rem;border-radius:999px;margin-left:.6rem;vertical-align:middle}
+.cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.2rem;opacity:.78}
+@media(max-width:760px){.cards{grid-template-columns:1fr}}
+.card{border:1px dashed var(--line);border-radius:12px;padding:1.3rem;background:#fff}
+.card h3{margin:0 0 .4rem;font-family:var(--serif);color:var(--accent)}
+.card p{margin:0;color:var(--muted);font-size:.95rem}
+
+/* OFFER + footer */
+.offer{background:var(--void);color:var(--paper);border-radius:18px;padding:2.4rem;text-align:center}
+.offer h2{color:var(--paper)} .offer p{color:#bcccc4;max-width:54ch;margin:.6rem auto 0}
+footer{border-top:1px solid var(--line)}
+footer .inner{max-width:var(--max);margin:0 auto;padding:2.2rem 1.4rem 4rem}
+.honesty{font-family:var(--mono);font-size:.7rem;letter-spacing:.03em;color:var(--soft);background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:.75rem 1rem;display:block;line-height:1.7}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}

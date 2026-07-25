@@ -21,7 +21,10 @@ from dharma_swarm.memory_kernel.context_compiler_shadow import (
     notify_memory_kernel_context_canary,
     run_memory_kernel_context_canary,
 )
-from dharma_swarm.memory_kernel.default_context import build_memory_kernel_default_context
+from dharma_swarm.memory_kernel.default_context import (
+    build_memory_kernel_default_context,
+    memory_kernel_isolation_policy_from_metadata,
+)
 from dharma_swarm.provider_policy import ProviderPolicyRouter, ProviderRouteRequest
 from dharma_swarm.runtime_state import (
     ArtifactRecord, ContextBundleRecord, DelegationRun, MemoryFact, RuntimeStateStore,
@@ -272,8 +275,12 @@ class ContextCompiler:
             query=query,
             task_id=task_id,
         )
+        isolation_policy = memory_kernel_isolation_policy_from_metadata(metadata)
         memory_kernel_section, memory_kernel_metadata = build_memory_kernel_default_context(
-            self.memory_kernel, recall_query=recall_query, token_budget=token_budget
+            self.memory_kernel,
+            recall_query=recall_query,
+            token_budget=token_budget,
+            isolation_policy=isolation_policy,
         )
         recall_hits = (
             await self.memory_lattice.recall(
@@ -624,7 +631,7 @@ class ContextCompiler:
                 if related:
                     line += f" (related: {', '.join(str(r) for r in related[:3])})"
                 if loc:
-                    line += f" [files: {', '.join(str(l) for l in loc[:2])}]"
+                    line += f" [files: {', '.join(str(location) for location in loc[:2])}]"
                 sem_lines.append(line)
             sections.append(
                 ContextSection(

@@ -26,35 +26,25 @@ import httpx
 
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
-    CEREBRAS_BASE_URL_ENV,
     CEREBRAS_API_KEY_ENV,
-    CHUTES_BASE_URL_ENV,
     CHUTES_API_KEY_ENV,
-    FIREWORKS_BASE_URL_ENV,
     FIREWORKS_API_KEY_ENV,
-    GOOGLE_AI_BASE_URL_ENV,
     GOOGLE_AI_API_KEY_ENV,
-    GROQ_BASE_URL_ENV,
     GROQ_API_KEY_ENV,
-    MISTRAL_BASE_URL_ENV,
+    KIMI_API_KEY_ENV,
     MISTRAL_API_KEY_ENV,
-    NVIDIA_NIM_BASE_URL_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     OLLAMA_API_KEY_ENV,
-    OPENAI_BASE_URL_ENV,
     OPENAI_API_KEY_ENV,
-    OPENROUTER_BASE_URL_ENV,
     OPENROUTER_API_KEY_ENV,
-    SAMBANOVA_BASE_URL_ENV,
     SAMBANOVA_API_KEY_ENV,
-    SILICONFLOW_BASE_URL_ENV,
     SILICONFLOW_API_KEY_ENV,
-    TOGETHER_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
-    env_value,
+    ZHIPU_API_KEY_ENV,
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -65,6 +55,7 @@ from dharma_swarm.ollama_config import (
     OLLAMA_LOCAL_BASE_URL,
     build_ollama_headers,
     get_ollama_cloud_frontier_chain,
+    is_ollama_cloud_model,
     ollama_transport_mode,
     resolve_ollama_base_url,
     resolve_ollama_model,
@@ -73,6 +64,17 @@ from dharma_swarm.provider_policy import (
     ProviderPolicyRouter,
     ProviderRouteDecision,
     ProviderRouteRequest,
+)
+from dharma_swarm.provider_transport import (
+    KeyLivenessProvider,
+    apply_canary as apply_transport_canary,
+    decision_with_transport_provenance,
+    deduplicate_physical_provider_chain,
+    provider_chain_with_transport_provenance,
+    provider_instance_available,
+    prune_dead_key_providers,
+    response_indicates_failure,
+    route_request_with_transport_provenance,
 )
 from dharma_swarm.router_retrospective import (
     RouteOutcomeRecord,
@@ -98,68 +100,6 @@ from dharma_swarm.telemetry_plane import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-OPENAI_COMPATIBLE_BASE_URLS: dict[ProviderType, str] = {
-    ProviderType.OPENAI: "https://api.openai.com/v1",
-    ProviderType.OPENROUTER: "https://openrouter.ai/api/v1",
-    ProviderType.OPENROUTER_FREE: "https://openrouter.ai/api/v1",
-    ProviderType.GROQ: "https://api.groq.com/openai/v1",
-    ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
-    ProviderType.SILICONFLOW: "https://api.siliconflow.cn/v1",
-    ProviderType.TOGETHER: "https://api.together.xyz/v1",
-    ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
-    ProviderType.GOOGLE_AI: "https://generativelanguage.googleapis.com/v1beta/openai/",
-    ProviderType.SAMBANOVA: "https://api.sambanova.ai/v1",
-    ProviderType.MISTRAL: "https://api.mistral.ai/v1",
-    ProviderType.CHUTES: "https://api.chutes.ai/v1",
-}
-
-
-def _configured_value(explicit: str | None, env_var: str) -> str | None:
-    return explicit or env_value(env_var)
-
-
-def _configured_base_url(
-    explicit: str | None,
-    env_var: str,
-    default: str,
-) -> str:
-    return str(explicit or env_value(env_var) or default).rstrip("/")
-
-
-def _configured_timeout(
-    timeout_seconds: float | int | None,
-    default: float = 120.0,
-) -> float:
-    return float(timeout_seconds if timeout_seconds is not None else default)
-
-
-class ProviderChainExecutionError(RuntimeError):
-    """Raised when a routed provider chain exhausts all candidate lanes."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        chain: list[str],
-        failure_trace: list[dict[str, Any]],
-        selected_provider: str,
-        selected_model: str,
-        planned_provider: str,
-        planned_model: str,
-    ) -> None:
-        super().__init__(message)
-        self.chain = list(chain)
-        self.failure_trace = [dict(item) for item in failure_trace]
-        self.selected_provider = selected_provider
-        self.selected_model = selected_model
-        self.planned_provider = planned_provider
-        self.planned_model = planned_model
-        last_attempt = self.failure_trace[-1] if self.failure_trace else {}
-        self.last_attempt_provider = str(last_attempt.get("provider") or "").strip()
-        self.last_attempt_model = str(last_attempt.get("model") or "").strip()
-
 
 class LLMProvider(BaseProvider):
     """Abstract base for all LLM providers.
@@ -235,6 +175,11 @@ def _extract_openai_compatible_message_text(message: Any) -> str:
     reasoning = _coerce_openrouter_text(_get_openai_compatible_field(message, "reasoning"))
     if reasoning:
         return reasoning
+    reasoning_content = _coerce_openrouter_text(
+        _get_openai_compatible_field(message, "reasoning_content")
+    )
+    if reasoning_content:
+        return reasoning_content
     return _coerce_openrouter_text(
         _get_openai_compatible_field(message, "reasoning_details")
     )
@@ -314,7 +259,7 @@ class AnthropicProvider(LLMProvider):
     )
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = _configured_value(api_key, ANTHROPIC_API_KEY_ENV)
+        self._api_key = api_key or os.environ.get(ANTHROPIC_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -380,19 +325,8 @@ class OpenAIProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="openai",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, OPENAI_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            OPENAI_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENAI],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(OPENAI_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -404,11 +338,7 @@ class OpenAIProvider(LLMProvider):
             from openai import AsyncOpenAI
         except ImportError as exc:
             raise ImportError("pip install openai") from exc
-        self._client = AsyncOpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
-        )
+        self._client = AsyncOpenAI(api_key=self._api_key)
         return self._client
 
     @staticmethod
@@ -475,19 +405,8 @@ class OpenRouterProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="openrouter",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, OPENROUTER_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            OPENROUTER_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENROUTER],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(OPENROUTER_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -501,8 +420,7 @@ class OpenRouterProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://openrouter.ai/api/v1",
         )
         return self._client
 
@@ -560,6 +478,10 @@ class OpenRouterProvider(LLMProvider):
 class NVIDIANIMProvider(LLMProvider):
     """Provider backed by NVIDIA NIM's OpenAI-compatible endpoint."""
 
+    _RATE_LIMIT_MAX_RETRIES = 3
+    _RATE_LIMIT_BASE_DELAY_SECONDS = 0.75
+    _RATE_LIMIT_MAX_DELAY_SECONDS = 6.0
+
     capabilities = ProviderCapabilities(
         supports_streaming=False, supports_tools=True,
         max_context_tokens=128_000, provider_family="nvidia",
@@ -571,17 +493,16 @@ class NVIDIANIMProvider(LLMProvider):
         api_key: str | None = None,
         base_url: str | None = None,
         default_model: str | None = None,
-        timeout_seconds: float | int | None = None,
     ) -> None:
-        self._api_key = _configured_value(api_key, NVIDIA_NIM_API_KEY_ENV)
+        self._api_key = api_key or os.environ.get(NVIDIA_NIM_API_KEY_ENV)
         self._base_url = (
             base_url
-            or env_value(NVIDIA_NIM_BASE_URL_ENV)
+            or os.environ.get("NVIDIA_NIM_BASE_URL")
             or "https://integrate.api.nvidia.com/v1"
         ).rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.NVIDIA_NIM)
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: httpx.AsyncClient | None = None
+        self._rate_limit_semaphore = asyncio.Semaphore(1)
 
     @staticmethod
     def _build_messages(request: LLMRequest) -> list[dict[str, str]]:
@@ -602,7 +523,7 @@ class NVIDIANIMProvider(LLMProvider):
     def _get_client(self) -> httpx.AsyncClient:
         """Return a persistent httpx client, creating one if needed."""
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=self._timeout_seconds)
+            self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
 
     async def close(self) -> None:
@@ -610,6 +531,43 @@ class NVIDIANIMProvider(LLMProvider):
         if self._client is not None and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
+
+    @staticmethod
+    def _retry_after_seconds(resp: httpx.Response) -> float | None:
+        raw = resp.headers.get("Retry-After")
+        if raw is None:
+            return None
+        try:
+            value = float(raw.strip())
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+
+    def _rate_limit_delay(self, resp: httpx.Response, attempt: int) -> float:
+        retry_after = self._retry_after_seconds(resp)
+        if retry_after is not None:
+            return min(retry_after, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+        backoff = self._RATE_LIMIT_BASE_DELAY_SECONDS * (2 ** attempt)
+        jitter = random.uniform(0.0, 0.25)
+        return min(backoff + jitter, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+
+    async def _post_chat_with_backoff(
+        self,
+        client: httpx.AsyncClient,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        async with self._rate_limit_semaphore:
+            for attempt in range(self._RATE_LIMIT_MAX_RETRIES + 1):
+                resp = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                )
+                if resp.status_code != 429 or attempt >= self._RATE_LIMIT_MAX_RETRIES:
+                    return resp
+                await asyncio.sleep(self._rate_limit_delay(resp, attempt))
+        raise RuntimeError("NVIDIA NIM request loop exited unexpectedly")
 
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
@@ -624,11 +582,7 @@ class NVIDIANIMProvider(LLMProvider):
             payload["tools"] = request.tools
 
         client = self._get_client()
-        resp = await client.post(
-            f"{self._base_url}/chat/completions",
-            json=payload,
-            headers=self._headers_or_raise(),
-        )
+        resp = await self._post_chat_with_backoff(client, payload, self._headers_or_raise())
         if resp.status_code != 200:
             raise RuntimeError(
                 f"NVIDIA NIM error {resp.status_code}: {resp.text[:300]}"
@@ -740,7 +694,12 @@ class _SubprocessProvider(LLMProvider):
         prompt += "- Read other agents' notes in ~/.dharma/shared/ first\n"
         # Memory survival instinct — injected into EVERY subprocess agent
         prompt += MEMORY_SURVIVAL_DIRECTIVE
-        return prompt
+        # A NUL byte anywhere in the prompt makes asyncio.create_subprocess_exec
+        # raise ValueError("embedded null byte") and kills the dispatch (the
+        # long-standing "claude_code embedded null byte" failure class). It is
+        # never meaningful in an LLM prompt and can ride in from upstream context
+        # assembly, so strip it at this shared chokepoint for every CLI provider.
+        return prompt.replace("\x00", "")
 
     def _build_cli_args(self, prompt: str, model: str | None = None) -> list[str]:
         resolved = model or "sonnet"
@@ -749,6 +708,11 @@ class _SubprocessProvider(LLMProvider):
     def _build_env(self) -> dict[str, str]:
         env = {**os.environ, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
         env.pop("CLAUDECODE", None)  # Allow nesting
+        # Remote/web hosts inject this to stream partials to the parent session;
+        # it forces `--include-partial-messages`, which is invalid with the
+        # `--output-format text` headless args below and breaks every nested
+        # subprocess agent in a Claude Code on the web session. Drop it.
+        env.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
         return env
 
     @jikoku_traced_provider
@@ -780,10 +744,11 @@ class _SubprocessProvider(LLMProvider):
             return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
 
         content = stdout.decode()[:50_000] if stdout else ""
-        if proc.returncode != 0 and not content:
-            content = (
-                f"ERROR (rc={proc.returncode}): "
-                f"{stderr.decode()[:500] if stderr else 'unknown'}"
+        if proc.returncode != 0:
+            stderr_text = stderr.decode()[:500] if stderr else ""
+            detail = content or stderr_text or "unknown"
+            raise RuntimeError(
+                f"{self._cli_label} exited {proc.returncode}: {detail[:500]}"
             )
 
         return LLMResponse(content=content, model=self._cli_label)
@@ -907,21 +872,9 @@ class OpenRouterFreeProvider(LLMProvider):
             await cls._discover_free_models()
         return list(cls._discovered_models)
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        model: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, OPENROUTER_API_KEY_ENV)
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(OPENROUTER_API_KEY_ENV)
         self._preferred_model = model  # May be None — resolved at call time
-        self._base_url = _configured_base_url(
-            base_url,
-            OPENROUTER_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENROUTER_FREE],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -935,8 +888,7 @@ class OpenRouterFreeProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://openrouter.ai/api/v1",
         )
         return self._client
 
@@ -1041,13 +993,11 @@ class OllamaProvider(LLMProvider):
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
-        timeout_seconds: float | int | None = None,
     ) -> None:
-        self._api_key = _configured_value(api_key, OLLAMA_API_KEY_ENV)
+        self._api_key = api_key or os.environ.get(OLLAMA_API_KEY_ENV)
         self._base_url = resolve_ollama_base_url(base_url=base_url, api_key=self._api_key)
         self._model = resolve_ollama_model(model, base_url=self._base_url, api_key=self._api_key)
         self._transport_mode = ollama_transport_mode(base_url=self._base_url, api_key=self._api_key)
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -1065,7 +1015,7 @@ class OllamaProvider(LLMProvider):
     def _get_client(self) -> httpx.AsyncClient:
         """Return a persistent httpx client, creating one if needed."""
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=self._timeout_seconds)
+            self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
 
     async def close(self) -> None:
@@ -1104,6 +1054,12 @@ class OllamaProvider(LLMProvider):
         # kimi-k2.5:cloud returns empty content with output in "thinking").
         if self._transport_mode == "cloud_api":
             return await self._complete_openai_compat(model, messages, request)
+
+        # Keyless local transport cannot serve :cloud models (the local daemon
+        # proxies them to ollama.com and gets 401). Degrade to the local
+        # default so frontier-pinned agents stay functional without a key.
+        if is_ollama_cloud_model(model) and not (self._api_key or "").strip():
+            model = OLLAMA_DEFAULT_LOCAL_MODEL
 
         return await self._complete_native(model, messages, request)
 
@@ -1169,13 +1125,36 @@ class OllamaProvider(LLMProvider):
             f"Ollama cloud error after {len(attempts)} attempts: {last_error or 'unknown error'}"
         )
 
+    @staticmethod
+    def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Native /api/chat requires tool_call arguments as objects, not JSON
+        strings — Ollama rejects string arguments with a 400 parse error."""
+        normalized: list[dict[str, Any]] = []
+        for msg in messages:
+            tool_calls = msg.get("tool_calls")
+            if not tool_calls:
+                normalized.append(msg)
+                continue
+            fixed_calls = []
+            for tc in tool_calls:
+                fn = dict(tc.get("function") or {})
+                args = fn.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        fn["arguments"] = json.loads(args) if args.strip() else {}
+                    except (ValueError, TypeError):
+                        fn["arguments"] = {}
+                fixed_calls.append({**tc, "function": fn})
+            normalized.append({**msg, "tool_calls": fixed_calls})
+        return normalized
+
     async def _complete_native(
         self, model: str, messages: list[dict[str, str]], request: LLMRequest,
     ) -> LLMResponse:
         """Local path: native Ollama /api/chat endpoint."""
         payload: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": self._native_messages(messages),
             "stream": False,
             "options": {
                 "temperature": request.temperature,
@@ -1291,15 +1270,13 @@ class GroqProvider(LLMProvider):
         self,
         api_key: str | None = None,
         base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
     ) -> None:
-        self._api_key = _configured_value(api_key, GROQ_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            GROQ_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.GROQ],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+        self._api_key = api_key or os.environ.get(GROQ_API_KEY_ENV)
+        self._base_url = (
+            base_url
+            or os.environ.get("GROQ_BASE_URL")
+            or "https://api.groq.com/openai/v1"
+        ).rstrip("/")
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1314,7 +1291,6 @@ class GroqProvider(LLMProvider):
         self._client = AsyncOpenAI(
             api_key=self._api_key,
             base_url=self._base_url,
-            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1373,19 +1349,8 @@ class CerebrasProvider(LLMProvider):
         max_context_tokens=131_072, provider_family="cerebras",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, CEREBRAS_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            CEREBRAS_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.CEREBRAS],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(CEREBRAS_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1399,8 +1364,7 @@ class CerebrasProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.cerebras.ai/v1",
         )
         return self._client
 
@@ -1459,19 +1423,8 @@ class SiliconFlowProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="siliconflow",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, SILICONFLOW_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            SILICONFLOW_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.SILICONFLOW],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(SILICONFLOW_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1485,8 +1438,7 @@ class SiliconFlowProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.siliconflow.cn/v1",
         )
         return self._client
 
@@ -1545,19 +1497,8 @@ class TogetherProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="together",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, TOGETHER_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            TOGETHER_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.TOGETHER],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(TOGETHER_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1571,8 +1512,7 @@ class TogetherProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.together.xyz/v1",
         )
         return self._client
 
@@ -1631,19 +1571,8 @@ class FireworksProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="fireworks",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, FIREWORKS_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            FIREWORKS_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.FIREWORKS],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(FIREWORKS_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1657,8 +1586,7 @@ class FireworksProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.fireworks.ai/inference/v1",
         )
         return self._client
 
@@ -1717,19 +1645,8 @@ class GoogleAIProvider(LLMProvider):
         max_context_tokens=1_000_000, provider_family="google_ai",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, GOOGLE_AI_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            GOOGLE_AI_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.GOOGLE_AI],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(GOOGLE_AI_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1743,8 +1660,7 @@ class GoogleAIProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         )
         return self._client
 
@@ -1803,19 +1719,8 @@ class SambaNovaProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="sambanova",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, SAMBANOVA_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            SAMBANOVA_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.SAMBANOVA],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(SAMBANOVA_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1829,8 +1734,7 @@ class SambaNovaProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.sambanova.ai/v1",
         )
         return self._client
 
@@ -1889,19 +1793,8 @@ class MistralProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="mistral",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, MISTRAL_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            MISTRAL_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.MISTRAL],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(MISTRAL_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1915,8 +1808,7 @@ class MistralProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.mistral.ai/v1",
         )
         return self._client
 
@@ -1975,19 +1867,8 @@ class ChutesProvider(LLMProvider):
         max_context_tokens=64_000, provider_family="chutes",
     )
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        timeout_seconds: float | int | None = None,
-    ) -> None:
-        self._api_key = _configured_value(api_key, CHUTES_API_KEY_ENV)
-        self._base_url = _configured_base_url(
-            base_url,
-            CHUTES_BASE_URL_ENV,
-            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.CHUTES],
-        )
-        self._timeout_seconds = _configured_timeout(timeout_seconds)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get(CHUTES_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -2001,8 +1882,7 @@ class ChutesProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout_seconds,
+            base_url="https://api.chutes.ai/v1",
         )
         return self._client
 
@@ -2046,6 +1926,194 @@ class ChutesProvider(LLMProvider):
                 yield delta.content
 
 
+class KimiCodeProvider(LLMProvider):
+    """Kimi Code subscription lane, using its OpenAI-compatible endpoint."""
+
+    capabilities = ProviderCapabilities(
+        supports_streaming=True, supports_tools=True,
+        supports_thinking=True, supports_system_prompt=True,
+        max_context_tokens=1_048_576, provider_family="kimi_code",
+    )
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        default_model: str | None = None,
+        timeout: float = 300.0,
+    ) -> None:
+        self._api_key = api_key or os.environ.get(KIMI_API_KEY_ENV)
+        self._base_url = (base_url or "https://api.kimi.com/coding/v1").rstrip("/")
+        self._default_model = default_model or canonical_default_model(ProviderType.KIMI_CODE)
+        self._timeout = float(timeout)
+        self._client: Any = None
+
+    def _client_or_raise(self) -> Any:
+        if self._client is not None:
+            return self._client
+        if not self._api_key:
+            raise RuntimeError(f"{KIMI_API_KEY_ENV} not set")
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as exc:
+            raise ImportError("pip install openai") from exc
+        self._client = AsyncOpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout,
+        )
+        return self._client
+
+    @staticmethod
+    def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        if system:
+            out.append({"role": "system", "content": system})
+        out.extend(msgs)
+        return out
+
+    @jikoku_traced_provider
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        client = self._client_or_raise()
+        messages = self._build_messages(request.messages, request.system)
+        kwargs: dict[str, Any] = dict(
+            model=request.model or self._default_model,
+            messages=messages,
+            max_tokens=request.max_tokens,
+            # Kimi Code models require this fixed temperature.
+            temperature=1,
+        )
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+        msg = choice.message
+        tool_calls: list[dict[str, Any]] = [
+            {"id": tc.id, "name": tc.function.name,
+             "arguments": tc.function.arguments}
+            for tc in (msg.tool_calls or [])
+        ]
+        return LLMResponse(
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
+            usage={"prompt_tokens": resp.usage.prompt_tokens,
+                   "completion_tokens": resp.usage.completion_tokens,
+                   "total_tokens": resp.usage.total_tokens} if resp.usage else {},
+            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+        )
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        client = self._client_or_raise()
+        kwargs: dict[str, Any] = {
+            "model": request.model or self._default_model,
+            "stream": True,
+            "messages": self._build_messages(request.messages, request.system),
+            "max_tokens": request.max_tokens,
+            "temperature": 1,
+        }
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
+        async for chunk in resp:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+
+class ZhipuProvider(LLMProvider):
+    """z.ai / Zhipu -- first-party GLM lane (glm-5.2, GLM-4.6). OpenAI-compatible.
+
+    Direct vendor endpoint, NOT routed through OpenRouter. Base URL defaults to
+    the z.ai OpenAI-compatible paas endpoint and is overridable via ZHIPU_BASE_URL.
+    """
+
+    capabilities = ProviderCapabilities(
+        supports_streaming=True, supports_tools=True,
+        max_context_tokens=200_000, provider_family="zhipu",
+    )
+
+    _DEFAULT_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        default_model: str | None = None,
+        timeout: float = 300.0,
+    ) -> None:
+        self._api_key = api_key or os.environ.get(ZHIPU_API_KEY_ENV)
+        self._base_url = (base_url or self._DEFAULT_BASE_URL).rstrip("/")
+        self._default_model = default_model or canonical_default_model(ProviderType.ZHIPU)
+        self._timeout = float(timeout)
+        self._client: Any = None
+
+    def _client_or_raise(self) -> Any:
+        if self._client is not None:
+            return self._client
+        if not self._api_key:
+            raise RuntimeError(f"{ZHIPU_API_KEY_ENV} not set")
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as exc:
+            raise ImportError("pip install openai") from exc
+        self._client = AsyncOpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout,
+        )
+        return self._client
+
+    @staticmethod
+    def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        if system:
+            out.append({"role": "system", "content": system})
+        out.extend(msgs)
+        return out
+
+    @jikoku_traced_provider
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        client = self._client_or_raise()
+        messages = self._build_messages(request.messages, request.system)
+        kwargs: dict[str, Any] = dict(
+            model=request.model or self._default_model, messages=messages,
+            max_tokens=request.max_tokens, temperature=request.temperature,
+        )
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+        msg = choice.message
+        tool_calls: list[dict[str, Any]] = [
+            {"id": tc.id, "name": tc.function.name,
+             "arguments": tc.function.arguments}
+            for tc in (msg.tool_calls or [])
+        ]
+        return LLMResponse(
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
+            usage={"prompt_tokens": resp.usage.prompt_tokens,
+                   "completion_tokens": resp.usage.completion_tokens,
+                   "total_tokens": resp.usage.total_tokens} if resp.usage else {},
+            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+        )
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        client = self._client_or_raise()
+        kwargs: dict[str, Any] = dict(
+            model=request.model or self._default_model, stream=True,
+            messages=self._build_messages(request.messages, request.system),
+            max_tokens=request.max_tokens, temperature=request.temperature,
+        )
+        # capabilities declares supports_tools=True; honor tools when streaming
+        # too (complete() already does) so function-calling isn't silently lost.
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
+        async for chunk in resp:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+
 class ModelRouter:
     """Routes LLM requests to the appropriate provider."""
 
@@ -2069,11 +2137,13 @@ class ModelRouter:
         telemetry: TelemetryPlaneStore | None = None,
         telemetry_enabled: bool | None = None,
         telemetry_db_path: Path | None = None,
+        key_liveness_provider: KeyLivenessProvider | None = None,
     ) -> None:
         self._providers = providers
         self._policy_router = policy_router or ProviderPolicyRouter()
         self._retry_policy = retry_policy or RetryPolicy()
         self._breaker_registry = breaker_registry or CircuitBreakerRegistry()
+        self._key_liveness_provider = key_liveness_provider
         sticky_seconds_env = os.environ.get("DGC_ROUTER_STICKY_SECONDS")
         sticky_min_tokens_env = os.environ.get("DGC_ROUTER_STICKY_MIN_TOKENS")
         effective_sticky_seconds = (
@@ -2193,16 +2263,6 @@ class ModelRouter:
             else:
                 self._telemetry = None
 
-    def attach_telemetry(
-        self,
-        telemetry: TelemetryPlaneStore,
-        *,
-        enabled: bool = True,
-    ) -> None:
-        """Attach the canonical runtime telemetry store after router creation."""
-        self._telemetry = telemetry
-        self._telemetry_enabled = bool(enabled)
-
     @staticmethod
     def _parse_provider_type(raw: str) -> ProviderType | None:
         if not raw:
@@ -2255,14 +2315,11 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
-        available = [
-            provider
-            for provider in (available_provider_types or list(self._providers.keys()))
-            if provider in self._providers
-        ]
-        return self._policy_router.route(
+        return route_request_with_transport_provenance(
             route_request,
-            available_providers=available,
+            providers=self._providers,
+            policy_router=self._policy_router,
+            available_provider_types=available_provider_types,
         )
 
     @staticmethod
@@ -2272,63 +2329,8 @@ class ModelRouter:
         return request.model_copy(update={"model": model_hint})
 
     @staticmethod
-    def _response_with_served_provider(
-        response: LLMResponse,
-        provider: ProviderType,
-    ) -> LLMResponse:
-        if str(response.provider or "").strip():
-            return response
-        return response.model_copy(update={"provider": provider.value})
-
-    @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
-        body = response.content.strip().lower()
-        if body.startswith("timeout:"):
-            return "provider_timeout"
-        if body.startswith("error:") or body.startswith("error (rc="):
-            return "provider_error"
-        # Three orthogonal failure classes (a quota exhaustion is not a
-        # circuit failure, and a rate limit is neither):
-        #   rate_limited     -- transient; back off / fall through, never fast-trip
-        #   quota_exhausted  -- permanent until operator refills; fast-trip
-        #   billing_exhausted-- permanent until operator pays/re-enables; fast-trip
-        _RATE_LIMIT_MARKERS = (
-            "rate_limit_exceeded",
-            "rate limit",
-            "too many requests",
-            "429",
-        )
-        _QUOTA_MARKERS = (
-            "insufficient_quota",
-            "you exceeded your current quota",
-        )
-        _BILLING_MARKERS = (
-            "credit balance is too low",
-            "credit balance",
-            "billing hard limit",
-            "your api key has been disabled",
-        )
-        _ACCESS_DENIED_MARKERS = (
-            "access denied",
-            "please check your network settings",
-            "403",
-            "forbidden",
-            "unauthorized",
-        )
-        if len(body) < 300:
-            for marker in _RATE_LIMIT_MARKERS:
-                if marker in body:
-                    return "rate_limited"
-            for marker in _QUOTA_MARKERS:
-                if marker in body:
-                    return "quota_exhausted"
-            for marker in _BILLING_MARKERS:
-                if marker in body:
-                    return "billing_exhausted"
-            for marker in _ACCESS_DENIED_MARKERS:
-                if marker in body:
-                    return "access_denied"
-        return None
+        return response_indicates_failure(response)
 
     def _provider_chain(
         self,
@@ -2336,12 +2338,24 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> list[ProviderType]:
-        available = set(available_provider_types or self._providers.keys())
-        chain: list[ProviderType] = []
-        for provider in [decision.selected_provider, *decision.fallback_providers]:
-            if provider in available and provider in self._providers and provider not in chain:
-                chain.append(provider)
+        chain, _aliases = provider_chain_with_transport_provenance(
+            decision,
+            providers=self._providers,
+            available_provider_types=available_provider_types,
+            live_provider=self._key_liveness_provider,
+        )
         return chain
+
+    @staticmethod
+    def _prune_dead_key_providers(
+        chain: list[ProviderType],
+        *,
+        live_provider: KeyLivenessProvider | None = None,
+    ) -> list[ProviderType]:
+        return prune_dead_key_providers(
+            chain,
+            live_provider=live_provider or live_providers,
+        )
 
     @staticmethod
     def _session_id_from_context(route_request: ProviderRouteRequest) -> str | None:
@@ -2413,7 +2427,6 @@ class ModelRouter:
                 "planned_provider": planned_provider.value,
                 "planned_model": planned_model,
                 "candidate_chain": [provider.value for provider in chain],
-                "route_trace": list(decision.route_trace),
             },
         )
         try:
@@ -2457,45 +2470,6 @@ class ModelRouter:
                 "latency_ms": round(float(latency_ms), 3),
                 "total_tokens": int(total_tokens),
                 "error": error or "",
-            },
-        )
-        try:
-            await self._telemetry.record_external_outcome(record)
-        except Exception:
-            return
-
-    async def _record_provider_attempt_started(
-        self,
-        *,
-        route_request: ProviderRouteRequest,
-        provider: ProviderType,
-        model: str,
-        route_path: str,
-        task_signature: str,
-    ) -> None:
-        if self._telemetry is None:
-            return
-        scope = self._telemetry_scope(route_request)
-        record = ExternalOutcomeRecord(
-            outcome_id=self._telemetry_id("outcome"),
-            outcome_kind="provider_attempt",
-            value=0.0,
-            unit="success_ratio",
-            confidence=1.0,
-            status="started",
-            subject_id=provider.value,
-            summary=f"{route_request.action_name} via {provider.value} started",
-            session_id=scope["session_id"],
-            task_id=scope["task_id"],
-            run_id=scope["run_id"],
-            metadata={
-                "provider": provider.value,
-                "model": model,
-                "route_path": route_path,
-                "task_signature": task_signature,
-                "latency_ms": 0.0,
-                "total_tokens": 0,
-                "error": "",
             },
         )
         try:
@@ -2552,7 +2526,6 @@ class ModelRouter:
                 "estimated_cost_usd": estimated_cost_usd,
                 "response_model": response_model or "",
                 "failure_trace": list(failure_trace),
-                "route_trace": list(decision.route_trace),
             },
         )
         completion_outcome = ExternalOutcomeRecord(
@@ -2656,26 +2629,6 @@ class ModelRouter:
             "token_estimate": int(token_estimate),
             "updated_at": time.monotonic(),
         }
-
-    def _apply_canary(
-        self,
-        chain: list[ProviderType],
-        *,
-        model_hints: dict[ProviderType, str | None],
-    ) -> tuple[list[ProviderType], bool]:
-        if (
-            self._canary_percent <= 0
-            or self._canary_provider is None
-            or self._canary_provider not in self._providers
-        ):
-            return (chain, False)
-        if random.random() * 100.0 >= self._canary_percent:
-            return (chain, False)
-        canary_provider = self._canary_provider
-        reordered = [canary_provider] + [item for item in chain if item != canary_provider]
-        if self._canary_model_hint:
-            model_hints[canary_provider] = self._canary_model_hint
-        return (reordered, True)
 
     @staticmethod
     def _reward_key(provider: ProviderType, model: str) -> str:
@@ -2916,16 +2869,49 @@ class ModelRouter:
             enriched_request,
             available_provider_types=available_provider_types,
         )
-        chain = self._provider_chain(
+        try:
+            key_liveness_oracle = self._key_liveness_provider or live_providers
+            key_liveness_snapshot = key_liveness_oracle()
+        except Exception:
+            logger.warning(
+                "key_oracle raised; keeping unfiltered request chain",
+                exc_info=True,
+            )
+            key_liveness_snapshot = None
+
+        def request_key_liveness() -> set[str] | None:
+            return key_liveness_snapshot
+
+        chain, transport_aliases = provider_chain_with_transport_provenance(
             decision,
+            providers=self._providers,
             available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
         if not chain:
             # Routing filter found nothing — fall back to any registered provider
-            fallback_set = set(available_provider_types or self._providers.keys())
-            chain = [p for p in self._providers if p in fallback_set]
+            fallback_set = (
+                set(self._providers)
+                if available_provider_types is None
+                else set(available_provider_types)
+            )
+            chain = [
+                p
+                for p in self._providers
+                if p in fallback_set
+                and provider_instance_available(self._providers, p)
+            ]
+            chain, fallback_aliases = deduplicate_physical_provider_chain(
+                chain,
+                providers=self._providers,
+            )
+            transport_aliases.extend(fallback_aliases)
         if not chain:
             raise RuntimeError("No available providers after routing filter")
+        decision = decision_with_transport_provenance(
+            decision,
+            transport_aliases,
+        )
         task_signature = build_task_signature(
             action_name=enriched_request.action_name,
             context=enriched_request.context,
@@ -2982,10 +2968,28 @@ class ModelRouter:
                 chain,
                 model_hints=model_hints,
             )
-        chain, canary_applied = self._apply_canary(
+        pre_canary_chain = list(chain)
+        chain, canary_applied = apply_transport_canary(
             chain,
+            providers=self._providers,
+            canary_percent=self._canary_percent,
+            canary_provider=self._canary_provider,
+            canary_model_hint=self._canary_model_hint,
             model_hints=model_hints,
+            available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
+        chain, canary_aliases = deduplicate_physical_provider_chain(
+            chain,
+            providers=self._providers,
+            preferred_logical_lanes=pre_canary_chain,
+        )
+        if canary_aliases:
+            decision = decision_with_transport_provenance(
+                decision,
+                canary_aliases,
+            )
+            canary_applied = False
         if affinity_applied:
             decision = replace(
                 decision,
@@ -3075,13 +3079,6 @@ class ModelRouter:
 
             try:
                 attempt_started = time.monotonic()
-                await self._record_provider_attempt_started(
-                    route_request=enriched_request,
-                    provider=provider_type,
-                    model=reward_model,
-                    route_path=decision.path.value,
-                    task_signature=task_signature,
-                )
                 response = await run_with_retry(
                     lambda: self.complete(provider_type, request_for_provider),
                     policy=self._retry_policy,
@@ -3238,10 +3235,10 @@ class ModelRouter:
                     initial_model=planned_model,
                     response_model=response.model,
                 )
-                return (
-                    routed_decision,
-                    self._response_with_served_provider(response, selected_provider),
-                )
+                # Enrich response with provider info for trajectory capture
+                if not response.provider:
+                    response.provider = selected_provider.value
+                return (routed_decision, response)
             except Exception as exc:
                 latency_ms = (
                     (time.monotonic() - attempt_started) * 1000.0
@@ -3324,16 +3321,8 @@ class ModelRouter:
         trace_preview = "; ".join(
             f"{item.get('provider')}:{item.get('error')}" for item in failure_trace[-6:]
         )
-        chain_values = [item.value for item in chain]
-        last_attempt = failure_trace[-1] if failure_trace else {}
-        raise ProviderChainExecutionError(
-            f"All providers failed in chain {chain_values} :: {trace_preview}",
-            chain=chain_values,
-            failure_trace=failure_trace,
-            selected_provider=str(last_attempt.get("provider") or planned_provider.value),
-            selected_model=str(last_attempt.get("model") or planned_model),
-            planned_provider=planned_provider.value,
-            planned_model=planned_model,
+        raise RuntimeError(
+            f"All providers failed in chain {[item.value for item in chain]} :: {trace_preview}"
         )
 
 

@@ -394,8 +394,10 @@ The gate blocks when any of these are true:
 
 - PR is draft.
 - GitHub says the branch is not mergeable.
-- Any check is failing.
-- Checks are pending, unless `--allow-pending` is explicitly passed.
+- Any manifest-required CI context is missing, failing, or pending.
+- Non-required check failures and pending states remain visible warnings but do
+  not acquire merge authority. `--allow-pending` remains accepted only as a
+  deprecated compatibility flag; it never waives a required context.
 - GitHub review decision is `CHANGES_REQUESTED`.
 - Coherence Delta fields are missing or placeholders.
 - Review threads are unresolved.

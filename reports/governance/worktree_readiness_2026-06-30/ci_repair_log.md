@@ -50,4 +50,3 @@ All commands were read-only except writing this receipt file.
 | `2026-06-29T16:00:50Z` | `for n in 706 714 704 713 716 718 719 708 710 715 717 720 722; do gh pr view "$n" --repo AmitabhainArunachala/dharma_swarm --json number,statusCheckRollup --jq 'pending/unknown selector'; done` |
 | `2026-06-29T15:59Z-16:03Z` | Spot-check logs with `gh run view <run_id> --repo AmitabhainArunachala/dharma_swarm --job <job_id> --log` for failing quality-ratchet, DocOps, import-provenance, and pytest jobs. |
 | `2026-06-29T16:04:43Z` | `date -u +%Y-%m-%dT%H:%M:%SZ` |
-

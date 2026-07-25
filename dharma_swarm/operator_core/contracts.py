@@ -165,6 +165,7 @@ class RuntimeTruthPacket:
     eval_refs: list[str] = field(default_factory=list)
     stop_reason: str | None = None
     missing_machine_fields: list[str] = field(default_factory=list)
+    proof_grade: str = "MISSING"
     is_authoritative: bool = False
     is_projection: bool = True
     projection_lag: str | None = None

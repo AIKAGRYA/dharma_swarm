@@ -1,0 +1,279 @@
+{
+  "schema": "dharma.prod_grade_track_review.v1",
+  "generated_at": "2026-06-23T00:25:00+09:00",
+  "authority": {
+    "canonical_ref": "origin/main",
+    "canonical_commit": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "canonical_commit_subject": "[codex] governance: refresh active track and fitness properties [impact-checked] (#647)",
+    "review_worktree": "/private/tmp/dharma_swarm_prod_readiness_20260623_839fd25",
+    "dirty_candidate_checkout_excluded": "/Users/dhyana/dharma_swarm"
+  },
+  "commands": [
+    {
+      "command": "make onboard",
+      "result": "PASS",
+      "notes": "Reported 7 active tracks, max_active 10, and five checker-SHIPPABLE targets. Some sections degraded under default python3 because the clean worktree has no local dependency environment."
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "result": "PASS",
+      "notes": "Reported five SHIPPABLE targets and two in-progress tracks; WIP and uncovered spine objectives are warn-only."
+    },
+    {
+      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "result": "FAIL",
+      "notes": "Managed active-track blocks are out of date in CLAUDE.md, docs/governance/SOVEREIGN_MANIFEST.md, and docs/governance/BUILD_SESSION_ENTRYPOINT.md. The shown diff is whitespace-only inside rendered blocks, but the gate fails."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q --tb=short tests/test_agent_onboard.py::test_runtime_truth_render_is_read_only tests/test_operator_core_contracts.py::test_runtime_truth_packet_keeps_state_axes_separate tests/test_spine_persistence_invariant.py::test_submit_via_spine_retry_does_not_create_second_runtime_receipt tests/test_orientation_graph.py tests/test_truth_graph_repo_context.py tests/test_a2a_gate.py tests/test_agent_registry_presence.py tests/test_holon_bridge.py tests/test_holon_runtime.py tests/test_provider_routing_explicit.py tests/test_zhipu_provider.py",
+      "result": "PASS",
+      "notes": "71 passed in 5.73s."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q --tb=short tests/test_nats_live_contact.py tests/test_nats_transport.py tests/test_a2a_send.py tests/test_a2a_inbox_bridge.py tests/test_a2a_inbox_bridge_tmux_scripts.py tests/test_a2a_domain_reply_worker.py tests/test_a2a_reply_capture.py",
+      "result": "PASS",
+      "notes": "55 passed in 1.25s."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q --tb=short tests/test_holon_bridge.py tests/test_holon_runtime.py tests/test_model_hierarchy.py tests/test_orchestrator.py::test_dispatch_fan_out tests/test_spine_adoption_dispatch.py tests/test_orchestrator_spine_dispatch.py tests/test_dispatch_dropoff_sources.py",
+      "result": "PASS",
+      "notes": "104 passed in 2.23s."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q --tb=short tests/test_operator_core_contracts.py tests/test_runtime_truth_projection_fields.py tests/test_runtime_truth_command_cutover.py tests/test_runtime_state_invariants.py tests/test_runtime_truth_spine_v1.py tests/test_runtime_truth_spine_v2_tollbooth.py tests/test_runtime_truth_spine_v2_adapters.py tests/test_runtime_truth_spine_v2_evidence.py tests/test_agent_onboard.py::test_runtime_truth_render_is_read_only tests/test_spine_persistence_invariant.py::test_submit_via_spine_retry_does_not_create_second_runtime_receipt",
+      "result": "PASS",
+      "notes": "29 passed in 2.42s."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q --tb=short tests/test_provider_routing_explicit.py tests/test_zhipu_provider.py tests/test_runtime_provider.py tests/test_model_hierarchy.py tests/test_providers_quality_track.py",
+      "result": "PASS",
+      "notes": "135 passed in 1.23s."
+    },
+    {
+      "command": "nc -vz 127.0.0.1 4222",
+      "result": "FAIL",
+      "notes": "Connection refused."
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/truth_graph_nats_e2e_demo.py",
+      "result": "FAIL",
+      "notes": "NATS_E2E_FAIL: [Errno 61] Connection refused."
+    },
+    {
+      "command": "make orient",
+      "result": "FAIL",
+      "notes": "Default clean-worktree python3 lacks pydantic."
+    },
+    {
+      "command": "make PYTHON=/Users/dhyana/dharma_swarm/.venv/bin/python orient",
+      "result": "PASS",
+      "notes": "Wrote reports/orientation/repo_context.json and reports/orientation/repo_context.md."
+    }
+  ],
+  "strategic_confirmation": {
+    "canonical_active_count": 7,
+    "max_active": 10,
+    "new_orchestration_substrate_track_would_exceed_max_active": false,
+    "active_count_after_new_orchestration_substrate_track": 8,
+    "dirty_local_only_tracks_should_be_promoted_now": false,
+    "dirty_local_only_track_recommendation": "Keep as candidate lanes in reconciliation/portfolio-truth records; do not raw-union into ACTIVE_TRACK.yaml.",
+    "dirty_local_only_active_tracks": [
+      "a2a-cloud-agent-bridge-2026-06",
+      "agent-admission-semantic-commons-2026-06",
+      "cybernetics-codex-stewardship-2026-06",
+      "helm-worldclass-terminal-2026-06",
+      "orientation-graph-2026-06",
+      "telos-ai-morning-refinery-2026-06"
+    ],
+    "stale_reactivation": {
+      "track_id": "orientation-graph-2026-06",
+      "recommendation": "Do not promote; closed on origin/main and superseded by truth-graph-platform-2026-06."
+    },
+    "dedup_fold": {
+      "track_id": "cybernetics-codex-stewardship-2026-06",
+      "recommendation": "Fold under loop-closure-2026-06 unless the operator deliberately opens a separate successor track."
+    }
+  },
+  "tracks": [
+    {
+      "track_id": "runtime-truth-reconciliation-2026-06",
+      "checker_status": "SHIPPABLE",
+      "verdict": "CLOSE_READY_WITH_FOLLOWUP",
+      "owned_surfaces_checked": [
+        "dharma_swarm/operator_core/**",
+        "scripts/governance/agent_onboard.py",
+        "dharma_swarm/runtime_state.py"
+      ],
+      "evidence_checked": [
+        "All checker completion criteria pass.",
+        "RuntimeTruthPacket and RuntimeTruthState exist in dharma_swarm/operator_core/contracts.py.",
+        "render_runtime_truth is wired into scripts/governance/agent_onboard.py.",
+        "Runtime truth projection code exists in dharma_swarm/operator_core/runtime_truth.py.",
+        "Runtime truth focused and broader canonical tests passed."
+      ],
+      "missing_production_grade_evidence": [
+        "Default clean-worktree make onboard degrades runtime truth because default python3 lacks dependencies.",
+        "Rendered active-track include gate is currently failing.",
+        "No fresh live runtime database receipt snapshot was produced in this review."
+      ],
+      "next_actions": [
+        "Make the default operator path dependency-honest or explicitly self-remediating.",
+        "Refresh rendered include blocks only after approved closure/reconciliation action.",
+        "Attach one current runtime DB receipt snapshot proving live projection over real jobs."
+      ],
+      "recommended_owner_lane": "runtime-truth-reconciliation-2026-06 closeout follow-up owned by @AmitabhainArunachala",
+      "blocks_dgm_orchestration_arena_path": false,
+      "dgm_orchestration_arena_note": "Does not block admission; carry as closure follow-up risk for operator truth packet reliability.",
+      "closure_risk": "low_to_medium"
+    },
+    {
+      "track_id": "runtime-truth-nats-2026-06",
+      "checker_status": "SHIPPABLE",
+      "verdict": "KEEP_ACTIVE_PROD_HARDENING",
+      "owned_surfaces_checked": [
+        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+        "dharma_swarm/a2a/a2a_nats_contact.py",
+        "dharma_swarm/a2a/a2a_core_contact.py"
+      ],
+      "evidence_checked": [
+        "Checker criteria pass but only prove NATS master spec existence and a string match.",
+        "NATS implementation currently appears under dharma_swarm/a2a/nats_transport.py and operator_core NATS probes.",
+        "NATS-focused offline/fake-transport tests passed: 55 passed.",
+        "NATS spec states declared surfaces are not liveness proof."
+      ],
+      "missing_production_grade_evidence": [
+        "Declared owned files dharma_swarm/a2a/a2a_nats_contact.py and dharma_swarm/a2a/a2a_core_contact.py are missing.",
+        "Local broker socket check failed on 127.0.0.1:4222.",
+        "Truth-graph NATS e2e demo failed with connection refused.",
+        "No fresh JetStream ack-bearing hot-contact receipt exists from this review."
+      ],
+      "next_actions": [
+        "Reconcile declared owned surfaces with actual owner modules through an approved lifecycle change.",
+        "Produce a fresh nats_live_contact.py --write-receipt result with ack_verified=true.",
+        "Run live JetStream publish/consumer round trip and attach receipt path.",
+        "Ensure operator surfaces prefer fresh NATS receipts over stale live-ops snapshots."
+      ],
+      "recommended_owner_lane": "runtime-truth-nats-2026-06 under @codex",
+      "blocks_dgm_orchestration_arena_path": true,
+      "dgm_orchestration_arena_note": "Blocks production-grade live-transport claims; does not block opening the orchestration track by WIP cap.",
+      "closure_risk": "high"
+    },
+    {
+      "track_id": "truth-graph-platform-2026-06",
+      "checker_status": "SHIPPABLE",
+      "verdict": "KEEP_ACTIVE_PROD_HARDENING",
+      "owned_surfaces_checked": [
+        "scripts/governance/orientation_graph.py",
+        "scripts/governance/truth_graph_nats_e2e_demo.py",
+        "scripts/governance/run_truth_graph_nats_e2e_demo.sh",
+        "tests/test_orientation_graph.py",
+        "tests/test_truth_graph_repo_context.py",
+        "dharma_swarm/a2a/task_receipt.py",
+        "dharma_swarm/a2a/agent_presence.py",
+        "tests/test_a2a_gate.py",
+        "tests/test_agent_registry_presence.py",
+        "reports/orientation/**"
+      ],
+      "evidence_checked": [
+        "All checker criteria pass.",
+        "Focused orientation/repo-context/A2A-gate/presence tests passed.",
+        "Venv-backed make orient wrote repo_context JSON and Markdown.",
+        "Generated repo_context reports 7 active tracks and loop1_live false."
+      ],
+      "missing_production_grade_evidence": [
+        "Default clean-worktree make orient fails without dependencies.",
+        "Current NATS e2e proof fails with connection refused.",
+        "Generated agent presence shows RED heartbeats for listed agents.",
+        "Stale local orientation-graph reactivation must not be unioned back into active tracks."
+      ],
+      "next_actions": [
+        "Require fresh NATS e2e receipt generation or explicitly mark NATS proof absent in repo_context.",
+        "Make make orient dependency-honest in clean worktrees.",
+        "Add freshness policy for reports/orientation/nats_e2e_receipt.json.",
+        "Keep orientation-graph-2026-06 closed in reconciliation."
+      ],
+      "recommended_owner_lane": "truth-graph-platform-2026-06 under @codex",
+      "blocks_dgm_orchestration_arena_path": true,
+      "dgm_orchestration_arena_note": "Partially blocks production-grade DGM readiness because truthful repo context and live presence proof are arena inputs.",
+      "closure_risk": "medium_to_high"
+    },
+    {
+      "track_id": "composer-holon-spine-longrun-2026-06",
+      "checker_status": "SHIPPABLE",
+      "verdict": "SPLIT_BEFORE_CLOSE",
+      "owned_surfaces_checked": [
+        "docs/sovereign_holons/**",
+        "reports/sovereign_holons/**",
+        "dharma_swarm/holon_*.py",
+        "scripts/holon_*.py",
+        "tests/test_holon_*.py"
+      ],
+      "evidence_checked": [
+        "All checker criteria pass.",
+        "BUILD_A_90_READINESS_PACKET exists and names itself a confidence-lift packet, not a launch receipt.",
+        "COMPOSER_WAKE_WITNESSED proves one-shot unattended wake proof for both composer seats.",
+        "Frozen verifier set passed: 104 passed."
+      ],
+      "missing_production_grade_evidence": [
+        "Permanent recurring wake loop is explicitly not ratified by the one-shot witness.",
+        "No fresh current-date recurring wake proof was generated.",
+        "Depends on runtime-truth-spine-adoption-2026-06, which is still active at 7/8."
+      ],
+      "next_actions": [
+        "Split Build A readiness closure from permanent standing composer production.",
+        "Do not claim longrun production until recurring wake, cost/routing ledger, and state freshness proof exist.",
+        "Keep dependency on spine-adoption explicit until bypass allowlist is drained."
+      ],
+      "recommended_owner_lane": "Close only Build A readiness after approval; open or keep successor standing-composer hardening under @AmitabhainArunachala.",
+      "blocks_dgm_orchestration_arena_path": false,
+      "dgm_orchestration_arena_note": "Adjacent holon readiness work; should not consume the orchestration substrate slot unless deliberately scoped as a dependency.",
+      "closure_risk": "medium"
+    },
+    {
+      "track_id": "provider-routing-consolidation-2026-06",
+      "checker_status": "SHIPPABLE",
+      "verdict": "CLOSE_READY_WITH_FOLLOWUP",
+      "owned_surfaces_checked": [
+        "dharma_swarm/providers.py",
+        "dharma_swarm/provider_policy.py",
+        "dharma_swarm/model_hierarchy.py",
+        "dharma_swarm/model_pool.py",
+        "dharma_swarm/model_defaults.py",
+        "dharma_swarm/runtime_provider.py",
+        "dharma_swarm/router_v1.py",
+        "dharma_swarm/smart_router.py",
+        "dharma_swarm/decision_router.py",
+        "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
+      ],
+      "evidence_checked": [
+        "All checker criteria pass.",
+        "Architecture doc declares single precedence.",
+        "provider_policy.py honors preferred_provider and returns explicit pins before reranking.",
+        "power_first default exists.",
+        "ProviderType.ZHIPU, DEFAULT_ZHIPU_MODEL, ZhipuProvider, and runtime-provider creation path exist.",
+        "Provider-focused verifier batch passed: 135 passed."
+      ],
+      "missing_production_grade_evidence": [
+        "No live z.ai/Zhipu API call was run.",
+        "No current live provider-canary receipt was produced.",
+        "Stage 5 deliberate exceptions remain documented follow-up debt."
+      ],
+      "next_actions": [
+        "Close with follow-up for live provider canary and egress allowlist proof.",
+        "Add post-closure smoke receipt proving explicit provider/model selection reaches an actual configured provider when keys are available.",
+        "Keep Stage 5 exceptions visible in a successor drift-cleanup owner."
+      ],
+      "recommended_owner_lane": "provider-routing-consolidation-2026-06 closure with successor provider-live-canary/drift-cleanup follow-up under @AmitabhainArunachala",
+      "blocks_dgm_orchestration_arena_path": false,
+      "dgm_orchestration_arena_note": "Enables orchestration substrate model-roster work; arena should still require live-provider canary proof before production quality claims.",
+      "closure_risk": "low_to_medium"
+    }
+  ],
+  "closure_guidance": [
+    "Do not close tracks just to make room; cap allows an orchestration-substrate track at 8/10.",
+    "Close provider-routing-consolidation with follow-up after operator approval.",
+    "Close runtime-truth-reconciliation with follow-up only after dependency/render hygiene is accepted.",
+    "Keep runtime-truth-nats and truth-graph-platform active for live-proof hardening.",
+    "Split composer-holon-spine-longrun before closure so Build A readiness does not masquerade as permanent standing composer production."
+  ]
+}

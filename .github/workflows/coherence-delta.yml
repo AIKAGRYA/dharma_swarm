@@ -1,5 +1,12 @@
 name: coherence-delta
 
+# PR-body coherence gate. The self-heal step derives and posts a Coherence
+# Delta comment when automation-authored PRs skip the template; the validate
+# step then enforces that the body or a comment answers all four fields.
+# "Coherence Delta PR body" is a required branch-protection context, so the
+# validate step must be able to fail — a required check that cannot go red
+# protects nothing (2026-07-04 hardening; previously continue-on-error).
+
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
@@ -8,12 +15,19 @@ on:
 
 concurrency:
   group: coherence-delta-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel in-progress runs: this is a required context, and a
+  # cancelled conclusion left as the latest check run on a head SHA reads
+  # as a red X until another event fires (observed on PR #750, run
+  # 28702706071). Runs cost 10-30s, so queueing is cheaper than a
+  # stranded required check.
+  cancel-in-progress: false
 
 permissions:
   contents: read
-  pull-requests: read
-  issues: read
+  # write so the gate can self-heal: derive + post a Coherence Delta comment
+  # for automation-authored PRs that skipped the template, then validate.
+  pull-requests: write
+  issues: write
 
 jobs:
   coherence-delta:
@@ -23,7 +37,12 @@ jobs:
     # SHAs); these PR-shaped validations already passed on the PR run
     # before the PR entered the queue. Skipped = satisfied for required
     # checks, so the queue is not blocked.
-    if: github.event_name != 'merge_group'
+    # Also skip closed/merged PRs: bots edit PR bodies post-merge, and an
+    # `edited` run spawned after merge can leave the required context in a
+    # non-success state on the head SHA with no later event to repair it.
+    if: >-
+      github.event_name != 'merge_group' &&
+      github.event.pull_request.state == 'open'
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -37,6 +56,33 @@ jobs:
           gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --paginate --jq '[.[] | {body: .body}]' > /tmp/pr_comments.json \
             || echo '[]' > /tmp/pr_comments.json
+
+      # Best-effort by design (continue-on-error): fork PRs get a read-only
+      # token and cannot post comments. The validate step below is the gate.
+      - name: Self-heal — derive + post Coherence Delta if missing
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # Changed file paths drive the derived "Organ touched" answer.
+          gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" \
+            --paginate --jq '.[].filename' > /tmp/pr_files.txt || true
+          python3 scripts/governance/autofill_coherence_delta.py \
+            --comments-file /tmp/pr_comments.json \
+            --files-file /tmp/pr_files.txt \
+            --out /tmp/cd_block.md
+          if [ -s /tmp/cd_block.md ]; then
+            gh pr comment "${PR_NUMBER}" --repo "${{ github.repository }}" --body-file /tmp/cd_block.md
+            # Re-fetch so the validate step (same job) sees the block we just posted.
+            for _ in 1 2 3; do
+              gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+                --paginate --jq '[.[] | {body: .body}]' > /tmp/pr_comments.json && break
+              sleep 2
+            done
+          fi
 
       - name: Validate Coherence Delta fields
         env:

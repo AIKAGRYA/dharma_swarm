@@ -4,17 +4,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
+import subprocess  # noqa: F401  (tests patch go_bridge.subprocess.run for the go_invoke layer)
 import time
 from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.operator_core.world_radar.receipt_bridge import (
-    project_world_signal_receipts,
     receipt_paths,
     world_receipts_dir,
 )
 from dharma_swarm.operator_core.ingest_nats import publish_ingest_receipts_if_enabled
+from dharma_swarm.world_radar.go_invoke import (  # noqa: F401  (re-exported; callers and tests patch these here)
+    _go_invocation,
+    _health_source_errors,
+    _merged_source_errors,
+    _partial_source_error,
+    _run_go_ingestor,
+    _run_go_scout,
+    _source_counts,
+)
 from dharma_swarm.world_radar.analysis import (
     build_world_signal_board,
     incubating_movements,
@@ -33,7 +41,6 @@ from dharma_swarm.world_radar.io_utils import (
     read_json as _read_json,
     read_jsonl as _read_jsonl,
     release_lock as _release_lock,
-    repo_root as _repo_root,
     utc_now_iso as _utc_now_iso,
     write_json_atomic as _write_json_atomic,
     write_jsonl as _write_jsonl,
@@ -70,6 +77,10 @@ class WorldRadarGoResult:
     archive_clean_text_bytes: int = 0
     archive_error_count: int = 0
     errors: tuple[str, ...] = ()
+    source_errors: tuple[dict[str, str], ...] = ()
+    scout_invocation_mode: str = ""
+    ingestor_invocation_mode: str = ""
+
 
 
 def run_world_radar_go_once(
@@ -124,6 +135,9 @@ def run_world_radar_go_once(
     receipt_dir = world_receipts_dir(state)
     receipt_correlation_id = f"world_radar_go_{time.time_ns()}"
     errors: list[str] = []
+    source_errors: list[dict[str, str]] = []
+    scout_invocation_mode = ""
+    ingestor_invocation_mode = ""
     archive_enabled = False
     archive_count = 0
     dedupe_count = 0
@@ -203,13 +217,17 @@ def run_world_radar_go_once(
         archive_clean_text_count += int(scout_counts.get("archive_clean_text_count", 0) or 0)
         archive_clean_text_bytes += int(scout_counts.get("archive_clean_text_bytes", 0) or 0)
         archive_error_count += int(scout_counts.get("archive_error_count", 0) or 0)
+        scout_invocation_mode = str(scout_counts.get("invocation_mode", "") or scout_invocation_mode)
+        source_errors.extend(
+            _merged_source_errors(scout_counts, scout_error, source="world_scout_go", stage="scout")
+        )
         if scout_error:
             errors.append(scout_error)
         if archive_index_path:
             raw_rows.extend(_archive_index_to_raw_rows(Path(archive_index_path)))
     _write_jsonl(raw_path, raw_rows)
 
-    ingested_rows, ingest_error = _run_go_ingestor(
+    ingested_rows, ingest_error, ingestor_invocation_mode = _run_go_ingestor(
         input_path=raw_path,
         output_path=signal_path,
         min_score=min_score,
@@ -219,11 +237,14 @@ def run_world_radar_go_once(
     )
     if ingest_error:
         errors.append(ingest_error)
+        source_errors.append(
+            {"source": "world_signal_ingestor_go", "stage": "ingest", "error": ingest_error}
+        )
         ingested_rows = _read_jsonl(signal_path)
 
     board = build_world_signal_board(ingested_rows, source_weights=source_weights)
     if scout_fetch:
-        cascade_rows, cascade_errors, cascade_counts = _run_cascade(
+        cascade_rows, cascade_errors, cascade_counts, cascade_source_errors = _run_cascade(
             state=state,
             movements=incubating_movements(board),
             output_dir=radar,
@@ -232,7 +253,7 @@ def run_world_radar_go_once(
         if cascade_rows:
             raw_rows.extend(cascade_rows)
             _write_jsonl(raw_path, raw_rows)
-            ingested_rows, ingest_error = _run_go_ingestor(
+            ingested_rows, ingest_error, ingestor_invocation_mode = _run_go_ingestor(
                 input_path=raw_path,
                 output_path=signal_path,
                 min_score=min_score,
@@ -242,9 +263,13 @@ def run_world_radar_go_once(
             )
             if ingest_error:
                 errors.append(ingest_error)
+                source_errors.append(
+                    {"source": "world_signal_ingestor_go", "stage": "ingest", "error": ingest_error}
+                )
                 ingested_rows = _read_jsonl(signal_path)
             board = build_world_signal_board(ingested_rows, source_weights=source_weights)
         errors.extend(cascade_errors)
+        source_errors.extend(cascade_source_errors)
         successful_sources += cascade_counts.get("successful_sources", 0)
         failed_sources += cascade_counts.get("failed_sources", 0)
         retry_count += cascade_counts.get("retry_count", 0)
@@ -302,6 +327,7 @@ def run_world_radar_go_once(
         promotion_count=len(promotions),
         incubation_count=len(incubation_paths),
         errors=errors,
+        source_errors=source_errors,
         duration_s=duration_s,
         retry_count=retry_count,
         feedback_events_applied=len(applied_feedback_ids) - applied_before,
@@ -331,6 +357,8 @@ def run_world_radar_go_once(
             "freshest_receipt": ingest_summary["freshest_receipt"],
             "cost_event_recorded": cost_event_recorded,
             "nats_receipt_transport": nats_receipt_transport,
+            "scout_invocation_mode": scout_invocation_mode,
+            "ingestor_invocation_mode": ingestor_invocation_mode,
         }
     )
     _write_json_atomic(health_path, health)
@@ -364,6 +392,9 @@ def run_world_radar_go_once(
         archive_clean_text_bytes=archive_clean_text_bytes,
         archive_error_count=archive_error_count,
         errors=tuple(errors),
+        source_errors=tuple(source_errors),
+        scout_invocation_mode=scout_invocation_mode,
+        ingestor_invocation_mode=ingestor_invocation_mode,
     )
 
 
@@ -373,9 +404,10 @@ def _run_cascade(
     movements: list[dict[str, Any]],
     output_dir: Path,
     timeout_s: int,
-) -> tuple[list[dict[str, Any]], list[str], dict[str, int]]:
+) -> tuple[list[dict[str, Any]], list[str], dict[str, int], list[dict[str, str]]]:
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
+    source_errors: list[dict[str, str]] = []
     counts = {"successful_sources": 0, "failed_sources": 0, "retry_count": 0}
     for movement in movements[:5]:
         movement_id = str(movement.get("movement_id") or "")
@@ -396,9 +428,14 @@ def _run_cascade(
         counts["successful_sources"] += int(scout_counts.get("successful_sources", 0) or 0)
         counts["failed_sources"] += int(scout_counts.get("failed_sources", 0) or 0)
         counts["retry_count"] += int(scout_counts.get("retry_count", 0) or 0)
+        source_errors.extend(
+            _merged_source_errors(
+                scout_counts, scout_error, source="world_scout_go", stage=f"cascade:{movement_id}"
+            )
+        )
         if scout_error:
             errors.append(scout_error)
-    return rows, errors, counts
+    return rows, errors, counts, source_errors
 
 
 def _collect_raw_rows(meta: Path) -> list[dict[str, Any]]:
@@ -476,149 +513,6 @@ def _archive_clean_text(entry: dict[str, Any], *, max_chars: int = 4000) -> str:
         return path.read_text(encoding="utf-8", errors="replace")[:max_chars]
     return ""
 
-
-def _run_go_scout(
-    *,
-    state: Path,
-    output_path: Path,
-    health_path: Path,
-    timeout_s: int,
-    queries: list[str] | None = None,
-    cascade_for: str = "",
-    archive: bool = False,
-    archive_dir: Path | None = None,
-    archive_urls: list[str] | None = None,
-    archive_url_files: list[str] | None = None,
-    archive_source_specs: list[str] | None = None,
-    archive_max_bytes: int = 2_000_000,
-    archive_max_pages: int = 100,
-    archive_max_depth: int = 0,
-    archive_same_domain: bool = True,
-    archive_rate_limit_ms: int = 100,
-    archive_robots: bool = True,
-    archive_default_crawl_delay_ms: int = 0,
-    archive_max_retries: int = 1,
-    archive_retry_base_delay_ms: int = 250,
-    archive_retry_max_delay_ms: int = 2000,
-    archive_max_fetch_duration_ms: int = 30000,
-    archive_include: list[str] | None = None,
-    archive_exclude: list[str] | None = None,
-    archive_workers: int = 6,
-    archive_discover_llms: bool = False,
-    archive_discover_sitemap: bool = False,
-    archive_sitemap_max_urls: int = 100,
-) -> tuple[list[dict[str, Any]], str | None, dict[str, int | str]]:
-    module_dir = _repo_root() / "tools" / "world_scout_go"
-    if not module_dir.exists():
-        return [], f"missing Go scout module: {module_dir}", {}
-    cmd = [
-        "go",
-        "run",
-        ".",
-        "--state-dir",
-        str(state),
-        "--output",
-        str(output_path),
-        "--health",
-        str(health_path),
-        "--fetch",
-    ]
-    if cascade_for:
-        cmd.extend(["--cascade-for", cascade_for])
-    for query in queries or []:
-        cmd.extend(["--query", query])
-    if archive:
-        effective_archive_dir = archive_dir or (state / "meta" / "world_radar" / "archive" / "world_scout")
-        cmd.extend(["--archive", "--archive-dir", str(effective_archive_dir)])
-        cmd.extend(["--archive-max-bytes", str(archive_max_bytes)])
-        cmd.extend(["--archive-max-pages", str(archive_max_pages)])
-        cmd.extend(["--archive-max-depth", str(archive_max_depth)])
-        cmd.append(f"--archive-same-domain={str(archive_same_domain).lower()}")
-        cmd.extend(["--archive-rate-limit-ms", str(archive_rate_limit_ms)])
-        cmd.append(f"--archive-robots={str(archive_robots).lower()}")
-        cmd.extend(["--archive-default-crawl-delay-ms", str(archive_default_crawl_delay_ms)])
-        cmd.extend(["--archive-max-retries", str(archive_max_retries)])
-        cmd.extend(["--archive-retry-base-delay-ms", str(archive_retry_base_delay_ms)])
-        cmd.extend(["--archive-retry-max-delay-ms", str(archive_retry_max_delay_ms)])
-        cmd.extend(["--archive-max-fetch-duration-ms", str(archive_max_fetch_duration_ms)])
-        cmd.extend(["--archive-workers", str(archive_workers)])
-        cmd.extend(["--archive-sitemap-max-urls", str(archive_sitemap_max_urls)])
-        if archive_discover_llms:
-            cmd.append("--archive-discover-llms")
-        if archive_discover_sitemap:
-            cmd.append("--archive-discover-sitemap")
-        for raw_url in archive_urls or []:
-            cmd.extend(["--query-url", raw_url])
-        for url_file in archive_url_files or []:
-            cmd.extend(["--query-url-file", url_file])
-        for spec_file in archive_source_specs or []:
-            cmd.extend(["--source-spec", spec_file])
-        for pattern in archive_include or []:
-            cmd.extend(["--archive-include", pattern])
-        for pattern in archive_exclude or []:
-            cmd.extend(["--archive-exclude", pattern])
-    try:
-        proc = subprocess.run(cmd, cwd=module_dir, capture_output=True, text=True, timeout=timeout_s)
-    except FileNotFoundError as exc:
-        return [], f"world_scout_go could not start: {exc}", {}
-    except subprocess.TimeoutExpired:
-        health = _read_json(health_path, default={})
-        return [], f"world_scout_go timed out after {timeout_s}s", _source_counts(health)
-    health = _read_json(health_path, default={})
-    counts = _source_counts(health)
-    if proc.returncode != 0:
-        return [], (proc.stderr or proc.stdout or "world_scout_go failed").strip()[:1000], counts
-    return _read_jsonl(output_path), _partial_source_error(health), counts
-
-
-def _run_go_ingestor(
-    *,
-    input_path: Path,
-    output_path: Path,
-    min_score: float,
-    timeout_s: int,
-    receipt_dir: Path | None = None,
-    correlation_id: str = "",
-) -> tuple[list[dict[str, Any]], str | None]:
-    module_dir = _repo_root() / "tools" / "world_signal_ingestor_go"
-    if not module_dir.exists():
-        return [], f"missing Go ingestor module: {module_dir}"
-    cmd = [
-        "go",
-        "run",
-        ".",
-        "--input",
-        str(input_path),
-        "--output",
-        str(output_path),
-        "--min-score",
-        str(min_score),
-    ]
-    if receipt_dir is not None and correlation_id:
-        cmd.extend(["--receipt-dir", str(receipt_dir), "--correlation-id", correlation_id])
-    try:
-        proc = subprocess.run(cmd, cwd=module_dir, capture_output=True, text=True, timeout=timeout_s)
-    except FileNotFoundError as exc:
-        return [], f"world_signal_ingestor_go could not start: {exc}"
-    except subprocess.TimeoutExpired:
-        return [], f"world_signal_ingestor_go timed out after {timeout_s}s"
-    if proc.returncode != 0:
-        return [], (proc.stderr or proc.stdout or "world_signal_ingestor_go failed").strip()[:1000]
-    if receipt_dir is not None and correlation_id:
-        projected_rows = _project_receipts_for_correlation(receipt_dir, correlation_id)
-        if projected_rows:
-            return projected_rows, None
-    return _read_jsonl(output_path), None
-
-
-def _project_receipts_for_correlation(receipt_dir: Path, correlation_id: str) -> list[dict[str, Any]]:
-    rows = project_world_signal_receipts(receipt_paths(receipt_dir))
-    return [
-        row
-        for row in rows
-        if isinstance(row.get("metadata"), dict)
-        and row["metadata"].get("correlation_id") == correlation_id
-    ]
 
 
 def _build_ingest_summary(
@@ -810,6 +704,7 @@ def _build_health(
     promotion_count: int,
     incubation_count: int,
     errors: list[str],
+    source_errors: list[dict[str, str]] | None = None,
     duration_s: float,
     retry_count: int,
     feedback_events_applied: int,
@@ -867,14 +762,23 @@ def _build_health(
         "archive_clean_text_bytes": archive_clean_text_bytes,
         "archive_error_count": archive_error_count,
         "errors": errors[:10],
+        "source_errors": list(source_errors or [])[:20],
     }
 
 
 def _render_health_markdown(health: dict[str, Any]) -> str:
+    source_errors = health.get("source_errors") if isinstance(health.get("source_errors"), list) else []
+    source_error_lines = "".join(
+        f"  - [{entry.get('stage', '')}] {entry.get('source', '')}: {entry.get('error', '')}\n"
+        for entry in source_errors
+        if isinstance(entry, dict)
+    )
     return (
         "# World Radar Health\n\n"
         f"- status: {health.get('status')}\n"
         f"- ingest_run_id: {health.get('ingest_run_id', '')}\n"
+        f"- scout_invocation_mode: {health.get('scout_invocation_mode', '')}\n"
+        f"- ingestor_invocation_mode: {health.get('ingestor_invocation_mode', '')}\n"
         f"- fetch_enabled: {health.get('fetch_enabled')}\n"
         f"- successful_sources: {health.get('successful_sources')}\n"
         f"- failed_sources: {health.get('failed_sources')}\n"
@@ -897,40 +801,6 @@ def _render_health_markdown(health: dict[str, Any]) -> str:
         f"- archive_error_count: {health.get('archive_error_count', 0)}\n"
         f"- signals: {health.get('signals')}\n"
         f"- promotion_ready: {health.get('promotion_ready')}\n"
+        f"- source_errors: {len(source_errors)}\n"
+        f"{source_error_lines}"
     )
-
-
-def _source_counts(health: Any) -> dict[str, int | str]:
-    if not isinstance(health, dict):
-        return {"successful_sources": 0, "failed_sources": 0}
-    return {
-        "successful_sources": int(float(health.get("successful_sources", 0) or 0)),
-        "failed_sources": int(float(health.get("failed_sources", 0) or 0)),
-        "retry_count": int(float(health.get("retry_count", 0) or 0)),
-        "archive_enabled": bool(health.get("archive_enabled", False)),
-        "archive_count": int(float(health.get("archive_count", 0) or 0)),
-        "dedupe_count": int(float(health.get("dedupe_count", 0) or 0)),
-        "archive_dir": str(health.get("archive_dir", "") or ""),
-        "archive_index_path": str(health.get("archive_index_path", "") or ""),
-        "archive_replay_index_path": str(health.get("archive_replay_index_path", "") or ""),
-        "archive_manifest_path": str(health.get("archive_manifest_path", "") or ""),
-        "archive_discovered_count": int(float(health.get("archive_discovered_count", 0) or 0)),
-        "archive_workers": int(float(health.get("archive_workers", 0) or 0)),
-        "archive_total_bytes": int(float(health.get("archive_total_bytes", 0) or 0)),
-        "archive_clean_text_count": int(float(health.get("archive_clean_text_count", 0) or 0)),
-        "archive_clean_text_bytes": int(float(health.get("archive_clean_text_bytes", 0) or 0)),
-        "archive_error_count": int(float(health.get("archive_error_count", 0) or 0)),
-    }
-
-
-def _partial_source_error(health: Any) -> str | None:
-    if not isinstance(health, dict):
-        return None
-    failed = int(float(health.get("failed_sources", 0) or 0))
-    if failed <= 0:
-        return None
-    errors = health.get("errors") if isinstance(health.get("errors"), list) else []
-    detail = "; ".join(str(item) for item in errors[:3])
-    if detail:
-        return f"world_scout_go partial source failures={failed}: {detail}"[:1000]
-    return f"world_scout_go partial source failures={failed}"

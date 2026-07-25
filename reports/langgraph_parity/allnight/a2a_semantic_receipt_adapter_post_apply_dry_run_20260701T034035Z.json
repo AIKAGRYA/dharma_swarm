@@ -1,0 +1,365 @@
+{
+  "applied": [],
+  "applied_count": 0,
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm"
+  ],
+  "backup_path": "",
+  "candidate_count": 0,
+  "candidates": [],
+  "generated_at": "2026-07-01T03:40:35Z",
+  "mode": "dry_run",
+  "post_readiness": {
+    "blocker_task_id_coverage_complete": true,
+    "blocker_task_ids": {
+      "open_or_claimed_tasks_present": [
+        "forge-v0.1-001",
+        "holon-plan-review-cursor-20260612",
+        "holon-plan-review-opus-20260612",
+        "l1-fx-001",
+        "reconcile-564-565-20260611",
+        "sab-flywheel-d01-qwen-code-first-spark",
+        "tam-wp-wp_dfa4e1134277",
+        "ts-converge-0611",
+        "ts-evo-0611-1",
+        "ts-evo-0611-2",
+        "ts-evo-0611-3",
+        "ts-hb0631-credit",
+        "ts-pr-babysit-div-20260610",
+        "yatagarasu-10cceaa8",
+        "yatagarasu-20260619-credit-monitor",
+        "yatagarasu-20260619-gap-scan-fix",
+        "yatagarasu-20260619-staging-decay"
+      ],
+      "unverified_closed_tasks_present": [
+        "ts-converge-0611"
+      ]
+    },
+    "gate_status": "DEGRADED",
+    "open_tasks": 17,
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present",
+      "unverified_closed_tasks_present"
+    ],
+    "tasks": [
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:collector:hermes-m5",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+        "lifecycle_state": "blocked_verified",
+        "status": "blocked",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+        "lifecycle_state": "blocked_verified",
+        "status": "blocked",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "forge-v0.1-001",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "qwen-code-review-001",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "ts-hb0631-credit",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "review-holon-drift-1781002954",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "ts-pr-babysit-div-20260610",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-1",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-2",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-3",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "reconcile-564-565-20260611",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-converge-0611",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "ts-converge-0611",
+        "lifecycle_state": "completed_unverified",
+        "status": "completed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "holon-plan-review-codex-20260612",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "holon-plan-review-opus-20260612",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "holon-plan-review-cursor-20260612",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "tg-001",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "l1-fx-001",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "tam-wp-wp_dfa4e1134277",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-10cceaa8",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-gap-scan-fix",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-credit-monitor",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-staging-decay",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-setu-sab-agni",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-codex-composer-mac",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-codex-rushabdev",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-research-scout",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-hardener",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-recruiter-bridge",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-research-spark-3-challenge",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-setu-approve-day1-queue",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-codex-semantic-reply-queue17",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-hardener-route-service-runbook",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-research-scout-channel-validation",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "sab-flywheel-d01-qwen-code-first-spark",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-codex-visible-reply-proof",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-research-next-spark",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-hardener-top-risks",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-rushabdev-federation-watch",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      }
+    ],
+    "total_tasks": 44,
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 1
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": []
+}

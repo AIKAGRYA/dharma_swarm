@@ -35,6 +35,7 @@ connected_relevant_files:
   - docs/plans/2026-04-02-cleanup-control-center.md
   - docs/plans/REPO_HYGIENE_TRIAGE_2026-04-01.md
   - docs/plans/2026-04-02-top-level-docs-canon-map.md
+  - docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md
 improvement:
   room_for_improvement:
     - Group plan families if the subtree keeps growing.
@@ -74,6 +75,7 @@ Use it for:
 
 Current examples:
 
+- [Titanium-Grade Repository Hardening — Integrated Execution Specification vNext](TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md)
 - [ALLOUT_6H_MODE.md](/Users/dhyana/dharma_swarm/docs/plans/ALLOUT_6H_MODE.md)
 - [ALL_NIGHT_BUILD_CONCLAVE_2026-03-20.md](/Users/dhyana/dharma_swarm/docs/plans/ALL_NIGHT_BUILD_CONCLAVE_2026-03-20.md)
 - [CODEX_ALLNIGHT_YOLO.md](/Users/dhyana/dharma_swarm/docs/plans/CODEX_ALLNIGHT_YOLO.md)

@@ -1,0 +1,20 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS1 opened truth-graph-platform-2026-06 and closed orientation-graph-2026-06 into closed_tracks.",
+  "evidence": [
+    {"kind": "path", "value": "docs/governance/ACTIVE_TRACK.yaml"},
+    {"kind": "command", "value": "python3 scripts/governance/check_track_status.py"},
+    {"kind": "command", "value": "python3 scripts/governance/render_active_track_includes.py --check"}
+  ],
+  "verdict": "verified",
+  "next_action": "Keep generated managed blocks in sync before PR.",
+  "files_changed": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+    "reports/orientation/receipts/tg001_ws1_track.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS1"
+}

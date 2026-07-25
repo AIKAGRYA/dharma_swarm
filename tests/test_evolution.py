@@ -17,12 +17,70 @@ from dharma_swarm.evolution import (
     Proposal,
     _paths_from_unified_diff,
 )
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
 from dharma_swarm.landscape import BasinType, LandscapeProbe
 from dharma_swarm.meta_evolution import MetaParameters
 from dharma_swarm.experiment_log import ExperimentRecord
 from dharma_swarm.models import GateDecision, LLMResponse, SandboxResult
 from dharma_swarm.router_retrospective import RouteOutcomeRecord
 from dharma_swarm.ucb_selector import UCBConfig
+
+
+class _ExplodingProvider:
+    async def complete(self, request):
+        del request
+        raise AssertionError("proposal generation should have been monkeypatched or refused")
+
+
+def _unsigned_allow_live_packet(
+    authorized: tuple[str, ...] = ("target.py",),
+) -> dict:
+    from dharma_swarm.forge_v1.forge_v2.promote import REQUIRED_RECEIPTS_V0_ABSENT
+
+    packet = {
+        "schema": "forge_v2.promotion_verification.v1",
+        "decision": "allow",
+        "live_apply_allowed": True,
+        "promotion_packet": {"decision": "promotable_candidate"},
+        "governed_admission": {"decision": "allow"},
+        "telos": {"decision": "allow"},
+        "signed_receipts": {name: True for name in REQUIRED_RECEIPTS_V0_ABSENT},
+        "operator_lease_present": True,
+        # The packet is a capability scoped to specific files, never a bearer
+        # token — the gate refuses packets without an authorization scope.
+        "authorized_source_files": list(authorized),
+        "blockers": [],
+    }
+    packet["payload_sha256"] = canonical_sha256(packet)
+    return packet
+
+
+def _signed_allow_live_packet(
+    authorized: tuple[str, ...] = ("target.py",),
+) -> tuple[dict, list[str]]:
+    packet = _unsigned_allow_live_packet(authorized)
+    public_key = "01" * 32
+    packet["verification_signature"] = {
+        "scheme": "ed25519",
+        "key_id": "unit-judge",
+        "public_key": public_key,
+        "signature": "02" * 64,
+    }
+    return packet, [public_key]
+
+
+def _trust_test_judge(monkeypatch):
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as promotion_verifier
+
+    def fake_signature_verifier(packet, *, trusted_public_keys=()):
+        signature = dict(packet.get("verification_signature", {}) or {})
+        return signature.get("public_key") in set(trusted_public_keys)
+
+    monkeypatch.setattr(
+        promotion_verifier,
+        "verify_promotion_verification_signature",
+        fake_signature_verifier,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -113,10 +171,19 @@ _THINK_NOTES_REVIEW = (
 
 
 def _safe_proposal(**kw) -> Proposal:
-    """Create a safe proposal that will pass all gates."""
+    """Create a safe proposal that will pass all gates.
+
+    WS4: uses a non-self-mod change_type ("observation") so the proposal can
+    flow through to GATED/archive even when the gates return a Tier-C REVIEW
+    advisory (e.g. the ANEKANTA "epistemological diversity" advisory that fires
+    in the unit-test environment). Under WS4, a self-mod change_type on a
+    REVIEW decision is a hard REJECT; that enforcement is covered by the
+    dedicated self-mod gate tests. Tests that specifically need a self-mod
+    change_type pass it explicitly via kwargs.
+    """
     defaults = {
         "component": "module.py",
-        "change_type": "mutation",
+        "change_type": "observation",
         "description": (
             "Improve activation mechanism with consciousness witness "
             "and ecosystem resilience feedback"
@@ -142,10 +209,16 @@ def _harmful_proposal(**kw) -> Proposal:
 
 
 def _review_proposal(**kw) -> Proposal:
-    """Create a proposal that triggers a Tier C review advisory."""
+    """Create a proposal that triggers a Tier C review advisory.
+
+    WS4: uses a non-self-mod change_type ("observation") so this fixture
+    exercises the REVIEW-advisory -> GATED path. A self-mod change_type
+    (e.g. "mutation") on a REVIEW decision is now a hard REJECT (WS4), which
+    is covered separately by the self-mod enforcement tests.
+    """
     defaults = {
         "component": "ops.py",
-        "change_type": "mutation",
+        "change_type": "observation",
         "description": "force override the configuration",
         "diff": "",
         "think_notes": _THINK_NOTES_REVIEW,
@@ -662,9 +735,33 @@ async def test_gate_check_harmful_proposal(engine):
 async def test_gate_check_review_proposal(engine):
     p = _review_proposal()
     result = await engine.gate_check(p)
-    # "force" triggers VYAVASTHIT (Tier C) -> REVIEW, not BLOCK
+    # "force" triggers VYAVASTHIT (Tier C) -> REVIEW, not BLOCK.
+    # _review_proposal uses a non-self-mod change_type, so REVIEW -> GATED.
     assert result.status == EvolutionStatus.GATED
     assert result.gate_decision == GateDecision.REVIEW.value
+
+
+async def test_gate_check_self_mod_review_is_rejected(engine):
+    """WS4: a self-mod change_type on a REVIEW decision must HARD REJECT.
+
+    The same advisory that yields GATED for a non-self-mod proposal must
+    block a self-modification proposal — it may not flow through to apply.
+    """
+    p = _review_proposal(change_type="mutation")
+    result = await engine.gate_check(p)
+    assert result.gate_decision == GateDecision.REVIEW.value
+    assert result.status == EvolutionStatus.REJECTED
+
+
+async def test_gate_check_self_mod_review_rejected_for_all_types(engine):
+    """WS4: every change_type in SELF_MOD_TYPES rejects on REVIEW."""
+    from dharma_swarm.evolution import SELF_MOD_TYPES
+
+    for change_type in sorted(SELF_MOD_TYPES):
+        p = _review_proposal(change_type=change_type)
+        result = await engine.gate_check(p)
+        assert result.gate_decision == GateDecision.REVIEW.value, change_type
+        assert result.status == EvolutionStatus.REJECTED, change_type
 
 
 async def test_gate_check_logs_trace(engine):
@@ -919,7 +1016,9 @@ async def test_archive_result_stores_entry(engine):
     stored = await engine.archive.get_entry(entry_id)
     assert stored is not None
     assert stored.component == "module.py"
-    assert stored.status == "applied"
+    # No diff apply ran on this path — honest status is "evaluated",
+    # not "applied" (which is reserved for diffs that actually landed).
+    assert stored.status == "evaluated"
     assert stored.fitness.correctness == pytest.approx(0.8)
     assert stored.promotion_state == "candidate"
     assert stored.evidence_tier == "unvalidated"
@@ -1498,15 +1597,114 @@ async def test_auto_evolve_routes_through_sandbox_cycle(engine_paths, tmp_path, 
     monkeypatch.setattr(eng, "generate_proposal", fake_generate)
     monkeypatch.setattr(eng, "run_cycle_with_sandbox", fake_run_cycle_with_sandbox)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("pkg_file.py", "misc_file.py"),
+    )
     result = await eng.auto_evolve(
         DummyProvider(),
         [source_a, source_b],
         test_command="echo 'global passed'",
         timeout=9.0,
+        shadow=False,
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
     )
 
     assert result.proposals_submitted == 2
     assert result.proposals_archived == 2
+
+
+async def test_auto_evolve_live_mode_requires_verified_promotion_packet(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("live refusal must happen before proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_auto_evolve_refuses_worker_authored_allow_packet(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("self-authored allow packet must not reach proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+        promotion_verification=_unsigned_allow_live_packet(),
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_auto_evolve_refuses_untrusted_judge_signature(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("untrusted judge packet must not reach proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+    packet, _trusted_keys = _signed_allow_live_packet()
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+        promotion_verification=packet,
+        trusted_judge_public_keys=[],
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_commit_if_worthy_requires_signed_promotion_verdict(engine, tmp_path, monkeypatch):
+    proposal = Proposal(
+        component="target.py",
+        change_type="mutation",
+        description="direct commit bypass attempt",
+        diff=(
+            "diff --git a/target.py b/target.py\n"
+            "--- a/target.py\n"
+            "+++ b/target.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+        ),
+        actual_fitness=FitnessScore(correctness=1.0, safety=1.0),
+    )
+
+    async def explode_subprocess(*_args, **_kwargs):
+        raise AssertionError("commit bypass must refuse before any git subprocess")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", explode_subprocess)
+
+    result = await engine.commit_if_worthy(
+        proposal,
+        fitness_threshold=0.1,
+        workspace=tmp_path,
+        promotion_verification=_unsigned_allow_live_packet(),
+    )
+
+    assert result is None
 
 
 async def test_run_cycle_circuit_breaker_after_repeated_failures(engine):
@@ -2043,6 +2241,42 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
 
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("dharma_swarm/safe_leaf.py",),
+    )
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=False,
+        workspace=workspace,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
+    )
+
+    assert result.accepted is True
+    assert result.applied is True
+    assert result.archive_entry_id is not None
+    assert len(calls) == 1
+    assert calls[0][3] == workspace
+
+
+async def test_apply_sealed_packet_live_requires_verified_promotion_packet(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _write_sealed_packet(root, diff_text=_safe_diff())
+
+    async def fake_apply(*_args, **_kwargs):
+        raise AssertionError("live sealed packet must refuse before apply")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
+
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,
@@ -2051,11 +2285,10 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
         halt_path=tmp_path / "missing-halt",
     )
 
-    assert result.accepted is True
-    assert result.applied is True
-    assert result.archive_entry_id is not None
-    assert len(calls) == 1
-    assert calls[0][3] == workspace
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["promotion_verification"]
+    assert "verify_promotion" in result.reason
 
 
 async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
@@ -2079,11 +2312,17 @@ async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
 
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("dharma_swarm/dharma_kernel.py",),
+    )
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,
         proof_timeout=5.0,
         halt_path=tmp_path / "missing-halt",
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
     )
 
     assert result.accepted is False
@@ -2174,9 +2413,12 @@ async def test_cycle_result_reflection_fields_default():
 @pytest.mark.asyncio
 async def test_think_gate_reroutes_empty_notes(engine):
     """TEST 5: Empty think_notes trigger reflective reroute instead of dead stop."""
+    # WS4: non-self-mod change_type so a post-reroute REVIEW advisory still
+    # reaches GATED; this test targets the reroute mechanism, not self-mod
+    # enforcement (covered by the dedicated self-mod gate tests).
     p = Proposal(
         component="empty.py",
-        change_type="mutation",
+        change_type="observation",
         description="some change",
         think_notes="",
     )
@@ -2189,9 +2431,10 @@ async def test_think_gate_reroutes_empty_notes(engine):
 @pytest.mark.asyncio
 async def test_think_gate_reroutes_short_notes(engine):
     """Very short think_notes (< 10 chars) trigger reflective reroute."""
+    # WS4: non-self-mod change_type (see test_think_gate_reroutes_empty_notes).
     p = Proposal(
         component="short.py",
-        change_type="mutation",
+        change_type="observation",
         description="some change",
         think_notes="ok",
     )

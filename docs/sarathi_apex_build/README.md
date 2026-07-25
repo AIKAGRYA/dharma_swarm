@@ -1,62 +1,68 @@
-# Sarathi Apex Build — Front Door
+# Sarathi Apex / Holon System Build History
 
-**This is the obvious front door for the whole holon-system build.** Read the
-numbered files in order. Legacy files are retained and linked at the bottom so
-nothing is lost, but the numbered set is canonical.
+Status: **collapse base landed on main; Sarathi is not yet a durable living
+service**. This folder preserves the Sarathi-specific design and build sequence.
+It no longer owns the ecosystem-wide source or readiness verdict.
 
-## What we are building (one line)
+Start with
+[`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+That map is the current holon-specific body synthesis across the repo,
+`~/.dharma`, `~/.hermes`, recent PRs, a dated live witness, and the closure path.
+Onboarding and `docs/state/LIVE_OPS_DASHBOARD.md` still own live state.
 
-Our own **Hermes-class holon system** — identity + provider routing + persistent
-wake kernel + governed runtime + orchestration + A2A transport + semantic
-responders + gateway + observability + packaging/CLI + proof gates. **Sarathi is
-the apex continuity holon that sits on top of that system — not the whole build.**
+## Read order
 
-## Read order (canonical)
+1. [Current estate map](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) — what
+   exists and works now.
+2. [`00_START_HERE.md`](00_START_HERE.md) — Sarathi thesis and current baseline.
+3. [`02_CODEBASE_RUNTIME_BOUNDARY.md`](02_CODEBASE_RUNTIME_BOUNDARY.md) — dated
+   repo/runtime boundary detail; defer to the estate map on conflicts.
+4. [`05_SARATHI_APEX_MAP.md`](05_SARATHI_APEX_MAP.md) — Sarathi-specific intent.
+5. [`06_PROOF_GATES.md`](06_PROOF_GATES.md) — original gate design.
+6. [`07_BACKLOG.md`](07_BACKLOG.md) — current closure packets.
+7. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) and
+   [`91_SPRAWL_HARNESS_RUNBOOK.md`](91_SPRAWL_HARNESS_RUNBOOK.md) — anti-fork
+   policy and enforcement.
 
-1. [`00_START_HERE.md`](00_START_HERE.md) — orientation + the locked sentence + "alive" definition.
-2. [`01_CURRENT_STATE.md`](01_CURRENT_STATE.md) — live snapshot (git, dgc, runtime counts, Sarathi surfaces).
-3. [`02_CODEBASE_RUNTIME_BOUNDARY.md`](02_CODEBASE_RUNTIME_BOUNDARY.md) — dharma_swarm/ vs ~/.dharma vs ~/.hermes, and the drift.
-4. [`03_HOLON_SYSTEM_CODE_MAP.md`](03_HOLON_SYSTEM_CODE_MAP.md) — Hermes-class organs → our code (exists/partial/scattered/missing).
-5. [`04_PERSISTENT_AGENT_RELATION.md`](04_PERSISTENT_AGENT_RELATION.md) — the lineage ladder up to the apex.
-6. [`05_SARATHI_APEX_MAP.md`](05_SARATHI_APEX_MAP.md) — what Sarathi is + its target source package.
-7. [`06_PROOF_GATES.md`](06_PROOF_GATES.md) — gate-ordered next work; what authorizes "alive".
-8. [`07_BACKLOG.md`](07_BACKLOG.md) — safe-to-change, next steps, do-not-touch.
-9. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) — the rules that stop the next map from scattering.
+`01_CURRENT_STATE.md`, `03_HOLON_SYSTEM_CODE_MAP.md`, and
+`04_PERSISTENT_AGENT_RELATION.md` are useful dated lane captures, not current
+estate authorities.
 
-## Answer these in under 60 seconds
+## Current orientation
 
-- What are we building? → this README + `03_HOLON_SYSTEM_CODE_MAP.md`
-- Where is the code? → `03` (map) + `dharma_swarm/holon_system/` (facade package)
-- Where is runtime state? → `02_CODEBASE_RUNTIME_BOUNDARY.md`
-- Sarathi vs the holon system? → this README + `05_SARATHI_APEX_MAP.md`
-- Hermes-m5 vs our lineage? → `02` + `04_PERSISTENT_AGENT_RELATION.md`
-- Which organs exist / are missing? → `03_HOLON_SYSTEM_CODE_MAP.md`
-- Next proof gate? → `06_PROOF_GATES.md`
-- What can I safely change / not touch? → `07_BACKLOG.md`
+1. PR #821 landed the collapse base on 2026-07-09 at merge `0beef7584`
+   (`git show -s --format='%H %cs %s' 0beef7584`).
+2. The repo-root `holon/` fork is gone from current main; the sprawl guard is
+   clean (`test ! -d holon`; `PYTHONPATH=$PWD python3 scripts/governance/sprawl_guard.py`).
+3. `dharma_swarm/holon_system/` is a thin facade/navigation package, not a new
+   runtime body (`find dharma_swarm/holon_system -type f -name '*.py' -print0 | xargs -0 wc -l`).
+4. The proposal runner does not execute its proposed action, acquire an execution
+   lease, connect live cost accounting, or bind an independent verifier receipt.
+5. The installed `dgc` talk/run path imports top-level `scripts`, while packaging
+   excludes `scripts*`; the estate map records the exact failing probe.
+6. Sarathi's source projections keep `wake_loop_active` and `alive_claim` false.
+7. Local commit `e7856fed9` contains additional Sarathi work but is not on main
+   and is not product truth.
+8. The next exact work is the three closure packets in `07_BACKLOG.md`, starting
+   with a typed, lease-backed, budgeted real effect and receipt.
 
-## Non-negotiable current truth
+This build-history file makes no current process claim; run onboarding and read
+Live Ops for that state. Reproduce the landed, packaging, and source-tree
+observations above with the estate map's Sections 8–9 and these anchors:
+`scripts/holon_run.py:32-87`, `pyproject.toml:58-64`,
+`dharma_swarm/terminal_commands/agents.py:101-127`, and
+`dharma_swarm/holon_system/sarathi/gateway.py:15-24`. Reproduce the local-only
+branch claim with `git branch -a --contains e7856fed9`.
 
-- Sarathi's identity/mind exists under `~/.dharma/agents/sarathi`; its runtime
-  body is **not alive** (`service_alive=false`, `wake_loop_active=false`).
-- Code lives in git (`dharma_swarm/`); mutable runtime state lives under
-  `~/.dharma`; `~/.hermes` is a third-party product we benchmark, not our lineage.
-- No new `load_holon`, `holon_wake_cycle`, orchestrator, task store, model
-  router, A2A bus, or receipt spine. Facades/wrappers over existing owners only.
-- No "alive" or "beats Hermes" claim without a receipt (proof gates 9/10).
+## Non-negotiable boundaries
 
-## Supporting / historical docs (linked, non-canonical)
-
-- [`HOLON_SYSTEM_CODE_ORGANIZATION.md`](HOLON_SYSTEM_CODE_ORGANIZATION.md) — long-form organ map + scale comparison (backs doc 03).
-- [`11_PERSISTENT_AGENT_RELATION.md`](11_PERSISTENT_AGENT_RELATION.md) — full file:line lineage table (backs doc 04).
-- [`12_LOAD_HOLON_COLLAPSE_PLAN.md`](12_LOAD_HOLON_COLLAPSE_PLAN.md) — the holon_bridge fork collapse plan.
-- [`91_SPRAWL_HARNESS_RUNBOOK.md`](91_SPRAWL_HARNESS_RUNBOOK.md) — how to run `sprawl_guard.py`.
-- [`CURRENT_MAP_2026-07-06.md`](CURRENT_MAP_2026-07-06.md) — earlier working map draft.
-- [`SCRATCHPAD_2026-07-06.md`](SCRATCHPAD_2026-07-06.md) — verification scratchpad.
-
-## Executable guards
-
-```bash
-cd /Users/dhyana/dharma_swarm
-.venv/bin/python -m pytest tests/test_holon_system_imports.py tests/test_reversibility_gate.py -q
-python3 scripts/governance/sprawl_guard.py   # red until the holon/ fork collapse (doc 12)
-```
+- Repo source owns implementation; `~/.dharma` owns mutable runtime evidence.
+- `~/.hermes` is a parallel product/compatibility boundary, not Sarathi's body.
+- Reuse the existing provider, Living Agent Kernel, authority, A2A, and receipt
+  owners; do not introduce another runtime stack.
+- A process, heartbeat, identity, pulse, or model response cannot promote its
+  own liveness claim.
+- Target rule: only the proposed `DurableServiceProven` level should permit an
+  alive flag. Current two-boolean/tmux promotion code does not yet enforce it
+  (`dharma_swarm/holon_system/observability/proof_gates.py:6-11`;
+  `scripts/runtime/codex_composer_wake_loop.py:1213-1257`).

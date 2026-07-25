@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-30T19:04:22Z",
+  "phase": "phase_6_provider_truth",
+  "status": "completed_partial",
+  "score_after": 58,
+  "claim": "Not 100/100. Orchestrator spine EvidenceReceipt now records requested, planned, actual, and served provider/model from AgentRunner route telemetry and LLMResponse when available, with fallback plan, route path, confidence, route reasons, and normalized token counts. Full live-provider matrix proof and A2A strict green remain unproven.",
+  "files_changed": [
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/provider_truth.py",
+    "tests/test_orchestrator_spine_dispatch.py",
+    "reports/langgraph_parity/allnight/provider_truth_spine_receipt_20260630T190422Z.json",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+  ],
+  "implementation": {
+    "agent_runner": [
+      "Initializes and resets _last_route_request, _last_route_decision, _last_response, and _last_usage per task.",
+      "Persists the final route decision and response snapshot on both success and failure without changing run_task's string return contract."
+    ],
+    "orchestrator_spine": [
+      "Seeds RoutingDecision with runner-config requested provider/model.",
+      "Builds EvidenceReceipt provider/model from LLMResponse first, ProviderRouteDecision second, and runner config as the final fallback via dharma_swarm/provider_truth.py.",
+      "Adds receipt attributes for requested_provider, requested_model, planned_provider, planned_model, actual_provider, actual_model, served_provider, served_model, route_path, route_confidence, route_reasons, route_fallback_plan, route_requires_human, provider_truth_source, fallback_used, and actual_differs_from_requested.",
+      "Normalizes prompt/completion usage into EvidenceReceipt input_tokens/output_tokens."
+    ]
+  },
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest tests/test_orchestrator_spine_dispatch.py tests/test_loop1_spine_provider_model.py -q",
+      "result": "8 passed in 0.35s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state -q",
+      "result": "2 passed in 7.42s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "passed with warnings: context_compiler.py and orchestrator.py approach budget; runtime_state.py pre-existing breach not introduced by this PR"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "passed; green=true"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "passed; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "failed exit 2 as expected; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": ".venv/bin/python -m ruff check dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python -m ruff check dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py",
+      "result": "failed on pre-existing lint debt in agent_runner.py and orchestrator.py outside this diff: unused legacy imports, semicolon statements, unused locals, and one ambiguous variable name"
+    }
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Provider truth is still partial: routed orchestrator dispatch receipts now bind actual served provider/model when AgentRunner has route/response telemetry, but there is no exhaustive live-provider matrix proof.",
+    "Cockpit/API graph inspection remains pending."
+  ]
+}

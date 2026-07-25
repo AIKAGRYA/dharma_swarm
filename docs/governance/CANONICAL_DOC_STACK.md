@@ -1,15 +1,18 @@
 # CANONICAL DOC STACK
 
 **Purpose:** Define which doc owns which kind of truth, and which surfaces an
-agent reads first. This is the doc-ownership map. The single *door* into the
-current operating state is the onboarding command, not this file:
+agent reads first. This is the doc-ownership map. Start with read-only session
+status, not this file:
 
 ```bash
 make onboard
 # or: python3 scripts/governance/agent_onboard.py
 ```
 
-That command reads the owners below and renders the live truth in one screen.
+That command reports the local session verdict. Use `make organism-status` for
+the deeper whole-organism projection and `make agent-build-preflight
+PACKET=<path>` for edit admission. `BUILD_SESSION_ENTRYPOINT.md` owns the
+boundary between those commands.
 
 ---
 
@@ -21,7 +24,7 @@ Every governance fact lives in exactly one of three layers:
 |---|---|---|---|
 | **Intent** | What are we working on right now? | [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) | CI gate + TTL + managed-block render |
 | **Surface** | What exists in the codebase (routers, state dirs, nav)? | [`ACTIVE_SURFACE_MANIFEST.yaml`](../../ACTIVE_SURFACE_MANIFEST.yaml) | Manifest Health API |
-| **State** | What is live right now (HEAD, recent merges, runtime)? | [`docs/state/LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md) | Onboarding surfaces staleness as soft warning |
+| **State** | What is live right now (HEAD, recent merges, runtime)? | [`docs/state/LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md) | `make organism-status` + owner-specific probes |
 
 Everything else is **doctrine** (stable, prose-friendly: axioms, anti-slop
 rules, AGENTOPS loops, architecture). Doctrine never claims live state;
@@ -53,7 +56,8 @@ is no longer a forced first-read surface.
 
 | Kind of truth | Single owner | Who defers to it |
 |---|---|---|
-| Active build track (intent) | `ACTIVE_TRACK.yaml` | CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md (rendered via managed blocks) |
+| Active build track (intent) | `ACTIVE_TRACK.yaml` | CLAUDE.md and SOVEREIGN_MANIFEST.md (managed digests); BUILD_SESSION_ENTRYPOINT.md links without copying |
+| Session-entry command boundaries | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Onboarding and build-session guides |
 | Declared surfaces (routers, state dirs, nav) | `ACTIVE_SURFACE_MANIFEST.yaml` | Manifest Health API, anti-slop allowlists |
 | Live runtime / merge state | `docs/state/LIVE_OPS_DASHBOARD.md` | Daily Operating Brief, situational prose |
 | Known breakage | `docs/state/BROKEN_REGISTER.md` | INTERFACE_MISMATCH_MAP.md (parallel substrate) |
@@ -64,26 +68,49 @@ is no longer a forced first-read surface.
 | Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
 | Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
-| Whole-system why / canonical North Star v2 | `docs/vision_maps/NORTH_STAR.md` | Vision maps, organ maps, venture-cell framing, architecture-fitness reviews |
+| External-gradient / autoresearch-node portfolio (build spec) | `docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md` | Defers to `ACTIVE_TRACK.yaml` (track state), One Wire quorum owners, and receipts for live facts |
+| Memory first-token ordering (build spec) | `docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md` | Defers to `context_compiler.py`/MemoryKernel code and trust-gate C5 for live state |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
+| Forge / Pudgala naming rule | `docs/governance/SOVEREIGN_MANIFEST.md` | `docs/governance/FORGE_NAMING_BOUNDARY.md` is reference-only and defers to the manifest |
 | Vibe-code and AI-agent hygiene lifecycle | `docs/governance/hygiene/README.md` + `docs/governance/hygiene/AI_AGENT_GOVERNANCE.md` + `docs/governance/hygiene/patterns/*.yaml` | `ANTI_SLOP_RULES.md` and `docs/ops/PR_REVIEW_CONTROL.md` when a pattern is promoted to a hard gate |
 | Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
+| Semantic Commons agent identity and naming ontology | `docs/ontology/SEMANTIC_COMMONS.md` | A2A cards, contact registries, `docs/ontology/semantic_objects.yaml`, `docs/ontology/semantic_aliases.yaml`, runtime resolver names |
 | Internal live transport decision | `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` | A2A docs, runtime plans, onboarding output, Live Ops Cockpit |
+| Always-on A2A spine implementation plan | `docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md` | Defers to `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`, `ACTIVE_TRACK.yaml`, `RuntimeStateStore`, and `A2ANatsTransport` for executable truth |
+| LangGraph parity local acceptance contract | `docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md` | parity benchmark, readiness report, future adapter work |
+| LangGraph parity operator runbook | `docs/langgraph_parity/OPERATOR_RUNBOOK.md` | benchmark/readiness commands and human verification flow |
+| LangGraph parity task graph | `docs/langgraph_parity/TASK_GRAPH.md` | future parity adapter sequencing; defers to the acceptance contract |
 | Living Agent Kernel build spec (holon lane) | `spec-forge/living-agent-kernel/MASTER_SPEC.md` | Defers to `dharma_swarm/operator_core/living_agent_kernel.py` + its tests for runtime truth |
 | Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
-| Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, control-surface rows, operator travel/restart triage |
+| Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, operator-coherence report, operator travel/restart triage |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
-| PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook, Greptile review intake artifacts |
+| PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
 | Merge authority charter (Merge Master Mike) | `docs/governance/MMM_CHARTER.md` | Defers to `docs/ops/PR_REVIEW_CONTROL.md` for operations and to `examples/agents/merge_master_mike.registration.json` for capabilities |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
-| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
+| Titanium Telos kernel specification | `specs/TITANIUM_TELOS_GATES_SPEC_v3.md` | Defers to `kernel/manifest.yaml` and `packages/telos-kernel/` tests for executable enforcement |
+| Titanium Telos hardwiring plan | `docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md` | Defers to PR state and CI for live readiness |
+| Telos kernel trust boundary | `packages/telos-kernel/SECURITY.md` | Defers to `packages/telos-kernel/telos_kernel/tests/test_import_boundary.py` and `packages/telos-kernel/telos_kernel/tests/test_tcb_loc.py` for enforcement |
+| Nagini graduation memo | `specs/memos/nagini_graduation_memo.md` | Defers to `.github/workflows/kernel-titanium-verify.yml` and `packages/titanium-verify/titanium_verify/tests/` for executable status |
+| Titanium verifier README | `packages/titanium-verify/README.md` | Defers to `packages/titanium-verify/titanium_verify/tests/` and the verifier CI job for executable status |
+| Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
+| Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
+| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | Defers command boundaries to BUILD_SESSION_ENTRYPOINT.md |
+| Persistent A2A agent registration | `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | `make agent-register` owns the live drift result |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
+| Hermes-class holon body synthesis (reference) | `docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md` | Depth-on-demand reference across repo source, `~/.dharma`, `~/.hermes`, recent work, and a dated witness; defers live state to onboarding/`docs/state/LIVE_OPS_DASHBOARD.md` and executable claims to code/tests/receipts |
+| Sovereign holon call-chain index | `docs/architecture/AGENT_HOLON_CODE_MAP.md` | Subordinate quick index; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` for all estate and liveness claims |
+| Sarathi holon-system build history | `docs/sarathi_apex_build/README.md` | Owns the dated collapse-lane narrative; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` for current body synthesis and onboarding/Live Ops for live state |
+| Sarathi holon-system lane start | `docs/sarathi_apex_build/00_START_HERE.md` | Defers to `README.md` for read order and to tests/PR checks for proof |
+| Sarathi code/runtime boundary | `docs/sarathi_apex_build/02_CODEBASE_RUNTIME_BOUNDARY.md` | Defers to `README.md` and runtime state commands for current facts |
+| Sarathi holon-system code map | `docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md` | Historical lane map; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` and current source code |
+| Sarathi collapse backlog | `docs/sarathi_apex_build/07_BACKLOG.md` | Working-plan status; defers to PR state and proof gates |
+| Sarathi anti-sprawl harness policy | `docs/sarathi_apex_build/90_ANTI_SPRAWL_HARNESS.md` | Defers to `scripts/governance/sprawl_guard.py` for enforcement |
+| Sarathi sprawl harness runbook | `docs/sarathi_apex_build/91_SPRAWL_HARNESS_RUNBOOK.md` | Defers to `scripts/governance/sprawl_guard.py` output |
 | Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |
 | VentureCell portfolio (which cells exist, status, instrument, separation) | `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` | per-cell `VENTURE_CELL_*.md` declarations defer to it |
 | Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
 | Memory Kernel production bar | `docs/architecture/MEMORY_KERNEL_PROD_BAR.md` | MemoryLattice, MemoryPalace, projection stores, canon/promotion claims |
-| Dharma Forge Proving Ground benchmark/evolution contract | `reports/forge/FORGE_CANONICAL_INDEX.md` | Highest Forge Proving Ground-specific doc; defers to global governance, Semantic Commons, runtime truth, and source code for live facts |
 | Perplexity Computer autonomous loop mode | `docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md` | Perplexity Computer agent card loop-mode metadata and deployment notes |
 | BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
@@ -93,7 +120,7 @@ is no longer a forced first-read surface.
 | Lodestone index | `lodestones/README.md` | Lodestone seed discoverability |
 | Onboarding megafile slots | `docs/MEGAFILE_INDEX.md` | individual slot files |
 | Audit trail | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | — |
-| Work loops / continuous improvement | `docs/governance/KAIZENOPS.md` | Primary improvement umbrella. AgentOps, Daily Operating Brief, Metabolic Clock, Human YDS Ledger, drift triage, hygiene scans, name-drift scans, and Hermes pulse findings defer to KaizenOps for observation-to-improvement interpretation; their owner files still own their raw facts. |
+| Work loops | `docs/governance/AGENTOPS.md`, `KAIZENOPS.md`, `DAILY_OPERATING_BRIEF.md`, `METABOLIC_CLOCK.md`, `HUMAN_YDS_LEDGER.md` | — |
 | Cross-agent coordination | `docs/state/CROSS_AGENT_INVENTORY.md` | — |
 
 If any file claims to own a fact already owned above, the rule is: **the file

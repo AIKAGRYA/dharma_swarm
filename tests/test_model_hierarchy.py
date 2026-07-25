@@ -317,3 +317,44 @@ class TestConvenience:
         output = dump_hierarchy()
         for tier_name in ALL_TIERS:
             assert tier_name.upper() in output
+
+
+class TestModelIntelligence:
+    def test_every_default_model_lane_has_score(self):
+        from dharma_swarm.model_hierarchy import DEFAULT_MODELS, MODEL_INTELLIGENCE
+
+        for provider in DEFAULT_MODELS:
+            assert provider in MODEL_INTELLIGENCE, provider
+
+    def test_tier_free_listed_most_intelligent_first(self):
+        from dharma_swarm.model_hierarchy import TIER_FREE, intelligence_score
+
+        scores = [intelligence_score(p) for p in TIER_FREE]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_intelligence_order_respects_cost_ladder(self):
+        from dharma_swarm.model_hierarchy import intelligence_order
+
+        ordered = intelligence_order(
+            [ProviderType.ANTHROPIC, ProviderType.MISTRAL, ProviderType.OLLAMA]
+        )
+        assert ordered == [
+            ProviderType.OLLAMA,     # free frontier first
+            ProviderType.MISTRAL,    # cheap second
+            ProviderType.ANTHROPIC,  # paid API last
+        ]
+
+    def test_intelligence_order_raw_mode_picks_smartest(self):
+        from dharma_swarm.model_hierarchy import intelligence_order
+
+        ordered = intelligence_order(
+            [ProviderType.OPENROUTER_FREE, ProviderType.OLLAMA, ProviderType.ANTHROPIC],
+            respect_cost_tiers=False,
+        )
+        assert ordered[0] == ProviderType.ANTHROPIC
+        assert ordered[1] == ProviderType.OLLAMA
+
+    def test_get_live_order_seed_fallback_is_intelligence_ordered(self):
+        from dharma_swarm.model_hierarchy import get_live_order, intelligence_order
+
+        assert get_live_order() == intelligence_order()

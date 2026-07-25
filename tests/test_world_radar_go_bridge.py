@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from dharma_swarm.world_radar import go_bridge as bridge
+from dharma_swarm.world_radar import go_invoke
 
 
 def test_world_radar_promotes_operator_drop_with_fake_ingestor(
@@ -165,6 +166,9 @@ def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
     rows, error, counts = bridge._run_go_scout(
         state=state,
@@ -228,6 +232,82 @@ def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
     assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--query-url-file"] == [str(url_file)]
     assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--source-spec"] == [str(tmp_path / "sourcespec.json")]
     assert "app.cofounder.co" in cmd
+
+
+def test_run_go_scout_treats_partial_source_failure_as_nonfatal(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    output_path = tmp_path / "observations.jsonl"
+    health_path = tmp_path / "health.json"
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        _write_jsonl(output_path, [_signal("github", score=0.74)])
+        health_path.write_text(
+            json.dumps(
+                {
+                    "successful_sources": 1,
+                    "failed_sources": 1,
+                    "errors": ["arxiv_agentic_design_patterns: 429"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
+
+    rows, error, counts = bridge._run_go_scout(
+        state=state,
+        output_path=output_path,
+        health_path=health_path,
+        timeout_s=30,
+    )
+
+    assert error is None
+    assert rows[0]["source"] == "github"
+    assert counts["successful_sources"] == 1
+    assert counts["failed_sources"] == 1
+
+
+def test_partial_source_error_still_reports_total_source_failure() -> None:
+    error = bridge._partial_source_error(
+        {
+            "successful_sources": 0,
+            "failed_sources": 2,
+            "errors": ["arxiv: 429", "hn: 503"],
+        }
+    )
+
+    assert error is not None
+    assert "partial source failures=2" in error
+
+
+def test_partial_source_error_never_raises_on_malformed_health() -> None:
+    # Copilot review finding: a non-numeric health field must not crash the
+    # scout -- health parsing is advisory, never fatal.
+    error = bridge._partial_source_error(
+        {"successful_sources": "not-a-number", "failed_sources": None, "errors": "not-a-list"}
+    )
+    assert error is None  # failed coerces to 0 -> failed <= 0 -> no error
+
+
+def test_source_counts_never_raises_on_malformed_health() -> None:
+    counts = bridge._source_counts(
+        {
+            "successful_sources": "N/A",
+            "failed_sources": [],
+            "retry_count": {},
+            "archive_count": "inf",
+            "dedupe_count": "-1",
+        }
+    )
+    assert counts["successful_sources"] == 0
+    assert counts["failed_sources"] == 0
+    assert counts["retry_count"] == 0
+    assert counts["archive_count"] == 0
+    assert counts["dedupe_count"] == 0
 
 
 def test_world_radar_imports_go_archive_rows_as_untrusted_evidence(monkeypatch, tmp_path: Path) -> None:
@@ -340,8 +420,11 @@ def test_run_go_ingestor_projects_current_run_receipts(monkeypatch, tmp_path: Pa
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
-    rows, error = bridge._run_go_ingestor(
+    rows, error, invocation_mode = bridge._run_go_ingestor(
         input_path=input_path,
         output_path=output_path,
         min_score=0.45,
@@ -353,6 +436,7 @@ def test_run_go_ingestor_projects_current_run_receipts(monkeypatch, tmp_path: Pa
     cmd = captured["cmd"]
     assert isinstance(cmd, list)
     assert error is None
+    assert invocation_mode in {"binary", "go_run"}
     assert "--receipt-dir" in cmd
     assert "--correlation-id" in cmd
     assert rows[0]["source"] == "go_world_signal_receipt"
@@ -398,6 +482,200 @@ def test_world_radar_writes_ingest_summary_and_cost_event(monkeypatch, tmp_path:
     assert health["nats_receipt_transport"]["status"] == "disabled"
 
 
+def test_go_invocation_prefers_prebuilt_binary(monkeypatch, tmp_path: Path) -> None:
+    module_dir = tmp_path / "world_scout_go"
+    module_dir.mkdir()
+
+    # No binary + toolchain on PATH -> `go run .` (host-independent via patch).
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
+    cmd, mode = bridge._go_invocation(module_dir)
+    assert cmd == ["go", "run", "."]
+    assert mode == "go_run"
+
+    binary = module_dir / "world_scout_go"
+    binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    binary.chmod(0o755)
+
+    cmd, mode = bridge._go_invocation(module_dir)
+    assert cmd == [str(binary)]
+    assert mode == "binary"
+
+
+def test_go_invocation_needs_host_without_binary_or_toolchain(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Toolchain-checked invocation: neither binary nor `go` -> needs_host, no argv."""
+    module_dir = tmp_path / "world_scout_go"
+    module_dir.mkdir()
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: None)
+
+    cmd, mode = bridge._go_invocation(module_dir)
+    assert cmd == []
+    assert mode == "needs_host"
+
+
+def test_run_go_scout_needs_host_returns_structured_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """needs_host never invokes a subprocess and names the fix (`make go-build`)."""
+    monkeypatch.setattr(
+        go_invoke, "_go_invocation", lambda _module_dir: ([], "needs_host")
+    )
+
+    def _no_subprocess(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("subprocess must not run when the host lacks Go")
+
+    monkeypatch.setattr(go_invoke.subprocess, "run", _no_subprocess)
+
+    rows, error, counts = bridge._run_go_scout(
+        state=tmp_path / ".dharma",
+        output_path=tmp_path / "observations.jsonl",
+        health_path=tmp_path / "health.json",
+        timeout_s=5,
+    )
+
+    assert rows == []
+    assert error is not None
+    assert "make go-build" in error
+    assert "world_scout_go" in error
+    assert counts["invocation_mode"] == "needs_host"
+    assert counts["source_errors"] == [
+        {"source": "world_scout_go", "stage": "scout", "error": error}
+    ]
+
+
+def test_run_go_ingestor_needs_host_returns_structured_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        go_invoke, "_go_invocation", lambda _module_dir: ([], "needs_host")
+    )
+
+    def _no_subprocess(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("subprocess must not run when the host lacks Go")
+
+    monkeypatch.setattr(go_invoke.subprocess, "run", _no_subprocess)
+
+    rows, error, invocation_mode = bridge._run_go_ingestor(
+        input_path=tmp_path / "observations.jsonl",
+        output_path=tmp_path / "signals.jsonl",
+        min_score=0.4,
+        timeout_s=5,
+    )
+
+    assert rows == []
+    assert error is not None
+    assert "make go-build" in error
+    assert "world_signal_ingestor_go" in error
+    assert invocation_mode == "needs_host"
+
+
+def test_run_go_scout_surfaces_structured_source_errors_and_mode(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "observations.jsonl"
+    health_path = tmp_path / "health.json"
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        _write_jsonl(output_path, [_signal("hacker_news_ai", score=0.7)])
+        health_path.write_text(
+            json.dumps(
+                {
+                    "successful_sources": 1,
+                    "failed_sources": 2,
+                    "errors": [
+                        "arxiv_agents: fetch https://export.arxiv.org: 503",
+                        "some free-form failure text",
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
+
+    rows, error, counts = bridge._run_go_scout(
+        state=tmp_path / ".dharma",
+        output_path=output_path,
+        health_path=health_path,
+        timeout_s=30,
+    )
+
+    assert rows[0]["source"] == "hacker_news_ai"
+    # Merged semantics (origin/main): the flat error string fires only when
+    # ALL sources fail; partial failures surface via structured source_errors.
+    assert error is None
+    assert counts["invocation_mode"] in {"binary", "go_run"}
+    assert counts["source_errors"] == [
+        {
+            "source": "arxiv_agents",
+            "stage": "scout",
+            "error": "fetch https://export.arxiv.org: 503",
+        },
+        {
+            "source": "world_scout_go",
+            "stage": "scout",
+            "error": "some free-form failure text",
+        },
+    ]
+
+
+def test_world_radar_surfaces_source_errors_in_result_and_health(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = tmp_path / ".dharma"
+
+    def fake_scout(**kwargs):  # type: ignore[no-untyped-def]
+        if kwargs.get("cascade_for"):
+            return [], None, {"successful_sources": 1, "failed_sources": 0}
+        return (
+            [_signal("hacker_news", score=0.72)],
+            "world_scout_go partial source failures=1: arxiv_agents: 503",
+            {
+                "successful_sources": 1,
+                "failed_sources": 1,
+                "invocation_mode": "go_run",
+                "source_errors": [
+                    {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+                ],
+            },
+        )
+
+    monkeypatch.setattr(bridge, "_run_go_scout", fake_scout)
+    monkeypatch.setattr(bridge, "_run_go_ingestor", _fake_ingestor)
+
+    result = bridge.run_world_radar_go_once(state_dir=state, scout_fetch=True)
+
+    assert result.ok is False
+    assert result.scout_invocation_mode == "go_run"
+    assert result.ingestor_invocation_mode == "go_run"
+    assert result.source_errors == (
+        {"source": "arxiv_agents", "stage": "scout", "error": "503"},
+    )
+    health = json.loads(
+        (state / "meta" / "world_radar" / "world_radar_health.json").read_text(encoding="utf-8")
+    )
+    assert health["source_errors"] == [
+        {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+    ]
+    assert health["scout_invocation_mode"] == "go_run"
+    assert health["ingestor_invocation_mode"] == "go_run"
+    health_md = (state / "meta" / "world_radar" / "world_radar_health.md").read_text(
+        encoding="utf-8"
+    )
+    assert "arxiv_agents" in health_md
+    assert "scout_invocation_mode: go_run" in health_md
+
+
 def test_record_ingest_cost_event_is_idempotent(tmp_path: Path) -> None:
     ledger_path = tmp_path / "ingest_cost_ledger.jsonl"
     summary = {
@@ -434,14 +712,14 @@ def _fake_ingestor(
     timeout_s: int,
     receipt_dir: Path | None = None,
     correlation_id: str = "",
-) -> tuple[list[dict[str, object]], None]:
+) -> tuple[list[dict[str, object]], None, str]:
     rows = [
         row
         for row in _read_jsonl(input_path)
         if float(row.get("relevance_score", 0.0) or 0.0) >= min_score
     ]
     _write_jsonl(output_path, rows)
-    return rows, None
+    return rows, None, "go_run"
 
 
 def _signal(source: str, *, score: float) -> dict[str, object]:

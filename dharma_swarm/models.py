@@ -23,6 +23,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    QUARANTINED_FAKE_RESULT = "quarantined_fake_result"
 
 
 class TaskPriority(str, Enum):
@@ -34,6 +35,7 @@ class TaskPriority(str, Enum):
 
 class AgentStatus(str, Enum):
     IDLE = "idle"
+    INACTIVE = "inactive"  # BSP Vote-to-Halt: no inbox messages, vertex halted
     BUSY = "busy"
     STARTING = "starting"
     STOPPING = "stopping"
@@ -101,6 +103,9 @@ class TopologyType(str, Enum):
     FAN_IN = "fan_in"
     PIPELINE = "pipeline"
     BROADCAST = "broadcast"
+    SWARM = "swarm"
+    SUPERVISOR = "supervisor"
+    SUBAGENTS_AS_TOOLS = "subagents_as_tools"
 
 
 class MemoryLayer(str, Enum):
@@ -130,7 +135,9 @@ class ProviderType(str, Enum):
     SAMBANOVA = "sambanova"
     MISTRAL = "mistral"
     CHUTES = "chutes"
-    SAKANA = "sakana"
+    ZHIPU = "zhipu"
+    KIMI_CODE = "kimi_code"
+    MOONSHOT = "moonshot"
 
 
 class AutonomyLevel(str, Enum):
@@ -262,6 +269,7 @@ class GateCheckResult(BaseModel):
     reason: str
     gate: str = ""
     gate_results: dict[str, tuple[GateResult, str]] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=_utc_now)
 
 

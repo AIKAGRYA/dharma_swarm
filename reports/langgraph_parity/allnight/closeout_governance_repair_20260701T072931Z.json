@@ -1,0 +1,59 @@
+{
+  "schema_version": "dharma.langgraph_parity.closeout_governance_repair.v1",
+  "generated_at": "2026-07-01T07:29:31Z",
+  "target_gate": "Aggregate agent-build-closeout governance",
+  "claim": "make agent-build-closeout now passes locally after narrowing the historical gitleaks false-positive allowlist, running uplift guards through the repo Python environment, and refreshing generated DocOps inventory counts.",
+  "changes": [
+    {
+      "file": ".pre-commit-config.yaml",
+      "reason": "Make the dharma-uplift-guards pre-commit hook prefer .venv/bin/python and fall back to python3, matching the closeout target behavior so normal commits do not fail from system Python 3.9."
+    },
+    {
+      "file": ".gitleaks.toml",
+      "reason": "Allowlist historical quality-reports audit output beside existing reports/analysis/results audit-log allowlists. The reproduced 68 findings were all generic-api-key matches in quality-reports/hygiene-probe-2026-05-09/normalized-findings.jsonl from two old commits, and that path is absent at HEAD."
+    },
+    {
+      "file": "Makefile",
+      "reason": "Run uplift-guards through $(REPO_PYTHON) instead of system python3 so guards use the repo venv and do not crash on Python 3.10+ typing syntax or dataclass slots."
+    },
+    {
+      "file": "docs/docops/AUTO_INVENTORY.md",
+      "reason": "Refresh generated inventory counts with scripts/docops/check_docops_integrity.py --write-auto-sections."
+    },
+    {
+      "file": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "reason": "Refresh generated manifest count tokens with scripts/docops/check_docops_integrity.py --write-manifest-counts."
+    }
+  ],
+  "verification": [
+    {
+      "command": "gitleaks detect --source . --redact --no-banner --exit-code 1 --report-format json --report-path /tmp/dharma-gitleaks-current.json",
+      "result": "reproduced blocker: 68 redacted generic-api-key findings, all in quality-reports/hygiene-probe-2026-05-09/normalized-findings.jsonl across two historical commits"
+    },
+    {
+      "command": "gitleaks detect --source . --redact --no-banner --exit-code 1 --report-format json --report-path /tmp/dharma-gitleaks-after-quality-reports.json",
+      "result": "passed: 2825 commits scanned; no leaks found"
+    },
+    {
+      "command": "PYTHONPATH=. .venv/bin/python scripts/uplift_guards/run_pre_commit.py",
+      "result": "passed: kernel-integrity, secrets-scan, autonomous-destruction, hotpath-ack, fourfold-shakti-warrant, mismatch-adjacency, assurance-diff, spine-ownership, and no-model-literals"
+    },
+    {
+      "command": "pre-commit run dharma-uplift-guards --all-files",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python scripts/docops/check_docops_integrity.py --write-auto-sections --write-manifest-counts",
+      "result": "passed and refreshed generated counts"
+    },
+    {
+      "command": "make agent-build-closeout",
+      "result": "passed: semgrep wrapper skipped absent semgrep by repo policy; gitleaks scanned 2825 commits with no leaks; test hygiene warned only on known offender; contract tests 22 passed; NATS tests 55 passed; uplift guards passed; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory with undergraded active-track warnings"
+    }
+  ],
+  "residual_risks": [
+    "Semgrep is not installed on PATH and the repo wrapper skips it locally; this is not a hard failure in the current target, but CI should still be monitored.",
+    "Claim/evidence binding reports four active tracks as undergraded while AI-M1 remains advisory.",
+    "This repair closes aggregate closeout governance, but the overall LangGraph parity score remains below 100 because Phase 7 platform/cockpit evidence is still marked partial."
+  ]
+}

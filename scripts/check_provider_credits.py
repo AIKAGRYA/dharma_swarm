@@ -48,7 +48,11 @@ PROVIDERS: dict[str, dict[str, str]] = {
     for provider, key_env in PROVIDER_API_KEY_ENV_KEYS.items()
 }
 
-# Patterns that indicate credit exhaustion in log files
+# Patterns that indicate credit exhaustion in log files.
+# 2026-07-03: extended with wordings providers ACTUALLY emit — the live
+# ollama-cloud failure ("you have reached your weekly usage limit") matched
+# nothing here, so likely_exhausted read 0 while the chain-head was hard
+# capped. Keep this list aligned with observed provider error strings.
 CREDIT_ERROR_PATTERNS = [
     re.compile(r"credit balance.*too low", re.IGNORECASE),
     re.compile(r"insufficient.*credits?", re.IGNORECASE),
@@ -57,7 +61,16 @@ CREDIT_ERROR_PATTERNS = [
     re.compile(r"billing.*error", re.IGNORECASE),
     re.compile(r"payment.*required", re.IGNORECASE),
     re.compile(r"402", re.IGNORECASE),
+    re.compile(r"\b429\b"),
+    re.compile(r"too many requests", re.IGNORECASE),
+    re.compile(r"usage limit", re.IGNORECASE),
+    re.compile(r"resource[_ ]exhausted", re.IGNORECASE),
 ]
+
+# Only log files touched within this window count as exhaustion evidence.
+# Before 2026-07-03 ANY historical match flagged a provider "likely
+# exhausted" forever — one stale 402 read as "low on api keys" for weeks.
+DEFAULT_WINDOW_HOURS = 72.0
 
 SENSITIVE_LOG_PATTERNS = [
     (
@@ -115,12 +128,44 @@ def check_env_keys() -> dict[str, dict[str, Any]]:
     return results
 
 
-def scan_logs_for_credit_errors(results: dict[str, dict[str, Any]]) -> None:
-    """Scan recent log files for credit/quota exhaustion errors."""
-    for log_dir in LOG_DIRS:
+def _recent_files(
+    log_dir: Path,
+    pattern: str,
+    limit: int,
+    window_hours: float,
+    *,
+    now: float | None = None,
+) -> list[Path]:
+    """Newest `limit` files matching `pattern`, restricted to the mtime window."""
+    import time
+
+    current = time.time() if now is None else now
+    cutoff = current - window_hours * 3600.0
+    candidates: list[tuple[float, Path]] = []
+    for path in log_dir.rglob(pattern):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime >= cutoff:
+            candidates.append((mtime, path))
+    candidates.sort()
+    return [path for _, path in candidates[-limit:]]
+
+
+def scan_logs_for_credit_errors(
+    results: dict[str, dict[str, Any]],
+    *,
+    log_dirs: list[Path] | None = None,
+    window_hours: float = DEFAULT_WINDOW_HOURS,
+    now: float | None = None,
+) -> None:
+    """Scan recent (windowed) log files for credit/quota exhaustion errors."""
+    dirs = LOG_DIRS if log_dirs is None else log_dirs
+    for log_dir in dirs:
         if not log_dir.exists():
             continue
-        for log_file in sorted(log_dir.rglob("*.log"))[-20:]:  # Last 20 log files
+        for log_file in _recent_files(log_dir, "*.log", 20, window_hours, now=now):
             try:
                 text = log_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
@@ -137,10 +182,10 @@ def scan_logs_for_credit_errors(results: dict[str, dict[str, Any]]) -> None:
                                 break
 
     # Also scan JSONL logs
-    for log_dir in LOG_DIRS:
+    for log_dir in dirs:
         if not log_dir.exists():
             continue
-        for log_file in sorted(log_dir.rglob("*.jsonl"))[-10:]:
+        for log_file in _recent_files(log_dir, "*.jsonl", 10, window_hours, now=now):
             try:
                 lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
             except OSError:
@@ -185,10 +230,17 @@ def main() -> int:
         default=None,
         help="Write output to this file instead of stdout (supports ~ expansion)",
     )
+    parser.add_argument(
+        "--window-hours",
+        type=float,
+        default=DEFAULT_WINDOW_HOURS,
+        help="Only log files modified within this window count as exhaustion "
+        f"evidence (default: {DEFAULT_WINDOW_HOURS})",
+    )
     args = parser.parse_args()
 
     results = check_env_keys()
-    scan_logs_for_credit_errors(results)
+    scan_logs_for_credit_errors(results, window_hours=args.window_hours)
 
     # Compute summary
     present = [p for p, r in results.items() if r["key_present"]]
@@ -198,6 +250,13 @@ def main() -> int:
     if args.json:
         output = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            # Honesty header: consumers (and agents reading this file) must
+            # know this is NOT a live balance check. "missing" = env var
+            # unset in THIS process; "likely_exhausted" = a credit-error
+            # regex matched a recent log line naming the provider.
+            "method": "env-presence + windowed log-scan (heuristic; no live API calls)",
+            "window_hours": args.window_hours,
+            "writer": "scripts/check_provider_credits.py",
             "summary": {
                 "present": len(present),
                 "missing": len(missing),

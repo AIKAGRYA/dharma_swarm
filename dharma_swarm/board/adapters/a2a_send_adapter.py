@@ -538,7 +538,11 @@ class A2ASendBoardAdapter:
             *[(path, "domain_reply") for path in self.domain_reply_receipt_paths()],
             *[(path, "reply") for path in self.reply_receipt_paths()],
         ]
-        items.sort(key=lambda item: item[0].stat().st_mtime, reverse=True)
+        # Newest first; on mtime ties, replies/domain replies/bridge receipts
+        # precede send receipts (the send is the least informative card of a
+        # tied pair) — mtime-only sorting made this ordering nondeterministic.
+        kind_priority = {"reply": 0, "domain_reply": 1, "bridge": 2, "send": 3}
+        items.sort(key=lambda item: (-item[0].stat().st_mtime, kind_priority[item[1]]))
         cards: list[Card] = []
         for path, kind in items:
             receipt = _read_json(path)

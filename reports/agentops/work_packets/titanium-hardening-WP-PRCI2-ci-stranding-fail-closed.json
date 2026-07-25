@@ -1,0 +1,86 @@
+{
+  "id": "titanium-hardening-WP-PRCI2-ci-stranding-fail-closed",
+  "base_ref": "af5bee75f77970755f16a190769707506c4dd77f",
+  "branch": "fix/pr-ci-health-strand-loop-20260721",
+  "worktree": ".",
+  "intent": "Repair the PR CI-health control plane so scheduled rebases never rewrite a PR head with the default GITHUB_TOKEN, exact-head zero-run/draft/unknown/hard-failure states cannot be reported green, and every automated mutation remains fail-closed and human-merge-gated.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "scripts/governance/pr_ci_health.py",
+    "tests/test_pr_ci_health.py",
+    "reports/agentops/work_packets/titanium-hardening-WP-PRCI2-ci-stranding-fail-closed.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "pr-ci-health-classifier-and-rebase-tests",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py tests/test_pr_ci_safe_rebase.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "pr-ci-health-ruff",
+      "command": "python3 -m ruff check scripts/governance/pr_ci_health.py tests/test_pr_ci_health.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "startup-failure-removal-restores-false-green",
+      "command": "python3 -c \"from pathlib import Path; import importlib.util,sys; p=Path('scripts/governance/pr_ci_health.py'); t=p.read_text(); old='            \\\"startup_failure\\\",\\\\n'; assert old in t; p.write_text(t.replace(old,'',1)); spec=importlib.util.spec_from_file_location('pr_ci_health_mutant',p); m=importlib.util.module_from_spec(spec); sys.modules[spec.name]=m; spec.loader.exec_module(m); pr={'number':1083,'title':'mutant','base':{'ref':'main'},'head':{'ref':'mutant','sha':'deadbeef'},'draft':False,'user':{'login':'tester'},'mergeable_state':'clean'}; runs=[{'name':'passing advisory','conclusion':'success'},{'name':'required gate','conclusion':'startup_failure'}]; sys.exit(1 if m.classify_pr(pr,runs).categories==['green'] else 0)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(ci-health): fail closed on bot-rebase CI stranding"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.5",
+      "git": "2.47.3",
+      "make": "4.4.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRCI2",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "af5bee75f77970755f16a190769707506c4dd77f",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The hourly PR-health workflow could rewrite exact PR heads with GITHUB_TOKEN while its classifier interpreted the resulting absence of CI evidence as green."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/governance/pr_ci_health.py",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_health.py",
+      "tests/test_pr_ci_safe_rebase.py",
+      "reports/agentops/work_packets/titanium-hardening-WP-PRCI1-session-entry-guard.json"
+    ],
+    "honest_blockers": [
+      "This Session Entry packet was added after implementation because exact-head CI correctly rejected the high-risk event for having no packet; it supplies committed-range scope and does not rewrite history into a pre-edit admission claim.",
+      "PR_CI_HEALTH_PUSH_TOKEN is an operator-managed repository secret and is not provisioned or exposed by this packet; until it exists, scheduled auto-rebase remains intentionally disabled.",
+      "Already-stranded pull-request heads require separate trusted push events after this repair lands; this packet does not mutate unrelated branches.",
+      "Hosted exact-head CI, independent review policy, and human merge authority remain required."
+    ],
+    "rollback": "Revert the workflow, classifier, tests, and this packet together. Do not selectively restore GITHUB_TOKEN rebase pushes or absence-based green classification.",
+    "packet_digest": "378f43eb8e0819ce6220681e1083a61de7e12b714407a69a968df743c0425830"
+  }
+}

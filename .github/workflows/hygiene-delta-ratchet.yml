@@ -1,0 +1,47 @@
+name: hygiene-delta-ratchet
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  merge_group:
+
+concurrency:
+  group: hygiene-delta-ratchet-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  delta-ratchet:
+    name: Hygiene delta-ratchet — touched-file regressions
+    runs-on: ubuntu-latest
+    # On merge_group batches there is no PR base/head; the touched-file
+    # diff already ran on the PR before it entered the queue.
+    if: github.event_name != 'merge_group'
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Run hygiene delta-ratchet
+        # The detector (silent-excepts AS-09, sync-in-async AS-08) already
+        # shipped in scripts/governance/hygiene/delta_ratchet.py; this step
+        # wires it to CI. It is a touched-file ratchet: only files changed
+        # between base and head are scanned, and only NET-NEW violations in
+        # those files fail. Pre-existing violations are grandfathered.
+        # Pure code moves are credited: counts landing in a NEW file are
+        # classified MOVED (not a regression) when the net delta for that
+        # metric across all touched files is <= 0.
+        run: |
+          python3 scripts/governance/hygiene/delta_ratchet.py \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
+            --head-ref "${{ github.event.pull_request.head.sha }}"

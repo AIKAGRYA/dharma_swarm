@@ -1,0 +1,41 @@
+{
+  "aggregation_rule": "oracle_argmax_v0 (train-signal only, not a capability rule)",
+  "capability_claim": "NONE \u2014 internal gym numbers under a train-signal aggregation rule; never a benchmark claim.",
+  "compute_roi": {
+    "note": "fixture/control solver \u2014 zero inference cost; live seats populate tokens/usd via the ONE model door.",
+    "scored_iterations": 4,
+    "tokens_total": 0,
+    "usd_total": 0.0,
+    "wall_seconds_per_scored_iteration": 3.988,
+    "wall_seconds_per_task": {
+      "g1-9269f779c5e9": 8.07,
+      "g1-efe5a10f7b8c": 7.883
+    },
+    "wall_seconds_total": 15.953
+  },
+  "digest": "36383b893506c41fdff473af2f5035f3114690486757bb40440803f93cd45921",
+  "env_id": "g1_git_history",
+  "live_solver": {
+    "available": false,
+    "reason": "keys dispatchable but live solver lane lands with track next-item 2"
+  },
+  "per_task": {
+    "g1-9269f779c5e9": true,
+    "g1-efe5a10f7b8c": true
+  },
+  "schema": "chamber_gym_run.v1",
+  "scorer_hash": "e0a4e986b076b0c9132e83a71a64d277c1e8f884f8892f37d76ed42ccc732145",
+  "seats": [
+    "seat_landed_replay",
+    "seat_null"
+  ],
+  "seed": 7,
+  "taskpack_sha": "28a47b9f92a3e7e064bdb4d309af9271227830396e6dabe413c33f30903cf984",
+  "tasks_correct": 2,
+  "tasks_run": 2,
+  "trace_corpus": {
+    "file": "trace_corpus.jsonl",
+    "rows": 2,
+    "sha256": "113d6489e1f66a7ca92545ad780011daf5e481c1d2e30ccf7f97080e5249b86d"
+  }
+}

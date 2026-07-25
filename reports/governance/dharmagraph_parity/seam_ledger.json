@@ -1,0 +1,3329 @@
+{
+  "effects": [
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 18,
+      "file": "dharma_swarm/correlation_context.py",
+      "id": "dharma_swarm/correlation_context.py:49:18",
+      "line": 49,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 22,
+      "file": "dharma_swarm/engine/artifacts.py",
+      "id": "dharma_swarm/engine/artifacts.py:111:22",
+      "line": 111,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/artifacts.py",
+      "id": "dharma_swarm/engine/artifacts.py:120:8",
+      "line": 120,
+      "scope": "runtime",
+      "symbol": "*.write_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/engine/artifacts.py",
+      "id": "dharma_swarm/engine/artifacts.py:136:15",
+      "line": 136,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/artifacts.py",
+      "id": "dharma_swarm/engine/artifacts.py:157:8",
+      "line": 157,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/artifacts.py",
+      "id": "dharma_swarm/engine/artifacts.py:158:8",
+      "line": 158,
+      "scope": "runtime",
+      "symbol": "*.write_text"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:23:11",
+      "line": 23,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:181:8",
+      "line": 181,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:182:13",
+      "line": 182,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 26,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:196:26",
+      "line": 196,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:202:13",
+      "line": 202,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:299:13",
+      "line": 299,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 34,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:308:34",
+      "line": 308,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 35,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:358:35",
+      "line": 358,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:368:13",
+      "line": 368,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:401:13",
+      "line": 401,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 31,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:413:31",
+      "line": 413,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:449:13",
+      "line": 449,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 27,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:462:27",
+      "line": 462,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:503:13",
+      "line": 503,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 27,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:516:27",
+      "line": 516,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:544:13",
+      "line": 544,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:562:13",
+      "line": 562,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:603:13",
+      "line": 603,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:634:13",
+      "line": 634,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:646:13",
+      "line": 646,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 35,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:657:35",
+      "line": 657,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "id": "dharma_swarm/engine/conversation_memory.py:670:13",
+      "line": 670,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 26,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:15:26",
+      "line": 15,
+      "scope": "module",
+      "symbol": "Path.home"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:156:11",
+      "line": 156,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:269:8",
+      "line": 269,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:270:19",
+      "line": 270,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:280:8",
+      "line": 280,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:281:19",
+      "line": 281,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:314:19",
+      "line": 314,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/engine/event_memory.py",
+      "id": "dharma_swarm/engine/event_memory.py:345:19",
+      "line": 345,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/events.py",
+      "id": "dharma_swarm/engine/events.py:13:11",
+      "line": 13,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 50,
+      "file": "dharma_swarm/engine/events.py",
+      "id": "dharma_swarm/engine/events.py:63:50",
+      "line": 63,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 49,
+      "file": "dharma_swarm/engine/events.py",
+      "id": "dharma_swarm/engine/events.py:99:49",
+      "line": 99,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/hybrid_retriever.py",
+      "id": "dharma_swarm/engine/hybrid_retriever.py:24:11",
+      "line": 24,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/knowledge_store.py",
+      "id": "dharma_swarm/engine/knowledge_store.py:20:11",
+      "line": 20,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 51,
+      "file": "dharma_swarm/engine/knowledge_store.py",
+      "id": "dharma_swarm/engine/knowledge_store.py:64:51",
+      "line": 64,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 18,
+      "file": "dharma_swarm/engine/knowledge_store.py",
+      "id": "dharma_swarm/engine/knowledge_store.py:261:18",
+      "line": 261,
+      "scope": "runtime",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/provenance.py",
+      "id": "dharma_swarm/engine/provenance.py:15:11",
+      "line": 15,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/provenance.py",
+      "id": "dharma_swarm/engine/provenance.py:80:8",
+      "line": 80,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/provenance.py",
+      "id": "dharma_swarm/engine/provenance.py:81:13",
+      "line": 81,
+      "scope": "runtime",
+      "symbol": "*.open"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/engine/provenance.py",
+      "id": "dharma_swarm/engine/provenance.py:102:15",
+      "line": 102,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/provenance.py",
+      "id": "dharma_swarm/engine/provenance.py:105:13",
+      "line": 105,
+      "scope": "runtime",
+      "symbol": "*.open"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:25:11",
+      "line": 25,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:255:8",
+      "line": 255,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:256:13",
+      "line": 256,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:270:13",
+      "line": 270,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 31,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:283:31",
+      "line": 283,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:317:13",
+      "line": 317,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:344:13",
+      "line": 344,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:397:13",
+      "line": 397,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:464:13",
+      "line": 464,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "id": "dharma_swarm/engine/retrieval_feedback.py:514:13",
+      "line": 514,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 18,
+      "file": "dharma_swarm/engine/settings.py",
+      "id": "dharma_swarm/engine/settings.py:20:18",
+      "line": 20,
+      "scope": "runtime",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 26,
+      "file": "dharma_swarm/engine/settings.py",
+      "id": "dharma_swarm/engine/settings.py:24:26",
+      "line": 24,
+      "scope": "runtime",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/engine/settings.py",
+      "id": "dharma_swarm/engine/settings.py:32:23",
+      "line": 32,
+      "scope": "runtime",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 30,
+      "file": "dharma_swarm/engine/settings.py",
+      "id": "dharma_swarm/engine/settings.py:33:30",
+      "line": 33,
+      "scope": "runtime",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:27:11",
+      "line": 27,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:158:8",
+      "line": 158,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:159:13",
+      "line": 159,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:184:19",
+      "line": 184,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 24,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:197:24",
+      "line": 197,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:201:13",
+      "line": 201,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 27,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:213:27",
+      "line": 213,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:227:13",
+      "line": 227,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:259:13",
+      "line": 259,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:288:13",
+      "line": 288,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:320:13",
+      "line": 320,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/engine/unified_index.py",
+      "id": "dharma_swarm/engine/unified_index.py:356:13",
+      "line": 356,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 26,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:14:26",
+      "line": 14,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 4,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:27:4",
+      "line": 27,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:34:19",
+      "line": 34,
+      "scope": "runtime",
+      "symbol": "tempfile.mkstemp"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:38:13",
+      "line": 38,
+      "scope": "runtime",
+      "symbol": "os.fdopen"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:42:12",
+      "line": 42,
+      "scope": "runtime",
+      "symbol": "os.fsync"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:43:8",
+      "line": 43,
+      "scope": "runtime",
+      "symbol": "os.replace"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "id": "dharma_swarm/graph/_persistence_io.py:46:12",
+      "line": 46,
+      "scope": "runtime",
+      "symbol": "os.unlink"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/graph/_persistence_lock.py",
+      "id": "dharma_swarm/graph/_persistence_lock.py:31:8",
+      "line": 31,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/graph/_persistence_lock.py",
+      "id": "dharma_swarm/graph/_persistence_lock.py:32:13",
+      "line": 32,
+      "scope": "runtime",
+      "symbol": "*.open"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "dharma_swarm/graph/_persistence_lock.py",
+      "id": "dharma_swarm/graph/_persistence_lock.py:33:12",
+      "line": 33,
+      "scope": "runtime",
+      "symbol": "fcntl.flock"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 16,
+      "file": "dharma_swarm/graph/_persistence_lock.py",
+      "id": "dharma_swarm/graph/_persistence_lock.py:37:16",
+      "line": 37,
+      "scope": "runtime",
+      "symbol": "fcntl.flock"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 4,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:33:4",
+      "line": 33,
+      "scope": "module",
+      "symbol": "os.getenv"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 49,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:33:49",
+      "line": 33,
+      "scope": "module",
+      "symbol": "Path.home"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:38:11",
+      "line": 38,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:138:8",
+      "line": 138,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:140:23",
+      "line": 140,
+      "scope": "runtime",
+      "symbol": "tempfile.mkstemp"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 17,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:142:17",
+      "line": 142,
+      "scope": "runtime",
+      "symbol": "os.fdopen"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 16,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:146:16",
+      "line": 146,
+      "scope": "runtime",
+      "symbol": "os.fsync"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:147:12",
+      "line": 147,
+      "scope": "runtime",
+      "symbol": "os.replace"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 16,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:150:16",
+      "line": 150,
+      "scope": "runtime",
+      "symbol": "os.unlink"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:176:15",
+      "line": 176,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 26,
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "id": "dharma_swarm/graph/checkpoint.py:179:26",
+      "line": 179,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:187:19",
+      "line": 187,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:223:11",
+      "line": 223,
+      "scope": "runtime",
+      "symbol": "*.expanduser"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 18,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:226:18",
+      "line": 226,
+      "scope": "runtime",
+      "symbol": "*.expanduser"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:338:23",
+      "line": 338,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 15,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:411:15",
+      "line": 411,
+      "scope": "runtime",
+      "symbol": "self._effects.now"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 31,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:492:31",
+      "line": 492,
+      "scope": "runtime",
+      "symbol": "self._effects.now"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 31,
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "id": "dharma_swarm/graph/durable_invoker.py:624:31",
+      "line": 624,
+      "scope": "runtime",
+      "symbol": "self._effects.now"
+    },
+    {
+      "category": "rng",
+      "classification": "mediated",
+      "col": 48,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:57:48",
+      "line": 57,
+      "scope": "module",
+      "symbol": "random.Random"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 15,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:60:15",
+      "line": 60,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "mediated",
+      "col": 20,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:86:20",
+      "line": 86,
+      "scope": "runtime",
+      "symbol": "random.Random"
+    },
+    {
+      "category": "ordering",
+      "classification": "bypass",
+      "col": 31,
+      "file": "dharma_swarm/graph/executor.py",
+      "id": "dharma_swarm/graph/executor.py:162:31",
+      "line": 162,
+      "scope": "runtime",
+      "symbol": "asyncio.wait"
+    },
+    {
+      "category": "ordering",
+      "classification": "bypass",
+      "col": 22,
+      "file": "dharma_swarm/graph/executor.py",
+      "id": "dharma_swarm/graph/executor.py:180:22",
+      "line": 180,
+      "scope": "runtime",
+      "symbol": "asyncio.wait"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 31,
+      "file": "dharma_swarm/graph/executor.py",
+      "id": "dharma_swarm/graph/executor.py:280:31",
+      "line": 280,
+      "scope": "runtime",
+      "symbol": "asyncio.timeout"
+    },
+    {
+      "category": "ordering",
+      "classification": "bypass",
+      "col": 28,
+      "file": "dharma_swarm/graph/executor.py",
+      "id": "dharma_swarm/graph/executor.py:376:28",
+      "line": 376,
+      "scope": "runtime",
+      "symbol": "asyncio.to_thread"
+    },
+    {
+      "category": "ordering",
+      "classification": "mediated",
+      "col": 19,
+      "file": "dharma_swarm/graph/executor.py",
+      "id": "dharma_swarm/graph/executor.py:419:19",
+      "line": 419,
+      "scope": "runtime",
+      "symbol": "self._effects.dispatch_order"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:38:11",
+      "line": 38,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:369:15",
+      "line": 369,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:383:15",
+      "line": 383,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 16,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:384:16",
+      "line": 384,
+      "scope": "runtime",
+      "symbol": "*.unlink"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 20,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:388:20",
+      "line": 388,
+      "scope": "runtime",
+      "symbol": "*.glob"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/graph/persistence.py",
+      "id": "dharma_swarm/graph/persistence.py:455:15",
+      "line": 455,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "rng",
+      "classification": "mediated",
+      "col": 33,
+      "file": "dharma_swarm/graph/scheduler.py",
+      "id": "dharma_swarm/graph/scheduler.py:166:33",
+      "line": 166,
+      "scope": "runtime",
+      "symbol": "active_effects.random().getrandbits"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 3,
+      "file": "dharma_swarm/merkle_log.py",
+      "id": "dharma_swarm/merkle_log.py:22:3",
+      "line": 22,
+      "scope": "module",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/runtime_contract.py",
+      "id": "dharma_swarm/runtime_contract.py:25:11",
+      "line": 25,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 33,
+      "file": "dharma_swarm/runtime_contract.py",
+      "id": "dharma_swarm/runtime_contract.py:67:33",
+      "line": 67,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 33,
+      "file": "dharma_swarm/runtime_contract.py",
+      "id": "dharma_swarm/runtime_contract.py:68:33",
+      "line": 68,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 21,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:30:21",
+      "line": 30,
+      "scope": "module",
+      "symbol": "Path.home"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:318:11",
+      "line": 318,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:338:23",
+      "line": 338,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1222:8",
+      "line": 1222,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1223:13",
+      "line": 1223,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1230:8",
+      "line": 1230,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1231:19",
+      "line": 1231,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1374:19",
+      "line": 1374,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1404:13",
+      "line": 1404,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1412:19",
+      "line": 1412,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1420:19",
+      "line": 1420,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1449:13",
+      "line": 1449,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1463:13",
+      "line": 1463,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1531:19",
+      "line": 1531,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1538:15",
+      "line": 1538,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 44,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1538:44",
+      "line": 1538,
+      "scope": "runtime",
+      "symbol": "*.is_dir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1543:13",
+      "line": 1543,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1547:23",
+      "line": 1547,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 27,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1549:27",
+      "line": 1549,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 36,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1573:36",
+      "line": 1573,
+      "scope": "runtime",
+      "symbol": "Path.home"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1574:15",
+      "line": 1574,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 34,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1580:34",
+      "line": 1580,
+      "scope": "runtime",
+      "symbol": "*.iterdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 52,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1580:52",
+      "line": 1580,
+      "scope": "runtime",
+      "symbol": "*.is_dir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 33,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1581:33",
+      "line": 1581,
+      "scope": "runtime",
+      "symbol": "*.stat"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1589:19",
+      "line": 1589,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 42,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1589:42",
+      "line": 1589,
+      "scope": "runtime",
+      "symbol": "*.is_dir"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1601:19",
+      "line": 1601,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1644:19",
+      "line": 1644,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1686:19",
+      "line": 1686,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1755:19",
+      "line": 1755,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1803:19",
+      "line": 1803,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1843:19",
+      "line": 1843,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1856:19",
+      "line": 1856,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1901:19",
+      "line": 1901,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1919:19",
+      "line": 1919,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:1960:19",
+      "line": 1960,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2014:13",
+      "line": 2014,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2063:13",
+      "line": 2063,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2081:13",
+      "line": 2081,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2103:13",
+      "line": 2103,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2161:13",
+      "line": 2161,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2241:13",
+      "line": 2241,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2267:13",
+      "line": 2267,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2279:19",
+      "line": 2279,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2312:19",
+      "line": 2312,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2344:19",
+      "line": 2344,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2373:19",
+      "line": 2373,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2415:19",
+      "line": 2415,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2463:19",
+      "line": 2463,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2557:19",
+      "line": 2557,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2580:13",
+      "line": 2580,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2591:19",
+      "line": 2591,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2607:13",
+      "line": 2607,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:2625:19",
+      "line": 2625,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3110:19",
+      "line": 3110,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3159:13",
+      "line": 3159,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3189:19",
+      "line": 3189,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3218:13",
+      "line": 3218,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3277:19",
+      "line": 3277,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3297:19",
+      "line": 3297,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3329:13",
+      "line": 3329,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3459:19",
+      "line": 3459,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3527:13",
+      "line": 3527,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3590:19",
+      "line": 3590,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3632:13",
+      "line": 3632,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3690:19",
+      "line": 3690,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3725:19",
+      "line": 3725,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3744:13",
+      "line": 3744,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3766:19",
+      "line": 3766,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3790:19",
+      "line": 3790,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3820:19",
+      "line": 3820,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3866:19",
+      "line": 3866,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3906:19",
+      "line": 3906,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3943:19",
+      "line": 3943,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3964:19",
+      "line": 3964,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:3991:19",
+      "line": 3991,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:4005:13",
+      "line": 4005,
+      "scope": "runtime",
+      "symbol": "sqlite3.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:4041:19",
+      "line": 4041,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:4048:19",
+      "line": 4048,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:4072:19",
+      "line": 4072,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "sqlite",
+      "classification": "bypass",
+      "col": 19,
+      "file": "dharma_swarm/runtime_state.py",
+      "id": "dharma_swarm/runtime_state.py:4105:19",
+      "line": 4105,
+      "scope": "runtime",
+      "symbol": "aiosqlite.connect"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 23,
+      "file": "dharma_swarm/spine/identity.py",
+      "id": "dharma_swarm/spine/identity.py:21:23",
+      "line": 21,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 35,
+      "file": "dharma_swarm/spine/identity.py",
+      "id": "dharma_swarm/spine/identity.py:209:35",
+      "line": 209,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 45,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:45:45",
+      "line": 45,
+      "scope": "module",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 57,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:66:57",
+      "line": 66,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 4,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:156:4",
+      "line": 156,
+      "scope": "module",
+      "symbol": "Path.home"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:163:8",
+      "line": 163,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 39,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:185:39",
+      "line": 185,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 9,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:291:9",
+      "line": 291,
+      "scope": "runtime",
+      "symbol": "*.open"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:292:8",
+      "line": 292,
+      "scope": "runtime",
+      "symbol": "fcntl.flock"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:296:12",
+      "line": 296,
+      "scope": "runtime",
+      "symbol": "fcntl.flock"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 4,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:315:4",
+      "line": 315,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:318:11",
+      "line": 318,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "dharma_swarm/spine/receipt.py",
+      "id": "dharma_swarm/spine/receipt.py:323:13",
+      "line": 323,
+      "scope": "runtime",
+      "symbol": "*.open"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 46,
+      "file": "dharma_swarm/spine/routing.py",
+      "id": "dharma_swarm/spine/routing.py:24:46",
+      "line": 24,
+      "scope": "module",
+      "symbol": "uuid.uuid4"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 57,
+      "file": "dharma_swarm/spine/routing.py",
+      "id": "dharma_swarm/spine/routing.py:34:57",
+      "line": 34,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "id": "dharma_swarm/tiny_router_shadow.py:471:11",
+      "line": 471,
+      "scope": "runtime",
+      "symbol": "os.environ"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 11,
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "id": "dharma_swarm/tiny_router_shadow.py:513:11",
+      "line": 513,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 45,
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "id": "dharma_swarm/tiny_router_shadow.py:513:45",
+      "line": 513,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 30,
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "id": "dharma_swarm/tiny_router_shadow.py:515:30",
+      "line": 515,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 33,
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "id": "dharma_swarm/tiny_router_shadow.py:516:33",
+      "line": 516,
+      "scope": "runtime",
+      "symbol": "*.read_text"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 9,
+      "file": "packages/telos-kernel/telos_kernel/_io/manifest_loader.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/manifest_loader.py:34:9",
+      "line": 34,
+      "scope": "runtime",
+      "symbol": "open"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 20,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:36:20",
+      "line": 36,
+      "scope": "runtime",
+      "symbol": "*.expanduser"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:37:8",
+      "line": 37,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 15,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:41:15",
+      "line": 41,
+      "scope": "runtime",
+      "symbol": "*.exists"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 17,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:44:17",
+      "line": 44,
+      "scope": "runtime",
+      "symbol": "open"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:82:13",
+      "line": 82,
+      "scope": "runtime",
+      "symbol": "tempfile.NamedTemporaryFile"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 12,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:89:12",
+      "line": 89,
+      "scope": "runtime",
+      "symbol": "os.fsync"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py:91:8",
+      "line": 91,
+      "scope": "runtime",
+      "symbol": "os.replace"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 21,
+      "file": "packages/telos-kernel/telos_kernel/_io/notary_fs.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/notary_fs.py:38:21",
+      "line": 38,
+      "scope": "runtime",
+      "symbol": "*.expanduser"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 8,
+      "file": "packages/telos-kernel/telos_kernel/_io/notary_fs.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/notary_fs.py:39:8",
+      "line": 39,
+      "scope": "runtime",
+      "symbol": "*.mkdir"
+    },
+    {
+      "category": "env",
+      "classification": "bypass",
+      "col": 25,
+      "file": "packages/telos-kernel/telos_kernel/_io/notary_fs.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/notary_fs.py:40:25",
+      "line": 40,
+      "scope": "runtime",
+      "symbol": "*.expanduser"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "packages/telos-kernel/telos_kernel/_io/notary_fs.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/notary_fs.py:62:13",
+      "line": 62,
+      "scope": "runtime",
+      "symbol": "open"
+    },
+    {
+      "category": "filesystem",
+      "classification": "bypass",
+      "col": 13,
+      "file": "packages/telos-kernel/telos_kernel/_io/sbom.py",
+      "id": "packages/telos-kernel/telos_kernel/_io/sbom.py:35:13",
+      "line": 35,
+      "scope": "runtime",
+      "symbol": "open"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 11,
+      "file": "packages/telos-kernel/telos_kernel/capabilities.py",
+      "id": "packages/telos-kernel/telos_kernel/capabilities.py:213:11",
+      "line": 213,
+      "scope": "runtime",
+      "symbol": "secrets.token_bytes"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 8,
+      "file": "packages/telos-kernel/telos_kernel/notary.py",
+      "id": "packages/telos-kernel/telos_kernel/notary.py:48:8",
+      "line": 48,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "time",
+      "classification": "bypass",
+      "col": 8,
+      "file": "packages/telos-kernel/telos_kernel/receipt.py",
+      "id": "packages/telos-kernel/telos_kernel/receipt.py:245:8",
+      "line": 245,
+      "scope": "runtime",
+      "symbol": "datetime.now"
+    },
+    {
+      "category": "rng",
+      "classification": "bypass",
+      "col": 15,
+      "file": "packages/telos-kernel/telos_kernel/receipt.py",
+      "id": "packages/telos-kernel/telos_kernel/receipt.py:259:15",
+      "line": 259,
+      "scope": "runtime",
+      "symbol": "uuid.uuid4"
+    }
+  ],
+  "generator": "tests/antithesis_support/seam_ledger.py",
+  "modules": [
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "importlib",
+        "typing"
+      ],
+      "file": "dharma_swarm/__init__.py",
+      "module": "dharma_swarm"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "contextlib",
+        "contextvars",
+        "dataclasses",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/correlation_context.py",
+      "module": "dharma_swarm.correlation_context"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [],
+      "file": "dharma_swarm/engine/__init__.py",
+      "module": "dharma_swarm.engine"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [],
+      "file": "dharma_swarm/engine/adapters/__init__.py",
+      "module": "dharma_swarm.engine.adapters"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "abc",
+        "dataclasses",
+        "enum",
+        "typing"
+      ],
+      "file": "dharma_swarm/engine/adapters/base.py",
+      "module": "dharma_swarm.engine.adapters.base"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "pathlib",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/artifacts.py",
+      "module": "dharma_swarm.engine.artifacts"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "re",
+        "typing"
+      ],
+      "file": "dharma_swarm/engine/chunker.py",
+      "module": "dharma_swarm.engine.chunker"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "sqlite3"
+      ],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "json",
+        "pathlib",
+        "re",
+        "sqlite3",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/conversation_memory.py",
+      "module": "dharma_swarm.engine.conversation_memory"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "aiosqlite"
+      ],
+      "external_imports": [
+        "__future__",
+        "aiosqlite",
+        "datetime",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "file": "dharma_swarm/engine/event_memory.py",
+      "module": "dharma_swarm.engine.event_memory"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/events.py",
+      "module": "dharma_swarm.engine.events"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "typing"
+      ],
+      "file": "dharma_swarm/engine/hybrid_retriever.py",
+      "module": "dharma_swarm.engine.hybrid_retriever"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "math",
+        "os",
+        "qdrant_client",
+        "re",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/knowledge_store.py",
+      "module": "dharma_swarm.engine.knowledge_store"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "file": "dharma_swarm/engine/provenance.py",
+      "module": "dharma_swarm.engine.provenance"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses"
+      ],
+      "file": "dharma_swarm/engine/provider_runner.py",
+      "module": "dharma_swarm.engine.provider_runner"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "sqlite3"
+      ],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "json",
+        "pathlib",
+        "re",
+        "sqlite3",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/retrieval_feedback.py",
+      "module": "dharma_swarm.engine.retrieval_feedback"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "os"
+      ],
+      "file": "dharma_swarm/engine/settings.py",
+      "module": "dharma_swarm.engine.settings"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "sqlite3"
+      ],
+      "external_imports": [
+        "__future__",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "sqlite3",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/engine/unified_index.py",
+      "module": "dharma_swarm.engine.unified_index"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__"
+      ],
+      "file": "dharma_swarm/graph/__init__.py",
+      "module": "dharma_swarm.graph"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [
+        "tempfile"
+      ],
+      "external_imports": [
+        "__future__",
+        "base64",
+        "json",
+        "os",
+        "pathlib",
+        "tempfile",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/_persistence_io.py",
+      "module": "dharma_swarm.graph._persistence_io"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [
+        "fcntl"
+      ],
+      "external_imports": [
+        "__future__",
+        "collections",
+        "contextlib",
+        "fcntl",
+        "pathlib",
+        "threading"
+      ],
+      "file": "dharma_swarm/graph/_persistence_lock.py",
+      "module": "dharma_swarm.graph._persistence_lock"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/_persistence_state.py",
+      "module": "dharma_swarm.graph._persistence_state"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "abc",
+        "copy",
+        "dataclasses",
+        "json",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/channels.py",
+      "module": "dharma_swarm.graph.channels"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [
+        "tempfile"
+      ],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "json",
+        "logging",
+        "os",
+        "pathlib",
+        "tempfile",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/checkpoint.py",
+      "module": "dharma_swarm.graph.checkpoint"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/compiler.py",
+      "module": "dharma_swarm.graph.compiler"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [
+        "aiosqlite",
+        "sqlite3"
+      ],
+      "external_imports": [
+        "__future__",
+        "aiosqlite",
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "json",
+        "logging",
+        "pathlib",
+        "sqlite3",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/graph/durable_invoker.py",
+      "module": "dharma_swarm.graph.durable_invoker"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "random",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/effects.py",
+      "module": "dharma_swarm.graph.effects"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/errors.py",
+      "module": "dharma_swarm.graph.errors"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "asyncio",
+        "collections",
+        "copy",
+        "dataclasses",
+        "inspect",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/executor.py",
+      "module": "dharma_swarm.graph.executor"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "contextvars",
+        "dataclasses",
+        "hashlib",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/interrupts.py",
+      "module": "dharma_swarm.graph.interrupts"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/persistence.py",
+      "module": "dharma_swarm.graph.persistence"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/persistence_adapter.py",
+      "module": "dharma_swarm.graph.persistence_adapter"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/persistence_runtime.py",
+      "module": "dharma_swarm.graph.persistence_runtime"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "file": "dharma_swarm/graph/receipt_chain.py",
+      "module": "dharma_swarm.graph.receipt_chain"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "dataclasses",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/routing.py",
+      "module": "dharma_swarm.graph.routing"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/scheduler.py",
+      "module": "dharma_swarm.graph.scheduler"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "contextvars",
+        "dataclasses",
+        "inspect",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/schema.py",
+      "module": "dharma_swarm.graph.schema"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "hashlib",
+        "json",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/state.py",
+      "module": "dharma_swarm.graph.state"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/subgraph.py",
+      "module": "dharma_swarm.graph.subgraph"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/telos_bridge.py",
+      "module": "dharma_swarm.graph.telos_bridge"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "dataclasses",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/types.py",
+      "module": "dharma_swarm.graph.types"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "pathlib",
+        "sys",
+        "typing"
+      ],
+      "file": "dharma_swarm/merkle_log.py",
+      "module": "dharma_swarm.merkle_log"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "hashlib",
+        "json",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/runtime_contract.py",
+      "module": "dharma_swarm.runtime_contract"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "aiosqlite",
+        "sqlite3"
+      ],
+      "external_imports": [
+        "__future__",
+        "aiosqlite",
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re",
+        "sqlite3",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/runtime_state.py",
+      "module": "dharma_swarm.runtime_state"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [],
+      "file": "dharma_swarm/spine/__init__.py",
+      "module": "dharma_swarm.spine"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "typing"
+      ],
+      "file": "dharma_swarm/spine/adapters.py",
+      "module": "dharma_swarm.spine.adapters"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/spine/identity.py",
+      "module": "dharma_swarm.spine.identity"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "typing"
+      ],
+      "file": "dharma_swarm/spine/invoke.py",
+      "module": "dharma_swarm.spine.invoke"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "json",
+        "logging",
+        "typing"
+      ],
+      "file": "dharma_swarm/spine/persistence.py",
+      "module": "dharma_swarm.spine.persistence"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "fcntl"
+      ],
+      "external_imports": [
+        "__future__",
+        "contextlib",
+        "dataclasses",
+        "datetime",
+        "fcntl",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/spine/receipt.py",
+      "module": "dharma_swarm.spine.receipt"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/spine/routing.py",
+      "module": "dharma_swarm.spine.routing"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "re",
+        "typing"
+      ],
+      "file": "dharma_swarm/spine/warrant.py",
+      "module": "dharma_swarm.spine.warrant"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "functools",
+        "huggingface_hub",
+        "json",
+        "math",
+        "os",
+        "pathlib",
+        "sys",
+        "torch",
+        "transformers",
+        "typing"
+      ],
+      "file": "dharma_swarm/tiny_router_shadow.py",
+      "module": "dharma_swarm.tiny_router_shadow"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/__init__.py",
+      "module": "telos_kernel"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/_io/__init__.py",
+      "module": "telos_kernel._io"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "pathlib",
+        "typing",
+        "yaml"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/_io/manifest_loader.py",
+      "module": "telos_kernel._io.manifest_loader"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "tempfile"
+      ],
+      "external_imports": [
+        "__future__",
+        "json",
+        "os",
+        "pathlib",
+        "tempfile",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/_io/merkle_file_backend.py",
+      "module": "telos_kernel._io.merkle_file_backend"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [
+        "subprocess"
+      ],
+      "external_imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "subprocess"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/_io/notary_fs.py",
+      "module": "telos_kernel._io.notary_fs"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "hashlib",
+        "pathlib",
+        "sys"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/_io/sbom.py",
+      "module": "telos_kernel._io.sbom"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "json",
+        "math",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/canonical.py",
+      "module": "telos_kernel.canonical"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "hmac",
+        "icontract",
+        "secrets",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/capabilities.py",
+      "module": "telos_kernel.capabilities"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "icontract",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/checker.py",
+      "module": "telos_kernel.checker"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "enum",
+        "functools",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/effects.py",
+      "module": "telos_kernel.effects"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "cryptography",
+        "enum",
+        "hashlib",
+        "icontract",
+        "pydantic",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/manifest.py",
+      "module": "telos_kernel.manifest"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "abc",
+        "hashlib",
+        "icontract",
+        "math",
+        "pathlib",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/merkle_log.py",
+      "module": "telos_kernel.merkle_log"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "abc",
+        "dataclasses",
+        "datetime"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/notary.py",
+      "module": "telos_kernel.notary"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "cryptography",
+        "datetime",
+        "enum",
+        "pydantic",
+        "typing",
+        "uuid"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/receipt.py",
+      "module": "telos_kernel.receipt"
+    },
+    {
+      "custody": "outside_track",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ],
+      "file": "packages/telos-kernel/telos_kernel/result.py",
+      "module": "telos_kernel.result"
+    }
+  ],
+  "schema_version": 2,
+  "spec": "docs/prompts/DHARMAGRAPH_ANTITHESIS_V0_GOAL_2026-07-18.md",
+  "summary": {
+    "bypass_by_category": {
+      "env": 17,
+      "filesystem": 73,
+      "ordering": 3,
+      "rng": 22,
+      "sqlite": 98,
+      "time": 19
+    },
+    "bypass_total": 232,
+    "effect_site_count": 240,
+    "mediated_total": 8,
+    "module_count": 67
+  },
+  "workload": {
+    "description": "Bounded graph run: GraphBuilder.compile() topology invoked via CompiledGraph.invoke() with SimulatedEffects, a GraphPersistenceKernel (checkpointing on), and a DurableInvoker-wrapped dispatch (derive_graph_side_effect_key). Crosses scheduling (executor superstep barrier), persistence (journal + checkpoint + idempotency store), and channel boundaries.",
+    "reach_model": "static runtime-import closure restricted to first-party namespaces (dharma_swarm + repo-local distributions); function-local imports included; TYPE_CHECKING-guarded imports excluded; external packages recorded but not scanned; import aliases resolved before matching",
+    "roots": [
+      "dharma_swarm.graph"
+    ]
+  }
+}

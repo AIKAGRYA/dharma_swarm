@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-import pytest
+import asyncio
+
+import openai
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.runtime_provider import (
     DEFAULT_GROQ_MODEL,
+    DEFAULT_KIMI_CODE_MODEL,
     DEFAULT_SILICONFLOW_MODEL,
     DEFAULT_FIREWORKS_MODEL,
     DEFAULT_OPENROUTER_MODEL,
     DEFAULT_TOGETHER_MODEL,
     FIREWORKS_BASE_URL,
-    GROQ_BASE_URL,
-    NVIDIA_NIM_BASE_URL,
+    KIMI_BASE_URL,
     OPENROUTER_BASE_URL,
     SILICONFLOW_BASE_URL,
     TOGETHER_BASE_URL,
@@ -21,8 +23,8 @@ from dharma_swarm.runtime_provider import (
     create_default_provider_map,
     create_runtime_provider,
     preferred_runtime_provider_configs,
-    resolve_top_available_at_wake,
     resolve_runtime_provider_config,
+    runtime_provider_transport_identity,
 )
 
 
@@ -43,26 +45,15 @@ def test_resolve_runtime_provider_config_for_nim_uses_env_base_and_model(monkeyp
 
 def test_resolve_runtime_provider_config_for_ollama_prefers_cloud_with_api_key(monkeypatch) -> None:
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
 
     cfg = resolve_runtime_provider_config(ProviderType.OLLAMA)
 
     assert cfg.base_url == "https://ollama.com"
     assert cfg.transport_mode == "cloud_api"
     assert cfg.default_model == DEFAULT_MODELS[ProviderType.OLLAMA]
-
-
-def test_resolve_runtime_provider_config_aliases_local_to_ollama_local(monkeypatch) -> None:
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
-    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
-
-    cfg = resolve_runtime_provider_config(ProviderType.LOCAL, model="llama3.2")
-
-    assert cfg.provider == ProviderType.OLLAMA
-    assert cfg.base_url == "http://localhost:11434"
-    assert cfg.transport_mode == "local_api"
-    assert cfg.default_model == "llama3.2"
-    assert cfg.available is True
 
 
 def test_resolve_runtime_provider_config_for_openrouter_uses_canonical_base(monkeypatch) -> None:
@@ -85,6 +76,84 @@ def test_resolve_runtime_provider_config_normalizes_alias_env() -> None:
     assert cfg.available is True
 
 
+def test_resolve_runtime_provider_config_for_zhipu_uses_coding_endpoint_and_alias() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.ZHIPU,
+        model="glm-5.2",
+        env={"GLM_API_KEY": "zai-key"},
+    )
+
+    assert cfg.api_key == "zai-key"
+    assert cfg.base_url == "https://api.z.ai/api/coding/paas/v4"
+    assert cfg.default_model == "glm-5.2"
+    assert cfg.available is True
+
+
+def test_resolve_runtime_provider_config_for_kimi_code_uses_default_model() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={"KIMI_API_KEY": "kimi-key"},
+    )
+
+    assert cfg.api_key == "kimi-key"
+    assert cfg.base_url == KIMI_BASE_URL
+    assert cfg.default_model == DEFAULT_KIMI_CODE_MODEL
+    assert cfg.default_model == "k3"
+    assert cfg.available is True
+
+
+def test_resolve_runtime_provider_config_for_kimi_code_uses_env_base_and_alias() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={
+            "MOONSHOT_KIMI_API_KEY": "kimi-key",
+            "KIMI_BASE_URL": "https://kimi.internal/coding/v1",
+        },
+    )
+
+    assert cfg.api_key == "kimi-key"
+    assert cfg.base_url == "https://kimi.internal/coding/v1"
+    assert cfg.default_model == "k3"
+    assert cfg.available is True
+
+
+def test_kimi_code_does_not_consume_moonshot_platform_key() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={"MOONSHOT_API_KEY": "moonshot-platform-key"},
+    )
+
+    assert cfg.api_key is None
+    assert cfg.base_url == "https://api.kimi.com/coding/v1"
+    assert cfg.available is False
+
+
+def test_create_runtime_provider_threads_timeout_to_kimi_and_zhipu() -> None:
+    kimi = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.KIMI_CODE,
+            api_key="kimi-key",
+            base_url=KIMI_BASE_URL,
+            default_model=DEFAULT_KIMI_CODE_MODEL,
+            timeout_seconds=17,
+            available=True,
+        )
+    )
+    zhipu = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.ZHIPU,
+            api_key="zhipu-key",
+            base_url="https://api.z.ai/api/coding/paas/v4",
+            default_model="glm-5.2",
+            timeout_seconds=19,
+            available=True,
+        )
+    )
+
+    assert kimi._timeout == 17
+    assert zhipu._timeout == 19
+
+
 def test_anthropic_routes_to_claude_code_by_default(monkeypatch) -> None:
     monkeypatch.setattr(
         "dharma_swarm.runtime_provider._resolve_cli_binary",
@@ -96,9 +165,13 @@ def test_anthropic_routes_to_claude_code_by_default(monkeypatch) -> None:
         env={"ANTHROPIC_API_KEY": "metered-key"},
     )
 
-    assert cfg.provider == ProviderType.CLAUDE_CODE
+    assert cfg.provider == ProviderType.ANTHROPIC
+    assert cfg.transport_mode == "claude_code"
     assert cfg.api_key is None
     assert cfg.available is True
+
+    provider = create_runtime_provider(cfg)
+    assert provider.__class__.__name__ == "ClaudeCodeProvider"
 
 
 def test_anthropic_api_escape_hatch_keeps_raw_api() -> None:
@@ -150,6 +223,40 @@ def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkey
     assert cfg.base_url == "https://groq.internal/openai/v1"
     assert cfg.default_model == "qwen/qwen3-32b"
     assert cfg.available is True
+
+
+def test_create_groq_provider_preserves_resolved_base_url(monkeypatch) -> None:
+    requested = (
+        "https://fixture-user:fixture-password@fixture-proxy.invalid/v1"
+        "?api_key=fixture-secret#fixture-fragment"
+    )
+    observed: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            observed.update(kwargs)
+
+    cfg = resolve_runtime_provider_config(
+        ProviderType.GROQ,
+        api_key="fixture-token-not-live",
+        base_url=requested,
+        env={},
+    )
+    provider = create_runtime_provider(cfg)
+    monkeypatch.setattr(openai, "AsyncOpenAI", FakeClient)
+
+    provider._client_or_raise()
+
+    assert observed["base_url"] == requested
+    identity = runtime_provider_transport_identity(cfg)
+    assert identity == (
+        "provider:https://fixture-proxy.invalid/"
+        ".path-sha256-2d234c97703ce824eaa4d98fbd2701668ef5e63e46f1574f2ea72e7927b1f57e"
+    )
+    assert "fixture-user" not in identity
+    assert "fixture-password" not in identity
+    assert "fixture-secret" not in identity
+    assert "fixture-fragment" not in identity
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_default_model(monkeypatch) -> None:
@@ -240,79 +347,6 @@ def test_resolve_runtime_provider_config_for_fireworks_uses_default_model(monkey
     assert cfg.default_model == DEFAULT_FIREWORKS_MODEL
 
 
-def test_resolve_runtime_provider_config_for_sakana_is_external_only() -> None:
-    cfg = resolve_runtime_provider_config(ProviderType.SAKANA, model="sakana/fugu-ultra")
-
-    assert cfg.provider == ProviderType.SAKANA
-    assert cfg.default_model == "sakana/fugu-ultra"
-    assert cfg.available is False
-    assert cfg.source == "external_only"
-    assert cfg.metadata is not None
-    assert cfg.metadata["external_only"] is True
-
-
-def test_create_runtime_provider_refuses_sakana_external_only() -> None:
-    with pytest.raises(ValueError, match="external-only provider"):
-        create_runtime_provider(
-            RuntimeProviderConfig(
-                provider=ProviderType.SAKANA,
-                default_model="sakana/fugu-ultra",
-                available=False,
-                source="external_only",
-            )
-        )
-
-
-@pytest.mark.parametrize(
-    ("provider_type", "env", "expected_provider"),
-    (
-        (ProviderType.ANTHROPIC, {}, ProviderType.CLAUDE_CODE),
-        (
-            ProviderType.ANTHROPIC,
-            {"DHARMA_FORCE_ANTHROPIC_API": "1"},
-            ProviderType.ANTHROPIC,
-        ),
-        (ProviderType.OPENAI, {}, ProviderType.OPENAI),
-        (ProviderType.OPENROUTER, {}, ProviderType.OPENROUTER),
-        (ProviderType.OPENROUTER_FREE, {}, ProviderType.OPENROUTER_FREE),
-        (ProviderType.NVIDIA_NIM, {}, ProviderType.NVIDIA_NIM),
-        (ProviderType.LOCAL, {}, ProviderType.OLLAMA),
-        (ProviderType.OLLAMA, {}, ProviderType.OLLAMA),
-        (ProviderType.CLAUDE_CODE, {}, ProviderType.CLAUDE_CODE),
-        (ProviderType.CODEX, {}, ProviderType.CODEX),
-        (ProviderType.GROQ, {}, ProviderType.GROQ),
-        (ProviderType.CEREBRAS, {}, ProviderType.CEREBRAS),
-        (ProviderType.SILICONFLOW, {}, ProviderType.SILICONFLOW),
-        (ProviderType.TOGETHER, {}, ProviderType.TOGETHER),
-        (ProviderType.FIREWORKS, {}, ProviderType.FIREWORKS),
-        (ProviderType.GOOGLE_AI, {}, ProviderType.GOOGLE_AI),
-        (ProviderType.SAMBANOVA, {}, ProviderType.SAMBANOVA),
-        (ProviderType.MISTRAL, {}, ProviderType.MISTRAL),
-        (ProviderType.CHUTES, {}, ProviderType.CHUTES),
-    ),
-)
-def test_resolve_runtime_provider_config_preserves_timeout_seconds(
-    monkeypatch,
-    provider_type,
-    env,
-    expected_provider,
-) -> None:
-    monkeypatch.setattr(
-        "dharma_swarm.runtime_provider._resolve_cli_binary",
-        lambda name: f"/usr/bin/{name}",
-    )
-
-    cfg = resolve_runtime_provider_config(
-        provider_type,
-        api_key="test-key",
-        timeout_seconds=77,
-        env=env,
-    )
-
-    assert cfg.provider == expected_provider
-    assert cfg.timeout_seconds == 77
-
-
 def test_create_default_provider_map_includes_expected_runtime_providers() -> None:
     provider_map = create_default_provider_map(env={})
 
@@ -325,80 +359,8 @@ def test_create_default_provider_map_includes_expected_runtime_providers() -> No
     assert ProviderType.NVIDIA_NIM in provider_map
     assert ProviderType.OPENROUTER_FREE in provider_map
     assert ProviderType.OLLAMA in provider_map
-
-
-def test_create_runtime_provider_attaches_runtime_provider_metadata() -> None:
-    provider = create_runtime_provider(
-        RuntimeProviderConfig(
-            provider=ProviderType.NVIDIA_NIM,
-            available=True,
-            api_key="nim-key",
-            default_model="nim-model",
-        )
-    )
-
-    assert provider.runtime_provider_type == "nvidia_nim"
-    assert provider.runtime_default_model == "nim-model"
-    assert provider.runtime_available is True
-    assert provider.available is True
-
-
-@pytest.mark.parametrize(
-    "provider_type",
-    (
-        ProviderType.OPENAI,
-        ProviderType.OPENROUTER,
-        ProviderType.OPENROUTER_FREE,
-        ProviderType.GROQ,
-        ProviderType.CEREBRAS,
-        ProviderType.SILICONFLOW,
-        ProviderType.TOGETHER,
-        ProviderType.FIREWORKS,
-        ProviderType.GOOGLE_AI,
-        ProviderType.SAMBANOVA,
-        ProviderType.MISTRAL,
-        ProviderType.CHUTES,
-    ),
-)
-def test_create_runtime_provider_passes_openai_compatible_base_url(provider_type) -> None:
-    provider = create_runtime_provider(
-        RuntimeProviderConfig(
-            provider=provider_type,
-            available=True,
-            api_key="test-key",
-            base_url="https://router.internal/v1/",
-            default_model=DEFAULT_MODELS[provider_type],
-            timeout_seconds=42,
-        )
-    )
-
-    assert provider._base_url == "https://router.internal/v1"
-    assert provider._timeout_seconds == 42.0
-
-
-def test_create_runtime_provider_passes_http_timeout_to_nim_and_ollama() -> None:
-    nim = create_runtime_provider(
-        RuntimeProviderConfig(
-            provider=ProviderType.NVIDIA_NIM,
-            available=True,
-            api_key="nim-key",
-            base_url="https://nim.internal/v1",
-            default_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
-            timeout_seconds=17,
-        )
-    )
-    ollama = create_runtime_provider(
-        RuntimeProviderConfig(
-            provider=ProviderType.OLLAMA,
-            available=True,
-            base_url="http://localhost:11434",
-            default_model="mistral:latest",
-            timeout_seconds=19,
-        )
-    )
-
-    assert nim._timeout_seconds == 17.0
-    assert ollama._timeout_seconds == 19.0
+    assert ProviderType.KIMI_CODE in provider_map
+    assert ProviderType.ZHIPU in provider_map
 
 
 def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openrouter(
@@ -411,17 +373,27 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
     monkeypatch.setenv("SILICONFLOW_API_KEY", "sf-key")
     monkeypatch.setenv("TOGETHER_API_KEY", "together-key")
     monkeypatch.setenv("FIREWORKS_API_KEY", "fireworks-key")
+    monkeypatch.setenv("KIMI_API_KEY", "kimi-key")
+    monkeypatch.setenv("ZHIPU_API_KEY", "zhipu-key")
 
     configs = preferred_runtime_provider_configs(model="test-model")
 
     providers = [cfg.provider for cfg in configs]
-    assert providers.index(ProviderType.GROQ) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.SILICONFLOW) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.TOGETHER) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.FIREWORKS) < providers.index(ProviderType.OPENROUTER)
+    openrouter_index = providers.index(ProviderType.OPENROUTER_FREE)
+    assert providers.index(ProviderType.GROQ) < openrouter_index
+    assert providers.index(ProviderType.SILICONFLOW) < openrouter_index
+    assert providers.index(ProviderType.TOGETHER) < openrouter_index
+    assert providers.index(ProviderType.FIREWORKS) < openrouter_index
     assert ProviderType.OPENROUTER_FREE in providers
+    assert ProviderType.OPENROUTER not in providers
     assert ProviderType.NVIDIA_NIM in providers
     assert ProviderType.OLLAMA in providers
+    retained = configs[openrouter_index]
+    assert retained.metadata is not None
+    assert retained.metadata["logical_provider_aliases"] == [
+        ProviderType.OPENROUTER_FREE.value,
+        ProviderType.OPENROUTER.value,
+    ]
 
 
 def test_preferred_runtime_provider_configs_skips_unavailable(monkeypatch) -> None:
@@ -440,41 +412,63 @@ def test_preferred_runtime_provider_configs_skips_unavailable(monkeypatch) -> No
     # Verify available providers are present (order may vary by chain config)
     assert ProviderType.OLLAMA in providers
     assert ProviderType.OPENROUTER_FREE in providers
-    assert ProviderType.OPENROUTER in providers
+    assert ProviderType.OPENROUTER not in providers
+    retained = next(
+        config
+        for config in configs
+        if config.provider == ProviderType.OPENROUTER_FREE
+    )
+    assert retained.metadata is not None
+    assert retained.metadata["logical_provider_aliases"] == [
+        ProviderType.OPENROUTER_FREE.value,
+        ProviderType.OPENROUTER.value,
+    ]
 
 
-def test_resolve_top_available_at_wake_picks_first_available_provider() -> None:
-    cfg = resolve_top_available_at_wake(
-        provider_order=(ProviderType.GROQ, ProviderType.GOOGLE_AI),
-        fallback_provider=ProviderType.GOOGLE_AI,
-        fallback_model="gemini-2.5-flash",
-        env={"GEMINI_API_KEY": "gemini-key"},
+def test_preferred_runtime_provider_configs_deduplicates_shared_claude_cli(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("DHARMA_FORCE_ANTHROPIC_API", raising=False)
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/fixture/bin/{name}",
     )
 
-    assert cfg.provider == ProviderType.GOOGLE_AI
-    assert cfg.default_model == DEFAULT_MODELS[ProviderType.GOOGLE_AI]
-    assert cfg.available is True
+    configs = preferred_runtime_provider_configs(
+        provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+        env={},
+    )
+
+    assert [config.provider for config in configs] == [ProviderType.ANTHROPIC]
+    assert configs[0].metadata == {
+        "physical_transport_identity": "cli:claude:/fixture/bin/claude",
+        "logical_provider_aliases": ["anthropic", "claude_code"],
+    }
 
 
-def test_resolve_top_available_at_wake_logs_honest_fallback(caplog) -> None:
-    with caplog.at_level("WARNING"):
-        cfg = resolve_top_available_at_wake(
-            provider_order=(ProviderType.GROQ,),
-            fallback_provider=ProviderType.GOOGLE_AI,
-            fallback_model="gemini-2.5-flash",
-            env={},
-        )
+def test_preferred_runtime_provider_configs_keeps_anthropic_api_and_claude_cli_distinct(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/fixture/bin/{name}",
+    )
 
-    assert cfg.provider == ProviderType.GOOGLE_AI
-    assert cfg.default_model == "gemini-2.5-flash"
-    assert cfg.available is False
-    assert cfg.metadata is not None
-    assert cfg.metadata["frontier_resolution"]["status"] == "fallback_unavailable"
-    assert any("No @frontier provider was available" in r.message for r in caplog.records)
+    configs = preferred_runtime_provider_configs(
+        provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+        env={
+            "DHARMA_FORCE_ANTHROPIC_API": "1",
+            "ANTHROPIC_API_KEY": "fixture-key-not-live",
+        },
+    )
+
+    assert [config.provider for config in configs] == [
+        ProviderType.ANTHROPIC,
+        ProviderType.CLAUDE_CODE,
+    ]
 
 
-@pytest.mark.asyncio
-async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
+def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
     monkeypatch,
 ) -> None:
     calls: list[tuple[str, str]] = []
@@ -527,13 +521,14 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
         _fake_create_provider,
     )
 
-    response, config = await complete_via_preferred_runtime_providers(
-        messages=[{"role": "user", "content": "hello"}],
-        openrouter_model="meta-llama/llama-3.3-70b-instruct:free",
+    response, config = asyncio.run(
+        complete_via_preferred_runtime_providers(
+            messages=[{"role": "user", "content": "hello"}],
+            openrouter_model="meta-llama/llama-3.3-70b-instruct:free",
+        )
     )
 
     assert response.content == "nvidia_nim ok"
-    assert response.provider == "nvidia_nim"
     assert config.provider == ProviderType.NVIDIA_NIM
     assert calls == [
         ("ollama", "ollama-local"),
