@@ -10,6 +10,7 @@ from typing import Any
 import aiosqlite
 
 from dharma_swarm.engine.knowledge_store import _jaccard, _tokenize
+from dharma_swarm.redaction import PII_RISK_HIGH, scan_json_values_for_write, stable_hash
 from dharma_swarm.runtime_contract import RuntimeEnvelope, validate_envelope
 
 DEFAULT_MEMORY_PLANE_DB = Path.home() / ".dharma" / "db" / "memory_plane.db"
@@ -277,6 +278,26 @@ class EventMemoryStore:
         if not ok:
             return False
 
+        # Checksum is validated on the raw envelope above; the persisted
+        # payload may then be redacted, so a stored `_redaction` marker means
+        # the row's checksum documents the producer's original payload.
+        scan = scan_json_values_for_write(data["payload"])
+        if scan.quarantined:
+            persisted_payload: dict[str, Any] = {
+                "_redaction": {
+                    "quarantined": True,
+                    "context_admissible": False,
+                    "payload_sha256": stable_hash(data["payload"]),
+                }
+            }
+        else:
+            persisted_payload = dict(scan.value)
+            if scan.sensitive_count:
+                persisted_payload["_redaction"] = {
+                    "pii_risk": PII_RISK_HIGH,
+                    "sensitive_count": scan.sensitive_count,
+                }
+
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         async with aiosqlite.connect(self.db_path) as db:
             await ensure_memory_plane_schema_async(db)
@@ -293,7 +314,7 @@ class EventMemoryStore:
                         str(data["source"]),
                         str(data["agent_id"]),
                         str(data["emitted_at"]),
-                        json.dumps(data["payload"], sort_keys=True, ensure_ascii=True),
+                        json.dumps(persisted_payload, sort_keys=True, ensure_ascii=True),
                         str(data["checksum"]),
                         _utc_now_iso(),
                     ),

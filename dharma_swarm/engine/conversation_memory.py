@@ -16,6 +16,7 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_sync,
 )
 from dharma_swarm.engine.knowledge_store import _jaccard, _tokenize
+from dharma_swarm.redaction import PII_RISK_HIGH, scan_text_for_write
 from dharma_swarm.tiny_router_shadow import TinyRouterShadowInput, infer_tiny_router_shadow
 
 
@@ -194,8 +195,16 @@ class ConversationMemoryStore:
         harvest: bool = True,
     ) -> str:
         turn_id = f"turn_{uuid4().hex}"
+        scan = scan_text_for_write(content)
+        content = scan.text
         flow_score = _detect_flow_score(content)
         payload = dict(metadata or {})
+        if scan.quarantined:
+            payload["context_admissible"] = False
+            payload["redaction_scan"] = "error"
+        elif scan.sensitive_count:
+            payload["pii_risk"] = PII_RISK_HIGH
+            payload["redaction_findings"] = scan.sensitive_count
         payload["flow_score"] = flow_score
         created_at = _utc_now_iso()
 
@@ -226,7 +235,7 @@ class ConversationMemoryStore:
             )
             db.commit()
 
-        if harvest:
+        if harvest and not scan.quarantined:
             self.harvest_turn(turn_id)
         return turn_id
 
@@ -290,6 +299,8 @@ class ConversationMemoryStore:
         turn = self.get_turn(turn_id)
         if turn is None:
             return []
+        if turn.metadata.get("context_admissible") is False:
+            return []
 
         candidates = _split_candidates(turn.content)
         threshold = _turn_threshold(turn.metadata.get("flow_score", _detect_flow_score(turn.content)))
@@ -299,6 +310,14 @@ class ConversationMemoryStore:
         with sqlite3.connect(str(self.db_path)) as db:
             ensure_memory_plane_schema_sync(db)
             for candidate in candidates:
+                # Turns recorded via record_turn are already scanned; harvest
+                # can also run over turns written by other producers, so the
+                # scan repeats here. Scan errors skip the candidate — the turn
+                # row is the quarantined record; a shard must never carry raw.
+                scan = scan_text_for_write(candidate)
+                if scan.quarantined:
+                    continue
+                candidate = scan.text
                 flow_score = float(turn.metadata.get("flow_score", _detect_flow_score(turn.content)))
                 salience = _salience_score(candidate, flow_score)
                 novelty = _novelty_score(candidate, prior_texts)
@@ -312,6 +331,8 @@ class ConversationMemoryStore:
                     "flow_state": turn.flow_state,
                     "candidate_index": len(harvested),
                 }
+                if scan.sensitive_count:
+                    metadata["pii_risk"] = PII_RISK_HIGH
                 for key in (
                     "relation_to_previous",
                     "actionability",

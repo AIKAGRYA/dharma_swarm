@@ -21,6 +21,7 @@ from dharma_swarm.engine.knowledge_store import (
     _metadata_match,
     _tokenize,
 )
+from dharma_swarm.redaction import PII_RISK_HIGH, scan_text_for_write
 
 
 def _utc_now_iso() -> str:
@@ -379,11 +380,17 @@ class UnifiedIndex:
             )
 
             for idx, chunk in enumerate(chunks):
+                scan = scan_text_for_write(chunk.text)
                 chunk_metadata = {
                     **chunk.metadata,
                     "chunk_index": idx,
                 }
-                chunk_hash = _sha256(f"{chunk.text}\n{_canonical_json(chunk_metadata)}")
+                if scan.quarantined:
+                    chunk_metadata["context_admissible"] = False
+                    chunk_metadata["redaction_scan"] = "error"
+                elif scan.sensitive_count:
+                    chunk_metadata["pii_risk"] = PII_RISK_HIGH
+                chunk_hash = _sha256(f"{scan.text}\n{_canonical_json(chunk_metadata)}")
                 chunk_id = _sha256(f"{doc_id}:{idx}:{chunk_hash}")[:16]
                 db.execute(
                     "INSERT OR REPLACE INTO source_chunks"
@@ -393,7 +400,7 @@ class UnifiedIndex:
                         chunk_id,
                         doc_id,
                         idx,
-                        chunk.text,
+                        scan.text,
                         _canonical_json(chunk_metadata),
                         chunk_hash,
                     ),
