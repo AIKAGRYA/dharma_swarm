@@ -36,15 +36,6 @@ from dharma_swarm.memory_kernel_retrieval.types import (
 )
 from dharma_swarm.vector_store import VectorStore
 
-# Shadow-scoring threshold used until an operator-set calibrated value lands.
-# From the 2026-07-25 scripts/memory_retrieval_calibrate_abstention.py run over
-# 31,591 live telemetry rows (27 days): 0.37 newly abstains 25/31,380 served
-# queries (0.08%, within the 0.1% loss budget) while zero served queries ever
-# scored below 0.25; nonsense queries score ~0.0-0.21. Receipt:
-# ~/.dharma/witness/audit_impl_20260725/abstention_calibration_20260725T145824Z.json
-# NOT a serving-path threshold while RetrievalAbstentionConfig.enabled is False.
-_DEFAULT_CALIBRATED_MIN_SCORE = 0.37
-
 # Curated memory layers considered for the default retrieval scope. Currently
 # unreferenced within this module (kept for the public retrieval-layer
 # vocabulary this door documents); left in place rather than moved so a
@@ -106,8 +97,11 @@ class GovernedRetrievalEngine(_SearchMixin):
             timings["vector_search"] = _elapsed_ms(vec_t0)
 
         min_score = query.min_score
-        if self.abstention.enabled and self.abstention.min_score is not None:
-            min_score = self.abstention.min_score
+        if self.abstention.enabled:
+            # Fail-closed: max() so an enabled config can only tighten the
+            # per-query floor, and effective_min_score() resolves a missing
+            # threshold to the calibrated default, never to query.min_score.
+            min_score = max(min_score, self.abstention.effective_min_score())
 
         fuse_t0 = time.perf_counter()
         candidates = self._fuse_candidates(
@@ -156,11 +150,7 @@ class GovernedRetrievalEngine(_SearchMixin):
         with floors removed, so it is an upper bound on served quality.
         """
 
-        shadow_min = (
-            self.abstention.min_score
-            if self.abstention.min_score is not None
-            else _DEFAULT_CALIBRATED_MIN_SCORE
-        )
+        shadow_min = self.abstention.effective_min_score()
         if not result.candidates:
             return 1, shadow_min
         return int(float(result.candidates[0].score) < shadow_min), shadow_min

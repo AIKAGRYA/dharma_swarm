@@ -15,6 +15,16 @@ from typing import Any
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
+# Calibrated threshold used whenever an enabled config carries no explicit
+# min_score (and as the shadow-scoring threshold while enabled=False). From
+# the 2026-07-25 scripts/memory_retrieval_calibrate_abstention.py run over
+# 31,593 live telemetry rows (27 days, 31,380 served-scored): 0.37 newly
+# abstains 25/31,380 served queries (0.08%, within the 0.1% loss budget)
+# while zero served queries ever scored below 0.25; nonsense queries score
+# ~0.0-0.21. Receipt:
+# ~/.dharma/witness/audit_impl_20260725/abstention_calibration_20260725T145824Z.json
+DEFAULT_CALIBRATED_MIN_SCORE = 0.37
+
 
 @dataclass(frozen=True)
 class RetrievalAbstentionConfig:
@@ -28,7 +38,13 @@ class RetrievalAbstentionConfig:
     on 100% of live queries), so an un-shadowed flip would silently zero
     recall fleet-wide.
 
-    ``min_score`` doubles as the shadow-scoring threshold while
+    Fail-closed: an enabled config never serves at the permissive per-query
+    floor. ``calibrated()`` resolves a missing/invalid ``min_score`` to
+    ``DEFAULT_CALIBRATED_MIN_SCORE`` — the measured threshold the shadow
+    telemetry was scored at — so the env flip cannot silently deploy an
+    unmeasured configuration.
+
+    ``effective_min_score()`` doubles as the shadow-scoring threshold while
     ``enabled=False``: every telemetry row records whether the calibrated
     config *would* have abstained, without changing what is served.
     """
@@ -38,13 +54,18 @@ class RetrievalAbstentionConfig:
     apply_score_floors: bool = True
     min_score: float | None = None
 
+    def effective_min_score(self) -> float:
+        if self.min_score is not None:
+            return self.min_score
+        return DEFAULT_CALIBRATED_MIN_SCORE
+
     @classmethod
     def calibrated(cls, min_score: float | None = None) -> "RetrievalAbstentionConfig":
         return cls(
             enabled=True,
             include_below_threshold=False,
             apply_score_floors=False,
-            min_score=min_score,
+            min_score=min_score if min_score is not None else DEFAULT_CALIBRATED_MIN_SCORE,
         )
 
     @classmethod
@@ -59,6 +80,9 @@ class RetrievalAbstentionConfig:
             try:
                 min_score = float(raw)
             except ValueError:
+                # Fail-closed: a typo'd threshold must not enable the config
+                # at the permissive per-query floor; calibrated() resolves
+                # None to the measured default instead.
                 min_score = None
         if enabled:
             return cls.calibrated(min_score=min_score)

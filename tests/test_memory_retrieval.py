@@ -532,12 +532,73 @@ def test_abstention_config_from_env(monkeypatch):
     assert RetrievalAbstentionConfig.from_env() == RetrievalAbstentionConfig()
 
     monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "1")
-    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0.37")
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0.42")
     config = RetrievalAbstentionConfig.from_env()
     assert config.enabled is True
     assert config.include_below_threshold is False
     assert config.apply_score_floors is False
-    assert config.min_score == 0.37
+    assert config.min_score == 0.42
 
-    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "not-a-float")
-    assert RetrievalAbstentionConfig.from_env().min_score is None
+
+def test_abstention_config_from_env_fails_closed_to_calibrated_default(monkeypatch):
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "1")
+
+    # Enabled without an explicit threshold must serve at the measured
+    # calibrated default, never fall through to the permissive query floor.
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", raising=False)
+    assert RetrievalAbstentionConfig.from_env().min_score == 0.37
+
+    # A typo'd threshold must not silently deploy an unmeasured config.
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0,37")
+    assert RetrievalAbstentionConfig.from_env().min_score == 0.37
+
+    # Directly-constructed enabled configs without a threshold resolve the
+    # same way at the serving/shadow seam.
+    bare = RetrievalAbstentionConfig(enabled=True, min_score=None)
+    assert bare.effective_min_score() == 0.37
+
+    # Disabled + malformed stays legacy; shadow scoring uses the default.
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", raising=False)
+    disabled = RetrievalAbstentionConfig.from_env()
+    assert disabled.min_score is None
+    assert disabled.effective_min_score() == 0.37
+
+
+def test_calibrated_config_serves_results_on_normal_path(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert result.abstained is False
+    assert result.abstained_reason == ""
+    assert result.candidates
+    assert result.candidates[0].metadata["expected"] == "a2a"
+    assert result.candidates[0].score >= 0.37
+
+
+def test_calibrated_config_serves_results_when_fts_guard_blocked(tmp_path, monkeypatch):
+    # The floors-off arms (_bounded_row_distance real-score branch and the
+    # 0.0 default-score branch) must still SERVE on the guard-blocked path —
+    # the live serving path — not just abstain on nonsense.
+    store = _seed_vector_store(tmp_path)
+    monkeypatch.setenv("DHARMA_VECTOR_FTS_MAX_ROWS", "1")
+    monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+    monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert "fts_guard_blocked" in result.diagnostics.degraded_reasons
+    assert result.abstained is False
+    assert result.candidates
+    assert result.candidates[0].metadata["expected"] == "a2a"
+    assert result.candidates[0].score >= 0.37
