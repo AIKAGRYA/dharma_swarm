@@ -661,3 +661,62 @@ class TestDedupeDigest:
         rows = self._doc_rows(tmp_path, "s1")
         assert len(rows) == 2
         assert all(valid_until is None for _, valid_until in rows)
+
+    def test_dedupe_creates_partial_index(self, tmp_path):
+        import sqlite3
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        store.upsert("content", source="s1", dedupe_digest="digest-a")
+        conn = sqlite3.connect(tmp_path / "vectors.db")
+        try:
+            row = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='index' "
+                "AND name='idx_vec_documents_source_active'"
+            ).fetchone()
+        finally:
+            conn.close()
+        assert row is not None
+        assert "valid_until IS NULL" in row[0]
+
+    def test_guard_failure_fails_closed(self, tmp_path, monkeypatch):
+        import sqlite3
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+
+        def _boom(*_args, **_kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(store, "_active_row_for_digest", _boom)
+        doc_id, status = store.upsert_with_status(
+            "content", source="s1", dedupe_digest="digest-a"
+        )
+        assert (doc_id, status) == (-1, "guard_error")
+        assert store.dedupe_guard_errors == 1
+        assert self._doc_rows(tmp_path, "s1") == []
+
+    def test_upsert_with_status_statuses(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1, s1 = store.upsert_with_status(
+            "content", source="s1", dedupe_digest="digest-a"
+        )
+        assert s1 == "inserted" and id1 > 0
+        id2, s2 = store.upsert_with_status(
+            "content", source="s1", dedupe_digest="digest-a"
+        )
+        assert (id2, s2) == (id1, "unchanged")
+        id3, s3 = store.upsert_with_status(
+            "   ", source="s1", dedupe_digest="digest-a"
+        )
+        assert (id3, s3) == (-1, "rejected")
+
+    def test_distinct_sources_do_not_expire_each_other(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("doc one", source="research:a/x.md", dedupe_digest="da")
+        id2 = store.upsert("doc two", source="research:b/x.md", dedupe_digest="db")
+        assert id1 > 0 and id2 > 0
+        rows_a = self._doc_rows(tmp_path, "research:a/x.md")
+        rows_b = self._doc_rows(tmp_path, "research:b/x.md")
+        assert [vu for _, vu in rows_a] == [None]
+        assert [vu for _, vu in rows_b] == [None]

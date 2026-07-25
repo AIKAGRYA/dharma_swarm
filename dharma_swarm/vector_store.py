@@ -239,6 +239,8 @@ class VectorStore:
         self._dim = dim
         self._memory_embedder: TFIDFEmbedder | None = None
         self._memory_embedder_mtime: float | None = None
+        self._dedupe_index_ok = False
+        self.dedupe_guard_errors = 0
 
         # Embedder — TFIDFEmbedder by default, swappable
         if embedder is not None:
@@ -406,17 +408,59 @@ class VectorStore:
         Default None keeps the historical INSERT-only behavior for all
         existing callers.
         """
+        doc_id, _status = self.upsert_with_status(
+            content,
+            source=source,
+            layer=layer,
+            metadata=metadata,
+            event_time=event_time,
+            dedupe_digest=dedupe_digest,
+        )
+        return doc_id
+
+    def upsert_with_status(
+        self,
+        content: str,
+        source: str = "",
+        layer: str = "working",
+        metadata: dict[str, Any] | None = None,
+        event_time: datetime | None = None,
+        dedupe_digest: str | None = None,
+    ) -> tuple[int, str]:
+        """Like :meth:`upsert`, but also returns what actually happened.
+
+        Status is one of:
+          - ``"inserted"``     — a new row was written
+          - ``"unchanged"``    — dedupe short-circuit; existing active row id returned
+          - ``"guard_error"``  — dedupe guard could not run; insert skipped (fail-closed)
+          - ``"rejected"``     — empty content
+          - ``"error"``        — insert failed
+        """
         if not content or not content.strip():
-            return -1
+            return -1, "rejected"
         conn = self._connect()
         try:
             now_iso = _utc_now_iso()
             event_iso = event_time.isoformat() if event_time else now_iso
             if dedupe_digest:
-                existing = self._active_row_for_digest(conn, source, dedupe_digest)
-                if existing is not None:
-                    return existing
-                self._expire_active_source_rows(conn, source, dedupe_digest, now_iso)
+                # Fail-closed: if the guard cannot run (index uncreatable,
+                # json1 missing, DB locked) we must NOT fall back to blind
+                # INSERT — that silently restores the unbounded-growth
+                # behavior this guard exists to stop.
+                try:
+                    self._ensure_dedupe_index(conn)
+                    existing = self._active_row_for_digest(conn, source, dedupe_digest)
+                    if existing is not None:
+                        return existing, "unchanged"
+                    self._expire_active_source_rows(conn, source, dedupe_digest, now_iso)
+                except Exception as exc:
+                    self.dedupe_guard_errors += 1
+                    logger.warning(
+                        "VectorStore dedupe guard failed for source=%s "
+                        "(guard_errors=%d); skipping insert fail-closed: %s",
+                        source, self.dedupe_guard_errors, exc,
+                    )
+                    return -1, "guard_error"
                 metadata = {**(metadata or {}), "source_digest": dedupe_digest}
             meta_json = json.dumps(metadata or {})
 
@@ -451,12 +495,40 @@ class VectorStore:
                 logger.debug("VectorStore: embedding storage failed (non-fatal): %s", vec_exc)
 
             conn.commit()
-            return doc_id or -1
+            if doc_id:
+                return doc_id, "inserted"
+            return -1, "error"
         except Exception as exc:
             logger.debug("VectorStore.upsert failed: %s", exc)
-            return -1
+            return -1, "error"
         finally:
             conn.close()
+
+    def _ensure_dedupe_index(self, conn: sqlite3.Connection) -> None:
+        """Partial index over active rows — required by the dedupe guard.
+
+        Without it, _active_row_for_digest/_expire_active_source_rows are
+        full-table scans (measured ~250s per query on the live 61GB
+        vectors.db). The one-time build on a large existing DB takes minutes
+        and holds the write lock; pre-build offline where that matters:
+        sqlite3 vectors.db "CREATE INDEX IF NOT EXISTS
+        idx_vec_documents_source_active ON vec_documents(source)
+        WHERE valid_until IS NULL". Errors propagate to the fail-closed
+        guard handler in upsert_with_status.
+        """
+        if self._dedupe_index_ok:
+            return
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+            ("idx_vec_documents_source_active",),
+        ).fetchone()
+        if row is None:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_vec_documents_source_active "
+                "ON vec_documents(source) WHERE valid_until IS NULL"
+            )
+            conn.commit()
+        self._dedupe_index_ok = True
 
     def _active_row_for_digest(
         self,
@@ -464,22 +536,20 @@ class VectorStore:
         source: str,
         digest: str,
     ) -> int | None:
-        try:
-            row = conn.execute(
-                """
-                SELECT id FROM vec_documents
-                WHERE source = ?
-                  AND valid_until IS NULL
-                  AND json_valid(metadata_json)
-                  AND json_extract(metadata_json, '$.source_digest') = ?
-                ORDER BY id DESC LIMIT 1
-                """,
-                (source, digest),
-            ).fetchone()
-            return int(row[0]) if row else None
-        except Exception as exc:
-            logger.debug("VectorStore digest lookup failed: %s", exc)
-            return None
+        # No try/except: guard errors must surface so upsert_with_status can
+        # fail closed instead of silently inserting.
+        row = conn.execute(
+            """
+            SELECT id FROM vec_documents
+            WHERE source = ?
+              AND valid_until IS NULL
+              AND json_valid(metadata_json)
+              AND json_extract(metadata_json, '$.source_digest') = ?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (source, digest),
+        ).fetchone()
+        return int(row[0]) if row else None
 
     def _expire_active_source_rows(
         self,
@@ -488,29 +558,29 @@ class VectorStore:
         replacement_digest: str,
         now_iso: str,
     ) -> int:
-        """Expire prior active rows for the same source before a replacing insert."""
-        try:
-            patch = json.dumps({
-                "invalidated_at": now_iso,
-                "invalidated_reason": "source_digest_replaced",
-                "replacement_source_digest": replacement_digest,
-            }, sort_keys=True)
-            cursor = conn.execute(
-                """
-                UPDATE vec_documents
-                SET valid_until = ?,
-                    metadata_json = json_patch(
-                        CASE WHEN json_valid(metadata_json) THEN metadata_json ELSE '{}' END,
-                        ?
-                    )
-                WHERE source = ? AND valid_until IS NULL
-                """,
-                (now_iso, patch, source),
-            )
-            return max(0, int(cursor.rowcount or 0))
-        except Exception as exc:
-            logger.debug("VectorStore source-row expiry failed: %s", exc)
-            return 0
+        """Expire prior active rows for the same source before a replacing insert.
+
+        No try/except: guard errors must surface so upsert_with_status can
+        fail closed instead of inserting alongside still-active stale rows.
+        """
+        patch = json.dumps({
+            "invalidated_at": now_iso,
+            "invalidated_reason": "source_digest_replaced",
+            "replacement_source_digest": replacement_digest,
+        }, sort_keys=True)
+        cursor = conn.execute(
+            """
+            UPDATE vec_documents
+            SET valid_until = ?,
+                metadata_json = json_patch(
+                    CASE WHEN json_valid(metadata_json) THEN metadata_json ELSE '{}' END,
+                    ?
+                )
+            WHERE source = ? AND valid_until IS NULL
+            """,
+            (now_iso, patch, source),
+        )
+        return max(0, int(cursor.rowcount or 0))
 
     def invalidate(self, doc_id: int, reason: str = "") -> bool:
         """Soft-delete: set valid_until = now. Does NOT remove the record."""

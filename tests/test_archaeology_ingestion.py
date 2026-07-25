@@ -235,8 +235,11 @@ class _FakePalace:
         self._state_dir = state_dir
 
     async def ingest(self, content, source, *, layer="working", tags=None,
-                     metadata=None, event_time=None, dedupe_digest=None):
+                     metadata=None, event_time=None, dedupe_digest=None,
+                     dedupe_info=None):
         _FakePalace.ingest_calls.append(source)
+        if dedupe_info is not None:
+            dedupe_info["vec_status"] = "inserted"
         return f"doc{len(_FakePalace.ingest_calls)}"
 
     async def recall(self, query):
@@ -388,3 +391,150 @@ class TestIngestIntoPalaceLedger:
         assert doc_id is None
         assert ledger.inserted == 0
         assert ledger.state == {}
+
+
+class _UnchangedVecPalace(_FakePalace):
+    """Vec store already holds every doc — the state-file-lost recovery path."""
+
+    async def ingest(self, content, source, *, layer="working", tags=None,
+                     metadata=None, event_time=None, dedupe_digest=None,
+                     dedupe_info=None):
+        _FakePalace.ingest_calls.append(source)
+        if dedupe_info is not None:
+            dedupe_info["vec_status"] = "unchanged"
+        return "vec:1"
+
+
+class _GuardErrorPalace(_FakePalace):
+    """Vec store dedupe guard failing — nothing lands."""
+
+    async def ingest(self, content, source, *, layer="working", tags=None,
+                     metadata=None, event_time=None, dedupe_digest=None,
+                     dedupe_info=None):
+        _FakePalace.ingest_calls.append(source)
+        if dedupe_info is not None:
+            dedupe_info["vec_status"] = "guard_error"
+        return ""
+
+
+class TestVecStatusBudgeting:
+    @pytest.mark.asyncio
+    async def test_unchanged_rows_rebuild_state_without_budget(
+        self, tmp_path, fake_palace, monkeypatch,
+    ):
+        monkeypatch.setattr(
+            "dharma_swarm.memory_palace.MemoryPalace", _UnchangedVecPalace
+        )
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "2")
+        _write_archive(tmp_path, 5)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        # No new rows: nothing ingested, budget untouched, cursor rebuilt in full
+        assert counts["evolution_archive"] == 0
+        assert counts["skipped_unchanged"] == 5
+        assert counts["skipped_budget"] == 0
+        state = json.loads(
+            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
+        )
+        assert len(state) == 5
+
+        calls_after_first = len(fake_palace.ingest_calls)
+        counts2 = await daemon.run_once()
+        assert counts2["evolution_archive"] == 0
+        # Second cycle short-circuits on the rebuilt state file
+        assert len(fake_palace.ingest_calls) == calls_after_first
+
+    @pytest.mark.asyncio
+    async def test_guard_error_not_recorded_and_retried(
+        self, tmp_path, fake_palace, monkeypatch,
+    ):
+        monkeypatch.setattr(
+            "dharma_swarm.memory_palace.MemoryPalace", _GuardErrorPalace
+        )
+        _write_archive(tmp_path, 3)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["evolution_archive"] == 0
+        assert counts["skipped_error"] == 3
+        state = json.loads(
+            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
+        )
+        assert state == {}
+
+        counts2 = await daemon.run_once()
+        assert counts2["skipped_error"] == 3  # retried, not swallowed
+
+
+class TestStatePersistence:
+    def test_incremental_flush(self, tmp_path):
+        path = tmp_path / "state.json"
+        ledger = IngestCycleLedger(state_path=path, flush_every=2)
+        ledger.record("a", "1")
+        assert not path.exists()
+        ledger.record("b", "2")
+        assert json.loads(path.read_text()) == {"a": "1", "b": "2"}
+
+    def test_write_state_atomic_no_tmp_left(self, tmp_path):
+        from dharma_swarm.archaeology_ingestion import _write_ingest_state
+        path = tmp_path / "meta" / "state.json"
+        _write_ingest_state(path, {"a": "1"})
+        assert json.loads(path.read_text()) == {"a": "1"}
+        assert not (tmp_path / "meta" / "state.json.tmp").exists()
+
+    @pytest.mark.asyncio
+    async def test_state_survives_cancellation(self, tmp_path, fake_palace, monkeypatch):
+        import asyncio
+
+        _write_archive(tmp_path, 3)
+
+        async def _cancelled(*_args, **_kwargs):
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(
+            "dharma_swarm.archaeology_ingestion.ingest_shared_research", _cancelled
+        )
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        with pytest.raises(asyncio.CancelledError):
+            await daemon.run_once()
+        state = json.loads(
+            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
+        )
+        assert len(state) == 3
+
+
+class TestSourceKeyUniqueness:
+    @pytest.mark.asyncio
+    async def test_research_keys_path_unique(self, tmp_path, fake_palace):
+        (tmp_path / "shared" / "a").mkdir(parents=True)
+        (tmp_path / "shared" / "b").mkdir(parents=True)
+        (tmp_path / "shared" / "a" / "x.md").write_text("alpha content")
+        (tmp_path / "shared" / "b" / "x.md").write_text("beta content")
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["shared_research"] == 2
+        sources = [s for s in fake_palace.ingest_calls if s.startswith("research:")]
+        assert sorted(sources) == [
+            "research:shared/a/x.md",
+            "research:shared/b/x.md",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_idless_stigmergy_marks_distinct_keys(self, tmp_path, fake_palace):
+        stig = tmp_path / "stigmergy"
+        stig.mkdir()
+        marks = [
+            {"channel": "gnani", "salience": 0.95, "observation": "first insight"},
+            {"channel": "gnani", "salience": 0.95, "observation": "second insight"},
+        ]
+        (stig / "marks.jsonl").write_text(
+            "\n".join(json.dumps(m) for m in marks)
+        )
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["stigmergy_marks"] == 2
+        keys = [s for s in fake_palace.ingest_calls if s.startswith("stigmergy:")]
+        assert len(set(keys)) == 2
+
+        counts2 = await daemon.run_once()
+        assert counts2["stigmergy_marks"] == 0
+        assert counts2["skipped_unchanged"] >= 2

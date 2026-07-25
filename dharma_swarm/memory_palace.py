@@ -416,12 +416,16 @@ class MemoryPalace:
         metadata: dict[str, Any] | None = None,
         event_time: datetime | None = None,
         dedupe_digest: str | None = None,
+        dedupe_info: dict[str, Any] | None = None,
     ) -> str:
         """Ingest new content into the Memory Palace.
 
         Phase 6: also upserts into VectorStore with bi-temporal metadata.
         ``dedupe_digest`` is forwarded to VectorStore.upsert for digest
-        short-circuiting (None = legacy INSERT-only behavior).
+        short-circuiting (None = legacy INSERT-only behavior). When a
+        ``dedupe_info`` dict is passed, ``dedupe_info["vec_status"]`` reports
+        what the vector store actually did (inserted/unchanged/guard_error/
+        error) so callers can budget real inserts, not no-ops.
         Returns the document ID.
         """
         doc_id = ""
@@ -483,19 +487,32 @@ class MemoryPalace:
                 meta = dict(metadata or {})
                 if tags:
                     meta["tags"] = tags
-                vec_id = self._vector_store.upsert(
-                    content=content,
-                    source=source,
-                    layer=layer,
-                    metadata=meta,
-                    event_time=event_time,
-                    dedupe_digest=dedupe_digest,
-                )
+                if dedupe_info is not None and hasattr(self._vector_store, "upsert_with_status"):
+                    vec_id, vec_status = self._vector_store.upsert_with_status(
+                        content=content,
+                        source=source,
+                        layer=layer,
+                        metadata=meta,
+                        event_time=event_time,
+                        dedupe_digest=dedupe_digest,
+                    )
+                    dedupe_info["vec_status"] = vec_status
+                else:
+                    vec_id = self._vector_store.upsert(
+                        content=content,
+                        source=source,
+                        layer=layer,
+                        metadata=meta,
+                        event_time=event_time,
+                        dedupe_digest=dedupe_digest,
+                    )
                 # Use vec_id as doc_id only in persistent mode when lattice gave nothing
                 if not doc_id and vec_id > 0 and _has_persistent_store:
                     doc_id = f"vec:{vec_id}"
             except Exception as exc:
                 logger.debug("VectorStore upsert failed (non-fatal): %s", exc)
+                if dedupe_info is not None:
+                    dedupe_info["vec_status"] = "error"
 
         # Phase 4: Also upsert into LanceDB for persistent cross-session memory.
         if self._lance is not None and content and content.strip():

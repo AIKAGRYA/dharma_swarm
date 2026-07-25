@@ -99,6 +99,11 @@ class IngestCycleLedger:
     ``state`` maps source uid → sha256(content) — the resumable state-file
     pattern from scripts/vector_store_backfill_memory_sources.py. Unchanged
     documents are skipped; the budget caps total inserts per cycle.
+
+    With a ``state_path``, the ledger flushes the state file every
+    ``flush_every`` mutations. run_once is cancelled at 120s by
+    orchestrate_live's asyncio.wait_for — without incremental flushes a
+    partial cycle would lose all progress and re-scan forever.
     """
 
     state: dict[str, str] = field(default_factory=dict)
@@ -106,6 +111,10 @@ class IngestCycleLedger:
     inserted: int = 0
     skipped_unchanged: int = 0
     skipped_budget: int = 0
+    skipped_error: int = 0
+    state_path: Path | None = None
+    flush_every: int = 25
+    _dirty: int = field(default=0, repr=False)
 
     def unchanged(self, source: str, digest: str) -> bool:
         return self.state.get(source) == digest
@@ -116,6 +125,33 @@ class IngestCycleLedger:
     def record(self, source: str, digest: str) -> None:
         self.state[source] = digest
         self.inserted += 1
+        self._flush_maybe()
+
+    def note(self, source: str, digest: str) -> None:
+        """State-only update — the store already holds this content.
+
+        Rebuilds the resume cursor (e.g. after state-file loss) without
+        consuming insert budget or counting as an ingest.
+        """
+        self.state[source] = digest
+        self._flush_maybe()
+
+    def _flush_maybe(self) -> None:
+        self._dirty += 1
+        if self.state_path is not None and self._dirty >= max(1, self.flush_every):
+            self.flush()
+
+    def flush(self) -> None:
+        if self.state_path is None:
+            return
+        try:
+            _write_ingest_state(self.state_path, self.state)
+            self._dirty = 0
+        except OSError as exc:
+            logger.warning(
+                "Failed to persist archaeology ingest state %s: %s",
+                self.state_path, exc,
+            )
 
 
 def _sha256(text: str) -> str:
@@ -139,8 +175,13 @@ def _read_ingest_state(path: Path) -> dict[str, str]:
 
 
 def _write_ingest_state(path: Path, state: dict[str, str]) -> None:
+    # Atomic tmp+replace: this runs every cycle in a daemon; a crash
+    # mid-write must not corrupt the cursor (which would force a full,
+    # slow re-scan next cycle).
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 @dataclass
@@ -192,6 +233,8 @@ async def _ingest_into_palace(
         if ledger.exhausted():
             ledger.skipped_budget += 1
             return None
+    dedupe_info: dict[str, Any] = {}
+    extra: dict[str, Any] = {"dedupe_info": dedupe_info} if ledger is not None else {}
     try:
         doc_id = await palace.ingest(
             content=content,
@@ -200,13 +243,28 @@ async def _ingest_into_palace(
             tags=tags,
             metadata=metadata,
             dedupe_digest=digest or None,
+            **extra,
         )
-        if doc_id and ledger is not None:
-            ledger.record(source, digest)
-        return doc_id
     except Exception as exc:
         logger.debug("Palace ingest failed for %s: %s", source, exc)
         return None
+    if ledger is None:
+        return doc_id
+    vec_status = dedupe_info.get("vec_status")
+    if vec_status == "unchanged":
+        # Vec row already present (state file lost/rebuilding): restore the
+        # cursor without consuming budget or reporting a new ingest.
+        ledger.note(source, digest)
+        ledger.skipped_unchanged += 1
+        return None
+    if vec_status in ("guard_error", "error"):
+        # Nothing landed in the vector store; leave the cursor untouched so
+        # the document is retried next cycle.
+        ledger.skipped_error += 1
+        return None
+    if doc_id:
+        ledger.record(source, digest)
+    return doc_id
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +388,14 @@ async def ingest_shared_research(
                 if not content.strip():
                     continue
 
-                source_key = f"research:{f.name}"
+                # Path-unique key: shared/ + artifacts/ carry duplicate
+                # filenames in different directories; a filename-only key
+                # makes distinct documents expire each other's rows.
+                try:
+                    rel_key = f.relative_to(state_dir).as_posix()
+                except ValueError:
+                    rel_key = f.name
+                source_key = f"research:{rel_key}"
                 doc_id = await _ingest_into_palace(
                     palace,
                     content=_truncate(content, 3000),
@@ -401,7 +466,12 @@ async def ingest_stigmergy_marks(
                 f"Observation: {observation}\n"
             )
 
-            source_key = f"stigmergy:{mark_id or channel}"
+            # Id-less marks: content-hash suffix so distinct marks in one
+            # channel don't collapse to a single key and expire each other.
+            source_key = (
+                f"stigmergy:{mark_id}" if mark_id
+                else f"stigmergy:{channel}:{_sha256(doc)[:16]}"
+            )
             doc_id = await _ingest_into_palace(
                 palace,
                 content=doc,
@@ -471,7 +541,13 @@ async def ingest_task_completions(
                     f"Result: {result_summary}\n"
                 )
 
-                source_key = f"task_completion:{task.get('id', title[:40])}"
+                task_id = task.get("id", "")
+                # Title fallback gets a content-hash suffix: distinct tasks
+                # sharing a title must not expire each other's rows.
+                source_key = (
+                    f"task_completion:{task_id}" if task_id
+                    else f"task_completion:{title[:40]}:{_sha256(doc)[:16]}"
+                )
                 doc_id = await _ingest_into_palace(
                     palace,
                     content=doc,
@@ -709,19 +785,22 @@ class ArchaeologyIngestionDaemon:
         ledger = IngestCycleLedger(
             state=_read_ingest_state(state_path),
             budget=_cycle_insert_budget(),
+            state_path=state_path,
         )
 
         counts: dict[str, int] = {}
 
-        counts["evolution_archive"] = await ingest_evolution_archive(palace, self._state_dir, ledger=ledger)
-        counts["shared_research"] = await ingest_shared_research(palace, self._state_dir, ledger=ledger)
-        counts["stigmergy_marks"] = await ingest_stigmergy_marks(palace, self._state_dir, ledger=ledger)
-        counts["task_completions"] = await ingest_task_completions(palace, self._state_dir, ledger=ledger)
-
         try:
-            _write_ingest_state(state_path, ledger.state)
-        except OSError as exc:
-            logger.warning("Failed to persist archaeology ingest state %s: %s", state_path, exc)
+            counts["evolution_archive"] = await ingest_evolution_archive(palace, self._state_dir, ledger=ledger)
+            counts["shared_research"] = await ingest_shared_research(palace, self._state_dir, ledger=ledger)
+            counts["stigmergy_marks"] = await ingest_stigmergy_marks(palace, self._state_dir, ledger=ledger)
+            counts["task_completions"] = await ingest_task_completions(palace, self._state_dir, ledger=ledger)
+        finally:
+            # orchestrate_live cancels run_once at 120s (asyncio.wait_for);
+            # the cursor must survive partial cycles or every cycle restarts
+            # from scratch. The write is synchronous, so it completes even
+            # during CancelledError unwinding.
+            ledger.flush()
 
         # Synthesize compressed lessons
         await synthesize_lessons_learned(palace, self._state_dir)
@@ -729,11 +808,13 @@ class ArchaeologyIngestionDaemon:
         total = sum(counts.values())
         logger.info(
             "Archaeology ingestion complete: %d documents total | %s | "
-            "skipped_unchanged=%d skipped_budget=%d budget=%s",
-            total, counts, ledger.skipped_unchanged, ledger.skipped_budget, ledger.budget,
+            "skipped_unchanged=%d skipped_budget=%d skipped_error=%d budget=%s",
+            total, counts, ledger.skipped_unchanged, ledger.skipped_budget,
+            ledger.skipped_error, ledger.budget,
         )
         counts["skipped_unchanged"] = ledger.skipped_unchanged
         counts["skipped_budget"] = ledger.skipped_budget
+        counts["skipped_error"] = ledger.skipped_error
         return counts
 
     async def run_forever(self) -> None:
