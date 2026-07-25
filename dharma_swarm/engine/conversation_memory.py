@@ -16,6 +16,13 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_sync,
 )
 from dharma_swarm.engine.knowledge_store import _jaccard, _tokenize
+from dharma_swarm.memory_quarantine import (
+    MODE_ENFORCE,
+    MODE_SHADOW,
+    is_shard_quarantined,
+    quarantine_mode,
+    record_shadow_receipt,
+)
 from dharma_swarm.tiny_router_shadow import TinyRouterShadowInput, infer_tiny_router_shadow
 
 
@@ -557,7 +564,17 @@ class ConversationMemoryStore:
         *,
         limit: int = 5,
         min_salience: float = 0.0,
+        include_quarantined: bool = False,
     ) -> list[IdeaShard]:
+        """Recall high-value idea shards.
+
+        Quality quarantine (DHARMA_MEMORY_QUALITY_QUARANTINE) gates shards
+        BEFORE swarm consumption (swarm.spawn_latent_gold_tasks spawns real
+        tasks from these): enforce drops quarantined shards, shadow serves
+        legacy and stamps would_be_excluded receipts.
+        """
+        mode = quarantine_mode()
+        gated = not include_quarantined
         normalized_query = query.strip()
         with sqlite3.connect(str(self.db_path)) as db:
             ensure_memory_plane_schema_sync(db)
@@ -590,6 +607,8 @@ class ConversationMemoryStore:
                 created_at=datetime.fromisoformat(row["created_at"]),
                 metadata=_as_metadata(row["metadata_json"]),
             )
+            if gated and mode == MODE_ENFORCE and is_shard_quarantined(shard.text):
+                continue
             retrieval = _score(normalized_query, shard.text) if normalized_query else 0.0
             state_bonus = {"orphaned": 0.12, "deferred": 0.10, "proposed": 0.04, "connected": 0.03}.get(shard.state, 0.0)
             total = retrieval + (0.25 * shard.salience) + (0.12 * shard.novelty) + state_bonus
@@ -597,7 +616,18 @@ class ConversationMemoryStore:
                 continue
             scored.append((shard, round(total, 6)))
         scored.sort(key=lambda item: (item[1], item[0].created_at), reverse=True)
-        return [shard for shard, _score_value in scored[: max(1, limit)]]
+        result = [shard for shard, _score_value in scored[: max(1, limit)]]
+        if gated and mode == MODE_SHADOW:
+            parent = self.db_path.parent
+            record_shadow_receipt(
+                site="conversation_memory.latent_gold",
+                served=len(result),
+                would_be_excluded=sum(
+                    1 for shard in result if is_shard_quarantined(shard.text)
+                ),
+                state_dir=parent.parent if parent.name == "db" else parent,
+            )
+        return result
 
     def recent_turns(self, *, task_id: str | None = None, limit: int = 20) -> list[ConversationTurn]:
         with sqlite3.connect(str(self.db_path)) as db:
