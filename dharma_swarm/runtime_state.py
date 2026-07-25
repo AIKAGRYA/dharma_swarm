@@ -25,6 +25,7 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
 )
+from dharma_swarm.episode_ledger import EpisodeEvent
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
@@ -1468,10 +1469,21 @@ class RuntimeStateStore:
     ) -> EpisodeOutboxRecord:
         delivery_key = str(delivery_key).strip()
         episode_id = str(episode_id).strip()
+        attempt_id = str(attempt_id)
         event_type = str(event_type).strip()
         if not delivery_key or not episode_id or not event_type:
             raise ValueError("delivery_key, episode_id, and event_type are required")
-        payload = dict(payload)
+        # The outbox is durable episode-ledger state, so apply the same
+        # validation and recursive secret redaction before SQLite sees the
+        # payload. Sequence zero is validation-only; the ledger allocates the
+        # durable sequence while holding its append lock.
+        payload = EpisodeEvent.new(
+            event_type=event_type,
+            episode_id=episode_id,
+            attempt_id=attempt_id,
+            sequence=0,
+            payload=payload,
+        ).payload
         created_at = _utc_now_iso()
         db.execute(
             "INSERT INTO episode_event_outbox"
@@ -1482,7 +1494,7 @@ class RuntimeStateStore:
             (
                 delivery_key,
                 episode_id,
-                str(attempt_id),
+                attempt_id,
                 event_type,
                 _json_dump(payload),
                 str(session_event_id),
@@ -1501,7 +1513,7 @@ class RuntimeStateStore:
         stored = _row_to_episode_outbox(row)
         if (
             stored.episode_id != episode_id
-            or stored.attempt_id != str(attempt_id)
+            or stored.attempt_id != attempt_id
             or stored.event_type != event_type
             or stored.payload != payload
             or stored.session_event_id != str(session_event_id)

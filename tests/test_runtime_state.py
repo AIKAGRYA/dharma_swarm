@@ -277,6 +277,86 @@ def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None
         )
 
 
+def test_episode_outbox_redacts_nested_secrets_before_sqlite_and_replays(
+    tmp_path,
+) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path)
+    raw_payload = {
+        "messages": [
+            {
+                "api_key": "sk-deep-secret",
+                "nested": {"Authorization": "Bearer hidden-secret"},
+            }
+        ],
+        "safe": "retained",
+    }
+
+    first = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-redacted:started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        event_type="attempt_started",
+        payload=raw_payload,
+    )
+    replay = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-redacted:started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        event_type="attempt_started",
+        payload=raw_payload,
+    )
+
+    assert replay == first
+    assert first.payload == {
+        "messages": [
+            {
+                "api_key": "[REDACTED]",
+                "nested": {"Authorization": "[REDACTED]"},
+            }
+        ],
+        "safe": "retained",
+    }
+    sqlite_bytes = b"".join(
+        path.read_bytes()
+        for path in tmp_path.iterdir()
+        if path.name.startswith(db_path.name)
+    )
+    assert b"sk-deep-secret" not in sqlite_bytes
+    assert b"hidden-secret" not in sqlite_bytes
+
+
+def test_invalid_episode_type_rolls_back_session_event_and_outbox(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    event = SessionEventRecord(
+        event_id="sevt-invalid-episode-type",
+        session_id="sess-invalid-episode-type",
+        ledger_kind="task",
+        event_name="dispatch_assigned",
+    )
+
+    with pytest.raises(ValueError, match="unknown event_type"):
+        store.record_session_event_with_episode_outbox_sync(
+            event,
+            delivery_key="session-event:sevt-invalid-episode-type:invalid",
+            episode_id="ep-invalid-type",
+            attempt_id="at-invalid-type",
+            event_type="not_a_lifecycle_event",
+            payload={"session_event_id": event.event_id},
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        session_event_count = db.execute(
+            "SELECT COUNT(*) FROM session_events WHERE event_id = ?",
+            (event.event_id,),
+        ).fetchone()[0]
+        outbox_count = db.execute(
+            "SELECT COUNT(*) FROM episode_event_outbox"
+        ).fetchone()[0]
+    assert session_event_count == 0
+    assert outbox_count == 0
+
+
 def test_runtime_state_indexes_historic_ledgers(tmp_path) -> None:
     ledger_base = tmp_path / "ledgers"
     session_dir = ledger_base / "sess-old"
