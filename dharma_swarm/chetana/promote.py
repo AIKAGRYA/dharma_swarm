@@ -36,12 +36,14 @@ from ..daemon_config import dharma_state_dir
 from .cross_update import cross_update_trusted
 from .governance import current_kernel_signature, gate_check_atom
 from .provenance import (
+    SIGNATURE_V2_PREFIX,
     GateResult,
     ReviewStatus,
     assemble_atom,
     compute_axiom_signature_v2,
     now_iso,
     parse_frontmatter,
+    signature_matches,
 )
 from .staging import quarantine_atom, write_trusted
 from .stigmergy_emit import emit_mark
@@ -201,7 +203,7 @@ def promote(
 
 @dataclass
 class ApproveResult:
-    decision: str  # APPROVED | ALREADY_APPROVED | REJECTED_PRIOR | BAD_STATE | NOT_FOUND | NEEDS_PROMOTE | PARSE_ERROR
+    decision: str  # APPROVED | ALREADY_APPROVED | REJECTED_PRIOR | BAD_STATE | NOT_FOUND | NEEDS_PROMOTE | PARSE_ERROR | SIGNATURE_MISMATCH | GATE_BLOCKED | COLLISION
     trusted_path: Path | None = None
     prior_status: str | None = None
     reviewer: str | None = None
@@ -214,9 +216,13 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
 
     Accepts a pending atom (wiki/pending/), a staged-with-provenance atom, or
     an already-trusted atom whose review_status is staged|auto_promoted.
-    Flips review_status → 'approved', re-signs with v2 (which covers
-    review_status), moves the file into the trusted dir, then runs
-    cross-update + the (env-gated) vector auto-ingest scoped to this file.
+    Before flipping anything it re-verifies the promote-time v2 signature
+    (pending files are agent-writable — a body edited after promote must not
+    ride an operator's approval into trusted) and re-runs the telos gates on
+    the bytes actually being approved. Then it flips review_status →
+    'approved', re-signs with v2 (which covers review_status), moves the file
+    into the trusted dir, then runs cross-update + the (env-gated) vector
+    auto-ingest scoped to this file.
     """
     if not reviewer or not str(reviewer).strip():
         return ApproveResult(
@@ -226,13 +232,17 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
     target = Path(path).expanduser()
     if not target.exists():
         # Resolve bare atom ids / slugs under staging first, then pending.
-        candidates: list[Path] = []
-        if staging_mod.STAGING_ROOT.exists():
-            candidates = list(staging_mod.STAGING_ROOT.rglob(f"{path}.md"))
-        if not candidates and staging_mod.WIKI_PENDING_ROOT.exists():
-            candidates = list(staging_mod.WIKI_PENDING_ROOT.rglob(f"{path}.md"))
-        if candidates:
-            target = candidates[0]
+        # Only simple names: rglob raises NotImplementedError on absolute
+        # patterns, and a path-shaped miss should be NOT_FOUND, not a search.
+        raw = str(path)
+        if not Path(raw).is_absolute() and "/" not in raw and os.sep not in raw:
+            candidates: list[Path] = []
+            if staging_mod.STAGING_ROOT.exists():
+                candidates = list(staging_mod.STAGING_ROOT.rglob(f"{raw}.md"))
+            if not candidates and staging_mod.WIKI_PENDING_ROOT.exists():
+                candidates = list(staging_mod.WIKI_PENDING_ROOT.rglob(f"{raw}.md"))
+            if candidates:
+                target = candidates[0]
     if not target.exists():
         return ApproveResult(decision="NOT_FOUND", error=f"{path} not found")
     target = target.resolve()
@@ -268,6 +278,51 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
             error=f"unexpected review_status '{current_status}'",
         )
 
+    # The pending file sat in an agent-writable dir since promote. Verify the
+    # promote-time signature before trusting its bytes. v2 is required here:
+    # promote() always signs v2 now, and the kernel signature is readable, so
+    # accepting a recomputed v1 (body-only) sig would let tamper+downgrade
+    # pass this boundary.
+    kernel_sig = current_kernel_signature()
+    stored_sig = schema.provenance.axiom_signature or ""
+    if not stored_sig.startswith(SIGNATURE_V2_PREFIX):
+        return ApproveResult(
+            decision="SIGNATURE_MISMATCH",
+            prior_status=current_status,
+            error=(
+                "stored axiom_signature is not v2; promote() signs v2 — "
+                "refusing approval (possible v1 downgrade; re-promote the atom)"
+            ),
+        )
+    if not signature_matches(stored_sig, schema, body, kernel_sig):
+        return ApproveResult(
+            decision="SIGNATURE_MISMATCH",
+            prior_status=current_status,
+            error=(
+                "axiom_signature does not verify under the current kernel — "
+                "content changed after promote (or the kernel rotated); re-promote"
+            ),
+        )
+
+    # Signatures are forgeable by anything that can read the kernel manifest,
+    # so re-run the gates on the exact bytes being approved — a body swapped
+    # in after promote must face the same battery it dodged.
+    gov = gate_check_atom(
+        atom_content=body,
+        atom_title=schema.title,
+        requested_action="chetana.approve",
+        metadata={"atom_id": schema.atom_id, "atom_type": schema.type},
+    )
+    if gov.result == "BLOCK":
+        return ApproveResult(
+            decision="GATE_BLOCKED",
+            prior_status=current_status,
+            error=(
+                "telos gates BLOCK at approve: "
+                f"{gov.record.rationale or gov.record.gates_blocked}"
+            ),
+        )
+
     approval_entry = {
         "event": "approve",
         "ts": now_iso(),
@@ -284,7 +339,7 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
     new_schema = schema.model_copy(update={"provenance": new_provenance})
     # review_status changed → the v2 signature must be recomputed here, under
     # the current kernel; a bare on-disk flip breaks verification by design.
-    new_schema = _resign_v2(new_schema, body, current_kernel_signature())
+    new_schema = _resign_v2(new_schema, body, kernel_sig)
 
     notes: list[str] = []
     movable_roots = (staging_mod.STAGING_ROOT, staging_mod.WIKI_PENDING_ROOT)
@@ -298,12 +353,37 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
             continue
 
     if in_movable_root:
-        trusted_path = write_trusted(new_schema, body)
+        try:
+            trusted_path = write_trusted(new_schema, body)
+        except FileExistsError as e:
+            # Slug collision with an existing trusted/legacy page: fail closed,
+            # leave the pending copy untouched for the operator to resolve.
+            return ApproveResult(
+                decision="COLLISION",
+                prior_status=current_status,
+                error=str(e),
+                notes=[f"pending copy left untouched at {target}"],
+            )
         try:
             target.unlink()
         except OSError as e:
             notes.append(f"failed to remove source file: {type(e).__name__}: {e}")
     else:
+        # In-place approval is only legal inside the trusted projection —
+        # approving a file at an arbitrary path would mint 'approved' status
+        # for content that never enters concepts/.
+        try:
+            target.relative_to(staging_mod.TRUSTED_DEFAULT.resolve())
+        except ValueError:
+            return ApproveResult(
+                decision="BAD_STATE",
+                prior_status=current_status,
+                error=(
+                    f"refusing in-place approval outside the trusted dir: {target} "
+                    f"(trusted root: {staging_mod.TRUSTED_DEFAULT}); move the atom "
+                    "into staging/pending and re-promote"
+                ),
+            )
         trusted_path = target
         trusted_path.write_text(assemble_atom(new_schema, body), encoding="utf-8")
 

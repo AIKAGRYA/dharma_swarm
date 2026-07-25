@@ -244,10 +244,12 @@ def _coerce_decision(raw: Any) -> GateResult:
     Handles GateDecision.ALLOW / .BLOCK / .REVIEW (the dharma_swarm enum), plus
     string variants. REVIEW maps to WARN (chetana's middle tier). Anything
     unrecognized fails closed to BLOCK — chetana writes trust, so an unknown
-    gate verdict must never promote.
+    gate verdict must never promote. That includes None: a GateCheckResult
+    whose ``decision`` attribute is missing (interface drift) must not read
+    as ALLOW.
     """
     if raw is None:
-        return "ALLOW"
+        return "BLOCK"
     # Try the enum's .value first ('allow' | 'block' | 'review')
     val = getattr(raw, "value", None)
     if isinstance(val, str):
