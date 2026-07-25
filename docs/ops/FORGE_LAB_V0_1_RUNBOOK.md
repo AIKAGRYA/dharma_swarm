@@ -75,3 +75,70 @@ The `codex_rsi_lab_manager` identity remains an
 NATS, daemon, key, protected-branch, or positive-capability-claim authority.
 Path validation must not invoke the wrapper, onboarding, NATS, or any runtime
 service.
+
+## Minimum governed campaign lifecycle
+
+First verify that `rsi version` reports
+`implementation_status: minimum_safe_blocked_controller`. The minimum lifecycle
+is intentionally closure-first: it can plan, instantiate, preflight, receipt,
+query, stop, and reconcile, but it has no governed scientific executor. It
+therefore cannot spend provider tokens or count a scientific attempt.
+
+Plan the pinned n30-to-1000 definition without a provider call:
+
+```bash
+rsi campaign plan --profile forge-lab-n30-to-1000-v1 --json
+```
+
+`plan` stores a content-addressed manifest below the canonical state root. The
+manifest records null cumulative token, USD, request, deadline, and host caps
+when the signed operator envelope did not provide exact values. Null is
+unpowered; neither a prompt nor a budget environment variable fills it.
+
+Run accepts only the printed digest:
+
+```bash
+rsi campaign run --manifest sha256:DIGEST \
+  --identity-receipt /canonical/evidence/sync-status.json \
+  --provider-receipt /canonical/evidence/moonshot-selftest.json \
+  --operator-envelope /canonical/evidence/operator-envelope.json \
+  --host meghadharma --json
+```
+
+If any gate is missing—or while the governed scientific executor remains
+unimplemented—`run` exits nonzero after committing one
+`forge_lab.blocked_receipt.v1`, closes the lifecycle to `FAILED`, and releases
+its fenced lease. Repeating the same request returns the same receipt. It does
+not create scratch space or dispatch a provider request.
+
+`rsi provider selftest --live` is also disabled in this release. Exact route
+evidence must eventually be produced by a manifest-bound, signed probe grant
+through the same fenced broker used for campaign work; a configuration-only
+row or an older unsigned callable row cannot open admission.
+
+Read committed state independently of process output:
+
+```bash
+rsi campaign list --json
+rsi campaign status forge-lab-n30-to-1000-v1 --json
+rsi campaign progress forge-lab-n30-to-1000-v1 --json
+rsi campaign events forge-lab-n30-to-1000-v1 --json
+rsi campaign stop forge-lab-n30-to-1000-v1 --json
+rsi reconcile --json
+```
+
+`reconcile` is read-only unless `--apply` is explicit. Apply additionally
+requires the exact report file/digest and a request ID, and can only create
+enumerated operational directories. No reconciliation or cleanup command can
+mint provider, evaluation, lineage, usage, or scientific evidence, and the
+minimum cleanup planner performs no deletion.
+
+The external watchdog prototype runs in a separate credential-free process and
+is bound to campaign, manifest digest, deadline, and fencing token. Its file
+gate is not spend authority and does not satisfy lifecycle acceptance until a
+governed broker transactionally observes the same fuse. A stale watchdog
+cannot mutate a newer fence.
+
+The legacy `rsi newrun --execute` and
+`python -m dharma_swarm.forge_lab.cli run` launch paths are retired and return
+`GOVERNED_CAMPAIGN_REQUIRED`.

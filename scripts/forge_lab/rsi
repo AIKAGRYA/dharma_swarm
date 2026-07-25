@@ -25,6 +25,7 @@ fi
 
 export PYTHONDONTWRITEBYTECODE=1
 export RSI_LAB_BASE="${base}"
+export RSI_LAB_STATE="${RSI_LAB_STATE:-${base}/state}"
 export RSI_LAB_REPO="${repo}"
 export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
 cd "${repo}"

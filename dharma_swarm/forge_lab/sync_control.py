@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -190,6 +191,41 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
         except (OSError, json.JSONDecodeError) as exc:
             reasons.append(f"active campaign manifest is unreadable: {exc}")
 
+    control_db = (
+        root
+        / "state"
+        / ".dharma"
+        / "forge_lab"
+        / "campaigns"
+        / "control.sqlite3"
+    )
+    if control_db.exists():
+        try:
+            uri = f"file:{control_db.resolve()}?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=2) as db:
+                rows = db.execute(
+                    """SELECT campaign_id,active_fence,lease_holder,lease_mode,
+                    lease_expires FROM campaigns WHERE active_fence IS NOT NULL
+                    AND lease_expires>? ORDER BY campaign_id""",
+                    (_now(),),
+                ).fetchall()
+            evidence["authoritative_active_leases"] = [
+                {
+                    "campaign": row[0],
+                    "fencing_token": row[1],
+                    "holder": row[2],
+                    "mode": row[3],
+                    "expires_at": row[4],
+                }
+                for row in rows
+            ]
+            if rows:
+                reasons.append(
+                    f"authoritative campaign lease count: {len(rows)}"
+                )
+        except (OSError, sqlite3.Error) as exc:
+            reasons.append(f"authoritative campaign store is unreadable: {exc}")
+
     try:
         tmux = subprocess.run(
             ["tmux", "list-sessions", "-F", "#{session_name}"],
@@ -221,6 +257,8 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
     except (OSError, subprocess.SubprocessError):
         processes = []
     patterns = (
+        "dharma_swarm.forge_lab.cli",
+        "dharma_swarm.forge_lab.campaign_watchdog",
         "dharma_swarm.forge_lab.experiment",
         "rsi-manager-",
         "rsi-overnight",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 
@@ -205,6 +206,43 @@ def test_campaign_block_refuses_switch_without_touching_current(tmp_path: Path) 
 
     assert error.value.code == "ACTIVE_CAMPAIGN"
     assert not (root / "current").exists()
+
+
+def test_authoritative_fenced_lease_blocks_release_switch(tmp_path: Path) -> None:
+    root, _, _ = _make_release(tmp_path)
+    db_path = (
+        root
+        / "state"
+        / ".dharma"
+        / "forge_lab"
+        / "campaigns"
+        / "control.sqlite3"
+    )
+    db_path.parent.mkdir(parents=True)
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            """CREATE TABLE campaigns(
+            campaign_id TEXT, active_fence INTEGER, lease_holder TEXT,
+            lease_mode TEXT, lease_expires TEXT)"""
+        )
+        db.execute(
+            "INSERT INTO campaigns VALUES(?,?,?,?,?)",
+            (
+                "forge-lab-n30-to-1000-v1",
+                7,
+                "codex-rsi-lab-manager",
+                "active",
+                "2099-01-01T00:00:00Z",
+            ),
+        )
+
+    guard = sync._campaign_guard(root)
+
+    assert guard["ok"] is False
+    assert "authoritative campaign lease count: 1" in guard["reasons"]
+    assert guard["evidence"]["authoritative_active_leases"][0][
+        "fencing_token"
+    ] == 7
 
 
 def test_wrapper_failure_rolls_back_initial_current_pointer(

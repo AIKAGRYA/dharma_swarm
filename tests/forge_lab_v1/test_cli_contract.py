@@ -79,7 +79,9 @@ def test_package_and_cli_report_packet_a_version() -> None:
     assert payload["result"]["canonical_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_tree_state"] in {"clean", "dirty", "unknown"}
-    assert payload["result"]["implementation_status"] == "cli_skeleton"
+    assert payload["result"]["implementation_status"] == (
+        "minimum_safe_blocked_controller"
+    )
 
 
 def test_default_checkout_selection_survives_inaccessible_remote_path(
@@ -223,6 +225,7 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     assert 'python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"' in launcher
     assert 'pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"' in launcher
     assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
+    assert 'export RSI_LAB_STATE="${RSI_LAB_STATE:-${base}/state}"' in launcher
 
     rsilab = (REPO_ROOT / "scripts" / "forge_lab" / "RSILAB").read_text(encoding="utf-8")
     assert 'exec "${script_dir}/rsi" "$@"' in rsilab
@@ -247,7 +250,9 @@ def test_newrun_menu_projects_bleeding_edge_options_without_live_imports() -> No
     assert current["solver_model"] == "glm-5.2"
     assert current["mutator_model"] == "glm-5.2"
     assert current["verifier_model"] == "kimi-code"
-    assert current["command"].startswith("python -m dharma_swarm.forge_lab.cli run --mode shadow")
+    assert current["command"] == (
+        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+    )
 
 
 def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
@@ -259,9 +264,9 @@ def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
     assert selected["solver_model"] == "deepseek-v4-pro:cloud"
     assert selected["verifier_model"] == "minimax-m3:cloud"
     assert selected["mutator_model"] == "kimi-k2.7-code:cloud"
-    assert "--solver-model deepseek-v4-pro:cloud" in selected["command"]
-    assert "--verifier-model minimax-m3:cloud" in selected["command"]
-    assert "--mutator-model kimi-k2.7-code:cloud" in selected["command"]
+    assert selected["command"] == (
+        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+    )
 
 
 
@@ -292,7 +297,9 @@ def test_newrun_selected_preset_can_be_overridden_without_execute() -> None:
     assert selected["name"] == "fast"
     assert selected["solver_model"] == "qwen3-coder:480b-cloud"
     assert selected["generations"] == 2
-    assert "--solver-model qwen3-coder:480b-cloud" in selected["command"]
+    assert selected["command"] == (
+        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+    )
 
 
 
@@ -330,15 +337,6 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
     [
         ("doctor",),
         ("taskpack", "build", "--profile", "offline"),
-        ("campaign", "plan", "--profile", "explore-open"),
-        ("campaign", "run", "--manifest", "sha256:" + "0" * 64),
-        ("campaign", "list"),
-        ("campaign", "status"),
-        ("campaign", "progress"),
-        ("campaign", "events", "campaign-1"),
-        ("campaign", "pause", "campaign-1"),
-        ("campaign", "resume", "campaign-1"),
-        ("campaign", "stop", "campaign-1"),
         ("campaign", "fork", "campaign-1"),
         (
             "campaign",
@@ -349,7 +347,6 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
             "--reason",
             "test",
         ),
-        ("reconcile",),
         ("backup", "create"),
         ("backup", "verify", "--snapshot", "sha256:" + "2" * 64),
         (

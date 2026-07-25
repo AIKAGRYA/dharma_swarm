@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from dharma_swarm.forge_lab import provider_selftest
 from dharma_swarm.forge_lab.newrun import (
     DEFAULT_DIVERSE_MUTATOR,
@@ -63,7 +65,10 @@ def test_provider_selftest_requires_live_for_independent_route_claim(monkeypatch
     assert payload["failures"] == ["live_probe_required_for_independent_routes"]
 
 
-def test_provider_selftest_live_counts_attested_independent_families(monkeypatch, tmp_path):
+def test_provider_selftest_live_requires_governed_probe_authority(
+    monkeypatch,
+    tmp_path,
+):
     monkeypatch.setenv("RSI_LAB_PROVIDER_SELFTEST_ROOT", str(tmp_path))
     monkeypatch.setattr(provider_selftest, "profile_model_ids", lambda profile, current_model=None: ["glm-5.2", "kimi-code", "deepseek-v4-pro"])
     from dharma_swarm.forge_v1.forge_v2 import runner_slots
@@ -85,14 +90,11 @@ def test_provider_selftest_live_counts_attested_independent_families(monkeypatch
 
     monkeypatch.setattr(runner_slots, "_probe_with_receipt", fake_probe)
 
-    payload = provider_selftest.run_provider_selftest(
-        profile="frontier",
-        live=True,
-        require_independent_routes=2,
-    )
+    with pytest.raises(ValueError, match="signed probe authority"):
+        provider_selftest.run_provider_selftest(
+            profile="frontier",
+            live=True,
+            require_independent_routes=2,
+        )
 
-    assert payload["ok"] is True
-    assert payload["independent_route_count"] == 2
-    assert payload["probed_models"] == ["glm-5.2", "kimi-code"]
-    assert payload["receipt"]
-    assert tmp_path.joinpath(payload["receipt"]).exists() or payload["receipt"].startswith(str(tmp_path))
+    assert not list(tmp_path.iterdir())

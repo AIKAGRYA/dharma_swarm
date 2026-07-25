@@ -1,10 +1,9 @@
-"""One-command run planner for sustained Forge/RSI Lab exploration.
+"""Operator-facing preview for governed Forge/RSI Lab exploration.
 
-``rsi newrun`` is intentionally an operator-facing *menu* first and a live
-launcher only when ``--execute`` is supplied.  The generated commands are all
-shadow-mode EXPLORE runs: they can spend model tokens, write isolated lab
-receipts, and create scratch worktrees, but they do not promote candidates or
-mutate production state.
+``rsi newrun`` projects candidate run shapes, but it is not a spend-authority
+surface. Execution belongs to ``rsi campaign`` and requires a validated signed
+operator envelope. The retained ``--execute`` flag fails closed so old
+automation cannot silently fall through to the legacy live launcher.
 """
 
 from __future__ import annotations
@@ -12,13 +11,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shlex
+import sys
 from pathlib import Path
 from dataclasses import dataclass, replace
 from typing import Any, Iterable
 
 NEW_RUN_SCHEMA = "rsi_lab.newrun_options.v1"
 NEW_RUN_RECOMMEND_SCHEMA = "rsi_lab.newrun_recommendation.v1"
+CLI_RESULT_SCHEMA = "forge_lab.cli_result.v1"
+GOVERNED_CAMPAIGN_REQUIRED = "GOVERNED_CAMPAIGN_REQUIRED"
+GOVERNED_CAMPAIGN_REQUIRED_EXIT = 7
+GOVERNED_CAMPAIGN_COMMAND = (
+    "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+)
 
 CURRENT_MODEL_ENV_KEYS = (
     "RSILAB_MODEL",
@@ -102,9 +107,10 @@ class NewRunPreset:
         return args
 
     def command(self, *, source_repo: str | None = None, keep_worktree: bool = False) -> str:
-        return "python -m dharma_swarm.forge_lab.cli " + " ".join(
-            shlex.quote(part) for part in self.forge_args(source_repo=source_repo, keep_worktree=keep_worktree)
-        )
+        """Return the governed planning entrypoint, never a legacy live command."""
+
+        del source_repo, keep_worktree
+        return GOVERNED_CAMPAIGN_COMMAND
 
     def as_dict(self, *, source_repo: str | None = None, keep_worktree: bool = False) -> dict[str, Any]:
         return {
@@ -293,12 +299,25 @@ def apply_overrides(preset: NewRunPreset, args: argparse.Namespace) -> NewRunPre
 
 
 def _archive_root() -> Path:
-    return Path(
-        os.environ.get(
-            "RSILAB_EVOLUTION_ARCHIVE_ROOT",
-            Path.home() / ".dharma" / "evolution_archive" / "agent_evolution",
-        )
-    )
+    explicit = os.environ.get("RSILAB_EVOLUTION_ARCHIVE_ROOT", "").strip()
+    if explicit:
+        root = Path(explicit)
+        if not root.is_absolute():
+            raise ValueError("RSILAB_EVOLUTION_ARCHIVE_ROOT must be absolute")
+        return root
+    state = os.environ.get("RSI_LAB_STATE", "").strip()
+    if state:
+        state_root = Path(state)
+    else:
+        base = os.environ.get("RSI_LAB_BASE", "").strip()
+        if not base:
+            raise ValueError(
+                "canonical state is unbound; set RSI_LAB_STATE or RSI_LAB_BASE"
+            )
+        state_root = Path(base) / "state"
+    if not state_root.is_absolute():
+        raise ValueError("canonical RSI Lab state root must be absolute")
+    return state_root / ".dharma" / "evolution_archive" / "agent_evolution"
 
 
 def _safe_json(path: Path) -> dict[str, Any]:
@@ -309,7 +328,10 @@ def _safe_json(path: Path) -> dict[str, Any]:
 
 
 def _recent_runs(limit: int = 12) -> list[dict[str, Any]]:
-    root = _archive_root()
+    try:
+        root = _archive_root()
+    except ValueError:
+        return []
     if not root.exists():
         return []
     runs: list[tuple[float, dict[str, Any]]] = []
@@ -389,12 +411,12 @@ def _is_fast_route(run: dict[str, Any]) -> bool:
 
 
 def _latest_provider_selftest() -> dict[str, Any] | None:
-    root = Path(
-        os.environ.get(
-            "RSI_LAB_PROVIDER_SELFTEST_ROOT",
-            Path.home() / ".dharma" / "forge_lab" / "provider_selftests",
-        )
-    )
+    from dharma_swarm.forge_lab.provider_selftest import _receipt_root
+
+    try:
+        root = _receipt_root()
+    except ValueError:
+        return None
     if not root.exists():
         return None
     receipts = sorted(root.glob("*provider_selftest.json"), key=lambda path: path.stat().st_mtime, reverse=True)
@@ -493,7 +515,11 @@ def add_newrun_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--rng-seed", type=int, help="override RNG seed")
     parser.add_argument("--source-repo", help="source repo for scratch worktrees; defaults to the Forge CLI default")
     parser.add_argument("--keep-worktree", action="store_true", help="keep scratch worktree after execution")
-    parser.add_argument("--execute", action="store_true", help="run the selected preset now; this can spend live model tokens")
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="deprecated compatibility flag; always fails closed (use governed rsi campaign)",
+    )
 
 
 def _payload(args: argparse.Namespace) -> tuple[dict[str, Any], NewRunPreset | None]:
@@ -508,7 +534,9 @@ def _payload(args: argparse.Namespace) -> tuple[dict[str, Any], NewRunPreset | N
         "current_model_source": current_source,
         "safety_boundary": {
             "mode": "shadow EXPLORE",
-            "live_model_spend_requires_execute": True,
+            "execution_surface": "rsi campaign",
+            "newrun_execute_supported": False,
+            "signed_operator_envelope_required": True,
             "production_mutation": False,
             "positive_lift_claim": False,
         },
@@ -523,12 +551,15 @@ def _payload(args: argparse.Namespace) -> tuple[dict[str, Any], NewRunPreset | N
 
 
 def print_human_menu(payload: dict[str, Any]) -> None:
-    print("RSI Lab NEWRUN — bleeding-edge run menu")
+    print("RSI Lab NEWRUN — governed campaign preview")
     current = payload.get("current_model") or "not detected"
     source = payload.get("current_model_source") or "pass --model or set RSILAB_MODEL"
     print(f"Current model: {current} ({source})")
     print()
-    print("Safety: shadow EXPLORE only; --execute can spend model tokens; no production mutation; no positive-lift claim.")
+    print(
+        "Safety: preview only; paid execution requires rsi campaign plus a "
+        "validated signed operator envelope."
+    )
     print()
     print("Options:")
     for index, preset in enumerate(payload["presets"], start=1):
@@ -543,42 +574,59 @@ def print_human_menu(payload: dict[str, Any]) -> None:
             f"g={preset['generations']} children={preset['children']} tasks={preset['tasks']} "
             f"max_tokens={preset['max_experiment_tokens']}"
         )
-        print(f"     run: rsi newrun --preset {preset['name']} --execute")
-        print(f"     underlying: {preset['command']}")
+        print(f"     governed plan: {preset['command']}")
         for note in preset.get("notes", []):
             print(f"       note: {note}")
         print()
     print("Examples:")
     print("  RSILAB - NEWRUN --recommend")
-    print("  RSILAB - NEWRUN --preset fast --execute")
-    print("  rsi newrun --model glm-5.2 --preset soak --execute")
-    print("  rsi newrun --preset current --model claude-opus-4-6 --execute")
+    print("  rsi newrun --model glm-5.2 --preset soak")
+    print(f"  {GOVERNED_CAMPAIGN_COMMAND}")
 
 
 def run_newrun(args: argparse.Namespace) -> int:
     payload, selected = _payload(args)
-    if args.json and not args.execute:
+    if args.execute:
+        message = (
+            "rsi newrun is preview-only; execution requires a "
+            "content-addressed governed campaign and validated signed "
+            "operator envelope"
+        )
+        error = {
+            "schema": CLI_RESULT_SCHEMA,
+            "ok": False,
+            "command": "newrun",
+            "error": {
+                "code": GOVERNED_CAMPAIGN_REQUIRED,
+                "message": message,
+            },
+            "result": {
+                "selected_preset": selected.name if selected else None,
+                "governed_entrypoint": GOVERNED_CAMPAIGN_COMMAND,
+            },
+        }
+        if args.json:
+            print(json.dumps(error, sort_keys=True))
+        print(
+            f"rsi newrun failed [{GOVERNED_CAMPAIGN_REQUIRED}]: {message}; "
+            f"next: {GOVERNED_CAMPAIGN_COMMAND}",
+            file=sys.stderr,
+        )
+        return GOVERNED_CAMPAIGN_REQUIRED_EXIT
+
+    if args.json:
         print(json.dumps({"ok": True, **payload}, indent=2, sort_keys=True))
         return 0
     if not selected:
         print_human_menu(payload)
         return 0
-    if not args.execute:
-        if args.json:
-            print(json.dumps({"ok": True, **payload}, indent=2, sort_keys=True))
-        else:
-            print_human_menu(payload)
-            recommendation = payload.get("recommendation") or {}
-            if recommendation:
-                print("Recommendation:")
-                print(f"  selected: {recommendation.get('selected_preset')}")
-                for reason in recommendation.get("reasons", []):
-                    print(f"  reason: {reason}")
-            print(f"Selected preset: {selected.name}")
-            print(f"Execute with: rsi newrun --preset {selected.name} --execute")
-        return 0
-
-    print(f"[rsi newrun] executing preset={selected.name}; live model tokens may be spent", flush=True)
-    from dharma_swarm.forge_lab.cli import main as forge_lab_main
-
-    return forge_lab_main(selected.forge_args(source_repo=args.source_repo, keep_worktree=args.keep_worktree))
+    print_human_menu(payload)
+    recommendation = payload.get("recommendation") or {}
+    if recommendation:
+        print("Recommendation:")
+        print(f"  selected: {recommendation.get('selected_preset')}")
+        for reason in recommendation.get("reasons", []):
+            print(f"  reason: {reason}")
+    print(f"Selected preset: {selected.name}")
+    print(f"Governed planning entrypoint: {selected.command()}")
+    return 0

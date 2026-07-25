@@ -82,16 +82,40 @@ def profile_model_ids(profile: str, *, current_model: str | None = None) -> list
 
 
 def _receipt_root() -> Path:
-    return Path(
-        os.environ.get(
-            "RSI_LAB_PROVIDER_SELFTEST_ROOT",
-            Path.home() / ".dharma" / "forge_lab" / "provider_selftests",
-        )
-    )
+    """Resolve receipts inside explicit test or canonical RSI Lab state.
+
+    There is deliberately no home-directory fallback: a live probe must know
+    which canonical state boundary will receive its immutable evidence before
+    making any provider request.
+    """
+
+    explicit = os.environ.get("RSI_LAB_PROVIDER_SELFTEST_ROOT", "").strip()
+    if explicit:
+        root = Path(explicit)
+    else:
+        state = os.environ.get("RSI_LAB_STATE", "").strip()
+        if state:
+            state_root = Path(state)
+        else:
+            base = os.environ.get("RSI_LAB_BASE", "").strip()
+            if not base:
+                raise ValueError(
+                    "canonical state is unbound; set RSI_LAB_STATE, "
+                    "RSI_LAB_BASE, or RSI_LAB_PROVIDER_SELFTEST_ROOT"
+                )
+            state_root = Path(base) / "state"
+        root = state_root / ".dharma" / "forge_lab" / "provider_selftests"
+    if not root.is_absolute():
+        raise ValueError("provider selftest receipt root must be absolute")
+    return root
 
 
-def _write_live_receipt(payload: dict[str, Any]) -> Path:
-    root = _receipt_root()
+def _write_live_receipt(
+    payload: dict[str, Any],
+    *,
+    root: Path | None = None,
+) -> Path:
+    root = root or _receipt_root()
     root.mkdir(parents=True, exist_ok=True)
     stamp = payload["checked_at"].replace(":", "").replace("-", "")
     suffix = payload["profile"].replace("/", "_")
@@ -169,8 +193,15 @@ def run_provider_selftest(
 ) -> dict[str, Any]:
     """Run or plan a provider selftest and return a redacted result."""
 
+    if live:
+        raise ValueError(
+            "live provider selftest is disabled until a manifest-bound, signed "
+            "probe authority and fenced request reservation are implemented"
+        )
+
     require = max(0, int(require_independent_routes or 0))
     model_ids = profile_model_ids(profile, current_model=current_model)
+    receipt_root = None
     rows: list[dict[str, Any]] = []
     for model_id in model_ids:
         row = _live_row(model_id, timeout_s=timeout_s) if live else _config_row(model_id)
@@ -208,5 +239,7 @@ def run_provider_selftest(
         "receipt": None,
     }
     if live:
-        payload["receipt"] = str(_write_live_receipt(payload))
+        payload["receipt"] = str(
+            _write_live_receipt(payload, root=receipt_root)
+        )
     return payload

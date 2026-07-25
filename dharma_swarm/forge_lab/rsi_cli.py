@@ -1,8 +1,8 @@
-"""Repo-owned RSI CLI skeleton.
+"""Repo-owned RSI control plane.
 
-Only version reporting is implemented in Packet A. Every operational command is
-registered so callers can discover the target surface, but dispatch fails closed
-before importing legacy experiment or live-provider code.
+The governed minimum implements content-addressed campaign planning, fail-closed
+preflight, durable query/control receipts, reconciliation, and code sync. Other
+registered surfaces still refuse before importing legacy live experiment code.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from dharma_swarm.forge_lab.version import (
 NOT_IMPLEMENTED_EXIT = 3
 DRIFT_EXIT = 4
 SYNC_FAILURE_EXIT = 5
-PROVIDER_FAILURE_EXIT = 6
 
 
 def _json_flag(parser: argparse.ArgumentParser) -> None:
@@ -106,107 +105,9 @@ def build_parser() -> argparse.ArgumentParser:
     taskpack_build.add_argument("--profile", required=True)
     _json_flag(taskpack_build)
 
-    campaign = commands.add_parser("campaign", help="manage governed RSI campaigns")
-    campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
+    from dharma_swarm.forge_lab.campaign_cli import add_campaign_commands
 
-    campaign_plan = _leaf(
-        campaign_commands,
-        "plan",
-        command_path="campaign plan",
-        help_text="materialize a campaign manifest",
-    )
-    campaign_plan.add_argument("--profile", required=True, choices=("explore-open",))
-    _json_flag(campaign_plan)
-
-    campaign_run = _leaf(
-        campaign_commands,
-        "run",
-        command_path="campaign run",
-        help_text="run a stored campaign manifest",
-    )
-    campaign_run.add_argument("--manifest", required=True)
-    campaign_run.add_argument("--request-id")
-    _json_flag(campaign_run)
-
-    campaign_list = _leaf(
-        campaign_commands,
-        "list",
-        command_path="campaign list",
-        help_text="list campaigns",
-    )
-    campaign_list.add_argument("--state")
-    _json_flag(campaign_list)
-
-    campaign_status = _leaf(
-        campaign_commands,
-        "status",
-        command_path="campaign status",
-        help_text="show campaign state",
-    )
-    campaign_status.add_argument("campaign", nargs="?")
-    _json_flag(campaign_status)
-
-    campaign_progress = _leaf(
-        campaign_commands,
-        "progress",
-        command_path="campaign progress",
-        help_text="show durable campaign progress",
-    )
-    campaign_progress.add_argument("campaign", nargs="?")
-    _json_flag(campaign_progress)
-
-    campaign_events = _leaf(
-        campaign_commands,
-        "events",
-        command_path="campaign events",
-        help_text="read the authoritative campaign event sequence",
-    )
-    campaign_events.add_argument("campaign")
-    campaign_events.add_argument("--after", type=int)
-    campaign_events.add_argument("--follow", action="store_true")
-    _json_flag(campaign_events)
-
-    for name in ("pause", "resume", "stop"):
-        lifecycle = _leaf(
-            campaign_commands,
-            name,
-            command_path=f"campaign {name}",
-            help_text=f"{name} a campaign",
-        )
-        lifecycle.add_argument("campaign")
-        lifecycle.add_argument("--request-id")
-        _json_flag(lifecycle)
-
-    campaign_fork = _leaf(
-        campaign_commands,
-        "fork",
-        command_path="campaign fork",
-        help_text="create a provenance-linked campaign fork",
-    )
-    campaign_fork.add_argument("campaign")
-    campaign_fork.add_argument("--runner")
-    _json_flag(campaign_fork)
-
-    campaign_fuse_ack = _leaf(
-        campaign_commands,
-        "fuse-ack",
-        command_path="campaign fuse-ack",
-        help_text="acknowledge a campaign fuse trip",
-    )
-    campaign_fuse_ack.add_argument("campaign")
-    campaign_fuse_ack.add_argument("--trip", required=True)
-    campaign_fuse_ack.add_argument("--reason", required=True)
-    campaign_fuse_ack.add_argument("--rearm", action="store_true")
-    _json_flag(campaign_fuse_ack)
-
-    reconcile = _leaf(
-        commands,
-        "reconcile",
-        command_path="reconcile",
-        help_text="report control-plane drift",
-    )
-    reconcile.add_argument("--apply", action="store_true")
-    _json_flag(reconcile)
+    add_campaign_commands(commands, leaf=_leaf, json_flag=_json_flag)
 
     backup = commands.add_parser("backup", help="manage control-plane snapshots")
     backup_commands = backup.add_subparsers(dest="backup_command", required=True)
@@ -435,73 +336,6 @@ def _emit_sync_payload(
 
 
 
-def _emit_provider_selftest_payload(result: dict[str, Any], *, as_json: bool) -> None:
-    if as_json:
-        print(
-            json.dumps(
-                {
-                    "schema": CLI_RESULT_SCHEMA,
-                    "ok": bool(result.get("ok")),
-                    "command": "provider selftest",
-                    "result": result,
-                },
-                sort_keys=True,
-            )
-        )
-        return
-    print(f"provider selftest: {'PASS' if result.get('ok') else 'FAIL'}")
-    print(f"profile: {result.get('profile')} live={result.get('live')}")
-    print(
-        "independent routes: "
-        f"{result.get('independent_route_count')}/{result.get('require_independent_routes')}"
-    )
-    if result.get("receipt"):
-        print(f"receipt: {result['receipt']}")
-    for failure in result.get("failures", []):
-        print(f"failure: {failure}")
-    for row in result.get("rows", []):
-        model = row.get("requested_model") or row.get("model_id")
-        provider = row.get("provider") or "unresolved"
-        stage = row.get("stage") or "unknown"
-        error = row.get("error_type") or ""
-        print(
-            f"row: model={model} provider={provider} "
-            f"callable={bool(row.get('callable'))} stage={stage} {error}".rstrip()
-        )
-
-
-def _dispatch_provider(args: argparse.Namespace) -> int:
-    command_path = args._command_path
-    if command_path != "provider selftest":  # pragma: no cover - parser owns this
-        return _fail_not_implemented(command_path, args.json)
-    try:
-        from dharma_swarm.forge_lab.provider_selftest import run_provider_selftest
-
-        result = run_provider_selftest(
-            profile=args.profile,
-            live=args.live,
-            require_independent_routes=args.require_independent_routes,
-            current_model=args.model,
-            timeout_s=args.timeout_s,
-        )
-    except ValueError as exc:
-        if args.json:
-            print(
-                json.dumps(
-                    {
-                        "schema": CLI_RESULT_SCHEMA,
-                        "ok": False,
-                        "command": command_path,
-                        "error": {"code": "INVALID_PROFILE", "message": str(exc)},
-                    },
-                    sort_keys=True,
-                )
-            )
-        print(f"rsi {command_path} failed [INVALID_PROFILE]: {exc}", file=sys.stderr)
-        return PROVIDER_FAILURE_EXIT
-    _emit_provider_selftest_payload(result, as_json=args.json)
-    return 0 if result.get("ok") else PROVIDER_FAILURE_EXIT
-
 def _dispatch_sync(args: argparse.Namespace) -> int:
     from dharma_swarm.forge_lab import sync_orchestrator as sync_control
 
@@ -580,7 +414,12 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_newrun(args)
     if command_path.startswith("provider "):
-        return _dispatch_provider(args)
+        from dharma_swarm.forge_lab.provider_selftest_cli import dispatch
+
+        return dispatch(args)
+    if command_path.startswith("campaign ") or command_path == "reconcile":
+        from dharma_swarm.forge_lab.campaign_cli import dispatch
+        return dispatch(args)
     if command_path.startswith("sync "):
         return _dispatch_sync(args)
     return _fail_not_implemented(command_path, args.json)

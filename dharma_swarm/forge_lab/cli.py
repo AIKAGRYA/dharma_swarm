@@ -1,10 +1,13 @@
-"""Forge lab CLI — shadow by construction (``--mode`` parses only "shadow")."""
+"""Retired legacy Forge experiment CLI.
+
+Scientific seams remain importable for tests, but the old direct live launcher
+cannot satisfy campaign fencing, checkpoint, or spend-authority contracts and
+therefore fails closed.
+"""
 
 from __future__ import annotations
 
 import argparse
-import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -52,36 +55,15 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     args = build_parser().parse_args(argv)
-    from dharma_swarm.forge_lab.experiment import ExperimentConfig, run_experiment
-
     if args.dry_run:
         print("--dry-run is test-harness only; wire Seams in code instead", file=sys.stderr)
         return 2
-    if not args.solver_model or not args.mutator_model:
-        print("--solver-model and --mutator-model are required for a live run", file=sys.stderr)
-        return 2
-    cfg = ExperimentConfig(
-        generations=args.generations,
-        children=args.children,
-        tasks_per_generation=args.tasks,
-        novelty_pressure=args.novelty_pressure,
-        solver_model=args.solver_model,
-        verifier_model=args.verifier_model,
-        mutator_model=args.mutator_model,
-        budget_cap_tokens=args.budget_tokens,
-        budget_cap_usd=args.budget_usd,
-        soft_token_cap=not args.hard_token_cap,
-        require_valid_seed=not args.allow_hard_invalid_seed,
-        max_experiment_tokens=args.max_experiment_tokens,
-        propose_timeout_s=args.propose_timeout,
-        grade_timeout_s=args.grade_timeout,
-        rng_seed=args.rng_seed,
-        source_repo=Path(args.source_repo),
-        keep_worktree=args.keep_worktree,
+    print(
+        "GOVERNED_CAMPAIGN_REQUIRED: direct forge_lab.cli execution is retired; "
+        "use rsi campaign plan/run with a content-addressed manifest",
+        file=sys.stderr,
     )
-    closeout = asyncio.run(run_experiment(cfg))
-    print(json.dumps(closeout, indent=2, default=str))
-    return 0 if closeout.get("closeout_state") in ("inconclusive_low_power", "measured_negative") else 1
+    return 7
 
 
 if __name__ == "__main__":
