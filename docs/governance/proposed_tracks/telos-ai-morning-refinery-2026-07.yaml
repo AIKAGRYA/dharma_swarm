@@ -29,8 +29,8 @@
 # Live context, 2026-07-21: the consent-ready sanitized artifact
 # (reports/telos_ai/SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md) exists
 # on the local checkout only, unsent for 21 days. The operator outreach hold
-# (standing since 2026-05-27) covers the send; one lease spend can serve both
-# this gate and the SAB first-independent-operator sequence. Send kit:
+# (standing since 2026-05-27) covers the TELOS send; releasing that hold is a
+# TELOS-specific operator decision. Send kit:
 # ~/handoffs/2026-07-21_telos_first_receipt_kit/.
 #
 # Promotion gates (all operator-held)
@@ -114,7 +114,7 @@
       kind: docs
       blocker: true
     - id: 3
-      what: "Operator lifts the outreach hold for ONE send using ~/handoffs/2026-07-21_telos_first_receipt_kit/ (same lease spend opens the SAB first-independent-operator contact)."
+      what: "Operator decides whether to lift the outreach hold for ONE TELOS send using ~/handoffs/2026-07-21_telos_first_receipt_kit/."
       kind: external
       blocker: true
     - id: 4

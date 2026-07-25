@@ -18,7 +18,7 @@ re-admission candidate) · operator send kit at `~/handoffs/2026-07-21_telos_fir
 **Consequence:** a perfect first external acted receipt currently has no canon gate to satisfy. It
 would go green only on a non-canon branch. The 21-days-unsent sanitized artifact
 (`reports/telos_ai/SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md`, local only) is consent-ready
-external evidence with nowhere canonical to land.
+external evidence with nowhere on main to land.
 
 ## Option (a) — port the telos track to canon, honestly re-scoped
 
@@ -59,10 +59,9 @@ external receipt" — and (a) implements exactly that and nothing more. (b) is w
 decree lane carry a second falsifier for a different product; boundary hygiene has been the estate's
 hardest-won lesson.
 
-Either way, the send itself is one operator lease decision that serves two threads at once (TELOS
-receipt + SAB first-independent-operator contact) — kit with generic and named-recipient email
-variants, verbatim artifact copy, and a fail-closed receipt skeleton is staged at
-`~/handoffs/2026-07-21_telos_first_receipt_kit/`.
+Either way, the TELOS send requires its own operator decision. A kit with generic and
+named-recipient email variants, verbatim artifact copy, and a fail-closed receipt skeleton is staged
+at `~/handoffs/2026-07-21_telos_first_receipt_kit/`.
 
 ## Operator decisions needed
 
