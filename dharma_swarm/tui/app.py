@@ -2035,17 +2035,12 @@ class DGCApp(App):
                     out(f"  [{BENGARA}]MISSING[/{BENGARA}] {name} -- {info.get('path', '?')}")
 
         elif cmd == "memory":
-            out("[dim]Loading memory...[/dim]")
-            from dharma_swarm.context import read_latent_gold_overview, read_memory_context
+            out("[dim]Loading common memory...[/dim]")
+            from dharma_swarm.memory_common import render_memory_common_command
 
-            ctx = read_memory_context()
-            for line in ctx.split("\n")[:30]:
-                out(f"  {line}")
-            latent = read_latent_gold_overview(state_dir=DHARMA_STATE, limit=5)
-            if latent:
-                out(f"  [{INDIGO}]Latent gold[/{INDIGO}]")
-                for line in latent.split("\n")[:10]:
-                    out(f"  {line}")
+            rendered = render_memory_common_command(arg or "status", state_dir=DHARMA_STATE)
+            for line in rendered.split("\n"):
+                out(line)
 
         elif cmd == "witness":
             if not arg:
