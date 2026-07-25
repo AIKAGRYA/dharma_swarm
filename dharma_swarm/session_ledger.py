@@ -44,6 +44,26 @@ def _fsync_directory(path: Path) -> None:
         os.close(directory_fd)
 
 
+def _mkdir_durable(path: Path) -> None:
+    missing: list[Path] = []
+    current = path
+    while not current.exists():
+        missing.append(current)
+        parent = current.parent
+        if parent == current:
+            raise FileNotFoundError(f"no existing ancestor for {path}")
+        current = parent
+    if not current.is_dir():
+        raise NotADirectoryError(str(current))
+    for directory in reversed(missing):
+        try:
+            directory.mkdir(exist_ok=False)
+        except FileExistsError:
+            if not directory.is_dir():
+                raise
+        _fsync_directory(directory.parent)
+
+
 class SessionLedger:
     """Append-only JSONL ledgers grouped by session ID."""
 
@@ -60,13 +80,7 @@ class SessionLedger:
         )
         self.session_id = session_id or os.getenv("DGC_SESSION_ID") or _session_stamp()
         self.session_dir = self.base_dir / self.session_id
-        try:
-            self.session_dir.mkdir(parents=True, exist_ok=False)
-        except FileExistsError:
-            if not self.session_dir.is_dir():
-                raise
-        else:
-            _fsync_directory(self.base_dir)
+        _mkdir_durable(self.session_dir)
         self.task_path = self.session_dir / "task_ledger.jsonl"
         self.progress_path = self.session_dir / "progress_ledger.jsonl"
         self._runtime_state = RuntimeStateStore(runtime_db_path)
@@ -103,14 +117,14 @@ class SessionLedger:
             and not self._episode_writer.has_logical_delivery(opened_delivery_key)
         ):
             try:
-                self._runtime_state.requeue_episode_event_sync(
-                    opened_delivery_key,
+                self._runtime_state.requeue_episode_destination_history_sync(
+                    episode_id=self.episode_id,
                     destination_id=self.episode_destination_id,
                 )
             except Exception as exc:
                 self.episode_ledger_failures += 1
                 raise RuntimeError(
-                    "failed to requeue the required episode_opened delivery"
+                    "failed to requeue the required episode destination history"
                 ) from exc
         # Establish and acknowledge the stable open before touching later
         # backlog rows. A crash can never leave those rows acknowledged into a

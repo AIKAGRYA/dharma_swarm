@@ -67,7 +67,6 @@ def test_new_nested_session_fsyncs_base_directory(tmp_path, monkeypatch):
 
     def record_fsync(path):
         assert path.is_dir()
-        assert (path / "sess_nested").is_dir()
         synced.append(path)
 
     monkeypatch.setattr(
@@ -81,7 +80,8 @@ def test_new_nested_session_fsyncs_base_directory(tmp_path, monkeypatch):
     }
     SessionLedger(**kwargs)
 
-    assert synced == [base_dir]
+    assert synced == [tmp_path, tmp_path / "nested", base_dir]
+    assert (base_dir / "sess_nested").is_dir()
     synced.clear()
     SessionLedger(**kwargs)
     assert synced == []
@@ -276,8 +276,12 @@ def test_deleted_destination_requeues_stable_open_before_new_attempt(tmp_path):
     assert [event.event_type for event in recreated] == [
         "episode_opened",
         "attempt_started",
+        "attempt_started",
     ]
-    assert recreated[1].attempt_id == second.attempt_id
+    assert [event.attempt_id for event in recreated[1:]] == [
+        first.attempt_id,
+        second.attempt_id,
+    ]
 
 
 def test_recreated_destination_durably_opens_before_later_backlog_ack(
@@ -324,12 +328,22 @@ def test_recreated_destination_durably_opens_before_later_backlog_ack(
         SessionLedger(**kwargs)
 
     opened_key = f"episode:{first.episode_id}:opened"
+    first_attempt_key = f"attempt:{first.attempt_id}:started"
     recreated = _read_episode_events(first.episode_path)
-    assert recreated[0].event_type == "episode_opened"
-    assert not any(event.event_type == "attempt_started" for event in recreated)
-    assert acked_keys == [opened_key, backlog_key]
+    assert [event.event_type for event in recreated] == [
+        "episode_opened",
+        "attempt_started",
+        "observation_recorded",
+    ]
+    assert recreated[1].attempt_id == first.attempt_id
+    assert recreated[2].attempt_id == first.attempt_id
+    assert acked_keys == [opened_key, first_attempt_key, backlog_key]
     assert store.get_episode_outbox_sync(
         opened_key,
+        destination_id=first.episode_destination_id,
+    ).acked_at is not None
+    assert store.get_episode_outbox_sync(
+        first_attempt_key,
         destination_id=first.episode_destination_id,
     ).acked_at is not None
     assert store.get_episode_outbox_sync(

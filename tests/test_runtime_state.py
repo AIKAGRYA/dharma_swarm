@@ -279,7 +279,10 @@ def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None
         )
 
 
-@pytest.mark.parametrize("corrupt_payload_json", ["{", "[]"])
+@pytest.mark.parametrize(
+    "corrupt_payload_json",
+    ["{", "[]", '{"value": NaN}', '{"value": Infinity}', '{"value": -Infinity}'],
+)
 def test_episode_outbox_corrupt_payload_json_fails_closed(
     tmp_path,
     corrupt_payload_json,
@@ -311,6 +314,33 @@ def test_episode_outbox_corrupt_payload_json_fails_closed(
             (pending.storage_key,),
         ).fetchone()[0]
     assert acked_at is None
+
+
+@pytest.mark.parametrize(
+    "non_finite",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+def test_episode_outbox_rejects_non_finite_payloads(
+    tmp_path,
+    non_finite,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="JSON"):
+        store.enqueue_episode_event_sync(
+            delivery_key="non-finite-payload",
+            destination_id="non-finite-destination",
+            episode_id="ep-non-finite",
+            attempt_id="at-non-finite",
+            event_type="observation_recorded",
+            payload={"value": non_finite},
+        )
+
+    assert store.get_episode_outbox_sync(
+        "non-finite-payload",
+        destination_id="non-finite-destination",
+    ) is None
 
 
 @pytest.mark.parametrize("changed_value", [1.0, True])

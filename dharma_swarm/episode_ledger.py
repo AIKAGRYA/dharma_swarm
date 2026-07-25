@@ -52,7 +52,7 @@ def new_attempt_id() -> str:
 
 
 def _canonical(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str)
+    return json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str, allow_nan=False)
 
 
 def redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -420,7 +420,7 @@ class EpisodeLedgerWriter:
         record["payload"] = redact_payload(event.payload)
         EpisodeEvent.from_dict(record)
         prefix = b"\n" if self._tail_unterminated else b""
-        encoded = json.dumps(record, ensure_ascii=True, default=str).encode("utf-8")
+        encoded = json.dumps(record, ensure_ascii=True, default=str, allow_nan=False).encode("utf-8")
         encoded += b"\n"
         stream.seek(0, os.SEEK_END)
         stream.write(prefix + encoded)

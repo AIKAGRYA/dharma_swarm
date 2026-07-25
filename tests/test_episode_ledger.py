@@ -80,6 +80,16 @@ def test_event_round_trips_through_json():
     assert rebuilt.schema_version == EPISODE_EVENT_SCHEMA_VERSION
 
 
+@pytest.mark.parametrize(
+    "non_finite",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+def test_event_rejects_non_finite_json_numbers(non_finite):
+    with pytest.raises(ValueError, match="JSON"):
+        _event("observation_recorded", 1, value=non_finite)
+
+
 def test_unknown_schema_version_fails_closed():
     payload = _event().to_dict()
     payload["schema_version"] = "episode_event.v999"

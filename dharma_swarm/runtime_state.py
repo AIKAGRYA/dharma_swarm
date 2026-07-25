@@ -4191,7 +4191,7 @@ class RuntimeStateStore:
                 episode_id,
                 attempt_id,
                 event_type,
-                _json_dump(payload),
+                _episode_outbox_json_dump(payload),
                 str(session_event_id),
                 created_at,
             ),
@@ -4211,7 +4211,8 @@ class RuntimeStateStore:
             stored.episode_id != episode_id
             or stored.attempt_id != attempt_id
             or stored.event_type != event_type
-            or _json_dump(stored.payload) != _json_dump(payload)
+            or _episode_outbox_json_dump(stored.payload)
+            != _episode_outbox_json_dump(payload)
             or stored.session_event_id != str(session_event_id)
             or stored.destination_id != destination_id
         ):
@@ -4429,6 +4430,29 @@ class RuntimeStateStore:
 
         return self._run_sync_transaction(operation, immediate=True)
 
+    def requeue_episode_destination_history_sync(
+        self,
+        *,
+        episode_id: str,
+        destination_id: str,
+    ) -> int:
+        """Requeue the retained causal history for one recreated destination."""
+        episode_id = str(episode_id).strip()
+        destination_id = str(destination_id).strip()
+        if not episode_id or not destination_id:
+            raise ValueError("episode_id and destination_id are required")
+
+        def operation(db: sqlite3.Connection) -> int:
+            cursor = db.execute(
+                "UPDATE episode_event_outbox"
+                " SET acked_at = NULL, episode_event_id = ''"
+                " WHERE episode_id = ? AND destination_id = ?",
+                (episode_id, destination_id),
+            )
+            return max(0, int(cursor.rowcount))
+
+        return self._run_sync_transaction(operation, immediate=True)
+
 
 _EPISODE_OUTBOX_EVENT_TYPES = (
     "episode_opened",
@@ -4477,6 +4501,14 @@ def _redact_episode_outbox_value(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_redact_episode_outbox_value(item) for item in value]
     return value
+
+
+def _reject_episode_outbox_json_constant(value: str) -> Any:
+    raise ValueError(f"non-finite JSON number {value!r} is not allowed")
+
+
+def _episode_outbox_json_dump(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, ensure_ascii=True, allow_nan=False)
 
 
 def _normalize_episode_outbox_payload(
@@ -4571,14 +4603,19 @@ def _row_to_episode_outbox(row: sqlite3.Row | aiosqlite.Row) -> EpisodeOutboxRec
     storage_key = str(row["delivery_key"])
     event_type = str(row["event_type"])
     try:
-        decoded_payload = json.loads(row["payload_json"])
+        decoded_payload = json.loads(
+            row["payload_json"],
+            parse_constant=_reject_episode_outbox_json_constant,
+        )
         if not isinstance(decoded_payload, dict):
             raise TypeError("payload must decode to an object")
         payload = _normalize_episode_outbox_payload(
             event_type=event_type,
             payload=decoded_payload,
         )
-        if _json_dump(payload) != _json_dump(decoded_payload):
+        if _episode_outbox_json_dump(payload) != _episode_outbox_json_dump(
+            decoded_payload
+        ):
             raise ValueError("payload is not normalized")
     except (TypeError, ValueError) as exc:
         raise ValueError(
