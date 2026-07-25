@@ -17,6 +17,7 @@ class WikiVectorIngestReceipt:
     backfill: dict[str, Any]
     sync_index: dict[str, Any]
     reembed: dict[str, Any]
+    manifest_excluded_files: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
@@ -45,11 +46,18 @@ def ingest_wiki_concepts(
     )
     from scripts.vector_store_reembed_vec0 import reembed_queries
 
-    text_paths = discover_text_files(
+    discovered = discover_text_files(
         (resolved_wiki_dir,),
         max_files=max_files,
         max_bytes=max_file_bytes,
     )
+    from dharma_swarm.chetana.manifest import load_manifest
+
+    # Trust binds at READ: only manifest-trusted files reach the vector door.
+    # No valid signed manifest → nothing is ingested (fail closed).
+    manifest = load_manifest(resolved_wiki_dir)
+    text_paths = tuple(p for p in discovered if manifest.is_trusted(p))
+    manifest_excluded = len(discovered) - len(text_paths)
     backfill = backfill_memory_sources(
         state_dir=resolved_state_dir,
         memory_jsonl_paths=(),
@@ -82,4 +90,5 @@ def ingest_wiki_concepts(
         backfill=backfill.to_json(),
         sync_index=sync.to_json(),
         reembed=reembed.to_json(),
+        manifest_excluded_files=manifest_excluded,
     )

@@ -299,11 +299,14 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     staged = list_staged()
     pending = list_pending()
     trusted = list_trusted()
+    on_disk = list_trusted(apply_manifest=False)
     quarantined = list_quarantine()
     print("# chetana status")
     print(f"- staged    : {len(staged)}")
     print(f"- pending   : {len(pending)}")
-    print(f"- trusted   : {len(trusted)}")
+    # trusted = manifest projection; on-disk drift means pages awaiting
+    # manifest adjudication (OP-3/D-3) or an invalid/missing manifest
+    print(f"- trusted   : {len(trusted)} (on-disk: {len(on_disk)})")
     print(f"- quarantine: {len(quarantined)}")
     return 0
 

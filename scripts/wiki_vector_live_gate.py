@@ -182,11 +182,21 @@ def run_gate(
 def _concept_files(wiki_concepts_dir: Path) -> tuple[Path, ...]:
     if wiki_concepts_dir.name != "concepts" and (wiki_concepts_dir / "concepts").is_dir():
         wiki_concepts_dir = wiki_concepts_dir / "concepts"
+    from dharma_swarm.chetana.manifest import load_manifest
+
+    # Only manifest-trusted files are gate-counted (fail-closed: no valid
+    # signed manifest → zero concepts → gate fails on min_concepts).
+    # verify_content=False on purpose: content drift must stay VISIBLE to the
+    # gate's own digest comparison (missing_or_stale) instead of silently
+    # shrinking the concept set; ingest refuses drifted bytes regardless.
+    manifest = load_manifest(wiki_concepts_dir)
     return tuple(
         sorted(
             path.resolve()
             for path in wiki_concepts_dir.glob("*.md")
-            if path.is_file() and not path.name.startswith(".")
+            if path.is_file()
+            and not path.name.startswith(".")
+            and manifest.is_trusted(path, verify_content=False)
         )
     )
 
