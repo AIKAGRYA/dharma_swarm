@@ -28,9 +28,9 @@ scripts/governance/check_track_status.py and memory_kernel.write_receipts.
 
 import argparse
 import html
+import http.client
 import json
 import sys
-import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -78,6 +78,26 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def _fetch_publication(url: str) -> tuple[int, bytes]:
+    """Fetch one validated page without allowing redirects or a dynamic host."""
+    safe_url = _validated_publication_url(url)
+    parsed = urlsplit(safe_url)
+    request_target = parsed.path or "/"
+    if parsed.query:
+        request_target = f"{request_target}?{parsed.query}"
+
+    connection = http.client.HTTPSConnection(
+        DARSHAN_PUBLICATION_NETLOC,
+        timeout=30,
+    )
+    try:
+        connection.request("GET", request_target)
+        response = connection.getresponse()
+        return response.status, response.read()
+    finally:
+        connection.close()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--operator-read-confirmed", required=False, default="",
@@ -109,14 +129,8 @@ def main() -> None:
     live_pages: dict[str, str] = {}
     for art in receipt["articles"]:
         url = art["published_url"]
-        safe_url = _validated_publication_url(url)
         try:
-            with urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-                safe_url,
-                timeout=30,
-            ) as resp:
-                status = resp.status
-                body = resp.read()
+            status, body = _fetch_publication(url)
         except Exception as exc:
             fail(f"{url} unreachable: {type(exc).__name__}: {exc}")
         if status != 200:

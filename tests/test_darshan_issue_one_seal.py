@@ -54,3 +54,39 @@ def test_all_draft_publication_urls_use_exact_https_origin() -> None:
     for article in receipt["articles"]:
         url = article["published_url"]
         assert seal._validated_publication_url(url) == url
+
+
+def test_fetch_publication_uses_fixed_host_and_path(monkeypatch) -> None:
+    calls = []
+
+    class FakeResponse:
+        status = 200
+
+        def read(self) -> bytes:
+            return b"page"
+
+    class FakeConnection:
+        def __init__(self, host: str, *, timeout: int) -> None:
+            calls.append(("connect", host, timeout))
+
+        def request(self, method: str, target: str) -> None:
+            calls.append(("request", method, target))
+
+        def getresponse(self) -> FakeResponse:
+            return FakeResponse()
+
+        def close(self) -> None:
+            calls.append(("close",))
+
+    monkeypatch.setattr(seal.http.client, "HTTPSConnection", FakeConnection)
+
+    status, body = seal._fetch_publication(
+        "https://amitabhainarunachala.github.io/darshan/article/?view=full"
+    )
+
+    assert (status, body) == (200, b"page")
+    assert calls == [
+        ("connect", "amitabhainarunachala.github.io", 30),
+        ("request", "GET", "/darshan/article/?view=full"),
+        ("close",),
+    ]
