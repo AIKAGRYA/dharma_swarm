@@ -38,6 +38,7 @@ from dharma_swarm.models import (
 )
 from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
+from dharma_swarm.runtime_admission import runtime_control_enabled
 from dharma_swarm.runtime_topology import (
     resolve_swarm_handoff,
     subagent_tool_metadata,
@@ -429,7 +430,7 @@ class Orchestrator:
 
     async def route_next(self) -> list[TaskDispatch]:
         """Match ready tasks to idle agents, one-to-one. Returns dispatches."""
-        import time as _tt; _rn0 = _tt.monotonic()
+        import time as _tt; _rn0 = _tt.monotonic()  # noqa: E702
         if self._board is None or self._pool is None:
             return []
 
@@ -1843,7 +1844,7 @@ class Orchestrator:
         return merged
 
     async def _refresh_coordination_state(self) -> dict[str, Any]:
-        import time as _t; _cs_t0 = _t.monotonic()
+        import time as _t; _cs_t0 = _t.monotonic()  # noqa: E702
         logger.info("_refresh_coordination: entering")
         agents = await self._list_coordination_agents()
         logger.info("_refresh_coordination: agents=%.1fs (n=%d)", _t.monotonic() - _cs_t0, len(agents))
@@ -2144,7 +2145,7 @@ class Orchestrator:
 
     async def _assign_dispatch(self, td: TaskDispatch) -> None:
         """Record dispatch, update board + pool, kick off execution, notify via bus."""
-        import time as _adt; _ad0 = _adt.monotonic()
+        import time as _adt; _ad0 = _adt.monotonic()  # noqa: E702
         td.metadata["dispatch_started_monotonic"] = time.monotonic()
         task_for_gate = await self._safe_get_task(td.task_id)
         logger.info("_assign_dispatch(%s): get_task=%.2fs", td.task_id[:8], _adt.monotonic() - _ad0)
@@ -3109,36 +3110,35 @@ class Orchestrator:
                 },
             )
 
-        # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
-        # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus
-        # that future vector/hybrid search will query.
-        try:
-            from dharma_swarm.memory_palace import MemoryPalace
-            palace = MemoryPalace(state_dir=self._runtime_root())
-            _t_palace = asyncio.create_task(
-                palace.ingest(
-                    content=result,
-                    source=f"task:{task.id[:8]}:{task.title[:60]}",
-                    layer="working",
-                    tags=["task_output"],
+        # Feed task results into MemoryPalace for cross-session semantic recall.
+        if runtime_control_enabled("DGC_TASK_MEMORY_PALACE_INGESTION"):
+            try:
+                from dharma_swarm.memory_palace import MemoryPalace
+                palace = MemoryPalace(state_dir=self._runtime_root())
+                _t_palace = asyncio.create_task(
+                    palace.ingest(
+                        content=result,
+                        source=f"task:{task.id[:8]}:{task.title[:60]}",
+                        layer="working",
+                        tags=["task_output"],
+                    )
                 )
-            )
-            _t_palace.add_done_callback(
-                lambda t: (
-                    logger.debug("MemoryPalace ingest failed: %s", t.exception())
-                    if not t.cancelled() and t.exception() else None
+                _t_palace.add_done_callback(
+                    lambda task: (
+                        logger.debug("MemoryPalace ingest failed: %s", task.exception())
+                        if not task.cancelled() and task.exception()
+                        else None  # pragma: no branch - callback expression
+                    )
                 )
-            )
-        except Exception as exc:
-            logger.debug("MemoryPalace ingest failed (non-fatal): %s", exc)
-
+            except Exception as exc:
+                logger.debug("MemoryPalace ingest failed (non-fatal): %s", exc)
         # Leave stigmergic mark
         try:
             from dharma_swarm.stigmergy import StigmergyStore, StigmergicMark
 
             store = StigmergyStore(self._stigmergy_dir)
             # Extract first meaningful line as observation
-            lines = [l.strip() for l in result.split("\n") if l.strip()]
+            lines = [line.strip() for line in result.split("\n") if line.strip()]
             observation = lines[0][:200] if lines else f"Completed: {task.title}"
             mark = StigmergicMark(
                 agent=agent_name,
@@ -3207,7 +3207,7 @@ class Orchestrator:
                 source="claim_timeout",
             )
         return len(done_tasks), len(stale)
-from dharma_swarm import orchestrator_bsp as _bsp
+from dharma_swarm import orchestrator_bsp as _bsp  # noqa: E402
 Orchestrator._combine_results = staticmethod(_bsp.combine_results)  # type: ignore[attr-defined]
 Orchestrator._collect_completed_with_barrier = _bsp.collect_completed_with_barrier  # type: ignore[attr-defined]
 Orchestrator._save_superstep_checkpoint = _bsp.save_superstep_checkpoint  # type: ignore[attr-defined]
