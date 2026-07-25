@@ -35,7 +35,10 @@ from scripts.store_inventory_census import (  # noqa: E402
 # PR to silently re-grow into. Consolidation LOWERS a baseline; a genuinely new
 # store must be justified in review before RAISING one.
 BASELINE_DB_NAMES = 39
-BASELINE_JSONL_NAMES = 216
+# 216 -> 217 (2026-07-24): episode_ledger.jsonl — the session ledger's Episode
+# Ledger producer file (B1 producer slice; schema landed in #1062). One new
+# versioned validated store, not proliferation of an unversioned one.
+BASELINE_JSONL_NAMES = 217
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12

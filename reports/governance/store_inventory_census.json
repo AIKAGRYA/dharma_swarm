@@ -107,6 +107,7 @@
     "embodiments.jsonl",
     "entities.jsonl",
     "entries.jsonl",
+    "episode_ledger.jsonl",
     "equity_curve.jsonl",
     "evaluations.jsonl",
     "evolution_log.jsonl",
@@ -296,7 +297,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 216,
+    "distinct_jsonl_names": 217,
     "ledger_classes": 11,
     "ledger_modules": 12
   }

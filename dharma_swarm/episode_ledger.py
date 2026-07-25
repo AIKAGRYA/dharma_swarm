@@ -273,12 +273,22 @@ class EpisodeLedgerWriter:
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
         self._seen: set[str] = set()
+        # A torn tail has no trailing newline; the next append must start on
+        # a fresh line or the new event is absorbed INTO the garbage line and
+        # silently lost on the following rehydration.
+        self._tail_unterminated = False
         self._rehydrate()
 
     def _rehydrate(self) -> None:
         if not self.path.exists():
             return
-        for line in self.path.read_text(encoding="utf-8").splitlines():
+        raw = self.path.read_bytes()
+        self._tail_unterminated = bool(raw) and not raw.endswith(b"\n")
+        # Tolerant decode: a torn multi-byte UTF-8 tail from a crashed write
+        # must degrade to a corrupt LINE (skipped below), not a decode error
+        # that aborts rehydration and disables the writer entirely.
+        text = raw.decode("utf-8", errors="replace")
+        for line in text.splitlines():
             try:
                 record = json.loads(line)
             except (TypeError, ValueError):
@@ -321,6 +331,8 @@ class EpisodeLedgerWriter:
         EpisodeEvent.from_dict(record)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=True, default=str) + "\n")
+            prefix = "\n" if self._tail_unterminated else ""
+            f.write(prefix + json.dumps(record, ensure_ascii=True, default=str) + "\n")
+        self._tail_unterminated = False
         self._seen.add(event.event_id)
         return True
