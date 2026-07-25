@@ -48,3 +48,9 @@ dgc cron daemon
 ```
 
 Run `dgc memory metabolize` manually after wiki/atom promotion when you want an immediate receipt. The scheduled job uses the typed `memory_common_metabolism` cron handler, so it runs local ingest/gates directly and fails the cron job if the gates fail.
+
+Metabolism receipts land under `<state_dir>/reports/memory_kernel/` (default `~/.dharma/reports/memory_kernel/`) — runtime receipts never enter git. Status reads fall back to the legacy in-repo `reports/memory_kernel/` for pre-relocation receipts.
+
+## Gate Trust Caveat
+
+The broad-sweep component of the system gate generates its eval cases from the same indexed sidecar rows it retrieves against (audit 2026-07-25 §5.7). A 100/100 score is custody/regression signal, not external relevance — do not re-trust it as a quality bar until the eval battery is replaced with held-out cases.

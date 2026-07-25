@@ -54,8 +54,12 @@ def memory_common_summary(*, state_dir: Path | None = None) -> MemoryCommonSumma
         vector_db_exists=db_path.exists(),
         sidecar_rows=sum(counts.values()),
         sidecar_counts=counts,
-        wiki_gate_score=_latest_gate_score("WIKI_VECTOR_LIVE_GATE_*FINAL.json"),
-        system_gate_score=_latest_gate_score("MEMORY_RETRIEVAL_SYSTEM_GATE_*FINAL.json"),
+        wiki_gate_score=_latest_gate_score(
+            "WIKI_VECTOR_LIVE_GATE_*FINAL.json", state_dir=resolved_state_dir
+        ),
+        system_gate_score=_latest_gate_score(
+            "MEMORY_RETRIEVAL_SYSTEM_GATE_*FINAL.json", state_dir=resolved_state_dir
+        ),
     )
 
 
@@ -285,7 +289,9 @@ def run_memory_metabolism(
         "system_gate": system_gate,
         "passed": bool(wiki_gate.passed and system_gate.get("passed")),
     }
-    out_dir = Path(receipt_dir or Path(__file__).resolve().parents[1] / "reports" / "memory_kernel")
+    # Runtime receipts never enter git: default sink lives under the state
+    # dir, not the repo checkout hosting the code.
+    out_dir = Path(receipt_dir or resolved_state_dir / "reports" / "memory_kernel")
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = started.strftime("%Y%m%dT%H%M%SZ")
     receipt_path = out_dir / f"MEMORY_COMMON_METABOLISM_{stamp}.json"
@@ -418,19 +424,27 @@ def render_memory_common_command(
     )
 
 
-def _latest_gate_score(pattern: str) -> float | None:
-    root = Path(__file__).resolve().parents[1]
-    report_dir = root / "reports" / "memory_kernel"
-    try:
-        paths = sorted(report_dir.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True)
-    except OSError:
-        return None
-    for path in paths:
+def _latest_gate_score(pattern: str, *, state_dir: Path | None = None) -> float | None:
+    resolved_state_dir = Path(state_dir or DEFAULT_STATE_DIR).expanduser()
+    # New receipt home first; legacy in-repo reports dir second so the 26
+    # historical metabolism receipts stay readable until new runs land.
+    report_dirs = (
+        resolved_state_dir / "reports" / "memory_kernel",
+        Path(__file__).resolve().parents[1] / "reports" / "memory_kernel",
+    )
+    for report_dir in report_dirs:
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+            paths = sorted(
+                report_dir.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True
+            )
+        except OSError:
             continue
-        score = payload.get("score")
-        if isinstance(score, (int, float)):
-            return float(score)
+        for path in paths:
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            score = payload.get("score")
+            if isinstance(score, (int, float)):
+                return float(score)
     return None
