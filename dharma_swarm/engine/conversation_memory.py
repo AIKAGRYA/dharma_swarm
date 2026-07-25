@@ -361,7 +361,6 @@ class ConversationMemoryStore:
                 )
             db.commit()
 
-        self._link_harvested_shards(turn, harvested)
         return harvested
 
     def get_turn(self, turn_id: str) -> ConversationTurn | None:
@@ -639,31 +638,6 @@ class ConversationMemoryStore:
                 (session_id, max(1, limit)),
             ).fetchall()
         return [{"text": row["text"]} for row in rows]
-
-    def _link_harvested_shards(self, turn: ConversationTurn, shards: list[IdeaShard]) -> None:
-        if len(shards) < 2:
-            return
-        with sqlite3.connect(str(self.db_path)) as db:
-            ensure_memory_plane_schema_sync(db)
-            for index, left in enumerate(shards):
-                for right in shards[index + 1 :]:
-                    relation = "alternative_to" if left.shard_kind == right.shard_kind else "related_to"
-                    weight = 0.4 + (_jaccard(_tokenize(_normalize(left.text)), _tokenize(_normalize(right.text))) * 0.4)
-                    db.execute(
-                        "INSERT INTO idea_links"
-                        " (link_id, from_shard_id, to_shard_id, relation, weight, metadata_json, created_at)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (
-                            f"lnk_{uuid4().hex}",
-                            left.shard_id,
-                            right.shard_id,
-                            relation,
-                            round(weight, 6),
-                            json.dumps({"turn_id": turn.turn_id}, sort_keys=True, ensure_ascii=True),
-                            _utc_now_iso(),
-                        ),
-                    )
-            db.commit()
 
     def _task_shards(self, task_id: str, *, states: tuple[str, ...]) -> list[IdeaShard]:
         placeholders = ", ".join("?" for _ in states)
