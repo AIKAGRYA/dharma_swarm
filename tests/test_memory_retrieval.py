@@ -433,3 +433,82 @@ def test_atoms_for_candidates_maps_ranked_candidates_to_projection_atoms(tmp_pat
     assert atom.source_digest
     assert atom.promotion_allowed is False
     assert atom.context_admissible is False
+
+
+def test_atoms_for_candidates_fails_loud_when_projection_surface_missing(tmp_path):
+    import pytest
+
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    kernel.surfaces_by_id = {
+        surface_id: surface
+        for surface_id, surface in kernel.surfaces_by_id.items()
+        if surface_id != "home.vectors"
+    }
+    candidate = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.9,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="chunk",
+    )
+
+    # A silent () would make shadow receipts read admitted=0 with no WHY;
+    # the missing-surface anomaly must surface as a stamped shadow_error.
+    with pytest.raises(LookupError, match="home.vectors"):
+        kernel.atoms_for_candidates((candidate,))
+
+
+def test_memory_kernel_query_forwards_shadow_flags(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import dharma_swarm.memory_retrieval as memory_retrieval_module
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+
+    captured: dict[str, object] = {}
+
+    class _CaptureEngine:
+        def __init__(self, *, state_dir, memory_kernel):
+            captured["state_dir"] = state_dir
+
+        def retrieve(self, query):
+            captured["query"] = query
+            return SimpleNamespace(candidates=())
+
+    monkeypatch.setattr(
+        memory_retrieval_module, "GovernedRetrievalEngine", _CaptureEngine
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+
+    kernel.query(
+        "governed memory",
+        top_k=6,
+        enable_memory_kernel=False,
+        record_telemetry=False,
+    )
+
+    query = captured["query"]
+    assert query.text == "governed memory"
+    assert query.top_k == 6
+    assert query.enable_memory_kernel is False
+    assert query.record_telemetry is False

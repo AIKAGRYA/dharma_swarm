@@ -175,32 +175,35 @@ def build_memory_kernel_default_context(
         None
     )
     isolation_mode = "unrestricted" if isolation_legacy_enabled() else "scoped"
-    atom_budget = max(4, min(24, int(token_budget) // 100))
-    budget = MemoryContextBudget(
-        max_candidate_atoms=atom_budget,
-        max_admitted_atoms=max(1, min(8, atom_budget)),
-        max_total_chars=max(600, min(2400, int(token_budget) * 2)),
-        max_atom_chars=420,
-        include_content=True,
-        require_context_admissible=False,
-        allow_projections=False,
-        allow_high_risk=False,
-        reject_stale=True,
-        require_source_digest=True,
-        require_source_row_key=True,
-        block_tool_exposure=True,
-        isolation_mode=isolation_mode,
-        allowed_scopes=resolved_isolation.allowed_scopes,
-        allowed_agent_ids=resolved_isolation.allowed_agent_ids,
-        allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
-        allowed_truth_states=(
-            TruthState.OBSERVED,
-            TruthState.CLAIMED,
-            TruthState.CURATED,
-            TruthState.CANONICAL,
-        ),
-    )
+    # Budget construction stays inside the try: a bad token_budget must keep
+    # the pre-shadow failure contract (section omitted, status "failed") —
+    # never a raise out of the compile.
     try:
+        atom_budget = max(4, min(24, int(token_budget) // 100))
+        budget = MemoryContextBudget(
+            max_candidate_atoms=atom_budget,
+            max_admitted_atoms=max(1, min(8, atom_budget)),
+            max_total_chars=max(600, min(2400, int(token_budget) * 2)),
+            max_atom_chars=420,
+            include_content=True,
+            require_context_admissible=False,
+            allow_projections=False,
+            allow_high_risk=False,
+            reject_stale=True,
+            require_source_digest=True,
+            require_source_row_key=True,
+            block_tool_exposure=True,
+            isolation_mode=isolation_mode,
+            allowed_scopes=resolved_isolation.allowed_scopes,
+            allowed_agent_ids=resolved_isolation.allowed_agent_ids,
+            allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
+            allowed_truth_states=(
+                TruthState.OBSERVED,
+                TruthState.CLAIMED,
+                TruthState.CURATED,
+                TruthState.CANONICAL,
+            ),
+        )
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
                 text_query=recall_query or None,
@@ -264,6 +267,14 @@ def _ranked_retrieval_shadow(
     MEMORY_FIRST_TOKEN_SPEC sequencing: shadow -> receipts -> flip. The legacy
     scan keeps serving; this only stamps metadata. Any failure is captured as
     ``shadow_error`` — the shadow must never break bundle compilation.
+
+    ``shadow_overlap_at_k`` is an UNREDACTED-IDENTITY-namespace metric only:
+    legacy pack refs are stamped post-redaction (context_admission ``_safe_ref``
+    turns any local path into ``<local_path_redacted>``), so file-path-backed
+    identities can never match raw candidate paths and overlap deterministically
+    under-counts for file-backed atoms. ``legacy_redacted_ref_count`` stamps how
+    many legacy refs were blinded that way; PR-04b must not flip on overlap
+    numbers alone (see adversarial review #106).
     """
 
     shadow: dict[str, Any] = {
@@ -290,11 +301,21 @@ def _ranked_retrieval_shadow(
 
     shadow_t0 = time.perf_counter()
     try:
-        result = query_door(recall_query, top_k=top_k)
+        # Shadow flags: skip the engine's own kernel-admission pass (we run
+        # admission ourselves via atoms_for_candidates) and skip the sqlite
+        # telemetry write — the shadow must not double kernel I/O per compile.
+        result = query_door(
+            recall_query,
+            top_k=top_k,
+            enable_memory_kernel=False,
+            record_telemetry=False,
+        )
         candidates = tuple(getattr(result, "candidates", ()) or ())
         shadow_atoms = tuple(atoms_door(candidates))
         shadow_pack = preview_memory_pack(shadow_atoms, budget=budget)
-        legacy_keys = _legacy_pack_identity_keys(legacy_pack)
+        legacy_keys, legacy_redacted_ref_count = _legacy_pack_identity_keys(
+            legacy_pack
+        )
         overlap_count = sum(
             1
             for candidate in candidates
@@ -302,6 +323,7 @@ def _ranked_retrieval_shadow(
         )
         detail["status"] = "recorded"
         detail["candidate_count"] = len(candidates)
+        detail["shadow_atom_count"] = len(shadow_atoms)
         detail["shadow_admitted_count"] = shadow_pack.admitted_count
         detail["legacy_candidate_count"] = int(
             getattr(legacy_pack, "candidate_count", 0) or 0
@@ -310,6 +332,9 @@ def _ranked_retrieval_shadow(
             getattr(legacy_pack, "admitted_count", 0) or 0
         )
         detail["overlap_count"] = overlap_count
+        detail["overlap_key_namespace"] = "unredacted_identity_only"
+        detail["legacy_identity_key_count"] = len(legacy_keys)
+        detail["legacy_redacted_ref_count"] = legacy_redacted_ref_count
         detail["shadow_omission_reason_counts"] = _count_reasons(
             reason
             for item in shadow_pack.items
@@ -332,8 +357,24 @@ def _ranked_retrieval_shadow(
     return shadow
 
 
-def _legacy_pack_identity_keys(pack: Any) -> set[str]:
+# Pack items carry post-redaction refs; these sentinels are many-to-one and
+# must never become identity keys (they would false-match across atoms).
+_REDACTION_SENTINELS = frozenset(
+    {"<local_path_redacted>", "<secret_like_redacted>"}
+)
+
+
+def _legacy_pack_identity_keys(pack: Any) -> tuple[set[str], int]:
+    """Return (identity keys, count of refs blinded by redaction).
+
+    Only ``atom_id`` is guaranteed pre-redaction; ``content_ref``/``source_refs``
+    are post-redaction, so any file-path ref arrives as a sentinel and is
+    counted instead of keyed — that count is the overlap metric's stamped
+    blind spot.
+    """
+
     keys: set[str] = set()
+    redacted_ref_count = 0
     for item in getattr(pack, "items", ()) or ():
         values = (
             getattr(item, "atom_id", ""),
@@ -342,9 +383,13 @@ def _legacy_pack_identity_keys(pack: Any) -> set[str]:
         )
         for value in values:
             key = _clean_text(value)
-            if key:
-                keys.add(key)
-    return keys
+            if not key:
+                continue
+            if key in _REDACTION_SENTINELS or "<local_path_redacted>" in key:
+                redacted_ref_count += 1
+                continue
+            keys.add(key)
+    return keys, redacted_ref_count
 
 
 def _candidate_identity_keys(candidate: Any) -> set[str]:

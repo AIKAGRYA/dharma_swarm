@@ -242,6 +242,8 @@ class MemoryKernel:
         top_k: int = 10,
         include_content: bool = True,
         min_score: float = 0.01,
+        enable_memory_kernel: bool = True,
+        record_telemetry: bool = True,
     ):
         """Query the governed wiki/vector retrieval door for ranked context."""
 
@@ -255,6 +257,8 @@ class MemoryKernel:
                 top_k=max(1, top_k),
                 include_content=include_content,
                 min_score=min_score,
+                enable_memory_kernel=enable_memory_kernel,
+                record_telemetry=record_telemetry,
             )
         )
 
@@ -269,7 +273,12 @@ class MemoryKernel:
 
         surface = self.surfaces_by_id.get(RETRIEVAL_PROJECTION_SURFACE_ID)
         if surface is None:
-            return ()
+            # Fail closed and loud: a silent () here would make shadow receipts
+            # read admitted=0 with no stamped WHY, poisoning the flip decision.
+            raise LookupError(
+                "retrieval projection surface "
+                f"{RETRIEVAL_PROJECTION_SURFACE_ID!r} missing from census"
+            )
         atoms: list[MemoryAtom] = []
         for candidate in candidates:
             doc_id = str(getattr(candidate, "doc_id", "") or "")
