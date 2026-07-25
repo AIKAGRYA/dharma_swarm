@@ -37,6 +37,7 @@ CONTRACT_SOURCES = (
     "docs/governance/ANTI_SLOP_RULES.md",
     "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
     "docs/state/BROKEN_REGISTER.md",
     "pyproject.toml",
     "uv.lock",
