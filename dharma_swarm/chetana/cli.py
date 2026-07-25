@@ -206,18 +206,33 @@ def _cmd_approve(args: argparse.Namespace) -> int:
 def _cmd_verify(args: argparse.Namespace) -> int:
     """Round-trip every trusted atom's axiom_signature against current kernel.
 
-    Reports four buckets:
+    Reports five buckets:
       - verified      : recomputed sig matches stored sig under current kernel
       - zero-sig      : atom was signed with the "0"*64 placeholder (silent
                         integrity failure surfaced by the 2026-04-28 governance fix)
       - kernel-drift  : atom signature does not match current kernel and is not
                         zero-sig — kernel has rotated since this atom was promoted
-      - malformed     : frontmatter doesn't parse or has no axiom_signature
+      - no-provenance : pre-chetana wiki atom; never went through promote
+      - schema-error  : malformed frontmatter / unreadable file
+    plus the overlapping ``unapproved`` list (provenance present but
+    review_status != approved).
+
+    Exit semantics by --mode:
+      - compat (default): non-zero only on zero-sig or schema-error — the
+        legacy rule that tolerates the ~251 pre-chetana wiki pages.
+      - production: fail-closed — non-zero on no-provenance, kernel-drift,
+        zero-sig, schema-error, any unapproved review_status, or an
+        unavailable kernel.
     """
-    from .provenance import parse_frontmatter, signature_matches
+    from .provenance import (
+        PLACEHOLDER_SIGNATURE,
+        VERIFY_BUCKETS,
+        production_verdict,
+        scan_verify_targets,
+    )
     from .staging import list_trusted
 
-    placeholder = "0" * 64
+    placeholder = PLACEHOLDER_SIGNATURE
     current_kernel_sig = placeholder
     try:
         from dharma_swarm.dharma_kernel import KernelGuard  # type: ignore
@@ -238,48 +253,23 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         print(f"warning: KernelGuard unavailable ({e}); using placeholder")
 
     targets: list[Path]
+    projection_empty = False
     if args.path and args.path != ".":
         targets = [Path(args.path)]
     else:
         targets = list_trusted()
+        if not targets and list_trusted(apply_manifest=False):
+            # Atoms exist on disk but the manifest projection is empty
+            # (missing/invalid manifest). Attesting green here would fail open.
+            projection_empty = True
 
-    buckets = {
-        "verified": [],
-        "zero-sig": [],
-        "kernel-drift": [],
-        "no-provenance": [],   # parses as v1 wiki atom; chetana never promoted it
-        "schema-error": [],    # malformed YAML or unrecoverable parse failure
-    }
-    for p in targets:
-        try:
-            text = p.read_text(encoding="utf-8")
-            try:
-                schema, body = parse_frontmatter(text, source_path=str(p))
-            except Exception:
-                # Most likely a v1 wiki atom missing chetana-strict fields.
-                # Distinguish that from genuinely malformed YAML.
-                if text.lstrip().startswith("---"):
-                    buckets["no-provenance"].append(str(p))
-                else:
-                    buckets["schema-error"].append(str(p))
-                continue
-            stored = schema.provenance.axiom_signature if schema.provenance else None
-            if not stored:
-                buckets["no-provenance"].append(str(p))
-                continue
-            if stored == placeholder:
-                buckets["zero-sig"].append(str(p))
-            elif signature_matches(stored, schema, body, current_kernel_sig):
-                buckets["verified"].append(str(p))
-            elif signature_matches(stored, schema, body, placeholder):
-                buckets["zero-sig"].append(str(p))
-            else:
-                buckets["kernel-drift"].append(str(p))
-        except Exception as e:
-            buckets["schema-error"].append(f"{p}: {type(e).__name__}")
+    buckets, unapproved, v1_approved = scan_verify_targets(
+        targets, kernel_signature=current_kernel_sig
+    )
 
     print("# chetana verify\n- current kernel sig: <redacted; compare via dgc dharma status>")
-    for label in ("verified", "zero-sig", "kernel-drift", "no-provenance", "schema-error"):
+    print(f"- mode: {args.mode}")
+    for label in VERIFY_BUCKETS:
         rows = buckets[label]
         print(f"- {label:14s}: {len(rows)}")
         if args.show and rows:
@@ -287,13 +277,32 @@ def _cmd_verify(args: argparse.Namespace) -> int:
                 print(f"    <redacted atom path {idx}>")
             if len(rows) > args.show:
                 print(f"    (... {len(rows) - args.show} more)")
+    print(f"- {'unapproved':14s}: {len(unapproved)}")
+    print(f"- {'v1-approved':14s}: {len(v1_approved)}")
     print("\nlegend:")
     print("  verified      = sig matches under current kernel ✓")
     print("  zero-sig      = signed with placeholder (silent integrity failure)")
     print("  kernel-drift  = sig is real but kernel has rotated")
     print("  no-provenance = pre-chetana wiki atom; never went through promote pipeline")
     print("  schema-error  = malformed YAML or unrecoverable parse failure")
-    # exit non-zero only on actual integrity failures, not on pre-chetana atoms
+    print("  unapproved    = provenance present but review_status != approved (overlaps above)")
+    print("  v1-approved   = approved atom on forgeable body-only v1 sig (overlaps verified)")
+
+    if args.mode == "production":
+        verdict, reasons = production_verdict(
+            buckets, unapproved, kernel_signature=current_kernel_sig, v1_approved=v1_approved
+        )
+        print(f"\nproduction verdict: {verdict.upper()}")
+        for reason in reasons:
+            print(f"  · {reason}")
+        return 0 if verdict == "pass" else 1
+    # compat: exit non-zero only on actual integrity failures, not on pre-chetana atoms
+    if projection_empty:
+        print(
+            "\ncompat verdict: FAIL — empty-manifest-projection "
+            "(trusted dir non-empty but no signed manifest admits it)"
+        )
+        return 1
     return 0 if not buckets["zero-sig"] and not buckets["schema-error"] else 1
 
 
@@ -301,11 +310,14 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     staged = list_staged()
     pending = list_pending()
     trusted = list_trusted()
+    on_disk = list_trusted(apply_manifest=False)
     quarantined = list_quarantine()
     print("# chetana status")
     print(f"- staged    : {len(staged)}")
     print(f"- pending   : {len(pending)}")
-    print(f"- trusted   : {len(trusted)}")
+    # trusted = manifest projection; on-disk drift means pages awaiting
+    # manifest adjudication (OP-3/D-3) or an invalid/missing manifest
+    print(f"- trusted   : {len(trusted)} (on-disk: {len(on_disk)})")
     print(f"- quarantine: {len(quarantined)}")
     return 0
 
@@ -425,6 +437,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp_vf.add_argument("path", nargs="?", default=".", help="atom path (omit to verify all trusted)")
     sp_vf.add_argument("--show", type=int, default=0, help="show first N paths per bucket")
+    sp_vf.add_argument(
+        "--mode",
+        choices=["compat", "production"],
+        default="compat",
+        help=(
+            "compat: legacy exit rule (fail only on zero-sig/schema-error); "
+            "production: fail-closed — also fail on no-provenance, kernel-drift, "
+            "unapproved review_status, or unavailable kernel"
+        ),
+    )
     sp_vf.set_defaults(func=_cmd_verify)
 
     sp_ap = sub.add_parser(
