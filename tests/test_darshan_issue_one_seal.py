@@ -60,25 +60,37 @@ def test_fetch_publication_uses_fixed_host_and_path(monkeypatch) -> None:
     calls = []
 
     class FakeResponse:
-        status = 200
+        status_code = 200
+        content = b"page"
 
-        def read(self) -> bytes:
-            return b"page"
+    class FakeClient:
+        def __init__(
+            self,
+            *,
+            verify: bool,
+            follow_redirects: bool,
+            timeout: int,
+        ) -> None:
+            calls.append(("client", verify, follow_redirects, timeout))
 
-    class FakeConnection:
-        def __init__(self, host: str, *, timeout: int) -> None:
-            calls.append(("connect", host, timeout))
+        def __enter__(self):
+            return self
 
-        def request(self, method: str, target: str) -> None:
-            calls.append(("request", method, target))
-
-        def getresponse(self) -> FakeResponse:
-            return FakeResponse()
-
-        def close(self) -> None:
+        def __exit__(self, *_args) -> None:
             calls.append(("close",))
 
-    monkeypatch.setattr(seal.http.client, "HTTPSConnection", FakeConnection)
+        def get(self, target):
+            calls.append(
+                (
+                    "get",
+                    target.scheme,
+                    target.host,
+                    target.raw_path,
+                )
+            )
+            return FakeResponse()
+
+    monkeypatch.setattr(seal.httpx, "Client", FakeClient)
 
     status, body = seal._fetch_publication(
         "https://amitabhainarunachala.github.io/darshan/article/?view=full"
@@ -86,7 +98,12 @@ def test_fetch_publication_uses_fixed_host_and_path(monkeypatch) -> None:
 
     assert (status, body) == (200, b"page")
     assert calls == [
-        ("connect", "amitabhainarunachala.github.io", 30),
-        ("request", "GET", "/darshan/article/?view=full"),
+        ("client", True, False, 30),
+        (
+            "get",
+            "https",
+            "amitabhainarunachala.github.io",
+            b"/darshan/article/?view=full",
+        ),
         ("close",),
     ]

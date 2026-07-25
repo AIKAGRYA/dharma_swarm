@@ -28,11 +28,12 @@ scripts/governance/check_track_status.py and memory_kernel.write_receipts.
 
 import argparse
 import html
-import http.client
 import json
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
+
+import httpx
 
 REPO = Path(__file__).resolve().parents[3]
 DRAFT = REPO / "reports/darshan/issue_one_receipt.DRAFT.json"
@@ -82,20 +83,19 @@ def _fetch_publication(url: str) -> tuple[int, bytes]:
     """Fetch one validated page without allowing redirects or a dynamic host."""
     safe_url = _validated_publication_url(url)
     parsed = urlsplit(safe_url)
-    request_target = parsed.path or "/"
-    if parsed.query:
-        request_target = f"{request_target}?{parsed.query}"
-
-    connection = http.client.HTTPSConnection(
-        DARSHAN_PUBLICATION_NETLOC,
-        timeout=30,
+    request_target = httpx.URL(
+        scheme="https",
+        host=DARSHAN_PUBLICATION_NETLOC,
+        path=parsed.path or "/",
+        query=parsed.query.encode("utf-8"),
     )
-    try:
-        connection.request("GET", request_target)
-        response = connection.getresponse()
-        return response.status, response.read()
-    finally:
-        connection.close()
+    with httpx.Client(
+        verify=True,
+        follow_redirects=False,
+        timeout=30,
+    ) as client:
+        response = client.get(request_target)
+    return response.status_code, response.content
 
 
 def main() -> None:
