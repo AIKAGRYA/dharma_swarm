@@ -63,9 +63,11 @@ Reference:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
@@ -75,6 +77,70 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _DEFAULT_INGESTION_INTERVAL = 1800  # 30 minutes
+_DEFAULT_CYCLE_INSERT_BUDGET = 500
+_CYCLE_BUDGET_ENV = "DHARMA_ARCHAEOLOGY_CYCLE_BUDGET"
+_INGEST_STATE_FILENAME = "archaeology_ingest_state.json"
+
+
+def _cycle_insert_budget() -> int:
+    """Per-cycle insert budget. Fail-closed: bad/nonpositive values → default."""
+    raw = os.environ.get(_CYCLE_BUDGET_ENV, "")
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_CYCLE_INSERT_BUDGET
+    return value if value > 0 else _DEFAULT_CYCLE_INSERT_BUDGET
+
+
+@dataclass
+class IngestCycleLedger:
+    """Per-cycle dedupe state + insert budget for archaeology ingestion.
+
+    ``state`` maps source uid → sha256(content) — the resumable state-file
+    pattern from scripts/vector_store_backfill_memory_sources.py. Unchanged
+    documents are skipped; the budget caps total inserts per cycle.
+    """
+
+    state: dict[str, str] = field(default_factory=dict)
+    budget: int | None = None
+    inserted: int = 0
+    skipped_unchanged: int = 0
+    skipped_budget: int = 0
+
+    def unchanged(self, source: str, digest: str) -> bool:
+        return self.state.get(source) == digest
+
+    def exhausted(self) -> bool:
+        return self.budget is not None and self.inserted >= self.budget
+
+    def record(self, source: str, digest: str) -> None:
+        self.state[source] = digest
+        self.inserted += 1
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _read_ingest_state(path: Path) -> dict[str, str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            return {str(key): str(value) for key, value in payload.items()}
+    except FileNotFoundError:
+        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "Archaeology ingest state %s unreadable (%s); starting fresh",
+            path, type(exc).__name__,
+        )
+        return {}
+    return {}
+
+
+def _write_ingest_state(path: Path, state: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 @dataclass
@@ -108,10 +174,24 @@ async def _ingest_into_palace(
     layer: str,
     tags: list[str],
     metadata: dict[str, Any],
+    ledger: IngestCycleLedger | None = None,
 ) -> str | None:
-    """Ingest one document into MemoryPalace. Returns doc_id or None on failure."""
+    """Ingest one document into MemoryPalace. Returns doc_id or None on failure/skip.
+
+    With a ledger, unchanged content (same source uid + digest as last cycle)
+    and over-budget inserts are skipped. ledger=None keeps legacy behavior.
+    """
     if not content.strip():
         return None
+    digest = ""
+    if ledger is not None:
+        digest = _sha256(content)
+        if ledger.unchanged(source, digest):
+            ledger.skipped_unchanged += 1
+            return None
+        if ledger.exhausted():
+            ledger.skipped_budget += 1
+            return None
     try:
         doc_id = await palace.ingest(
             content=content,
@@ -119,7 +199,10 @@ async def _ingest_into_palace(
             layer=layer,
             tags=tags,
             metadata=metadata,
+            dedupe_digest=digest or None,
         )
+        if doc_id and ledger is not None:
+            ledger.record(source, digest)
         return doc_id
     except Exception as exc:
         logger.debug("Palace ingest failed for %s: %s", source, exc)
@@ -133,6 +216,7 @@ async def _ingest_into_palace(
 async def ingest_evolution_archive(
     palace: Any,
     state_dir: Path,
+    ledger: IngestCycleLedger | None = None,
 ) -> int:
     """Ingest all evolution archive entries into MemoryPalace.
 
@@ -203,6 +287,7 @@ async def ingest_evolution_archive(
                     "parent_id": parent_id,
                     "stream": "evolution_archive",
                 },
+                ledger=ledger,
             )
             if doc_id:
                 ingested += 1
@@ -217,6 +302,7 @@ async def ingest_evolution_archive(
 async def ingest_shared_research(
     palace: Any,
     state_dir: Path,
+    ledger: IngestCycleLedger | None = None,
 ) -> int:
     """Ingest research outputs from ~/.dharma/shared/ into MemoryPalace.
 
@@ -257,6 +343,7 @@ async def ingest_shared_research(
                         "stream": "shared_research",
                         "size_bytes": f.stat().st_size,
                     },
+                    ledger=ledger,
                 )
                 if doc_id:
                     ingested += 1
@@ -271,6 +358,7 @@ async def ingest_stigmergy_marks(
     palace: Any,
     state_dir: Path,
     min_salience: float = 0.85,
+    ledger: IngestCycleLedger | None = None,
 ) -> int:
     """Ingest high-salience stigmergy marks into MemoryPalace as permanent memory.
 
@@ -326,6 +414,7 @@ async def ingest_stigmergy_marks(
                     "salience": salience,
                     "stream": "stigmergy",
                 },
+                ledger=ledger,
             )
             if doc_id:
                 ingested += 1
@@ -340,6 +429,7 @@ async def ingest_stigmergy_marks(
 async def ingest_task_completions(
     palace: Any,
     state_dir: Path,
+    ledger: IngestCycleLedger | None = None,
 ) -> int:
     """Ingest completed task records into MemoryPalace.
 
@@ -394,6 +484,7 @@ async def ingest_task_completions(
                         "agent": agent,
                         "stream": "task_completions",
                     },
+                    ledger=ledger,
                 )
                 if doc_id:
                     ingested += 1
@@ -614,18 +705,35 @@ class ArchaeologyIngestionDaemon:
             logger.error("ArchaeologyIngestionDaemon: MemoryPalace unavailable: %s", exc)
             return {}
 
+        state_path = self._state_dir / "meta" / _INGEST_STATE_FILENAME
+        ledger = IngestCycleLedger(
+            state=_read_ingest_state(state_path),
+            budget=_cycle_insert_budget(),
+        )
+
         counts: dict[str, int] = {}
 
-        counts["evolution_archive"] = await ingest_evolution_archive(palace, self._state_dir)
-        counts["shared_research"] = await ingest_shared_research(palace, self._state_dir)
-        counts["stigmergy_marks"] = await ingest_stigmergy_marks(palace, self._state_dir)
-        counts["task_completions"] = await ingest_task_completions(palace, self._state_dir)
+        counts["evolution_archive"] = await ingest_evolution_archive(palace, self._state_dir, ledger=ledger)
+        counts["shared_research"] = await ingest_shared_research(palace, self._state_dir, ledger=ledger)
+        counts["stigmergy_marks"] = await ingest_stigmergy_marks(palace, self._state_dir, ledger=ledger)
+        counts["task_completions"] = await ingest_task_completions(palace, self._state_dir, ledger=ledger)
+
+        try:
+            _write_ingest_state(state_path, ledger.state)
+        except OSError as exc:
+            logger.warning("Failed to persist archaeology ingest state %s: %s", state_path, exc)
 
         # Synthesize compressed lessons
         await synthesize_lessons_learned(palace, self._state_dir)
 
         total = sum(counts.values())
-        logger.info("Archaeology ingestion complete: %d documents total | %s", total, counts)
+        logger.info(
+            "Archaeology ingestion complete: %d documents total | %s | "
+            "skipped_unchanged=%d skipped_budget=%d budget=%s",
+            total, counts, ledger.skipped_unchanged, ledger.skipped_budget, ledger.budget,
+        )
+        counts["skipped_unchanged"] = ledger.skipped_unchanged
+        counts["skipped_budget"] = ledger.skipped_budget
         return counts
 
     async def run_forever(self) -> None:

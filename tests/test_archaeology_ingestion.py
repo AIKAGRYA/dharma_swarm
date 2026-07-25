@@ -212,3 +212,179 @@ class TestIngestTaskCompletions:
         palace.ingest = AsyncMock(side_effect=["d1", "d2"])
         result = await ingest_task_completions(palace, tmp_path)
         assert result == 2
+
+
+# ---------------------------------------------------------------------------
+# Digest dedupe + per-cycle insert budget (PR-11)
+# ---------------------------------------------------------------------------
+
+from dharma_swarm.archaeology_ingestion import (  # noqa: E402
+    ArchaeologyIngestionDaemon,
+    IngestCycleLedger,
+    _cycle_insert_budget,
+    _ingest_into_palace,
+)
+
+
+class _FakePalace:
+    """Stands in for MemoryPalace inside daemon.run_once."""
+
+    ingest_calls: list[str] = []
+
+    def __init__(self, state_dir=None, **_kwargs):
+        self._state_dir = state_dir
+
+    async def ingest(self, content, source, *, layer="working", tags=None,
+                     metadata=None, event_time=None, dedupe_digest=None):
+        _FakePalace.ingest_calls.append(source)
+        return f"doc{len(_FakePalace.ingest_calls)}"
+
+    async def recall(self, query):
+        class _Resp:
+            results: list = []
+        return _Resp()
+
+
+@pytest.fixture
+def fake_palace(monkeypatch):
+    _FakePalace.ingest_calls = []
+    monkeypatch.setattr("dharma_swarm.memory_palace.MemoryPalace", _FakePalace)
+    monkeypatch.delenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", raising=False)
+    return _FakePalace
+
+
+def _write_archive(state_dir: Path, n: int, prefix: str = "e") -> None:
+    evo_dir = state_dir / "evolution"
+    evo_dir.mkdir(exist_ok=True)
+    entries = [
+        {"id": f"{prefix}{i}", "component": "router.py", "status": "applied",
+         "diff": f"change {i}", "fitness": {"weighted": 0.5}}
+        for i in range(n)
+    ]
+    (evo_dir / "archive.jsonl").write_text(
+        "\n".join(json.dumps(e) for e in entries)
+    )
+
+
+class TestDigestDedupeCycles:
+    @pytest.mark.asyncio
+    async def test_second_cycle_inserts_zero(self, tmp_path, fake_palace):
+        _write_archive(tmp_path, 3)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+
+        counts1 = await daemon.run_once()
+        assert counts1["evolution_archive"] == 3
+        calls_after_first = len(fake_palace.ingest_calls)
+
+        counts2 = await daemon.run_once()
+        assert counts2["evolution_archive"] == 0
+        assert counts2["skipped_unchanged"] == 3
+        assert len(fake_palace.ingest_calls) == calls_after_first
+
+    @pytest.mark.asyncio
+    async def test_state_file_written(self, tmp_path, fake_palace):
+        _write_archive(tmp_path, 2)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        await daemon.run_once()
+        state_path = tmp_path / "meta" / "archaeology_ingest_state.json"
+        assert state_path.exists()
+        state = json.loads(state_path.read_text())
+        assert len(state) == 2
+        assert all(k.startswith("evolution_archive:") for k in state)
+
+    @pytest.mark.asyncio
+    async def test_changed_entry_reingested(self, tmp_path, fake_palace):
+        _write_archive(tmp_path, 3)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        await daemon.run_once()
+
+        # Mutate one entry's content; keep the other two byte-identical
+        archive = tmp_path / "evolution" / "archive.jsonl"
+        lines = archive.read_text().splitlines()
+        entry = json.loads(lines[0])
+        entry["status"] = "rolled_back"
+        lines[0] = json.dumps(entry)
+        archive.write_text("\n".join(lines))
+
+        counts = await daemon.run_once()
+        assert counts["evolution_archive"] == 1
+        assert counts["skipped_unchanged"] == 2
+
+    @pytest.mark.asyncio
+    async def test_corrupt_state_starts_fresh(self, tmp_path, fake_palace):
+        _write_archive(tmp_path, 2)
+        meta = tmp_path / "meta"
+        meta.mkdir()
+        (meta / "archaeology_ingest_state.json").write_text("{not json")
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["evolution_archive"] == 2
+
+
+class TestCycleInsertBudget:
+    @pytest.mark.asyncio
+    async def test_budget_cap_honored(self, tmp_path, fake_palace, monkeypatch):
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "2")
+        _write_archive(tmp_path, 5)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["evolution_archive"] == 2
+        assert counts["skipped_budget"] == 3
+
+    @pytest.mark.asyncio
+    async def test_budget_resumes_next_cycle(self, tmp_path, fake_palace, monkeypatch):
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "2")
+        _write_archive(tmp_path, 5)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        await daemon.run_once()
+
+        counts2 = await daemon.run_once()
+        assert counts2["evolution_archive"] == 2
+        assert counts2["skipped_unchanged"] == 2
+        assert counts2["skipped_budget"] == 1
+
+        counts3 = await daemon.run_once()
+        assert counts3["evolution_archive"] == 1
+        assert counts3["skipped_unchanged"] == 4
+
+        counts4 = await daemon.run_once()
+        assert counts4["evolution_archive"] == 0
+        assert counts4["skipped_unchanged"] == 5
+
+    def test_env_parsing_fail_closed(self, monkeypatch):
+        monkeypatch.delenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", raising=False)
+        assert _cycle_insert_budget() == 500
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "garbage")
+        assert _cycle_insert_budget() == 500
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "-3")
+        assert _cycle_insert_budget() == 500
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "0")
+        assert _cycle_insert_budget() == 500
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "7")
+        assert _cycle_insert_budget() == 7
+
+
+class TestIngestIntoPalaceLedger:
+    @pytest.mark.asyncio
+    async def test_no_ledger_keeps_legacy_behavior(self):
+        palace = AsyncMock()
+        palace.ingest = AsyncMock(return_value="doc1")
+        doc_id = await _ingest_into_palace(
+            palace, content="hello", source="s1", layer="working",
+            tags=[], metadata={},
+        )
+        assert doc_id == "doc1"
+        assert palace.ingest.call_args.kwargs["dedupe_digest"] is None
+
+    @pytest.mark.asyncio
+    async def test_failed_ingest_not_recorded(self):
+        palace = AsyncMock()
+        palace.ingest = AsyncMock(side_effect=RuntimeError("boom"))
+        ledger = IngestCycleLedger()
+        doc_id = await _ingest_into_palace(
+            palace, content="hello", source="s1", layer="working",
+            tags=[], metadata={}, ledger=ledger,
+        )
+        assert doc_id is None
+        assert ledger.inserted == 0
+        assert ledger.state == {}
