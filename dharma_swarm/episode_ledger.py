@@ -1,7 +1,6 @@
 """Episode Ledger — versioned, validated lifecycle events (THE_KEEL §6).
 
-Validated event schema, pure projector, and locked append-only JSONL writer.
-Producers wire in as separate slices.
+Validated schema, pure projector, and locked append-only JSONL writer.
 """
 
 from __future__ import annotations
@@ -25,14 +24,9 @@ LOGICAL_DELIVERY_KEY_FIELD = "logical_delivery_key"
 
 # The lifecycle vocabulary each producer appends at the transition it owns.
 EVENT_TYPES = (
-    "episode_opened",
-    "attempt_started",
-    "observation_recorded",
-    "effect_requested",
-    "effect_resolved",
-    "review_recorded",
-    "episode_closed",
-    "post_merge_observation",
+    "episode_opened", "attempt_started", "observation_recorded",
+    "effect_requested", "effect_resolved", "review_recorded",
+    "episode_closed", "post_merge_observation",
 )
 
 # Effect events carry the idempotency fence key — mandatory, never implied.
@@ -62,11 +56,7 @@ def _canonical(payload: dict[str, Any]) -> str:
 
 
 def redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Mask secret-like keys recursively; persistence never sees raw secrets.
-
-    Lists are containers, not leaves: a secret inside e.g.
-    ``{"messages": [{"api_key": ...}]}`` is masked at any depth.
-    """
+    """Mask secret-like keys recursively, including inside list containers."""
     redacted: dict[str, Any] = {}
     for key, value in payload.items():
         if any(marker in key.lower() for marker in _REDACT_KEY_MARKERS):
@@ -106,9 +96,8 @@ class EpisodeEvent:
         sequence: int,
         payload: dict[str, Any] | None = None,
     ) -> "EpisodeEvent":
-        # Redact at CONSTRUCTION: secrets never enter the event, and event
-        # identity is computed over exactly what persistence will write, so
-        # the from_dict tamper check holds across the disk round-trip.
+        # Identity covers exactly the redacted content persistence will write,
+        # so the from_dict tamper check holds across the disk round-trip.
         payload = redact_payload(dict(payload or {}))
         _validate(
             schema_version=EPISODE_EVENT_SCHEMA_VERSION,
@@ -188,12 +177,8 @@ class EpisodeEvent:
 
 
 def _validate(
-    *,
-    schema_version: str,
-    event_type: str,
-    episode_id: str,
-    sequence: Any,
-    payload: dict[str, Any],
+    *, schema_version: str, event_type: str, episode_id: str,
+    sequence: Any, payload: dict[str, Any],
 ) -> None:
     if schema_version != EPISODE_EVENT_SCHEMA_VERSION:
         raise LedgerValidationError(f"unknown schema_version {schema_version!r}")
@@ -213,8 +198,7 @@ def _validate(
 
 @dataclass
 class EpisodeState:
-    """Pure projection of one episode's events. Regenerable; never authoritative
-    over the raw events it was projected from."""
+    """Regenerable pure projection, never authoritative over its raw events."""
 
     episode_id: str = ""
     events: list[EpisodeEvent] = field(default_factory=list)
@@ -227,10 +211,10 @@ class EpisodeState:
 
 
 def project_episode(events: list[EpisodeEvent]) -> EpisodeState:
-    """SIDE-EFFECT-FREE projector: explicit ordering (sequence, then event_id),
-    dedup by event_id, conflicting observations kept visible (never
-    last-write-wins), and fail-closed closure — an episode_closed with zero
-    observations AND zero reviews is closed but NOT valid (missing evidence)."""
+    """Project in explicit order, deduplicating IDs and keeping conflicts visible.
+
+    A close with no observations or reviews is closed but invalid.
+    """
     episode_ids = sorted({e.episode_id for e in events})
     if len(episode_ids) > 1:
         raise LedgerValidationError(
@@ -378,22 +362,19 @@ class EpisodeLedgerWriter:
             record = json.loads(raw_line.decode("utf-8", errors="replace"))
         except (TypeError, ValueError):
             logger.warning(
-                "episode_ledger: skipping corrupt line in %s during rehydrate",
-                self.path,
+                "episode_ledger: skipping corrupt line in %s during rehydrate", self.path
             )
             return
         if not isinstance(record, dict):
             logger.warning(
-                "episode_ledger: skipping non-object line in %s during rehydrate",
-                self.path,
+                "episode_ledger: skipping non-object line in %s during rehydrate", self.path
             )
             return
         try:
             event = EpisodeEvent.from_dict(record)
         except LedgerValidationError:
             logger.warning(
-                "episode_ledger: skipping invalid record in %s during rehydrate",
-                self.path,
+                "episode_ledger: skipping invalid record in %s during rehydrate", self.path
             )
             return
         self._observe_event(event)
@@ -482,25 +463,19 @@ class EpisodeLedgerWriter:
         payload: dict[str, Any],
         fixed_sequence: int | None = None,
     ) -> EpisodeEvent:
-        """Append or replay one logical delivery under the file lock.
-
-        Replays return the persisted event only when normalized content matches.
-        """
-
+        """Append or replay only content-matching delivery under the file lock."""
         delivery_key = str(delivery_key).strip()
         if not delivery_key:
             raise LedgerValidationError("delivery_key is required")
         with self._locked_stream() as stream:
             self._sync_from_disk_locked(stream)
-            sequence = (
-                int(fixed_sequence)
-                if fixed_sequence is not None
-                else max(1, self._high_water.get(episode_id, 0) + 1)
+            sequence = int(fixed_sequence) if fixed_sequence is not None else max(
+                1, self._high_water.get(episode_id, 0) + 1
             )
             event_payload = dict(payload)
-            supplied_key = str(
-                event_payload.get(LOGICAL_DELIVERY_KEY_FIELD, delivery_key)
-            ).strip()
+            supplied_key = str(event_payload.get(
+                LOGICAL_DELIVERY_KEY_FIELD, delivery_key
+            )).strip()
             if supplied_key != delivery_key:
                 raise LedgerValidationError(
                     "payload logical_delivery_key conflicts with delivery_key"
