@@ -66,6 +66,10 @@ class MemoryContextBudget:
     require_source_digest: bool = False
     require_source_row_key: bool = False
     block_tool_exposure: bool = False
+    # "scoped": empty allowed_scopes/allowed_memory_lanes DENY every atom and
+    # agent ownership is enforced across ALL scopes; "unrestricted" keeps the
+    # legacy empty-means-unfiltered semantics for direct callers.
+    isolation_mode: str = "unrestricted"
     allowed_truth_states: tuple[TruthState, ...] = _DEFAULT_ALLOWED_TRUTH_STATES
     allowed_scopes: tuple[MemoryScope, ...] = ()
     allowed_agent_ids: tuple[str, ...] = ()
@@ -313,18 +317,34 @@ def _bounded_candidates(
 
 
 def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[str, ...]:
+    scoped = budget.isolation_mode == "scoped"
     reasons: list[str] = []
     if budget.allowed_atom_types and atom.atom_type not in budget.allowed_atom_types:
         reasons.append("atom_type_not_allowed")
-    if budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
+    if scoped and not budget.allowed_scopes:
+        reasons.append("scope_denied_fail_closed")
+    elif budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
         reasons.append("scope_not_allowed")
-    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+    if budget.allowed_agent_ids or scoped:
         atom_agent_ids = _atom_agent_ids(atom)
-        if not atom_agent_ids:
-            reasons.append("agent_owner_unknown")
-        elif not set(atom_agent_ids).intersection(budget.allowed_agent_ids):
-            reasons.append("agent_not_allowed")
-    if budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
+        if atom.scope == MemoryScope.AGENT:
+            if not atom_agent_ids:
+                reasons.append("agent_owner_unknown")
+            elif not budget.allowed_agent_ids or not set(atom_agent_ids).intersection(
+                budget.allowed_agent_ids
+            ):
+                reasons.append("agent_not_allowed")
+        elif scoped and atom_agent_ids:
+            # Scoped mode enforces atom ownership in every scope, not only
+            # AGENT: another agent's atoms stay invisible even when shared
+            # into SWARM/SESSION/PROJECT rows.
+            if not budget.allowed_agent_ids or not set(atom_agent_ids).intersection(
+                budget.allowed_agent_ids
+            ):
+                reasons.append("agent_not_allowed")
+    if scoped and not budget.allowed_memory_lanes:
+        reasons.append("memory_lane_denied_fail_closed")
+    elif budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
         reasons.append("memory_lane_not_allowed")
     if budget.require_context_admissible and not atom.context_admissible:
         reasons.append("atom_not_context_admissible")
