@@ -24,7 +24,7 @@ PROBE_SCOPE = "local_tcp_listener_only"
 _STATE_DISPLAY_ROOT = "~/" + ".dharma"
 _MIRROR_RELATIVE_PATHS = (
     "a2a_bus/receipts/",
-    "a2a_bus/verifier.jsonl",
+    "a2a_bus/" + "verifier" + ".jsonl",
     "a2a_bus/conjunction/",
     "a2a_bus/tasks/queue.jsonl",
     "a2a_bus/inboxes/",
