@@ -4569,6 +4569,21 @@ class EpisodeOutboxRecord:
 
 def _row_to_episode_outbox(row: sqlite3.Row | aiosqlite.Row) -> EpisodeOutboxRecord:
     storage_key = str(row["delivery_key"])
+    event_type = str(row["event_type"])
+    try:
+        decoded_payload = json.loads(row["payload_json"])
+        if not isinstance(decoded_payload, dict):
+            raise TypeError("payload must decode to an object")
+        payload = _normalize_episode_outbox_payload(
+            event_type=event_type,
+            payload=decoded_payload,
+        )
+        if _json_dump(payload) != _json_dump(decoded_payload):
+            raise ValueError("payload is not normalized")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"episode outbox {storage_key!r} has invalid payload_json"
+        ) from exc
     return EpisodeOutboxRecord(
         outbox_id=int(row["outbox_id"]),
         delivery_key=str(row["logical_delivery_key"] or storage_key),
@@ -4576,8 +4591,8 @@ def _row_to_episode_outbox(row: sqlite3.Row | aiosqlite.Row) -> EpisodeOutboxRec
         storage_key=storage_key,
         episode_id=str(row["episode_id"]),
         attempt_id=str(row["attempt_id"] or ""),
-        event_type=str(row["event_type"]),
-        payload=_json_load(row["payload_json"], {}),
+        event_type=event_type,
+        payload=payload,
         session_event_id=str(row["session_event_id"] or ""),
         created_at=_parse_dt(row["created_at"]) or _utc_now(),
         acked_at=_parse_dt(row["acked_at"]),

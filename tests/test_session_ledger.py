@@ -61,6 +61,32 @@ def test_session_ledger_uses_env_dir_and_session(tmp_path, monkeypatch):
     assert task_path.exists()
 
 
+def test_new_nested_session_fsyncs_base_directory(tmp_path, monkeypatch):
+    base_dir = tmp_path / "nested" / "ledgers"
+    synced = []
+
+    def record_fsync(path):
+        assert path.is_dir()
+        assert (path / "sess_nested").is_dir()
+        synced.append(path)
+
+    monkeypatch.setattr(
+        "dharma_swarm.session_ledger._fsync_directory",
+        record_fsync,
+    )
+    kwargs = {
+        "base_dir": base_dir,
+        "session_id": "sess_nested",
+        "runtime_db_path": tmp_path / "runtime.db",
+    }
+    SessionLedger(**kwargs)
+
+    assert synced == [base_dir]
+    synced.clear()
+    SessionLedger(**kwargs)
+    assert synced == []
+
+
 def test_session_ledger_produces_validated_episode_events(tmp_path):
     """The producer emits an episode, one attempt, then observations."""
 
@@ -252,6 +278,64 @@ def test_deleted_destination_requeues_stable_open_before_new_attempt(tmp_path):
         "attempt_started",
     ]
     assert recreated[1].attempt_id == second.attempt_id
+
+
+def test_recreated_destination_durably_opens_before_later_backlog_ack(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-open-before-backlog",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    backlog_key = "session-event:sevt-crash-gap:observation"
+    store = RuntimeStateStore(runtime_db)
+    store.enqueue_episode_event_sync(
+        delivery_key=backlog_key,
+        destination_id=first.episode_destination_id,
+        episode_id=first.episode_id,
+        attempt_id=first.attempt_id,
+        event_type="observation_recorded",
+        payload={"session_event_id": "sevt-crash-gap"},
+    )
+    first.episode_path.unlink()
+    original_ack = RuntimeStateStore.ack_episode_event_sync
+    acked_keys = []
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def crash_after_backlog_ack(store_self, delivery_key, **ack):
+        result = original_ack(store_self, delivery_key, **ack)
+        acked_keys.append(delivery_key)
+        if delivery_key == backlog_key:
+            raise SimulatedCrash
+        return result
+
+    monkeypatch.setattr(
+        RuntimeStateStore,
+        "ack_episode_event_sync",
+        crash_after_backlog_ack,
+    )
+    with pytest.raises(SimulatedCrash):
+        SessionLedger(**kwargs)
+
+    opened_key = f"episode:{first.episode_id}:opened"
+    recreated = _read_episode_events(first.episode_path)
+    assert recreated[0].event_type == "episode_opened"
+    assert not any(event.event_type == "attempt_started" for event in recreated)
+    assert acked_keys == [opened_key, backlog_key]
+    assert store.get_episode_outbox_sync(
+        opened_key,
+        destination_id=first.episode_destination_id,
+    ).acked_at is not None
+    assert store.get_episode_outbox_sync(
+        backlog_key,
+        destination_id=first.episode_destination_id,
+    ).acked_at is not None
 
 
 def test_session_ledger_sequence_uses_highest_valid_event_not_line_count(tmp_path):

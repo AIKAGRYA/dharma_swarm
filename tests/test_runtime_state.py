@@ -279,6 +279,40 @@ def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None
         )
 
 
+@pytest.mark.parametrize("corrupt_payload_json", ["{", "[]"])
+def test_episode_outbox_corrupt_payload_json_fails_closed(
+    tmp_path,
+    corrupt_payload_json,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    pending = store.enqueue_episode_event_sync(
+        delivery_key="corrupt-payload",
+        destination_id="corrupt-destination",
+        episode_id="ep-corrupt",
+        attempt_id="at-corrupt",
+        event_type="observation_recorded",
+        payload={"session_event_id": "sevt-corrupt"},
+    )
+    with sqlite3.connect(store.db_path) as db:
+        db.execute(
+            "UPDATE episode_event_outbox SET payload_json = ? WHERE delivery_key = ?",
+            (corrupt_payload_json, pending.storage_key),
+        )
+
+    with pytest.raises(ValueError, match="invalid payload_json"):
+        store.list_pending_episode_events_sync(
+            episode_id=pending.episode_id,
+            destination_id=pending.destination_id,
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        acked_at = db.execute(
+            "SELECT acked_at FROM episode_event_outbox WHERE delivery_key = ?",
+            (pending.storage_key,),
+        ).fetchone()[0]
+    assert acked_at is None
+
+
 @pytest.mark.parametrize("changed_value", [1.0, True])
 def test_episode_outbox_compares_json_distinct_scalars(
     tmp_path,

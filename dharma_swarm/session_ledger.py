@@ -36,6 +36,14 @@ def _session_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _fsync_directory(path: Path) -> None:
+    directory_fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
 class SessionLedger:
     """Append-only JSONL ledgers grouped by session ID."""
 
@@ -52,7 +60,13 @@ class SessionLedger:
         )
         self.session_id = session_id or os.getenv("DGC_SESSION_ID") or _session_stamp()
         self.session_dir = self.base_dir / self.session_id
-        self.session_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.session_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            if not self.session_dir.is_dir():
+                raise
+        else:
+            _fsync_directory(self.base_dir)
         self.task_path = self.session_dir / "task_ledger.jsonl"
         self.progress_path = self.session_dir / "progress_ledger.jsonl"
         self._runtime_state = RuntimeStateStore(runtime_db_path)
@@ -77,10 +91,6 @@ class SessionLedger:
             self._episode_writer = None
             self.episode_ledger_failures += 1
 
-        # Replay older unacked deliveries before recording this runtime's
-        # attempt. File append precedes DB ack; logical-key dedupe makes a
-        # crash in that gap exactly-once on the next drain.
-        self._drain_episode_outbox(require_complete=self._episode_writer is not None)
         opened_delivery_key = f"episode:{self.episode_id}:opened"
         self._require_episode_event(
             delivery_key=opened_delivery_key,
@@ -102,6 +112,17 @@ class SessionLedger:
                 raise RuntimeError(
                     "failed to requeue the required episode_opened delivery"
                 ) from exc
+        # Establish and acknowledge the stable open before touching later
+        # backlog rows. A crash can never leave those rows acknowledged into a
+        # recreated destination that still lacks its episode_opened event.
+        self._drain_episode_outbox(
+            delivery_key=opened_delivery_key,
+            require_complete=self._episode_writer is not None,
+        )
+        # Replay older unacked deliveries before recording this runtime's
+        # attempt. File append precedes DB ack; logical-key dedupe makes a
+        # crash in that gap exactly-once on the next drain.
+        self._drain_episode_outbox(require_complete=self._episode_writer is not None)
         self._require_episode_event(
             delivery_key=f"attempt:{self.attempt_id}:started",
             event_type="attempt_started",
@@ -200,11 +221,17 @@ class SessionLedger:
         ):
             raise RuntimeError(f"failed to stage required {event_type} delivery")
 
-    def _drain_episode_outbox(self, *, require_complete: bool = False) -> int:
+    def _drain_episode_outbox(
+        self,
+        *,
+        delivery_key: str | None = None,
+        require_complete: bool = False,
+    ) -> int:
         """Append pending deliveries in durable enqueue order, then ack.
 
         Stop at the first failure so later evidence never overtakes an older
-        pending lifecycle event. Fetch pages until this destination is empty.
+        pending lifecycle event. A delivery_key drains only that required row
+        as a lifecycle barrier; otherwise fetch until the destination is empty.
         """
 
         if self._episode_writer is None:
@@ -212,10 +239,21 @@ class SessionLedger:
         delivered = 0
         while True:
             try:
-                pending = self._runtime_state.list_pending_episode_events_sync(
-                    episode_id=self.episode_id,
-                    destination_id=self.episode_destination_id,
-                )
+                if delivery_key is None:
+                    pending = self._runtime_state.list_pending_episode_events_sync(
+                        episode_id=self.episode_id,
+                        destination_id=self.episode_destination_id,
+                    )
+                else:
+                    item = self._runtime_state.get_episode_outbox_sync(
+                        delivery_key,
+                        destination_id=self.episode_destination_id,
+                    )
+                    if item is None:
+                        raise RuntimeError(
+                            f"required episode delivery {delivery_key!r} vanished"
+                        )
+                    pending = [] if item.acked_at is not None else [item]
             except Exception as exc:
                 self.episode_ledger_failures += 1
                 if require_complete:
