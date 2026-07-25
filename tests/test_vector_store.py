@@ -596,3 +596,68 @@ class TestVectorStoreStats:
         assert s["total_documents"] == 2
         assert s["valid_documents"] == 1
         assert s["invalidated_documents"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Digest short-circuit (dedupe_digest param, PR-11)
+# ---------------------------------------------------------------------------
+
+class TestDedupeDigest:
+
+    def _doc_rows(self, tmp_path, source):
+        import sqlite3
+        conn = sqlite3.connect(tmp_path / "vectors.db")
+        try:
+            rows = conn.execute(
+                "SELECT id, valid_until FROM vec_documents WHERE source = ? ORDER BY id",
+                (source,),
+            ).fetchall()
+        finally:
+            conn.close()
+        return rows
+
+    def test_same_digest_short_circuits(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("stable content", source="s1", dedupe_digest="digest-a")
+        id2 = store.upsert("stable content", source="s1", dedupe_digest="digest-a")
+        assert id1 > 0
+        assert id2 == id1
+        rows = self._doc_rows(tmp_path, "s1")
+        assert len(rows) == 1
+
+    def test_changed_digest_expires_prior_row(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("old content", source="s1", dedupe_digest="digest-a")
+        id2 = store.upsert("new content", source="s1", dedupe_digest="digest-b")
+        assert id2 != id1
+        rows = self._doc_rows(tmp_path, "s1")
+        assert len(rows) == 2
+        by_id = dict(rows)
+        assert by_id[id1] is not None  # expired
+        assert by_id[id2] is None      # active
+
+    def test_digest_stamped_in_metadata(self, tmp_path):
+        import sqlite3
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        doc_id = store.upsert("content", source="s1", dedupe_digest="digest-a")
+        conn = sqlite3.connect(tmp_path / "vectors.db")
+        try:
+            meta = conn.execute(
+                "SELECT metadata_json FROM vec_documents WHERE id = ?", (doc_id,)
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        assert json.loads(meta)["source_digest"] == "digest-a"
+
+    def test_no_digest_keeps_insert_only(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("same content", source="s1")
+        id2 = store.upsert("same content", source="s1")
+        assert id1 > 0 and id2 > 0 and id1 != id2
+        rows = self._doc_rows(tmp_path, "s1")
+        assert len(rows) == 2
+        assert all(valid_until is None for _, valid_until in rows)

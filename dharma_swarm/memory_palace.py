@@ -415,10 +415,13 @@ class MemoryPalace:
         tags: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
         event_time: datetime | None = None,
+        dedupe_digest: str | None = None,
     ) -> str:
         """Ingest new content into the Memory Palace.
 
         Phase 6: also upserts into VectorStore with bi-temporal metadata.
+        ``dedupe_digest`` is forwarded to VectorStore.upsert for digest
+        short-circuiting (None = legacy INSERT-only behavior).
         Returns the document ID.
         """
         doc_id = ""
@@ -486,6 +489,7 @@ class MemoryPalace:
                     layer=layer,
                     metadata=meta,
                     event_time=event_time,
+                    dedupe_digest=dedupe_digest,
                 )
                 # Use vec_id as doc_id only in persistent mode when lattice gave nothing
                 if not doc_id and vec_id > 0 and _has_persistent_store:
