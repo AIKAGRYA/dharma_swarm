@@ -15,6 +15,7 @@ from dharma_swarm.memory_kernel import (
     CensusConfig,
     MemoryAtom,
     MemoryAtomType,
+    MemoryContextBudget,
     MemoryKernel,
     MemoryKernelConfig,
     MemoryLane,
@@ -497,6 +498,75 @@ def test_isolation_semantics_map_is_total_over_topology_type() -> None:
     from dharma_swarm.models import TopologyType
 
     assert set(ISOLATION_SEMANTICS) == set(TopologyType)
+
+
+def test_resolve_unmapped_topology_member_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dharma_swarm.memory_kernel import topology_policy
+    from dharma_swarm.models import TopologyType
+
+    monkeypatch.delitem(
+        topology_policy.ISOLATION_SEMANTICS, TopologyType.FAN_OUT
+    )
+    semantics, warnings = topology_policy.resolve(TopologyType.FAN_OUT)
+    assert semantics is topology_policy.FAIL_CLOSED_MINIMAL
+    assert warnings == ("unmapped_topology_fail_closed:fan_out",)
+    semantics, warnings = topology_policy.resolve("fan_out")
+    assert semantics is topology_policy.FAIL_CLOSED_MINIMAL
+    assert warnings == ("unmapped_topology_fail_closed:fan_out",)
+
+
+def test_scoped_budget_denies_on_empty_allowances() -> None:
+    budget = MemoryContextBudget(
+        isolation_mode="scoped",
+        allowed_scopes=(),
+        allowed_memory_lanes=(),
+    )
+    pack = preview_memory_pack(
+        (_memory_atom("orphaned atom", scope=MemoryScope.PROJECT),),
+        budget=budget,
+    )
+    assert pack.admitted_count == 0
+    reasons = pack.items[0].omission_reasons
+    assert "scope_denied_fail_closed" in reasons
+    assert "memory_lane_denied_fail_closed" in reasons
+
+
+def test_budget_rejects_unknown_isolation_mode() -> None:
+    with pytest.raises(ValueError, match="isolation_mode"):
+        MemoryContextBudget(isolation_mode="scopedd")
+
+
+def test_explicit_allowance_override_stamps_warning() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-alpha",
+            "memory_kernel_allowed_scopes": ["session"],
+        }
+    )
+    assert policy.semantics == "worker_scoped"
+    assert policy.allowed_scopes == (MemoryScope.SESSION,)
+    assert "explicit_scopes_override_topology_semantics" in policy.warnings
+
+
+def test_enum_topology_metadata_stamps_enum_value() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+    from dharma_swarm.models import TopologyType
+
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": TopologyType.FAN_OUT, "agent_id": "agent-alpha"}
+    )
+    assert policy.topology == "fan_out"
+    assert policy.semantics == "worker_scoped"
+    assert policy.warnings == ()
 
 
 @pytest.mark.asyncio
