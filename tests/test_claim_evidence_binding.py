@@ -534,6 +534,30 @@ def test_checker_rejects_non_finite_mutation_score(
     assert "non-finite" in res.detail
 
 
+@pytest.mark.parametrize("threshold", [float("nan"), float("inf"), -float("inf")])
+def test_checker_rejects_non_finite_mutation_threshold(
+    tmp_path: Path,
+    threshold: float,
+) -> None:
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 1.0,
+                "killed": 2,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), threshold, fresh_ttl_days=7)
+    assert not res.passed
+    assert res.failure_modality is None
+    assert "threshold" in res.detail
+    assert "non-finite" in res.detail
+
+
 def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
     report = tmp_path / "mutation_score.json"
     report.write_text(

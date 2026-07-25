@@ -114,17 +114,22 @@ def test_check_track_status_runs(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("enforce_ttl", "expected_severity", "expected_exit"),
-    [(False, "WARN", 0), (True, "ERROR", 1)],
+    ("enforce_ttl", "changed_by_pr", "expected_severity", "expected_exit"),
+    [
+        (False, False, "WARN", 0),
+        (True, False, "ERROR", 1),
+        (False, True, "ERROR", 1),
+    ],
 )
 def test_freshness_regression_is_warning_until_ttl_enforced(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     enforce_ttl: bool,
+    changed_by_pr: bool,
     expected_severity: str,
     expected_exit: int,
 ) -> None:
-    """Elapsed receipt age follows the same PR/scheduled authority split as track TTL."""
+    """Only unchanged elapsed age is advisory; PR-caused staleness still blocks."""
     import argparse
 
     sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
@@ -166,6 +171,11 @@ closed_tracks: []
         "_load_prior_passed",
         lambda _findings: {"freshness-track": {"fresh_receipt"}},
     )
+    monkeypatch.setattr(
+        cts,
+        "_freshness_failure_is_pr_caused",
+        lambda *_args, **_kwargs: changed_by_pr,
+    )
     monkeypatch.setattr(cts, "emit_reports", _capture)
 
     args = argparse.Namespace(
@@ -180,6 +190,151 @@ closed_tracks: []
         if finding.check == "regression:freshness-track:fresh_receipt"
     )
     assert regression.severity == expected_severity
+
+
+def test_enforced_freshness_blocks_after_baseline_records_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The scheduled authority blocks stale evidence even when prior pass is absent."""
+    import argparse
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    import check_track_status as cts  # type: ignore
+
+    receipt = tmp_path / "stale-receipt.json"
+    receipt.write_text(
+        json.dumps({"claim_id": "C1", "produced_at": "2000-01-01T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    track_file = tmp_path / "ACTIVE_TRACK.yaml"
+    track_file.write_text(
+        f"""
+schema_version: 2
+active_tracks:
+  - id: freshness-track
+    status: ACTIVE
+    verified_at: "2099-01-01"
+    ttl_days: 14
+    completion_criteria:
+      - id: fresh_receipt
+        kind: receipt_valid
+        file: "{receipt.as_posix()}"
+        requires_keys:
+          - claim_id
+        fresh_ttl_days: 7
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    emitted: list[cts.Finding] = []
+
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
+    monkeypatch.setattr(cts, "_load_prior_passed", lambda _findings: {})
+    monkeypatch.setattr(
+        cts,
+        "emit_reports",
+        lambda findings, *_args, **_kwargs: emitted.extend(findings),
+    )
+
+    args = argparse.Namespace(
+        enforce_ttl=True,
+        base=None,
+        reports_dir=tmp_path / "reports",
+    )
+    assert cts.run(args) == 1
+    finding = next(
+        finding
+        for finding in emitted
+        if finding.check == "freshness-enforced:freshness-track:fresh_receipt"
+    )
+    assert finding.severity == "ERROR"
+    assert "remains stale" in finding.message
+
+
+def test_freshness_diff_detects_changed_evidence_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Advisory status requires a git proof that the reviewed artifact is unchanged."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    import check_track_status as cts  # type: ignore
+
+    repo = tmp_path / "repo"
+    track_file = repo / "docs/governance/ACTIVE_TRACK.yaml"
+    receipt = repo / "reports/receipt.json"
+    track_file.parent.mkdir(parents=True)
+    receipt.parent.mkdir(parents=True)
+    criterion = {
+        "id": "fresh_receipt",
+        "kind": "receipt_valid",
+        "file": "reports/receipt.json",
+        "fresh_ttl_days": 7,
+    }
+    track_file.write_text(
+        """
+schema_version: 2
+active_tracks:
+  - id: freshness-track
+    status: ACTIVE
+    verified_at: "2099-01-01"
+    completion_criteria:
+      - id: fresh_receipt
+        kind: receipt_valid
+        file: "reports/receipt.json"
+        fresh_ttl_days: 7
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    receipt.write_text('{"produced_at":"2099-01-01T00:00:00Z"}\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    unrelated = repo / "README.md"
+    unrelated.write_text("unrelated\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "unrelated"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    monkeypatch.setattr(cts, "REPO_ROOT", repo)
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
+    assert not cts._freshness_failure_is_pr_caused(
+        "freshness-track",
+        criterion,
+        base_ref=base,
+    )
+
+    receipt.write_text('{"produced_at":"2000-01-01T00:00:00Z"}\n', encoding="utf-8")
+    subprocess.run(["git", "add", "reports/receipt.json"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "replace receipt"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    assert cts._freshness_failure_is_pr_caused(
+        "freshness-track",
+        criterion,
+        base_ref=base,
+    )
 
 
 @pytest.mark.parametrize("enforce_ttl", [False, True])

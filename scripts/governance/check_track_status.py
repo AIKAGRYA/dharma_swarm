@@ -906,6 +906,13 @@ def check_mutation_score_gte(file_path: str, threshold: float, *,
     faults. The expensive mutmut run happens in `make mutation-test`; this gate
     only reads the report so normal track evaluation stays fast.
     """
+    if not math.isfinite(threshold):
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation score threshold {threshold!r} is non-finite",
+        )
     path = repo_path(file_path)
     if not path.exists():
         return CriterionResult(
@@ -1150,13 +1157,19 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 try:
                     threshold = float(crit.get("threshold", 0.6))
                 except (TypeError, ValueError):
-                    threshold = 0.6
-                ttl = crit.get("fresh_ttl_days")
-                res = check_mutation_score_gte(
-                    report,
-                    threshold,
-                    fresh_ttl_days=int(ttl) if ttl is not None else None,
-                )
+                    res = CriterionResult(
+                        id="",
+                        kind=kind,
+                        passed=False,
+                        detail="malformed criterion: 'threshold' must be a finite number",
+                    )
+                else:
+                    ttl = crit.get("fresh_ttl_days")
+                    res = check_mutation_score_gte(
+                        report,
+                        threshold,
+                        fresh_ttl_days=int(ttl) if ttl is not None else None,
+                    )
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")
@@ -2044,15 +2057,120 @@ def _load_prior_passed(findings: list[Finding]) -> dict[str, set[str]]:
     return out
 
 
+def _resolve_base_ref(base_ref: str | None = None) -> str:
+    """Resolve the reviewed base consistently for every transition check."""
+    import os
+
+    return base_ref or (
+        f"origin/{os.environ['GITHUB_BASE_REF']}"
+        if os.environ.get("GITHUB_BASE_REF") else "origin/main"
+    )
+
+
+def _freshness_failure_is_pr_caused(
+    track_id: str,
+    criterion: dict[str, Any],
+    *,
+    base_ref: str | None,
+) -> bool:
+    """Return True unless the reviewed diff proves the stale input unchanged.
+
+    A naturally aging receipt is advisory on ordinary PRs. A PR that changes
+    the criterion or its evidence artifact caused the stale regression and
+    must remain blocking. Inability to inspect the canonical base fails closed;
+    out-of-tree test fixtures have no repository diff and remain advisory.
+    """
+    canonical = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+    try:
+        if Path(ACTIVE_TRACK_PATH).resolve() != canonical.resolve():
+            return False
+    except OSError:
+        return True
+
+    ref = _resolve_base_ref(base_ref)
+    try:
+        base = subprocess.run(
+            ["git", "show", f"{ref}:docs/governance/ACTIVE_TRACK.yaml"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(REPO_ROOT),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    if base.returncode != 0:
+        return True
+    try:
+        base_portfolio = normalize_portfolio(
+            _parse_active_track_text(base.stdout) or {}
+        )
+    except Exception:
+        return True
+
+    base_track = next(
+        (
+            item
+            for item in base_portfolio.get("active_tracks", [])
+            if isinstance(item, dict) and item.get("id") == track_id
+        ),
+        None,
+    )
+    base_criterion = next(
+        (
+            item
+            for item in (base_track or {}).get("completion_criteria", [])
+            if isinstance(item, dict) and item.get("id") == criterion.get("id")
+        ),
+        None,
+    )
+    if base_criterion != criterion:
+        return True
+
+    artifact = criterion.get("file")
+    if not isinstance(artifact, str) or not artifact:
+        return True
+    try:
+        artifact_path = repo_path(artifact).resolve()
+        relative_artifact = artifact_path.relative_to(REPO_ROOT.resolve())
+    except (OSError, ValueError):
+        # An unchanged absolute fixture outside the repository cannot be
+        # introduced by the reviewed git diff.
+        return False
+
+    try:
+        changed = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--quiet",
+                f"{ref}...HEAD",
+                "--",
+                relative_artifact.as_posix(),
+            ],
+            capture_output=True,
+            timeout=30,
+            cwd=str(REPO_ROOT),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    if changed.returncode == 0:
+        return False
+    # git diff uses 1 for a real diff and >1 for an inspection failure. Both
+    # are blocking because neither proves the evidence artifact unchanged.
+    return True
+
+
 def _regression_severity(
     result: CriterionResult,
     *,
     enforce_ttl: bool,
+    changed_by_pr: bool = False,
 ) -> str:
     """Keep elapsed-time drift advisory except on the freshness authority path."""
     if (
         result.failure_modality is CriterionFailureModality.FRESHNESS
         and not enforce_ttl
+        and not changed_by_pr
     ):
         return "WARN"
     return "ERROR"
@@ -2136,7 +2254,6 @@ def check_lifecycle_transition(head_p: dict[str, Any], findings: list[Finding],
     ACTIVE_TRACK_PATH points outside the repo (test fixtures validate
     portfolio *snapshots*; a transition diff against the repo's base ref is
     only meaningful for the repo's own tracked file)."""
-    import os
     canonical = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
     try:
         is_repo_file = Path(ACTIVE_TRACK_PATH).resolve() == canonical.resolve()
@@ -2146,9 +2263,7 @@ def check_lifecycle_transition(head_p: dict[str, Any], findings: list[Finding],
         findings.append(Finding("INFO", "lifecycle-base-unavailable",
             "validating an out-of-tree ACTIVE_TRACK file; transition check skipped."))
         return
-    ref = base_ref or (
-        f"origin/{os.environ['GITHUB_BASE_REF']}"
-        if os.environ.get("GITHUB_BASE_REF") else "origin/main")
+    ref = _resolve_base_ref(base_ref)
     try:
         res = subprocess.run(
             ["git", "show", f"{ref}:docs/governance/ACTIVE_TRACK.yaml"],
@@ -2281,20 +2396,49 @@ def run(args: argparse.Namespace) -> int:
         # code did not change, the runner is absent. Surface it as INFO so the
         # gap is visible without producing a false-positive block.
         prev = prior_passed.get(tid, set())
+        completion_defs = {
+            criterion.get("id"): criterion
+            for criterion in (t.get("completion_criteria") or [])
+            if isinstance(criterion, dict) and criterion.get("id")
+        }
+        enforce_ttl = bool(getattr(args, "enforce_ttl", False))
         for c in r["completion"]:
-            if c.id in prev and not c.passed:
+            if c.passed:
+                continue
+            if c.id in prev:
                 if not getattr(c, "executed", True):
                     findings.append(Finding("INFO", f"unverified:{tid}:{c.id}",
                         f"[{tid}] UNVERIFIED — '{c.id}' could not run here (not a regression): {c.detail}",
                         criterion_id=c.id))
                     continue
+                changed_by_pr = (
+                    c.failure_modality is CriterionFailureModality.FRESHNESS
+                    and _freshness_failure_is_pr_caused(
+                        str(tid),
+                        completion_defs.get(c.id, {}),
+                        base_ref=getattr(args, "base", None),
+                    )
+                )
                 severity = _regression_severity(
                     c,
-                    enforce_ttl=bool(getattr(args, "enforce_ttl", False)),
+                    enforce_ttl=enforce_ttl,
+                    changed_by_pr=changed_by_pr,
                 )
                 findings.append(Finding(severity, f"regression:{tid}:{c.id}",
                     f"[{tid}] REGRESSION — '{c.id}' passed before and now fails: {c.detail}",
                     criterion_id=c.id))
+                continue
+            if (
+                enforce_ttl
+                and getattr(c, "executed", True)
+                and c.failure_modality is CriterionFailureModality.FRESHNESS
+            ):
+                findings.append(Finding(
+                    "ERROR",
+                    f"freshness-enforced:{tid}:{c.id}",
+                    f"[{tid}] ENFORCED FRESHNESS — '{c.id}' remains stale: {c.detail}",
+                    criterion_id=c.id,
+                ))
 
         if r["shippable"]:
             findings.append(Finding("INFO", f"track-criteria-complete:{tid}",

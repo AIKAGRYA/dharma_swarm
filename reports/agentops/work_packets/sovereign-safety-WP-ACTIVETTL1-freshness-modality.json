@@ -3,7 +3,7 @@
   "base_ref": "7b6293be1cee2f65115477964b4794dfbfe31201",
   "branch": "agent/active-track-freshness-modality-20260724",
   "worktree": ".",
-  "intent": "Preserve ACTIVE_TRACK's declared pull-request versus scheduled freshness policy with an exclusive typed freshness modality: elapsed-time-only regressions warn on normal pull-request evaluation and remain blocking under --enforce-ttl, while compound stale-and-low mutation scores, non-finite scores, corruption, malformed evidence, and other executed regressions stay fail-closed.",
+  "intent": "Preserve ACTIVE_TRACK's declared pull-request versus scheduled freshness policy with an exclusive typed freshness modality: only elapsed-time drift whose criterion and evidence artifact are proven unchanged by the reviewed diff may warn on normal pull-request evaluation; PR-caused stale regressions, every executed stale criterion under --enforce-ttl, compound stale-and-low mutation scores, non-finite scores or thresholds, corruption, malformed evidence, and other executed regressions stay fail-closed.",
   "allowed_files": [
     "scripts/governance/check_track_status.py",
     "tests/test_active_track_governance.py",
@@ -41,7 +41,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "fix(governance): preserve exclusive freshness regressions"
+    "message": "fix(governance): bind freshness authority to reviewed diff"
   },
   "approval": {
     "before_commit": false,
@@ -70,7 +70,10 @@
       "details": []
     },
     "interface_mismatches": [
-      "CriterionResult records one typed failure modality, while mutation-score evaluation can observe compound elapsed-freshness and below-threshold failures. The modality must be treated as an exclusive cause so freshness cannot erase the substantive safety regression."
+      "CriterionResult records one typed failure modality, while mutation-score evaluation can observe compound elapsed-freshness and below-threshold failures. The modality must be treated as an exclusive cause so freshness cannot erase the substantive safety regression.",
+      "The previous pull-request severity split trusted the FRESHNESS modality without proving that the reviewed diff left the criterion and evidence artifact unchanged, so a PR-authored stale receipt could be downgraded.",
+      "The scheduled --enforce-ttl path previously consulted only the prior-pass regression set, so warn-only publication could remove a still-stale criterion from that set and make the next scheduled run false-green.",
+      "Mutation-score validation rejected non-finite observed scores but not non-finite configured thresholds, allowing stale evidence to be misclassified as freshness-only."
     ],
     "closest_existing_implementation": [
       ".github/workflows/active-track.yml",
@@ -81,11 +84,13 @@
     ],
     "honest_blockers": [
       "The freshness modality is exclusive rather than additive: it is emitted only when elapsed age is the sole observed failure. Compound stale-and-low scores carry both facts in detail and remain blocking.",
-      "Missing, malformed, tampered, below-threshold, and non-finite evidence remains fail-closed on both normal and --enforce-ttl paths.",
+      "The ordinary pull-request downgrade is allowed only when a base-ref comparison proves both the completion criterion and its repository evidence artifact unchanged; a changed or uninspectable input remains blocking.",
+      "The scheduled --enforce-ttl authority blocks every executed FRESHNESS failure even when the latest derived baseline already records that criterion as failed.",
+      "Missing, malformed, tampered, below-threshold, non-finite-score, and non-finite-threshold evidence remains fail-closed on both normal and --enforce-ttl paths.",
       "The branch remains subject to the Phase 0 M0 merge boundary and one post-M0 rebase; this packet does not authorize merging or rewrite any merged closure packet.",
       "Exact-head hosted CI, a fresh exact-head Codex review, and human merge authority remain required."
     ],
     "rollback": "Revert the checker, focused tests, and this current unmerged packet together. Reverting restores the known false blocker for freshness-only drift and the known downgrade bug for compound stale-and-low mutation evidence.",
-    "packet_digest": "455af10f01b9ffd528befb09832ff0dc7213a0227b2ed3d0130f524eb60ba1f0"
+    "packet_digest": "09cdd86f0ce941aaf11fd370da2bccdcf0af7864bf96461cc83170bdfa96d0d4"
   }
 }
