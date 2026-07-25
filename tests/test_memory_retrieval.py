@@ -377,3 +377,59 @@ def test_governed_retrieval_prefers_source_identity_for_source_files(tmp_path):
     assert result
     assert result[0].metadata["expected"] == "target"
     assert result[0].metadata["retrieval_source_match"] > 0
+
+
+def test_atoms_for_candidates_maps_ranked_candidates_to_projection_atoms(tmp_path):
+    from dharma_swarm.memory_kernel import (
+        CensusConfig,
+        MemoryAtomType,
+        MemoryKernel,
+        MemoryKernelConfig,
+    )
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    ranked = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.91,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="semantic inbox drains require a verified reply receipt",
+    )
+    unidentified = RetrievalCandidate(
+        doc_id="",
+        rank=2,
+        score=0.4,
+        source="receipt:no-doc-id",
+        layer="working",
+        channels=("vector",),
+        content="candidate without a doc id is skipped",
+    )
+
+    atoms = kernel.atoms_for_candidates((ranked, unidentified))
+
+    assert len(atoms) == 1
+    atom = atoms[0]
+    assert atom.surface_id == "home.vectors"
+    assert atom.atom_type == MemoryAtomType.SOURCE_CHUNK
+    assert atom.content_ref == "retrieval:doc-a2a"
+    assert atom.source_row_key == "doc-a2a"
+    assert atom.source_refs == ("receipt:a2a-consumer-liveness",)
+    assert atom.content == "semantic inbox drains require a verified reply receipt"
+    assert atom.metadata["retrieval_rank"] == 1
+    assert atom.metadata["retrieval_score"] == 0.91
+    assert atom.metadata["retrieval_layer"] == "working"
+    assert atom.metadata["retrieval_channels"] == ["fts"]
+    assert atom.source_digest
+    assert atom.promotion_allowed is False
+    assert atom.context_admissible is False
