@@ -40,8 +40,13 @@ RATCHETED_DEGRADED_REASONS: dict[str, dict[str, str | None]] = {
     "fts_guard_blocked": {"declared": "2026-07-25", "flip_after": None},
 }
 
-# Worker topologies whose bundles must prove isolation_applied (PR-03 typing).
-_FALLBACK_WORKER_TOPOLOGIES = frozenset({"swarm", "supervisor", "subagents_as_tools"})
+# Worker topologies whose bundles must prove isolation_applied. PR-03 maps all
+# TopologyType members WORKER/SUPERVISOR_SCOPED and deletes the old private
+# _LIVE_TOPOLOGY_MODES set, so the live set is derived from the enum; this
+# frozen copy is only the fallback when models is unimportable.
+_FALLBACK_WORKER_TOPOLOGIES = frozenset(
+    {"fan_out", "fan_in", "pipeline", "broadcast", "swarm", "supervisor", "subagents_as_tools"}
+)
 
 
 @dataclass(frozen=True)
@@ -646,6 +651,9 @@ def load_isolation_proof(state_dir: Path, *, sample_limit: int = 5000) -> dict[s
         "legacy_rows": 0,
         "worker_rows": 0,
         "worker_applied_rows": 0,
+        "unknown_topology_rows": 0,
+        "untyped_rows": 0,
+        "untyped_unisolated_rows": 0,
         "violations": 0,
         "violation_bundles": [],
         "worker_topologies": sorted(_worker_topologies()),
@@ -691,7 +699,22 @@ def load_isolation_proof(state_dir: Path, *, sample_limit: int = 5000) -> dict[s
             continue
         proof["instrumented_rows"] += 1
         topology = str(kernel.get("isolation_topology") or "")
+        if not topology:
+            # Empty topology = single-agent/ambient compile; legitimately
+            # unisolated, but counted so a dark topology channel is visible.
+            proof["untyped_rows"] += 1
+            if not kernel.get("isolation_applied"):
+                proof["untyped_unisolated_rows"] += 1
+            continue
         if topology not in worker_topologies:
+            # Unknown non-empty topology is name drift the gate exists to
+            # catch (PR-03: no live traffic emits unknown strings): fail
+            # closed when such a bundle is unisolated.
+            proof["unknown_topology_rows"] += 1
+            if not kernel.get("isolation_applied"):
+                proof["violations"] += 1
+                if len(proof["violation_bundles"]) < 20:
+                    proof["violation_bundles"].append(str(row["bundle_id"]))
             continue
         proof["worker_rows"] += 1
         if kernel.get("isolation_applied"):
@@ -704,19 +727,16 @@ def load_isolation_proof(state_dir: Path, *, sample_limit: int = 5000) -> dict[s
 
 
 def _worker_topologies() -> frozenset[str]:
-    # Mirrors memory_kernel.default_context._LIVE_TOPOLOGY_MODES when importable
-    # (feature-detect: pre-PR-03 checkouts may not expose it); fan_out is the
-    # PR-03 typed name and is always included.
-    modes: frozenset[str] = _FALLBACK_WORKER_TOPOLOGIES
+    # Every TopologyType member is a multi-agent dispatch and must prove
+    # isolation once instrumented (PR-03's total topology map). Derived from
+    # the enum, not default_context._LIVE_TOPOLOGY_MODES — PR-03 deletes that
+    # private attr, which would silently shrink a getattr-based set.
     try:
-        from dharma_swarm.memory_kernel import default_context
+        from dharma_swarm.models import TopologyType
 
-        live_modes = getattr(default_context, "_LIVE_TOPOLOGY_MODES", None)
-        if live_modes:
-            modes = frozenset(str(mode) for mode in live_modes)
+        return frozenset(member.value for member in TopologyType)
     except Exception:
-        pass
-    return modes | {"fan_out"}
+        return _FALLBACK_WORKER_TOPOLOGIES
 
 
 def score_isolation_proof(proof: dict[str, Any]) -> GateCheck:
@@ -733,20 +753,37 @@ def score_isolation_proof(proof: dict[str, Any]) -> GateCheck:
             details={**proof, "check_id": "isolation_applied_ratchet", "warning": True},
         )
     violations = int(proof.get("violations") or 0)
+    # Instrumentation live but zero typed rows while unisolated untyped rows
+    # exist = the topology channel went dark (key renamed/dropped); the proof
+    # would otherwise stay green while proving nothing, so fail closed.
+    channel_dark = (
+        int(proof.get("worker_rows") or 0) == 0
+        and int(proof.get("unknown_topology_rows") or 0) == 0
+        and int(proof.get("untyped_unisolated_rows") or 0) > 0
+    )
     summary = (
         f"{proof.get('worker_applied_rows')}/{proof.get('worker_rows')} worker bundles "
         f"isolated over {proof.get('instrumented_rows')} instrumented rows"
     )
     if violations:
-        summary = f"{violations} worker bundles WITHOUT isolation_applied; " + summary
+        summary = (
+            f"{violations} worker/unknown-topology bundles WITHOUT isolation_applied; " + summary
+        )
+    if channel_dark:
+        summary = "isolation_topology channel dark on instrumented rows (fail-closed); " + summary
     return GateCheck(
         name="fan_out_isolation_proof",
         score=0.0,
         max_score=0.0,
-        passed=violations == 0,
+        passed=violations == 0 and not channel_dark,
         summary=summary,
-        details={**proof, "check_id": "isolation_applied_ratchet", "warning": False},
-        hard_fail=violations > 0,
+        details={
+            **proof,
+            "check_id": "isolation_applied_ratchet",
+            "warning": False,
+            "topology_channel_dark": channel_dark,
+        },
+        hard_fail=violations > 0 or channel_dark,
     )
 
 

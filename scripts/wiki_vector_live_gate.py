@@ -257,9 +257,13 @@ def _manifest_provenance(
             loader = candidate
             break
     if loader is None:
+        # Module landed but the loader API drifted past our known names: the
+        # check can no longer run, so it must go red, not silently full-score.
+        report["status"] = "error"
         report["warning"] = (
             "chetana.manifest present but exposes none of "
-            f"{_MANIFEST_LOADER_NAMES}; provenance degraded to warning"
+            f"{_MANIFEST_LOADER_NAMES}; provenance fail-closed until the gate "
+            "learns the landed loader name"
         )
         return report
     # Module landed => provenance is enforceable; loader/verify failure fails closed.
@@ -297,7 +301,9 @@ def _accepted_manifest_paths(entries: Any, wiki_concepts_dir: Path) -> frozenset
         if not raw_path:
             continue
         path = Path(raw_path).expanduser()
-        forms = {raw_path, path.name}
+        # Full paths only — a bare-basename form would admit any file that
+        # shares a name with an accepted entry (poisoning bypass).
+        forms = {raw_path}
         if path.is_absolute():
             forms.add(str(path.resolve()))
         else:
@@ -322,7 +328,7 @@ def _matches_accepted(
     source_file: str, accepted: frozenset[str], wiki_concepts_dir: Path
 ) -> bool:
     resolved = Path(source_file).resolve()
-    candidates = {source_file, str(resolved), resolved.name}
+    candidates = {source_file, str(resolved)}
     try:
         candidates.add(str(resolved.relative_to(wiki_concepts_dir.resolve())))
     except ValueError:

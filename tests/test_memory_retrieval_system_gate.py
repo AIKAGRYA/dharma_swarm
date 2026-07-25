@@ -4,6 +4,9 @@ import json
 import sqlite3
 from pathlib import Path
 
+import sys
+
+from scripts import memory_retrieval_system_gate as gate
 from scripts.memory_retrieval_system_gate import (
     load_isolation_proof,
     load_telemetry_health,
@@ -224,11 +227,11 @@ def test_isolation_proof_passes_when_workers_isolated(tmp_path: Path) -> None:
                 },
             ),
             (
-                "single",
+                "ambient",
                 {
                     "memory_kernel_default": {
                         "isolation_applied": False,
-                        "isolation_topology": "single",
+                        "isolation_topology": "",
                     }
                 },
             ),
@@ -241,3 +244,113 @@ def test_isolation_proof_passes_when_workers_isolated(tmp_path: Path) -> None:
     assert not check.hard_fail
     assert check.details["worker_rows"] == 1
     assert check.details["worker_applied_rows"] == 1
+    assert check.details["untyped_unisolated_rows"] == 1
+    assert check.details["topology_channel_dark"] is False
+
+
+def test_isolation_proof_hard_fails_on_unknown_topology_unisolated(tmp_path: Path) -> None:
+    _seed_context_bundles(
+        tmp_path,
+        [
+            (
+                "drifted",
+                {
+                    "memory_kernel_default": {
+                        "isolation_applied": False,
+                        "isolation_topology": "fan-out",
+                    }
+                },
+            ),
+        ],
+    )
+
+    check = score_isolation_proof(load_isolation_proof(tmp_path))
+
+    assert not check.passed
+    assert check.hard_fail
+    assert check.details["unknown_topology_rows"] == 1
+    assert check.details["violation_bundles"] == ["drifted"]
+
+
+def test_isolation_proof_hard_fails_when_topology_channel_dark(tmp_path: Path) -> None:
+    # PR-03 regression scenario: isolation_applied stamped but the topology
+    # key renamed/dropped — the proof must go red, not silently prove nothing.
+    _seed_context_bundles(
+        tmp_path,
+        [
+            ("b1", {"memory_kernel_default": {"isolation_applied": False}}),
+            ("b2", {"memory_kernel_default": {"isolation_applied": False}}),
+        ],
+    )
+
+    check = score_isolation_proof(load_isolation_proof(tmp_path))
+
+    assert not check.passed
+    assert check.hard_fail
+    assert check.details["topology_channel_dark"] is True
+    assert check.details["untyped_unisolated_rows"] == 2
+
+
+def test_worker_topologies_derived_from_topology_type_enum() -> None:
+    from dharma_swarm.models import TopologyType
+    from scripts.memory_retrieval_system_gate import _worker_topologies
+
+    assert _worker_topologies() == frozenset(member.value for member in TopologyType)
+
+
+def _stub_gate_inputs(monkeypatch, telemetry: dict) -> None:
+    monkeypatch.setattr(gate.broad, "load_indexed_rows", lambda state_dir: [])
+    monkeypatch.setattr(
+        gate, "load_telemetry_health", lambda state_dir, *, after_id=0: telemetry
+    )
+
+
+def test_run_system_gate_hard_failure_forces_passed_false(monkeypatch, tmp_path: Path) -> None:
+    _stub_gate_inputs(monkeypatch, _healthy_telemetry({"vector_backend_down": 1}))
+
+    payload = gate.run_system_gate(state_dir=tmp_path, run_live=False)
+
+    assert payload["schema_version"] == 2
+    assert payload["hard_failures"] == ["retrieval_telemetry"]
+    assert payload["passed"] is False
+    by_name = {check["name"]: check for check in payload["checks"]}
+    assert by_name["retrieval_telemetry"]["hard_fail"] is True
+
+
+def test_run_system_gate_no_hard_failures_on_clean_telemetry(monkeypatch, tmp_path: Path) -> None:
+    _stub_gate_inputs(monkeypatch, _healthy_telemetry({}))
+
+    payload = gate.run_system_gate(state_dir=tmp_path, run_live=False)
+
+    assert payload["schema_version"] == 2
+    assert payload["hard_failures"] == []
+
+
+def test_main_exits_1_on_hard_failure_regardless_of_fail_under(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    _stub_gate_inputs(monkeypatch, _healthy_telemetry({"vector_backend_down": 1}))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["gate", "--state-dir", str(tmp_path), "--skip-live", "--fail-under", "0"],
+    )
+
+    assert gate.main() == 1
+    out = capsys.readouterr().out
+    assert "Hard failures: ['retrieval_telemetry']" in out
+    assert "HARD-FAIL retrieval_telemetry" in out
+
+
+def test_main_exits_0_without_hard_failure_when_fail_under_met(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    _stub_gate_inputs(monkeypatch, _healthy_telemetry({}))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["gate", "--state-dir", str(tmp_path), "--skip-live", "--fail-under", "0"],
+    )
+
+    assert gate.main() == 0
+    assert "HARD-FAIL" not in capsys.readouterr().out
