@@ -30,6 +30,14 @@ from dharma_swarm.claim_graph import Contradiction
 from dharma_swarm.dharma_corpus import Claim
 from dharma_swarm.dharma_kernel import DharmaKernel
 from dharma_swarm.injection_scanner import scan_and_sanitize
+from dharma_swarm.memory_quarantine import (
+    MODE_ENFORCE,
+    MODE_SHADOW,
+    SQL_NOT_QUARANTINED,
+    is_quarantined,
+    quarantine_mode,
+    record_shadow_receipt,
+)
 from dharma_swarm.orientation_packet import (
     DirectiveSummary,
     OrientationPacket,
@@ -618,6 +626,57 @@ def _read_memory_plane_context(
     return ""
 
 
+def _select_recent_memories(
+    conn: sqlite3.Connection,
+    *,
+    limit: int,
+    include_quarantined: bool,
+    site: str,
+    state_dir: Path,
+) -> list[sqlite3.Row]:
+    """SELECT recent memories through the quality-quarantine gate.
+
+    Legacy DBs without tags/witness_quality columns fall back to the
+    ungated legacy SELECT (nothing there was ever tagged).
+    """
+    mode = quarantine_mode()
+    gated = not include_quarantined
+    base = "SELECT content, layer, timestamp FROM memories"
+    order = " ORDER BY timestamp DESC LIMIT ?"
+    if gated and mode == MODE_ENFORCE:
+        try:
+            return conn.execute(
+                f"{base} WHERE {SQL_NOT_QUARANTINED}{order}", (limit,)
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return conn.execute(base + order, (limit,)).fetchall()
+    if gated and mode == MODE_SHADOW:
+        try:
+            rows = conn.execute(
+                "SELECT content, layer, timestamp, tags, witness_quality"
+                f" FROM memories{order}",
+                (limit,),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return conn.execute(base + order, (limit,)).fetchall()
+        excluded = 0
+        for row in rows:
+            try:
+                tags = json.loads(row["tags"]) if row["tags"] else []
+            except (TypeError, ValueError):
+                tags = None
+            if is_quarantined(tags, row["witness_quality"]):
+                excluded += 1
+        record_shadow_receipt(
+            site=site,
+            served=len(rows),
+            would_be_excluded=excluded,
+            state_dir=state_dir,
+        )
+        return rows
+    return conn.execute(base + order, (limit,)).fetchall()
+
+
 def read_memory_context(
     state_dir: Path | None = None,
     *,
@@ -632,6 +691,7 @@ def read_memory_context(
     memory_kernel_shadow_home: Path | None = None,
     memory_kernel_shadow_surfaces: tuple[str, ...] = (),
     memory_kernel_shadow_callback: Callable[[object], None] | None = None,
+    include_quarantined: bool = False,
 ) -> str:
     """Get recent or query-specific memory from dharma_swarm state."""
     base_dir = state_dir or STATE_DIR
@@ -695,10 +755,13 @@ def read_memory_context(
         conn = sqlite3.connect(str(db_path))
         try:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT content, layer, timestamp FROM memories ORDER BY timestamp DESC LIMIT ?",
-                (max(1, limit),),
-            ).fetchall()
+            rows = _select_recent_memories(
+                conn,
+                limit=max(1, limit),
+                include_quarantined=include_quarantined,
+                site="context.read_memory_context",
+                state_dir=base_dir,
+            )
         finally:
             conn.close()
         if not rows:
@@ -915,6 +978,7 @@ def read_ops(state_dir: Path | None = None) -> str:
 def read_recent_memories(
     state_dir: Path | None = None,
     max_entries: int = 10,
+    include_quarantined: bool = False,
 ) -> str:
     """Read recent session memories from StrangeLoopMemory database.
 
@@ -937,11 +1001,14 @@ def read_recent_memories(
 
         conn = sqlite3.connect(str(db_path))
         try:
-            rows = conn.execute(
-                "SELECT content, layer, timestamp FROM memories "
-                "ORDER BY timestamp DESC LIMIT ?",
-                (max(1, max_entries),),
-            ).fetchall()
+            conn.row_factory = sqlite3.Row
+            rows = _select_recent_memories(
+                conn,
+                limit=max(1, max_entries),
+                include_quarantined=include_quarantined,
+                site="context.read_recent_memories",
+                state_dir=base_dir,
+            )
         finally:
             conn.close()
 
@@ -949,7 +1016,8 @@ def read_recent_memories(
             return ""
 
         lines = ["## Recent Session Memories"]
-        for content, layer, timestamp in rows:
+        for row in rows:
+            content, layer, timestamp = row["content"], row["layer"], row["timestamp"]
             stamp = str(timestamp)[:19] if timestamp else "?"
             layer_tag = str(layer) if layer else "unknown"
             snippet = str(content).replace("\n", " ").strip()[:200]
