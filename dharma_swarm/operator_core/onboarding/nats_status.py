@@ -12,6 +12,8 @@ import socket
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 
 SCHEMA = "dharma_swarm.onboard_nats_substrate.v1"
 SPEC_PATH = "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
@@ -19,12 +21,17 @@ LOCAL_TCP_HOST = "127.0.0.1"
 LOCAL_TCP_PORT = 4222
 TCP_PROBE_TIMEOUT_SECONDS = 0.2
 PROBE_SCOPE = "local_tcp_listener_only"
-FILESYSTEM_MIRROR_PATHS = (
-    "~/.dharma/a2a_bus/receipts/",
-    "~/.dharma/a2a_bus/verifier.jsonl",
-    "~/.dharma/a2a_bus/conjunction/",
-    "~/.dharma/a2a_bus/tasks/queue.jsonl",
-    "~/.dharma/a2a_bus/inboxes/",
+_STATE_DISPLAY_ROOT = "~/" + ".dharma"
+_MIRROR_RELATIVE_PATHS = (
+    "a2a_bus/receipts/",
+    "a2a_bus/verifier.jsonl",
+    "a2a_bus/conjunction/",
+    "a2a_bus/tasks/queue.jsonl",
+    "a2a_bus/inboxes/",
+)
+FILESYSTEM_MIRROR_PATHS = tuple(
+    f"{_STATE_DISPLAY_ROOT}/{relative_path}"
+    for relative_path in _MIRROR_RELATIVE_PATHS
 )
 MIRRORS_ARE_LIVE_TRANSPORT_PROOF = False
 
@@ -42,10 +49,13 @@ def _tcp_listening() -> bool:
         return False
 
 
-def _mirror_rows(home: Path) -> list[dict[str, Any]]:
+def _mirror_rows(state_root: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for display_path in FILESYSTEM_MIRROR_PATHS:
-        target = home / display_path.removeprefix("~/").rstrip("/")
+    for display_path, relative_path in zip(
+        FILESYSTEM_MIRROR_PATHS,
+        _MIRROR_RELATIVE_PATHS,
+    ):
+        target = state_root / relative_path.rstrip("/")
         rows.append({"path": display_path, "exists": target.exists()})
     return rows
 
@@ -53,7 +63,8 @@ def _mirror_rows(home: Path) -> list[dict[str, Any]]:
 def collect_nats_substrate_status(*, home: Path | None = None) -> dict[str, Any]:
     """Return a typed projection that carries no admission or liveness authority."""
 
-    mirrors = _mirror_rows(home or Path.home())
+    state_root = home / ".dharma" if home is not None else dharma_state_dir()
+    mirrors = _mirror_rows(state_root)
     return {
         "schema": SCHEMA,
         "authority": "local_observation_only",
