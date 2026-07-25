@@ -183,13 +183,16 @@ class StrangeLoopMemory:
 
         entries: list[MemoryEntry] = []
         if layer is None or layer == MemoryLayer.IMMEDIATE:
-            immediate = self._immediate[-limit:]
+            immediate = self._immediate
             if enforce:
+                # Filter before slicing so quarantined entries don't consume
+                # the window (parity with the SQL side, where LIMIT applies
+                # after the predicate).
                 immediate = [
                     e for e in immediate
                     if not is_quarantined(e.tags, e.witness_quality)
                 ]
-            entries.extend(immediate)
+            entries.extend(immediate[-limit:])
 
         targets = _PERSISTED if layer is None else ({layer} & _PERSISTED)
         if targets:

@@ -44,6 +44,10 @@ SQL_NOT_QUARANTINED = "tags NOT LIKE '%\"low_quality\"%'"
 RECEIPT_RELPATH = Path("witness") / "memory_quarantine_shadow.jsonl"
 _RECEIPT_MAX_BYTES = 64 * 1024 * 1024
 
+# In-process tally of receipt-append failures; recorded so the broad handler
+# in record_shadow_receipt is observable, not a silent swallow (AS-09).
+RECEIPT_WRITE_FAILURES = {"count": 0}
+
 
 def quarantine_mode() -> str:
     """Read the gate mode from the environment (default: shadow)."""
@@ -104,10 +108,15 @@ def record_shadow_receipt(
                 "mode": MODE_SHADOW,
                 "served": served,
                 "would_be_excluded": would_be_excluded,
+                # Discriminators so pytest/tooling traffic is separable from
+                # organism traffic when reading the shadow denominators.
+                "pid": os.getpid(),
+                "state": str(base),
             },
             sort_keys=True,
         )
         with path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
     except Exception:
+        RECEIPT_WRITE_FAILURES["count"] += 1
         logger.debug("Quarantine shadow receipt write failed", exc_info=True)

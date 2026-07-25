@@ -28,6 +28,19 @@ except ImportError:
     pass  # hypothesis not installed — property-based tests will be skipped
 
 
+@pytest.fixture(autouse=True)
+def _memory_quarantine_off(monkeypatch):
+    """Default the quality-quarantine gate off under pytest.
+
+    The gate's global default is shadow, which appends telemetry receipts
+    under the caller's state dir — for tests that hit context.py readers
+    with the default state_dir that would be the LIVE ~/.dharma witness
+    file, contaminating the shadow denominators the enforce decision reads.
+    Quarantine tests opt back in with monkeypatch.setenv.
+    """
+    monkeypatch.setenv("DHARMA_MEMORY_QUALITY_QUARANTINE", "off")
+
+
 @pytest.fixture
 def tmp_path_factory_custom(tmp_path):
     """Provide a temporary directory for test databases and state."""

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -87,6 +88,21 @@ def test_is_shard_quarantined():
     assert is_shard_quarantined(GOOD_TEXT) is False
 
 
+def test_shadow_receipt_write_failure_is_counted(tmp_path):
+    from dharma_swarm.memory_quarantine import (
+        RECEIPT_WRITE_FAILURES,
+        record_shadow_receipt,
+    )
+
+    blocker = tmp_path / "blocker"
+    blocker.write_text("")
+    before = RECEIPT_WRITE_FAILURES["count"]
+    record_shadow_receipt(
+        site="t", served=1, would_be_excluded=0, state_dir=blocker / "sub"
+    )
+    assert RECEIPT_WRITE_FAILURES["count"] == before + 1
+
+
 # ── StrangeLoopMemory.recall / get_context ───────────────────────────
 
 
@@ -110,6 +126,9 @@ async def test_recall_shadow_serves_legacy_and_stamps_receipt(
     assert last["site"] == "strange_loop.recall"
     assert last["served"] == 2
     assert last["would_be_excluded"] == 1
+    # Discriminators separating pytest/tooling traffic from organism traffic.
+    assert last["pid"] == os.getpid()
+    assert last["state"] == str(tmp_path)
 
 
 @pytest.mark.asyncio
@@ -134,6 +153,18 @@ async def test_recall_enforce_filters_immediate_layer(mem, monkeypatch):
     await mem.remember(BAD_TEXT, layer=MemoryLayer.IMMEDIATE)
     await mem.remember(GOOD_TEXT, layer=MemoryLayer.IMMEDIATE)
     entries = await mem.recall(layer=MemoryLayer.IMMEDIATE, limit=10)
+    assert [e.content for e in entries] == [GOOD_TEXT]
+
+
+@pytest.mark.asyncio
+async def test_recall_enforce_immediate_filters_before_limit(mem, monkeypatch):
+    # Quarantined entries must not consume the limit window: an older good
+    # entry still gets served when newer low-quality ones fill the slice.
+    monkeypatch.setenv(QUARANTINE_ENV, MODE_ENFORCE)
+    await mem.remember(GOOD_TEXT, layer=MemoryLayer.IMMEDIATE)
+    for _ in range(3):
+        await mem.remember(BAD_TEXT, layer=MemoryLayer.IMMEDIATE)
+    entries = await mem.recall(layer=MemoryLayer.IMMEDIATE, limit=2)
     assert [e.content for e in entries] == [GOOD_TEXT]
 
 
