@@ -3,7 +3,7 @@
   "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
   "branch": "agent/session-ledger-durable-sequence-20260725",
   "worktree": ".",
-  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery.",
+  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery. Consolidate the new synchronous outbox operations through the pre-existing ledger-anchored connection site and preserve the committed DharmaGraph seam ledger byte-for-byte.",
   "allowed_files": [
     "dharma_swarm/episode_ledger.py",
     "dharma_swarm/runtime_state.py",
@@ -83,7 +83,8 @@
     "interface_mismatches": [
       "PR #1112 SessionLedger instances cache independent next-sequence values for one stable episode, so concurrent writers can persist distinct events at the same sequence.",
       "PR #1112 commits a runtime-state session event before its Episode Ledger observation append without a durable retry record, so append failure or process exit can permanently lose the observation.",
-      "PR #1112 rehydrates EpisodeLedgerWriter and then separately rescans the complete JSONL history for the next sequence, doubling unbounded startup work."
+      "PR #1112 rehydrates EpisodeLedgerWriter and then separately rescans the complete JSONL history for the next sequence, doubling unbounded startup work.",
+      "The durable outbox initially raised the DharmaGraph SQLite inventory from 98 to 103 sites; route every new operation through the pre-existing sqlite3.connect effect at runtime_state.py:1404:13 and place additive blocks after ledger-anchored code so the committed effect inventory remains byte-identical."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/episode_ledger.py:EpisodeLedgerWriter",
@@ -94,10 +95,11 @@
     ],
     "honest_blockers": [
       "The outbox and file lock provide single-host process durability; they do not claim distributed multi-host ordering over a shared network filesystem.",
+      "Canonical seam-ledger generation is byte-identical on a case-sensitive Linux filesystem (committed SHA-256 4bbf169024dac4619b236ed403c33ad6bdce597353041b818dc2366119c49782). This case-insensitive macOS host alone resolves the exported Manifest symbol as a non-effect telos_kernel.Manifest module, changing only module_count 67 to 68; all 240 effect entries, bypass_total 232, and sqlite count 98 remain identical.",
       "Exact-head hosted CI and independent review remain required before integration.",
       "Human merge authority remains required; this branch must not self-merge."
     ],
-    "rollback": "Revert the additive outbox schema and methods, locked writer allocation, SessionLedger drain path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
-    "packet_digest": "a2d59cf92f665786a23f35e148558e4755ffb46d524d51797bb7dd619dea671b"
+    "rollback": "Revert the additive outbox schema and methods, shared sync-transaction layout, locked writer allocation, SessionLedger drain path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
+    "packet_digest": "d309bd3a94f0d6f46d9e9870dcb2fd63ce5a80a15ea5bf3acc50a8c60189ab9c"
   }
 }
