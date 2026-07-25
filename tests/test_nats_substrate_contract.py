@@ -93,6 +93,18 @@ def test_contract_checker_rejects_wrong_canonical_spec_path(tmp_path: Path) -> N
     assert any("nats_substrate_status points at the wrong spec path" in failure for failure in failures)
 
 
+def test_contract_checker_fails_when_onboarding_is_disconnected(tmp_path: Path) -> None:
+    paths = _write_contract_repo(tmp_path)
+    paths["onboard"].write_text(
+        "docs/NATS_SUBSTRATE_MASTER_SPEC.md\n",
+        encoding="utf-8",
+    )
+
+    failures = check_contract(tmp_path)
+
+    assert "onboard does not render canonical NATS spec path" in failures
+
+
 def test_contract_cli_renders_canonical_spec_path(monkeypatch, capsys) -> None:
     monkeypatch.setattr(_MODULE, "check_contract", lambda _root: [])
 
@@ -192,7 +204,10 @@ nats-live-production-matrix:
 governance-all: semgrep nats-substrate-contract
 """,
     )
-    _write(paths["onboard"], "NATS_SUBSTRATE_MASTER_SPEC.md\n")
+    _write(
+        paths["onboard"],
+        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md\n",
+    )
     _write(
         paths["a2a_send"],
         """

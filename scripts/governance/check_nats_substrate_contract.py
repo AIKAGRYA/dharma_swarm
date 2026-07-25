@@ -29,6 +29,7 @@ def _repo_paths(repo_root: Path) -> dict[str, Path]:
     return {
         "spec": repo_root / "docs" / "governance" / "NATS_SUBSTRATE_MASTER_SPEC.md",
         "makefile": repo_root / "Makefile",
+        "onboard": repo_root / "scripts" / "governance" / "agent_onboard.py",
         "a2a_send": repo_root / "scripts" / "runtime" / "a2a_send.py",
         "a2a_inbox_bridge": repo_root / "scripts" / "runtime" / "a2a_inbox_bridge.py",
         "a2a_domain_reply_worker": repo_root / "scripts" / "runtime" / "a2a_domain_reply_worker.py",
@@ -76,6 +77,7 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
 
     spec = _read(paths["spec"])
     makefile = _read(paths["makefile"])
+    onboard = _read(paths["onboard"])
     substrate_target = _make_target_block(makefile, "nats-substrate-contract")
     live_target = _make_target_block(makefile, "nats-live-production-matrix")
     governance_target = _make_target_block(makefile, "governance-all")
@@ -151,6 +153,11 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
         and "run_nats_live_production_matrix.py" in live_target
         and "--host-mode" in live_target,
         "Makefile missing live NATS production matrix target",
+        failures,
+    )
+    _require(
+        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md" in onboard,
+        "onboard does not render canonical NATS spec path",
         failures,
     )
     _require("classify_contact_evidence" in a2a_send, "a2a_send missing contact evidence classifier", failures)
