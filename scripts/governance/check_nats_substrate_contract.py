@@ -29,7 +29,6 @@ def _repo_paths(repo_root: Path) -> dict[str, Path]:
     return {
         "spec": repo_root / "docs" / "governance" / "NATS_SUBSTRATE_MASTER_SPEC.md",
         "makefile": repo_root / "Makefile",
-        "onboard": repo_root / "scripts" / "governance" / "agent_onboard.py",
         "a2a_send": repo_root / "scripts" / "runtime" / "a2a_send.py",
         "a2a_inbox_bridge": repo_root / "scripts" / "runtime" / "a2a_inbox_bridge.py",
         "a2a_domain_reply_worker": repo_root / "scripts" / "runtime" / "a2a_domain_reply_worker.py",
@@ -42,7 +41,26 @@ def _repo_paths(repo_root: Path) -> dict[str, Path]:
         "nats_live_evidence": repo_root / "scripts" / "governance" / "check_nats_live_production_evidence.py",
         "nats_transport_tests": repo_root / "tests" / "test_nats_transport.py",
         "nats_contract_tests": repo_root / "tests" / "test_nats_substrate_contract.py",
+        "nats_live_evidence_tests": repo_root / "tests" / "test_nats_live_production_evidence.py",
+        "nats_verification_split_tests": repo_root / "tests" / "test_nats_verification_split.py",
     }
+
+
+def _make_target_block(makefile: str, target: str) -> str:
+    """Return one literal target block from the repository Makefile."""
+
+    lines = makefile.splitlines()
+    for index, line in enumerate(lines):
+        if line == f"{target}:" or line.startswith(f"{target}: "):
+            block = [line]
+            for candidate in lines[index + 1 :]:
+                if candidate and not candidate[0].isspace():
+                    break
+                block.append(candidate)
+                if candidate == "":
+                    break
+            return "\n".join(block)
+    return ""
 
 
 def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
@@ -58,7 +76,9 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
 
     spec = _read(paths["spec"])
     makefile = _read(paths["makefile"])
-    onboard = _read(paths["onboard"])
+    substrate_target = _make_target_block(makefile, "nats-substrate-contract")
+    live_target = _make_target_block(makefile, "nats-live-production-matrix")
+    governance_target = _make_target_block(makefile, "governance-all")
     a2a_send = _read(paths["a2a_send"])
     a2a_inbox_bridge = _read(paths["a2a_inbox_bridge"])
     a2a_domain_reply_worker = _read(paths["a2a_domain_reply_worker"])
@@ -71,6 +91,8 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
     nats_live_evidence = _read(paths["nats_live_evidence"])
     nats_transport_tests = _read(paths["nats_transport_tests"])
     nats_contract_tests = _read(paths["nats_contract_tests"])
+    nats_live_evidence_tests = _read(paths["nats_live_evidence_tests"])
+    nats_verification_split_tests = _read(paths["nats_verification_split_tests"])
 
     required_spec_phrases = [
         "Filesystem and SQLite buses: compatibility mirrors",
@@ -97,28 +119,40 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
     for phrase in required_spec_phrases:
         _require(phrase in spec, f"spec missing required phrase: {phrase}", failures)
 
-    _require("nats-substrate-contract:" in makefile, "Makefile missing nats-substrate-contract target", failures)
+    _require(substrate_target, "Makefile missing nats-substrate-contract target", failures)
     _require(
-        "governance-all:" in makefile and "nats-substrate-contract" in makefile,
+        governance_target and "nats-substrate-contract" in governance_target,
         "governance-all does not include nats-substrate-contract",
         failures,
     )
     _require(
-        "tests/test_nats_substrate_contract.py" in makefile,
+        "tests/test_nats_substrate_contract.py" in substrate_target,
         "nats-substrate-contract target does not run tests/test_nats_substrate_contract.py",
         failures,
     )
     _require(
-        "check_nats_live_production_evidence.py" in makefile,
-        "nats-substrate-contract target does not require fresh live production evidence",
+        "tests/test_nats_verification_split.py" in substrate_target,
+        "nats-substrate-contract target does not run tests/test_nats_verification_split.py",
         failures,
     )
     _require(
-        "nats-live-production-matrix:" in makefile and "run_nats_live_production_matrix.py" in makefile,
+        "tests/test_nats_live_production_evidence.py" in substrate_target,
+        "nats-substrate-contract target does not run fixture-only live evidence tests",
+        failures,
+    )
+    _require(
+        "check_nats_live_production_evidence.py" not in substrate_target
+        and "run_nats_live_production_matrix.py" not in substrate_target,
+        "nats-substrate-contract reaches live-host evidence code",
+        failures,
+    )
+    _require(
+        live_target
+        and "run_nats_live_production_matrix.py" in live_target
+        and "--host-mode" in live_target,
         "Makefile missing live NATS production matrix target",
         failures,
     )
-    _require("NATS_SUBSTRATE_MASTER_SPEC.md" in onboard, "onboard does not render canonical NATS spec path", failures)
     _require("classify_contact_evidence" in a2a_send, "a2a_send missing contact evidence classifier", failures)
     _require("NATS_CLI_JETSTREAM_PUB_ACK" in a2a_send, "a2a_send missing governed NATS CLI fallback receipt marker", failures)
     _require("live_contact_claim" in a2a_send, "a2a_send receipts do not expose live_contact_claim", failures)
@@ -197,6 +231,8 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
         "restart_path",
         "governance_negative_path",
         "source_fingerprints",
+        "host_mode",
+        "check_evidence",
         "dharma.nats.live_production_matrix.v1",
     ]
     for marker in required_live_matrix_markers:
@@ -216,6 +252,9 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
         "governance_negative_path",
         "source_fingerprints",
         "validate_source_freshness",
+        "EvidenceAssessment",
+        "VERDICT_NEEDS_HOST",
+        "EXIT_NEEDS_HOST",
         "dharma.nats.live_production_matrix.v1",
     ]
     for marker in required_live_evidence_markers:
@@ -245,6 +284,32 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
     ]
     for marker in required_contract_test_markers:
         _require(marker in nats_contract_tests, f"contract tests missing marker: {marker}", failures)
+
+    required_live_evidence_test_markers = [
+        "test_missing_evidence_on_non_live_host_is_needs_host",
+        "test_stale_declared_live_evidence_is_fail",
+        "test_fresh_valid_evidence_preserves_pass_verdict",
+    ]
+    for marker in required_live_evidence_test_markers:
+        _require(
+            marker in nats_live_evidence_tests,
+            f"live evidence tests missing regression marker: {marker}",
+            failures,
+        )
+
+    required_split_test_markers = [
+        "make",
+        "-qp",
+        "governance-all",
+        "nats-live-production-matrix",
+        "LIVE_SCRIPTS",
+    ]
+    for marker in required_split_test_markers:
+        _require(
+            marker in nats_verification_split_tests,
+            f"verification split tests missing dependency-graph marker: {marker}",
+            failures,
+        )
 
     unavailable = _probe_unavailable(paths["nats_status"])
     _require(unavailable["ack_verified"] is False, "unreachable NATS endpoint reported ack_verified=True", failures)
@@ -277,28 +342,6 @@ def _check_current_repo_behavior(repo_root: Path) -> list[str]:
         failures.append(f"NATS transport behavioral check failed: {type(exc).__name__}: {exc}")
     finally:
         sys.path[:] = old_path
-
-    try:
-        evidence_module_path = repo_root / "scripts" / "governance" / "check_nats_live_production_evidence.py"
-        spec = importlib.util.spec_from_file_location(
-            "_dharma_nats_live_production_evidence_contract",
-            evidence_module_path,
-        )
-        if spec is None or spec.loader is None:
-            raise RuntimeError(f"cannot import {evidence_module_path}")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        evidence_path = (
-            repo_root
-            / "reports"
-            / "governance"
-            / "nats_live_production_matrix"
-            / "latest.json"
-        )
-        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
-        module.validate(payload, 24, source_grace_seconds=2.0)
-    except Exception as exc:
-        failures.append(f"fresh live NATS production evidence check failed: {type(exc).__name__}: {exc}")
     return failures
 
 
@@ -385,6 +428,7 @@ def _probe_unavailable(nats_status_path: Path) -> dict[str, Any]:
     sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
+        module._tcp_listening = lambda *args, **kwargs: False
         status = module.probe_nats_substrate(endpoint="nats://127.0.0.1:1", verify_ack=True)
     finally:
         if old_module is None:

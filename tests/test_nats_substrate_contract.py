@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 from pathlib import Path
 from typing import Callable
@@ -76,6 +77,34 @@ def test_contract_checker_fails_when_a2a_send_can_overclaim_production(tmp_path:
     assert any("a2a_send compatibility bypass can be mistaken for production evidence" in failure for failure in failures)
 
 
+def test_contract_checker_rejects_wrong_canonical_spec_path(tmp_path: Path) -> None:
+    paths = _write_contract_repo(tmp_path)
+    status = paths["nats_status"]
+    status.write_text(
+        status.read_text(encoding="utf-8").replace(
+            "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+            "docs/NATS_SUBSTRATE_MASTER_SPEC.md",
+        ),
+        encoding="utf-8",
+    )
+
+    failures = check_contract(tmp_path)
+
+    assert any("nats_substrate_status points at the wrong spec path" in failure for failure in failures)
+
+
+def test_contract_cli_renders_canonical_spec_path(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(_MODULE, "check_contract", lambda _root: [])
+
+    result = _MODULE.main(["--repo-root", str(Path.cwd())])
+
+    assert result == 0
+    assert (
+        capsys.readouterr().out.strip()
+        == "NATS_CONTRACT_OK docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+    )
+
+
 def test_live_matrix_deterministic_probe_writes_semantic_receipt(tmp_path: Path) -> None:
     probe = _RUNNER_MODULE.ModelProbe("deterministic", "local-deterministic", 1.0, tmp_path)
 
@@ -85,6 +114,26 @@ def test_live_matrix_deterministic_probe_writes_semantic_receipt(tmp_path: Path)
     assert receipt["response_model"] == "local-deterministic"
     assert "deterministic_transport_probe" in receipt["content"]
     assert Path(receipt["receipt_path"]).exists()
+
+
+def test_non_live_matrix_returns_needs_host_without_constructing_runner(
+    monkeypatch,
+) -> None:
+    def _must_not_construct(*_args, **_kwargs):
+        raise AssertionError("non-live host must not construct the live matrix runner")
+
+    monkeypatch.setattr(_RUNNER_MODULE, "MatrixRunner", _must_not_construct)
+
+    result = asyncio.run(
+        _RUNNER_MODULE.async_main(
+            [
+                "--host-mode",
+                "non-live",
+            ]
+        )
+    )
+
+    assert result == 2
 
 
 def _write_contract_repo(root: Path) -> dict[str, Path]:
@@ -104,6 +153,8 @@ def _write_contract_repo(root: Path) -> dict[str, Path]:
         "nats_live_evidence": root / "scripts" / "governance" / "check_nats_live_production_evidence.py",
         "nats_transport_tests": root / "tests" / "test_nats_transport.py",
         "nats_contract_tests": root / "tests" / "test_nats_substrate_contract.py",
+        "nats_live_evidence_tests": root / "tests" / "test_nats_live_production_evidence.py",
+        "nats_verification_split_tests": root / "tests" / "test_nats_verification_split.py",
     }
     _write(
         paths["spec"],
@@ -135,10 +186,9 @@ NO_REPLY
         """
 nats-substrate-contract:
 \tpython scripts/governance/check_nats_substrate_contract.py
-\tpython scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24
-\tpytest tests/test_nats_substrate_contract.py
+\tpytest tests/test_nats_live_production_evidence.py tests/test_nats_substrate_contract.py tests/test_nats_verification_split.py
 nats-live-production-matrix:
-\tpython scripts/governance/run_nats_live_production_matrix.py
+\tpython scripts/governance/run_nats_live_production_matrix.py --host-mode $${DHARMA_NATS_HOST_MODE:-non-live}
 governance-all: semgrep nats-substrate-contract
 """,
     )
@@ -210,6 +260,8 @@ dlq_failure_path
 restart_path
 governance_negative_path
 source_fingerprints
+host_mode
+check_evidence
 dharma.nats.live_production_matrix.v1
 """,
     )
@@ -229,6 +281,9 @@ restart_path
 governance_negative_path
 source_fingerprints
 validate_source_freshness
+EvidenceAssessment
+VERDICT_NEEDS_HOST
+EXIT_NEEDS_HOST
 dharma.nats.live_production_matrix.v1
 """,
     )
@@ -255,6 +310,24 @@ check_contract
 test_contract_checker_fails_when_nats_transport_wiring_missing
 test_contract_checker_fails_when_regression_tests_are_disconnected
 test_contract_checker_fails_when_a2a_send_can_overclaim_production
+""",
+    )
+    _write(
+        paths["nats_live_evidence_tests"],
+        """
+test_missing_evidence_on_non_live_host_is_needs_host
+test_stale_declared_live_evidence_is_fail
+test_fresh_valid_evidence_preserves_pass_verdict
+""",
+    )
+    _write(
+        paths["nats_verification_split_tests"],
+        """
+make
+-qp
+governance-all
+nats-live-production-matrix
+LIVE_SCRIPTS
 """,
     )
     return paths
