@@ -297,13 +297,14 @@ def tool_revive(
 REVIEWER_TOKEN_ENV = "DHARMA_CHETANA_REVIEWER_TOKEN"
 
 
-def tool_approve(path: str, reviewer_token: str) -> dict:
+def tool_approve(path: str, reviewer_token: str, reviewer: str = "") -> dict:
     """Operator-token-gated approval transitioning staged/pending → approved.
 
-    The free-string ``reviewer`` is abolished: MCP callers are unauthenticated
-    agents, so approval requires ``reviewer_token`` to match the operator-set
-    DHARMA_CHETANA_REVIEWER_TOKEN env var. Token unset ⇒ approval via MCP is
-    disabled entirely (fail closed).
+    Authorization comes ONLY from ``reviewer_token`` matching the operator-set
+    DHARMA_CHETANA_REVIEWER_TOKEN env var; token unset ⇒ approval via MCP is
+    disabled entirely (fail closed). ``reviewer`` is an optional display name
+    recorded in provenance so the approval trail keeps a human identity — it
+    grants nothing.
     """
     expected = os.environ.get(REVIEWER_TOKEN_ENV, "")
     if not expected.strip():
@@ -318,8 +319,10 @@ def tool_approve(path: str, reviewer_token: str) -> dict:
 
     from .promote import approve_atom
 
+    name = (reviewer or "").strip()
+    recorded = f"operator-token:{name}" if name else "operator-token"
     try:
-        result = approve_atom(path=path, reviewer="operator-token")
+        result = approve_atom(path=path, reviewer=recorded)
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "decision": "ERROR"}
     return {
@@ -449,6 +452,13 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 "description": (
                     "REQUIRED: operator token matching DHARMA_CHETANA_REVIEWER_TOKEN. "
                     "Approval is disabled when the env var is unset."
+                ),
+            },
+            "reviewer": {
+                "type": "string",
+                "description": (
+                    "Optional display name recorded in provenance as "
+                    "'operator-token:<name>'. Grants nothing; the token authorizes."
                 ),
             },
         },

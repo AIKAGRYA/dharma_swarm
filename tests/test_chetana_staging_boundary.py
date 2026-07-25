@@ -8,9 +8,12 @@ Covers every hole the audit + recon named:
     are protected; no bare-except fail-open)
   - axiom signature v2 covers frontmatter (incl. review_status) + body;
     verify accepts v1 and v2
-  - governance._coerce_decision unknown verdict → BLOCK
+  - governance._coerce_decision unknown verdict (incl. None) → BLOCK
+  - the approve door verifies the promote-time v2 signature, refuses v1
+    downgrades, re-runs the telos gates, fails closed on slug collisions,
+    and only approves in place inside the trusted dir
   - MCP: tool_promote has no auto_promote; tool_approve is operator-token
-    gated (free-string reviewer abolished)
+    gated (free-string reviewer abolished; optional display name recorded)
   - OP-4 relocation script is dry-run by default and fail-closed on collision
 """
 
@@ -207,6 +210,106 @@ def test_approve_requires_reviewer(sandbox: Path):
 
 
 # ---------------------------------------------------------------------------
+# 3b. the approve door verifies before it trusts
+# ---------------------------------------------------------------------------
+
+
+def test_approve_refuses_tampered_pending_body(sandbox: Path):
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+    text = pr.trusted_path.read_text(encoding="utf-8")
+    tampered = text.replace("boundary test body", "payload swapped in after promote")
+    assert tampered != text
+    pr.trusted_path.write_text(tampered, encoding="utf-8")
+    result = approve_atom(path=pr.trusted_path, reviewer="op")
+    assert result.decision == "SIGNATURE_MISMATCH"
+    assert pr.trusted_path.exists()  # left in pending for the operator
+    assert list((sandbox / "wiki" / "concepts").glob("*.md")) == []
+
+
+def test_approve_refuses_v1_downgrade_resign(sandbox: Path):
+    # Tamper the body AND re-sign with a freshly computed v1 (body-only) sig —
+    # the kernel signature is world-readable, so v1 is forgeable. The approve
+    # door must require v2.
+    from dharma_swarm.chetana.governance import current_kernel_signature
+    from dharma_swarm.chetana.provenance import compute_axiom_signature
+
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+    text = pr.trusted_path.read_text(encoding="utf-8")
+    schema, _ = parse_frontmatter(text)
+    tampered = text.replace("boundary test body", "downgrade attack body")
+    schema_t, body_t = parse_frontmatter(tampered)
+    forged_v1 = compute_axiom_signature(body_t, current_kernel_signature())
+    assert signature_matches(forged_v1, schema_t, body_t, current_kernel_signature())
+    tampered = tampered.replace(schema.provenance.axiom_signature, forged_v1)
+    pr.trusted_path.write_text(tampered, encoding="utf-8")
+    result = approve_atom(path=pr.trusted_path, reviewer="op")
+    assert result.decision == "SIGNATURE_MISMATCH"
+    assert "not v2" in result.error
+    assert list((sandbox / "wiki" / "concepts").glob("*.md")) == []
+
+
+def test_approve_reruns_gates_and_blocks(sandbox: Path, monkeypatch: pytest.MonkeyPatch):
+    import dataclasses
+
+    from dharma_swarm.chetana import promote as promote_mod
+
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+
+    real_gate = promote_mod.gate_check_atom
+
+    def _block(**kwargs):
+        gov = real_gate(**kwargs)
+        return dataclasses.replace(gov, result="BLOCK", can_promote=False)
+
+    monkeypatch.setattr(promote_mod, "gate_check_atom", _block, raising=True)
+    result = approve_atom(path=pr.trusted_path, reviewer="op")
+    assert result.decision == "GATE_BLOCKED"
+    assert pr.trusted_path.exists()
+    assert list((sandbox / "wiki" / "concepts").glob("*.md")) == []
+
+
+def test_approve_nonexistent_absolute_path_is_not_found(sandbox: Path):
+    # Regression: rglob on an absolute pattern raised NotImplementedError.
+    result = approve_atom(path="/nonexistent/absolute/path/atom", reviewer="op")
+    assert result.decision == "NOT_FOUND"
+
+
+def test_approve_slug_collision_fails_closed(sandbox: Path):
+    trusted_root = sandbox / "wiki" / "concepts"
+    pr = promote(staged_path=_stage_atom(title="Clash Title"), promoted_by="t")
+    legacy = trusted_root / pr.trusted_path.name
+    legacy.write_text("# Legacy concept page\n\nNo frontmatter, no atom_id.\n", encoding="utf-8")
+    result = approve_atom(path=pr.trusted_path, reviewer="op")
+    assert result.decision == "COLLISION"
+    assert pr.trusted_path.exists()  # pending copy preserved
+    assert "Legacy concept page" in legacy.read_text(encoding="utf-8")
+
+
+def test_approve_in_place_refused_outside_trusted(sandbox: Path):
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+    rogue = sandbox / "rogue.md"
+    rogue.write_text(pr.trusted_path.read_text(encoding="utf-8"), encoding="utf-8")
+    result = approve_atom(path=rogue, reviewer="op")
+    assert result.decision == "BAD_STATE"
+    assert "outside the trusted dir" in result.error
+    schema, _ = parse_frontmatter(rogue.read_text(encoding="utf-8"))
+    assert schema.provenance.review_status != "approved"
+
+
+def test_approve_in_place_inside_trusted_works(sandbox: Path, ingest_recorder: list[dict]):
+    import shutil
+
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+    dest = sandbox / "wiki" / "concepts" / pr.trusted_path.name
+    shutil.move(str(pr.trusted_path), str(dest))  # legacy pre-relocation state
+    result = approve_atom(path=dest, reviewer="op")
+    assert result.decision == "APPROVED"
+    assert result.trusted_path == dest
+    schema, _ = parse_frontmatter(dest.read_text(encoding="utf-8"))
+    assert schema.provenance.review_status == "approved"
+
+
+# ---------------------------------------------------------------------------
 # 4. signature v2: frontmatter (incl. review_status) is signed
 # ---------------------------------------------------------------------------
 
@@ -297,8 +400,10 @@ def test_write_trusted_allows_same_atom_rewrite(sandbox: Path):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("raw", ["MAYBE", "surprise", 42, object()])
+@pytest.mark.parametrize("raw", ["MAYBE", "surprise", 42, object(), None])
 def test_coerce_decision_unknown_blocks(raw):
+    # None = a GateCheckResult without a .decision attribute (interface
+    # drift) — the most likely real-world unknown must also fail closed.
     assert _coerce_decision(raw) == "BLOCK"
 
 
@@ -306,7 +411,6 @@ def test_coerce_decision_known_values_unchanged():
     assert _coerce_decision("allow") == "ALLOW"
     assert _coerce_decision("REVIEW") == "WARN"
     assert _coerce_decision("deny") == "BLOCK"
-    assert _coerce_decision(None) == "ALLOW"
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +453,20 @@ def test_mcp_tool_approve_with_token_approves(
     result = tool_approve(path=str(pr.trusted_path), reviewer_token="sekrit")
     assert result["decision"] == "APPROVED"
     assert Path(result["trusted_path"]).parent == sandbox / "wiki" / "concepts"
+
+
+def test_mcp_tool_approve_records_reviewer_identity(
+    sandbox: Path, ingest_recorder: list[dict], monkeypatch: pytest.MonkeyPatch
+):
+    from dharma_swarm.chetana.mcp_server import REVIEWER_TOKEN_ENV, tool_approve
+
+    monkeypatch.setenv(REVIEWER_TOKEN_ENV, "sekrit")
+    pr = promote(staged_path=_stage_atom(), promoted_by="t")
+    result = tool_approve(path=str(pr.trusted_path), reviewer_token="sekrit", reviewer="dhyana")
+    assert result["decision"] == "APPROVED"
+    assert result["reviewer"] == "operator-token:dhyana"
+    schema, _ = parse_frontmatter(Path(result["trusted_path"]).read_text(encoding="utf-8"))
+    assert schema.provenance.reviewer == "operator-token:dhyana"
 
 
 # ---------------------------------------------------------------------------
