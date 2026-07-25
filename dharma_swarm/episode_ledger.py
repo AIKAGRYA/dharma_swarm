@@ -10,17 +10,22 @@ as separate slices.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import logging
+import os
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, Iterator
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
 EPISODE_EVENT_SCHEMA_VERSION = "episode_event.v1"
+LOGICAL_DELIVERY_KEY_FIELD = "logical_delivery_key"
 
 # The lifecycle vocabulary each producer appends at the transition it owns.
 EVENT_TYPES = (
@@ -39,6 +44,9 @@ _EFFECT_EVENT_TYPES = ("effect_requested", "effect_resolved")
 
 _REDACT_KEY_MARKERS = ("secret", "token", "password", "api_key", "authorization", "credential")
 _REDACTED = "[REDACTED]"
+
+_THREAD_LOCKS_GUARD = threading.Lock()
+_THREAD_LOCKS: dict[str, threading.RLock] = {}
 
 
 class LedgerValidationError(ValueError):
@@ -262,77 +270,223 @@ def project_episode(events: list[EpisodeEvent]) -> EpisodeState:
     return state
 
 
+def _thread_lock_for(path: Path) -> threading.RLock:
+    key = str(path.expanduser().resolve(strict=False))
+    with _THREAD_LOCKS_GUARD:
+        return _THREAD_LOCKS.setdefault(key, threading.RLock())
+
+
+def _logical_key_from_event(event: EpisodeEvent) -> str:
+    explicit = str(event.payload.get(LOGICAL_DELIVERY_KEY_FIELD, "")).strip()
+    if explicit:
+        return explicit
+    if event.event_type == "episode_opened":
+        return f"episode:{event.episode_id}:opened"
+    if event.event_type == "attempt_started" and event.attempt_id:
+        return f"attempt:{event.attempt_id}:started"
+    if event.event_type == "observation_recorded":
+        session_event_id = str(event.payload.get("session_event_id", "")).strip()
+        if session_event_id:
+            return f"session-event:{session_event_id}:observation"
+    return ""
+
+
 class EpisodeLedgerWriter:
     """Thin persistence wrapper — owns the writes the pure core never makes.
 
     Append-only JSONL; payloads are redacted before persistence; duplicate
-    event_ids are refused, including across restarts (seen-IDs rehydrate from
-    disk, skipping torn/corrupt lines so one bad write cannot poison the file).
+    event IDs, logical delivery keys, and episode sequences are refused across
+    threads, processes, and restarts. Rehydration streams the history once to
+    recover all three indexes; later appends only ingest bytes written since
+    this instance's last offset while holding the interprocess file lock.
     """
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
         self._seen: set[str] = set()
+        self._logical_events: dict[str, EpisodeEvent] = {}
+        self._high_water: dict[str, int] = {}
+        self._sequences: dict[str, set[int]] = {}
+        self._scan_offset = 0
+        self._rehydration_passes = 0
+        self._thread_lock = _thread_lock_for(self.path)
         # A torn tail has no trailing newline; the next append must start on
         # a fresh line or the new event is absorbed INTO the garbage line and
         # silently lost on the following rehydration.
         self._tail_unterminated = False
         self._rehydrate()
 
+    @property
+    def rehydration_passes(self) -> int:
+        return self._rehydration_passes
+
+    @contextmanager
+    def _locked_stream(self) -> Iterator[BinaryIO]:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self._thread_lock:
+            with open(self.path, "a+b") as stream:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield stream
+                finally:
+                    fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
     def _rehydrate(self) -> None:
         if not self.path.exists():
             return
-        raw = self.path.read_bytes()
-        self._tail_unterminated = bool(raw) and not raw.endswith(b"\n")
-        # Tolerant decode: a torn multi-byte UTF-8 tail from a crashed write
-        # must degrade to a corrupt LINE (skipped below), not a decode error
-        # that aborts rehydration and disables the writer entirely.
-        text = raw.decode("utf-8", errors="replace")
-        for line in text.splitlines():
-            try:
-                record = json.loads(line)
-            except (TypeError, ValueError):
-                logger.warning(
-                    "episode_ledger: skipping corrupt line in %s during rehydrate",
-                    self.path,
-                )
-                continue
-            if not isinstance(record, dict):
-                logger.warning(
-                    "episode_ledger: skipping non-object line in %s during rehydrate",
-                    self.path,
-                )
-                continue
-            # Full schema + tamper validation before trusting the claimed id:
-            # a malformed line that merely SQUATS a valid event_id must not
-            # poison dedup and silently suppress the genuine event forever.
-            # Readers validate too, so a later valid append under the same id
-            # is unambiguous — only one line passes from_dict.
-            try:
-                event = EpisodeEvent.from_dict(record)
-            except LedgerValidationError:
-                logger.warning(
-                    "episode_ledger: skipping invalid record in %s during rehydrate",
-                    self.path,
-                )
-                continue
-            self._seen.add(event.event_id)
+        with self._locked_stream() as stream:
+            self._rehydration_passes += 1
+            self._sync_from_disk_locked(stream)
 
-    def append(self, event: EpisodeEvent) -> bool:
-        """Append one event; returns False when the event_id was already
-        persisted (write-side dedup)."""
+    def _sync_from_disk_locked(self, stream: BinaryIO) -> None:
+        stream.seek(0, os.SEEK_END)
+        end = stream.tell()
+        if end < self._scan_offset:
+            self._seen.clear()
+            self._logical_events.clear()
+            self._high_water.clear()
+            self._sequences.clear()
+            self._scan_offset = 0
+            self._rehydration_passes += 1
+        stream.seek(self._scan_offset)
+        while stream.tell() < end:
+            raw_line = stream.readline()
+            if not raw_line:
+                break
+            self._observe_line(raw_line)
+        self._scan_offset = end
+        if end:
+            stream.seek(end - 1)
+            self._tail_unterminated = stream.read(1) != b"\n"
+        else:
+            self._tail_unterminated = False
+
+    def _observe_line(self, raw_line: bytes) -> None:
+        if not raw_line.strip():
+            return
+        # Tolerant decode: a torn multi-byte UTF-8 tail from a crashed write
+        # must degrade to a corrupt LINE, not disable the writer.
+        try:
+            record = json.loads(raw_line.decode("utf-8", errors="replace"))
+        except (TypeError, ValueError):
+            logger.warning(
+                "episode_ledger: skipping corrupt line in %s during rehydrate",
+                self.path,
+            )
+            return
+        if not isinstance(record, dict):
+            logger.warning(
+                "episode_ledger: skipping non-object line in %s during rehydrate",
+                self.path,
+            )
+            return
+        try:
+            event = EpisodeEvent.from_dict(record)
+        except LedgerValidationError:
+            logger.warning(
+                "episode_ledger: skipping invalid record in %s during rehydrate",
+                self.path,
+            )
+            return
+        self._observe_event(event)
+
+    def _observe_event(self, event: EpisodeEvent) -> None:
+        self._seen.add(event.event_id)
+        self._high_water[event.episode_id] = max(
+            self._high_water.get(event.episode_id, 0),
+            event.sequence,
+        )
+        self._sequences.setdefault(event.episode_id, set()).add(event.sequence)
+        logical_key = _logical_key_from_event(event)
+        if logical_key:
+            self._logical_events.setdefault(logical_key, event)
+
+    def _append_event_locked(self, stream: BinaryIO, event: EpisodeEvent) -> bool:
         if event.event_id in self._seen:
+            return False
+        logical_key = _logical_key_from_event(event)
+        if logical_key and logical_key in self._logical_events:
+            return False
+        if event.sequence in self._sequences.get(event.episode_id, set()):
             return False
         record = event.to_dict()
         record["payload"] = redact_payload(event.payload)
-        # Content-addressed tamper check at the write boundary: a payload
-        # mutated after construction no longer matches the already-computed
-        # event_id and must not be persisted under that stale identity.
         EpisodeEvent.from_dict(record)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding="utf-8") as f:
-            prefix = "\n" if self._tail_unterminated else ""
-            f.write(prefix + json.dumps(record, ensure_ascii=True, default=str) + "\n")
+        prefix = b"\n" if self._tail_unterminated else b""
+        encoded = (
+            json.dumps(record, ensure_ascii=True, default=str).encode("utf-8")
+            + b"\n"
+        )
+        stream.seek(0, os.SEEK_END)
+        stream.write(prefix + encoded)
+        stream.flush()
+        os.fsync(stream.fileno())
+        self._scan_offset = stream.tell()
         self._tail_unterminated = False
-        self._seen.add(event.event_id)
+        self._observe_event(event)
         return True
+
+    def append(self, event: EpisodeEvent) -> bool:
+        """Append one event; returns False when the event_id was already
+        persisted or its logical key/sequence is already occupied."""
+        record = event.to_dict()
+        record["payload"] = redact_payload(event.payload)
+        EpisodeEvent.from_dict(record)
+        with self._locked_stream() as stream:
+            self._sync_from_disk_locked(stream)
+            return self._append_event_locked(stream, event)
+
+    def append_delivery(
+        self,
+        *,
+        delivery_key: str,
+        event_type: str,
+        episode_id: str,
+        attempt_id: str,
+        payload: dict[str, Any],
+        fixed_sequence: int | None = None,
+    ) -> EpisodeEvent:
+        """Append one logical delivery under the file lock and return its event.
+
+        A replay after file append but before outbox ack returns the already
+        persisted event for ``delivery_key``. New non-fixed sequences are
+        allocated only after ingesting bytes from competing writers.
+        """
+
+        delivery_key = str(delivery_key).strip()
+        if not delivery_key:
+            raise LedgerValidationError("delivery_key is required")
+        with self._locked_stream() as stream:
+            self._sync_from_disk_locked(stream)
+            existing = self._logical_events.get(delivery_key)
+            if existing is not None:
+                return existing
+            sequence = (
+                int(fixed_sequence)
+                if fixed_sequence is not None
+                else max(1, self._high_water.get(episode_id, 0) + 1)
+            )
+            event_payload = dict(payload)
+            supplied_key = str(
+                event_payload.get(LOGICAL_DELIVERY_KEY_FIELD, delivery_key)
+            ).strip()
+            if supplied_key != delivery_key:
+                raise LedgerValidationError(
+                    "payload logical_delivery_key conflicts with delivery_key"
+                )
+            event_payload[LOGICAL_DELIVERY_KEY_FIELD] = delivery_key
+            event = EpisodeEvent.new(
+                event_type=event_type,
+                episode_id=episode_id,
+                attempt_id=attempt_id,
+                sequence=sequence,
+                payload=event_payload,
+            )
+            if not self._append_event_locked(stream, event):
+                replay = self._logical_events.get(delivery_key)
+                if replay is not None:
+                    return replay
+                raise LedgerValidationError(
+                    f"sequence {sequence} for episode {episode_id!r} is occupied"
+                )
+            return event

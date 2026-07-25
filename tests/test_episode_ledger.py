@@ -8,6 +8,7 @@ observations stay visible; missing evidence fails closed.
 from __future__ import annotations
 
 import json
+import multiprocessing
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,25 @@ def _event(event_type: str = "episode_opened", sequence: int = 0, **payload):
         sequence=sequence,
         payload=payload,
     )
+
+
+def _append_delivery_batch(
+    path: str,
+    episode_id: str,
+    worker_id: str,
+    count: int,
+    barrier,
+) -> None:
+    writer = EpisodeLedgerWriter(path)
+    barrier.wait(timeout=10)
+    for index in range(count):
+        writer.append_delivery(
+            delivery_key=f"worker:{worker_id}:{index}",
+            event_type="attempt_started",
+            episode_id=episode_id,
+            attempt_id=f"at_{worker_id}_{index}",
+            payload={"worker_id": worker_id, "index": index},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -366,3 +386,114 @@ def test_writer_recovers_from_valid_json_non_object_lines(tmp_path: Path):
     writer = EpisodeLedgerWriter(path)
     assert writer.append(obs) is False
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+
+
+def test_writer_rejects_distinct_events_at_the_same_episode_sequence(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    first = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep_sequence",
+        attempt_id="at_first",
+        sequence=1,
+    )
+    second = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep_sequence",
+        attempt_id="at_second",
+        sequence=1,
+    )
+
+    assert writer.append(first) is True
+    assert writer.append(second) is False
+
+
+def test_logical_delivery_key_dedupes_replay_after_restart(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    first = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key="session-event:sevt-1:observation",
+        event_type="observation_recorded",
+        episode_id="ep_delivery",
+        attempt_id="at_delivery",
+        payload={"session_event_id": "sevt-1"},
+    )
+    replay = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key="session-event:sevt-1:observation",
+        event_type="observation_recorded",
+        episode_id="ep_delivery",
+        attempt_id="at_delivery",
+        payload={"session_event_id": "sevt-1"},
+    )
+
+    assert replay.event_id == first.event_id
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_rehydrate_collects_logical_keys_and_high_water_in_one_pass(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    seed = EpisodeLedgerWriter(path)
+    first = seed.append_delivery(
+        delivery_key="attempt:at_one:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_one",
+        payload={},
+    )
+    seed.append_delivery(
+        delivery_key="attempt:at_two:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_two",
+        payload={},
+    )
+
+    restarted = EpisodeLedgerWriter(path)
+    replay = restarted.append_delivery(
+        delivery_key="attempt:at_one:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_one",
+        payload={},
+    )
+    third = restarted.append_delivery(
+        delivery_key="attempt:at_three:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_three",
+        payload={},
+    )
+
+    assert restarted.rehydration_passes == 1
+    assert replay.event_id == first.event_id
+    assert third.sequence == 3
+
+
+def test_interprocess_writers_allocate_unique_monotonic_sequences(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    episode_id = "ep_concurrent"
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(3)
+    processes = [
+        context.Process(
+            target=_append_delivery_batch,
+            args=(str(path), episode_id, worker_id, 12, barrier),
+        )
+        for worker_id in ("a", "b")
+    ]
+
+    for process in processes:
+        process.start()
+    barrier.wait(timeout=10)
+    for process in processes:
+        process.join(timeout=20)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+
+    assert [process.exitcode for process in processes] == [0, 0]
+    events = [
+        EpisodeEvent.from_dict(json.loads(line))
+        for line in path.read_text().splitlines()
+    ]
+    sequences = sorted(event.sequence for event in events)
+    assert sequences == list(range(1, 25))

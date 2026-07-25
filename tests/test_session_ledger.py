@@ -151,6 +151,8 @@ def test_session_ledger_sequence_uses_highest_valid_event_not_line_count(tmp_pat
 
     assert second_attempt.sequence == 3
     assert second_observation.sequence == 4
+    assert not hasattr(second, "_episode_sequence")
+    assert second._episode_writer.rehydration_passes == 1
 
 
 def test_session_ledger_survives_torn_utf8_tail(tmp_path):
@@ -190,14 +192,110 @@ def test_session_ledger_counts_episode_persistence_failures(tmp_path, monkeypatc
     )
     assert ledger.episode_ledger_failures == 0
 
-    def boom(_event):
+    def boom(**_kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr(ledger._episode_writer, "append", boom)
+    monkeypatch.setattr(ledger._episode_writer, "append_delivery", boom)
     ledger.task_event("dispatch_assigned", task_id="t1")
 
     assert ledger.episode_ledger_failures == 1
     assert (tmp_path / "sess_fl" / "task_ledger.jsonl").exists()
+
+
+def test_episode_append_failure_replays_durable_observation_on_restart(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess_replay",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+
+    def fail_append(**_kwargs):
+        raise OSError("transient episode append failure")
+
+    monkeypatch.setattr(first._episode_writer, "append_delivery", fail_append)
+    first.task_event("dispatch_assigned", task_id="t-replay")
+    task_row = json.loads(
+        (tmp_path / "sess_replay" / "task_ledger.jsonl").read_text().strip()
+    )
+    delivery_key = f"session-event:{task_row['event_id']}:observation"
+    store = RuntimeStateStore(runtime_db)
+
+    assert len(store.search_session_events_sync("dispatch_assigned")) == 1
+    assert [
+        item.delivery_key
+        for item in store.list_pending_episode_events_sync(
+            episode_id=first.episode_id
+        )
+    ] == [delivery_key]
+
+    SessionLedger(**kwargs)
+    events = _read_episode_events(
+        tmp_path / "sess_replay" / "episode_ledger.jsonl"
+    )
+    observations = [
+        event
+        for event in events
+        if event.payload.get("session_event_id") == task_row["event_id"]
+    ]
+    delivered = store.get_episode_outbox_sync(delivery_key)
+
+    assert len(observations) == 1
+    assert delivered is not None
+    assert delivered.acked_at is not None
+    assert delivered.episode_event_id == observations[0].event_id
+
+
+def test_crash_before_outbox_ack_replays_without_duplicate_file_event(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess_crash_ack",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+
+    def fail_ack(*_args, **_kwargs):
+        raise RuntimeError("simulated crash before ack")
+
+    monkeypatch.setattr(first._runtime_state, "ack_episode_event_sync", fail_ack)
+    first.progress_event("task_started", task_id="t-crash")
+    progress_row = json.loads(
+        (tmp_path / "sess_crash_ack" / "progress_ledger.jsonl").read_text().strip()
+    )
+    delivery_key = f"session-event:{progress_row['event_id']}:observation"
+    episode_path = tmp_path / "sess_crash_ack" / "episode_ledger.jsonl"
+    before = [
+        event
+        for event in _read_episode_events(episode_path)
+        if event.payload.get("session_event_id") == progress_row["event_id"]
+    ]
+
+    assert len(before) == 1
+    assert RuntimeStateStore(runtime_db).get_episode_outbox_sync(
+        delivery_key
+    ).acked_at is None
+
+    SessionLedger(**kwargs)
+    after = [
+        event
+        for event in _read_episode_events(episode_path)
+        if event.payload.get("session_event_id") == progress_row["event_id"]
+    ]
+    delivered = RuntimeStateStore(runtime_db).get_episode_outbox_sync(delivery_key)
+
+    assert len(after) == 1
+    assert after[0].event_id == before[0].event_id
+    assert delivered is not None
+    assert delivered.acked_at is not None
+    assert delivered.episode_event_id == before[0].event_id
 
 
 def test_session_ledger_counts_writer_setup_failure_once(tmp_path, monkeypatch):

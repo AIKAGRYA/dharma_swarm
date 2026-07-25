@@ -1,0 +1,103 @@
+{
+  "id": "loop-closure-WP-EPISODEDURABILITY-20260725",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/session-ledger-durable-sequence-20260725",
+  "worktree": ".",
+  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery.",
+  "allowed_files": [
+    "dharma_swarm/episode_ledger.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/session_ledger.py",
+    "tests/test_episode_ledger.py",
+    "tests/test_runtime_state.py",
+    "tests/test_session_ledger.py",
+    "reports/agentops/work_packets/loop-closure-WP-EPISODEDURABILITY-20260725.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/governance/**",
+    "reports/governance/**",
+    "scripts/governance/**"
+  ],
+  "gates": [
+    {
+      "name": "episode-session-runtime-ledger-tests",
+      "command": "python3 -m pytest -q tests/test_episode_ledger.py tests/test_runtime_state.py tests/test_session_ledger.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "existing-ledger-caller-tests",
+      "command": "python3 -m pytest -q tests/test_runtime_lifecycle.py tests/test_orchestrator.py tests/test_operator_bridge.py tests/test_runtime_truth_spine_v1.py tests/test_runtime_truth_spine_v2_evidence.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "episode-session-runtime-ledger-ruff",
+      "command": "python3 -m ruff check dharma_swarm/episode_ledger.py dharma_swarm/runtime_state.py dharma_swarm/session_ledger.py tests/test_episode_ledger.py tests/test_runtime_state.py tests/test_session_ledger.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "duplicate-episode-sequence-write-must-not-succeed",
+      "command": "python3 -c \"from pathlib import Path; import tempfile; from dharma_swarm.episode_ledger import EpisodeEvent, EpisodeLedgerWriter; d=tempfile.TemporaryDirectory(); w=EpisodeLedgerWriter(Path(d.name) / 'episode.jsonl'); a=EpisodeEvent.new(event_type='attempt_started', episode_id='ep_negative', attempt_id='at_a', sequence=1); b=EpisodeEvent.new(event_type='attempt_started', episode_id='ep_negative', attempt_id='at_b', sequence=1); assert w.append(a); assert w.append(b)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(session-ledger): make episode delivery durable"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-EPISODEDURABILITY",
+    "active_track": "loop-closure-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "PR #1112 SessionLedger instances cache independent next-sequence values for one stable episode, so concurrent writers can persist distinct events at the same sequence.",
+      "PR #1112 commits a runtime-state session event before its Episode Ledger observation append without a durable retry record, so append failure or process exit can permanently lose the observation.",
+      "PR #1112 rehydrates EpisodeLedgerWriter and then separately rescans the complete JSONL history for the next sequence, doubling unbounded startup work."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/episode_ledger.py:EpisodeLedgerWriter",
+      "dharma_swarm/runtime_state.py:RuntimeStateStore._record_session_event_sync_db",
+      "dharma_swarm/runtime_state.py:RuntimeStateStore.record_session_event_sync",
+      "dharma_swarm/runtime_state.py:IdempotencyRecord",
+      "dharma_swarm/session_ledger.py:SessionLedger"
+    ],
+    "honest_blockers": [
+      "The outbox and file lock provide single-host process durability; they do not claim distributed multi-host ordering over a shared network filesystem.",
+      "Exact-head hosted CI and independent review remain required before integration.",
+      "Human merge authority remains required; this branch must not self-merge."
+    ],
+    "rollback": "Revert the additive outbox schema and methods, locked writer allocation, SessionLedger drain path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
+    "packet_digest": "a2d59cf92f665786a23f35e148558e4755ffb46d524d51797bb7dd619dea671b"
+  }
+}

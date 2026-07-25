@@ -184,6 +184,98 @@ async def test_runtime_state_records_and_searches_session_events(tmp_path) -> No
     assert sessions[0].session_id == "sess-search"
 
 
+def test_session_event_and_episode_outbox_rollback_atomically(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    event = SessionEventRecord(
+        event_id="sevt-atomic",
+        session_id="sess-atomic",
+        ledger_kind="task",
+        event_name="dispatch_assigned",
+    )
+
+    def fail_enqueue(*_args, **_kwargs):
+        raise OSError("injected outbox failure")
+
+    monkeypatch.setattr(
+        RuntimeStateStore,
+        "_enqueue_episode_outbox_sync_db",
+        staticmethod(fail_enqueue),
+    )
+    with pytest.raises(OSError, match="outbox"):
+        store.record_session_event_with_episode_outbox_sync(
+            event,
+            delivery_key="session-event:sevt-atomic:observation",
+            episode_id="ep-atomic",
+            attempt_id="at-atomic",
+            event_type="observation_recorded",
+            payload={"session_event_id": event.event_id},
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        session_event_count = db.execute(
+            "SELECT COUNT(*) FROM session_events WHERE event_id = ?",
+            (event.event_id,),
+        ).fetchone()[0]
+        outbox_count = db.execute(
+            "SELECT COUNT(*) FROM episode_event_outbox"
+        ).fetchone()[0]
+    assert session_event_count == 0
+    assert outbox_count == 0
+
+
+def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path)
+    first = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-durable:started",
+        episode_id="ep-durable",
+        attempt_id="at-durable",
+        event_type="attempt_started",
+        payload={"session_id": "sess-durable"},
+    )
+    duplicate = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-durable:started",
+        episode_id="ep-durable",
+        attempt_id="at-durable",
+        event_type="attempt_started",
+        payload={"session_id": "sess-durable"},
+    )
+
+    restarted = RuntimeStateStore(db_path)
+    pending = restarted.list_pending_episode_events_sync(episode_id="ep-durable")
+    acked = restarted.ack_episode_event_sync(
+        first.delivery_key,
+        episode_event_id="ev-durable",
+    )
+
+    assert duplicate.outbox_id == first.outbox_id
+    assert [item.delivery_key for item in pending] == [first.delivery_key]
+    assert acked.acked_at is not None
+    assert acked.episode_event_id == "ev-durable"
+    assert restarted.list_pending_episode_events_sync(episode_id="ep-durable") == []
+    assert (
+        restarted.enqueue_episode_event_sync(
+            delivery_key="attempt:at-durable:started",
+            episode_id="ep-durable",
+            attempt_id="at-durable",
+            event_type="attempt_started",
+            payload={"session_id": "sess-durable"},
+        ).acked_at
+        is not None
+    )
+    with pytest.raises(ValueError, match="different content"):
+        restarted.enqueue_episode_event_sync(
+            delivery_key="attempt:at-durable:started",
+            episode_id="ep-durable",
+            attempt_id="at-other",
+            event_type="attempt_started",
+            payload={"session_id": "sess-durable"},
+        )
+
+
 def test_runtime_state_indexes_historic_ledgers(tmp_path) -> None:
     ledger_base = tmp_path / "ledgers"
     session_dir = ledger_base / "sess-old"
