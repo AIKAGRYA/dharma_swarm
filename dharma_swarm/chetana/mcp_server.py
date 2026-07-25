@@ -10,7 +10,7 @@ Exposes 9 tools to agents:
     chetana_palace_state() -> {pillar_rooms, total_atoms, coverage_gaps}
     chetana_verify(path) -> {verified, zero_sig, kernel_drift, ...}      [Slice 7]
     chetana_revive(path|all, apply, reviewer) -> {proposals, applied}    [Slice 7]
-    chetana_approve(path, reviewer) -> {decision, trusted_path}          [Slice 7]
+    chetana_approve(path, reviewer_token) -> {decision, trusted_path}    [Slice 7; token-gated]
 
 This is a thin wrapper over the chetana package functions. The server is
 launched via `python -m dharma_swarm.chetana.mcp_server` from an .mcp.json
@@ -23,8 +23,10 @@ runs on it. Otherwise it prints a setup hint and exits non-zero.
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -71,12 +73,13 @@ def tool_promote(
     staged_path: str,
     confidence: float | None = None,
     requester: str = "mcp_caller",
-    auto_promote: bool = False,
 ) -> dict:
+    # No auto_promote from MCP: unauthenticated agent callers must not be able
+    # to mint auto_promoted atoms. Promoted atoms land in the pending root
+    # until an operator approves them (chetana_approve, token-gated).
     result = promote_fn(
         staged_path=Path(staged_path),
         promoted_by=requester,
-        auto_promote=auto_promote,
         confidence_override=confidence,
     )
     return {
@@ -176,7 +179,7 @@ def tool_verify(path: str | None = None) -> dict:
     Returns four buckets: verified, zero-sig, kernel-drift, no-provenance,
     schema-error.
     """
-    from .provenance import compute_axiom_signature, parse_frontmatter
+    from .provenance import parse_frontmatter, signature_matches
     from .staging import list_trusted
 
     placeholder = "0" * 64
@@ -215,9 +218,9 @@ def tool_verify(path: str | None = None) -> dict:
                 buckets["zero-sig"].append(str(p))
                 continue
 
-            if compute_axiom_signature(body, current_kernel_sig) == stored:
+            if signature_matches(stored, schema, body, current_kernel_sig):
                 buckets["verified"].append(str(p))
-            elif compute_axiom_signature(body, placeholder) == stored:
+            elif signature_matches(stored, schema, body, placeholder):
                 buckets["zero-sig"].append(str(p))
             else:
                 buckets["kernel-drift"].append(str(p))
@@ -291,96 +294,41 @@ def tool_revive(
     }
 
 
-def tool_approve(path: str, reviewer: str) -> dict:
-    """Human-explicit approval transitioning staged → approved.
+REVIEWER_TOKEN_ENV = "DHARMA_CHETANA_REVIEWER_TOKEN"
 
-    Slice 7 of Plan v3: NO auto-approve. ``reviewer`` is required and must be
-    a non-empty string identifying the human (or named agent) accepting
-    responsibility for the approval.
+
+def tool_approve(path: str, reviewer_token: str) -> dict:
+    """Operator-token-gated approval transitioning staged/pending → approved.
+
+    The free-string ``reviewer`` is abolished: MCP callers are unauthenticated
+    agents, so approval requires ``reviewer_token`` to match the operator-set
+    DHARMA_CHETANA_REVIEWER_TOKEN env var. Token unset ⇒ approval via MCP is
+    disabled entirely (fail closed).
     """
-    if not reviewer or not reviewer.strip():
+    expected = os.environ.get(REVIEWER_TOKEN_ENV, "")
+    if not expected.strip():
         return {
-            "error": "reviewer required for approve (no auto-approve)",
+            "error": f"approve disabled: {REVIEWER_TOKEN_ENV} is not configured",
             "decision": "REJECTED",
         }
-    from .provenance import assemble_atom, now_iso, parse_frontmatter
-    from .staging import STAGING_ROOT, write_trusted
+    if not reviewer_token or not hmac.compare_digest(
+        reviewer_token.encode("utf-8"), expected.encode("utf-8")
+    ):
+        return {"error": "invalid reviewer token", "decision": "REJECTED"}
 
-    target = Path(path).expanduser().resolve()
-    if not target.exists():
-        candidates = (
-            list(STAGING_ROOT.rglob(f"{path}.md")) if STAGING_ROOT.exists() else []
-        )
-        if candidates:
-            target = candidates[0]
-    if not target.exists():
-        return {"error": f"{path} not found", "decision": "NOT_FOUND"}
+    from .promote import approve_atom
 
-    text = target.read_text(encoding="utf-8")
     try:
-        schema, body = parse_frontmatter(text, source_path=str(target))
+        result = approve_atom(path=path, reviewer="operator-token")
     except Exception as e:
-        return {"error": f"parse failed: {e}", "decision": "PARSE_ERROR"}
-
-    if schema.provenance is None:
-        return {
-            "error": "atom has no provenance — promote first",
-            "decision": "NEEDS_PROMOTE",
-        }
-
-    current_status = schema.provenance.review_status
-    if current_status == "approved":
-        return {
-            "decision": "ALREADY_APPROVED",
-            "reviewer": schema.provenance.reviewer,
-            "trusted_path": str(target),
-        }
-    if current_status == "rejected":
-        return {"decision": "REJECTED_PRIOR", "trusted_path": str(target)}
-    if current_status not in ("staged", "auto_promoted"):
-        return {
-            "decision": "BAD_STATE",
-            "current_status": current_status,
-        }
-
-    approval_entry = {
-        "event": "approve",
-        "ts": now_iso(),
-        "reviewer": reviewer,
-        "prior_status": current_status,
-    }
-    new_revival_chain = list(schema.provenance.revival_chain) + [approval_entry]
-    new_provenance = schema.provenance.model_copy(update={
-        "review_status": "approved",
-        "reviewer": reviewer,
-        "revival_chain": new_revival_chain,
-    })
-    new_schema = schema.model_copy(update={"provenance": new_provenance})
-
-    try:
-        target.relative_to(STAGING_ROOT.resolve())
-        is_staged = True
-    except ValueError:
-        is_staged = False
-
-    if is_staged:
-        trusted_path = write_trusted(new_schema, body=body)
-        try:
-            target.unlink()
-        except OSError:
-            pass
-        return {
-            "decision": "APPROVED",
-            "prior_status": current_status,
-            "reviewer": reviewer,
-            "trusted_path": str(trusted_path),
-        }
-    target.write_text(assemble_atom(new_schema, body), encoding="utf-8")
+        return {"error": f"{type(e).__name__}: {e}", "decision": "ERROR"}
     return {
-        "decision": "APPROVED",
-        "prior_status": current_status,
-        "reviewer": reviewer,
-        "trusted_path": str(target),
+        "decision": result.decision,
+        "prior_status": result.prior_status,
+        "reviewer": result.reviewer,
+        "trusted_path": str(result.trusted_path) if result.trusted_path else None,
+        "error": result.error,
+        "notes": result.notes,
     }
 
 
@@ -432,7 +380,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "requester": {"type": "string", "default": "mcp_caller"},
-            "auto_promote": {"type": "boolean", "default": False},
         },
         "required": ["staged_path"],
         "additionalProperties": False,
@@ -495,14 +442,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to staged or trusted atom needing human approval.",
+                "description": "Path to pending/staged atom needing operator approval.",
             },
-            "reviewer": {
+            "reviewer_token": {
                 "type": "string",
-                "description": "REQUIRED: identifier for the human (or named agent) accepting responsibility. No auto-approve.",
+                "description": (
+                    "REQUIRED: operator token matching DHARMA_CHETANA_REVIEWER_TOKEN. "
+                    "Approval is disabled when the env var is unset."
+                ),
             },
         },
-        "required": ["path", "reviewer"],
+        "required": ["path", "reviewer_token"],
         "additionalProperties": False,
     },
 }
