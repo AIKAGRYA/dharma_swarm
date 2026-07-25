@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,6 +18,17 @@ RUN pip install --no-cache-dir -e ".[dev]"
 
 # Full source
 COPY dharma_swarm/ /app/dharma_swarm/
+COPY scripts/runtime/dharma_swarm_container_runner.sh /usr/local/bin/dharma-swarm-container-runner
+
+# Seal the exact source tree that the image will execute. Runtime admission
+# treats this as container-image provenance, never as proof of canonical Git.
+RUN set -eu; \
+    test -z "$(find /app/dharma_swarm -type l -print -quit)"; \
+    (cd /app/dharma_swarm && \
+      find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) \
+      > /app/.dharma-runtime-source.sha256; \
+    chmod 0444 /app/.dharma-runtime-source.sha256; \
+    chmod 0555 /usr/local/bin/dharma-swarm-container-runner
 
 # State directory
 RUN mkdir -p /root/.dharma/logs \
@@ -36,5 +48,5 @@ EXPOSE 7433
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=60s \
     CMD curl -f http://localhost:7433/health || exit 1
 
-# Boot the swarm
-CMD ["python", "-m", "dharma_swarm.orchestrate_live"]
+# Boot only after the image-baked source manifest verifies.
+CMD ["/usr/local/bin/dharma-swarm-container-runner"]

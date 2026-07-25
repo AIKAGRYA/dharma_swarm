@@ -84,7 +84,8 @@ services:
       - "127.0.0.1:7433:7433"   # health API (loopback-only: world bind reopened MeghaDharma exposure on clean redeploys; 2026-07-09 forensics)
     volumes:
       - dharma-state:/root/.dharma
-      - ./dharma_swarm:/app/dharma_swarm:ro  # source is READ-ONLY (never mutable)
+      # Source is image-baked and manifest-bound; never overlay it from a
+      # checkout, even read-only, or container provenance becomes ambiguous.
       # PR-001: writable evolution surfaces are SEPARATE volumes, never source.
       - evolution-worktrees:/evolution_worktrees          # scratch worktrees (rw)
       - evolution-archive:/evolution_archive:ro           # immutable experiment artifacts

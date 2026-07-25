@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -9,8 +10,11 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.runtime_admission import (
+    ContainerRuntimeAdmission,
     RuntimeAdmissionError,
+    assess_container_runtime_admission,
     assess_runtime_admission,
+    require_runtime_admission,
     runtime_admission_or_exit,
 )
 
@@ -84,6 +88,28 @@ def test_untracked_path_is_rejected_because_it_can_change_imports(
         assess_runtime_admission(repo)
 
 
+def test_ignored_import_bytecode_is_rejected(tmp_path: Path) -> None:
+    repo, _head = _runtime_repo(tmp_path)
+    (repo / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore")
+    _git(
+        repo,
+        "-c",
+        "user.name=Runtime Admission Test",
+        "-c",
+        "user.email=runtime-admission@example.invalid",
+        "commit",
+        "-m",
+        "ignore bytecode",
+    )
+    head = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/main", head)
+    (repo / "sitecustomize.pyc").write_bytes(b"ignored startup bytecode")
+
+    with pytest.raises(RuntimeAdmissionError, match="ignored import bytecode"):
+        assess_runtime_admission(repo)
+
+
 def test_tracked_dirty_checkout_is_rejected(tmp_path: Path) -> None:
     repo, _head = _runtime_repo(tmp_path)
     (repo / "runtime.txt").write_text("mutated", encoding="utf-8")
@@ -130,6 +156,8 @@ def test_release_pin_must_match_head_and_use_full_sha(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeAdmissionError, match="full 40-character"):
         assess_runtime_admission(repo, expected_commit=head[:12])
+    with pytest.raises(RuntimeAdmissionError, match="full 40-character"):
+        assess_runtime_admission(repo, expected_commit="   ")
     with pytest.raises(RuntimeAdmissionError, match="does not match pinned"):
         assess_runtime_admission(repo, expected_commit="0" * 40)
 
@@ -153,3 +181,61 @@ def test_command_boundary_exits_with_configuration_error(
 
     assert exc.value.code == 78
     assert "admission denied" in capsys.readouterr().err
+
+
+def _container_source(tmp_path: Path) -> tuple[Path, Path, str]:
+    app = tmp_path / "app"
+    source = app / "dharma_swarm"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text('"""sealed"""', encoding="utf-8")
+    (source / "worker.py").write_text("VALUE = 1\n", encoding="utf-8")
+    lines = []
+    for path in sorted(item for item in source.rglob("*") if item.is_file()):
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append(f"{digest}  ./{path.relative_to(source).as_posix()}")
+    manifest = app / ".dharma-runtime-source.sha256"
+    manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    manifest_digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    return source, manifest, manifest_digest
+
+
+def test_container_image_source_manifest_is_a_distinct_admission(
+    tmp_path: Path,
+) -> None:
+    source, manifest, digest = _container_source(tmp_path)
+
+    admission = assess_container_runtime_admission(
+        source,
+        manifest=manifest,
+        expected_digest=digest,
+    )
+
+    assert isinstance(admission, ContainerRuntimeAdmission)
+    assert admission.source_root == source
+    assert admission.source_digest == digest
+
+
+def test_container_image_admission_rejects_tampering_and_mixed_git_pin(
+    tmp_path: Path,
+) -> None:
+    source, manifest, digest = _container_source(tmp_path)
+    environment = {
+        "DHARMA_RUNTIME_PROVENANCE_MODE": "container-image",
+        "DHARMA_RUNTIME_SOURCE_ROOT": str(source),
+        "DHARMA_RUNTIME_SOURCE_MANIFEST": str(manifest),
+        "DHARMA_RUNTIME_SOURCE_DIGEST": digest,
+    }
+
+    assert isinstance(
+        require_runtime_admission(environ=environment),
+        ContainerRuntimeAdmission,
+    )
+    with pytest.raises(RuntimeAdmissionError, match="cannot be combined"):
+        require_runtime_admission(
+            expected_commit="a" * 40,
+            environ=environment,
+        )
+
+    (source / "worker.py").write_text("VALUE = 2\n", encoding="utf-8")
+    with pytest.raises(RuntimeAdmissionError, match="does not match"):
+        require_runtime_admission(environ=environment)
