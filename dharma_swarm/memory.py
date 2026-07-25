@@ -14,6 +14,14 @@ from pathlib import Path
 
 import aiosqlite
 
+from dharma_swarm.memory_quarantine import (
+    MODE_ENFORCE,
+    MODE_SHADOW,
+    SQL_NOT_QUARANTINED,
+    is_quarantined,
+    quarantine_mode,
+    record_shadow_receipt,
+)
 from dharma_swarm.models import MemoryEntry, MemoryLayer
 
 _SCHEMA = """
@@ -160,11 +168,28 @@ class StrangeLoopMemory:
         layer: MemoryLayer | None = None,
         limit: int = 10,
         development_only: bool = False,
+        include_quarantined: bool = False,
     ) -> list[MemoryEntry]:
-        """Retrieve memories, optionally filtered by layer."""
+        """Retrieve memories, optionally filtered by layer.
+
+        Quality quarantine (DHARMA_MEMORY_QUALITY_QUARANTINE): in enforce
+        mode low_quality rows are excluded unless include_quarantined=True;
+        in shadow mode (default) legacy results are served and a
+        would_be_excluded receipt is stamped.
+        """
+        mode = quarantine_mode()
+        gated = not include_quarantined
+        enforce = gated and mode == MODE_ENFORCE
+
         entries: list[MemoryEntry] = []
         if layer is None or layer == MemoryLayer.IMMEDIATE:
-            entries.extend(self._immediate[-limit:])
+            immediate = self._immediate[-limit:]
+            if enforce:
+                immediate = [
+                    e for e in immediate
+                    if not is_quarantined(e.tags, e.witness_quality)
+                ]
+            entries.extend(immediate)
 
         targets = _PERSISTED if layer is None else ({layer} & _PERSISTED)
         if targets:
@@ -173,13 +198,30 @@ class StrangeLoopMemory:
             params: list[str | int] = [ly.value for ly in targets]
             if development_only:
                 sql += " AND development_marker = 1"
+            if enforce:
+                sql += f" AND {SQL_NOT_QUARANTINED}"
             sql += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
             async with self._conn.execute(sql, params) as cur:
                 entries.extend(_row_to_entry(r) for r in await cur.fetchall())
 
         entries.sort(key=lambda e: e.timestamp, reverse=True)
-        return entries[:limit]
+        result = entries[:limit]
+        if gated and mode == MODE_SHADOW:
+            record_shadow_receipt(
+                site="strange_loop.recall",
+                served=len(result),
+                would_be_excluded=sum(
+                    1 for e in result
+                    if is_quarantined(e.tags, e.witness_quality)
+                ),
+                state_dir=self._quarantine_state_dir(),
+            )
+        return result
+
+    def _quarantine_state_dir(self) -> Path:
+        parent = self.db_path.parent
+        return parent.parent if parent.name == "db" else parent
 
     async def mark_development(self, what_changed: str, evidence: str) -> MemoryEntry:
         """Record genuine development (not just accumulation)."""
@@ -220,24 +262,31 @@ class StrangeLoopMemory:
             tags=["meta", "pattern", "consolidation"],
         )
 
-    async def get_context(self, max_chars: int = 3000) -> str:
+    async def get_context(
+        self,
+        max_chars: int = 3000,
+        include_quarantined: bool = False,
+    ) -> str:
         """Generate a context string suitable for session injection."""
         parts: list[str] = ["## Strange Loop Memory Context"]
 
         dev = await self.recall(layer=MemoryLayer.DEVELOPMENT, limit=5,
-                                development_only=True)
+                                development_only=True,
+                                include_quarantined=include_quarantined)
         if dev:
             parts.append("\n### Recent Developments")
             for e in dev:
                 parts.append(f"- [{e.timestamp:%Y-%m-%d}] {e.content[:200]}")
 
-        wit = await self.recall(layer=MemoryLayer.WITNESS, limit=3)
+        wit = await self.recall(layer=MemoryLayer.WITNESS, limit=3,
+                                include_quarantined=include_quarantined)
         if wit:
             parts.append("\n### Witness Layer")
             for e in wit:
                 parts.append(f"- [W] {e.content[:150]}")
 
-        meta = await self.recall(layer=MemoryLayer.META, limit=2)
+        meta = await self.recall(layer=MemoryLayer.META, limit=2,
+                                 include_quarantined=include_quarantined)
         if meta:
             parts.append("\n### Meta Patterns")
             for e in meta:
