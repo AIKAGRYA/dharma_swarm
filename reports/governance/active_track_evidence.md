@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-21T22:29:47+09:00 (schema v2)
+Generated: 2026-07-25T20:45:43+09:00 (schema v2)
 Active tracks: **11** (warn 11, max 11) — shippable 8
 
 ## Spine coverage
@@ -41,9 +41,9 @@ Active tracks: **11** (warn 11, max 11) — shippable 8
   - ✓ `nats_contract_checker_exists` (file_exists) — scripts/governance/check_nats_substrate_contract.py present
   - ✓ `nats_transport_tests_exist` (file_exists) — tests/test_nats_transport.py present
   - ✓ `nats_contract_tests_exist` (file_exists) — tests/test_nats_substrate_contract.py present
-  - ✗ `nats_substrate_contract_checker_passes` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_substrate_contract.py exited 1; output: NATS_CONTRACT_FAIL fresh live NATS production evidence check failed: EvidenceError: evidence is stale: age=20 days, 12:54:42.158418
-  - ✓ `nats_transport_regression_tests_pass` (command_passes) — pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py exited 0; output: ...................                                                      [100%] | 19 passed in 1.51s
-  - ✗ `nats_live_production_evidence_fresh` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24 exited 1; output: NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: evidence is stale: age=20 days, 12:54:43.968017
+  - ✗ `nats_substrate_contract_checker_passes` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_substrate_contract.py exited 1; output: NATS_CONTRACT_FAIL fresh live NATS production evidence check failed: EvidenceError: evidence is stale: age=24 days, 11:10:37.636294
+  - ✓ `nats_transport_regression_tests_pass` (command_passes) — pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py exited 0; output: ...................                                                      [100%] | 19 passed in 1.57s
+  - ✗ `nats_live_production_evidence_fresh` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24 exited 1; output: NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: evidence is stale: age=24 days, 11:10:39.522197
 
 ## `runtime-truth-spine-adoption-2026-06` — 9/10
 
@@ -222,25 +222,25 @@ Active tracks: **11** (warn 11, max 11) — shippable 8
 - **WARN** `gauntlet-gate-missing:telos-ai-morning-refinery-2026-06`: ACTIVE track 'telos-ai-morning-refinery-2026-06' declares no 'gauntlet_verified' completion criterion — it can currently render SHIPPABLE without passing the gauntlet. Add a gauntlet_verified gate to its completion_criteria.
 - **WARN** `gauntlet-gate-missing:helm-worldclass-terminal-2026-06`: ACTIVE track 'helm-worldclass-terminal-2026-06' declares no 'gauntlet_verified' completion criterion — it can currently render SHIPPABLE without passing the gauntlet. Add a gauntlet_verified gate to its completion_criteria.
 - **WARN** `gauntlet-gate-missing:a2a-cloud-agent-bridge-2026-06`: ACTIVE track 'a2a-cloud-agent-bridge-2026-06' declares no 'gauntlet_verified' completion criterion — it can currently render SHIPPABLE without passing the gauntlet. Add a gauntlet_verified gate to its completion_criteria.
-- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] verified_at is 26 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 1/3 completion criteria pass.
-- **ERROR** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 41 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 45 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 9/10 completion criteria pass.
-- **ERROR** `track-stale:loop-closure-2026-06`: [loop-closure-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:loop-closure-2026-06`: [loop-closure-2026-06] verified_at is 26 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:loop-closure-2026-06`: [loop-closure-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:orientation-graph-2026-06`: [orientation-graph-2026-06] verified_at is 40 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:orientation-graph-2026-06`: [orientation-graph-2026-06] verified_at is 44 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] all 16 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] all 12 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 6/7 completion criteria pass.
-- **ERROR** `track-stale:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] verified_at is 22 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] verified_at is 26 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
