@@ -48,7 +48,9 @@ def _next_episode_sequence(path: Path, episode_id: str) -> int:
         return 1
 
     highest = 0
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # Tolerant decode, matching EpisodeLedgerWriter._rehydrate: a torn UTF-8
+    # tail is one skippable bad line, never a scan-aborting decode error.
+    for line in path.read_bytes().decode("utf-8", errors="replace").splitlines():
         try:
             record = json.loads(line)
         except (TypeError, ValueError):

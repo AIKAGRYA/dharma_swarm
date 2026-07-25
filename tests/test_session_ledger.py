@@ -10,7 +10,7 @@ from dharma_swarm.session_ledger import SessionLedger
 
 def _read_episode_events(path):
     events = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_bytes().decode("utf-8", errors="replace").splitlines():
         try:
             record = json.loads(line)
         except (TypeError, ValueError):
@@ -151,6 +151,35 @@ def test_session_ledger_sequence_uses_highest_valid_event_not_line_count(tmp_pat
 
     assert second_attempt.sequence == 3
     assert second_observation.sequence == 4
+
+
+def test_session_ledger_survives_torn_utf8_tail(tmp_path):
+    """A torn multi-byte UTF-8 write at the end of the episode file must not
+    disable the producer: decoding happens per line, so the torn tail is
+    skipped like any corrupt line and new events still persist."""
+
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess_torn",
+        "runtime_db_path": tmp_path / "runtime.db",
+    }
+    first = SessionLedger(**kwargs)
+    first.task_event("dispatch_assigned", task_id="t1")
+
+    episode_path = tmp_path / "sess_torn" / "episode_ledger.jsonl"
+    with open(episode_path, "ab") as stream:
+        stream.write(b'{"note": "caf\xc3')  # torn mid-codepoint, no newline
+
+    second = SessionLedger(**kwargs)
+    assert second._episode_writer is not None, "torn UTF-8 disabled the producer"
+    second.task_event("task_started", task_id="t2")
+
+    events = _read_episode_events(episode_path)
+    assert any(
+        event.event_type == "observation_recorded"
+        and event.attempt_id == second.attempt_id
+        for event in events
+    ), "no observation persisted after torn-tail restart"
 
 
 def test_session_ledger_counts_episode_persistence_failures(tmp_path, monkeypatch):

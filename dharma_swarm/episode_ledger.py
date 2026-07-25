@@ -278,7 +278,11 @@ class EpisodeLedgerWriter:
     def _rehydrate(self) -> None:
         if not self.path.exists():
             return
-        for line in self.path.read_text(encoding="utf-8").splitlines():
+        # Tolerant decode: a torn multi-byte UTF-8 tail from a crashed write
+        # must degrade to a corrupt LINE (skipped below), not a decode error
+        # that aborts rehydration and disables the writer entirely.
+        text = self.path.read_bytes().decode("utf-8", errors="replace")
+        for line in text.splitlines():
             try:
                 record = json.loads(line)
             except (TypeError, ValueError):

@@ -312,6 +312,20 @@ def test_writer_recovers_from_corrupt_lines(tmp_path: Path):
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
 
 
+def test_writer_survives_torn_utf8_tail(tmp_path: Path):
+    """A crash mid-write can leave a torn multi-byte UTF-8 tail. Rehydration
+    must skip it like any corrupt line — a strict whole-file decode would
+    raise before per-line recovery even starts, disabling the writer."""
+    path = tmp_path / "episodes.jsonl"
+    obs = _event("observation_recorded", 1, note="fine")
+    EpisodeLedgerWriter(path).append(obs)
+    with open(path, "ab") as f:
+        f.write(b'{"note": "caf\xc3')  # torn mid-codepoint, no newline
+    writer = EpisodeLedgerWriter(path)
+    assert writer.append(obs) is False, "valid persisted event lost from dedup"
+    assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+
+
 def test_squatted_event_id_cannot_suppress_the_real_event(tmp_path: Path):
     """A malformed line that merely CLAIMS a valid event_id must not poison
     write-side dedup: after restart, appending the genuine event still
