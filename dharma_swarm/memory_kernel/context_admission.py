@@ -48,6 +48,7 @@ _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.CANONICAL,
 )
 _STALE_FRESHNESS_VALUES = {"snapshot", "dormant", "missing", "unknown"}
+_ISOLATION_MODES = ("unrestricted", "scoped")
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,16 @@ class MemoryContextBudget:
     allowed_agent_ids: tuple[str, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
     allowed_atom_types: tuple[MemoryAtomType, ...] = ()
+
+    def __post_init__(self) -> None:
+        # An unknown mode must fail loudly at construction; comparing a
+        # typo'd value against "scoped" downstream would silently degrade
+        # to the legacy allow-all semantics.
+        if self.isolation_mode not in _ISOLATION_MODES:
+            raise ValueError(
+                "isolation_mode must be one of "
+                f"{_ISOLATION_MODES}, got {self.isolation_mode!r}"
+            )
 
     def to_json(self) -> dict[str, object]:
         payload = asdict(self)
