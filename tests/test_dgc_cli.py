@@ -659,6 +659,20 @@ def test_dgc_cli_memory_command():
             mock.assert_called_once_with(None, text="", top_k=5, as_json=False)
 
 
+def test_dgc_cli_memory_status_json_flag_works_in_both_positions():
+    """`memory status --json` and `memory --json status` both set as_json."""
+    from dharma_swarm.dgc_cli import main
+
+    for argv in (
+        ["dgc", "memory", "status", "--json"],
+        ["dgc", "memory", "--json", "status"],
+    ):
+        with patch("sys.argv", argv):
+            with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+                main()
+                mock.assert_called_once_with("status", text="", top_k=5, as_json=True)
+
+
 def test_dgc_cli_memory_query_command():
     """main() dispatches `memory query` to cmd_memory with joined query text."""
     from dharma_swarm.dgc_cli import main
