@@ -115,19 +115,37 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
     assert len(staged_paths) == 1
     staged = staged_paths[0]
 
-    # 2. PROMOTE
+    # 2. PROMOTE — lands in the PENDING root, not the trusted projection
     p2 = _run(["promote", str(staged), "--promoted-by", "cli-e2e"], home=cli_home)
     assert p2.returncode == 0, p2.stderr
     assert "promoted" in p2.stdout.lower()
 
     trusted_dir = cli_home / ".dharma" / "knowledge" / "wiki" / "concepts"
-    trusted_paths = list(trusted_dir.glob("*.md"))
-    assert len(trusted_paths) == 1
+    pending_dir = cli_home / ".dharma" / "knowledge" / "wiki" / "pending"
+    assert list(trusted_dir.glob("*.md")) == []
+    pending_paths = list(pending_dir.glob("*.md"))
+    assert len(pending_paths) == 1
     assert not staged.exists()  # staged file removed after promote
 
-    # 3. STATUS reflects promote
+    # 2b. STATUS reflects pending, not trusted
+    p2s = _run(["status"], home=cli_home)
+    assert "pending   : 1" in p2s.stdout
+    assert "trusted   : 0" in p2s.stdout
+
+    # 2c. APPROVE — the only door into the trusted projection
+    p2a = _run(
+        ["approve", str(pending_paths[0]), "--reviewer", "cli-e2e"], home=cli_home
+    )
+    assert p2a.returncode == 0, p2a.stderr
+    assert "approved" in p2a.stdout.lower()
+    trusted_paths = list(trusted_dir.glob("*.md"))
+    assert len(trusted_paths) == 1
+    assert not pending_paths[0].exists()
+
+    # 3. STATUS reflects approve
     p3 = _run(["status"], home=cli_home)
     assert "trusted   : 1" in p3.stdout
+    assert "pending   : 0" in p3.stdout
     assert "staged    : 0" in p3.stdout
     assert str(cli_home) not in p3.stdout
 

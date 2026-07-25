@@ -1,4 +1,4 @@
-"""chetana.promote — staged → trusted.
+"""chetana.promote — staged → pending → trusted.
 
 The single bottleneck through which all atoms must pass to become trusted.
 Every promote call:
@@ -7,13 +7,21 @@ Every promote call:
     2. Validates the frontmatter against the chetana schema.
     3. Runs gate_check_atom() — telos gates on the body content.
     4. On BLOCK: writes a rejected-atom audit row, leaves the staged file alone.
-    5. On WARN: writes the trusted atom with review_status='staged' (still needs human approval).
+    5. On WARN: writes the atom with review_status='staged' (still needs human approval).
     6. On ALLOW with auto_promote=True: writes review_status='auto_promoted'.
     7. On ALLOW with auto_promote=False (default): writes review_status='staged'.
-    8. Computes axiom_signature, sets provenance.promoted_at + promoted_by.
-    9. Writes the trusted file to ~/.dharma/knowledge/wiki/concepts/<slug>.md
+    8. Computes axiom_signature (v2: frontmatter + body), sets provenance.
+    9. Writes the atom. Anything not review_status='approved' lands in the
+       PENDING root (~/.dharma/knowledge/wiki/pending/), NEVER in the trusted
+       projection (~/.dharma/knowledge/wiki/concepts/). Only approve_atom()
+       moves an atom into the trusted dir.
    10. Deletes the staging file iff write succeeded AND result != BLOCK.
    11. Returns PromoteResult with paths + decision.
+
+approve_atom() is the ONLY door into the trusted projection: it flips
+review_status to 'approved', re-signs (v2 covers review_status), moves the file
+from pending/staging into concepts/, and only then runs cross-update + the
+vector auto-ingest (scoped to the approved file).
 """
 
 from __future__ import annotations
@@ -26,10 +34,13 @@ from pathlib import Path
 from . import staging as staging_mod
 from ..daemon_config import dharma_state_dir
 from .cross_update import cross_update_trusted
-from .governance import gate_check_atom
+from .governance import current_kernel_signature, gate_check_atom
 from .provenance import (
     GateResult,
     ReviewStatus,
+    assemble_atom,
+    compute_axiom_signature_v2,
+    now_iso,
     parse_frontmatter,
 )
 from .staging import quarantine_atom, write_trusted
@@ -121,8 +132,15 @@ def promote(
             )
         }
     )
+    promoted_schema = _resign_v2(promoted_schema, body, gov.kernel_signature)
 
-    trusted_path = write_trusted(promoted_schema, body)
+    # Non-approved atoms NEVER enter the trusted projection — they land in the
+    # pending root and wait for approve_atom(). promote() can only produce
+    # staged/auto_promoted, so this always routes to pending today; the guard
+    # is on review_status so a future approved-at-promote path stays correct.
+    pending = review_status != "approved"
+    target_root = staging_mod.WIKI_PENDING_ROOT if pending else None
+    trusted_path = write_trusted(promoted_schema, body, root=target_root)
     notes.append(f"promoted ({gov.result}, review={review_status}) → {trusted_path}")
     try:
         log_path = append_wiki_log(
@@ -134,34 +152,26 @@ def promote(
         notes.append(f"log appended → {log_path}")
     except OSError as e:
         notes.append(f"log append failed: {e}")
-    try:
-        cross = cross_update_trusted(trusted_path)
-        notes.append(
-            "cross-update: "
-            f"backlinks={len(cross.backlinks_updated)}, "
-            f"missing_related={len(cross.missing_related)}, "
-            f"contradictions={len(cross.contradictions_flagged)}"
-        )
-    except Exception as e:
-        notes.append(f"cross-update failed: {type(e).__name__}: {e}")
-
-    if _wiki_vector_auto_ingest_enabled():
+    if pending:
+        # Cross-update writes index/backlinks — the trusted projection. Staged
+        # content must not appear there; deferred to approve_atom().
+        notes.append("cross-update deferred until approval (atom is pending)")
+    else:
         try:
-            from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
-
-            receipt = ingest_wiki_concepts(
-                state_dir=_wiki_vector_state_dir_for_trusted_path(trusted_path),
-                wiki_concepts_dir=trusted_path.parent,
-            )
+            cross = cross_update_trusted(trusted_path)
             notes.append(
-                "wiki-vector ingest: "
-                f"discovered={receipt.discovered_files}, "
-                f"inserted={receipt.backfill.get('inserted_rows')}, "
-                f"indexed={receipt.sync_index.get('indexed_rows')}, "
-                f"reembedded={receipt.reembed.get('upserted_rows')}"
+                "cross-update: "
+                f"backlinks={len(cross.backlinks_updated)}, "
+                f"missing_related={len(cross.missing_related)}, "
+                f"contradictions={len(cross.contradictions_flagged)}"
             )
         except Exception as e:
-            notes.append(f"wiki-vector ingest failed: {type(e).__name__}: {e}")
+            notes.append(f"cross-update failed: {type(e).__name__}: {e}")
+
+    if _wiki_vector_auto_ingest_enabled(review_status):
+        _auto_ingest_file(trusted_path, notes)
+    elif pending:
+        notes.append("wiki-vector ingest skipped (review_status != approved)")
 
     result = PromoteResult(
         staged_path=staged_path,
@@ -189,6 +199,182 @@ def promote(
     return result
 
 
+@dataclass
+class ApproveResult:
+    decision: str  # APPROVED | ALREADY_APPROVED | REJECTED_PRIOR | BAD_STATE | NOT_FOUND | NEEDS_PROMOTE | PARSE_ERROR
+    trusted_path: Path | None = None
+    prior_status: str | None = None
+    reviewer: str | None = None
+    error: str | None = None
+    notes: list[str] = field(default_factory=list)
+
+
+def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
+    """Human-explicit approval — the ONLY door into the trusted projection.
+
+    Accepts a pending atom (wiki/pending/), a staged-with-provenance atom, or
+    an already-trusted atom whose review_status is staged|auto_promoted.
+    Flips review_status → 'approved', re-signs with v2 (which covers
+    review_status), moves the file into the trusted dir, then runs
+    cross-update + the (env-gated) vector auto-ingest scoped to this file.
+    """
+    if not reviewer or not str(reviewer).strip():
+        return ApproveResult(
+            decision="REJECTED", error="reviewer required for approve (no auto-approve)"
+        )
+
+    target = Path(path).expanduser()
+    if not target.exists():
+        # Resolve bare atom ids / slugs under staging first, then pending.
+        candidates: list[Path] = []
+        if staging_mod.STAGING_ROOT.exists():
+            candidates = list(staging_mod.STAGING_ROOT.rglob(f"{path}.md"))
+        if not candidates and staging_mod.WIKI_PENDING_ROOT.exists():
+            candidates = list(staging_mod.WIKI_PENDING_ROOT.rglob(f"{path}.md"))
+        if candidates:
+            target = candidates[0]
+    if not target.exists():
+        return ApproveResult(decision="NOT_FOUND", error=f"{path} not found")
+    target = target.resolve()
+
+    text = target.read_text(encoding="utf-8")
+    try:
+        schema, body = parse_frontmatter(text, source_path=str(target))
+    except Exception as e:
+        return ApproveResult(decision="PARSE_ERROR", error=f"parse failed: {e}")
+
+    if schema is None or schema.provenance is None:
+        return ApproveResult(
+            decision="NEEDS_PROMOTE", error="atom has no provenance — promote first"
+        )
+
+    current_status = schema.provenance.review_status
+    if current_status == "approved":
+        return ApproveResult(
+            decision="ALREADY_APPROVED",
+            trusted_path=target,
+            reviewer=schema.provenance.reviewer,
+        )
+    if current_status == "rejected":
+        return ApproveResult(
+            decision="REJECTED_PRIOR",
+            trusted_path=target,
+            error="atom was rejected; cannot approve a rejected atom",
+        )
+    if current_status not in ("staged", "auto_promoted"):
+        return ApproveResult(
+            decision="BAD_STATE",
+            prior_status=current_status,
+            error=f"unexpected review_status '{current_status}'",
+        )
+
+    approval_entry = {
+        "event": "approve",
+        "ts": now_iso(),
+        "reviewer": reviewer,
+        "prior_status": current_status,
+    }
+    new_provenance = schema.provenance.model_copy(
+        update={
+            "review_status": "approved",
+            "reviewer": reviewer,
+            "revival_chain": list(schema.provenance.revival_chain) + [approval_entry],
+        }
+    )
+    new_schema = schema.model_copy(update={"provenance": new_provenance})
+    # review_status changed → the v2 signature must be recomputed here, under
+    # the current kernel; a bare on-disk flip breaks verification by design.
+    new_schema = _resign_v2(new_schema, body, current_kernel_signature())
+
+    notes: list[str] = []
+    movable_roots = (staging_mod.STAGING_ROOT, staging_mod.WIKI_PENDING_ROOT)
+    in_movable_root = False
+    for root in movable_roots:
+        try:
+            target.relative_to(root.resolve())
+            in_movable_root = True
+            break
+        except ValueError:
+            continue
+
+    if in_movable_root:
+        trusted_path = write_trusted(new_schema, body)
+        try:
+            target.unlink()
+        except OSError as e:
+            notes.append(f"failed to remove source file: {type(e).__name__}: {e}")
+    else:
+        trusted_path = target
+        trusted_path.write_text(assemble_atom(new_schema, body), encoding="utf-8")
+
+    try:
+        log_path = append_wiki_log(
+            operation="approve",
+            title=new_schema.title,
+            atom_path=trusted_path,
+            atom_id=new_schema.atom_id,
+        )
+        notes.append(f"log appended → {log_path}")
+    except OSError as e:
+        notes.append(f"log append failed: {e}")
+    try:
+        cross = cross_update_trusted(trusted_path)
+        notes.append(
+            "cross-update: "
+            f"backlinks={len(cross.backlinks_updated)}, "
+            f"missing_related={len(cross.missing_related)}, "
+            f"contradictions={len(cross.contradictions_flagged)}"
+        )
+    except Exception as e:
+        notes.append(f"cross-update failed: {type(e).__name__}: {e}")
+
+    if _wiki_vector_auto_ingest_enabled("approved"):
+        _auto_ingest_file(trusted_path, notes)
+
+    emit_mark(
+        action="chetana.approve",
+        content=f"{new_schema.title} | APPROVED",
+        connections=["chetana", "approve", new_schema.type, "approved"],
+        salience=new_schema.confidence,
+    )
+
+    return ApproveResult(
+        decision="APPROVED",
+        trusted_path=trusted_path,
+        prior_status=current_status,
+        reviewer=reviewer,
+        notes=notes,
+    )
+
+
+def _resign_v2(schema, body: str, kernel_signature: str):
+    """Replace provenance.axiom_signature with the v2 signature of this atom."""
+    sig = compute_axiom_signature_v2(schema, body, kernel_signature)
+    return schema.model_copy(
+        update={"provenance": schema.provenance.model_copy(update={"axiom_signature": sig})}
+    )
+
+
+def _auto_ingest_file(trusted_path: Path, notes: list[str]) -> None:
+    """Best-effort vector ingest of ONE approved file (never the whole dir)."""
+    try:
+        from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
+
+        receipt = ingest_wiki_concepts(
+            state_dir=_wiki_vector_state_dir_for_trusted_path(trusted_path),
+            wiki_concepts_dir=trusted_path,
+        )
+        notes.append(
+            "wiki-vector ingest: "
+            f"discovered={receipt.discovered_files}, "
+            f"inserted={receipt.backfill.get('inserted_rows')}, "
+            f"indexed={receipt.sync_index.get('indexed_rows')}, "
+            f"reembedded={receipt.reembed.get('upserted_rows')}"
+        )
+    except Exception as e:
+        notes.append(f"wiki-vector ingest failed: {type(e).__name__}: {e}")
+
+
 def _require_staged_path(path: Path) -> None:
     """Require promote inputs to originate from the configured staging root."""
     staging_root = staging_mod.STAGING_ROOT.resolve()
@@ -201,7 +387,11 @@ def _require_staged_path(path: Path) -> None:
         ) from exc
 
 
-def _wiki_vector_auto_ingest_enabled() -> bool:
+def _wiki_vector_auto_ingest_enabled(review_status: ReviewStatus | None) -> bool:
+    # Hard gate: non-approved content never reaches the vector projection,
+    # regardless of env. The env flag only opts approved atoms out.
+    if review_status != "approved":
+        return False
     value = os.environ.get("DHARMA_WIKI_VECTOR_AUTO_INGEST", "1").strip().lower()
     return value not in {"0", "false", "no", "off"}
 
