@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -30,6 +31,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +98,12 @@ class Finding:
     criterion_id: str | None = None
 
 
+class CriterionFailureModality(str, Enum):
+    """Why an executed criterion failed when policy must distinguish causes."""
+
+    FRESHNESS = "freshness"
+
+
 @dataclass
 class CriterionResult:
     id: str
@@ -107,6 +115,7 @@ class CriterionResult:
     # is neither a pass nor a regression — it is "could not observe", and
     # must be reported as such instead of being scored as a hard failure.
     executed: bool = True
+    failure_modality: CriterionFailureModality | None = None
 
 
 def load_active_track(path: Path) -> dict[str, Any]:
@@ -875,7 +884,8 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
                 detail=f"receipt {file_path} timestamp malformed: {ts!r}")
         if age > fresh_ttl_days:
             return CriterionResult(id="", kind="receipt_valid", passed=False,
-                detail=f"receipt {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}")
+                detail=f"receipt {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}",
+                failure_modality=CriterionFailureModality.FRESHNESS)
 
     bits = [f"{len(requires_keys or [])} keys present"]
     if expect_chain:
@@ -929,6 +939,18 @@ def check_mutation_score_gte(file_path: str, threshold: float, *,
             passed=False,
             detail=f"mutation report {file_path} has no numeric 'score'",
         )
+    if not math.isfinite(score):
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation report {file_path} has non-finite 'score'",
+        )
+    passed = score >= threshold
+    score_detail = (
+        f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
+        f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)"
+    )
     if fresh_ttl_days is not None:
         ts = _receipt_timestamp(data)
         age = days_since(ts[:10]) if ts else None
@@ -940,21 +962,29 @@ def check_mutation_score_gte(file_path: str, threshold: float, *,
                 detail=f"mutation report {file_path} has no usable timestamp for freshness",
             )
         if age > fresh_ttl_days:
+            freshness_detail = (
+                f"mutation report {file_path} is stale: {age}d old > "
+                f"fresh_ttl_days={fresh_ttl_days}"
+            )
+            if score < threshold:
+                return CriterionResult(
+                    id="",
+                    kind="mutation_score_gte",
+                    passed=False,
+                    detail=f"{score_detail}; {freshness_detail}",
+                )
             return CriterionResult(
                 id="",
                 kind="mutation_score_gte",
                 passed=False,
-                detail=f"mutation report {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}",
+                detail=freshness_detail,
+                failure_modality=CriterionFailureModality.FRESHNESS,
             )
-    passed = score >= threshold
     return CriterionResult(
         id="",
         kind="mutation_score_gte",
         passed=passed,
-        detail=(
-            f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
-            f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)"
-        ),
+        detail=score_detail,
     )
 
 
@@ -2014,6 +2044,20 @@ def _load_prior_passed(findings: list[Finding]) -> dict[str, set[str]]:
     return out
 
 
+def _regression_severity(
+    result: CriterionResult,
+    *,
+    enforce_ttl: bool,
+) -> str:
+    """Keep elapsed-time drift advisory except on the freshness authority path."""
+    if (
+        result.failure_modality is CriterionFailureModality.FRESHNESS
+        and not enforce_ttl
+    ):
+        return "WARN"
+    return "ERROR"
+
+
 def _lifecycle_findings(base_p: dict[str, Any], head_p: dict[str, Any]) -> list[Finding]:
     """Merge-time lifecycle invariants between a base and a head portfolio.
 
@@ -2244,7 +2288,11 @@ def run(args: argparse.Namespace) -> int:
                         f"[{tid}] UNVERIFIED — '{c.id}' could not run here (not a regression): {c.detail}",
                         criterion_id=c.id))
                     continue
-                findings.append(Finding("ERROR", f"regression:{tid}:{c.id}",
+                severity = _regression_severity(
+                    c,
+                    enforce_ttl=bool(getattr(args, "enforce_ttl", False)),
+                )
+                findings.append(Finding(severity, f"regression:{tid}:{c.id}",
                     f"[{tid}] REGRESSION — '{c.id}' passed before and now fails: {c.detail}",
                     criterion_id=c.id))
 

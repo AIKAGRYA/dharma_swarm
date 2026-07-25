@@ -113,6 +113,147 @@ def test_check_track_status_runs(tmp_path: Path) -> None:
     assert _report_snapshot(SOURCE_REPORTS_DIR) == source_before
 
 
+@pytest.mark.parametrize(
+    ("enforce_ttl", "expected_severity", "expected_exit"),
+    [(False, "WARN", 0), (True, "ERROR", 1)],
+)
+def test_freshness_regression_is_warning_until_ttl_enforced(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    enforce_ttl: bool,
+    expected_severity: str,
+    expected_exit: int,
+) -> None:
+    """Elapsed receipt age follows the same PR/scheduled authority split as track TTL."""
+    import argparse
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    import check_track_status as cts  # type: ignore
+
+    receipt = tmp_path / "stale-receipt.json"
+    receipt.write_text(
+        json.dumps({"claim_id": "C1", "produced_at": "2000-01-01T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    track_file = tmp_path / "ACTIVE_TRACK.yaml"
+    track_file.write_text(
+        f"""
+schema_version: 2
+active_tracks:
+  - id: freshness-track
+    status: ACTIVE
+    verified_at: "2099-01-01"
+    ttl_days: 14
+    completion_criteria:
+      - id: fresh_receipt
+        kind: receipt_valid
+        file: "{receipt.as_posix()}"
+        requires_keys:
+          - claim_id
+        fresh_ttl_days: 7
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    emitted: list[cts.Finding] = []
+
+    def _capture(findings, *_args, **_kwargs) -> None:
+        emitted.extend(findings)
+
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
+    monkeypatch.setattr(
+        cts,
+        "_load_prior_passed",
+        lambda _findings: {"freshness-track": {"fresh_receipt"}},
+    )
+    monkeypatch.setattr(cts, "emit_reports", _capture)
+
+    args = argparse.Namespace(
+        enforce_ttl=enforce_ttl,
+        base=None,
+        reports_dir=tmp_path / "reports",
+    )
+    assert cts.run(args) == expected_exit
+    regression = next(
+        finding
+        for finding in emitted
+        if finding.check == "regression:freshness-track:fresh_receipt"
+    )
+    assert regression.severity == expected_severity
+
+
+@pytest.mark.parametrize("enforce_ttl", [False, True])
+def test_stale_low_mutation_regression_remains_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    enforce_ttl: bool,
+) -> None:
+    """Freshness cannot downgrade a concurrent mutation-score regression."""
+    import argparse
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    import check_track_status as cts  # type: ignore
+
+    report = tmp_path / "mutation-score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.5,
+                "killed": 1,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    track_file = tmp_path / "ACTIVE_TRACK.yaml"
+    track_file.write_text(
+        f"""
+schema_version: 2
+active_tracks:
+  - id: mutation-track
+    status: ACTIVE
+    verified_at: "2099-01-01"
+    ttl_days: 14
+    completion_criteria:
+      - id: mutation_floor
+        kind: mutation_score_gte
+        file: "{report.as_posix()}"
+        threshold: 0.6
+        fresh_ttl_days: 7
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    emitted: list[cts.Finding] = []
+
+    def _capture(findings, *_args, **_kwargs) -> None:
+        emitted.extend(findings)
+
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
+    monkeypatch.setattr(
+        cts,
+        "_load_prior_passed",
+        lambda _findings: {"mutation-track": {"mutation_floor"}},
+    )
+    monkeypatch.setattr(cts, "emit_reports", _capture)
+
+    args = argparse.Namespace(
+        enforce_ttl=enforce_ttl,
+        base=None,
+        reports_dir=tmp_path / "reports",
+    )
+    assert cts.run(args) == 1
+    regression = next(
+        finding
+        for finding in emitted
+        if finding.check == "regression:mutation-track:mutation_floor"
+    )
+    assert regression.severity == "ERROR"
+    assert "0.50 < 0.60" in regression.message
+    assert "stale" in regression.message
+
+
 def test_managed_blocks_in_sync() -> None:
     """All managed files have the ACTIVE_TRACK block matching the YAML."""
     result = _run(RENDER_SCRIPT, "--check")

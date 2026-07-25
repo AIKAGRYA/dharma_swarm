@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
+    CriterionFailureModality,
     CriterionResult,
     check_mutation_score_gte,
     check_receipt_valid,
@@ -450,6 +451,7 @@ def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:
     log.write_text(json.dumps(row), encoding="utf-8")
     res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
     assert not res.passed
+    assert res.failure_modality is CriterionFailureModality.FRESHNESS
     assert "stale" in res.detail
 
 
@@ -509,6 +511,29 @@ def test_checker_rejects_low_mutation_score(tmp_path: Path) -> None:
     assert "0.50 < 0.60" in res.detail
 
 
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), -float("inf")])
+def test_checker_rejects_non_finite_mutation_score(
+    tmp_path: Path,
+    score: float,
+) -> None:
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": score,
+                "killed": 1,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert res.failure_modality is None
+    assert "non-finite" in res.detail
+
+
 def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
     report = tmp_path / "mutation_score.json"
     report.write_text(
@@ -524,6 +549,27 @@ def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
     )
     res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
     assert not res.passed
+    assert res.failure_modality is CriterionFailureModality.FRESHNESS
+    assert "stale" in res.detail
+
+
+def test_checker_keeps_stale_low_mutation_score_substantive(tmp_path: Path) -> None:
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.5,
+                "killed": 1,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert res.failure_modality is None
+    assert "0.50 < 0.60" in res.detail
     assert "stale" in res.detail
 
 

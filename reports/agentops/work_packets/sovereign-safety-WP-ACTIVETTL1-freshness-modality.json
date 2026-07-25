@@ -1,0 +1,91 @@
+{
+  "id": "sovereign-safety-WP-ACTIVETTL1-freshness-modality",
+  "base_ref": "7b6293be1cee2f65115477964b4794dfbfe31201",
+  "branch": "agent/active-track-freshness-modality-20260724",
+  "worktree": ".",
+  "intent": "Preserve ACTIVE_TRACK's declared pull-request versus scheduled freshness policy with an exclusive typed freshness modality: elapsed-time-only regressions warn on normal pull-request evaluation and remain blocking under --enforce-ttl, while compound stale-and-low mutation scores, non-finite scores, corruption, malformed evidence, and other executed regressions stay fail-closed.",
+  "allowed_files": [
+    "scripts/governance/check_track_status.py",
+    "tests/test_active_track_governance.py",
+    "tests/test_claim_evidence_binding.py",
+    "reports/agentops/work_packets/sovereign-safety-WP-ACTIVETTL1-freshness-modality.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "active-track-freshness-policy-tests",
+      "command": "python3 -m pytest tests/test_active_track_governance.py tests/test_claim_evidence_binding.py tests/test_track_closure_rigor.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "active-track-freshness-touched-file-ruff",
+      "command": "python3 -m ruff check scripts/governance/check_track_status.py tests/test_active_track_governance.py tests/test_claim_evidence_binding.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "active-track-freshness-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "compound-stale-low-score-downgrade-detected",
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGltcG9ydGxpYi51dGlsCmltcG9ydCBqc29uCmltcG9ydCBwYXRobGliCmltcG9ydCBzeXMKaW1wb3J0IHRlbXBmaWxlCgpTRVRVUF9GQUlMVVJFID0gMwoKdHJ5OgogICAgY2hlY2tlcl9wYXRoID0gcGF0aGxpYi5QYXRoKCJzY3JpcHRzL2dvdmVybmFuY2UvY2hlY2tfdHJhY2tfc3RhdHVzLnB5IikKICAgIHNvdXJjZSA9IGNoZWNrZXJfcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKICAgIGFuY2hvciA9ICIgICAgICAgICAgICBpZiBzY29yZSA8IHRocmVzaG9sZDpcbiIKICAgIHJlcGxhY2VtZW50ID0gIiAgICAgICAgICAgIGlmIHNjb3JlID49IHRocmVzaG9sZDpcbiIKICAgIGlmIHNvdXJjZS5jb3VudChhbmNob3IpICE9IDE6CiAgICAgICAgc3lzLmV4aXQoU0VUVVBfRkFJTFVSRSkKICAgIGNoZWNrZXJfcGF0aC53cml0ZV90ZXh0KAogICAgICAgIHNvdXJjZS5yZXBsYWNlKGFuY2hvciwgcmVwbGFjZW1lbnQsIDEpLAogICAgICAgIGVuY29kaW5nPSJ1dGYtOCIsCiAgICApCgogICAgc3BlYyA9IGltcG9ydGxpYi51dGlsLnNwZWNfZnJvbV9maWxlX2xvY2F0aW9uKCJtdXRhdGVkX3RyYWNrX3N0YXR1cyIsIGNoZWNrZXJfcGF0aCkKICAgIGlmIHNwZWMgaXMgTm9uZSBvciBzcGVjLmxvYWRlciBpcyBOb25lOgogICAgICAgIHN5cy5leGl0KFNFVFVQX0ZBSUxVUkUpCiAgICBjaGVja2VyID0gaW1wb3J0bGliLnV0aWwubW9kdWxlX2Zyb21fc3BlYyhzcGVjKQogICAgc3lzLm1vZHVsZXNbc3BlYy5uYW1lXSA9IGNoZWNrZXIKICAgIHNwZWMubG9hZGVyLmV4ZWNfbW9kdWxlKGNoZWNrZXIpCgogICAgcmVwb3J0X2RpciA9IHBhdGhsaWIuUGF0aCh0ZW1wZmlsZS5ta2R0ZW1wKGRpcj0iLiIpKQogICAgcmVwb3J0ID0gcmVwb3J0X2RpciAvICJtdXRhdGlvbi1zY29yZS5qc29uIgogICAgcmVwb3J0LndyaXRlX3RleHQoCiAgICAgICAganNvbi5kdW1wcygKICAgICAgICAgICAgewogICAgICAgICAgICAgICAgInNjb3JlIjogMC41LAogICAgICAgICAgICAgICAgImtpbGxlZCI6IDEsCiAgICAgICAgICAgICAgICAidG90YWwiOiAyLAogICAgICAgICAgICAgICAgInByb2R1Y2VkX2F0IjogIjIwMDAtMDEtMDFUMDA6MDA6MDBaIiwKICAgICAgICAgICAgfQogICAgICAgICksCiAgICAgICAgZW5jb2Rpbmc9InV0Zi04IiwKICAgICkKICAgIHJlc3VsdCA9IGNoZWNrZXIuY2hlY2tfbXV0YXRpb25fc2NvcmVfZ3RlKAogICAgICAgIHN0cihyZXBvcnQucmVzb2x2ZSgpKSwKICAgICAgICAwLjYsCiAgICAgICAgZnJlc2hfdHRsX2RheXM9NywKICAgICkKICAgIG11dGF0aW9uX2V4cHJlc3NlZCA9ICgKICAgICAgICByZXN1bHQuZmFpbHVyZV9tb2RhbGl0eSBpcyBjaGVja2VyLkNyaXRlcmlvbkZhaWx1cmVNb2RhbGl0eS5GUkVTSE5FU1MKICAgICkKICAgIHN5cy5leGl0KDEgaWYgbXV0YXRpb25fZXhwcmVzc2VkIGVsc2UgMCkKZXhjZXB0IFN5c3RlbUV4aXQ6CiAgICByYWlzZQpleGNlcHQgQmFzZUV4Y2VwdGlvbjoKICAgIHN5cy5leGl0KFNFVFVQX0ZBSUxVUkUpCg==').decode())\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): preserve exclusive freshness regressions"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-ACTIVETTL1",
+    "active_track": "sovereign-safety-tcb-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "7b6293be1cee2f65115477964b4794dfbfe31201",
+      "details": []
+    },
+    "interface_mismatches": [
+      "CriterionResult records one typed failure modality, while mutation-score evaluation can observe compound elapsed-freshness and below-threshold failures. The modality must be treated as an exclusive cause so freshness cannot erase the substantive safety regression."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/active-track.yml",
+      "scripts/governance/check_track_status.py",
+      "tests/test_active_track_governance.py",
+      "tests/test_claim_evidence_binding.py",
+      "tests/test_track_closure_rigor.py"
+    ],
+    "honest_blockers": [
+      "The freshness modality is exclusive rather than additive: it is emitted only when elapsed age is the sole observed failure. Compound stale-and-low scores carry both facts in detail and remain blocking.",
+      "Missing, malformed, tampered, below-threshold, and non-finite evidence remains fail-closed on both normal and --enforce-ttl paths.",
+      "The branch remains subject to the Phase 0 M0 merge boundary and one post-M0 rebase; this packet does not authorize merging or rewrite any merged closure packet.",
+      "Exact-head hosted CI, a fresh exact-head Codex review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the checker, focused tests, and this current unmerged packet together. Reverting restores the known false blocker for freshness-only drift and the known downgrade bug for compound stale-and-low mutation evidence.",
+    "packet_digest": "455af10f01b9ffd528befb09832ff0dc7213a0227b2ed3d0130f524eb60ba1f0"
+  }
+}
