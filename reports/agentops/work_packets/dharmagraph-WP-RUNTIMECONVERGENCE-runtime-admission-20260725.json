@@ -3,25 +3,20 @@
   "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
   "branch": "agent/runtime-convergence-20260725",
   "worktree": ".",
-  "intent": "Converge the warranted runtime-control fixes from the deployed recovery snapshot onto current main, add versioned release and container runners, and make every current orchestrate-live command boundary fail closed on explicit provenance. A tracked checkout must be clean and either exactly current origin/main or an explicitly pinned current-main descendant; the source-only container must instead match an image-baked source manifest and is typed as container-image provenance rather than canonical Git authority. Preserve the already-landed stronger quarantine-status implementation from PR 1110 rather than replaying its older release commit.",
+  "intent": "Converge the warranted runtime-control fixes from the deployed recovery snapshot onto current main, add a versioned release runner, and make every current orchestrate-live command boundary fail closed unless its tracked checkout is clean and either exactly current origin/main or an explicitly pinned current-main descendant. Harden the release boundary against blank pins, ignored import bytecode, interpreter traversal, and symlinked virtual environments. Preserve the already-landed stronger quarantine-status implementation from PR 1110 rather than replaying its older release commit.",
   "allowed_files": [
-    ".dockerignore",
-    "Dockerfile.swarm",
     "dharma_swarm/context_agent.py",
     "dharma_swarm/orchestrate_live.py",
     "dharma_swarm/orchestrator.py",
     "dharma_swarm/runtime_admission.py",
     "dharma_swarm/terminal_commands/lifecycle.py",
-    "docker-compose.yml",
     "reports/agentops/work_packets/dharmagraph-WP-RUNTIMECONVERGENCE-runtime-admission-20260725.json",
-    "scripts/runtime/dharma_swarm_container_runner.sh",
     "scripts/runtime/dharma_swarm_release_runner.sh",
     "tests/test_context_agent.py",
     "tests/test_dgc_cli.py",
     "tests/test_orchestrate_live.py",
     "tests/test_orchestrator.py",
     "tests/test_runtime_admission.py",
-    "tests/test_runtime_container_runner.py",
     "tests/test_runtime_release_runner.py"
   ],
   "forbidden_files": [
@@ -31,13 +26,13 @@
   "gates": [
     {
       "name": "runtime-convergence-tests",
-      "command": "python3 -m pytest -q tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_runtime_container_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
+      "command": "python3 -m pytest -q tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
       "name": "runtime-convergence-ruff",
-      "command": "python3 -m ruff check dharma_swarm/runtime_admission.py dharma_swarm/terminal_commands/lifecycle.py dharma_swarm/context_agent.py dharma_swarm/orchestrator.py tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_runtime_container_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
+      "command": "python3 -m ruff check dharma_swarm/runtime_admission.py dharma_swarm/terminal_commands/lifecycle.py dharma_swarm/context_agent.py dharma_swarm/orchestrator.py tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -83,13 +78,11 @@
     "interface_mismatches": [
       "The deployed release carries two runtime-control commits that are absent from current main, while current main already carries a stronger version of the release's quarantine-status commit.",
       "The machine launchd runner is unversioned and selects release code while borrowing the stale checkout's interpreter and secret file, so its provenance and dependency boundary are split.",
-      "The current CLI starts orchestrate-live from any checkout that imports it, including clean branches that are hundreds of commits behind origin/main.",
-      "The source-only swarm image has no Git metadata and overlays its baked package with a host checkout, so canonical Git admission cannot describe or verify that runtime authority."
+      "The current CLI starts orchestrate-live from any checkout that imports it, including clean branches that are hundreds of commits behind origin/main."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/terminal_commands/lifecycle.py:cmd_orchestrate_live",
       "dharma_swarm/orchestrate_live.py:orchestrate",
-      "Dockerfile.swarm and docker-compose.yml:swarm",
       "scripts/load_runtime_env.sh",
       "release commits f248b838f3502363a8bf9917b1c3c8abdab96056 and b5ec7a82e7bee6c51a63d472a5d2fd3979e63468",
       "main commit fdf9670f0 implementing PR 1110 quarantine-status compatibility"
@@ -97,11 +90,10 @@
     "honest_blockers": [
       "A source-level guard cannot retroactively alter old checkouts; the versioned release runner must be installed at the stable machine path and launchd must be repointed during the separately controlled live cutover.",
       "The admission comparison uses the shared local origin/main ref; deployment must fetch immediately before cutting and pinning the release.",
-      "Container-image admission proves equality to the image-baked source manifest, not equality to canonical Git; image build and registry promotion remain separate authorities.",
       "This lane does not stop, restart, mutate, or claim health for the live daemon.",
       "Exact-head hosted CI, independent review policy, and operator merge and deployment authority remain required."
     ],
     "rollback": "Restore the prior stable machine runner and release root, then revert the runtime admission module, command-boundary calls, release-runner script, runtime-control gates, tests, and this packet together. Do not roll back PR 1110 or rewrite quarantined task rows.",
-    "packet_digest": "df1314bda5c774db3959fb6be7b14d3c96a56101583f0f71f839c45564fa1e01"
+    "packet_digest": "831af49658ae9de9166de0f651e8f1dcc1253fe79c0ee1bb6471a81d482eb2f9"
   }
 }
