@@ -284,6 +284,145 @@ def test_deleted_destination_requeues_stable_open_before_new_attempt(tmp_path):
     ]
 
 
+def test_live_unlink_defers_observation_until_prefix_replay(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-live-unlink",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    first.episode_path.unlink()
+    first.task_event("after-delete")
+    first.task_event("still-after-delete")
+    task_rows = [json.loads(line) for line in first.task_path.read_text().splitlines()]
+    delivery_keys = [
+        f"session-event:{row['event_id']}:observation" for row in task_rows
+    ]
+    store = RuntimeStateStore(runtime_db)
+
+    assert all(
+        store.get_episode_outbox_sync(
+            key,
+            destination_id=first.episode_destination_id,
+        ).acked_at
+        is None
+        for key in delivery_keys
+    )
+    assert not _read_episode_events(first.episode_path)
+
+    second = SessionLedger(**kwargs)
+    replayed = _read_episode_events(second.episode_path)
+    assert [event.event_type for event in replayed] == [
+        "episode_opened",
+        "attempt_started",
+        "observation_recorded",
+        "observation_recorded",
+        "attempt_started",
+    ]
+    assert [event.sequence for event in replayed] == [0, 1, 2, 3, 4]
+    assert all(event.attempt_id == first.attempt_id for event in replayed[1:4])
+    assert all(
+        store.get_episode_outbox_sync(
+            key,
+            destination_id=first.episode_destination_id,
+        ).acked_at
+        is not None
+        for key in delivery_keys
+    )
+
+
+def test_live_prefix_truncation_defers_observation_until_full_replay(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-live-prefix-truncate",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    first.task_event("before-truncate")
+    retained_prefix = first.episode_path.read_bytes().splitlines(keepends=True)[:2]
+    with open(first.episode_path, "r+b") as stream:
+        stream.seek(0)
+        stream.write(b"".join(retained_prefix))
+        stream.truncate()
+
+    first.task_event("after-truncate")
+    first.task_event("still-after-truncate")
+    task_rows = [json.loads(line) for line in first.task_path.read_text().splitlines()]
+    delivery_keys = [
+        f"session-event:{row['event_id']}:observation" for row in task_rows
+    ]
+    store = RuntimeStateStore(runtime_db)
+    assert all(
+        store.get_episode_outbox_sync(
+            key,
+            destination_id=first.episode_destination_id,
+        ).acked_at
+        is None
+        for key in delivery_keys[-2:]
+    )
+    assert [event.event_type for event in _read_episode_events(first.episode_path)] == [
+        "episode_opened",
+        "attempt_started",
+    ]
+
+    second = SessionLedger(**kwargs)
+    replayed = _read_episode_events(second.episode_path)
+    assert [event.event_type for event in replayed] == [
+        "episode_opened",
+        "attempt_started",
+        "observation_recorded",
+        "observation_recorded",
+        "observation_recorded",
+        "attempt_started",
+    ]
+    assert [event.sequence for event in replayed] == [0, 1, 2, 3, 4, 5]
+    assert all(event.attempt_id == first.attempt_id for event in replayed[1:5])
+    assert all(
+        store.get_episode_outbox_sync(
+            key,
+            destination_id=first.episode_destination_id,
+        ).acked_at
+        is not None
+        for key in delivery_keys
+    )
+
+
+def test_non_prefix_destination_history_fails_closed(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-non-prefix",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    first.task_event("persisted-observation")
+    observation_line = next(
+        line
+        for line in first.episode_path.read_text().splitlines()
+        if json.loads(line)["event_type"] == "observation_recorded"
+    )
+    first.episode_path.write_text(observation_line + "\n")
+    pending_key = "session-event:sevt-non-prefix:observation"
+    store = RuntimeStateStore(runtime_db)
+    store.enqueue_episode_event_sync(
+        delivery_key=pending_key,
+        destination_id=first.episode_destination_id,
+        episode_id=first.episode_id,
+        attempt_id=first.attempt_id,
+        event_type="observation_recorded",
+        payload={"session_event_id": "sevt-non-prefix"},
+    )
+
+    with pytest.raises(RuntimeError, match="failed to verify or requeue"):
+        SessionLedger(**kwargs)
+    assert store.get_episode_outbox_sync(
+        pending_key,
+        destination_id=first.episode_destination_id,
+    ).acked_at is None
+
+
 def test_recreated_destination_durably_opens_before_later_backlog_ack(
     tmp_path,
     monkeypatch,

@@ -24,9 +24,9 @@ LOGICAL_DELIVERY_KEY_FIELD = "logical_delivery_key"
 
 # The lifecycle vocabulary each producer appends at the transition it owns.
 EVENT_TYPES = (
-    "episode_opened", "attempt_started", "observation_recorded",
-    "effect_requested", "effect_resolved", "review_recorded",
-    "episode_closed", "post_merge_observation",
+    "episode_opened", "attempt_started", "observation_recorded", "effect_requested",
+    "effect_resolved", "review_recorded", "episode_closed",
+    "post_merge_observation",
 )
 
 # Effect events carry the idempotency fence key — mandatory, never implied.
@@ -98,7 +98,9 @@ class EpisodeEvent:
     ) -> "EpisodeEvent":
         # Identity covers exactly the redacted content persistence will write,
         # so the from_dict tamper check holds across the disk round-trip.
-        payload = redact_payload(dict(payload or {}))
+        payload = dict(payload or {})
+        _canonical(payload)
+        payload = redact_payload(payload)
         _validate(
             schema_version=EPISODE_EVENT_SCHEMA_VERSION,
             event_type=event_type,
@@ -298,6 +300,8 @@ class EpisodeLedgerWriter:
         self._scan_offset = 0
         self._rehydration_passes = 0
         self._thread_lock = _thread_lock_for(self.path)
+        self._file_identity: tuple[int, int] | None = None
+        self._generation_error = ""
         # A torn tail needs a newline before the next append or it absorbs the
         # new event into its corrupt line.
         self._tail_unterminated = False
@@ -311,6 +315,8 @@ class EpisodeLedgerWriter:
     def _locked_stream(self) -> Iterator[BinaryIO]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._thread_lock:
+            if self._generation_error:
+                raise LedgerValidationError(self._generation_error)
             created = not self.path.exists()
             with open(self.path, "a+b") as stream:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
@@ -319,6 +325,12 @@ class EpisodeLedgerWriter:
                         stream.flush()
                         os.fsync(stream.fileno())
                         _fsync_parent_directory(self.path.parent)
+                    stat = os.fstat(stream.fileno())
+                    identity = (stat.st_dev, stat.st_ino)
+                    if self._file_identity not in (None, identity):
+                        self._generation_error = "episode destination generation changed"
+                        raise LedgerValidationError(self._generation_error)
+                    self._file_identity = identity
                     yield stream
                 finally:
                     fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
@@ -334,13 +346,8 @@ class EpisodeLedgerWriter:
         stream.seek(0, os.SEEK_END)
         end = stream.tell()
         if end < self._scan_offset:
-            self._seen.clear()
-            self._logical_events.clear()
-            self._logical_conflicts.clear()
-            self._high_water.clear()
-            self._sequences.clear()
-            self._scan_offset = 0
-            self._rehydration_passes += 1
+            self._generation_error = "episode destination was truncated"
+            raise LedgerValidationError(self._generation_error)
         stream.seek(self._scan_offset)
         while stream.tell() < end:
             raw_line = stream.readline()
@@ -359,23 +366,17 @@ class EpisodeLedgerWriter:
             return
         # A torn multi-byte UTF-8 tail degrades to one skipped corrupt line.
         try:
-            record = json.loads(raw_line.decode("utf-8", errors="replace"))
+            record = json.loads(raw_line.decode("utf-8", errors="replace"), parse_constant=int)
         except (TypeError, ValueError):
-            logger.warning(
-                "episode_ledger: skipping corrupt line in %s during rehydrate", self.path
-            )
+            logger.warning("episode_ledger: skipping corrupt line in %s during rehydrate", self.path)
             return
         if not isinstance(record, dict):
-            logger.warning(
-                "episode_ledger: skipping non-object line in %s during rehydrate", self.path
-            )
+            logger.warning("episode_ledger: skipping non-object line in %s during rehydrate", self.path)
             return
         try:
             event = EpisodeEvent.from_dict(record)
-        except LedgerValidationError:
-            logger.warning(
-                "episode_ledger: skipping invalid record in %s during rehydrate", self.path
-            )
+        except ValueError:
+            logger.warning("episode_ledger: skipping invalid record in %s during rehydrate", self.path)
             return
         self._observe_event(event)
 

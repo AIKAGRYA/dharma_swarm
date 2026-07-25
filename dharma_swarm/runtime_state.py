@@ -4306,6 +4306,32 @@ class RuntimeStateStore:
 
         return self._run_sync_transaction(operation)
 
+    def list_episode_destination_history_sync(
+        self,
+        *,
+        episode_id: str,
+        destination_id: str,
+    ) -> list[EpisodeOutboxRecord]:
+        """Return every retained delivery for one episode destination in order."""
+        episode_id = str(episode_id).strip()
+        destination_id = str(destination_id).strip()
+        if not episode_id or not destination_id:
+            raise ValueError("episode_id and destination_id are required")
+
+        def operation(db: sqlite3.Connection) -> list[EpisodeOutboxRecord]:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox"
+                " WHERE episode_id = ? AND destination_id = ? ORDER BY outbox_id",
+                (episode_id, destination_id),
+            ).fetchall()
+            return [_row_to_episode_outbox(row) for row in rows]
+
+        return self._run_sync_transaction(operation)
+
     def get_episode_outbox_sync(
         self,
         delivery_key: str,
@@ -4528,6 +4554,7 @@ def _normalize_episode_outbox_payload(
             f"unknown event_type {event_type!r}; the lifecycle vocabulary is "
             f"{_EPISODE_OUTBOX_EVENT_TYPES}"
         )
+    _episode_outbox_json_dump(payload)
     redacted = _redact_episode_outbox_value(dict(payload))
     if event_type in _EPISODE_OUTBOX_EFFECT_EVENT_TYPES and not str(
         redacted.get("idempotency_key", "")

@@ -321,9 +321,11 @@ def test_episode_outbox_corrupt_payload_json_fails_closed(
     [float("nan"), float("inf"), float("-inf")],
     ids=["nan", "positive-infinity", "negative-infinity"],
 )
+@pytest.mark.parametrize("payload_key", ["value", "token"])
 def test_episode_outbox_rejects_non_finite_payloads(
     tmp_path,
     non_finite,
+    payload_key,
 ) -> None:
     store = RuntimeStateStore(tmp_path / "runtime.db")
 
@@ -334,7 +336,7 @@ def test_episode_outbox_rejects_non_finite_payloads(
             episode_id="ep-non-finite",
             attempt_id="at-non-finite",
             event_type="observation_recorded",
-            payload={"value": non_finite},
+            payload={payload_key: non_finite},
         )
 
     assert store.get_episode_outbox_sync(

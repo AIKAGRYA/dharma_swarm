@@ -112,19 +112,38 @@ class SessionLedger:
             attempt_id="",
             payload={"session_id": self.session_id},
         )
-        if (
-            self._episode_writer is not None
-            and not self._episode_writer.has_logical_delivery(opened_delivery_key)
-        ):
+        if self._episode_writer is not None:
             try:
-                self._runtime_state.requeue_episode_destination_history_sync(
-                    episode_id=self.episode_id,
-                    destination_id=self.episode_destination_id,
+                retained = (
+                    self._runtime_state.list_episode_destination_history_sync(
+                        episode_id=self.episode_id,
+                        destination_id=self.episode_destination_id,
+                    )
                 )
+                present = [
+                    self._episode_writer.has_logical_delivery(item.delivery_key)
+                    for item in retained
+                ]
+                gap_seen = False
+                for exists in present:
+                    if exists and gap_seen:
+                        raise RuntimeError(
+                            "episode destination history is not a retained prefix"
+                        )
+                    gap_seen = gap_seen or not exists
+                retained_missing = any(
+                    (item.acked_at is not None or item.episode_event_id) and not exists
+                    for item, exists in zip(retained, present, strict=True)
+                )
+                if retained_missing:
+                    self._runtime_state.requeue_episode_destination_history_sync(
+                        episode_id=self.episode_id,
+                        destination_id=self.episode_destination_id,
+                    )
             except Exception as exc:
                 self.episode_ledger_failures += 1
                 raise RuntimeError(
-                    "failed to requeue the required episode destination history"
+                    "failed to verify or requeue the episode destination history"
                 ) from exc
         # Establish and acknowledge the stable open before touching later
         # backlog rows. A crash can never leave those rows acknowledged into a
@@ -279,6 +298,17 @@ class SessionLedger:
                 return delivered
             for item in pending:
                 try:
+                    if item.event_type == "observation_recorded":
+                        opened_key = f"episode:{item.episode_id}:opened"
+                        attempt_key = f"attempt:{item.attempt_id}:started"
+                        if (
+                            not item.attempt_id
+                            or not self._episode_writer.has_logical_delivery(opened_key)
+                            or not self._episode_writer.has_logical_delivery(attempt_key)
+                        ):
+                            raise RuntimeError(
+                                "observation delivery lacks durable lifecycle prefix"
+                            )
                     persisted = self._episode_writer.append_delivery(
                         delivery_key=item.delivery_key,
                         event_type=item.event_type,

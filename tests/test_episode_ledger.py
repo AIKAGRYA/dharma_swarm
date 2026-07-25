@@ -85,9 +85,10 @@ def test_event_round_trips_through_json():
     [float("nan"), float("inf"), float("-inf")],
     ids=["nan", "positive-infinity", "negative-infinity"],
 )
-def test_event_rejects_non_finite_json_numbers(non_finite):
+@pytest.mark.parametrize("payload_key", ["value", "api_key"])
+def test_event_rejects_non_finite_json_numbers(non_finite, payload_key):
     with pytest.raises(ValueError, match="JSON"):
-        _event("observation_recorded", 1, value=non_finite)
+        _event("observation_recorded", 1, **{payload_key: non_finite})
 
 
 def test_unknown_schema_version_fails_closed():
@@ -340,6 +341,44 @@ def test_writer_recovers_from_corrupt_lines(tmp_path: Path):
     writer = EpisodeLedgerWriter(path)
     assert writer.append(obs) is False
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity", "1e999"])
+def test_writer_rehydration_skips_non_finite_records(
+    tmp_path: Path,
+    constant: str,
+):
+    path = tmp_path / "episodes.jsonl"
+    observation = _event("observation_recorded", 1, value=0)
+    EpisodeLedgerWriter(path).append(observation)
+    invalid = json.dumps(_event("review_recorded", 2, value=0).to_dict())
+    invalid = invalid.replace('"value": 0', f'"value": {constant}')
+    with open(path, "a") as stream:
+        stream.write(invalid + "\n")
+
+    recovered = EpisodeLedgerWriter(path)
+    assert recovered.append(observation) is False
+    assert recovered.append(_event("review_recorded", 2, value=1)) is True
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity", "1e999"])
+def test_non_finite_secret_record_cannot_squat_valid_identity(
+    tmp_path: Path,
+    constant: str,
+):
+    path = tmp_path / "episodes.jsonl"
+    original = _event("observation_recorded", 1, api_key="secret")
+    invalid = json.dumps(original.to_dict()).replace(
+        '"api_key": "[REDACTED]"',
+        f'"api_key": {constant}',
+    )
+    path.write_text(invalid + "\n")
+
+    recovered = EpisodeLedgerWriter(path)
+    assert recovered.append(original) is True
+    assert EpisodeEvent.from_dict(
+        json.loads(path.read_text().splitlines()[-1])
+    ) == original
 
 
 def test_writer_survives_torn_utf8_tail(tmp_path: Path):
