@@ -4,8 +4,9 @@ Writes compact JSONL events for:
 - task_ledger.jsonl: assignment/routing lifecycle
 - progress_ledger.jsonl: execution outcomes, pivots, timing
 - episode_ledger.jsonl: versioned validated Episode Ledger events
-  (episode_opened at init, observation_recorded per task/progress event);
-  the first producer of the THE_KEEL §6 event family in episode_ledger.py
+  (one stable episode_opened, one attempt_started per runtime construction,
+  and observation_recorded per task/progress event); this is the first
+  producer of the THE_KEEL §6 event family in episode_ledger.py.
 """
 
 from __future__ import annotations
@@ -17,7 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.episode_ledger import EpisodeEvent, EpisodeLedgerWriter
+from dharma_swarm.episode_ledger import (
+    EpisodeEvent,
+    EpisodeLedgerWriter,
+    new_attempt_id,
+)
 from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     build_session_event_from_ledger_record,
@@ -30,6 +35,33 @@ def _utc_ts() -> str:
 
 def _session_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _next_episode_sequence(path: Path, episode_id: str) -> int:
+    """Return one greater than the highest valid sequence for *episode_id*.
+
+    Physical line count is not an ordering authority: torn, corrupt, foreign,
+    or non-contiguous records must not advance or reuse the next sequence.
+    """
+
+    if not path.exists():
+        return 1
+
+    highest = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        try:
+            event = EpisodeEvent.from_dict(record)
+        except (TypeError, ValueError):
+            continue
+        if event.episode_id == episode_id:
+            highest = max(highest, event.sequence)
+    return max(1, highest + 1)
 
 
 class SessionLedger:
@@ -52,26 +84,43 @@ class SessionLedger:
         self.task_path = self.session_dir / "task_ledger.jsonl"
         self.progress_path = self.session_dir / "progress_ledger.jsonl"
         self._runtime_state = RuntimeStateStore(runtime_db_path)
-        # Episode Ledger producer: stable identity derived from the session id
-        # (same session -> same episode across restarts), episode_opened at a
-        # FIXED sequence 0 so a restart's re-emit dedups by content-addressed
-        # event_id instead of duplicating the open.
+
+        # Episode identity is stable across restarts of the same named session.
+        # Attempt identity is not: every SessionLedger construction represents
+        # a distinct runtime attempt within that episode.
         digest = hashlib.sha256(self.session_id.encode("utf-8")).hexdigest()
         self.episode_id = f"ep_{digest[:16]}"
-        self.attempt_id = f"at_{digest[16:32]}"
+        self.attempt_id = new_attempt_id()
         self.episode_path = self.session_dir / "episode_ledger.jsonl"
         self.episode_ledger_failures = 0
         self._episode_writer: EpisodeLedgerWriter | None = None
         self._episode_sequence = 1
+
         try:
             self._episode_writer = EpisodeLedgerWriter(self.episode_path)
-            persisted = len(self.episode_path.read_text(encoding="utf-8").splitlines()) if self.episode_path.exists() else 0
-            self._episode_sequence = max(1, persisted)
+            self._episode_sequence = _next_episode_sequence(
+                self.episode_path, self.episode_id
+            )
         except Exception:
+            # Count the setup failure once. Later skipped emissions do not
+            # repeatedly inflate this same root-cause failure.
+            self._episode_writer = None
             self.episode_ledger_failures += 1
-        self._emit_episode_event(
-            "episode_opened", sequence=0, payload={"session_id": self.session_id}
-        )
+        else:
+            # episode_opened is episode-scoped (empty attempt_id) and fixed at
+            # sequence 0, so a restart re-emits identical content and dedupes.
+            self._emit_episode_event(
+                "episode_opened",
+                sequence=0,
+                payload={"session_id": self.session_id},
+                attempt_id="",
+            )
+            self._emit_episode_event(
+                "attempt_started",
+                sequence=self._episode_sequence,
+                payload={"session_id": self.session_id},
+            )
+            self._episode_sequence += 1
 
     def task_event(self, event: str, **payload: Any) -> None:
         self._append(self.task_path, "task", event, payload)
@@ -121,22 +170,32 @@ class SessionLedger:
         self._episode_sequence += 1
 
     def _emit_episode_event(
-        self, event_type: str, *, sequence: int, payload: dict[str, Any]
-    ) -> None:
-        """Append one validated Episode Ledger event. Persistence failures
-        never break orchestration but are COUNTED, never silently swallowed."""
+        self,
+        event_type: str,
+        *,
+        sequence: int,
+        payload: dict[str, Any],
+        attempt_id: str | None = None,
+    ) -> bool:
+        """Append one validated Episode Ledger event.
+
+        Real append failures are counted. A writer that failed construction was
+        already counted once and does not generate a second count per skipped
+        event.
+        """
+
         if self._episode_writer is None:
-            self.episode_ledger_failures += 1
-            return
+            return False
         try:
-            self._episode_writer.append(
+            return self._episode_writer.append(
                 EpisodeEvent.new(
                     event_type=event_type,
                     episode_id=self.episode_id,
-                    attempt_id=self.attempt_id,
+                    attempt_id=self.attempt_id if attempt_id is None else attempt_id,
                     sequence=sequence,
                     payload=payload,
                 )
             )
         except Exception:
             self.episode_ledger_failures += 1
+            return False
