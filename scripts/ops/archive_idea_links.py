@@ -16,6 +16,11 @@ pairwise INSERT, the DDL, and census row-counting). This script retires the
 
 Nothing runs against the live db without --apply. Every applied phase writes a
 JSON receipt with before/after counts, backup sha256, and rollback notes.
+
+The audit packet guardrail (ADVERSARIAL_REVIEW.md: no destructive DB op before
+an off-host backup exists) is enforced as an attestation: `--phase drop --apply`
+refuses to run without --offhost-copy naming where the off-host copy lives —
+the local --backup-dir file is same-host/same-disk and does NOT satisfy it.
 """
 
 from __future__ import annotations
@@ -36,8 +41,19 @@ def _utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d")
 
 
+def _utc_time_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _connect(db_path: Path) -> sqlite3.Connection:
+    db = sqlite3.connect(str(db_path))
+    # live db has concurrent writers; wait instead of raising "database is locked"
+    db.execute("PRAGMA busy_timeout = 60000")
+    return db
 
 
 def _sha256(path: Path) -> str:
@@ -61,14 +77,15 @@ def _count(db: sqlite3.Connection, table: str) -> int:
 
 def _write_receipt(receipt_dir: Path, receipt: dict) -> Path:
     receipt_dir.mkdir(parents=True, exist_ok=True)
-    path = receipt_dir / f"archive_idea_links_{receipt['action']}_{_utc_stamp()}.json"
-    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    path = receipt_dir / f"archive_idea_links_{receipt['action']}_{_utc_time_stamp()}.json"
+    with path.open("x") as handle:  # never clobber a prior run's receipt
+        handle.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     return path
 
 
 def phase_archive(db_path: Path, *, apply: bool, receipt_dir: Path) -> int:
     archive_name = f"idea_links_archive_{_utc_stamp()}"
-    with sqlite3.connect(str(db_path)) as db:
+    with _connect(db_path) as db:
         if not _table_exists(db, "idea_links"):
             print("idea_links does not exist; nothing to archive")
             return 1
@@ -105,9 +122,15 @@ def phase_archive(db_path: Path, *, apply: bool, receipt_dir: Path) -> int:
 
 
 def phase_drop(
-    db_path: Path, *, apply: bool, backup_dir: Path, vacuum: bool, receipt_dir: Path
+    db_path: Path,
+    *,
+    apply: bool,
+    backup_dir: Path,
+    vacuum: bool,
+    receipt_dir: Path,
+    offhost_copy: str,
 ) -> int:
-    with sqlite3.connect(str(db_path)) as db:
+    with _connect(db_path) as db:
         archives = [
             row[0]
             for row in db.execute(
@@ -125,12 +148,20 @@ def phase_drop(
         print(f"plan: backup -> {backup_path}; verify parity; DROP TABLE {archive_name}")
         if vacuum:
             print("plan: VACUUM after drop")
-        if not apply:
-            print("DRY RUN — nothing changed (pass --apply to execute)")
-            return 0
+        # refusal checks run before the dry-run return so a clean dry run
+        # implies --apply will not refuse for the same state
         if backup_path.exists():
             print(f"{backup_path} already exists; refusing to overwrite")
             return 1
+        if not offhost_copy:
+            print(
+                "no --offhost-copy attestation; refusing to DROP"
+                " (packet guardrail: off-host backup must exist first)"
+            )
+            return 1
+        if not apply:
+            print("DRY RUN — nothing changed (pass --apply to execute)")
+            return 0
         backup_dir.mkdir(parents=True, exist_ok=True)
         db.execute("ATTACH DATABASE ? AS backup", (str(backup_path),))
         db.execute(f'CREATE TABLE backup."{archive_name}" AS SELECT * FROM "{archive_name}"')
@@ -158,6 +189,7 @@ def phase_drop(
             "dropped": True,
             "vacuumed": vacuum,
         },
+        "offhost_copy_attestation": offhost_copy,
         "sha256s": {"backup": backup_sha},
         "timestamp": _utc_now_iso(),
         "rollback": f'ATTACH "{backup_path}" AS backup; CREATE TABLE "{archive_name}" AS SELECT * FROM backup."{archive_name}"',
@@ -183,6 +215,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--vacuum", action="store_true", help="VACUUM after drop (rewrites whole db)"
     )
+    parser.add_argument(
+        "--offhost-copy",
+        default="",
+        help=(
+            "attestation of where an off-host copy of the db/backup lives"
+            " (e.g. rsync destination); required for phase drop"
+        ),
+    )
     parser.add_argument("--receipt-dir", type=Path, default=DEFAULT_RECEIPT_DIR)
     args = parser.parse_args(argv)
 
@@ -197,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         backup_dir=args.backup_dir,
         vacuum=args.vacuum,
         receipt_dir=args.receipt_dir,
+        offhost_copy=args.offhost_copy,
     )
 
 

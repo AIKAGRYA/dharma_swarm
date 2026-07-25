@@ -184,7 +184,7 @@ def test_schema_has_idea_shards_turn_index(tmp_path) -> None:
 
     with sqlite3.connect(str(db_path)) as db:
         row = db.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_idea_shards_turn'"
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_shard_turn'"
         ).fetchone()
     assert row is not None
     assert "idea_shards" in row[0]
