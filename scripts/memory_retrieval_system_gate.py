@@ -30,6 +30,19 @@ REQUIRED_TRIGGERS = (
     "memory_retrieval_vec_au_refresh",
 )
 
+# Per-reason degraded-telemetry policy (Tier-D D1 measure-then-flip):
+# reasons listed here warn under a dated ratchet instead of hard-failing.
+# fts_guard_blocked carried 31,571/31,571 live rows at audit time (2026-07-25);
+# a cold flip would leave the gate permanently red, so it stays a warning until
+# the operator arms flip_after (decision D-4). Any reason NOT listed here is a
+# NEW degraded reason and hard-fails the gate immediately.
+RATCHETED_DEGRADED_REASONS: dict[str, dict[str, str | None]] = {
+    "fts_guard_blocked": {"declared": "2026-07-25", "flip_after": None},
+}
+
+# Worker topologies whose bundles must prove isolation_applied (PR-03 typing).
+_FALLBACK_WORKER_TOPOLOGIES = frozenset({"swarm", "supervisor", "subagents_as_tools"})
+
 
 @dataclass(frozen=True)
 class GateCheck:
@@ -39,6 +52,7 @@ class GateCheck:
     passed: bool
     summary: str
     details: dict[str, Any]
+    hard_fail: bool = False
 
     def to_json(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -117,15 +131,18 @@ def run_system_gate(
             max_score=10.0,
         )
     )
+    checks.append(score_isolation_proof(load_isolation_proof(state_dir)))
 
     score = round(sum(check.score for check in checks), 1)
     max_score = round(sum(check.max_score for check in checks), 1)
+    hard_failures = [check.name for check in checks if check.hard_fail]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "state_dir": str(state_dir),
         "score": score,
         "max_score": max_score,
-        "passed": score >= max_score,
+        "hard_failures": hard_failures,
+        "passed": score >= max_score and not hard_failures,
         "elapsed_ms": round((time.perf_counter() - started) * 1000.0, 3),
         "checks": [check.to_json() for check in checks],
         "index_health": health,
@@ -302,6 +319,7 @@ def load_telemetry_health(state_dir: Path, *, after_id: int = 0) -> dict[str, An
         "missing_core_fields": 0,
         "empty_result_rows": 0,
         "degraded_rows": 0,
+        "degraded_reason_counts": {},
         "p95_total_ms": None,
         "max_total_ms": None,
         "latest_query_time": None,
@@ -351,6 +369,11 @@ def load_telemetry_health(state_dir: Path, *, after_id: int = 0) -> dict[str, An
             for row in rows
             if str(row["degraded_reasons_json"] or "[]") not in ("[]", "")
         )
+        reason_counts: dict[str, int] = {}
+        for row in rows:
+            for reason in _parse_degraded_reasons(row["degraded_reasons_json"]):
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        health["degraded_reason_counts"] = reason_counts
         if totals:
             health["p95_total_ms"] = round(percentile(totals, 0.95), 3)
             health["max_total_ms"] = round(max(totals), 3)
@@ -518,6 +541,41 @@ def score_latency(rows: list[dict[str, Any]], *, max_score: float) -> GateCheck:
     )
 
 
+def _parse_degraded_reasons(raw: Any) -> list[str]:
+    text = str(raw or "[]").strip()
+    if text in ("", "[]"):
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # Unparseable telemetry is itself a NEW degraded reason: fail closed.
+        return ["_unparseable_degraded_reasons"]
+    if isinstance(parsed, list):
+        return [str(reason) for reason in parsed if str(reason)]
+    return [str(parsed)] if parsed else []
+
+
+def split_degraded_reasons(
+    reason_counts: dict[str, int],
+    *,
+    today: str | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
+    """Split per-reason counts into (ratchet warnings, hard-fail reasons)."""
+    today = today or time.strftime("%Y-%m-%d")
+    warnings: dict[str, dict[str, Any]] = {}
+    hard_fails: dict[str, int] = {}
+    for reason, count in sorted(reason_counts.items()):
+        if int(count) <= 0:
+            continue
+        ratchet = RATCHETED_DEGRADED_REASONS.get(reason)
+        flip_after = ratchet.get("flip_after") if ratchet else None
+        if ratchet is not None and (flip_after is None or today < str(flip_after)):
+            warnings[reason] = {"count": int(count), **ratchet}
+        else:
+            hard_fails[reason] = int(count)
+    return warnings, hard_fails
+
+
 def score_telemetry(
     telemetry: dict[str, Any],
     *,
@@ -539,21 +597,156 @@ def score_telemetry(
         elif p95 <= 1200.0 and max_ms <= 2500.0:
             earned += 1.0
     earned = min(max_score, earned)
+    reason_counts = {
+        str(key): int(value)
+        for key, value in dict(telemetry.get("degraded_reason_counts") or {}).items()
+    }
+    ratchet_warnings, new_degraded = split_degraded_reasons(reason_counts)
+    hard_fail = bool(new_degraded)
+    if hard_fail:
+        earned = 0.0
+    summary = (
+        f"new_rows={telemetry.get('new_rows')}/{expected_min_logs}, "
+        f"p95={telemetry.get('p95_total_ms')}ms"
+    )
+    if hard_fail:
+        summary += f", NEW degraded reasons: {sorted(new_degraded)}"
+    elif ratchet_warnings:
+        summary += f", ratcheted degraded reasons (warn): {sorted(ratchet_warnings)}"
     return GateCheck(
         name="retrieval_telemetry",
         score=earned,
         max_score=max_score,
-        passed=earned >= max_score,
-        summary=(
-            f"new_rows={telemetry.get('new_rows')}/{expected_min_logs}, "
-            f"p95={telemetry.get('p95_total_ms')}ms"
-        ),
+        passed=earned >= max_score and not hard_fail,
+        summary=summary,
         details={
             **telemetry,
             "expected_min_logs": expected_min_logs,
             "threshold_p95_ms": 750.0,
             "threshold_max_ms": 1500.0,
+            "check_ids": [
+                "telemetry_new_degraded_reasons",
+                "telemetry_fts_guard_blocked_ratchet",
+            ],
+            "new_degraded_reasons": new_degraded,
+            "ratchet_warnings": ratchet_warnings,
         },
+        hard_fail=hard_fail,
+    )
+
+
+def load_isolation_proof(state_dir: Path, *, sample_limit: int = 5000) -> dict[str, Any]:
+    db_path = Path(state_dir).expanduser() / "state" / "runtime.db"
+    proof: dict[str, Any] = {
+        "db_path": str(db_path),
+        "db_exists": db_path.exists(),
+        "table_exists": False,
+        "sampled_rows": 0,
+        "instrumented_rows": 0,
+        "legacy_rows": 0,
+        "worker_rows": 0,
+        "worker_applied_rows": 0,
+        "violations": 0,
+        "violation_bundles": [],
+        "worker_topologies": sorted(_worker_topologies()),
+        "sample_limit": sample_limit,
+    }
+    if not db_path.exists():
+        return proof
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        table = conn.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'context_bundles'
+            """
+        ).fetchone()
+        if table is None:
+            return proof
+        proof["table_exists"] = True
+        rows = conn.execute(
+            """
+            SELECT bundle_id, metadata_json
+            FROM context_bundles
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (sample_limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    worker_topologies = _worker_topologies()
+    proof["sampled_rows"] = len(rows)
+    for row in rows:
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        kernel = metadata.get("memory_kernel_default")
+        if not isinstance(kernel, dict) or "isolation_applied" not in kernel:
+            proof["legacy_rows"] += 1
+            continue
+        proof["instrumented_rows"] += 1
+        topology = str(kernel.get("isolation_topology") or "")
+        if topology not in worker_topologies:
+            continue
+        proof["worker_rows"] += 1
+        if kernel.get("isolation_applied"):
+            proof["worker_applied_rows"] += 1
+        else:
+            proof["violations"] += 1
+            if len(proof["violation_bundles"]) < 20:
+                proof["violation_bundles"].append(str(row["bundle_id"]))
+    return proof
+
+
+def _worker_topologies() -> frozenset[str]:
+    # Mirrors memory_kernel.default_context._LIVE_TOPOLOGY_MODES when importable
+    # (feature-detect: pre-PR-03 checkouts may not expose it); fan_out is the
+    # PR-03 typed name and is always included.
+    modes: frozenset[str] = _FALLBACK_WORKER_TOPOLOGIES
+    try:
+        from dharma_swarm.memory_kernel import default_context
+
+        live_modes = getattr(default_context, "_LIVE_TOPOLOGY_MODES", None)
+        if live_modes:
+            modes = frozenset(str(mode) for mode in live_modes)
+    except Exception:
+        pass
+    return modes | {"fan_out"}
+
+
+def score_isolation_proof(proof: dict[str, Any]) -> GateCheck:
+    # Advisory ratchet (max_score 0): pre-PR-03 stores carry no isolation
+    # metadata, so absence degrades to a warning; once any bundle carries the
+    # keys, an unisolated worker-topology bundle hard-fails the gate.
+    if not proof.get("table_exists") or not int(proof.get("instrumented_rows") or 0):
+        return GateCheck(
+            name="fan_out_isolation_proof",
+            score=0.0,
+            max_score=0.0,
+            passed=True,
+            summary="no isolation_applied metadata observed (pre-PR-03); warning only",
+            details={**proof, "check_id": "isolation_applied_ratchet", "warning": True},
+        )
+    violations = int(proof.get("violations") or 0)
+    summary = (
+        f"{proof.get('worker_applied_rows')}/{proof.get('worker_rows')} worker bundles "
+        f"isolated over {proof.get('instrumented_rows')} instrumented rows"
+    )
+    if violations:
+        summary = f"{violations} worker bundles WITHOUT isolation_applied; " + summary
+    return GateCheck(
+        name="fan_out_isolation_proof",
+        score=0.0,
+        max_score=0.0,
+        passed=violations == 0,
+        summary=summary,
+        details={**proof, "check_id": "isolation_applied_ratchet", "warning": False},
+        hard_fail=violations > 0,
     )
 
 
@@ -568,10 +761,17 @@ def render_text(payload: dict[str, Any]) -> str:
     lines = [
         f"Memory retrieval system gate: {payload['score']}/{payload['max_score']}",
         f"Passed: {payload['passed']}",
-        "",
     ]
+    if payload.get("hard_failures"):
+        lines.append(f"Hard failures: {payload['hard_failures']}")
+    lines.append("")
     for check in payload["checks"]:
-        status = "PASS" if check["passed"] else "FAIL"
+        if check["passed"]:
+            status = "PASS"
+        elif check.get("hard_fail"):
+            status = "HARD-FAIL"
+        else:
+            status = "FAIL"
         lines.append(
             f"{status} {check['name']}: {check['score']}/{check['max_score']} - {check['summary']}"
         )
@@ -624,6 +824,8 @@ def main() -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(render_text(payload))
+    if payload["hard_failures"]:
+        return 1
     return 0 if payload["score"] >= args.fail_under else 1
 
 
