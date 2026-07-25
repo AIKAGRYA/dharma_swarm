@@ -8,7 +8,7 @@ Exposes 9 tools to agents:
     chetana_gap_scan(focus_topic) -> {gaps, open_questions}
     chetana_decay_check() -> {stale_count, stale_atoms}
     chetana_palace_state() -> {pillar_rooms, total_atoms, coverage_gaps}
-    chetana_verify(path) -> {verified, zero_sig, kernel_drift, ...}      [Slice 7]
+    chetana_verify(path, mode) -> {verdict, verdict_reasons, buckets, ...} [Slice 7]
     chetana_revive(path|all, apply, reviewer) -> {proposals, applied}    [Slice 7]
     chetana_approve(path, reviewer_token) -> {decision, trusted_path}    [Slice 7; token-gated]
 
@@ -177,12 +177,15 @@ def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
         path: Optional atom path. If None or ".", verifies all trusted atoms.
         mode: "compat" (verdict fails only on zero-sig/schema-error — the
             legacy rule) or "production" (fail-closed: verdict also fails on
-            no-provenance, kernel-drift, unapproved review_status, or an
-            unavailable kernel).
+            no-provenance, kernel-drift, unapproved review_status, an
+            approved atom on a forgeable v1 signature, an unavailable
+            kernel, or an empty scan).
 
     Returns the five signature buckets (verified, zero-sig, kernel-drift,
     no-provenance, schema-error) plus the overlapping ``unapproved`` list,
     and a ``verdict`` field: "pass" | "fail" with ``verdict_reasons``.
+    ``buckets["unapproved"]`` overlaps the five disjoint buckets — never sum
+    the bucket lists for a total.
     """
     from .provenance import production_verdict, scan_verify_targets
     from .staging import list_trusted
@@ -197,11 +200,13 @@ def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
     else:
         targets = list_trusted()
 
-    buckets, unapproved = scan_verify_targets(targets, kernel_signature=current_kernel_sig)
+    buckets, unapproved, v1_approved = scan_verify_targets(
+        targets, kernel_signature=current_kernel_sig
+    )
 
     if mode == "production":
         verdict, reasons = production_verdict(
-            buckets, unapproved, kernel_signature=current_kernel_sig
+            buckets, unapproved, kernel_signature=current_kernel_sig, v1_approved=v1_approved
         )
     else:
         reasons = [
@@ -222,6 +227,7 @@ def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
         "no_provenance_count": len(buckets["no-provenance"]),
         "schema_error_count": len(buckets["schema-error"]),
         "unapproved_count": len(unapproved),
+        "v1_signed_approved_count": len(v1_approved),
         "buckets": {**buckets, "unapproved": unapproved},
     }
 
@@ -412,6 +418,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "path": {
                 "type": "string",
                 "description": "Specific atom path; omit or '.' to verify all trusted atoms.",
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["compat", "production"],
+                "default": "compat",
+                "description": (
+                    "compat: verdict fails only on zero-sig/schema-error. "
+                    "production: fail-closed (also fails on no-provenance, "
+                    "kernel-drift, unapproved review_status, v1-signed "
+                    "approved atoms, unavailable kernel, or an empty scan)."
+                ),
             },
         },
         "additionalProperties": False,

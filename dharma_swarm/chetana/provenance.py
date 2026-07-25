@@ -20,6 +20,7 @@ import hashlib
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field, field_validator
@@ -305,12 +306,14 @@ PRODUCTION_FAIL_BUCKETS = ("zero-sig", "kernel-drift", "no-provenance", "schema-
 
 def classify_atom_text(
     text: str, *, kernel_signature: str, source_path: str | None = None
-) -> tuple[str, str | None]:
+) -> tuple[str, str | None, str | None]:
     """Classify one atom's verification bucket under the given kernel.
 
-    Returns ``(bucket, review_status)`` where bucket ∈ VERIFY_BUCKETS and
-    review_status is None unless the atom carries parseable provenance.
-    Shared by the CLI and MCP verify surfaces so the two can never disagree.
+    Returns ``(bucket, review_status, sig_scheme)`` where bucket ∈
+    VERIFY_BUCKETS, review_status is None unless the atom carries parseable
+    provenance, and sig_scheme is "v1"/"v2" for a verified signature (None
+    otherwise). Shared by the CLI and MCP verify surfaces so the two can
+    never disagree.
     """
     try:
         schema, body = parse_frontmatter(text, source_path=source_path)
@@ -318,66 +321,93 @@ def classify_atom_text(
         # Most likely a v1 wiki atom missing chetana-strict fields.
         # Distinguish that from genuinely malformed content.
         if text.lstrip().startswith("---"):
-            return "no-provenance", None
-        return "schema-error", None
+            return "no-provenance", None, None
+        return "schema-error", None, None
     if schema is None:
-        return "schema-error", None
+        return "schema-error", None, None
     if schema.provenance is None:
-        return "no-provenance", None
+        return "no-provenance", None, None
     review_status = schema.provenance.review_status
     stored = schema.provenance.axiom_signature or ""
     if not stored or stored == PLACEHOLDER_SIGNATURE:
-        return "zero-sig", review_status
+        return "zero-sig", review_status, None
+    scheme = "v2" if stored.startswith(SIGNATURE_V2_PREFIX) else "v1"
     if signature_matches(stored, schema, body, kernel_signature):
-        return "verified", review_status
+        return "verified", review_status, scheme
     if signature_matches(stored, schema, body, PLACEHOLDER_SIGNATURE):
-        return "zero-sig", review_status
-    return "kernel-drift", review_status
+        return "zero-sig", review_status, None
+    return "kernel-drift", review_status, None
 
 
 def scan_verify_targets(
-    targets: list, *, kernel_signature: str
-) -> tuple[dict[str, list[str]], list[str]]:
-    """Bucket every target path, plus the overlapping ``unapproved`` list.
+    targets: list[Path], *, kernel_signature: str
+) -> tuple[dict[str, list[str]], list[str], list[str]]:
+    """Bucket every target path, plus two overlapping lists.
 
     ``unapproved`` collects atoms whose provenance parsed but whose
     review_status is not "approved" — an independent axis from the signature
     buckets (a verified auto_promoted atom is verified AND unapproved).
+    ``v1_approved`` collects approved atoms that verify only via the body-only
+    v1 signature — forgeable under a world-readable kernel sig, so production
+    mode must refuse them (the PR-06 downgrade seam).
     """
     buckets: dict[str, list[str]] = {label: [] for label in VERIFY_BUCKETS}
     unapproved: list[str] = []
+    v1_approved: list[str] = []
     for p in targets:
         try:
             text = p.read_text(encoding="utf-8")
-        except Exception:
-            buckets["schema-error"].append(str(p))
+        except Exception as e:
+            buckets["schema-error"].append(f"{p}: {type(e).__name__}")
             continue
-        bucket, review_status = classify_atom_text(
-            text, kernel_signature=kernel_signature, source_path=str(p)
-        )
+        try:
+            bucket, review_status, sig_scheme = classify_atom_text(
+                text, kernel_signature=kernel_signature, source_path=str(p)
+            )
+        except Exception as e:
+            # A raising sig computation must bucket, not crash the scan.
+            buckets["schema-error"].append(f"{p}: {type(e).__name__}")
+            continue
         buckets[bucket].append(str(p))
         if review_status is not None and review_status != "approved":
             unapproved.append(str(p))
-    return buckets, unapproved
+        if bucket == "verified" and review_status == "approved" and sig_scheme == "v1":
+            v1_approved.append(str(p))
+    return buckets, unapproved, v1_approved
 
 
 def production_verdict(
-    buckets: dict[str, list[str]], unapproved: list[str], *, kernel_signature: str
+    buckets: dict[str, list[str]],
+    unapproved: list[str],
+    *,
+    kernel_signature: str,
+    v1_approved: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     """Fail-closed verdict for production mode: ("pass"|"fail", reasons).
 
+    Reason-string grammar (downstream gates parse these — keep stable):
+      - bare condition labels, no count: "kernel-unavailable", "no-atoms-scanned"
+      - counted labels: "<label>: <count>" where <label> is a
+        PRODUCTION_FAIL_BUCKETS key, "unapproved", or "v1-signed-approved"
+
     Fails on any PRODUCTION_FAIL_BUCKETS hit, any unapproved review_status,
-    or an unavailable kernel (placeholder signature makes verification
-    meaningless, so an empty/clean scan must not pass on it).
+    any approved atom carried by a forgeable v1 signature, an unavailable
+    kernel (placeholder signature makes verification meaningless), or a scan
+    that touched zero atoms (a moved wiki root or misconfigured CHETANA_* env
+    attests nothing and must not read as green).
     """
     reasons: list[str] = []
     if kernel_signature == PLACEHOLDER_SIGNATURE:
         reasons.append("kernel-unavailable")
+    if not any(buckets.get(label) for label in VERIFY_BUCKETS):
+        reasons.append("no-atoms-scanned")
     for label in PRODUCTION_FAIL_BUCKETS:
         if buckets.get(label):
             reasons.append(f"{label}: {len(buckets[label])}")
     if unapproved:
-        reasons.append(f"unapproved review_status: {len(unapproved)}")
+        reasons.append(f"unapproved: {len(unapproved)}")
+    if v1_approved:
+        reasons.append(f"v1-signed-approved: {len(v1_approved)}")
     return ("pass" if not reasons else "fail"), reasons
 
 

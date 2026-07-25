@@ -258,7 +258,9 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     else:
         targets = list_trusted()
 
-    buckets, unapproved = scan_verify_targets(targets, kernel_signature=current_kernel_sig)
+    buckets, unapproved, v1_approved = scan_verify_targets(
+        targets, kernel_signature=current_kernel_sig
+    )
 
     print("# chetana verify\n- current kernel sig: <redacted; compare via dgc dharma status>")
     print(f"- mode: {args.mode}")
@@ -271,6 +273,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             if len(rows) > args.show:
                 print(f"    (... {len(rows) - args.show} more)")
     print(f"- {'unapproved':14s}: {len(unapproved)}")
+    print(f"- {'v1-approved':14s}: {len(v1_approved)}")
     print("\nlegend:")
     print("  verified      = sig matches under current kernel ✓")
     print("  zero-sig      = signed with placeholder (silent integrity failure)")
@@ -278,10 +281,11 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     print("  no-provenance = pre-chetana wiki atom; never went through promote pipeline")
     print("  schema-error  = malformed YAML or unrecoverable parse failure")
     print("  unapproved    = provenance present but review_status != approved (overlaps above)")
+    print("  v1-approved   = approved atom on forgeable body-only v1 sig (overlaps verified)")
 
     if args.mode == "production":
         verdict, reasons = production_verdict(
-            buckets, unapproved, kernel_signature=current_kernel_sig
+            buckets, unapproved, kernel_signature=current_kernel_sig, v1_approved=v1_approved
         )
         print(f"\nproduction verdict: {verdict.upper()}")
         for reason in reasons:

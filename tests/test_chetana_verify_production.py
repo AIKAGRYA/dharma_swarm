@@ -8,8 +8,10 @@ Per bucket:
   - review_status != approved (verified sig): compat 0, production non-zero
   - zero-sig / schema-error: both modes non-zero
   - unavailable kernel: production fails closed even on an empty corpus
+  - empty scan (zero atoms, real kernel): production fails closed
+  - v1-signed approved atom (forgeable downgrade): production fails closed
   - mcp tool_verify: verdict/verdict_reasons/unapproved fields per mode;
-    unknown mode raises
+    unknown mode raises; advertised TOOL_SCHEMAS declares mode
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from dharma_swarm.chetana.provenance import (
     FrontmatterSchema,
     GateCheckRecord,
     assemble_atom,
+    compute_axiom_signature,
     compute_axiom_signature_v2,
     new_atom_id,
     now_iso,
@@ -105,6 +108,7 @@ def _write_synthetic_atom(
     review_status: str = "approved",
     sign_kernel: str | None = None,
     zero_sig: bool = False,
+    sig_scheme: str = "v2",
     slug: str = "synthetic-atom",
 ) -> Path:
     fm = FrontmatterSchema(
@@ -131,7 +135,11 @@ def _write_synthetic_atom(
     )
     body = "synthetic body\n"
     if not zero_sig:
-        sig = compute_axiom_signature_v2(fm, body, sign_kernel or _current_kernel_sig())
+        kernel = sign_kernel or _current_kernel_sig()
+        if sig_scheme == "v1":
+            sig = compute_axiom_signature(body, kernel)
+        else:
+            sig = compute_axiom_signature_v2(fm, body, kernel)
         fm = fm.model_copy(
             update={"provenance": fm.provenance.model_copy(update={"axiom_signature": sig})}
         )
@@ -222,6 +230,36 @@ def test_kernel_unavailable_fails_production_even_on_empty_corpus(
     assert _verify_exit("production") == 1
 
 
+def test_v1_signed_approved_fails_production_only(sandbox: Path):
+    # PR-06 downgrade seam: body-only v1 sigs are forgeable under a
+    # world-readable kernel sig; production must refuse them on approved atoms
+    trusted = sandbox / "wiki" / "concepts"
+    _write_synthetic_atom(trusted, sig_scheme="v1", slug="v1-approved")
+    assert _verify_exit("compat") == 0
+    assert _verify_exit("production") == 1
+    out = tool_verify(mode="production")
+    assert out["verdict"] == "fail"
+    assert out["v1_signed_approved_count"] == 1
+    assert "v1-signed-approved: 1" in out["verdict_reasons"]
+
+
+def test_empty_scan_with_real_kernel_fails_production(sandbox: Path):
+    # misconfigured/moved wiki root must not attest green (fail-closed)
+    assert _verify_exit("compat") == 0
+    assert _verify_exit("production") == 1
+    out = tool_verify(mode="production")
+    assert out["verdict"] == "fail"
+    assert "no-atoms-scanned" in out["verdict_reasons"]
+
+
+def test_cli_default_mode_is_compat(sandbox: Path):
+    trusted = sandbox / "wiki" / "concepts"
+    _write_legacy_page(trusted, "legacy-default")
+    args = build_parser().parse_args(["verify"])
+    assert args.mode == "compat"
+    assert args.func(args) == 0
+
+
 def test_single_path_target_production(sandbox: Path):
     trusted = sandbox / "wiki" / "concepts"
     good = _write_synthetic_atom(trusted, slug="good-approved")
@@ -247,8 +285,9 @@ def test_tool_verify_production_verdict_and_reasons(sandbox: Path):
     assert out["verified_count"] == 2  # approved-ok + auto-promoted (sig-valid)
     assert out["kernel_drift_count"] == 1
     assert out["unapproved_count"] == 1
-    assert any("kernel-drift" in r for r in out["verdict_reasons"])
-    assert any("unapproved" in r for r in out["verdict_reasons"])
+    # exact reason-string grammar: "<label>: <count>" (parsed downstream)
+    assert "kernel-drift: 1" in out["verdict_reasons"]
+    assert "unapproved: 1" in out["verdict_reasons"]
     assert out["buckets"]["unapproved"], "unapproved bucket must list the atom"
 
 
@@ -276,3 +315,14 @@ def test_tool_verify_production_verdict_passes_clean(sandbox: Path):
 def test_tool_verify_unknown_mode_raises(sandbox: Path):
     with pytest.raises(ValueError, match="unknown verify mode"):
         tool_verify(mode="promiscuous")
+
+
+def test_mcp_tool_schema_declares_mode():
+    # a schema-conformant MCP client must be able to request production mode
+    from dharma_swarm.chetana.mcp_server import TOOL_SCHEMAS
+
+    schema = TOOL_SCHEMAS["chetana_verify"]
+    mode = schema["properties"]["mode"]
+    assert mode["enum"] == ["compat", "production"]
+    assert mode["default"] == "compat"
+    assert schema["additionalProperties"] is False
