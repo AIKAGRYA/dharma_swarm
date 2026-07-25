@@ -497,3 +497,115 @@ def test_interprocess_writers_allocate_unique_monotonic_sequences(tmp_path: Path
     ]
     sequences = sorted(event.sequence for event in events)
     assert sequences == list(range(1, 25))
+
+
+@pytest.mark.parametrize(
+    ("event_type", "attempt_id", "sequence", "payload", "delivery_key"),
+    [
+        (
+            "episode_opened",
+            "",
+            0,
+            {"session_id": "sess-legacy"},
+            "episode:ep_legacy:opened",
+        ),
+        (
+            "attempt_started",
+            "at_legacy",
+            1,
+            {"session_id": "sess-legacy"},
+            "attempt:at_legacy:started",
+        ),
+        (
+            "observation_recorded",
+            "at_legacy",
+            2,
+            {"session_event_id": "sevt-legacy", "value": 1},
+            "session-event:sevt-legacy:observation",
+        ),
+    ],
+)
+def test_legacy_implicit_delivery_key_replays_matching_normalized_content(
+    tmp_path: Path,
+    event_type: str,
+    attempt_id: str,
+    sequence: int,
+    payload: dict,
+    delivery_key: str,
+):
+    path = tmp_path / f"{event_type}.jsonl"
+    legacy = EpisodeEvent.new(
+        event_type=event_type,
+        episode_id="ep_legacy",
+        attempt_id=attempt_id,
+        sequence=sequence,
+        payload=payload,
+    )
+    assert EpisodeLedgerWriter(path).append(legacy) is True
+
+    replay = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key=delivery_key,
+        event_type=event_type,
+        episode_id="ep_legacy",
+        attempt_id=attempt_id,
+        payload=payload,
+    )
+
+    assert replay.event_id == legacy.event_id
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_logical_delivery_key_reuse_with_different_content_fails_closed(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    first = writer.append_delivery(
+        delivery_key="k",
+        event_type="observation_recorded",
+        episode_id="ep_x",
+        attempt_id="at_x",
+        payload={"session_event_id": "sevt-x", "value": 1},
+    )
+
+    with pytest.raises(LedgerValidationError, match="different content"):
+        writer.append_delivery(
+            delivery_key="k",
+            event_type="review_recorded",
+            episode_id="ep_other",
+            attempt_id="at_other",
+            payload={"value": 2},
+        )
+
+    assert EpisodeEvent.from_dict(json.loads(path.read_text())).event_id == first.event_id
+
+
+def test_rehydrated_conflicting_logical_records_poison_replay(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    first = EpisodeEvent.new(
+        event_type="observation_recorded",
+        episode_id="ep_conflict",
+        attempt_id="at_conflict",
+        sequence=1,
+        payload={"session_event_id": "sevt-conflict", "value": 1},
+    )
+    conflicting = EpisodeEvent.new(
+        event_type="observation_recorded",
+        episode_id="ep_other",
+        attempt_id="at_other",
+        sequence=1,
+        payload={"session_event_id": "sevt-conflict", "value": 2},
+    )
+    path.write_text(
+        "\n".join(json.dumps(event.to_dict()) for event in (first, conflicting)) + "\n"
+    )
+
+    writer = EpisodeLedgerWriter(path)
+    with pytest.raises(LedgerValidationError, match="conflicting records"):
+        writer.append_delivery(
+            delivery_key="session-event:sevt-conflict:observation",
+            event_type=first.event_type,
+            episode_id=first.episode_id,
+            attempt_id=first.attempt_id,
+            payload=first.payload,
+        )
+
+    assert len(path.read_text().splitlines()) == 2

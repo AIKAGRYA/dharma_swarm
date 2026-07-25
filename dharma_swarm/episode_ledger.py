@@ -1,11 +1,7 @@
 """Episode Ledger — versioned, validated lifecycle events (THE_KEEL §6).
 
-The ledger is an append-only event family with stable episode/attempt IDs.
-This module is the schema slice: a validated event type, a PURE projector
-(side-effect-free — ordering, dedup, visible conflicts, fail-closed closure),
-and a thin persistence wrapper that owns the writes (redaction, append-only
-JSONL, write-side dedup). Producers (session ledger, packet closeout) wire in
-as separate slices.
+Validated event schema, pure projector, and locked append-only JSONL writer.
+Producers wire in as separate slices.
 """
 
 from __future__ import annotations
@@ -291,28 +287,27 @@ def _logical_key_from_event(event: EpisodeEvent) -> str:
     return ""
 
 
-class EpisodeLedgerWriter:
-    """Thin persistence wrapper — owns the writes the pure core never makes.
+def _logical_content(event: EpisodeEvent) -> tuple[str, str, str, dict[str, Any]]:
+    payload = dict(event.payload)
+    payload.pop(LOGICAL_DELIVERY_KEY_FIELD, None)
+    return event.event_type, event.episode_id, event.attempt_id, payload
 
-    Append-only JSONL; payloads are redacted before persistence; duplicate
-    event IDs, logical delivery keys, and episode sequences are refused across
-    threads, processes, and restarts. Rehydration streams the history once to
-    recover all three indexes; later appends only ingest bytes written since
-    this instance's last offset while holding the interprocess file lock.
-    """
+
+class EpisodeLedgerWriter:
+    """Locked JSONL persistence with incremental replay and unique identities."""
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
         self._seen: set[str] = set()
         self._logical_events: dict[str, EpisodeEvent] = {}
+        self._logical_conflicts: set[str] = set()
         self._high_water: dict[str, int] = {}
         self._sequences: dict[str, set[int]] = {}
         self._scan_offset = 0
         self._rehydration_passes = 0
         self._thread_lock = _thread_lock_for(self.path)
-        # A torn tail has no trailing newline; the next append must start on
-        # a fresh line or the new event is absorbed INTO the garbage line and
-        # silently lost on the following rehydration.
+        # A torn tail needs a newline before the next append or it absorbs the
+        # new event into its corrupt line.
         self._tail_unterminated = False
         self._rehydrate()
 
@@ -344,6 +339,7 @@ class EpisodeLedgerWriter:
         if end < self._scan_offset:
             self._seen.clear()
             self._logical_events.clear()
+            self._logical_conflicts.clear()
             self._high_water.clear()
             self._sequences.clear()
             self._scan_offset = 0
@@ -364,8 +360,7 @@ class EpisodeLedgerWriter:
     def _observe_line(self, raw_line: bytes) -> None:
         if not raw_line.strip():
             return
-        # Tolerant decode: a torn multi-byte UTF-8 tail from a crashed write
-        # must degrade to a corrupt LINE, not disable the writer.
+        # A torn multi-byte UTF-8 tail degrades to one skipped corrupt line.
         try:
             record = json.loads(raw_line.decode("utf-8", errors="replace"))
         except (TypeError, ValueError):
@@ -399,13 +394,31 @@ class EpisodeLedgerWriter:
         self._sequences.setdefault(event.episode_id, set()).add(event.sequence)
         logical_key = _logical_key_from_event(event)
         if logical_key:
-            self._logical_events.setdefault(logical_key, event)
+            existing = self._logical_events.get(logical_key)
+            if existing is None:
+                self._logical_events[logical_key] = event
+            elif _logical_content(existing) != _logical_content(event):
+                self._logical_conflicts.add(logical_key)
+
+    def _matching_logical_event(
+        self, logical_key: str, event: EpisodeEvent
+    ) -> EpisodeEvent | None:
+        if logical_key in self._logical_conflicts:
+            raise LedgerValidationError(
+                f"logical delivery_key {logical_key!r} has conflicting records"
+            )
+        existing = self._logical_events.get(logical_key)
+        if existing is not None and _logical_content(existing) != _logical_content(event):
+            raise LedgerValidationError(
+                f"logical delivery_key {logical_key!r} was reused with different content"
+            )
+        return existing
 
     def _append_event_locked(self, stream: BinaryIO, event: EpisodeEvent) -> bool:
-        if event.event_id in self._seen:
-            return False
         logical_key = _logical_key_from_event(event)
-        if logical_key and logical_key in self._logical_events:
+        if logical_key and self._matching_logical_event(logical_key, event) is not None:
+            return False
+        if event.event_id in self._seen:
             return False
         if event.sequence in self._sequences.get(event.episode_id, set()):
             return False
@@ -413,10 +426,8 @@ class EpisodeLedgerWriter:
         record["payload"] = redact_payload(event.payload)
         EpisodeEvent.from_dict(record)
         prefix = b"\n" if self._tail_unterminated else b""
-        encoded = (
-            json.dumps(record, ensure_ascii=True, default=str).encode("utf-8")
-            + b"\n"
-        )
+        encoded = json.dumps(record, ensure_ascii=True, default=str).encode("utf-8")
+        encoded += b"\n"
         stream.seek(0, os.SEEK_END)
         stream.write(prefix + encoded)
         stream.flush()
@@ -427,8 +438,7 @@ class EpisodeLedgerWriter:
         return True
 
     def append(self, event: EpisodeEvent) -> bool:
-        """Append one event; returns False when the event_id was already
-        persisted or its logical key/sequence is already occupied."""
+        """Append one event; return False when its identity is occupied."""
         record = event.to_dict()
         record["payload"] = redact_payload(event.payload)
         EpisodeEvent.from_dict(record)
@@ -446,11 +456,9 @@ class EpisodeLedgerWriter:
         payload: dict[str, Any],
         fixed_sequence: int | None = None,
     ) -> EpisodeEvent:
-        """Append one logical delivery under the file lock and return its event.
+        """Append or replay one logical delivery under the file lock.
 
-        A replay after file append but before outbox ack returns the already
-        persisted event for ``delivery_key``. New non-fixed sequences are
-        allocated only after ingesting bytes from competing writers.
+        Replays return the persisted event only when normalized content matches.
         """
 
         delivery_key = str(delivery_key).strip()
@@ -458,9 +466,6 @@ class EpisodeLedgerWriter:
             raise LedgerValidationError("delivery_key is required")
         with self._locked_stream() as stream:
             self._sync_from_disk_locked(stream)
-            existing = self._logical_events.get(delivery_key)
-            if existing is not None:
-                return existing
             sequence = (
                 int(fixed_sequence)
                 if fixed_sequence is not None
@@ -482,10 +487,10 @@ class EpisodeLedgerWriter:
                 sequence=sequence,
                 payload=event_payload,
             )
+            existing = self._matching_logical_event(delivery_key, event)
+            if existing is not None:
+                return existing
             if not self._append_event_locked(stream, event):
-                replay = self._logical_events.get(delivery_key)
-                if replay is not None:
-                    return replay
                 raise LedgerValidationError(
                     f"sequence {sequence} for episode {episode_id!r} is occupied"
                 )
