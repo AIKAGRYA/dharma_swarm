@@ -147,3 +147,45 @@ def test_follow_up_task_marks_shard_reopened_then_implemented(tmp_path) -> None:
         ).fetchone()
     assert row is not None
     assert row[0] == "implemented"
+
+
+def test_harvest_creates_shards_without_idea_links(tmp_path) -> None:
+    db_path = tmp_path / "memory_plane.db"
+    store = ConversationMemoryStore(db_path)
+    store.record_turn(
+        session_id="sess-no-clique",
+        task_id="task-no-clique",
+        role="user",
+        content=(
+            "We could build a memory palace index for task recall.\n"
+            "Maybe we should also preserve abandoned branches from the conversation.\n"
+            "What if latent gold resurfaced automatically later?"
+        ),
+        turn_index=1,
+    )
+
+    with sqlite3.connect(str(db_path)) as db:
+        shard_count = db.execute("SELECT COUNT(*) FROM idea_shards").fetchone()[0]
+        link_count = db.execute("SELECT COUNT(*) FROM idea_links").fetchone()[0]
+    assert shard_count >= 2
+    assert link_count == 0
+
+
+def test_schema_has_idea_shards_turn_index(tmp_path) -> None:
+    db_path = tmp_path / "memory_plane.db"
+    store = ConversationMemoryStore(db_path)
+    store.record_turn(
+        session_id="sess-index",
+        task_id="task-index",
+        role="user",
+        content="Set a reminder for Friday",
+        turn_index=1,
+    )
+
+    with sqlite3.connect(str(db_path)) as db:
+        row = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_idea_shards_turn'"
+        ).fetchone()
+    assert row is not None
+    assert "idea_shards" in row[0]
+    assert "turn_id" in row[0]
