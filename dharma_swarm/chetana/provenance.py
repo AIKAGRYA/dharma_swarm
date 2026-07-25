@@ -183,8 +183,11 @@ class AtomProvenance(BaseModel):
     @field_validator("axiom_signature")
     @classmethod
     def _validate_signature_format(cls, v: str) -> str:
-        if not re.fullmatch(r"[0-9a-f]{64}", v):
-            raise ValueError("axiom_signature must be a 64-char lowercase sha256 hex digest")
+        if not re.fullmatch(r"(?:v2:)?[0-9a-f]{64}", v):
+            raise ValueError(
+                "axiom_signature must be a 64-char lowercase sha256 hex digest, "
+                "optionally prefixed with 'v2:'"
+            )
         return v
 
 
@@ -248,6 +251,47 @@ def compute_axiom_signature(content: str, kernel_signature: str) -> str:
     h.update(b"\x00")
     h.update(content.encode("utf-8"))
     return h.hexdigest()
+
+
+SIGNATURE_V2_PREFIX = "v2:"
+
+
+def compute_axiom_signature_v2(
+    schema: "FrontmatterSchema", body: str, kernel_signature: str
+) -> str:
+    """Version-2 signature: covers normalized frontmatter (incl. review_status) + body.
+
+    v1 (compute_axiom_signature) binds only the body, so review_status could be
+    flipped on disk without breaking verification. v2 hashes the canonical JSON
+    of the whole frontmatter (minus the signature field itself, which would be
+    circular) plus the body, domain-separated and version-tagged.
+    """
+    import json as _json
+
+    payload = _json.loads(schema.model_dump_json(exclude_none=True))
+    prov = payload.get("provenance")
+    if isinstance(prov, dict):
+        prov.pop("axiom_signature", None)
+    canonical = _json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    h = hashlib.sha256()
+    for part in (
+        kernel_signature.encode("utf-8"),
+        b"chetana-axiom-signature-v2",
+        canonical.encode("utf-8"),
+        body.encode("utf-8"),
+    ):
+        h.update(part)
+        h.update(b"\x00")
+    return SIGNATURE_V2_PREFIX + h.hexdigest()
+
+
+def signature_matches(
+    stored: str, schema: "FrontmatterSchema", body: str, kernel_signature: str
+) -> bool:
+    """Verify a stored axiom_signature under the given kernel, either version."""
+    if stored.startswith(SIGNATURE_V2_PREFIX):
+        return compute_axiom_signature_v2(schema, body, kernel_signature) == stored
+    return compute_axiom_signature(body, kernel_signature) == stored
 
 
 def validate_frontmatter(fm: dict[str, Any]) -> FrontmatterSchema:
