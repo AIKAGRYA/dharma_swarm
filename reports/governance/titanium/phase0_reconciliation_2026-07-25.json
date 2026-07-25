@@ -1,0 +1,446 @@
+{
+  "schema": "dharma.titanium.phase0-reconciliation.v1",
+  "observed_at": "2026-07-25T11:35:06Z",
+  "track_id": "repository-titanium-hardening-2026-07",
+  "reviewed_main": {
+    "ref": "origin/main",
+    "sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+    "tree": "96bacbb4e795fc214364afe5045c736a583e7ebe"
+  },
+  "generated_status": {
+    "authority": "projection_only",
+    "commit": "684f73458dbfb3661c634f6a7543099c638a2edb",
+    "derived_from_main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+    "generated_at": "2026-07-25T11:33:12Z",
+    "completion": {
+      "passed": 4,
+      "total": 8
+    },
+    "verify": "test \"$(git rev-parse origin/generated/status)\" = 684f73458dbfb3661c634f6a7543099c638a2edb && git log -1 --format=%B origin/generated/status | rg -q ' @ bb3eb9f4fb9f3ccd413eadd55cfada1b92354287$'"
+  },
+  "target_closure_kind": "CLOSED_NOT_PROD",
+  "current_verdict": "BLOCKED",
+  "claim_boundary": "This receipt reconciles Phase 0 repository packet state at one exact merged-main SHA. It does not prove production liveness, deployment readiness, complete security, external-host prerequisites, Phase 1-7 completion, or final clean-room closure.",
+  "modalities": {
+    "LANDED_PROVEN": "The bounded packet implementation and its packet-scoped deterministic evidence are present on reviewed main.",
+    "LANDED_EVIDENCE_GAP": "Implementation is present, but a required Phase 0 proof edge is absent.",
+    "BLOCKED_OPERATOR": "A required authority, credential, ownership, exposure, or policy decision cannot be inferred by an agent.",
+    "UNIMPLEMENTED": "The canonical packet contract or required implementation artifact is absent.",
+    "FINAL_REVIEW": "The work is intentionally reserved for an independent post-integration reviewer.",
+    "STALE_DERIVED": "A derived projection does not bind the exact reviewed main SHA and therefore has no selection authority."
+  },
+  "promotion_rules": [
+    {
+      "source_modality": "LANDED_PROVEN",
+      "target": "PHASE_0_PASS",
+      "allowed": false,
+      "obligation": "Packet-scoped proof cannot promote the overall phase; all eight canonical completion criteria and the independent final review must pass."
+    },
+    {
+      "source_modality": "LANDED_EVIDENCE_GAP",
+      "target": "PASS",
+      "allowed": false,
+      "obligation": "The named missing proof edge must be observed by its canonical evaluator."
+    },
+    {
+      "source_modality": "BLOCKED_OPERATOR",
+      "target": "PASS",
+      "allowed": false,
+      "obligation": "A recorded operator or external authority decision is required."
+    },
+    {
+      "source_modality": "UNIMPLEMENTED",
+      "target": "PASS",
+      "allowed": false,
+      "obligation": "The missing implementation and its verifier must land on main."
+    },
+    {
+      "source_modality": "FINAL_REVIEW",
+      "target": "PASS",
+      "allowed": false,
+      "obligation": "An independent fresh-clone receipt is required."
+    },
+    {
+      "source_modality": "STALE_DERIVED",
+      "target": "selection_authority",
+      "allowed": false,
+      "obligation": "A derived projection must bind the exact reviewed main SHA."
+    }
+  ],
+  "packets": [
+    {
+      "id": "WP-00",
+      "classification": "LANDED_PROVEN",
+      "merged_commits": [
+        "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "jq -e '.admission.squash_merge_sha == \"82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89\"' reports/governance/titanium/wp00_baseline.json"
+      ],
+      "evidence_observation_ids": [
+        "exact-main-tests-bb3"
+      ],
+      "remaining": []
+    },
+    {
+      "id": "WP-00B",
+      "classification": "LANDED_PROVEN",
+      "merged_commits": [
+        "a47c110ca38155390b04a7d85654d0a1840b0cce"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor a47c110ca38155390b04a7d85654d0a1840b0cce bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "jq -e '.schema_version == \"titanium-wp00b-baseline/v1\" and .claim_boundary != null' reports/governance/titanium/wp00_baseline.json"
+      ],
+      "evidence_observation_ids": [
+        "exact-main-tests-bb3"
+      ],
+      "remaining": []
+    },
+    {
+      "id": "WP-0S",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "1e71e1d4e09c7871a8feec62ca3486f4ea06a173"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 1e71e1d4e09c7871a8feec62ca3486f4ea06a173 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_api_auth.py tests/test_verify_api.py -q",
+        "rg -n 'WEBHOOK_SECRET|return True' dharma_swarm/verify/github_app.py"
+      ],
+      "remaining": [
+        "Record the operator exposure verdict.",
+        "Resolve or owner-route the handler-level keyless webhook residual."
+      ]
+    },
+    {
+      "id": "WP-0A",
+      "classification": "LANDED_EVIDENCE_GAP",
+      "merged_commits": [
+        "6b1c5438e0fe541ad89ea4aab8f1559528d07a86"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 6b1c5438e0fe541ad89ea4aab8f1559528d07a86 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_bootstrap_contract.py -q"
+      ],
+      "remaining": [
+        "Clean-container proof remains part of the final independent clone."
+      ],
+      "carried_by": "WP-0I"
+    },
+    {
+      "id": "WP-0B",
+      "classification": "LANDED_PROVEN",
+      "merged_commits": [
+        "524a0caabc264cf5d46ce7ec4471b01d6dde58cb"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 524a0caabc264cf5d46ce7ec4471b01d6dde58cb bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_verifier_selfcheck_contract.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
+      ],
+      "evidence_observation_ids": [
+        "exact-main-tests-bb3",
+        "m0-focused-local"
+      ],
+      "remaining": []
+    },
+    {
+      "id": "WP-0C1R",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "35b11a30f69d35712b82f70ff581959f5619f2e3"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 35b11a30f69d35712b82f70ff581959f5619f2e3 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "rg -n 'Typed verdict for WP-0C1R.*BLOCKED_OPERATOR|OWNER_DEFERRED' reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md"
+      ],
+      "remaining": [
+        "Re-run the pinned strict scan on current main.",
+        "Resolve every current owner-deferred finding through its governing owner."
+      ]
+    },
+    {
+      "id": "WP-0C1",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "edf9dec1e6364209fce90e0fa2185ac41d480619"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor edf9dec1e6364209fce90e0fa2185ac41d480619 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
+      ],
+      "remaining": [
+        "The fail-closed scanner mechanics are landed; the strict finding-set premise remains operator-blocked."
+      ],
+      "carried_by": "WP-0C1R"
+    },
+    {
+      "id": "WP-0C2",
+      "classification": "LANDED_PROVEN",
+      "merged_commits": [
+        "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_go_adapter_contracts.py tests/test_github_ingestor_runner.py tests/test_world_radar_go_bridge.py -q"
+      ],
+      "evidence_observation_ids": [
+        "exact-main-tests-bb3"
+      ],
+      "remaining": []
+    },
+    {
+      "id": "WP-0D",
+      "classification": "LANDED_EVIDENCE_GAP",
+      "merged_commits": [
+        "280fc251e99915062be19db48129b44d703402b1",
+        "2154aa100b03a80f9192d644207227ee773a8126"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 280fc251e99915062be19db48129b44d703402b1 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "git merge-base --is-ancestor 2154aa100b03a80f9192d644207227ee773a8126 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "test ! -e tests/test_fast_suite_isolation.py"
+      ],
+      "remaining": [
+        "Add tests/test_fast_suite_isolation.py.",
+        "Record two consecutive clean make test-fast runs and one make test run."
+      ]
+    },
+    {
+      "id": "WP-0E",
+      "classification": "UNIMPLEMENTED",
+      "merged_commits": [],
+      "evidence": [
+        "test ! -e tests/test_nats_verification_split.py",
+        "test ! -e tests/test_nats_live_production_evidence.py",
+        "rg -n 'nats-substrate-contract|nats-live-production' Makefile"
+      ],
+      "remaining": [
+        "Separate hermetic repository verification from live-host evidence.",
+        "Add both missing contract tests without promoting NEEDS_HOST."
+      ]
+    },
+    {
+      "id": "WP-0F1",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "1021b9cc60156b725e291904674e09e91ee97e69",
+        "2447ca565bfbd80258f7acfafb6121da7ab20886"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 1021b9cc60156b725e291904674e09e91ee97e69 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "git merge-base --is-ancestor 2447ca565bfbd80258f7acfafb6121da7ab20886 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q"
+      ],
+      "remaining": [
+        "Ratify the final required-check set and human-review policy.",
+        "Provision bounded Administration-read parity and reprove it continuously."
+      ]
+    },
+    {
+      "id": "WP-0F2",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "845443786da0786ca185fd477d274410b4372419",
+        "f4fd8e3e097e7df0333a176d990a95a136d74fcf"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 845443786da0786ca185fd477d274410b4372419 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "git merge-base --is-ancestor f4fd8e3e097e7df0333a176d990a95a136d74fcf bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py -q"
+      ],
+      "evidence_observation_ids": [
+        "exact-main-tests-bb3"
+      ],
+      "remaining": [
+        "Reprove every consumer against the operator-ratified final set."
+      ],
+      "carried_by": "WP-0F1"
+    },
+    {
+      "id": "WP-0G",
+      "classification": "BLOCKED_OPERATOR",
+      "merged_commits": [
+        "944dc89565edc9262574947abe8d93598f7bbaf3",
+        "4c613db1625bea016586930eb28a247d3d805f17"
+      ],
+      "evidence": [
+        "git merge-base --is-ancestor 944dc89565edc9262574947abe8d93598f7bbaf3 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        ".venv/bin/python -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q",
+        "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
+      ],
+      "remaining": [
+        "Choose DOCOPS_RECONCILE_TOKEN or a reviewed-PR delivery authority.",
+        "Prove a rolling reconcile head receives checks before merge."
+      ]
+    },
+    {
+      "id": "WP-0H",
+      "classification": "UNIMPLEMENTED",
+      "merged_commits": [],
+      "evidence": [
+        "test ! -e tests/test_polyglot_ci_contract.py",
+        "! rg -n '^frontend-check:|^terminal-check:' Makefile"
+      ],
+      "remaining": [
+        "Add pinned Go, dashboard, and terminal orchestration.",
+        "Add required CI execution and tests/test_polyglot_ci_contract.py."
+      ]
+    },
+    {
+      "id": "WP-0I",
+      "classification": "FINAL_REVIEW",
+      "merged_commits": [],
+      "evidence": [
+        "test ! -e reports/governance/titanium/phase0_clean_room_receipt.json",
+        "rg -n 'fresh non-shallow clone|implementation author' docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md"
+      ],
+      "remaining": [
+        "After all implementation dependencies merge, run an independent fresh non-shallow clone.",
+        "Include WP-0A clean-container evidence and commit the typed final receipt."
+      ]
+    }
+  ],
+  "canonical_next_items": [
+    "WP-0S",
+    "WP-0C1R",
+    "WP-0D",
+    "WP-0E",
+    "WP-0F1",
+    "WP-0G",
+    "WP-0H",
+    "WP-0I"
+  ],
+  "verification_observations": [
+    {
+      "id": "exact-main-tests-bb3",
+      "result": "PASS",
+      "observed_at": "2026-07-25T11:49:54Z",
+      "main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30156391278",
+      "claim": "The post-merge tests workflow completed successfully on the exact reviewed main SHA; this is repository CI evidence, not production evidence."
+    },
+    {
+      "id": "m0-focused-local",
+      "result": "PASS",
+      "observed_at": "2026-07-25T11:54:12Z",
+      "main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "evidence_handle": "local:.venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_bootstrap_contract.py tests/test_api_auth.py tests/test_verify_api.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py",
+      "claim": "221 tests passed with one deprecation warning on the M0 worktree."
+    },
+    {
+      "id": "exact-main-docops-bb3",
+      "result": "BLOCKED_OPERATOR",
+      "observed_at": "2026-07-25T11:33:05Z",
+      "main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30156391284",
+      "claim": "DocOps reconcile delivery failed on exact main because the rolling branch lacks a check-triggering credential path; local integrity remains green."
+    }
+  ],
+  "completion_snapshot": [
+    {
+      "id": "titanium_bootstrap_contract_passes",
+      "passed": true
+    },
+    {
+      "id": "titanium_verifier_truth_contracts_pass",
+      "passed": false
+    },
+    {
+      "id": "titanium_ingress_contracts_pass",
+      "passed": true
+    },
+    {
+      "id": "titanium_hermetic_live_split_contracts_pass",
+      "passed": false
+    },
+    {
+      "id": "titanium_ci_authority_contracts_pass",
+      "passed": true
+    },
+    {
+      "id": "titanium_docops_contracts_pass",
+      "passed": true
+    },
+    {
+      "id": "titanium_polyglot_contract_passes",
+      "passed": false
+    },
+    {
+      "id": "titanium_independent_clean_room_receipt_valid",
+      "passed": false
+    }
+  ],
+  "missing_artifacts": [
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_nats_verification_split.py",
+    "tests/test_nats_live_production_evidence.py",
+    "tests/test_polyglot_ci_contract.py",
+    "reports/governance/titanium/phase0_clean_room_receipt.json"
+  ],
+  "docops_reconcile": {
+    "pull_request": 1118,
+    "observed_head": "c503f153af48e62495ef7246270b112c7b97ce6b",
+    "classification": "BLOCKED_OPERATOR",
+    "integration_strategy": "M0 regenerates and absorbs the exact DocOps delta; PR 1118 may be closed as superseded only after M0 merges.",
+    "verify": "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
+  },
+  "source_objects": [
+    {
+      "path": "docs/governance/ACTIVE_TRACK.yaml",
+      "ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "git_object": "1332208f885585f0b515eb3dd3a7c2c687391838"
+    },
+    {
+      "path": "CLAUDE.md",
+      "ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "git_object": "36d07ed94025851881703cd26680e7008b10b057"
+    },
+    {
+      "path": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "git_object": "6b581fe0965291aed368f9882cdb6c94021c5355"
+    },
+    {
+      "path": "reports/governance/titanium/wp00_baseline.json",
+      "ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "git_object": "48a4ee7ae6e0ff68231027e4aa9832359b9a5ed8"
+    },
+    {
+      "path": "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md",
+      "ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "git_object": "05a081e488cc6c633ca8ba1208e6adca4a23aaa6"
+    }
+  ],
+  "local_replay": {
+    "observed_at": "2026-07-25T11:54:12Z",
+    "command": ".venv/bin/python scripts/governance/check_track_status.py --reports-dir \"$M0_REPORTS\"",
+    "environment": {
+      "os": "macOS",
+      "python": "3.12.13",
+      "uv": "0.11.2"
+    },
+    "completion": {
+      "passed": 4,
+      "total": 8
+    }
+  },
+  "memory_common": {
+    "task": "Titanium Phase 0 M0 truth reconciliation",
+    "used_source_ids": [
+      "text_file:users-dhyana-dharma_swarm-claude.md:eb791d775cef"
+    ],
+    "use": "Confirmed the canonical onboarding boundary; live Git, GitHub, and evaluator evidence supplied all packet-state claims.",
+    "failed_or_weak_queries": [
+      "No Titanium-specific current-state result was returned; the other retrieved results were discarded as out of scope."
+    ]
+  },
+  "excluded_scope": [
+    "Phase 1-7 implementation",
+    "hardening/five-pillar-synthesis commits",
+    "historical packet rewrites",
+    "TIT identifier redefinition",
+    "production-live or complete-security claims"
+  ]
+}
