@@ -28,12 +28,22 @@ from dharma_swarm.memory_kernel_retrieval.scoring_terms import (
 )
 from dharma_swarm.memory_kernel_retrieval.types import (
     MemoryKernelAdmissionSummary,
+    RetrievalAbstentionConfig,
     RetrievalCandidate,
     RetrievalDiagnostics,
     RetrievalQuery,
     RetrievalResult,
 )
 from dharma_swarm.vector_store import VectorStore
+
+# Shadow-scoring threshold used until an operator-set calibrated value lands.
+# From the 2026-07-25 scripts/memory_retrieval_calibrate_abstention.py run over
+# 31,591 live telemetry rows (27 days): 0.37 newly abstains 25/31,380 served
+# queries (0.08%, within the 0.1% loss budget) while zero served queries ever
+# scored below 0.25; nonsense queries score ~0.0-0.21. Receipt:
+# ~/.dharma/witness/audit_impl_20260725/abstention_calibration_20260725T145824Z.json
+# NOT a serving-path threshold while RetrievalAbstentionConfig.enabled is False.
+_DEFAULT_CALIBRATED_MIN_SCORE = 0.37
 
 # Curated memory layers considered for the default retrieval scope. Currently
 # unreferenced within this module (kept for the public retrieval-layer
@@ -52,10 +62,12 @@ class GovernedRetrievalEngine(_SearchMixin):
         vector_store: VectorStore | None = None,
         memory_kernel: Any | None = None,
         dim: int = 128,
+        abstention: RetrievalAbstentionConfig | None = None,
     ) -> None:
         self.state_dir = Path(state_dir)
         self.vector_store = vector_store or VectorStore(state_dir=self.state_dir, dim=dim)
         self.memory_kernel = memory_kernel
+        self.abstention = abstention if abstention is not None else RetrievalAbstentionConfig.from_env()
         self._retrieve_diagnostics_cache: RetrievalDiagnostics | None = None
         self._sidecar_scan_cache: tuple[tuple[sqlite3.Row, set[str]], ...] | None = None
 
@@ -73,6 +85,8 @@ class GovernedRetrievalEngine(_SearchMixin):
                 timings_ms=timings,
                 diagnostics=diagnostics,
                 memory_kernel=self._memory_kernel_admission(query),
+                abstained=self.abstention.enabled,
+                abstained_reason="empty_query" if self.abstention.enabled else "",
             )
             if query.record_telemetry:
                 self._record_retrieval_telemetry(result)
@@ -91,16 +105,30 @@ class GovernedRetrievalEngine(_SearchMixin):
             vector_results = self._safe_search_vector(query.text, fetch_k)
             timings["vector_search"] = _elapsed_ms(vec_t0)
 
+        min_score = query.min_score
+        if self.abstention.enabled and self.abstention.min_score is not None:
+            min_score = self.abstention.min_score
+
         fuse_t0 = time.perf_counter()
         candidates = self._fuse_candidates(
             query_text=query.text,
             vector_results=vector_results,
             fts_results=fts_results,
             top_k=query.top_k,
-            min_score=query.min_score,
+            min_score=min_score,
             include_content=query.include_content,
         )
         timings["fusion"] = _elapsed_ms(fuse_t0)
+
+        abstained = False
+        abstained_reason = ""
+        if self.abstention.enabled and not candidates:
+            abstained = True
+            abstained_reason = (
+                "no_candidates_above_min_score"
+                if (fts_results or vector_results)
+                else "no_matching_documents"
+            )
 
         kernel_t0 = time.perf_counter()
         memory_kernel = self._memory_kernel_admission(query)
@@ -112,16 +140,37 @@ class GovernedRetrievalEngine(_SearchMixin):
             timings_ms=timings,
             diagnostics=diagnostics,
             memory_kernel=memory_kernel,
+            abstained=abstained,
+            abstained_reason=abstained_reason,
         )
         if query.record_telemetry:
             self._record_retrieval_telemetry(result)
         return result
+
+    def _shadow_abstention(self, result: RetrievalResult) -> tuple[int, float]:
+        """What the calibrated config would decide for this result.
+
+        Recorded on every telemetry row so the DEFAULT-ON flip can be judged
+        from >=1 week of shadow receipts instead of guessed. Limitation: this
+        re-scores the served candidates only — it does not re-run the search
+        with floors removed, so it is an upper bound on served quality.
+        """
+
+        shadow_min = (
+            self.abstention.min_score
+            if self.abstention.min_score is not None
+            else _DEFAULT_CALIBRATED_MIN_SCORE
+        )
+        if not result.candidates:
+            return 1, shadow_min
+        return int(float(result.candidates[0].score) < shadow_min), shadow_min
 
     def _record_retrieval_telemetry(self, result: RetrievalResult) -> None:
         """Best-effort runtime telemetry for retrieval quality and drift audits."""
 
         try:
             top = result.candidates[0] if result.candidates else None
+            shadow_abstained, shadow_min_score = self._shadow_abstention(result)
             conn = self.vector_store._connect()
             try:
                 _ensure_retrieval_telemetry_table(conn)
@@ -134,9 +183,10 @@ class GovernedRetrievalEngine(_SearchMixin):
                         fusion_ms, memory_kernel_available,
                         memory_kernel_text_query_supported,
                         memory_kernel_admitted_count, degraded_reasons_json,
-                        top_channels_json
+                        top_channels_json, abstained, abstained_reason,
+                        shadow_abstained, shadow_min_score
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         _utc_now_iso(),
@@ -156,6 +206,10 @@ class GovernedRetrievalEngine(_SearchMixin):
                         int(result.memory_kernel.admitted_count),
                         json.dumps(tuple(result.diagnostics.degraded_reasons), sort_keys=True),
                         json.dumps(top.channels if top else (), sort_keys=True),
+                        int(result.abstained),
+                        result.abstained_reason,
+                        shadow_abstained,
+                        shadow_min_score,
                     ),
                 )
                 conn.commit()
@@ -321,6 +375,7 @@ class GovernedRetrievalEngine(_SearchMixin):
 __all__ = [
     "GovernedRetrievalEngine",
     "MemoryKernelAdmissionSummary",
+    "RetrievalAbstentionConfig",
     "RetrievalCandidate",
     "RetrievalDiagnostics",
     "RetrievalQuery",

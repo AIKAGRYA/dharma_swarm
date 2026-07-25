@@ -4,7 +4,11 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
-from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
+from dharma_swarm.memory_retrieval import (
+    GovernedRetrievalEngine,
+    RetrievalAbstentionConfig,
+    RetrievalQuery,
+)
 from dharma_swarm.vector_store import VectorStore
 
 
@@ -377,3 +381,163 @@ def test_governed_retrieval_prefers_source_identity_for_source_files(tmp_path):
     assert result
     assert result[0].metadata["expected"] == "target"
     assert result[0].metadata["retrieval_source_match"] > 0
+
+
+def test_nonsense_query_abstains_when_calibrated_config_enabled(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("nonexistent zxqwbblplk fnord")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason in {
+        "no_candidates_above_min_score",
+        "no_matching_documents",
+    }
+
+
+def test_legacy_default_never_marks_abstained(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(state_dir=tmp_path, vector_store=store)
+
+    assert engine.abstention == RetrievalAbstentionConfig()
+    nonsense = engine.retrieve("nonexistent zxqwbblplk fnord")
+    served = engine.retrieve("consumer liveness reply receipt")
+
+    assert nonsense.abstained is False
+    assert nonsense.abstained_reason == ""
+    assert served.abstained is False
+    assert served.candidates
+    assert served.candidates[0].metadata["expected"] == "a2a"
+
+
+def test_calibrated_min_score_overrides_query_min_score(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.99),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason == "no_candidates_above_min_score"
+
+
+def test_calibrated_empty_query_abstains_with_reason(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(),
+    )
+
+    result = engine.retrieve("   ")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason == "empty_query"
+
+
+def test_telemetry_records_shadow_abstention_columns(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(state_dir=tmp_path, vector_store=store)
+
+    engine.retrieve("consumer liveness reply receipt")
+    engine.retrieve("nonexistent zxqwbblplk fnord")
+
+    conn = sqlite3.connect(tmp_path / "vectors.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT query_preview, abstained, abstained_reason,
+                   shadow_abstained, shadow_min_score
+            FROM memory_retrieval_query_log
+            ORDER BY id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert len(rows) == 2
+    served, nonsense = rows
+    assert served["abstained"] == 0
+    assert served["abstained_reason"] == ""
+    assert served["shadow_min_score"] == 0.37
+    assert nonsense["abstained"] == 0
+    assert nonsense["shadow_abstained"] == 1
+
+
+def test_telemetry_schema_upgrade_is_additive(tmp_path):
+    from dharma_swarm.memory_kernel_retrieval.scoring_terms import (
+        _ensure_retrieval_telemetry_table,
+    )
+
+    db = tmp_path / "vectors.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE memory_retrieval_query_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query_time TEXT NOT NULL,
+            query_hash TEXT NOT NULL,
+            query_preview TEXT NOT NULL,
+            top_doc_id TEXT DEFAULT '',
+            top_source TEXT DEFAULT '',
+            top_layer TEXT DEFAULT '',
+            top_score REAL,
+            result_count INTEGER NOT NULL,
+            total_ms REAL,
+            vector_search_ms REAL,
+            fts_search_ms REAL,
+            fusion_ms REAL,
+            memory_kernel_available INTEGER NOT NULL DEFAULT 0,
+            memory_kernel_text_query_supported INTEGER NOT NULL DEFAULT 0,
+            memory_kernel_admitted_count INTEGER NOT NULL DEFAULT 0,
+            degraded_reasons_json TEXT NOT NULL DEFAULT '[]',
+            top_channels_json TEXT NOT NULL DEFAULT '[]'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO memory_retrieval_query_log (query_time, query_hash, query_preview, result_count)
+        VALUES ('2026-07-01T00:00:00+00:00', 'h', 'legacy row', 3)
+        """
+    )
+    conn.commit()
+
+    _ensure_retrieval_telemetry_table(conn)
+    _ensure_retrieval_telemetry_table(conn)
+
+    row = conn.execute(
+        "SELECT abstained, abstained_reason, shadow_abstained, shadow_min_score "
+        "FROM memory_retrieval_query_log"
+    ).fetchone()
+    conn.close()
+    assert row == (0, "", None, None)
+
+
+def test_abstention_config_from_env(monkeypatch):
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", raising=False)
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", raising=False)
+    assert RetrievalAbstentionConfig.from_env() == RetrievalAbstentionConfig()
+
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "1")
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0.37")
+    config = RetrievalAbstentionConfig.from_env()
+    assert config.enabled is True
+    assert config.include_below_threshold is False
+    assert config.apply_score_floors is False
+    assert config.min_score == 0.37
+
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "not-a-float")
+    assert RetrievalAbstentionConfig.from_env().min_score is None

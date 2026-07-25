@@ -9,8 +9,60 @@ from there, not from here, outside this package.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class RetrievalAbstentionConfig:
+    """Rollout switches for calibrated abstention (audit 2026-07-25 P0-5).
+
+    Defaults preserve legacy behavior exactly: below-threshold sidecar
+    fallback stays on, the 0.5 score/distance floors stay in place, and
+    results never carry ``abstained=True``. The calibrated path is enabled
+    per-engine (or fleet-wide via env) only after shadow telemetry justifies
+    the flip — the live fallback path IS the serving path (fts_guard_blocked
+    on 100% of live queries), so an un-shadowed flip would silently zero
+    recall fleet-wide.
+
+    ``min_score`` doubles as the shadow-scoring threshold while
+    ``enabled=False``: every telemetry row records whether the calibrated
+    config *would* have abstained, without changing what is served.
+    """
+
+    enabled: bool = False
+    include_below_threshold: bool = True
+    apply_score_floors: bool = True
+    min_score: float | None = None
+
+    @classmethod
+    def calibrated(cls, min_score: float | None = None) -> "RetrievalAbstentionConfig":
+        return cls(
+            enabled=True,
+            include_below_threshold=False,
+            apply_score_floors=False,
+            min_score=min_score,
+        )
+
+    @classmethod
+    def from_env(cls) -> "RetrievalAbstentionConfig":
+        enabled = (
+            str(os.environ.get("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "")).strip().lower()
+            in _TRUTHY
+        )
+        min_score: float | None = None
+        raw = str(os.environ.get("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "")).strip()
+        if raw:
+            try:
+                min_score = float(raw)
+            except ValueError:
+                min_score = None
+        if enabled:
+            return cls.calibrated(min_score=min_score)
+        return cls(min_score=min_score)
 
 
 @dataclass(frozen=True)
@@ -92,6 +144,8 @@ class RetrievalResult:
     timings_ms: dict[str, float]
     diagnostics: RetrievalDiagnostics
     memory_kernel: MemoryKernelAdmissionSummary
+    abstained: bool = False
+    abstained_reason: str = ""
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -100,4 +154,6 @@ class RetrievalResult:
             "timings_ms": self.timings_ms,
             "diagnostics": self.diagnostics.to_json(),
             "memory_kernel": self.memory_kernel.to_json(),
+            "abstained": self.abstained,
+            "abstained_reason": self.abstained_reason,
         }
