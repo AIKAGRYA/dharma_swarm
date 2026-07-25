@@ -49,7 +49,11 @@ dgc cron daemon
 
 Run `dgc memory metabolize` manually after wiki/atom promotion when you want an immediate receipt. The scheduled job uses the typed `memory_common_metabolism` cron handler, so it runs local ingest/gates directly and fails the cron job if the gates fail.
 
-Metabolism receipts land under `<state_dir>/reports/memory_kernel/` (default `~/.dharma/reports/memory_kernel/`) — runtime receipts never enter git. Status reads fall back to the legacy in-repo `reports/memory_kernel/` for pre-relocation receipts.
+Metabolism receipts land under `<state_dir>/reports/memory_kernel/` (default `~/.dharma/reports/memory_kernel/`) — runtime receipts never enter git. Each metabolism run also refreshes `WIKI_VECTOR_LIVE_GATE_*_FINAL.json` and `MEMORY_RETRIEVAL_SYSTEM_GATE_*_FINAL.json` there; those `*_FINAL.json` receipts are the only place `dgc memory status` reads gate scores from, so the scores stay null until the first metabolism run (or a manual gate run with `--receipt-path`) lands under the state dir. Historical receipts left in an old checkout's in-repo `reports/memory_kernel/` are not migrated and not read — copy them into the state-dir sink if you want them visible.
+
+## Surface State-Dir Caveat (live parity)
+
+The Bun/Helm terminal bridge routes `/memory` with its own bridge state dir (`~/.dharma/terminal`), not the global `~/.dharma`. From that surface `status`/`query` see an empty store, and the mutating modes are reachable too: `ingest`/`metabolize` would create a second vector store and receipt sink under `~/.dharma/terminal/`, while `schedule` still writes the global cron `jobs.json`. This is bug-for-bug parity with the live checkout this surface was ported from; re-rooting the bridge's memory door is a follow-up, not part of the port. Prefer `dgc memory ...` (global state dir) for real ingest/metabolism.
 
 ## Gate Trust Caveat
 
