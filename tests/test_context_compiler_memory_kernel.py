@@ -247,6 +247,7 @@ async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
         task_description="Use governed memory.",
         query="alpha governed memory",
         token_budget=1200,
+        metadata={"topology": "supervisor"},
     )
 
     assert "## Memory Kernel" in bundle.rendered_text
@@ -260,7 +261,18 @@ async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("topology", ["swarm", "supervisor", "subagents_as_tools"])
+@pytest.mark.parametrize(
+    "topology",
+    [
+        "swarm",
+        "supervisor",
+        "subagents_as_tools",
+        "fan_out",
+        "fan_in",
+        "pipeline",
+        "broadcast",
+    ],
+)
 async def test_context_compiler_applies_live_topology_agent_memory_isolation(
     topology: str,
 ) -> None:
@@ -312,10 +324,179 @@ async def test_context_compiler_applies_live_topology_agent_memory_isolation(
     assert metadata["allowed_agent_ids"] == ["agent-alpha"]
     assert "agent" in metadata["allowed_scopes"]
     assert "project" in metadata["allowed_scopes"]
+    expected_semantics = (
+        "supervisor_scoped" if topology == "supervisor" else "worker_scoped"
+    )
+    assert metadata["isolation_semantics"] == expected_semantics
+    assert metadata["isolation_warnings"] == []
+    assert ("session" in metadata["allowed_scopes"]) == (topology == "supervisor")
     assert metadata["admitted_count"] == 2
     assert metadata["omitted_count"] == 2
     budget = kernel.kwargs["budget"]
     assert getattr(budget, "allowed_agent_ids") == ("agent-alpha",)
+    assert getattr(budget, "isolation_mode") == "scoped"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topology", ["dispatch", "warlock_mode", None])
+async def test_context_compiler_fails_closed_on_unknown_topology(
+    topology: str | None,
+) -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "alpha governed memory for the active agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-alpha",
+            ),
+            _memory_atom(
+                "beta private memory for another agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-beta",
+            ),
+            _memory_atom(
+                "shared project memory for the graph",
+                scope=MemoryScope.PROJECT,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    metadata_in: dict[str, object] = {"agent_id": "agent-alpha"}
+    if topology is not None:
+        metadata_in["topology"] = topology
+    bundle = await compiler.compile_bundle(
+        session_id="sess_unknown_topology",
+        task_id="task_unknown_topology",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata=metadata_in,
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["isolation_applied"] is True
+    assert metadata["isolation_semantics"] == "fail_closed_minimal"
+    assert metadata["allowed_scopes"] == ["project", "repo"]
+    assert metadata["allowed_memory_lanes"] == ["semantic", "procedural"]
+    expected_warning = (
+        "topology_missing_fail_closed"
+        if topology is None
+        else f"unknown_topology_fail_closed:{topology}"
+    )
+    assert metadata["isolation_warnings"] == [expected_warning]
+    # PROVENANCE-lane fixtures are outside the minimal curated lanes; the
+    # unknown-topology bundle admits nothing instead of everything.
+    assert metadata["admitted_count"] == 0
+    assert "alpha governed memory for the active agent" not in bundle.rendered_text
+    assert "beta private memory for another agent" not in bundle.rendered_text
+    assert "shared project memory for the graph" not in bundle.rendered_text
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "isolation_mode") == "scoped"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topology", ["fan_out", "supervisor"])
+async def test_worker_topologies_exclude_session_scope(topology: str) -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "session memory from the originating run",
+                scope=MemoryScope.SESSION,
+            ),
+            _memory_atom(
+                "shared project memory for the graph",
+                scope=MemoryScope.PROJECT,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id=f"sess_session_scope_{topology}",
+        task_id=f"task_session_scope_{topology}",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata={"topology": topology, "agent_id": "agent-alpha"},
+    )
+
+    assert "shared project memory for the graph" in bundle.rendered_text
+    session_visible = "session memory from the originating run" in bundle.rendered_text
+    assert session_visible == (topology == "supervisor")
+    if topology != "supervisor":
+        assert "scope_not_allowed" in bundle.rendered_text
+
+
+@pytest.mark.asyncio
+async def test_scoped_isolation_hides_other_agents_atoms_in_shared_scopes() -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "beta owned note shared into the swarm scope",
+                scope=MemoryScope.SWARM,
+                agent_id="agent-beta",
+            ),
+            _memory_atom(
+                "ownerless swarm coordination note",
+                scope=MemoryScope.SWARM,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_cross_scope_ownership",
+        task_id="task_cross_scope_ownership",
+        task_description="Use governed memory.",
+        query="swarm",
+        token_budget=4000,
+        metadata={"topology": "fan_out", "agent_id": "agent-alpha"},
+    )
+
+    assert "ownerless swarm coordination note" in bundle.rendered_text
+    assert "beta owned note shared into the swarm scope" not in bundle.rendered_text
+    assert "agent_not_allowed" in bundle.rendered_text
+
+
+@pytest.mark.asyncio
+async def test_isolation_legacy_env_restores_pre_typed_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY", "1")
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "beta private memory for another agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-beta",
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_legacy_escape_hatch",
+        task_id="task_legacy_escape_hatch",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata={"topology": "fan_out"},
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["isolation_applied"] is False
+    assert metadata["isolation_semantics"] == "legacy"
+    assert "beta private memory for another agent" in bundle.rendered_text
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "isolation_mode") == "unrestricted"
+
+
+def test_isolation_semantics_map_is_total_over_topology_type() -> None:
+    from dharma_swarm.memory_kernel.topology_policy import ISOLATION_SEMANTICS
+    from dharma_swarm.models import TopologyType
+
+    assert set(ISOLATION_SEMANTICS) == set(TopologyType)
 
 
 @pytest.mark.asyncio
