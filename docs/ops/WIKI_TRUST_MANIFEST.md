@@ -1,7 +1,8 @@
 # Wiki Trust Manifest (PR-08, audit WS-D.1/2)
 
 **Rule-2 role declaration:** `~/.dharma/knowledge/wiki/MANIFEST.jsonl` (+ detached
-`MANIFEST.jsonl.sig`) is the **canonical trust projection** over the wiki tree —
+`MANIFEST.jsonl.sig`, or the OP-3 export `MANIFEST.sig.json`) is the
+**canonical trust projection** over the wiki tree —
 committed, signed, versioned. It owns exactly one fact per file: *(path, sha256,
 tier, reasons)* at adjudication time. It is not a store of wiki content and not a
 second registry; every consumer below is a read-side filter over it.
@@ -17,24 +18,56 @@ second registry; every consumer below is a read-side filter over it.
   permissive fallback and no bypass flag.
 - Manifest location: `DHARMA_WIKI_MANIFEST` env override, else `MANIFEST.jsonl`
   in the directory being read, else in its parent (so `concepts/` resolves to
-  the wiki root). Entry paths are posix, relative to the manifest's parent.
+  the wiki root). A single-FILE input (promote auto-ingest passes the approved
+  file) resolves via the file's tree. Entry paths are posix, relative to the
+  manifest's parent.
+- **Env-override trap, made diagnosable:** pointing `DHARMA_WIKI_MANIFEST` at a
+  manifest copy outside the wiki tree (e.g. the git-versioned copy) keeps the
+  manifest valid while every lookup resolves untrusted, because entry paths are
+  relative to the manifest's parent. Still fail-closed, but the loader now logs
+  one `does not govern requested tree` warning so the silent-empty state is
+  visible. The env override must point at a manifest that lives at the wiki
+  root it governs.
 - Signature: `chetana.provenance.compute_axiom_signature(manifest_bytes,
-  kernel_signature)` — the existing kernel-bound scheme, no new crypto. It is
-  **tamper-evidence and kernel-binding, not operator authentication**; the
-  authoritative copy is the git-versioned one (OP-3).
+  kernel_signature)` — the existing kernel-bound scheme, no new crypto. Two
+  detached-signature formats are accepted: canonical `MANIFEST.jsonl.sig`
+  (key `signature`, written by `sign_manifest`) and the OP-3 export
+  `MANIFEST.sig.json` (key `axiom_signature`) — the already-produced
+  2026-07-25 deliverable deploys without re-signing (verified against the real
+  pair: 11,945 rows load valid).
+- **Forgeability, stated plainly:** the kernel signature is world-readable
+  (`governance.current_kernel_signature()` is a plain file read), so ANY local
+  writer — including the 8 hermes writers below, the named adversary class —
+  can regenerate a poisoned manifest and recompute a passing signature. The
+  runtime signature is **tamper-evidence against accidental corruption and
+  kernel-binding only, not operator authentication and not an integrity
+  boundary against local hostile writers**. Authority lives in the
+  git-versioned copy (OP-3); detecting a self-signed on-disk swap requires
+  comparing against that committed copy (e.g. a pinned `manifest_sha256`),
+  which is deliberately out of scope here and belongs to the daily gate lane
+  (PR-13).
 
 ## Consumers (all four READ seams)
 
 | Seam | Behavior |
 |---|---|
-| `dharma_swarm/wiki_vector_ingest.py` | non-trusted files never reach the vector door; content drift since signing (sha256 mismatch) also refuses ingest; receipt carries `manifest_excluded_files` |
+| `dharma_swarm/wiki_vector_ingest.py` | non-trusted files never reach the vector door; content drift since signing (sha256 mismatch) also refuses ingest; manifest filter runs **before** the `max_files` cut (same contract as the adapter seam); receipt carries `manifest_excluded_files`; single-file promote auto-ingest resolves the manifest via the file's tree |
 | `scripts/wiki_vector_live_gate.py::_concept_files` | only trusted files are gate-counted (membership+tier; content drift intentionally stays visible so the gate's own digest comparison reports `missing_or_stale` instead of silently shrinking the set) |
 | `memory_kernel/adapters/read_only.py::KnowledgeWikiAdapter` | manifest filter runs **before** the `max_files` truncation — untrusted alphabetically-early scratch files can no longer crowd out trusted pages; drifted content is refused |
 | `dharma_swarm/chetana/staging.py::list_trusted` | the trusted projection is disk ∩ manifest; `apply_manifest=False` exists only for audit tooling (drift reports) |
 
 `chetana verify` therefore audits exactly what production consumers can see;
 its `--mode production` empty-scan fail-closed rule (PR-07) prevents a missing
-manifest from reading as a green corpus.
+manifest from reading as a green corpus. Compat mode (CLI and MCP) also fails
+closed when the manifest projection is empty while the trusted dir is
+non-empty (`empty-manifest-projection`) — a live corpus with a missing/invalid
+manifest can no longer exit green after scanning zero atoms.
+
+The live gate's `--min-concepts` default (`DEFAULT_MIN_CONCEPTS`) is calibrated
+to the manifest-FILTERED set: 204 gold+trusted top-level `concepts/*.md` rows
+in the 2026-07-25 manifest (the pre-manifest 257 counted the unfiltered dir
+and would keep the gate permanently red). Retune it with every manifest
+revision.
 
 ## Operational notes
 

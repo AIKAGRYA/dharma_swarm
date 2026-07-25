@@ -354,3 +354,28 @@ def test_mcp_tool_schema_declares_mode():
     assert mode["enum"] == ["compat", "production"]
     assert mode["default"] == "compat"
     assert schema["additionalProperties"] is False
+
+
+def test_compat_fails_closed_on_empty_manifest_projection(sandbox: Path):
+    # PR-08 review fix: atoms on disk + missing/invalid manifest → compat must
+    # not attest green over an empty projection (0 targets scanned)
+    trusted = sandbox / "wiki" / "concepts"
+    _write_synthetic_atom(trusted, slug="unmanifested")
+    (sandbox / "wiki" / "MANIFEST.jsonl").unlink()
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    manifest_mod.clear_manifest_cache()
+    assert _verify_exit("compat") == 1
+    assert _verify_exit("production") == 1
+
+
+def test_tool_verify_compat_fails_closed_on_empty_manifest_projection(sandbox: Path):
+    trusted = sandbox / "wiki" / "concepts"
+    _write_synthetic_atom(trusted, slug="unmanifested-mcp")
+    (sandbox / "wiki" / "MANIFEST.jsonl").unlink()
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    manifest_mod.clear_manifest_cache()
+    out = tool_verify(mode="compat")
+    assert out["verdict"] == "fail"
+    assert "empty-manifest-projection" in out["verdict_reasons"]

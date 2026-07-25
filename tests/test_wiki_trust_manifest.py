@@ -321,3 +321,111 @@ def test_list_trusted_empty_without_manifest(tmp_path: Path, monkeypatch: pytest
 
     assert staging_mod.list_trusted() == []
     assert staging_mod.list_trusted(apply_manifest=False) == [page]
+
+
+# ---------------------------------------------------------------------------
+# adversarial-review fixes (2026-07-26)
+# ---------------------------------------------------------------------------
+
+
+def test_single_file_root_resolves_wiki_manifest(tmp_path: Path):
+    # promote._auto_ingest_file passes the approved FILE as the root; the
+    # resolver must climb from <wiki>/concepts/<file> to <wiki>/MANIFEST.jsonl
+    _, _, gold, scratch = _wiki_fixture(tmp_path)
+    manifest = load_manifest(gold)
+    assert manifest.valid
+    assert manifest.is_trusted(gold)
+    assert not load_manifest(scratch).is_trusted(scratch)
+
+
+def test_promote_seam_single_file_ingest(tmp_path: Path):
+    from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
+
+    _, _, gold, scratch = _wiki_fixture(tmp_path)
+    receipt = ingest_wiki_concepts(state_dir=tmp_path / "state", wiki_concepts_dir=gold)
+    assert receipt.discovered_files == 1
+    ingested = {Path(p).name for p in receipt.backfill["text_file_paths"]}
+    assert ingested == {gold.name}
+    # unmanifested single file still refuses
+    refuse = ingest_wiki_concepts(state_dir=tmp_path / "state2", wiki_concepts_dir=scratch)
+    assert refuse.discovered_files == 0
+
+
+def test_op3_signature_artifact_format_accepted(tmp_path: Path):
+    # the already-produced OP-3 deliverable ships MANIFEST.sig.json with the
+    # signature under "axiom_signature" — must be deployable without re-signing
+    import json as json_mod
+
+    wiki_root, concepts, gold, _ = _wiki_fixture(tmp_path)
+    manifest_file = wiki_root / "MANIFEST.jsonl"
+    canonical_sig = signature_path_for(manifest_file)
+    payload = json_mod.loads(canonical_sig.read_text(encoding="utf-8"))
+    canonical_sig.unlink()
+    (wiki_root / "MANIFEST.sig.json").write_text(
+        json_mod.dumps(
+            {
+                "artifact": "MANIFEST.jsonl",
+                "axiom_signature": payload["signature"],
+                "kernel_signature": FAKE_KERNEL_SIG,
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_mod.clear_manifest_cache()
+    manifest = load_manifest(concepts)
+    assert manifest.valid
+    assert manifest.is_trusted(gold)
+
+
+def test_env_override_outside_tree_warns_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    import logging
+    import shutil
+
+    wiki_root, concepts, gold, _ = _wiki_fixture(tmp_path)
+    git_copy = tmp_path / "gitcopy" / "MANIFEST.jsonl"
+    git_copy.parent.mkdir(parents=True)
+    shutil.copy(wiki_root / "MANIFEST.jsonl", git_copy)
+    shutil.copy(signature_path_for(wiki_root / "MANIFEST.jsonl"), signature_path_for(git_copy))
+    monkeypatch.setenv(manifest_mod.MANIFEST_ENV, str(git_copy))
+    manifest_mod.clear_manifest_cache()
+    with caplog.at_level(logging.WARNING, logger="dharma_swarm.chetana.manifest"):
+        manifest = load_manifest(concepts)
+        again = load_manifest(concepts)
+    assert manifest.valid and again.valid
+    assert not manifest.is_trusted(gold), "fail-closed direction unchanged"
+    hits = [r for r in caplog.records if "does not govern" in r.getMessage()]
+    assert len(hits) == 1, "must warn exactly once (diagnosable, not noisy)"
+
+
+def test_ingest_filter_runs_before_max_files_cut(tmp_path: Path):
+    from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
+
+    wiki_root = tmp_path / "wiki"
+    concepts = wiki_root / "concepts"
+    gold = _write_page(concepts / "zzz-gold.md", "curated content that matters\n")
+    for i in range(5):
+        _write_page(concepts / f"aa{i}.md", "scratch\n")
+    write_manifest(
+        [manifest_entry_for_file(gold, root=wiki_root, tier="gold")],
+        manifest_file=wiki_root / "MANIFEST.jsonl",
+    )
+    # without pre-truncation filtering, max_files=1 admits an alphabetically
+    # earlier scratch file and evicts the gold page from the discover window
+    receipt = ingest_wiki_concepts(
+        state_dir=tmp_path / "state", wiki_concepts_dir=concepts, max_files=1
+    )
+    assert receipt.discovered_files == 1
+    ingested = {Path(p).name for p in receipt.backfill["text_file_paths"]}
+    assert ingested == {gold.name}
+    assert receipt.manifest_excluded_files == 5
+
+
+def test_gate_default_min_concepts_satisfiable():
+    from scripts.wiki_vector_live_gate import DEFAULT_MIN_CONCEPTS
+
+    # 2026-07-25 signed manifest: 204 gold+trusted top-level concepts/*.md
+    # rows, all on disk. A default above that is arithmetically unsatisfiable
+    # and the gate would be permanently red.
+    assert DEFAULT_MIN_CONCEPTS <= 204

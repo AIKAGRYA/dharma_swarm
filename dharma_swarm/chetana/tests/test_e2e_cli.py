@@ -151,8 +151,11 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
     assert "staged    : 0" in p3.stdout
     assert str(cli_home) not in p3.stdout
 
+    # compat verify fails CLOSED here: an atom sits on disk but no signed
+    # manifest admits it — an empty projection must not attest green
     verify = _run(["verify", "--show", "1"], home=cli_home)
-    assert verify.returncode == 0, verify.stderr
+    assert verify.returncode == 1, verify.stderr
+    assert "empty-manifest-projection" in verify.stdout
     assert str(cli_home) not in verify.stdout
     assert trusted_paths[0].name not in verify.stdout
 

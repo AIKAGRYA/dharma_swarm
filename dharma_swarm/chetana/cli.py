@@ -253,10 +253,15 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         print(f"warning: KernelGuard unavailable ({e}); using placeholder")
 
     targets: list[Path]
+    projection_empty = False
     if args.path and args.path != ".":
         targets = [Path(args.path)]
     else:
         targets = list_trusted()
+        if not targets and list_trusted(apply_manifest=False):
+            # Atoms exist on disk but the manifest projection is empty
+            # (missing/invalid manifest). Attesting green here would fail open.
+            projection_empty = True
 
     buckets, unapproved, v1_approved = scan_verify_targets(
         targets, kernel_signature=current_kernel_sig
@@ -292,6 +297,12 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             print(f"  · {reason}")
         return 0 if verdict == "pass" else 1
     # compat: exit non-zero only on actual integrity failures, not on pre-chetana atoms
+    if projection_empty:
+        print(
+            "\ncompat verdict: FAIL — empty-manifest-projection "
+            "(trusted dir non-empty but no signed manifest admits it)"
+        )
+        return 1
     return 0 if not buckets["zero-sig"] and not buckets["schema-error"] else 1
 
 

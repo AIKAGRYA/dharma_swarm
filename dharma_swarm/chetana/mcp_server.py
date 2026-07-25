@@ -195,10 +195,15 @@ def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
 
     current_kernel_sig = _current_kernel_signature()
 
+    projection_empty = False
     if path and path != ".":
         targets = [Path(path).expanduser().resolve()]
     else:
         targets = list_trusted()
+        if not targets and list_trusted(apply_manifest=False):
+            # mirror of the CLI compat guard: atoms on disk, empty manifest
+            # projection — green attestation here would fail open
+            projection_empty = True
 
     buckets, unapproved, v1_approved = scan_verify_targets(
         targets, kernel_signature=current_kernel_sig
@@ -214,6 +219,8 @@ def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
             for label in ("zero-sig", "schema-error")
             if buckets[label]
         ]
+        if projection_empty:
+            reasons.append("empty-manifest-projection")
         verdict = "pass" if not reasons else "fail"
 
     return {

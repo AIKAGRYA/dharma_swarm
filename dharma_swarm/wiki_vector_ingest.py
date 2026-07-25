@@ -46,18 +46,28 @@ def ingest_wiki_concepts(
     )
     from scripts.vector_store_reembed_vec0 import reembed_queries
 
-    discovered = discover_text_files(
-        (resolved_wiki_dir,),
-        max_files=max_files,
-        max_bytes=max_file_bytes,
+    # Manifest filter runs BEFORE the max_files cut (same contract as the
+    # memory-kernel adapter seam): a flood of untrusted higher-priority files
+    # must not crowd trusted pages out of the discover window.
+    # discover_text_files collects the full walk before slicing, so the wide
+    # cap adds no extra I/O.
+    discovered = (
+        discover_text_files(
+            (resolved_wiki_dir,),
+            max_files=1_000_000,
+            max_bytes=max_file_bytes,
+        )
+        if max_files > 0
+        else ()
     )
     from dharma_swarm.chetana.manifest import load_manifest
 
     # Trust binds at READ: only manifest-trusted files reach the vector door.
     # No valid signed manifest → nothing is ingested (fail closed).
     manifest = load_manifest(resolved_wiki_dir)
-    text_paths = tuple(p for p in discovered if manifest.is_trusted(p))
-    manifest_excluded = len(discovered) - len(text_paths)
+    trusted = tuple(p for p in discovered if manifest.is_trusted(p))
+    text_paths = trusted[:max_files]
+    manifest_excluded = len(discovered) - len(trusted)
     backfill = backfill_memory_sources(
         state_dir=resolved_state_dir,
         memory_jsonl_paths=(),

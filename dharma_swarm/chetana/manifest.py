@@ -89,17 +89,31 @@ def signature_path_for(manifest_file: Path) -> Path:
     return manifest_file.with_name(manifest_file.name + ".sig")
 
 
+def _signature_candidates(manifest_file: Path) -> tuple[Path, ...]:
+    # Canonical detached sig plus the OP-3 export format (MANIFEST.sig.json
+    # carrying the signature under "axiom_signature") — the already-produced
+    # 2026-07-25 artifact must be deployable without re-signing.
+    return (
+        signature_path_for(manifest_file),
+        manifest_file.with_name(manifest_file.stem + ".sig.json"),
+    )
+
+
 def manifest_path_for_root(root: Path) -> Path:
     """Locate the manifest governing a wiki tree rooted (or nested) at root.
 
     Precedence: DHARMA_WIKI_MANIFEST env override, then <root>/MANIFEST.jsonl,
     then <root.parent>/MANIFEST.jsonl (the concepts/ dir sits one level below
-    the canonical wiki root). Absence anywhere fails closed at load time.
+    the canonical wiki root). Single-file callers (promote auto-ingest passes
+    the approved FILE) resolve via the file's tree. Absence anywhere fails
+    closed at load time.
     """
     env = os.environ.get(MANIFEST_ENV, "").strip()
     if env:
         return Path(env).expanduser()
     root = Path(root).expanduser()
+    if root.is_file():
+        root = root.parent
     direct = root / MANIFEST_FILENAME
     if direct.is_file():
         return direct
@@ -130,6 +144,32 @@ def _invalid(manifest_file: Path, warning: str) -> WikiTrustManifest:
     return WikiTrustManifest(root=manifest_file.parent, valid=False, warning=warning)
 
 
+def _warn_if_ungoverned(manifest_file: Path, requested: Path) -> None:
+    """One warning when a VALID manifest cannot govern the requested tree.
+
+    The DHARMA_WIKI_MANIFEST trap: pointing the env at a manifest copy outside
+    the wiki tree keeps the manifest valid while every lookup resolves
+    untrusted (entry paths are relative to the manifest's parent). Fail-closed
+    but undiagnosable without this warning.
+    """
+    requested = Path(requested).expanduser()
+    if requested.is_file():
+        requested = requested.parent
+    try:
+        requested.resolve().relative_to(manifest_file.parent.resolve())
+    except (ValueError, OSError):
+        key = (str(manifest_file), "ungoverned-root", str(requested))
+        if key not in _WARNED:
+            _WARNED.add(key)
+            logger.warning(
+                "wiki trust manifest %s is valid but does not govern requested "
+                "tree %s — every lookup there resolves UNTRUSTED (check %s)",
+                manifest_file,
+                requested,
+                MANIFEST_ENV,
+            )
+
+
 def load_manifest(
     root: Path | str,
     *,
@@ -142,9 +182,18 @@ def load_manifest(
         return _invalid(manifest_file, "kernel-unavailable")
     try:
         stat = manifest_file.stat()
-        sig_file = signature_path_for(manifest_file)
-        sig_stat = sig_file.stat()
     except OSError:
+        return _invalid(manifest_file, "manifest-or-signature-missing")
+    sig_file = None
+    sig_stat = None
+    for candidate in _signature_candidates(manifest_file):
+        try:
+            sig_stat = candidate.stat()
+        except OSError:
+            continue
+        sig_file = candidate
+        break
+    if sig_file is None or sig_stat is None:
         return _invalid(manifest_file, "manifest-or-signature-missing")
     cache_key = (
         str(manifest_file),
@@ -156,11 +205,16 @@ def load_manifest(
     )
     cached = _CACHE.get(cache_key)
     if cached is not None:
+        if cached.valid:
+            _warn_if_ungoverned(manifest_file, Path(root))
         return cached
     try:
         manifest_text = manifest_file.read_text(encoding="utf-8")
         sig_payload = json.loads(sig_file.read_text(encoding="utf-8"))
-        stored_sig = str(sig_payload.get("signature", ""))
+        # "signature" = sign_manifest format; "axiom_signature" = OP-3 export
+        stored_sig = str(
+            sig_payload.get("signature") or sig_payload.get("axiom_signature") or ""
+        )
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return _invalid(manifest_file, "manifest-or-signature-unreadable")
     if compute_axiom_signature(manifest_text, kernel_sig) != stored_sig:
@@ -187,6 +241,7 @@ def load_manifest(
     manifest = WikiTrustManifest(
         root=manifest_file.parent, entries=entries, valid=True
     )
+    _warn_if_ungoverned(manifest_file, Path(root))
     if len(_CACHE) > 8:
         _CACHE.clear()
     _CACHE[cache_key] = manifest
