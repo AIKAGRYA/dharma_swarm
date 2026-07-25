@@ -84,6 +84,10 @@ def sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(staging_mod, "WIKI_ROOT", wiki_root, raising=True)
     monkeypatch.setattr(staging_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
     monkeypatch.setattr(staging_mod, "WIKI_PENDING_ROOT", pending_root, raising=True)
+
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    manifest_mod.clear_manifest_cache()
     return tmp_path
 
 
@@ -91,6 +95,26 @@ def _current_kernel_sig() -> str:
     from dharma_swarm import dharma_kernel as kernel_mod
 
     return asyncio.run(kernel_mod.KernelGuard().load()).signature
+
+
+def _sync_manifest() -> None:
+    """Regenerate + sign the wiki trust manifest from the sandbox trusted dir.
+
+    PR-08 binds list_trusted (and hence verify) to the signed manifest; this
+    plays the OP-3 regeneration step so the corpus under test stays scannable.
+    """
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    wiki_root = staging_mod.WIKI_ROOT
+    entries = [
+        manifest_mod.manifest_entry_for_file(p, root=wiki_root, tier="trusted")
+        for p in sorted(staging_mod.TRUSTED_DEFAULT.glob("*.md"))
+    ]
+    manifest_mod.write_manifest(
+        entries,
+        manifest_file=wiki_root / "MANIFEST.jsonl",
+        kernel_signature=_current_kernel_sig(),
+    )
 
 
 def _verify_exit(mode: str = "compat", path: str | None = None) -> int:
@@ -145,6 +169,7 @@ def _write_synthetic_atom(
         )
     path = trusted_root / f"{slug}.md"
     path.write_text(assemble_atom(fm, body), encoding="utf-8")
+    _sync_manifest()
     return path
 
 
@@ -154,6 +179,7 @@ def _write_legacy_page(trusted_root: Path, slug: str) -> Path:
         "---\ntitle: Legacy Concept\ntags: [wiki]\n---\n\n# Legacy\n\npre-chetana content\n",
         encoding="utf-8",
     )
+    _sync_manifest()
     return path
 
 
@@ -164,6 +190,7 @@ def _approved_pipeline_atom(title: str = "Verify Prod Atom") -> Path:
     assert pr.decision in {"ALLOW", "WARN"}
     ar = approve_atom(path=pr.trusted_path, reviewer="operator")
     assert ar.decision == "APPROVED", ar.error
+    _sync_manifest()
     return ar.trusted_path
 
 
@@ -214,6 +241,7 @@ def test_zero_sig_fails_both_modes(sandbox: Path):
 def test_schema_error_fails_both_modes(sandbox: Path):
     trusted = sandbox / "wiki" / "concepts"
     (trusted / "broken.md").write_text("no frontmatter here at all\n", encoding="utf-8")
+    _sync_manifest()
     assert _verify_exit("compat") == 1
     assert _verify_exit("production") == 1
 
@@ -326,3 +354,28 @@ def test_mcp_tool_schema_declares_mode():
     assert mode["enum"] == ["compat", "production"]
     assert mode["default"] == "compat"
     assert schema["additionalProperties"] is False
+
+
+def test_compat_fails_closed_on_empty_manifest_projection(sandbox: Path):
+    # PR-08 review fix: atoms on disk + missing/invalid manifest → compat must
+    # not attest green over an empty projection (0 targets scanned)
+    trusted = sandbox / "wiki" / "concepts"
+    _write_synthetic_atom(trusted, slug="unmanifested")
+    (sandbox / "wiki" / "MANIFEST.jsonl").unlink()
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    manifest_mod.clear_manifest_cache()
+    assert _verify_exit("compat") == 1
+    assert _verify_exit("production") == 1
+
+
+def test_tool_verify_compat_fails_closed_on_empty_manifest_projection(sandbox: Path):
+    trusted = sandbox / "wiki" / "concepts"
+    _write_synthetic_atom(trusted, slug="unmanifested-mcp")
+    (sandbox / "wiki" / "MANIFEST.jsonl").unlink()
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    manifest_mod.clear_manifest_cache()
+    out = tool_verify(mode="compat")
+    assert out["verdict"] == "fail"
+    assert "empty-manifest-projection" in out["verdict_reasons"]

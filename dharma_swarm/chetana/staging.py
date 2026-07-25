@@ -116,11 +116,23 @@ def list_staged() -> list[Path]:
     return sorted(p for p in STAGING_ROOT.rglob("*.md") if p.is_file())
 
 
-def list_trusted(root: Path | None = None) -> list[Path]:
+def list_trusted(root: Path | None = None, *, apply_manifest: bool = True) -> list[Path]:
+    """List the trusted projection: on-disk pages ∩ signed trust manifest.
+
+    apply_manifest=False is for audit tooling that must see raw disk state
+    (e.g. manifest-drift reports); every consumer that treats the result as
+    trusted MUST keep the default.
+    """
     root = root or TRUSTED_DEFAULT
     if not root.exists():
         return []
-    return sorted(p for p in root.glob("*.md") if p.is_file())
+    files = sorted(p for p in root.glob("*.md") if p.is_file())
+    if not apply_manifest:
+        return files
+    from .manifest import load_manifest
+
+    manifest = load_manifest(root)
+    return [p for p in files if manifest.is_trusted(p)]
 
 
 def list_pending(root: Path | None = None) -> list[Path]:

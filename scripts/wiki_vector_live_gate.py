@@ -22,6 +22,13 @@ if str(REPO_ROOT) not in sys.path:
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
 
+# Calibrated to the manifest-FILTERED concept set: the 2026-07-25 signed
+# manifest holds 204 gold+trusted top-level concepts/*.md rows (all on disk).
+# The pre-manifest default (257) counted the unfiltered dir and is
+# arithmetically unsatisfiable post-filter — a permanently red gate gets
+# tuned out. Retune alongside every manifest revision.
+DEFAULT_MIN_CONCEPTS = 200
+
 
 @dataclass(frozen=True)
 class WikiVectorGateReceipt:
@@ -50,7 +57,7 @@ def parse_args() -> argparse.Namespace:
         default=str(dharma_state_dir() / "knowledge" / "wiki" / "concepts"),
     )
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--min-concepts", type=int, default=257)
+    parser.add_argument("--min-concepts", type=int, default=DEFAULT_MIN_CONCEPTS)
     parser.add_argument("--max-retrieval-cases", type=int, default=0)
     parser.add_argument("--max-p95-ms", type=float, default=1200.0)
     parser.add_argument("--json", action="store_true")
@@ -84,7 +91,7 @@ def run_gate(
     state_dir: Path,
     wiki_concepts_dir: Path,
     top_k: int = 5,
-    min_concepts: int = 257,
+    min_concepts: int = DEFAULT_MIN_CONCEPTS,
     max_retrieval_cases: int = 0,
     max_p95_ms: float = 1200.0,
 ) -> WikiVectorGateReceipt:
@@ -182,11 +189,21 @@ def run_gate(
 def _concept_files(wiki_concepts_dir: Path) -> tuple[Path, ...]:
     if wiki_concepts_dir.name != "concepts" and (wiki_concepts_dir / "concepts").is_dir():
         wiki_concepts_dir = wiki_concepts_dir / "concepts"
+    from dharma_swarm.chetana.manifest import load_manifest
+
+    # Only manifest-trusted files are gate-counted (fail-closed: no valid
+    # signed manifest → zero concepts → gate fails on min_concepts).
+    # verify_content=False on purpose: content drift must stay VISIBLE to the
+    # gate's own digest comparison (missing_or_stale) instead of silently
+    # shrinking the concept set; ingest refuses drifted bytes regardless.
+    manifest = load_manifest(wiki_concepts_dir)
     return tuple(
         sorted(
             path.resolve()
             for path in wiki_concepts_dir.glob("*.md")
-            if path.is_file() and not path.name.startswith(".")
+            if path.is_file()
+            and not path.name.startswith(".")
+            and manifest.is_trusted(path, verify_content=False)
         )
     )
 
