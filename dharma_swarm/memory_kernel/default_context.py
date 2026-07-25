@@ -18,27 +18,18 @@ from dharma_swarm.memory_kernel import (
     MemoryScope,
     TruthState,
 )
+from dharma_swarm.memory_kernel.topology_policy import (
+    SUPERVISOR_SCOPED,
+    isolation_legacy_enabled,
+    resolve as resolve_isolation_semantics,
+)
 
 logger = logging.getLogger(__name__)
 
 
-_LIVE_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
-_LIVE_TOPOLOGY_SCOPES = (
-    MemoryScope.PROJECT,
-    MemoryScope.REPO,
-    MemoryScope.WORKTREE,
-    MemoryScope.SESSION,
-    MemoryScope.AGENT,
-    MemoryScope.SWARM,
-)
-_LIVE_TOPOLOGY_LANES = (
-    MemoryLane.WORKING,
-    MemoryLane.EPISODIC,
-    MemoryLane.SEMANTIC,
-    MemoryLane.PROCEDURAL,
-    MemoryLane.REFLECTION,
-    MemoryLane.PROVENANCE,
-)
+# Pre-typed isolation vocabulary, kept ONLY for the one-release
+# DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY=1 escape hatch. Remove with it.
+_LEGACY_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
 
 
 @dataclass(frozen=True)
@@ -49,12 +40,16 @@ class MemoryKernelIsolationPolicy:
     allowed_agent_ids: tuple[str, ...] = ()
     allowed_scopes: tuple[MemoryScope, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
+    semantics: str = ""
+    warnings: tuple[str, ...] = ()
 
     def metadata(self) -> dict[str, Any]:
         return {
             "isolation_applied": self.applied,
             "isolation_topology": self.topology,
             "isolation_agent_id": self.agent_id,
+            "isolation_semantics": self.semantics,
+            "isolation_warnings": list(self.warnings),
             "allowed_agent_ids": list(self.allowed_agent_ids),
             "allowed_scopes": [item.value for item in self.allowed_scopes],
             "allowed_memory_lanes": [item.value for item in self.allowed_memory_lanes],
@@ -64,9 +59,49 @@ class MemoryKernelIsolationPolicy:
 def memory_kernel_isolation_policy_from_metadata(
     metadata: dict[str, Any] | None,
 ) -> MemoryKernelIsolationPolicy:
-    """Derive the MemoryKernel read policy for one live agent context bundle."""
+    """Derive the MemoryKernel read policy for one live agent context bundle.
+
+    Every bundle gets an applied policy: known topologies map through
+    ``topology_policy.ISOLATION_SEMANTICS``; unknown/missing topology fails
+    closed to minimal shared allowances with a stamped warning.
+    """
 
     source = metadata or {}
+    if isolation_legacy_enabled():
+        return _legacy_isolation_policy_from_metadata(source)
+
+    raw_topology = (
+        source.get("topology")
+        or source.get("topology_mode")
+        or source.get("topology_type")
+    )
+    topology = _clean_text(raw_topology)
+    semantics, warnings = resolve_isolation_semantics(raw_topology)
+    agent_id = _clean_text(
+        source.get("agent_id")
+        or source.get("active_agent")
+        or source.get("parent_agent_id")
+    )
+    explicit_agent_ids = _string_tuple(source.get("memory_kernel_allowed_agent_ids"))
+    allowed_agent_ids = explicit_agent_ids or ((agent_id,) if agent_id else ())
+    explicit_scopes = _memory_scope_tuple(source.get("memory_kernel_allowed_scopes"))
+    explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
+
+    return MemoryKernelIsolationPolicy(
+        applied=True,
+        topology=topology,
+        agent_id=agent_id,
+        allowed_agent_ids=allowed_agent_ids,
+        allowed_scopes=explicit_scopes or semantics.allowed_scopes,
+        allowed_memory_lanes=explicit_lanes or semantics.allowed_memory_lanes,
+        semantics=semantics.name,
+        warnings=warnings,
+    )
+
+
+def _legacy_isolation_policy_from_metadata(
+    source: dict[str, Any],
+) -> MemoryKernelIsolationPolicy:
     topology = _clean_text(
         source.get("topology")
         or source.get("topology_mode")
@@ -84,21 +119,24 @@ def memory_kernel_isolation_policy_from_metadata(
     explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
 
     should_apply = (
-        topology in _LIVE_TOPOLOGY_MODES
+        topology in _LEGACY_TOPOLOGY_MODES
         or bool(explicit_agent_ids)
         or bool(explicit_scopes)
         or bool(explicit_lanes)
     )
     if not should_apply:
-        return MemoryKernelIsolationPolicy(topology=topology, agent_id=agent_id)
+        return MemoryKernelIsolationPolicy(
+            topology=topology, agent_id=agent_id, semantics="legacy"
+        )
 
     return MemoryKernelIsolationPolicy(
         applied=True,
         topology=topology,
         agent_id=agent_id,
         allowed_agent_ids=allowed_agent_ids,
-        allowed_scopes=explicit_scopes or _LIVE_TOPOLOGY_SCOPES,
-        allowed_memory_lanes=explicit_lanes or _LIVE_TOPOLOGY_LANES,
+        allowed_scopes=explicit_scopes or SUPERVISOR_SCOPED.allowed_scopes,
+        allowed_memory_lanes=explicit_lanes or SUPERVISOR_SCOPED.allowed_memory_lanes,
+        semantics="legacy",
     )
 
 
@@ -112,7 +150,10 @@ def build_memory_kernel_default_context(
     if memory_kernel is None:
         return None, {"status": "not_configured"}
 
-    resolved_isolation = isolation_policy or MemoryKernelIsolationPolicy()
+    resolved_isolation = isolation_policy or memory_kernel_isolation_policy_from_metadata(
+        None
+    )
+    isolation_mode = "unrestricted" if isolation_legacy_enabled() else "scoped"
     try:
         atom_budget = max(4, min(24, int(token_budget) // 100))
         pack = memory_kernel.preview_memory_pack(
@@ -142,6 +183,7 @@ def build_memory_kernel_default_context(
                 require_source_digest=True,
                 require_source_row_key=True,
                 block_tool_exposure=True,
+                isolation_mode=isolation_mode,
                 allowed_scopes=resolved_isolation.allowed_scopes,
                 allowed_agent_ids=resolved_isolation.allowed_agent_ids,
                 allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
