@@ -252,6 +252,72 @@ closed_tracks: []
     assert "remains stale" in finding.message
 
 
+def test_enforced_compound_staleness_blocks_after_baseline_records_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale+low result retains freshness for the scheduled authority."""
+    import argparse
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    import check_track_status as cts  # type: ignore
+
+    report = tmp_path / "mutation-score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.5,
+                "killed": 1,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    track_file = tmp_path / "ACTIVE_TRACK.yaml"
+    track_file.write_text(
+        f"""
+schema_version: 2
+active_tracks:
+  - id: mutation-track
+    status: ACTIVE
+    verified_at: "2099-01-01"
+    completion_criteria:
+      - id: mutation_floor
+        kind: mutation_score_gte
+        file: "{report.as_posix()}"
+        threshold: 0.6
+        fresh_ttl_days: 7
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    emitted: list[cts.Finding] = []
+
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
+    monkeypatch.setattr(cts, "_load_prior_passed", lambda _findings: {})
+    monkeypatch.setattr(
+        cts,
+        "emit_reports",
+        lambda findings, *_args, **_kwargs: emitted.extend(findings),
+    )
+
+    args = argparse.Namespace(
+        enforce_ttl=True,
+        base=None,
+        reports_dir=tmp_path / "reports",
+    )
+    assert cts.run(args) == 1
+    finding = next(
+        finding
+        for finding in emitted
+        if finding.check == "freshness-enforced:mutation-track:mutation_floor"
+    )
+    assert finding.severity == "ERROR"
+    assert "0.50 < 0.60" in finding.message
+    assert "stale" in finding.message
+
+
 def test_freshness_diff_detects_changed_evidence_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -263,6 +329,8 @@ def test_freshness_diff_detects_changed_evidence_artifact(
     repo = tmp_path / "repo"
     track_file = repo / "docs/governance/ACTIVE_TRACK.yaml"
     receipt = repo / "reports/receipt.json"
+    fresh_receipt = repo / "reports/fresh-receipt.json"
+    stale_receipt = repo / "reports/stale-receipt.json"
     track_file.parent.mkdir(parents=True)
     receipt.parent.mkdir(parents=True)
     criterion = {
@@ -287,7 +355,15 @@ closed_tracks: []
 """.lstrip(),
         encoding="utf-8",
     )
-    receipt.write_text('{"produced_at":"2099-01-01T00:00:00Z"}\n', encoding="utf-8")
+    fresh_receipt.write_text(
+        '{"produced_at":"2099-01-01T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
+    stale_receipt.write_text(
+        '{"produced_at":"2000-01-01T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
+    receipt.symlink_to(fresh_receipt.name)
     subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
@@ -322,7 +398,8 @@ closed_tracks: []
         base_ref=base,
     )
 
-    receipt.write_text('{"produced_at":"2000-01-01T00:00:00Z"}\n', encoding="utf-8")
+    receipt.unlink()
+    receipt.symlink_to(stale_receipt.name)
     subprocess.run(["git", "add", "reports/receipt.json"], cwd=repo, check=True)
     subprocess.run(
         ["git", "commit", "-m", "replace receipt"],

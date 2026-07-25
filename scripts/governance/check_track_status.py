@@ -115,7 +115,11 @@ class CriterionResult:
     # is neither a pass nor a regression — it is "could not observe", and
     # must be reported as such instead of being scored as a hard failure.
     executed: bool = True
+    # The primary modality is exclusive so an advisory policy cannot erase a
+    # compound substantive failure. Observed modalities are additive facts
+    # used by authorities such as the scheduled freshness sweep.
     failure_modality: CriterionFailureModality | None = None
+    observed_failure_modalities: tuple[CriterionFailureModality, ...] = ()
 
 
 def load_active_track(path: Path) -> dict[str, Any]:
@@ -885,7 +889,8 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
         if age > fresh_ttl_days:
             return CriterionResult(id="", kind="receipt_valid", passed=False,
                 detail=f"receipt {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}",
-                failure_modality=CriterionFailureModality.FRESHNESS)
+                failure_modality=CriterionFailureModality.FRESHNESS,
+                observed_failure_modalities=(CriterionFailureModality.FRESHNESS,))
 
     bits = [f"{len(requires_keys or [])} keys present"]
     if expect_chain:
@@ -979,6 +984,9 @@ def check_mutation_score_gte(file_path: str, threshold: float, *,
                     kind="mutation_score_gte",
                     passed=False,
                     detail=f"{score_detail}; {freshness_detail}",
+                    observed_failure_modalities=(
+                        CriterionFailureModality.FRESHNESS,
+                    ),
                 )
             return CriterionResult(
                 id="",
@@ -986,6 +994,9 @@ def check_mutation_score_gte(file_path: str, threshold: float, *,
                 passed=False,
                 detail=freshness_detail,
                 failure_modality=CriterionFailureModality.FRESHNESS,
+                observed_failure_modalities=(
+                    CriterionFailureModality.FRESHNESS,
+                ),
             )
     return CriterionResult(
         id="",
@@ -2130,9 +2141,13 @@ def _freshness_failure_is_pr_caused(
     if not isinstance(artifact, str) or not artifact:
         return True
     try:
-        artifact_path = repo_path(artifact).resolve()
-        relative_artifact = artifact_path.relative_to(REPO_ROOT.resolve())
-    except (OSError, ValueError):
+        # Use lexical normalization without following symlinks. A reviewed PR
+        # can change a repository symlink even when its target lives outside
+        # the checkout; resolving first would incorrectly call that unchanged.
+        artifact_path = Path(os.path.abspath(repo_path(artifact)))
+        repository_path = Path(os.path.abspath(REPO_ROOT))
+        relative_artifact = artifact_path.relative_to(repository_path)
+    except ValueError:
         # An unchanged absolute fixture outside the repository cannot be
         # introduced by the reviewed git diff.
         return False
@@ -2431,7 +2446,8 @@ def run(args: argparse.Namespace) -> int:
             if (
                 enforce_ttl
                 and getattr(c, "executed", True)
-                and c.failure_modality is CriterionFailureModality.FRESHNESS
+                and CriterionFailureModality.FRESHNESS
+                in c.observed_failure_modalities
             ):
                 findings.append(Finding(
                     "ERROR",

@@ -452,6 +452,7 @@ def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:
     res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
     assert not res.passed
     assert res.failure_modality is CriterionFailureModality.FRESHNESS
+    assert CriterionFailureModality.FRESHNESS in res.observed_failure_modalities
     assert "stale" in res.detail
 
 
@@ -574,6 +575,7 @@ def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
     res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
     assert not res.passed
     assert res.failure_modality is CriterionFailureModality.FRESHNESS
+    assert CriterionFailureModality.FRESHNESS in res.observed_failure_modalities
     assert "stale" in res.detail
 
 
@@ -593,6 +595,7 @@ def test_checker_keeps_stale_low_mutation_score_substantive(tmp_path: Path) -> N
     res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
     assert not res.passed
     assert res.failure_modality is None
+    assert CriterionFailureModality.FRESHNESS in res.observed_failure_modalities
     assert "0.50 < 0.60" in res.detail
     assert "stale" in res.detail
 
