@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import staging as staging_mod
 from ..daemon_config import dharma_state_dir
+from ..redaction import scan_text_for_write
 from .cross_update import cross_update_trusted
 from .governance import gate_check_atom
 from .provenance import (
@@ -81,6 +82,29 @@ def promote(
     if confidence_override is not None:
         schema = schema.model_copy(update={"confidence": confidence_override})
 
+    # Secret/PII scan BEFORE gates so the gate check, axiom signature, and the
+    # trusted write all see the exact body that persists. Scanner error =
+    # quarantine lane; raw body never reaches the trusted projection.
+    scan = scan_text_for_write(body)
+    if scan.quarantined:
+        rejected_path = quarantine_atom(staged_path)
+        return PromoteResult(
+            staged_path=staged_path,
+            trusted_path=None,
+            decision="BLOCK",
+            review_status="rejected",
+            rationale="redaction scan error — atom quarantined, raw body not persisted",
+            notes=[f"redaction scanner failed; staged atom moved to {rejected_path}"],
+        )
+    redaction_notes: list[str] = []
+    if scan.sensitive_count:
+        body = scan.text
+        if "pii_risk:high" not in schema.tags:
+            schema = schema.model_copy(update={"tags": [*schema.tags, "pii_risk:high"]})
+        redaction_notes.append(
+            f"redaction: {scan.sensitive_count} sensitive span(s) redacted; pii_risk=high"
+        )
+
     gov = gate_check_atom(
         atom_content=body,
         atom_title=schema.title,
@@ -88,7 +112,7 @@ def promote(
         metadata={"atom_id": schema.atom_id, "atom_type": schema.type},
     )
 
-    notes: list[str] = []
+    notes: list[str] = list(redaction_notes)
     if gov.result == "BLOCK":
         # Move to a rejected/ folder for audit, do NOT write to trusted.
         rejected_path = quarantine_atom(staged_path)
