@@ -32,10 +32,12 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 REPO = Path(__file__).resolve().parents[3]
 DRAFT = REPO / "reports/darshan/issue_one_receipt.DRAFT.json"
 CANONICAL = REPO / "reports/darshan/issue_one_receipt.json"
+DARSHAN_PUBLICATION_NETLOC = "amitabhainarunachala.github.io"
 
 try:
     from dharma_swarm.memory_kernel.write_receipts import stable_digest, utc_now
@@ -55,6 +57,20 @@ except Exception:  # stdlib fallback, byte-identical canonicalisation
 def fail(msg: str) -> None:
     print(f"SEAL REFUSED: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def _validated_publication_url(url: str) -> str:
+    """Admit only the exact HTTPS origin owned by the Darshan publication."""
+    try:
+        parsed = urlsplit(url)
+    except (TypeError, ValueError) as exc:
+        fail(f"invalid published_url {url!r}: {exc}")
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != DARSHAN_PUBLICATION_NETLOC
+    ):
+        fail("published_url must use the exact HTTPS Darshan publication origin")
+    return url
 
 
 def sha256_file(p: Path) -> str:
@@ -93,8 +109,12 @@ def main() -> None:
     live_pages: dict[str, str] = {}
     for art in receipt["articles"]:
         url = art["published_url"]
+        safe_url = _validated_publication_url(url)
         try:
-            with urllib.request.urlopen(url, timeout=30) as resp:
+            with urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+                safe_url,
+                timeout=30,
+            ) as resp:
                 status = resp.status
                 body = resp.read()
         except Exception as exc:
