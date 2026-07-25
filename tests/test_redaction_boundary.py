@@ -32,6 +32,21 @@ SECRET_FIXTURES = pytest.mark.parametrize(
     "secret", [SK_TOKEN, GHP_TOKEN, HIGH_ENTROPY], ids=["sk", "ghp", "entropy"]
 )
 
+# Benign estate content the write boundary must pass through byte-identical:
+# wiki-link slugs, 40-hex commit SHAs, repo paths, turn ids, UUIDs, home
+# paths, URLs (adversarial review: mangling these was the PR's dominant
+# behavior on real content before the token_like precision gate).
+BENIGN_CONTENT = (
+    "see [[rsi-evolution-strategy-2026-07-21]] near commit"
+    " bb3eb9f4fb9f3ccd413eadd55cfada1b92354287 in"
+    " dharma_swarm/engine/conversation_memory.py; replay"
+    " turn_0123456789abcdef0123456789abcdef with id"
+    " 550e8400-e29b-41d4-a716-446655440000 from"
+    " /Users/dhyana/dharma_swarm/docs/governance/ACTIVE_TRACK.yaml per"
+    " https://github.com/AmitabhainArunachala/dharma_swarm/pull/1112 and"
+    " tests/test_redaction_boundary.py::test_scan_json_values_preserves_structure"
+)
+
 
 def _raise_scanner_error(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(text: str) -> None:
@@ -297,34 +312,164 @@ def test_source_chunk_scan_error_quarantines(
         assert metadata["redaction_scan"] == "error"
 
 
-def test_wiki_vector_ingest_excludes_secret_files(tmp_path) -> None:
-    from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
+def test_write_scan_passes_benign_identifiers_unchanged() -> None:
+    scan = scan_text_for_write(BENIGN_CONTENT)
+    assert scan.text == BENIGN_CONTENT
+    assert scan.sensitive_count == 0
+    assert not scan.has_secret
+    assert "path" in scan.detected_categories
+    assert "url" in scan.detected_categories
 
-    wiki_dir = tmp_path / "wiki" / "concepts"
-    wiki_dir.mkdir(parents=True)
-    (wiki_dir / "clean.md").write_text(
-        "---\ntitle: Clean Concept\n---\nOrchestrator routing concept body.\n",
-        encoding="utf-8",
-    )
-    (wiki_dir / "leaky.md").write_text(
-        f"---\ntitle: Leaky Concept\n---\nApi key {SK_TOKEN} pasted by mistake.\n",
-        encoding="utf-8",
-    )
-    state_dir = tmp_path / "state"
 
-    receipt = ingest_wiki_concepts(
-        state_dir=state_dir,
-        wiki_concepts_dir=wiki_dir,
-        max_files=10,
+def test_record_turn_benign_content_unmangled_and_unstamped(tmp_path) -> None:
+    store = ConversationMemoryStore(tmp_path / "memory_plane.db")
+    store.record_turn(
+        session_id="sess-benign",
+        role="user",
+        content=BENIGN_CONTENT,
+        turn_index=1,
     )
 
-    assert receipt.discovered_files == 2
-    assert receipt.skipped_secret_files == 1
-    assert receipt.scan_error_files == 0
-    raw = SK_TOKEN.encode("utf-8")
-    for path in state_dir.rglob("*"):
-        if path.is_file():
-            assert raw not in path.read_bytes(), f"raw secret leaked into {path}"
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        content, metadata_json = db.execute(
+            "SELECT content, metadata_json FROM conversation_turns"
+        ).fetchone()
+
+    assert content == BENIGN_CONTENT
+    metadata = json.loads(metadata_json)
+    assert "pii_risk" not in metadata
+    assert metadata.get("context_admissible") is not False
+
+
+def test_record_turn_metadata_never_persists_raw_secret(tmp_path) -> None:
+    store = ConversationMemoryStore(tmp_path / "memory_plane.db")
+    store.record_turn(
+        session_id="sess-meta",
+        role="user",
+        content="clean summary of the deploy",
+        turn_index=1,
+        metadata={"note": f"leak {SK_TOKEN} in caller metadata"},
+    )
+
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        metadata_json = db.execute(
+            "SELECT metadata_json FROM conversation_turns"
+        ).fetchone()[0]
+
+    assert SK_TOKEN not in metadata_json
+    metadata = json.loads(metadata_json)
+    assert metadata["pii_risk"] == "high"
+    assert "<REDACTED_" in metadata["note"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_envelope_scans_payload_dict_keys(tmp_path) -> None:
+    store = EventMemoryStore(tmp_path / "memory_plane.db")
+    await store.init_db()
+    envelope = _action_envelope({SK_TOKEN: "value under a secret-shaped key"})
+    assert await store.ingest_envelope(envelope) is True
+
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        payload_json = db.execute("SELECT payload_json FROM event_log").fetchone()[0]
+
+    assert SK_TOKEN not in payload_json
+    payload = json.loads(payload_json)
+    assert payload["_redaction"]["pii_risk"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_ingest_envelope_preserves_replay_identifiers(tmp_path) -> None:
+    store = EventMemoryStore(tmp_path / "memory_plane.db")
+    await store.init_db()
+    envelope = _action_envelope(
+        {
+            "turn_ref": "turn_0123456789abcdef0123456789abcdef",
+            "commit": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        },
+        event_id="evt-replay",
+    )
+    assert await store.ingest_envelope(envelope) is True
+
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        payload_json = db.execute("SELECT payload_json FROM event_log").fetchone()[0]
+
+    payload = json.loads(payload_json)
+    assert payload["turn_ref"] == "turn_0123456789abcdef0123456789abcdef"
+    assert payload["commit"] == "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287"
+    assert "_redaction" not in payload
+
+
+def test_document_and_chunk_metadata_never_persist_raw_secret(tmp_path) -> None:
+    index = UnifiedIndex(tmp_path / "memory_plane.db")
+    index.index_document(
+        "note",
+        "notes/heading.md",
+        f"# token {SK_TOKEN} in heading\n\nplain body text without secrets\n",
+        {"note": f"doc-level {GHP_TOKEN}"},
+    )
+
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        doc_meta = db.execute(
+            "SELECT metadata_json FROM source_documents"
+        ).fetchone()[0]
+        chunk_rows = db.execute(
+            "SELECT text, metadata_json FROM source_chunks"
+        ).fetchall()
+
+    assert GHP_TOKEN not in doc_meta
+    assert json.loads(doc_meta)["pii_risk"] == "high"
+    assert chunk_rows
+    for text, metadata_json in chunk_rows:
+        assert SK_TOKEN not in text
+        assert SK_TOKEN not in metadata_json
+
+
+def test_legacy_raw_rows_rewritten_redacted_on_reindex(tmp_path) -> None:
+    from dharma_swarm.engine.unified_index import _canonical_json, _sha256
+
+    index = UnifiedIndex(tmp_path / "memory_plane.db")
+    raw_text = f"# Ops note\n\nRotate the deploy credential {SK_TOKEN} before release.\n"
+    doc_id = _sha256("note:notes/legacy.md")[:16]
+    # Simulate a pre-scan row: source_hash over RAW inputs, raw chunk text.
+    legacy_hash = _sha256(f"note\nnotes/legacy.md\n{_canonical_json({})}\n{raw_text}")
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        db.execute(
+            "INSERT OR REPLACE INTO source_documents"
+            " (doc_id, source_kind, source_path, source_hash, source_ref,"
+            " metadata_json, updated_at)"
+            " VALUES (?, 'note', 'notes/legacy.md', ?, 'legacy.md', '{}',"
+            " '2026-07-01T00:00:00+00:00')",
+            (doc_id, legacy_hash),
+        )
+        db.execute(
+            "INSERT INTO source_chunks"
+            " (chunk_id, doc_id, chunk_index, text, metadata_json, chunk_hash)"
+            " VALUES ('legacychunk00001', ?, 0, ?, '{}', 'x')",
+            (doc_id, raw_text),
+        )
+        db.commit()
+
+    _doc_id, updated = index._index_document(
+        source_kind="note", source_path="notes/legacy.md", text=raw_text, metadata={}
+    )
+
+    assert updated, "raw-hash legacy row must not early-return"
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        chunk_rows = db.execute("SELECT text FROM source_chunks").fetchall()
+    assert chunk_rows
+    for (text,) in chunk_rows:
+        assert SK_TOKEN not in text
+
+
+def test_home_path_redaction_deterministic_across_separators() -> None:
+    path = "/Users/alice/project/file.txt"
+    space = redaction_mod.redact_text(f"daemon is at {path}")
+    colon = redaction_mod.redact_text(f"daemon is at:{path}")
+    assert [f.source_hash for f in space.findings] == [
+        f.source_hash for f in colon.findings
+    ]
+    assert "at <REDACTED_PATH:" in space.redacted
+    assert "at:<REDACTED_PATH:" in colon.redacted
 
 
 def test_boundary_scan_result_secret_flag() -> None:

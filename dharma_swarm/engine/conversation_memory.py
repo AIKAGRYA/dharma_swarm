@@ -16,7 +16,11 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_sync,
 )
 from dharma_swarm.engine.knowledge_store import _jaccard, _tokenize
-from dharma_swarm.redaction import PII_RISK_HIGH, scan_text_for_write
+from dharma_swarm.redaction import (
+    PII_RISK_HIGH,
+    scan_json_values_for_write,
+    scan_text_for_write,
+)
 from dharma_swarm.tiny_router_shadow import TinyRouterShadowInput, infer_tiny_router_shadow
 
 
@@ -196,15 +200,20 @@ class ConversationMemoryStore:
     ) -> str:
         turn_id = f"turn_{uuid4().hex}"
         scan = scan_text_for_write(content)
+        meta_scan = scan_json_values_for_write(dict(metadata or {}))
         content = scan.text
         flow_score = _detect_flow_score(content)
-        payload = dict(metadata or {})
-        if scan.quarantined:
+        quarantined = scan.quarantined or meta_scan.quarantined
+        # Caller metadata lands in the same metadata_json column as the scan
+        # stamps, so it is scanned too; a metadata scan error drops the raw
+        # dict entirely rather than persisting it beside a quarantine marker.
+        payload: dict[str, Any] = {} if meta_scan.quarantined else dict(meta_scan.value)
+        if quarantined:
             payload["context_admissible"] = False
             payload["redaction_scan"] = "error"
-        elif scan.sensitive_count:
+        elif scan.sensitive_count or meta_scan.sensitive_count:
             payload["pii_risk"] = PII_RISK_HIGH
-            payload["redaction_findings"] = scan.sensitive_count
+            payload["redaction_findings"] = scan.sensitive_count + meta_scan.sensitive_count
         payload["flow_score"] = flow_score
         created_at = _utc_now_iso()
 
@@ -235,7 +244,7 @@ class ConversationMemoryStore:
             )
             db.commit()
 
-        if harvest and not scan.quarantined:
+        if harvest and not quarantined:
             self.harvest_turn(turn_id)
         return turn_id
 

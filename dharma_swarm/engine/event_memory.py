@@ -280,13 +280,17 @@ class EventMemoryStore:
 
         # Checksum is validated on the raw envelope above; the persisted
         # payload may then be redacted, so a stored `_redaction` marker means
-        # the row's checksum documents the producer's original payload.
+        # the row's checksum documents the producer's original payload
+        # (checksum_scope) and payload_sha256 fingerprints that original —
+        # re-verifying a marked row against its stored payload is expected to
+        # mismatch, by design, and the marker is the audit trail for it.
         scan = scan_json_values_for_write(data["payload"])
         if scan.quarantined:
             persisted_payload: dict[str, Any] = {
                 "_redaction": {
                     "quarantined": True,
                     "context_admissible": False,
+                    "checksum_scope": "producer_payload",
                     "payload_sha256": stable_hash(data["payload"]),
                 }
             }
@@ -296,6 +300,8 @@ class EventMemoryStore:
                 persisted_payload["_redaction"] = {
                     "pii_risk": PII_RISK_HIGH,
                     "sensitive_count": scan.sensitive_count,
+                    "checksum_scope": "producer_payload",
+                    "payload_sha256": stable_hash(data["payload"]),
                 }
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -14,21 +14,29 @@ Two API tiers:
   write-boundary wrappers. Policy: ``sensitive_count > 0`` → persist the
   redacted value and stamp ``pii_risk=high``; scanner ERROR → quarantine lane
   (placeholder value + ``context_admissible=False`` marker). Raw text is never
-  persisted on scanner failure.
+  persisted on scanner failure. Write boundaries redact secret-shaped material
+  and emails only; infrastructure references (paths, URLs, IPs, account ids)
+  are detected-but-preserved so the memory plane stays citable — the recall
+  admission redactor and ``redact_record`` export keep full scrubbing.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 _EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _IPV4_RE = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
 _URL_RE = re.compile(r"\b(?:https?|ssh|git)://[^\s<>'\")]+", re.IGNORECASE)
-_HOME_PATH_RE = re.compile(r"(?P<prefix>^|[\s:=,;\[\]('\"])(?:/Users|/home)/[^/\s]+(?:/[^\s,;:'\"\])}]+)*")
+_HOME_PATH_RE = re.compile(
+    r"(?P<prefix>^|[\s:=,;\[\]('\"])(?P<path>(?:/Users|/home)/[^/\s]+(?:/[^\s,;:'\"\])}]+)*)"
+)
 _WINDOWS_PATH_RE = re.compile(r"\b[A-Za-z]:\\Users\\[^\\\s]+(?:\\[^\s,;:'\"\])}]+)*")
 _TOKEN_ASSIGNMENT_RE = re.compile(
     r"(?i)\b(api[_-]?key|secret|token|password|passwd|bearer|authorization|credential)\b\s*[:=]\s*['\"]?([A-Za-z0-9._~+/=-]{8,})"
@@ -38,6 +46,57 @@ _TOKEN_PREFIX_RE = re.compile(
 )
 _HIGH_ENTROPY_RE = re.compile(r"\b[A-Za-z0-9+/=_-]{32,}\b")
 _ACCOUNT_ID_RE = re.compile(r"\b(?:acct|account|org|tenant|project|workspace)[_-]?[A-Za-z0-9]{8,}\b", re.IGNORECASE)
+_HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{32,}")
+_WORDISH_SEGMENT_RE = re.compile(r"[A-Za-z_][A-Za-z_.]*")
+# Random 32+-char tokens measure >=3.87 bits/char over base36/base62/base64
+# alphabets (7,696-sample floor); benign estate strings surviving the
+# structural rules measured <=3.69. 3.8 splits the gap.
+_TOKEN_LIKE_ENTROPY_MIN = 3.8
+
+
+def _shannon_entropy(text: str) -> float:
+    if not text:
+        return 0.0
+    counts = Counter(text)
+    total = len(text)
+    return -sum((n / total) * math.log2(n / total) for n in counts.values())
+
+
+def _slug_segment(segment: str) -> bool:
+    return segment.isalpha() or (segment[:1].isdigit() and segment.isalnum())
+
+
+def _is_high_entropy_token(candidate: str) -> bool:
+    """Precision gate over the coarse 32+-char run.
+
+    Length alone is not a secret signal: commit SHAs, UUIDs, kebab/snake
+    slugs, repo paths, and long identifiers all match ``_HIGH_ENTROPY_RE``.
+    Only candidates that survive the structural benign-shape rules AND carry
+    random-token character entropy are treated as secrets. Secrets these
+    rules pass over (e.g. pure-hex or slash-bearing tokens) remain covered by
+    the assignment-context and known-prefix regexes.
+    """
+    if "/" in candidate:
+        return False
+    if _HEX_RUN_RE.fullmatch(candidate):
+        return False
+    compact = candidate.replace("-", "").replace("_", "")
+    if _HEX_RUN_RE.fullmatch(compact):
+        return False
+    prefixed = re.fullmatch(r"[A-Za-z]{1,16}[_-](.+)", candidate)
+    if prefixed:
+        # turn_<hex32> / evt-<uuid> style row ids: short alpha prefix + hex
+        # body. Known secret prefixes (sk-, ghp_, ...) are already redacted
+        # by _TOKEN_PREFIX_RE before this gate runs.
+        tail = prefixed.group(1).replace("-", "").replace("_", "")
+        if len(tail) >= 16 and re.fullmatch(r"[0-9a-fA-F]+", tail):
+            return False
+    if not any(ch.isdigit() for ch in candidate) or not any(ch.isalpha() for ch in candidate):
+        return False
+    segments = [segment for segment in re.split(r"[-_]", candidate) if segment]
+    if len(segments) >= 3 and all(_slug_segment(segment) for segment in segments):
+        return False
+    return _shannon_entropy(candidate) >= _TOKEN_LIKE_ENTROPY_MIN
 
 SENSITIVE_FIELD_NAMES = {
     "body",
@@ -77,6 +136,7 @@ class RedactionResult:
     redacted: Any
     findings: list[RedactionFinding] = field(default_factory=list)
     fail_closed: bool = False
+    detected: list[RedactionFinding] = field(default_factory=list)
 
     @property
     def sensitive_count(self) -> int:
@@ -103,9 +163,12 @@ def _redact_with_regex(
     findings: list[RedactionFinding],
     *,
     group: int | str | None = None,
+    gate: Callable[[str], bool] | None = None,
 ) -> str:
     def repl(match: re.Match[str]) -> str:
         original = match.group(group) if group is not None else match.group(0)
+        if gate is not None and not gate(original):
+            return match.group(0)
         replacement = _replacement(category, original)
         findings.append(RedactionFinding(category, replacement, stable_hash(original)))
         if group is None:
@@ -118,28 +181,62 @@ def _redact_with_regex(
     return pattern.sub(repl, text)
 
 
-def redact_text(text: str) -> RedactionResult:
+def _detect_with_regex(
+    text: str,
+    pattern: re.Pattern[str],
+    category: str,
+    findings: list[RedactionFinding],
+    *,
+    group: int | str | None = None,
+) -> None:
+    for match in pattern.finditer(text):
+        original = match.group(group) if group is not None else match.group(0)
+        if not original:
+            continue
+        findings.append(
+            RedactionFinding(category, _replacement(category, original), stable_hash(original))
+        )
+
+
+def redact_text(text: str, *, preserve_infra: bool = False) -> RedactionResult:
     """Redact sensitive spans in free text.
 
     Long token-like strings are treated as uncertain sensitive material and set
     ``fail_closed=True`` so callers can quarantine the record for review.
+
+    ``preserve_infra=True`` is the write-boundary policy: infrastructure
+    references (IPs, URLs, home paths, account ids) are recorded in
+    ``detected`` but left in place — replacing them was measured to mangle
+    nearly every substantive memory-plane row on this estate.
     """
     findings: list[RedactionFinding] = []
+    detected: list[RedactionFinding] = []
     redacted = str(text)
 
     redacted = _redact_with_regex(redacted, _TOKEN_ASSIGNMENT_RE, "credential", findings, group=2)
     redacted = _redact_with_regex(redacted, _TOKEN_PREFIX_RE, "token", findings)
     redacted = _redact_with_regex(redacted, _EMAIL_RE, "email", findings)
-    redacted = _redact_with_regex(redacted, _IPV4_RE, "ip", findings)
-    redacted = _redact_with_regex(redacted, _URL_RE, "url", findings)
-    redacted = _redact_with_regex(redacted, _HOME_PATH_RE, "path", findings)
-    redacted = _redact_with_regex(redacted, _WINDOWS_PATH_RE, "path", findings)
-    redacted = _redact_with_regex(redacted, _ACCOUNT_ID_RE, "account_id", findings)
+    if preserve_infra:
+        _detect_with_regex(redacted, _IPV4_RE, "ip", detected)
+        _detect_with_regex(redacted, _URL_RE, "url", detected)
+        _detect_with_regex(redacted, _HOME_PATH_RE, "path", detected, group="path")
+        _detect_with_regex(redacted, _WINDOWS_PATH_RE, "path", detected)
+        _detect_with_regex(redacted, _ACCOUNT_ID_RE, "account_id", detected)
+    else:
+        redacted = _redact_with_regex(redacted, _IPV4_RE, "ip", findings)
+        redacted = _redact_with_regex(redacted, _URL_RE, "url", findings)
+        redacted = _redact_with_regex(redacted, _HOME_PATH_RE, "path", findings, group="path")
+        redacted = _redact_with_regex(redacted, _WINDOWS_PATH_RE, "path", findings)
+        redacted = _redact_with_regex(redacted, _ACCOUNT_ID_RE, "account_id", findings)
 
     before_entropy = len(findings)
-    redacted = _redact_with_regex(redacted, _HIGH_ENTROPY_RE, "token_like", findings)
+    redacted = _redact_with_regex(
+        redacted, _HIGH_ENTROPY_RE, "token_like", findings, gate=_is_high_entropy_token
+    )
     fail_closed = len(findings) > before_entropy
-    return RedactionResult(redacted=redacted, findings=findings, fail_closed=fail_closed)
+    return RedactionResult(
+        redacted=redacted, findings=findings, fail_closed=fail_closed, detected=detected
+    )
 
 
 def _field_replacement(key: str, value: Any) -> str:
@@ -196,6 +293,7 @@ class BoundaryScanResult:
     sensitive_count: int
     quarantined: bool
     categories: tuple[str, ...] = ()
+    detected_categories: tuple[str, ...] = ()
 
     @property
     def has_secret(self) -> bool:
@@ -210,6 +308,11 @@ class BoundaryRecordScanResult:
     sensitive_count: int
     quarantined: bool
     categories: tuple[str, ...] = ()
+    detected_categories: tuple[str, ...] = ()
+
+    @property
+    def has_secret(self) -> bool:
+        return bool(SECRET_CATEGORIES.intersection(self.categories))
 
 
 def quarantine_placeholder(value: Any) -> str:
@@ -228,7 +331,7 @@ def scan_text_for_write(text: Any) -> BoundaryScanResult:
     ``context_admissible=False`` marker, never the raw input.
     """
     try:
-        result = redact_text(str(text))
+        result = redact_text(str(text), preserve_infra=True)
     except Exception:
         return BoundaryScanResult(
             text=quarantine_placeholder(text),
@@ -240,27 +343,34 @@ def scan_text_for_write(text: Any) -> BoundaryScanResult:
         sensitive_count=result.sensitive_count,
         quarantined=False,
         categories=tuple(sorted({finding.category for finding in result.findings})),
+        detected_categories=tuple(sorted({finding.category for finding in result.detected})),
     )
 
 
 def scan_json_values_for_write(value: Any) -> BoundaryRecordScanResult:
     """Structure-preserving scan of a JSON-compatible value. Never raises.
 
-    Applies ``redact_text`` to every string leaf. Unlike ``redact_record``,
-    field names are NOT wholesale-redacted — event payloads must remain
-    replayable; only secret-shaped values are replaced.
+    Applies write-policy ``redact_text`` to every string leaf AND every dict
+    key. Unlike ``redact_record``, field names are NOT wholesale-redacted —
+    event payloads must remain replayable; only secret-shaped material is
+    replaced, wherever it appears.
     """
     findings: list[RedactionFinding] = []
+    detected: list[RedactionFinding] = []
+
+    def scan_string(item: str) -> str:
+        result = redact_text(item, preserve_infra=True)
+        findings.extend(result.findings)
+        detected.extend(result.detected)
+        return result.redacted
 
     def walk(item: Any) -> Any:
         if isinstance(item, dict):
-            return {str(key): walk(child) for key, child in item.items()}
+            return {scan_string(str(key)): walk(child) for key, child in item.items()}
         if isinstance(item, list):
             return [walk(child) for child in item]
         if isinstance(item, str):
-            result = redact_text(item)
-            findings.extend(result.findings)
-            return result.redacted
+            return scan_string(item)
         return item
 
     try:
@@ -272,4 +382,5 @@ def scan_json_values_for_write(value: Any) -> BoundaryRecordScanResult:
         sensitive_count=len(findings),
         quarantined=False,
         categories=tuple(sorted({finding.category for finding in findings})),
+        detected_categories=tuple(sorted({finding.category for finding in detected})),
     )

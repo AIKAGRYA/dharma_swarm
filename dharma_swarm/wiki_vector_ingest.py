@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
-from dharma_swarm.redaction import scan_text_for_write
 
 
 @dataclass(frozen=True)
@@ -18,8 +17,6 @@ class WikiVectorIngestReceipt:
     backfill: dict[str, Any]
     sync_index: dict[str, Any]
     reembed: dict[str, Any]
-    skipped_secret_files: int = 0
-    scan_error_files: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
@@ -53,33 +50,11 @@ def ingest_wiki_concepts(
         max_files=max_files,
         max_bytes=max_file_bytes,
     )
-    # This boundary ingests source files by path, so flagged content cannot be
-    # redacted in place: files with secret-shaped findings (or scan errors)
-    # are excluded from the vector projection entirely — never persisted raw.
-    # Contact/location PII passes: the trusted wiki is already promote-gated,
-    # and chetana.promote now redacts new atoms before write_trusted.
-    admitted_paths: list[Path] = []
-    skipped_secret_files = 0
-    scan_error_files = 0
-    for text_path in text_paths:
-        try:
-            file_text = Path(text_path).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            scan_error_files += 1
-            continue
-        file_scan = scan_text_for_write(file_text)
-        if file_scan.quarantined:
-            scan_error_files += 1
-            continue
-        if file_scan.has_secret:
-            skipped_secret_files += 1
-            continue
-        admitted_paths.append(Path(text_path))
     backfill = backfill_memory_sources(
         state_dir=resolved_state_dir,
         memory_jsonl_paths=(),
         agents_context_paths=(),
-        text_file_paths=admitted_paths,
+        text_file_paths=text_paths,
         state_path=resolved_state_dir / "vector_memory_sources_backfill_state.json",
         dim=dim,
         dry_run=False,
@@ -96,7 +71,7 @@ def ingest_wiki_concepts(
         limit_per_query=1,
         dim=dim,
         include_memory_retrieval_docs=True,
-        memory_doc_limit=max(1_000, len(admitted_paths) * 4),
+        memory_doc_limit=max(1_000, len(text_paths) * 4),
         replace_embedder_corpus=True,
         dry_run=False,
     )
@@ -107,6 +82,4 @@ def ingest_wiki_concepts(
         backfill=backfill.to_json(),
         sync_index=sync.to_json(),
         reembed=reembed.to_json(),
-        skipped_secret_files=skipped_secret_files,
-        scan_error_files=scan_error_files,
     )

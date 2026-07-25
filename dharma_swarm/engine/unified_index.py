@@ -21,7 +21,11 @@ from dharma_swarm.engine.knowledge_store import (
     _metadata_match,
     _tokenize,
 )
-from dharma_swarm.redaction import PII_RISK_HIGH, scan_text_for_write
+from dharma_swarm.redaction import (
+    PII_RISK_HIGH,
+    scan_json_values_for_write,
+    scan_text_for_write,
+)
 
 
 def _utc_now_iso() -> str:
@@ -340,9 +344,22 @@ class UnifiedIndex:
         metadata: dict[str, Any],
     ) -> tuple[str, bool]:
         doc_id = _sha256(f"{source_kind}:{source_path}")[:16]
-        normalized_metadata = dict(metadata)
+        doc_scan = scan_text_for_write(text)
+        meta_scan = scan_json_values_for_write(dict(metadata))
+        if meta_scan.quarantined:
+            normalized_metadata: dict[str, Any] = {}
+        else:
+            normalized_metadata = dict(meta_scan.value)
+        if doc_scan.quarantined or meta_scan.quarantined:
+            normalized_metadata["context_admissible"] = False
+            normalized_metadata["redaction_scan"] = "error"
+        elif meta_scan.sensitive_count:
+            normalized_metadata["pii_risk"] = PII_RISK_HIGH
+        # Hash what actually persists (post-scan), not the raw input: rows
+        # written before scanning existed carry a raw-content hash, so their
+        # next ingest misses the early return below and rewrites them redacted.
         source_hash = _sha256(
-            f"{source_kind}\n{source_path}\n{_canonical_json(normalized_metadata)}\n{text}"
+            f"{source_kind}\n{source_path}\n{_canonical_json(normalized_metadata)}\n{doc_scan.text}"
         )
         updated_at = _utc_now_iso()
         chunks = chunk_markdown(text)
@@ -381,14 +398,17 @@ class UnifiedIndex:
 
             for idx, chunk in enumerate(chunks):
                 scan = scan_text_for_write(chunk.text)
-                chunk_metadata = {
-                    **chunk.metadata,
-                    "chunk_index": idx,
-                }
-                if scan.quarantined:
+                # Chunk metadata (section_title, header_path) is document text
+                # from the chunker — scanned like the body, never persisted raw.
+                chunk_meta_scan = scan_json_values_for_write(dict(chunk.metadata))
+                if chunk_meta_scan.quarantined:
+                    chunk_metadata: dict[str, Any] = {"chunk_index": idx}
+                else:
+                    chunk_metadata = {**chunk_meta_scan.value, "chunk_index": idx}
+                if scan.quarantined or chunk_meta_scan.quarantined:
                     chunk_metadata["context_admissible"] = False
                     chunk_metadata["redaction_scan"] = "error"
-                elif scan.sensitive_count:
+                elif scan.sensitive_count or chunk_meta_scan.sensitive_count:
                     chunk_metadata["pii_risk"] = PII_RISK_HIGH
                 chunk_hash = _sha256(f"{scan.text}\n{_canonical_json(chunk_metadata)}")
                 chunk_id = _sha256(f"{doc_id}:{idx}:{chunk_hash}")[:16]
