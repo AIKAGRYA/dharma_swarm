@@ -28,13 +28,10 @@ EVENT_TYPES = (
     "effect_resolved", "review_recorded", "episode_closed",
     "post_merge_observation",
 )
-
 # Effect events carry the idempotency fence key — mandatory, never implied.
 _EFFECT_EVENT_TYPES = ("effect_requested", "effect_resolved")
-
 _REDACT_KEY_MARKERS = ("secret", "token", "password", "api_key", "authorization", "credential")
 _REDACTED = "[REDACTED]"
-
 _THREAD_LOCKS_GUARD = threading.Lock()
 _THREAD_LOCKS: dict[str, threading.RLock] = {}
 
@@ -441,8 +438,8 @@ class EpisodeLedgerWriter:
             self._sync_from_disk_locked(stream)
             return self._append_event_locked(stream, event)
 
-    def has_logical_delivery(self, delivery_key: str) -> bool:
-        """Return whether this destination contains one unconflicted delivery."""
+    def logical_delivery_event_id(self, delivery_key: str) -> str:
+        """Return the content-bound ID for one unconflicted logical delivery."""
         delivery_key = str(delivery_key).strip()
         if not delivery_key:
             raise LedgerValidationError("delivery_key is required")
@@ -452,7 +449,11 @@ class EpisodeLedgerWriter:
                 raise LedgerValidationError(
                     f"logical delivery_key {delivery_key!r} has conflicting records"
                 )
-            return delivery_key in self._logical_events
+            event = self._logical_events.get(delivery_key)
+            return event.event_id if event is not None else ""
+
+    def has_logical_delivery(self, delivery_key: str) -> bool:
+        return bool(self.logical_delivery_event_id(delivery_key))
 
     def append_delivery(
         self,

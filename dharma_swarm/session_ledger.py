@@ -120,20 +120,30 @@ class SessionLedger:
                         destination_id=self.episode_destination_id,
                     )
                 )
-                present = [
-                    self._episode_writer.has_logical_delivery(item.delivery_key)
+                persisted_ids = [
+                    self._episode_writer.logical_delivery_event_id(item.delivery_key)
                     for item in retained
                 ]
                 gap_seen = False
-                for exists in present:
+                for item, persisted_id in zip(retained, persisted_ids, strict=True):
+                    exists = bool(persisted_id)
+                    if (
+                        item.acked_at is not None
+                        and exists
+                        and item.episode_event_id != persisted_id
+                    ):
+                        raise RuntimeError(
+                            "acknowledged episode delivery identity does not match"
+                        )
                     if exists and gap_seen:
                         raise RuntimeError(
                             "episode destination history is not a retained prefix"
                         )
                     gap_seen = gap_seen or not exists
                 retained_missing = any(
-                    (item.acked_at is not None or item.episode_event_id) and not exists
-                    for item, exists in zip(retained, present, strict=True)
+                    (item.acked_at is not None or item.episode_event_id)
+                    and not persisted_id
+                    for item, persisted_id in zip(retained, persisted_ids, strict=True)
                 )
                 if retained_missing:
                     self._runtime_state.requeue_episode_destination_history_sync(

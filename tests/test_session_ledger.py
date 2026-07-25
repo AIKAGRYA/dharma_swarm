@@ -423,6 +423,45 @@ def test_non_prefix_destination_history_fails_closed(tmp_path):
     ).acked_at is None
 
 
+def test_acknowledged_delivery_identity_mismatch_fails_closed(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-ack-identity-mismatch",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    records = [
+        json.loads(line) for line in first.episode_path.read_text().splitlines()
+    ]
+    attempt_index = next(
+        index
+        for index, record in enumerate(records)
+        if record["event_type"] == "attempt_started"
+    )
+    original = records[attempt_index]
+    records[attempt_index] = EpisodeEvent.new(
+        event_type=original["event_type"],
+        episode_id=original["episode_id"],
+        attempt_id=original["attempt_id"],
+        sequence=original["sequence"],
+        payload={**original["payload"], "session_id": "tampered"},
+    ).to_dict()
+    first.episode_path.write_text(
+        "".join(json.dumps(record) + "\n" for record in records)
+    )
+
+    with pytest.raises(RuntimeError, match="failed to verify or requeue") as caught:
+        SessionLedger(**kwargs)
+    assert "identity does not match" in str(caught.value.__cause__)
+    history = RuntimeStateStore(runtime_db).list_episode_destination_history_sync(
+        episode_id=first.episode_id,
+        destination_id=first.episode_destination_id,
+    )
+    assert len(history) == 2
+    assert all(item.acked_at is not None for item in history)
+
+
 def test_recreated_destination_durably_opens_before_later_backlog_ack(
     tmp_path,
     monkeypatch,
