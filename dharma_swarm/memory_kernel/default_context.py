@@ -75,7 +75,7 @@ def memory_kernel_isolation_policy_from_metadata(
         or source.get("topology_mode")
         or source.get("topology_type")
     )
-    topology = _clean_text(raw_topology)
+    topology = _clean_text(getattr(raw_topology, "value", raw_topology))
     semantics, warnings = resolve_isolation_semantics(raw_topology)
     agent_id = _clean_text(
         source.get("agent_id")
@@ -86,6 +86,14 @@ def memory_kernel_isolation_policy_from_metadata(
     allowed_agent_ids = explicit_agent_ids or ((agent_id,) if agent_id else ())
     explicit_scopes = _memory_scope_tuple(source.get("memory_kernel_allowed_scopes"))
     explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
+    # Explicit metadata allowances take precedence over the typed semantics
+    # (pre-existing contract); stamp a warning so the semantics name in the
+    # bundle metadata cannot silently claim what the allowances override.
+    override_warnings = list(warnings)
+    if explicit_scopes and explicit_scopes != semantics.allowed_scopes:
+        override_warnings.append("explicit_scopes_override_topology_semantics")
+    if explicit_lanes and explicit_lanes != semantics.allowed_memory_lanes:
+        override_warnings.append("explicit_lanes_override_topology_semantics")
 
     return MemoryKernelIsolationPolicy(
         applied=True,
@@ -95,7 +103,7 @@ def memory_kernel_isolation_policy_from_metadata(
         allowed_scopes=explicit_scopes or semantics.allowed_scopes,
         allowed_memory_lanes=explicit_lanes or semantics.allowed_memory_lanes,
         semantics=semantics.name,
-        warnings=warnings,
+        warnings=tuple(override_warnings),
     )
 
 

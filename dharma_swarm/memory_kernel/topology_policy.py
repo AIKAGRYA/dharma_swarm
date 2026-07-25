@@ -91,7 +91,7 @@ def resolve(raw: str | TopologyType | None) -> tuple[IsolationSemantics, tuple[s
     """Resolve a topology value to isolation semantics; fail closed on unknown."""
 
     if isinstance(raw, TopologyType):
-        return ISOLATION_SEMANTICS[raw], ()
+        return _semantics_for(raw)
     text = str(raw or "").strip()
     if not text:
         return FAIL_CLOSED_MINIMAL, ("topology_missing_fail_closed",)
@@ -99,4 +99,17 @@ def resolve(raw: str | TopologyType | None) -> tuple[IsolationSemantics, tuple[s
         topology = TopologyType(text)
     except ValueError:
         return FAIL_CLOSED_MINIMAL, (f"unknown_topology_fail_closed:{text[:40]}",)
-    return ISOLATION_SEMANTICS[topology], ()
+    return _semantics_for(topology)
+
+
+def _semantics_for(topology: TopologyType) -> tuple[IsolationSemantics, tuple[str, ...]]:
+    semantics = ISOLATION_SEMANTICS.get(topology)
+    if semantics is None:
+        # A TopologyType member added without a map update must degrade to
+        # the minimal policy with a stamped warning, not KeyError into a
+        # memoryless failed bundle. The map-totality test keeps this path
+        # unreachable at CI; this is the runtime backstop.
+        return FAIL_CLOSED_MINIMAL, (
+            f"unmapped_topology_fail_closed:{topology.value}",
+        )
+    return semantics, ()
