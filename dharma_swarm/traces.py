@@ -19,6 +19,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from dharma_swarm.archive import FitnessScore
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.models import _new_id, _utc_now
 
 
@@ -221,7 +222,12 @@ def canonical_trace_store() -> TraceStore:
     override = os.getenv("DHARMA_TRACES_DIR", "").strip()
     if override:
         return TraceStore(base_path=Path(override))
-    return TraceStore()
+    # Repo-wide state root (.env.example DHARMA_STATE_DIR / DHARMA_HOME):
+    # a deployment that redirects all state must get traces under it too,
+    # or the front door recreates the very path split it exists to prevent.
+    return TraceStore(
+        base_path=dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME") / "traces"
+    )
 
 
 async def record_trace(

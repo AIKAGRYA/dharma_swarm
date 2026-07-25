@@ -313,7 +313,23 @@ class TestTraceFrontDoor:
         from dharma_swarm.traces import canonical_trace_store, _DEFAULT_TRACE_PATH
 
         monkeypatch.delenv("DHARMA_TRACES_DIR", raising=False)
+        monkeypatch.delenv("DHARMA_STATE_DIR", raising=False)
+        monkeypatch.delenv("DHARMA_HOME", raising=False)
         assert canonical_trace_store().base_path == _DEFAULT_TRACE_PATH
+
+    def test_canonical_store_honors_repo_wide_state_dir(self, tmp_path, monkeypatch):
+        """A deployment that sets only DHARMA_STATE_DIR (the repo-wide state
+        root, .env.example) must get its traces under <state>/traces — not
+        silently under the home directory."""
+        from dharma_swarm.traces import canonical_trace_store
+
+        monkeypatch.delenv("DHARMA_TRACES_DIR", raising=False)
+        monkeypatch.delenv("DHARMA_HOME", raising=False)
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_path / "state"))
+        assert canonical_trace_store().base_path == tmp_path / "state" / "traces"
+        # The trace-specific override still wins over the repo-wide root.
+        monkeypatch.setenv("DHARMA_TRACES_DIR", str(tmp_path / "custom"))
+        assert canonical_trace_store().base_path == tmp_path / "custom"
 
     @pytest.mark.asyncio
     async def test_record_trace_lands_in_canonical_store(self, tmp_path, monkeypatch):
