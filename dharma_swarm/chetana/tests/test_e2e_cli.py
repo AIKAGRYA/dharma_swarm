@@ -142,9 +142,11 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
     assert len(trusted_paths) == 1
     assert not pending_paths[0].exists()
 
-    # 3. STATUS reflects approve
+    # 3. STATUS reflects approve — on-disk only: with no signed trust
+    # manifest in the sandbox home, the trusted projection stays EMPTY
+    # (PR-08 fail-closed); the approved page shows up as manifest drift
     p3 = _run(["status"], home=cli_home)
-    assert "trusted   : 1" in p3.stdout
+    assert "trusted   : 0 (on-disk: 1)" in p3.stdout
     assert "pending   : 0" in p3.stdout
     assert "staged    : 0" in p3.stdout
     assert str(cli_home) not in p3.stdout
