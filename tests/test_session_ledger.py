@@ -8,6 +8,22 @@ from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.session_ledger import SessionLedger
 
 
+def _read_episode_events(path):
+    events = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        try:
+            events.append(EpisodeEvent.from_dict(record))
+        except (TypeError, ValueError):
+            continue
+    return events
+
+
 def test_session_ledger_writes_task_and_progress(tmp_path):
     runtime_db = tmp_path / "runtime.db"
     ledger = SessionLedger(
@@ -43,9 +59,8 @@ def test_session_ledger_uses_env_dir_and_session(tmp_path, monkeypatch):
 
 
 def test_session_ledger_produces_validated_episode_events(tmp_path):
-    """B1 producer slice: the session ledger emits Episode Ledger events —
-    episode_opened at init, observation_recorded per task/progress event —
-    all validating through EpisodeEvent.from_dict (versioned schema)."""
+    """The producer emits an episode, one attempt, then observations."""
+
     ledger = SessionLedger(
         base_dir=tmp_path, session_id="sess_ep", runtime_db_path=tmp_path / "runtime.db"
     )
@@ -54,42 +69,93 @@ def test_session_ledger_produces_validated_episode_events(tmp_path):
 
     episode_path = tmp_path / "sess_ep" / "episode_ledger.jsonl"
     assert episode_path.exists(), "producer wrote no episode ledger"
-    events = [
-        EpisodeEvent.from_dict(json.loads(line))
-        for line in episode_path.read_text().splitlines()
-    ]
+    events = _read_episode_events(episode_path)
     state = project_episode(events)
-    assert [e.event_type for e in state.events][0] == "episode_opened"
-    assert len(state.observations) == 2
-    kinds = [e.payload["ledger_kind"] for e in state.observations]
-    assert kinds == ["task", "progress"]
-    assert all(e.payload["session_event_id"] for e in state.observations)
+
+    assert [event.event_type for event in state.events] == [
+        "episode_opened",
+        "attempt_started",
+        "observation_recorded",
+        "observation_recorded",
+    ]
+    assert state.events[0].attempt_id == ""
+    assert state.events[1].attempt_id == ledger.attempt_id
+    assert all(event.attempt_id == ledger.attempt_id for event in state.observations)
+    assert [event.payload["ledger_kind"] for event in state.observations] == [
+        "task",
+        "progress",
+    ]
+    assert all(event.payload["session_event_id"] for event in state.observations)
 
 
-def test_session_ledger_episode_id_is_stable_and_opened_dedupes(tmp_path):
-    """Same session -> same episode_id (derived from session_id, not random),
-    and a restart re-emitting episode_opened dedups instead of duplicating."""
-    kwargs = dict(
-        base_dir=tmp_path, session_id="sess_st", runtime_db_path=tmp_path / "runtime.db"
-    )
+def test_session_ledger_episode_is_stable_but_attempts_are_distinct(tmp_path):
+    """Restarts reuse the episode, dedupe its open, and mint new attempts."""
+
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess_st",
+        "runtime_db_path": tmp_path / "runtime.db",
+    }
     first = SessionLedger(**kwargs)
     second = SessionLedger(**kwargs)
     expected = f"ep_{hashlib.sha256(b'sess_st').hexdigest()[:16]}"
+
     assert first.episode_id == expected
     assert second.episode_id == expected
+    assert first.attempt_id != second.attempt_id
 
-    episode_path = tmp_path / "sess_st" / "episode_ledger.jsonl"
-    opened = [
-        json.loads(line)
-        for line in episode_path.read_text().splitlines()
-        if json.loads(line)["event_type"] == "episode_opened"
-    ]
+    events = _read_episode_events(tmp_path / "sess_st" / "episode_ledger.jsonl")
+    opened = [event for event in events if event.event_type == "episode_opened"]
+    attempts = [event for event in events if event.event_type == "attempt_started"]
+
     assert len(opened) == 1, "restart duplicated episode_opened"
+    assert opened[0].attempt_id == ""
+    assert [event.attempt_id for event in attempts] == [
+        first.attempt_id,
+        second.attempt_id,
+    ]
+
+
+def test_session_ledger_sequence_uses_highest_valid_event_not_line_count(tmp_path):
+    """Corrupt physical lines cannot become the next sequence authority."""
+
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess_seq",
+        "runtime_db_path": tmp_path / "runtime.db",
+    }
+    first = SessionLedger(**kwargs)
+    first.task_event("dispatch_assigned", task_id="t1")
+
+    episode_path = tmp_path / "sess_seq" / "episode_ledger.jsonl"
+    with open(episode_path, "a", encoding="utf-8") as stream:
+        stream.write("not-json\n")
+        stream.write("null\n")
+
+    second = SessionLedger(**kwargs)
+    second.task_event("task_started", task_id="t2")
+
+    events = _read_episode_events(episode_path)
+    second_attempt = next(
+        event
+        for event in events
+        if event.event_type == "attempt_started"
+        and event.attempt_id == second.attempt_id
+    )
+    second_observation = next(
+        event
+        for event in events
+        if event.event_type == "observation_recorded"
+        and event.attempt_id == second.attempt_id
+    )
+
+    assert second_attempt.sequence == 3
+    assert second_observation.sequence == 4
 
 
 def test_session_ledger_counts_episode_persistence_failures(tmp_path, monkeypatch):
-    """Episode persistence failures never break orchestration but are COUNTED,
-    not swallowed — the unversioned ledger's silent-except pattern ends here."""
+    """A real append failure is counted without breaking the task ledger."""
+
     ledger = SessionLedger(
         base_dir=tmp_path, session_id="sess_fl", runtime_db_path=tmp_path / "runtime.db"
     )
@@ -100,14 +166,38 @@ def test_session_ledger_counts_episode_persistence_failures(tmp_path, monkeypatc
 
     monkeypatch.setattr(ledger._episode_writer, "append", boom)
     ledger.task_event("dispatch_assigned", task_id="t1")
+
     assert ledger.episode_ledger_failures == 1
-    task_path = tmp_path / "sess_fl" / "task_ledger.jsonl"
-    assert task_path.exists(), "episode failure broke the task ledger write"
+    assert (tmp_path / "sess_fl" / "task_ledger.jsonl").exists()
+
+
+def test_session_ledger_counts_writer_setup_failure_once(tmp_path, monkeypatch):
+    """One writer-construction failure is not recounted for every lost event."""
+
+    def fail_writer(_path):
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr("dharma_swarm.session_ledger.EpisodeLedgerWriter", fail_writer)
+    ledger = SessionLedger(
+        base_dir=tmp_path,
+        session_id="sess_setup_failure",
+        runtime_db_path=tmp_path / "runtime.db",
+    )
+
+    assert ledger.episode_ledger_failures == 1
+    assert ledger._episode_writer is None
+
+    ledger.task_event("dispatch_assigned", task_id="t1")
+    assert ledger.episode_ledger_failures == 1
 
 
 def test_session_ledger_updates_runtime_search_index(tmp_path):
     runtime_db = tmp_path / "runtime.db"
-    ledger = SessionLedger(base_dir=tmp_path, session_id="sess_idx", runtime_db_path=runtime_db)
+    ledger = SessionLedger(
+        base_dir=tmp_path,
+        session_id="sess_idx",
+        runtime_db_path=runtime_db,
+    )
 
     ledger.progress_event(
         "task_failed",
