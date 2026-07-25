@@ -1,6 +1,6 @@
 {
   "schema": "dharma.titanium.phase0-reconciliation.v1",
-  "observed_at": "2026-07-25T11:35:06Z",
+  "observed_at": "2026-07-25T12:37:53Z",
   "track_id": "repository-titanium-hardening-2026-07",
   "reviewed_main": {
     "ref": "origin/main",
@@ -267,6 +267,7 @@
       ],
       "evidence": [
         "git merge-base --is-ancestor 944dc89565edc9262574947abe8d93598f7bbaf3 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+        "git merge-base --is-ancestor 4c613db1625bea016586930eb28a247d3d805f17 bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
         ".venv/bin/python -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q",
         "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
       ],
