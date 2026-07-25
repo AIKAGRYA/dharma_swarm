@@ -293,6 +293,8 @@
       "docs/sarathi_apex_build/90_ANTI_SPRAWL_HARNESS.md",
       "docs/sarathi_apex_build/91_SPRAWL_HARNESS_RUNBOOK.md",
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+      "docs/governance/REMOTE_HOLON_MESH_AND_SHARED_BOARD_V1.md",
+      "docs/governance/SYNADIA_CAR_BRIDGE_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
       "docs/ops/TMUX_AGENT_SUBSTRATE.md",
