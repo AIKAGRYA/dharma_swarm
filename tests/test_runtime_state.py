@@ -252,6 +252,7 @@ def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None
     )
 
     assert duplicate.outbox_id == first.outbox_id
+    assert first.schema_version == "episode_outbox_record.v1"
     assert [item.delivery_key for item in pending] == [first.delivery_key]
     assert acked.acked_at is not None
     assert acked.episode_event_id == "ev-durable"

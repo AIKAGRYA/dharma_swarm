@@ -733,6 +733,7 @@ class EpisodeOutboxRecord:
     delivery_key: str
     episode_id: str
     event_type: str
+    schema_version: str = "episode_outbox_record.v1"
     attempt_id: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
     session_event_id: str = ""
