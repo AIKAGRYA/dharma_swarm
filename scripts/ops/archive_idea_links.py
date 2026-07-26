@@ -175,8 +175,18 @@ def phase_drop(
             return 1
         db.execute(f'DROP TABLE "{archive_name}"')
         db.commit()
+        vacuum_error: str | None = None
         if vacuum:
-            db.execute("VACUUM")
+            # A VACUUM failure must not bypass the receipt: the DROP is
+            # already committed, so record the failure and continue to the
+            # backup hash + receipt — otherwise the destructive op is left
+            # without its audit record and a retry refuses on the existing
+            # backup file.
+            try:
+                db.execute("VACUUM")
+            except sqlite3.Error as e:
+                vacuum_error = f"{type(e).__name__}: {e}"
+                print(f"VACUUM failed (drop already committed; receipt still written): {vacuum_error}")
     backup_sha = _sha256(backup_path)
     receipt = {
         "agent": "archive_idea_links.py",
@@ -187,7 +197,8 @@ def phase_drop(
             "backup_path": str(backup_path),
             "backup_rows": backed_up,
             "dropped": True,
-            "vacuumed": vacuum,
+            "vacuumed": vacuum and vacuum_error is None,
+            "vacuum_error": vacuum_error,
         },
         "offhost_copy_attestation": offhost_copy,
         "sha256s": {"backup": backup_sha},
