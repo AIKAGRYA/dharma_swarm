@@ -417,6 +417,11 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
     except Exception as e:
         notes.append(f"cross-update failed: {type(e).__name__}: {e}")
 
+    # Manifest admission must precede the scoped ingest: the ingest (and every
+    # manifest-gated reader) drops files without a trusted manifest row, so an
+    # approved atom would otherwise stay unsearchable until a manual re-sign.
+    _admit_to_manifest(trusted_path, notes)
+
     if _wiki_vector_auto_ingest_enabled("approved"):
         _auto_ingest_file(trusted_path, notes)
 
@@ -442,6 +447,51 @@ def _resign_v2(schema, body: str, kernel_signature: str):
     return schema.model_copy(
         update={"provenance": schema.provenance.model_copy(update={"axiom_signature": sig})}
     )
+
+
+def _admit_to_manifest(trusted_path: Path, notes: list[str]) -> None:
+    """Admit a freshly approved file into the signed wiki trust manifest.
+
+    Only appends to an already-valid manifest: creating a fresh manifest here
+    would implicitly demote every legacy page to untrusted. Failure is
+    recorded, never raised — approval stands; searchability is the
+    recoverable part (re-run OP-3 signing).
+    """
+    try:
+        from .manifest import (
+            load_manifest,
+            manifest_entry_for_file,
+            manifest_path_for_root,
+            write_manifest,
+        )
+
+        root = trusted_path.parent
+        manifest = load_manifest(root)
+        if not manifest.valid:
+            notes.append(
+                "manifest admission skipped: no valid signed manifest at "
+                f"{root} (run OP-3 signing; approved file stays outside the "
+                "manifest until then)"
+            )
+            return
+        entries = dict(manifest.entries)
+        entry = manifest_entry_for_file(
+            trusted_path,
+            root=root,
+            tier="trusted",
+            reasons=("chetana.approve_atom",),
+        )
+        entries[entry.path] = entry
+        write_manifest(
+            tuple(entries[key] for key in sorted(entries)),
+            manifest_file=manifest_path_for_root(root),
+        )
+        notes.append(f"manifest admitted {entry.path} (tier=trusted)")
+    except Exception as e:
+        notes.append(
+            f"manifest admission failed: {type(e).__name__}: {e} — approved "
+            "file stays outside the manifest until OP-3 re-sign"
+        )
 
 
 def _auto_ingest_file(trusted_path: Path, notes: list[str]) -> None:

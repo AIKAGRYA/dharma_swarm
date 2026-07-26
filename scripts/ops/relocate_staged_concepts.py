@@ -27,7 +27,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -161,7 +161,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     pending_root.mkdir(parents=True, exist_ok=True)
+    # Write-ahead receipt: persist the plan BEFORE the first move so an
+    # interrupted apply always leaves an auditable record; rewritten after
+    # every applied move so the receipt tracks reality, not intent.
+    receipt_dir = args.receipt_dir.expanduser()
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    receipt_path = receipt_dir / f"op4_relocate_{receipt['timestamp'].replace(':', '-')}.json"
     applied: list[dict] = []
+
+    def _persist(status: str) -> None:
+        receipt["status"] = status
+        receipt["applied"] = applied
+        receipt_path.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+
+    _persist("in_progress")
     for move in moves:
         src, dest = Path(move["before"]), Path(move["after"])
         if dest.exists():
@@ -200,14 +213,21 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
             continue
-        shutil.move(str(src), str(dest))
+        # Atomic no-clobber move: os.link fails with FileExistsError if a
+        # concurrent promotion created the destination after the exists()
+        # check above — a plain rename/shutil.move would silently replace it.
+        try:
+            os.link(src, dest)
+        except FileExistsError:
+            skipped.append(
+                {"path": str(src), "reason": "collision appeared at apply time (atomic link refused)"}
+            )
+            continue
+        src.unlink()
         applied.append({**move, "sha256_after": _sha256(dest)})
+        _persist("in_progress")
     receipt["moves"] = applied
-
-    receipt_dir = args.receipt_dir.expanduser()
-    receipt_dir.mkdir(parents=True, exist_ok=True)
-    receipt_path = receipt_dir / f"op4_relocate_{receipt['timestamp'].replace(':', '-')}.json"
-    receipt_path.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    _persist("complete")
     print(json.dumps(receipt, indent=2))
     print(f"\nAPPLIED: {len(applied)} moved, {len(skipped)} skipped. Receipt: {receipt_path}",
           file=sys.stderr)

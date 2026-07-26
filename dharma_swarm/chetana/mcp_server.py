@@ -23,6 +23,7 @@ runs on it. Otherwise it prints a setup hint and exits non-zero.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import logging
@@ -518,7 +519,11 @@ def main() -> int:
         if fn is None:
             raise ValueError(f"unknown tool: {name}")
         try:
-            result = fn(**(arguments or {}))
+            # Worker thread, not the event loop: the sync tools reach
+            # KernelGuard.load(), whose _run_sync_awaitable deliberately
+            # refuses to run while a loop is active — calling them inline
+            # turns every gate-checked MCP approval into GATE_BLOCKED.
+            result = await asyncio.to_thread(fn, **(arguments or {}))
         except Exception as e:
             return [{"type": "text", "text": json.dumps({"error": str(e)})}]
         return [{"type": "text", "text": json.dumps(result)}]
