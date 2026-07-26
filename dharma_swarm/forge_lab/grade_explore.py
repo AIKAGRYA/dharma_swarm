@@ -17,6 +17,12 @@ from typing import Any, Callable
 
 TIER_EXPLORE_FAST = "explore-fast-host-pytest"
 TIER_CONFIRM_SWEBENCH = "confirm-swebench-docker"
+_VALID_CANDIDATE_FAILURE_PREFIXES = (
+    "test_returncode=",
+    "patch_apply_failed",
+    "patch_touches_test_file",
+    "empty_patch",
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +63,24 @@ class GradeOutcome:
     tier: str = TIER_EXPLORE_FAST
     error: str | None = None
     failures: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _observation_validity(
+    error_note: str | None,
+) -> tuple[bool, str, str | None]:
+    """Classify the legacy grader's overloaded third tuple field.
+
+    The PR-suite grader currently uses ``error`` both for ordinary candidate
+    failures and for infrastructure failure.  Keep that distinction explicit
+    here until the seam returns a typed result.
+    """
+    note = str(error_note or "").strip()
+    if not note or note.startswith("receipt="):
+        return True, "official_grader_result", None
+    head = note.split("; receipt=", 1)[0]
+    if head.startswith(_VALID_CANDIDATE_FAILURE_PREFIXES):
+        return True, "candidate_grade_failure", None
+    return False, "grader_error", "grader_error"
 
 
 class _ExploreOpenBudget:
@@ -216,10 +240,16 @@ def grade_genome_explore(
     failures: list[dict[str, Any]] = []
     tokens_total = 0
     for task_id, (inst, ctx) in task_contexts.items():
-        row: dict[str, Any] = {"task_id": task_id, "resolved": False, "tier": tier}
+        row: dict[str, Any] = {
+            "task_id": task_id,
+            "resolved": False,
+            "tier": tier,
+            "valid_observation": False,
+        }
         try:
             if getattr(budget, "invalid", False):
                 row["error"] = f"budget_invalid:{getattr(budget, 'invalid_reason', '')}"
+                row["observation_invalid_reason"] = "budget_invalid"
                 per_task.append(row)
                 failures.append(row)
                 continue
@@ -231,19 +261,27 @@ def grade_genome_explore(
             row["budget_soft_token_cap_exceeded"] = bool(getattr(budget, "soft_token_cap_exceeded", False))
             if not patch.strip():
                 row["error"] = "empty_patch"
+                row["valid_observation"] = True
+                row["observation_validity"] = "candidate_output_failure"
             elif getattr(budget, "invalid", False):
                 row["error"] = f"budget_invalid:{getattr(budget, 'invalid_reason', '')}"
+                row["observation_invalid_reason"] = "budget_invalid"
             else:
                 resolved, seconds, err = seams.grade_task(inst, patch, timeout=grade_timeout_s)
                 row.update(resolved=bool(resolved), grade_seconds=float(seconds))
+                valid_grade, validity, invalid_reason = _observation_validity(err)
+                row["valid_observation"] = valid_grade
+                row["observation_validity"] = validity
                 if err:
                     row["grade_note"] = str(err)[:500]
+                if invalid_reason:
+                    row["observation_invalid_reason"] = invalid_reason
         except Exception as exc:  # observation-level honesty: record, continue
             row["error"] = f"{type(exc).__name__}:{exc}"[:500]
+            row["observation_invalid_reason"] = "provider_or_grader_exception"
         per_task.append(row)
         if not row.get("resolved"):
             failures.append(row)
-    graded = [r for r in per_task if "error" not in r or r.get("resolved")]
     denominator = len(per_task)
     resolved_count = sum(1 for r in per_task if r.get("resolved"))
     pass_rate = (resolved_count / denominator) if denominator else 0.0

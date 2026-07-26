@@ -149,6 +149,61 @@ def test_max_uses_per_epoch_rotates_confirm_tasks(tmp_path: Path) -> None:
     assert next_epoch["task_ids"] == ["fresh-0"]
 
 
+def test_explore_prefers_globally_least_used_tasks_across_epochs(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks(
+        [_task("fresh-0"), _task("fresh-1"), _task("fresh-2")],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+    )
+
+    task_ids = []
+    for epoch in range(1, 5):
+        allocation = taskbed_ledger.allocate_explore(
+            count=1,
+            epoch_id=f"epoch-{epoch}",
+            lane_id="dgm",
+            allocation_id=f"explore-{epoch}",
+            db_path=db,
+        )
+        task_ids.extend(allocation["task_ids"])
+
+    assert task_ids == ["fresh-0", "fresh-1", "fresh-2", "fresh-0"]
+
+
+def test_confirm_cross_epoch_selection_remains_oldest_clean_first(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks(
+        [
+            _task("public-0", "possible_pretrain"),
+            _task("fresh-1"),
+            _task("fresh-2"),
+        ],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+    )
+
+    first = taskbed_ledger.allocate_confirm(
+        count=1,
+        min_count=1,
+        epoch_id="epoch-1",
+        lane_id="dgm",
+        allocation_id="confirm-1",
+        db_path=db,
+    )
+    second = taskbed_ledger.allocate_confirm(
+        count=1,
+        min_count=1,
+        epoch_id="epoch-2",
+        lane_id="dgm",
+        allocation_id="confirm-2",
+        db_path=db,
+    )
+
+    assert first["task_ids"] == ["fresh-1"]
+    assert second["task_ids"] == ["fresh-1"]
+
+
 def test_allocate_task_ids_binds_exact_prediction_slice(tmp_path: Path) -> None:
     db = tmp_path / "taskbed.db"
     taskbed_ledger.register_tasks(

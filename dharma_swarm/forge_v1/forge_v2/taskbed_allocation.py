@@ -29,11 +29,21 @@ def _eligible_rows(
     opposite = "confirm" if split == "explore" else "explore"
     clean_filter = ""
     params: list[Any] = []
+    usage_order = ""
     if split == "confirm":
         clean_filter = "AND t.contamination_state IN ({})".format(
             ",".join("?" for _ in sorted(CLEAN_CONFIRM_STATES))
         )
         params.extend(sorted(CLEAN_CONFIRM_STATES))
+    else:
+        usage_order = """
+             (
+               SELECT COUNT(*) FROM taskbed_allocations historical
+                WHERE historical.task_id=t.task_id
+                  AND historical.split='explore'
+                  AND historical.status='allocated'
+             ) ASC,
+        """
     params.extend([opposite, epoch_id])
     params.append(limit)
     return conn.execute(
@@ -49,7 +59,8 @@ def _eligible_rows(
              SELECT COUNT(*) FROM taskbed_allocations used
               WHERE used.task_id=t.task_id AND used.epoch_id=? AND used.status='allocated'
            ) < t.max_uses_per_epoch
-         ORDER BY t.created_at ASC, t.first_seen_at ASC, t.task_id ASC
+         ORDER BY {usage_order}
+                  t.created_at ASC, t.first_seen_at ASC, t.task_id ASC
          LIMIT ?
         """,
         params,

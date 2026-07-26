@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import random
 
 import pytest
@@ -11,7 +10,12 @@ from dharma_swarm.archive import ArchiveEntry, FitnessScore
 from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection
 from dharma_swarm.forge_lab.candidate_store import BLOCKED, GRADED, CandidateStore
 from dharma_swarm.forge_lab.freeform_explore import FreeformExploreEnvelope, MEMBRANE_REQUIREMENTS
-from dharma_swarm.forge_lab.genome_spec import DEFAULT_GENOME, check_genome, merged_with_defaults
+from dharma_swarm.forge_lab.genome_spec import (
+    DEFAULT_GENOME,
+    check_genome,
+    executed_phenotype,
+    merged_with_defaults,
+)
 
 # ---------------------------------------------------------------- ids
 
@@ -56,6 +60,30 @@ def test_unknown_keys_are_compost_not_errors():
     genome = merged_with_defaults({"generator_model": "m", "mycelium": {"spore": 1}})
     checked = check_genome(genome)
     assert checked.executable and "mycelium" in checked.ignored_fields
+
+
+def test_executed_phenotype_distinguishes_treatment_from_ignored_metadata():
+    parent = merged_with_defaults(
+        {
+            "arm_kind": "verify_chain",
+            "generator_model": "solver",
+            "verifier_model": "verifier",
+            "extra_instruction": "ignored by this arm",
+            "notes": "parent",
+        }
+    )
+    metadata_only = {
+        **parent,
+        "extra_instruction": "still ignored by this arm",
+        "k": 8,
+        "notes": "different full-genome identity",
+        "mycelium": {"spore": 1},
+    }
+    material = {**metadata_only, "per_call_tokens": parent["per_call_tokens"] + 1}
+
+    assert executed_phenotype(metadata_only) == executed_phenotype(parent)
+    assert executed_phenotype(material) != executed_phenotype(parent)
+    assert executed_phenotype("not a genome") is None
 
 
 # ---------------------------------------------------------------- selection

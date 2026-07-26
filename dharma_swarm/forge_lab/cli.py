@@ -17,7 +17,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--category", choices=["agent"], default="agent")
     run.add_argument("--generations", type=int, default=2)
     run.add_argument("--children", type=int, default=3, help="TOTAL children per generation")
-    run.add_argument("--tasks", type=int, default=3, help="explore tasks per generation")
+    run.add_argument(
+        "--tasks",
+        type=int,
+        default=3,
+        help="tasks in the fixed EXPLORE panel reused for seed and children",
+    )
     run.add_argument("--novelty-pressure", type=float, default=0.7)
     run.add_argument("--solver-model", default="", help="seed genome generator (model_pool id)")
     run.add_argument("--verifier-model", default="")

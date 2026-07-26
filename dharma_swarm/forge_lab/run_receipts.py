@@ -119,16 +119,23 @@ def _after_run_notes_payload(exp_dir: Path, closeout: dict[str, Any]) -> dict[st
         "experiment_id": closeout.get("experiment_id"),
         "generated_at": _now(),
         "closeout_state": closeout.get("closeout_state"),
-        "claim_boundary": "explore_only_no_positive_lift_claim",
+        "claim_boundary": "L0_legacy_configuration_search_no_paired_lift",
         "honesty_rule": {
-            "sample": "n_tasks_per_generation",
-            "sample_value": stats.get("n_tasks_per_generation"),
-            "interpretation": "ranking_signal_only_not_capability_claim",
+            "sample": "fixed_adaptive_search_task_panel",
+            "sample_value": stats.get("allocated_task_count"),
+            "interpretation": "descriptive_configuration_signal_only_non_causal",
         },
+        "evidence_level": stats.get("evidence_level"),
+        "research_interpretation": stats.get("research_interpretation"),
+        "paired_lift_claim_eligible": stats.get("paired_lift_claim_eligible"),
+        "authority_granted": stats.get("authority_granted"),
         "counters": stats.get("counters", {}),
         "seed_pass_rate": stats.get("seed_pass_rate"),
         "best_pass_rate": stats.get("best_pass_rate"),
         "tokens_spent_total": stats.get("tokens_spent_total"),
+        "reported_tokens_lower_bound": stats.get("reported_tokens_lower_bound"),
+        "usage_completeness": stats.get("usage_completeness"),
+        "tokens_spent_total_semantics": stats.get("tokens_spent_total_semantics"),
         "merkle_verified": (closeout.get("merkle") or {}).get("verified")
         if isinstance(closeout.get("merkle"), dict)
         else None,
@@ -162,6 +169,8 @@ def _render_after_run_notes(notes: dict[str, Any]) -> str:
         f"- seed_pass_rate: {notes.get('seed_pass_rate')}",
         f"- best_pass_rate: {notes.get('best_pass_rate')}",
         f"- tokens_spent_total: {notes.get('tokens_spent_total')}",
+        f"- reported_tokens_lower_bound: {notes.get('reported_tokens_lower_bound')}",
+        f"- usage_completeness: {notes.get('usage_completeness')}",
         f"- merkle_verified: {notes.get('merkle_verified')}",
         f"- scratch_worktree: state={scratch.get('state')} removed={scratch.get('removed')} path={scratch.get('path')}",
         f"- result_rows: {(notes.get('artifact_counts') or {}).get('result_rows', 0)}",
@@ -176,7 +185,9 @@ def _render_after_run_notes(notes: dict[str, Any]) -> str:
             "",
             "## Interpretation",
             "- EXPLORE closeouts cannot claim positive lift.",
-            "- Any seed-vs-best pass_rate difference at this scale is ranking signal only.",
+            "- This is adaptive L0 configuration search, not authentic self-editing.",
+            "- Same-panel score differences are descriptive and selection-biased, not paired causal evidence.",
+            "- Reported tokens are a lower bound, not a provider billing ceiling.",
         ]
     )
     return "\n".join(lines) + "\n"

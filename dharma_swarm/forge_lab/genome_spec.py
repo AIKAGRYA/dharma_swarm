@@ -10,7 +10,7 @@ ignored genes must never masquerade as evolution.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 ARM_KINDS = ("freeform_single", "self_moa", "verify_chain", "mixed_moa")
@@ -91,4 +91,29 @@ def merged_with_defaults(genome: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
-__all__ = ["ARM_KINDS", "DEFAULT_GENOME", "EXECUTED_FIELDS", "GenomeCheck", "check_genome", "merged_with_defaults"]
+def executed_phenotype(genome: Any) -> dict[str, Any] | None:
+    """Return only the genes the current executor can causally observe.
+
+    Candidate identity remains the full legacy genome.  This projection is a
+    separate epistemic boundary: changes to notes, compost, or genes ignored by
+    the selected arm are evidence about the mutator, not a distinct executable
+    treatment.
+    """
+    if not isinstance(genome, dict):
+        return None
+    merged = merged_with_defaults(genome)
+    checked = check_genome(merged)
+    if not checked.executable:
+        return None
+    return {field: merged.get(field) for field in checked.executed_fields}
+
+
+__all__ = [
+    "ARM_KINDS",
+    "DEFAULT_GENOME",
+    "EXECUTED_FIELDS",
+    "GenomeCheck",
+    "check_genome",
+    "executed_phenotype",
+    "merged_with_defaults",
+]
