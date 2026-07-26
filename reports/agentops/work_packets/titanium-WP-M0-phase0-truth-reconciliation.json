@@ -1,9 +1,9 @@
 {
   "id": "titanium-WP-M0-phase0-truth-reconciliation",
-  "base_ref": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
+  "base_ref": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
   "branch": "agent/titanium-m0-phase0-truth-20260725",
   "worktree": ".",
-  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1130, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
+  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1138, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
   "allowed_files": [
     "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
     "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
@@ -92,12 +92,13 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
+      "checked_at_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
       "details": []
     },
     "interface_mismatches": [
       "The canonical track listed thirteen execution and residual nodes although exact merged-main proof reduces them to eight non-duplicated blocking residuals.",
       "PR 1118's rolling branch was regenerated for current main but still has no checks because it lacks a check-triggering credential path; M0 therefore carries the current generated counts.",
+      "PR 1135 landed a same-track repair packet and regenerated CODEOWNERS; neither path intersects M0's six-file envelope, and the removed explicit broad governance routes remain WP-0F1 authority-policy debt rather than Phase 0 completion evidence.",
       "PR 1112 merged with two distinct unresolved correctness defects; those require an independent corrective code packet and are not hidden or repaired by this governance-only packet."
     ],
     "closest_existing_implementation": [
@@ -115,6 +116,6 @@
       "The PR 1112 sequence-allocation and durable-delivery defects require a separate owner-safe corrective PR."
     ],
     "rollback": "Revert this packet, receipt, canonical next-item reconciliation, and generated projections as one unit, then allow the rolling DocOps lane to regenerate counts; do not alter historical packet receipts.",
-    "packet_digest": "3013a0d3948d538b78b13ebab23373d7713b4aa669b67c12d10278d7bb4ed315"
+    "packet_digest": "e5391f54f5127854d56919714da015ec64e13399e5ff412ed03c21170d18de87"
   }
 }
