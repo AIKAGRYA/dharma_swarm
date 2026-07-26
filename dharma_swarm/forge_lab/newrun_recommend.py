@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +16,12 @@ from dharma_swarm.forge_lab.newrun import (
     DEFAULT_FAST_SOLVER,
     DEFAULT_FAST_VERIFIER,
     NEW_RUN_RECOMMEND_SCHEMA,
+    NewRunPreset,
     build_presets,
-    select_preset,
 )
+
+PROVIDER_SELFTEST_SCHEMA = "rsi_lab.provider_selftest.v1"
+DEFAULT_PROVIDER_EVIDENCE_MAX_AGE_S = 24 * 60 * 60
 
 
 def _archive_root() -> Path:
@@ -58,22 +62,40 @@ def _run_models(run: dict[str, Any]) -> dict[str, Any]:
     return ((run.get("manifest") or {}).get("config") or {})
 
 
-def _best_minus_seed(run: dict[str, Any]) -> float:
+def _has_descriptive_movement(run: dict[str, Any]) -> bool:
+    """Return only an admitted descriptive configuration-score increase.
+
+    Older closeouts lack these fields and therefore fail closed. In particular,
+    a best pass rate above zero is not enough: it may be a saturated one-task
+    panel or a metadata-only mutation whose executed phenotype never changed.
+    This is L0 configuration-search evidence, never paired lift.
+    """
+
     stats = _stats(run)
     try:
-        return float(stats.get("best_pass_rate", 0) or 0) - float(stats.get("seed_pass_rate", 0) or 0)
+        executed_changes = int(stats.get("executed_phenotype_changes") or 0)
+        observed_delta = float(stats.get("observed_best_delta") or 0)
+        unique_task_ids = int(stats.get("unique_task_ids") or 0)
     except (TypeError, ValueError):
-        return 0.0
+        return False
+    return (
+        stats.get("descriptive_movement_eligible") is True
+        and stats.get("evidence_level") == "L0_LegacyConfigurationSignal"
+        and stats.get("research_interpretation") == "configuration_search_signal"
+        and stats.get("paired_lift_claim_eligible") is False
+        and stats.get("authority_granted") is False
+        and stats.get("same_panel_comparable") is True
+        and executed_changes > 0
+        and unique_task_ids >= 3
+        and stats.get("seed_panel_saturated") is False
+        and observed_delta > 0
+    )
 
 
 def _has_archive_movement(run: dict[str, Any]) -> bool:
-    stats = _stats(run)
-    closeout_state = str((run.get("closeout") or {}).get("closeout_state") or "")
-    try:
-        best = float(stats.get("best_pass_rate", 0) or 0)
-    except (TypeError, ValueError):
-        best = 0.0
-    return closeout_state in {"inconclusive_low_power", "measured_negative"} and (_best_minus_seed(run) > 0 or best > 0)
+    """Compatibility alias for the pre-L0-typing helper name."""
+
+    return _has_descriptive_movement(run)
 
 
 def _is_diverse_route(run: dict[str, Any]) -> bool:
@@ -86,53 +108,292 @@ def _is_fast_route(run: dict[str, Any]) -> bool:
     return cfg.get("solver_model") == DEFAULT_FAST_SOLVER and cfg.get("verifier_model") == DEFAULT_FAST_VERIFIER and cfg.get("mutator_model") == DEFAULT_FAST_MUTATOR
 
 
-def _latest_provider_selftest() -> dict[str, Any] | None:
+def _provider_receipts() -> list[dict[str, Any]]:
     root = Path(os.environ.get("RSI_LAB_PROVIDER_SELFTEST_ROOT", Path.home() / ".dharma" / "forge_lab" / "provider_selftests"))
     if not root.exists():
-        return None
-    receipts = sorted(root.glob("*provider_selftest.json"), key=lambda path: path.stat().st_mtime, reverse=True)
-    for path in receipts:
+        return []
+    now_raw = os.environ.get("RSI_LAB_PROVIDER_SELFTEST_NOW", "").strip()
+    now = _parse_timestamp(now_raw) if now_raw else datetime.now(timezone.utc)
+    if now is None:
+        now = datetime.now(timezone.utc)
+    try:
+        max_age_s = max(
+            0,
+            int(
+                os.environ.get(
+                    "RSI_LAB_PROVIDER_SELFTEST_MAX_AGE_S",
+                    DEFAULT_PROVIDER_EVIDENCE_MAX_AGE_S,
+                )
+            ),
+        )
+    except (TypeError, ValueError):
+        max_age_s = DEFAULT_PROVIDER_EVIDENCE_MAX_AGE_S
+    receipts: list[dict[str, Any]] = []
+    for path in root.glob("*provider_selftest.json"):
         payload = _safe_json(path)
-        if payload:
-            payload.setdefault("path", str(path))
-            return payload
-    return None
+        checked_at = _parse_timestamp(str(payload.get("checked_at") or ""))
+        if (
+            not payload
+            or payload.get("schema") != PROVIDER_SELFTEST_SCHEMA
+            or payload.get("live") is not True
+            or checked_at is None
+        ):
+            continue
+        raw_age_s = (now - checked_at).total_seconds()
+        age_s = max(0.0, raw_age_s)
+        payload.setdefault("path", str(path))
+        payload["_mtime"] = path.stat().st_mtime
+        payload["_age_seconds"] = round(age_s, 3)
+        payload["_fresh"] = -300 <= raw_age_s <= max_age_s
+        payload["_max_age_seconds"] = max_age_s
+        receipts.append(payload)
+    return sorted(
+        receipts,
+        key=lambda payload: (
+            str(payload.get("checked_at") or ""),
+            float(payload.get("_mtime") or 0),
+            str(payload.get("path") or ""),
+        ),
+        reverse=True,
+    )
+
+
+def _parse_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _latest_route_evidence(
+    receipts: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Project the newest live result for every exact model id.
+
+    A newer failure intentionally shadows an older success. Aggregate receipt
+    health and family counts cannot stand in for a callable exact route.
+    """
+
+    routes: dict[str, dict[str, Any]] = {}
+    for receipt in receipts:
+        if receipt.get("_fresh") is not True:
+            continue
+        for row in receipt.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            model_id = str(row.get("model_id") or "").strip()
+            if not model_id or model_id in routes:
+                continue
+            callable_exact = (
+                row.get("live") is True
+                and row.get("callable") is True
+                and str(row.get("outcome") or "") == "callable"
+                and str(row.get("stage") or "") == "complete"
+            )
+            routes[model_id] = {
+                "callable": callable_exact,
+                "outcome": row.get("outcome"),
+                "stage": row.get("stage"),
+                "error_type": row.get("error_type"),
+                "checked_at": receipt.get("checked_at"),
+                "age_seconds": receipt.get("_age_seconds"),
+                "fresh": True,
+                "receipt": receipt.get("path") or receipt.get("receipt"),
+                "host_bound": bool(receipt.get("execution_host")),
+                "code_bound": bool(receipt.get("source_commit")),
+            }
+    return routes
+
+
+def _preset_route_status(
+    preset: NewRunPreset,
+    routes: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    models = list(
+        dict.fromkeys(
+            (
+                preset.solver_model,
+                preset.verifier_model,
+                preset.mutator_model,
+            )
+        )
+    )
+    missing = [model for model in models if model not in routes]
+    unavailable = [
+        model
+        for model in models
+        if model in routes and routes[model].get("callable") is not True
+    ]
+    observed_callable = not missing and not unavailable
+    return {
+        "callable": observed_callable,
+        "observed_callable": observed_callable,
+        "host_bound": observed_callable
+        and all(routes[model].get("host_bound") is True for model in models),
+        "code_bound": observed_callable
+        and all(routes[model].get("code_bound") is True for model in models),
+        "models": models,
+        "missing": missing,
+        "unavailable": unavailable,
+    }
 
 
 def recommend_preset(current_model: str | None = None) -> dict[str, Any]:
     """Recommend a conservative next shadow EXPLORE run."""
 
     recent = _recent_runs()
-    provider = _latest_provider_selftest()
-    provider_ok = bool(provider and provider.get("ok") and int(provider.get("independent_route_count") or 0) >= 2)
+    receipts = _provider_receipts()
+    routes = _latest_route_evidence(receipts)
     latest_fast = next((run for run in recent if _is_fast_route(run)), None)
     latest_diverse = next((run for run in recent if _is_diverse_route(run)), None)
-    fast_moved = bool(latest_fast and _has_archive_movement(latest_fast))
+    fast_descriptive_movement = bool(
+        latest_fast and _has_descriptive_movement(latest_fast)
+    )
     diverse_recent_negative = bool(latest_diverse and str((latest_diverse.get("closeout") or {}).get("closeout_state") or "") == "measured_negative")
-    reasons: list[str] = []
-    preset = "fast"
-    if not provider_ok:
-        reasons.append("provider health is missing or below 2 independent callable families; start with cheap smoke")
-    elif not fast_moved:
-        reasons.append("latest fast lane has no positive archive movement; rerun cheap smoke before soaking")
-    elif diverse_recent_negative:
-        reasons.append("latest diverse lane was measured_negative; prefer current-model soak over diverse")
-        preset = "soak"
-    else:
-        recent_movers = [run for run in recent[:4] if _has_archive_movement(run)]
-        if len(recent_movers) >= 2:
-            reasons.append("provider health is clean and at least two recent runs show archive movement; diverse is allowed")
-            preset = "diverse"
-        else:
-            reasons.append("fast lane moved; collect more depth with soak before diverse")
-            preset = "soak"
+    recent_descriptive_movers = [
+        run for run in recent[:4] if _has_descriptive_movement(run)
+    ]
     presets = build_presets(current_model)
-    selected = select_preset(presets, preset)
+    route_status = {
+        preset.name: _preset_route_status(preset, routes)
+        for preset in presets
+    }
+    reasons: list[str] = []
+
+    # The signal lane is first when fresh exact-route observations cover its
+    # cloud trio: it spends its L0 budget on five same-panel adaptive-search
+    # tasks rather than the legacy diverse lane's candidate churn.
+    if not fast_descriptive_movement:
+        preferred = ["signal", "fast", "current", "soak", "diverse"]
+        reasons.append(
+            "no recent run records an eligible same-panel positive descriptive "
+            "configuration delta; prefer the five-task signal panel"
+        )
+    elif diverse_recent_negative:
+        preferred = ["signal", "soak", "fast", "current", "diverse"]
+        reasons.append(
+            "latest diverse lane was measured_negative; prefer the bounded signal panel"
+        )
+    elif len(recent_descriptive_movers) >= 2:
+        preferred = ["signal", "diverse", "soak", "fast", "current"]
+        reasons.append(
+            "recent descriptive configuration movement is recorded, but the "
+            "five-task signal panel remains the conservative next measurement"
+        )
+    else:
+        preferred = ["signal", "soak", "fast", "current", "diverse"]
+        reasons.append(
+            "one recent run records descriptive movement; collect a broader "
+            "same-panel comparison before candidate churn"
+        )
+
+    selected = next(
+        (
+            preset
+            for name in preferred
+            for preset in presets
+            if preset.name == name and route_status[name]["callable"]
+        ),
+        None,
+    )
+    if selected is None:
+        missing_models = sorted(
+            {
+                model
+                for status in route_status.values()
+                for model in (*status["missing"], *status["unavailable"])
+            }
+        )
+        reasons.append(
+            "no preset has explicit callable evidence for every exact solver, verifier, "
+            "and mutator route; run `rsi provider selftest --profile newrun --live`"
+        )
+        if missing_models:
+            reasons.append(
+                "unproven or unavailable exact routes: " + ", ".join(missing_models)
+            )
+    else:
+        selected_status = route_status[selected.name]
+        binding = (
+            "host/code-bound observations"
+            if selected_status["host_bound"] and selected_status["code_bound"]
+            else "advisory observations without complete host/code binding"
+        )
+        reasons.append(
+            f"selected {selected.name} from fresh exact-route {binding}"
+        )
+
+    latest_provider = receipts[0] if receipts else None
+    selected_status = route_status.get(selected.name) if selected else None
     return {
         "schema": NEW_RUN_RECOMMEND_SCHEMA,
-        "selected_preset": preset,
-        "selected": selected.as_dict(),
+        "selected_preset": selected.name if selected else None,
+        "selected": selected.as_dict() if selected else None,
         "reasons": reasons or ["default conservative smoke"],
-        "provider_selftest": {"present": provider is not None, "ok": bool(provider.get("ok")) if provider else False, "independent_route_count": int(provider.get("independent_route_count") or 0) if provider else 0, "receipt": provider.get("path") or provider.get("receipt") if provider else None},
-        "recent_runs": [{"experiment_id": run.get("experiment_id"), "path": run.get("path"), "closeout_state": (run.get("closeout") or {}).get("closeout_state"), "models": {key: _run_models(run).get(key) for key in ("solver_model", "verifier_model", "mutator_model")}, "stats": {key: _stats(run).get(key) for key in ("seed_pass_rate", "best_pass_rate", "tokens_spent_total")}} for run in recent[:6]],
+        "provider_selftest": {
+            "present": bool(receipts),
+            "scanned_receipts": len(receipts),
+            "max_age_seconds": (
+                int(latest_provider.get("_max_age_seconds"))
+                if latest_provider
+                else DEFAULT_PROVIDER_EVIDENCE_MAX_AGE_S
+            ),
+            "ok": (
+                bool(latest_provider.get("ok"))
+                if latest_provider
+                else False
+            ),
+            "independent_route_count": (
+                int(latest_provider.get("independent_route_count") or 0)
+                if latest_provider
+                else 0
+            ),
+            "receipt": (
+                latest_provider.get("path") or latest_provider.get("receipt")
+                if latest_provider
+                else None
+            ),
+            "routes": routes,
+            "preset_route_status": route_status,
+            "advisory_only": True,
+            "host_bound": bool(
+                selected_status and selected_status.get("host_bound")
+            ),
+            "code_bound": bool(
+                selected_status and selected_status.get("code_bound")
+            ),
+        },
+        "recent_runs": [
+            {
+                "experiment_id": run.get("experiment_id"),
+                "path": run.get("path"),
+                "closeout_state": (run.get("closeout") or {}).get("closeout_state"),
+                "models": {
+                    key: _run_models(run).get(key)
+                    for key in ("solver_model", "verifier_model", "mutator_model")
+                },
+                "stats": {
+                    key: _stats(run).get(key)
+                    for key in (
+                        "seed_pass_rate",
+                        "best_pass_rate",
+                        "reported_tokens_lower_bound",
+                        "usage_completeness",
+                        "same_panel_comparable",
+                        "executed_phenotype_changes",
+                        "unique_task_ids",
+                        "seed_panel_saturated",
+                        "observed_best_delta",
+                        "descriptive_movement_eligible",
+                        "evidence_level",
+                    )
+                },
+            }
+            for run in recent[:6]
+        ],
     }

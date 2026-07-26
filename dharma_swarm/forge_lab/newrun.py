@@ -13,7 +13,7 @@ import argparse
 import json
 import os
 import shlex
-from pathlib import Path
+import sys
 from dataclasses import dataclass, replace
 from typing import Any, Iterable
 
@@ -37,6 +37,9 @@ DEFAULT_FAST_MUTATOR = "gemini-2.5-flash"
 DEFAULT_DIVERSE_SOLVER = "deepseek-v4-pro:cloud"
 DEFAULT_DIVERSE_VERIFIER = "minimax-m3:cloud"
 DEFAULT_DIVERSE_MUTATOR = "kimi-k2.7-code:cloud"
+DEFAULT_SIGNAL_SOLVER = DEFAULT_DIVERSE_SOLVER
+DEFAULT_SIGNAL_VERIFIER = DEFAULT_DIVERSE_VERIFIER
+DEFAULT_SIGNAL_MUTATOR = DEFAULT_DIVERSE_MUTATOR
 
 
 @dataclass(frozen=True)
@@ -183,7 +186,7 @@ def build_presets(current_model: str | None = None) -> list[NewRunPreset]:
             label="Fast frontier smoke",
             description=(
                 "Lowest-friction live EXPLORE run: one generation, one child, one task. "
-                "Use this to keep the lab moving and verify the current route still works."
+                "Use it only as route smoke; one task is never evolutionary movement."
             ),
             solver_model=DEFAULT_FAST_SOLVER,
             verifier_model=DEFAULT_FAST_VERIFIER,
@@ -196,8 +199,8 @@ def build_presets(current_model: str | None = None) -> list[NewRunPreset]:
             max_experiment_tokens=220_000,
             rng_seed=20260723,
             notes=(
-                "Matches the latest successful local low-power shape: Kimi solve, GLM verify, Gemini mutate.",
-                "Good default when you want one fresh receipt without a long soak.",
+                "The recommender selects this only with fresh exact-route observations.",
+                "One task can verify plumbing, not candidate quality.",
             ),
         ),
         NewRunPreset(
@@ -220,6 +223,30 @@ def build_presets(current_model: str | None = None) -> list[NewRunPreset]:
             notes=(current_label, "Pass --model <id> or set RSILAB_MODEL/RSI_MODEL/FORGE_MODEL/CODEX_MODEL."),
         ),
         NewRunPreset(
+            name="signal",
+            label="Configuration-search signal panel",
+            description=(
+                "One generation, two children, and five same-panel adaptive-search "
+                "tasks through the cloud trio. This trades candidate churn for a "
+                "broader descriptive configuration comparison."
+            ),
+            solver_model=DEFAULT_SIGNAL_SOLVER,
+            verifier_model=DEFAULT_SIGNAL_VERIFIER,
+            mutator_model=DEFAULT_SIGNAL_MUTATOR,
+            generations=1,
+            children=2,
+            tasks=5,
+            budget_tokens=100_000,
+            budget_usd=2.0,
+            max_experiment_tokens=500_000,
+            rng_seed=20260726,
+            notes=(
+                "L0 legacy configuration search only; not authentic self-editing or paired lift.",
+                "The panel is exposed to mutation and is not sealed or held out.",
+                "500k is a reported-usage stop threshold, not a provider-request or billing ceiling.",
+            ),
+        ),
+        NewRunPreset(
             name="diverse",
             label="Diverse frontier n=3",
             description=(
@@ -237,7 +264,7 @@ def build_presets(current_model: str | None = None) -> list[NewRunPreset]:
             max_experiment_tokens=1_200_000,
             rng_seed=20260725,
             notes=(
-                "Higher spend and wall time; still EXPLORE-only and not a promotion claim.",
+                "Higher spend and wall time; still L0 configuration search only.",
                 "Local July 21 run of this shape was measured_negative; rerun only after route health improves.",
             ),
         ),
@@ -258,7 +285,10 @@ def build_presets(current_model: str | None = None) -> list[NewRunPreset]:
             budget_usd=2.0,
             max_experiment_tokens=700_000,
             rng_seed=20260726,
-            notes=("Good middle path between fast smoke and diverse n=3.", current_label),
+            notes=(
+                "Two tasks are an operational soak, below the three-task descriptive-movement floor.",
+                current_label,
+            ),
         ),
     ]
 
@@ -293,7 +323,11 @@ def apply_overrides(preset: NewRunPreset, args: argparse.Namespace) -> NewRunPre
 
 
 def add_newrun_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--preset", choices=("fast", "current", "diverse", "soak"), help="select a run preset")
+    parser.add_argument(
+        "--preset",
+        choices=("fast", "current", "signal", "diverse", "soak"),
+        help="select a run preset",
+    )
     parser.add_argument("--recommend", action="store_true", help="inspect recent archive/provider evidence and choose a preset")
     parser.add_argument("--model", help="current model id to use for the current/soak presets")
     parser.add_argument("--solver-model", help="override solver model id")
@@ -331,6 +365,10 @@ def _payload(args: argparse.Namespace) -> tuple[dict[str, Any], NewRunPreset | N
             "live_model_spend_requires_execute": True,
             "production_mutation": False,
             "positive_lift_claim": False,
+            "evidence_level": "L0_LegacyConfigurationSignal",
+            "authentic_self_editing": False,
+            "paired_lift_claim": False,
+            "authority_granted": False,
         },
         "presets": [
             p.as_dict(source_repo=args.source_repo, keep_worktree=args.keep_worktree)
@@ -348,7 +386,10 @@ def print_human_menu(payload: dict[str, Any]) -> None:
     source = payload.get("current_model_source") or "pass --model or set RSILAB_MODEL"
     print(f"Current model: {current} ({source})")
     print()
-    print("Safety: shadow EXPLORE only; --execute can spend model tokens; no production mutation; no positive-lift claim.")
+    print(
+        "Safety: shadow L0 configuration search only; --execute can spend model "
+        "tokens; no authentic self-editing, production mutation, or paired-lift claim."
+    )
     print()
     print("Options:")
     for index, preset in enumerate(payload["presets"], start=1):
@@ -370,6 +411,7 @@ def print_human_menu(payload: dict[str, Any]) -> None:
         print()
     print("Examples:")
     print("  RSILAB - NEWRUN --recommend")
+    print("  RSILAB - NEWRUN --preset signal --execute")
     print("  RSILAB - NEWRUN --preset fast --execute")
     print("  rsi newrun --model glm-5.2 --preset soak --execute")
     print("  rsi newrun --preset current --model claude-opus-4-6 --execute")
@@ -380,6 +422,13 @@ def run_newrun(args: argparse.Namespace) -> int:
     if args.json and not args.execute:
         print(json.dumps({"ok": True, **payload}, indent=2, sort_keys=True))
         return 0
+    if not selected and args.execute:
+        print(
+            "[rsi newrun] no exact-route, fresh recommendation is available; "
+            "nothing was executed",
+            file=sys.stderr,
+        )
+        return 2
     if not selected:
         print_human_menu(payload)
         return 0

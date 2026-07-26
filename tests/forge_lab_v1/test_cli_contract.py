@@ -240,6 +240,7 @@ def test_newrun_menu_projects_bleeding_edge_options_without_live_imports() -> No
     assert {preset["name"] for preset in payload["presets"]} == {
         "fast",
         "current",
+        "signal",
         "diverse",
         "soak",
     }
@@ -262,6 +263,22 @@ def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
     assert "--solver-model deepseek-v4-pro:cloud" in selected["command"]
     assert "--verifier-model minimax-m3:cloud" in selected["command"]
     assert "--mutator-model kimi-k2.7-code:cloud" in selected["command"]
+
+
+def test_newrun_signal_preset_uses_broad_fixed_panel_shape() -> None:
+    result = _invoke(MODULE_COMMAND, "newrun", "--json", "--preset", "signal")
+
+    assert result.returncode == 0, result.stderr
+    selected = json.loads(result.stdout)["selected"]
+    assert selected["solver_model"] == "deepseek-v4-pro:cloud"
+    assert selected["verifier_model"] == "minimax-m3:cloud"
+    assert selected["mutator_model"] == "kimi-k2.7-code:cloud"
+    assert selected["generations"] == 1
+    assert selected["children"] == 2
+    assert selected["tasks"] == 5
+    assert selected["budget_tokens"] == 100_000
+    assert selected["max_experiment_tokens"] == 500_000
+    assert "--generations 1 --children 2 --tasks 5" in selected["command"]
 
 
 
@@ -421,90 +438,11 @@ raise SystemExit(rsi_cli.main(['doctor']))
     assert "traceback" not in result.stderr.lower()
 
 
-def test_newrun_recommend_selects_fast_without_provider_health(tmp_path: Path) -> None:
-    archive = tmp_path / "archive" / "agent_evolution"
-    run_dir = archive / "exp_fast_latest"
-    run_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(
-        json.dumps(
-            {
-                "experiment_id": "exp_fast_latest",
-                "config": {
-                    "solver_model": "kimi-code",
-                    "verifier_model": "glm-5.2",
-                    "mutator_model": "gemini-2.5-flash",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    (run_dir / "closeout.json").write_text(
-        json.dumps(
-            {
-                "experiment_id": "exp_fast_latest",
-                "closeout_state": "inconclusive_low_power",
-                "stats": {"seed_pass_rate": 0.0, "best_pass_rate": 1.0},
-            }
-        ),
-        encoding="utf-8",
-    )
-    env = os.environ.copy()
-    env["PYTHONPATH"] = _pythonpath(env)
-    env["RSI_LAB_REPO"] = str(REPO_ROOT)
-    env["RSI_LAB_PYTHON"] = sys.executable
-    env["RSI_LAB_PYDEPS"] = str(PYDEPS_ROOT)
-    env["RSILAB_EVOLUTION_ARCHIVE_ROOT"] = str(archive)
-    env["RSI_LAB_PROVIDER_SELFTEST_ROOT"] = str(tmp_path / "missing-provider-receipts")
-
-    result = subprocess.run(
-        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["recommendation"]["selected_preset"] == "fast"
-    assert payload["selected"]["name"] == "fast"
-    assert "provider health" in payload["recommendation"]["reasons"][0]
-
-
-def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(tmp_path: Path) -> None:
-    archive = tmp_path / "archive" / "agent_evolution"
-    run_dir = archive / "exp_fast_latest"
-    run_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(
-        json.dumps(
-            {
-                "experiment_id": "exp_fast_latest",
-                "config": {
-                    "solver_model": "kimi-code",
-                    "verifier_model": "glm-5.2",
-                    "mutator_model": "gemini-2.5-flash",
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    (run_dir / "closeout.json").write_text(
-        json.dumps(
-            {
-                "experiment_id": "exp_fast_latest",
-                "closeout_state": "inconclusive_low_power",
-                "stats": {"seed_pass_rate": 0.0, "best_pass_rate": 1.0},
-            }
-        ),
-        encoding="utf-8",
-    )
-    provider_root = tmp_path / "provider"
-    provider_root.mkdir()
-    (provider_root / "20260723T000000Z__frontier__provider_selftest.json").write_text(
-        json.dumps({"ok": True, "independent_route_count": 2, "receipt": "test"}),
-        encoding="utf-8",
-    )
+def _newrun_recommend_env(
+    *,
+    archive: Path,
+    provider_root: Path,
+) -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = _pythonpath(env)
     env["RSI_LAB_REPO"] = str(REPO_ROOT)
@@ -512,6 +450,72 @@ def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(t
     env["RSI_LAB_PYDEPS"] = str(PYDEPS_ROOT)
     env["RSILAB_EVOLUTION_ARCHIVE_ROOT"] = str(archive)
     env["RSI_LAB_PROVIDER_SELFTEST_ROOT"] = str(provider_root)
+    env["RSI_LAB_PROVIDER_SELFTEST_NOW"] = "2026-07-26T00:00:00Z"
+    return env
+
+
+def _write_provider_receipt(
+    root: Path,
+    *,
+    checked_at: str,
+    rows: list[dict[str, object]],
+    suffix: str,
+) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"{checked_at.replace(':', '').replace('-', '')}__{suffix}__provider_selftest.json").write_text(
+        json.dumps(
+            {
+                "schema": "rsi_lab.provider_selftest.v1",
+                "live": True,
+                "checked_at": checked_at,
+                "rows": rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _provider_row(model_id: str, *, is_callable: bool) -> dict[str, object]:
+    return {
+        "model_id": model_id,
+        "live": True,
+        "callable": is_callable,
+        "outcome": "callable" if is_callable else "unavailable",
+        "stage": "complete" if is_callable else "call",
+    }
+
+
+def test_newrun_recommend_fails_closed_without_exact_provider_health(tmp_path: Path) -> None:
+    archive = tmp_path / "archive" / "agent_evolution"
+    run_dir = archive / "exp_fast_latest"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "config": {
+                    "solver_model": "kimi-code",
+                    "verifier_model": "glm-5.2",
+                    "mutator_model": "gemini-2.5-flash",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "closeout.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "closeout_state": "inconclusive_low_power",
+                "stats": {"seed_pass_rate": 0.0, "best_pass_rate": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = _newrun_recommend_env(
+        archive=archive,
+        provider_root=tmp_path / "missing-provider-receipts",
+    )
 
     result = subprocess.run(
         [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
@@ -524,5 +528,257 @@ def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(t
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["recommendation"]["selected_preset"] == "soak"
-    assert payload["selected"]["name"] == "soak"
+    assert payload["recommendation"]["selected_preset"] is None
+    assert payload["recommendation"]["selected"] is None
+    assert payload["selected"] is None
+    assert any(
+        "no preset has explicit callable evidence" in reason
+        for reason in payload["recommendation"]["reasons"]
+    )
+
+
+def test_newrun_explicit_preset_remains_allowed_when_recommendation_fails(
+    tmp_path: Path,
+) -> None:
+    result = subprocess.run(
+        [
+            *MODULE_COMMAND,
+            "newrun",
+            "--recommend",
+            "--preset",
+            "fast",
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        env=_newrun_recommend_env(
+            archive=tmp_path / "archive",
+            provider_root=tmp_path / "provider",
+        ),
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] is None
+    assert payload["selected"]["name"] == "fast"
+
+
+def test_newrun_recommend_execute_fails_when_nothing_is_selected(
+    tmp_path: Path,
+) -> None:
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--execute"],
+        cwd=REPO_ROOT,
+        env=_newrun_recommend_env(
+            archive=tmp_path / "archive",
+            provider_root=tmp_path / "provider",
+        ),
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "nothing was executed" in result.stderr
+
+
+def test_newrun_recommend_selects_signal_from_exact_routes_across_receipts(tmp_path: Path) -> None:
+    archive = tmp_path / "archive" / "agent_evolution"
+    run_dir = archive / "exp_fast_latest"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "config": {
+                    "solver_model": "kimi-code",
+                    "verifier_model": "glm-5.2",
+                    "mutator_model": "gemini-2.5-flash",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "closeout.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "closeout_state": "inconclusive_low_power",
+                "stats": {
+                    "seed_pass_rate": 0.0,
+                    "best_pass_rate": 1.0,
+                    "same_panel_comparable": True,
+                    "executed_phenotype_changes": 1,
+                    "unique_task_ids": 5,
+                    "seed_panel_saturated": False,
+                    "observed_best_delta": 1.0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    provider_root = tmp_path / "provider"
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-25T14:26:45Z",
+        suffix="solver",
+        rows=[_provider_row("deepseek-v4-pro:cloud", is_callable=True)],
+    )
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-25T14:32:27Z",
+        suffix="verifier",
+        rows=[_provider_row("minimax-m3:cloud", is_callable=True)],
+    )
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-25T14:32:36Z",
+        suffix="mutator",
+        rows=[_provider_row("kimi-k2.7-code:cloud", is_callable=True)],
+    )
+    env = _newrun_recommend_env(
+        archive=archive,
+        provider_root=provider_root,
+    )
+
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] == "signal"
+    assert payload["selected"]["name"] == "signal"
+    status = payload["recommendation"]["provider_selftest"]["preset_route_status"]
+    assert status["signal"]["callable"] is True
+    assert status["fast"]["callable"] is False
+
+
+def test_newrun_recommend_latest_exact_route_failure_shadows_success(
+    tmp_path: Path,
+) -> None:
+    archive = tmp_path / "archive"
+    provider_root = tmp_path / "provider"
+    trio = [
+        "deepseek-v4-pro:cloud",
+        "minimax-m3:cloud",
+        "kimi-k2.7-code:cloud",
+    ]
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-25T14:32:36Z",
+        suffix="trio-green",
+        rows=[_provider_row(model, is_callable=True) for model in trio],
+    )
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-25T14:39:03Z",
+        suffix="mutator-red",
+        rows=[_provider_row("kimi-k2.7-code:cloud", is_callable=False)],
+    )
+
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
+        cwd=REPO_ROOT,
+        env=_newrun_recommend_env(
+            archive=archive,
+            provider_root=provider_root,
+        ),
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] is None
+    assert payload["selected"] is None
+    routes = payload["recommendation"]["provider_selftest"]["routes"]
+    assert routes["kimi-k2.7-code:cloud"]["callable"] is False
+    assert "kimi-k2.7-code:cloud" in payload["recommendation"]["reasons"][-1]
+
+
+def test_newrun_recommend_rejects_stale_exact_route_receipts(tmp_path: Path) -> None:
+    provider_root = tmp_path / "provider"
+    trio = [
+        "deepseek-v4-pro:cloud",
+        "minimax-m3:cloud",
+        "kimi-k2.7-code:cloud",
+    ]
+    _write_provider_receipt(
+        provider_root,
+        checked_at="2026-07-24T00:00:00Z",
+        suffix="stale-trio",
+        rows=[_provider_row(model, is_callable=True) for model in trio],
+    )
+
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
+        cwd=REPO_ROOT,
+        env=_newrun_recommend_env(
+            archive=tmp_path / "archive",
+            provider_root=provider_root,
+        ),
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] is None
+    assert payload["selected"] is None
+    assert payload["recommendation"]["provider_selftest"]["routes"] == {}
+
+
+def test_archive_movement_requires_comparable_executed_unsaturated_delta() -> None:
+    from dharma_swarm.forge_lab.newrun_recommend import _has_archive_movement
+
+    def run(stats: dict[str, object]) -> dict[str, object]:
+        return {"closeout": {"stats": stats}}
+
+    legacy = {
+        "seed_pass_rate": 0.0,
+        "best_pass_rate": 1.0,
+    }
+    comparable = {
+        "descriptive_movement_eligible": True,
+        "evidence_level": "L0_LegacyConfigurationSignal",
+        "research_interpretation": "configuration_search_signal",
+        "paired_lift_claim_eligible": False,
+        "authority_granted": False,
+        "same_panel_comparable": True,
+        "executed_phenotype_changes": 1,
+        "unique_task_ids": 5,
+        "seed_panel_saturated": False,
+        "observed_best_delta": 0.25,
+    }
+
+    assert _has_archive_movement(run(legacy)) is False
+    assert _has_archive_movement(
+        run({**comparable, "executed_phenotype_changes": 0})
+    ) is False
+    assert _has_archive_movement(
+        run(
+            {
+                **comparable,
+                "seed_pass_rate": 0.0,
+                "best_pass_rate": 1.0,
+                "unique_task_ids": 1,
+            }
+        )
+    ) is False
+    assert _has_archive_movement(
+        run({**comparable, "seed_panel_saturated": True})
+    ) is False
+    assert _has_archive_movement(
+        run({**comparable, "observed_best_delta": 0.0})
+    ) is False
+    assert _has_archive_movement(run(comparable)) is True
