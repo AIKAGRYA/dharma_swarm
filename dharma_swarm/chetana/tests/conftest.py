@@ -55,14 +55,16 @@ def chetana_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     quarantine_root = tmp_path / "quarantine"
     wiki_root = tmp_path / "wiki"
     trusted_root = wiki_root / "concepts"
+    pending_root = wiki_root / "pending"
 
-    for d in (staging_root, quarantine_root, wiki_root, trusted_root):
+    for d in (staging_root, quarantine_root, wiki_root, trusted_root, pending_root):
         d.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr(staging_mod, "STAGING_ROOT", staging_root, raising=True)
     monkeypatch.setattr(staging_mod, "QUARANTINE_ROOT", quarantine_root, raising=True)
     monkeypatch.setattr(staging_mod, "WIKI_ROOT", wiki_root, raising=True)
     monkeypatch.setattr(staging_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
+    monkeypatch.setattr(staging_mod, "WIKI_PENDING_ROOT", pending_root, raising=True)
     monkeypatch.setattr(decay_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
     monkeypatch.setattr(gap_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
     monkeypatch.setattr(palace_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
