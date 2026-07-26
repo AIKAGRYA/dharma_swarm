@@ -6,11 +6,13 @@
   "intent": "PR #1135 repair: regenerate .github/CODEOWNERS from measured blast radius. The chetana staging-boundary changes add manifest-trust import edges from the memory-kernel wiki adapter and wiki_vector_ingest into chetana, pushing modules over the blast threshold; the CODEOWNERS gate and tests/test_hermetic_supply_chain.py require the regenerated file committed in the same PR.",
   "allowed_files": [
     ".github/CODEOWNERS",
+    "dharma_swarm/chetana/claude_code_plugin/chetana/commands/chetana-promote.md",
     "dharma_swarm/chetana/cli.py",
     "dharma_swarm/chetana/governance.py",
     "dharma_swarm/chetana/manifest.py",
     "dharma_swarm/chetana/mcp_server.py",
     "dharma_swarm/chetana/promote.py",
+    "dharma_swarm/chetana/promote_support.py",
     "dharma_swarm/chetana/provenance.py",
     "dharma_swarm/chetana/revival.py",
     "dharma_swarm/chetana/staging.py",
@@ -99,6 +101,6 @@
     ],
     "honest_blockers": [],
     "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
-    "packet_digest": "2f38b5a6482e9b23bda703cfe287321e697461024a972f41a2ebedaea68c2b24"
+    "packet_digest": "35dce965d7228e5749e8c1a3d42dc1f321ef14704ea23d01956b6eadf004fa82"
   }
 }
