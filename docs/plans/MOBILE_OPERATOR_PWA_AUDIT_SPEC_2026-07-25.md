@@ -283,6 +283,7 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
       - dashboard/playwright/**
       - dashboard/public/**
       - .github/workflows/dashboard-visual.yml   # new Phase 0 CI lane
+      - reports/governance/mobile_pwa/**          # closure receipts (git-tracked governance receipts, titanium precedent)
       - docs/plans/MOBILE_OPERATOR_PWA_AUDIT_SPEC_2026-07-25.md
       # Phase-5-gated (operator ratification; claimed only when Phase 5 opens):
       - api/ws.py
@@ -324,9 +325,13 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
       # admission — and any pr_merged criterion MUST carry a numeric pr: the
       # checker calls int(crit["pr"]) (scripts/governance/check_track_status.py:1087),
       # so a placeholder string crashes the track-status gate.
-      # Oracle note: these suites are claimant-run; evidence_grades downgrades
-      # oracle-dependent passes to S2 (evidence_grades.yaml:34-38) — same posture
-      # as helm's bun-test gate.
+      # Rigor note: command_passes executes outcomes but is NEITHER in
+      # RIGOROUS_KINDS (check_track_status.py:580-590) NOR graded
+      # (:620-632, defaults to 0), and test_passes is pytest-only
+      # (:729-738, :1094-1099) so it cannot express Playwright suites.
+      # The receipt_valid criterion below is what supplies the rigorous,
+      # graded (S2) evidence the shippable gate requires — without it the
+      # track could pass every suite and still never close.
       - id: mobile_shell_and_p0_baselines_green
         # Phases 0/1/3: shell + P0 routes render at 390px with no horizontal
         # scroll, >=44px action targets, visual baselines green on the mobile
@@ -352,6 +357,17 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
         # have crashed the checker — see int() note above).
         kind: file_exists
         file: docs/plans/decisions/MOBILE_PWA_PHASE5_DECISION.md
+      - id: renovation_closure_receipt_valid
+        # The RIGOROUS + graded criterion (receipt_valid: rigorous per
+        # check_track_status.py:583, grade S2 per :629 — the titanium
+        # pattern, ACTIVE_TRACK.yaml:1857). Written at closure review by a
+        # reviewer who independently re-ran the acceptance suites above
+        # against the recorded main sha; not claimable by the implementing
+        # agent (oracle-independence, evidence_grades.yaml:8-10).
+        kind: receipt_valid
+        file: reports/governance/mobile_pwa/CLOSURE_ACCEPTANCE_RECEIPT.json
+        expect_digest: true
+        requires_keys: [schema, observed_at, reviewed_main_sha, reviewer, verdict]
     next_items:
       - { id: 1, what: "Phase 0: playwright device projects + viewport export + nav integrity sweep", kind: test, blocker: true }
       - { id: 2, what: "Phase 1: responsive shell (sidebar drawer + bottom nav + ui primitives + effect gating)", kind: code, blocker: true }
