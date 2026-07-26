@@ -282,10 +282,12 @@ def current_kernel_signature() -> str:
             return kernel.signature
     except (ImportError, OSError, ValueError) as exc:
         # Kernel missing/unreadable/invalid (pydantic ValidationError is a
-        # ValueError): fall back to the zero-sig placeholder. Anything else
-        # propagates — an unexpected failure should fail the approval loudly,
-        # not silently downgrade it to placeholder-signed material.
+        # ValueError): fall back to the zero-sig placeholder, explicitly.
+        # Anything else propagates — an unexpected failure should fail the
+        # approval loudly, not silently downgrade to placeholder-signed
+        # material.
         logger.debug("chetana kernel signature unavailable, using placeholder: %s", exc)
+        return placeholder
     return placeholder
 
 
