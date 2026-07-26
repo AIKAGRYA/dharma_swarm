@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.atoms import (
+    AGENT_OWNER_METADATA_KEYS,
     AuthorityLevel,
     MemoryAtom,
     MemoryAtomType,
@@ -482,15 +483,9 @@ def _atom_agent_ids(atom: MemoryAtom) -> tuple[str, ...]:
 
 
 def _extend_agent_ids(ids: list[str], payload: dict[str, object]) -> None:
-    for key in (
-        "agent_id",
-        "agent",
-        "agent_name",
-        "owner_agent_id",
-        "assigned_to",
-        "assigned_agent_id",
-        "worker_agent_id",
-    ):
+    # "owner_agent_ids" is the hoisted key the adapters' redaction boundary
+    # writes when it drops a row/payload dict that carried ownership.
+    for key in (*AGENT_OWNER_METADATA_KEYS, "owner_agent_ids"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             ids.append(value.strip())
