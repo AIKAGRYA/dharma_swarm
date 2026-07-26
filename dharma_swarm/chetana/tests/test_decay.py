@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dharma_swarm.chetana.decay import scan_decay
 from dharma_swarm.chetana.ingest import ingest
-from dharma_swarm.chetana.promote import promote
+from dharma_swarm.chetana.promote import approve_atom, promote
 
 
 def _seed_promoted_atom_with_stale(
@@ -17,11 +17,14 @@ def _seed_promoted_atom_with_stale(
     staged = ingested.atoms[0]
     pr = promote(staged_path=staged, promoted_by="seeder")
     assert pr.trusted_path is not None
+    approved = approve_atom(path=pr.trusted_path, reviewer="seeder")
+    assert approved.decision == "APPROVED"
+    trusted = approved.trusted_path
     # Re-write the trusted file with an overridden stale_after for the test.
-    text = pr.trusted_path.read_text(encoding="utf-8")
+    text = trusted.read_text(encoding="utf-8")
     text = text.replace(_extract_stale(text), stale_after, 1)
-    pr.trusted_path.write_text(text, encoding="utf-8")
-    return pr.trusted_path
+    trusted.write_text(text, encoding="utf-8")
+    return trusted
 
 
 def _extract_stale(text: str) -> str:

@@ -39,6 +39,7 @@ from .governance import gate_check_atom
 from .provenance import (
     FrontmatterSchema,
     assemble_atom,
+    compute_axiom_signature_v2,
     default_stale_after,
     now_iso,
     parse_frontmatter,
@@ -295,6 +296,19 @@ def apply_revival(
             "provenance": new_provenance,
         }
     )
+    # Upgrade to v2: frontmatter (stale_after, revival_chain, …) just changed,
+    # so a body-only v1 signature would leave that drift unverifiable.
+    refreshed = refreshed.model_copy(
+        update={
+            "provenance": new_provenance.model_copy(
+                update={
+                    "axiom_signature": compute_axiom_signature_v2(
+                        refreshed, new_body, gov.kernel_signature
+                    )
+                }
+            )
+        }
+    )
     proposal.atom_path.write_text(assemble_atom(refreshed, new_body), encoding="utf-8")
 
     # Best-effort stigmergy emit — never blocks revival on failure.
@@ -378,11 +392,17 @@ def _last_verified_date(schema: FrontmatterSchema) -> date:
     """
     if schema.provenance is not None:
         chain = getattr(schema.provenance, "revival_chain", None) or []
-        if chain:
+        # Walk backwards for the newest entry with a real timestamp. Approval
+        # events carry "ts" rather than "revived_at"; an entry with neither
+        # must not default to today() (that would silently hide neighbors).
+        for entry in reversed(chain):
+            stamp = entry.get("revived_at") or entry.get("ts")
+            if not stamp:
+                continue
             try:
-                return _to_date(chain[-1].get("revived_at"))
+                return _to_date(stamp)
             except Exception:
-                pass
+                continue
         try:
             return _to_date(schema.provenance.promoted_at)
         except Exception:
