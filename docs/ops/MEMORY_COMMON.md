@@ -2,6 +2,10 @@
 
 Memory Common is the one-door retrieval surface for swarm context.
 
+Role: operator usage guidance (reference doc). The canonical agent behavior
+contract lives in `CLAUDE.md`; nothing in this document adds to or overrides
+it.
+
 ## Operator Commands
 
 - `/memory` or `dgc memory`: show common memory status.
@@ -12,9 +16,10 @@ Memory Common is the one-door retrieval surface for swarm context.
 - `/memory metabolize`: run ingest + gates and write a metabolism receipt.
 - `/memory schedule` or `dgc memory schedule --schedule "every 24h"`: register recurring memory metabolism with the existing cron system.
 
-## Agent Contract
+## Suggested Agent Usage
 
-Before non-trivial work, call Memory Common with the task:
+Memory Common can seed context for non-trivial work (this is usage guidance,
+not a behavioral mandate — those live in `CLAUDE.md`):
 
 ```text
 /memory common <task>
@@ -22,7 +27,7 @@ Before non-trivial work, call Memory Common with the task:
 
 Use the returned pack as retrieved context, not as proof by itself. Cite source ids you actually use. If hits are empty or weak, say so and proceed from live evidence.
 
-After work, write a receipt with:
+After work, a useful receipt records:
 
 - task and outcome
 - memory sources used
@@ -53,8 +58,8 @@ Metabolism receipts land under `<state_dir>/reports/memory_kernel/` (default `~/
 
 ## Surface State-Dir Caveat (live parity)
 
-The Bun/Helm terminal bridge routes `/memory` with its own bridge state dir (`~/.dharma/terminal`), not the global `~/.dharma`. From that surface `status`/`query` see an empty store, and the mutating modes are reachable too: `ingest`/`metabolize` would create a second vector store and receipt sink under `~/.dharma/terminal/`, while `schedule` still writes the global cron `jobs.json`. This is bug-for-bug parity with the live checkout this surface was ported from; re-rooting the bridge's memory door is a follow-up, not part of the port. Prefer `dgc memory ...` (global state dir) for real ingest/metabolism.
+The Bun/Helm terminal bridge routes `/memory` with its own bridge state dir (`~/.dharma/terminal`), not the global `~/.dharma`. From that surface `status`/`query` see an empty store, and the mutating modes are reachable too: `ingest`/`metabolize` would create a second vector store and receipt sink under `~/.dharma/terminal/`. This is bug-for-bug parity with the live checkout this surface was ported from; re-rooting the bridge's memory door is a follow-up, not part of the port. Prefer `dgc memory ...` (global state dir) for real ingest/metabolism. One divergence from live parity (review-forced): `schedule` now persists the scheduling surface's `state_dir` in the cron job payload, so a scheduled metabolism runs against the same store the scheduling door observes instead of silently falling back to the global default.
 
 ## Gate Trust Caveat
 
-The broad-sweep component of the system gate generates its eval cases from the same indexed sidecar rows it retrieves against (audit 2026-07-25 §5.7). A 100/100 score is custody/regression signal, not external relevance — do not re-trust it as a quality bar until the eval battery is replaced with held-out cases.
+The broad-sweep component of the system gate generates its eval cases from the same indexed sidecar rows it retrieves against (audit 2026-07-25 §5.7). The same applies to the metabolism path's source-coverage targets: `run_memory_metabolism` derives `*_target` values from the store's current sidecar counts, so a store that silently lost rows still earns full coverage credit. A 100/100 score is custody/regression signal, not external relevance or row-retention proof — do not re-trust it as a quality bar until the eval battery is replaced with held-out cases and the coverage targets are ratcheted against previously receipted minimums (named follow-up with the eval-battery replacement).

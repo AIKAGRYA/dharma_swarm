@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import signal
 import sqlite3
 import sys
 import time
@@ -87,13 +86,15 @@ def run_system_gate(
         live_rows = run_live_rows(state_dir=state_dir, top_k=top_k, timeout_s=timeout_s)
         checks.append(score_live_recall(live_rows, max_score=20.0))
     else:
+        # A requested skip is neutral: excluded from the attainable score so
+        # --skip-live can still reach passed=True, and marked in the payload.
         checks.append(
             GateCheck(
                 name="live_semantic_gate",
                 score=0.0,
-                max_score=20.0,
-                passed=False,
-                summary="skipped",
+                max_score=0.0,
+                passed=True,
+                summary="skipped (excluded from attainable score)",
                 details={"skipped": True},
             )
         )
@@ -170,13 +171,13 @@ def run_broad_rows(
         case_count=len(rows) + max(0, negative_count),
         negative_count=negative_count,
     )
-    signal.signal(signal.SIGALRM, broad._alarm)
+    broad.install_alarm_handler()
     engine = GovernedRetrievalEngine(state_dir=state_dir)
     return [broad.run_case(engine, case, top_k=top_k, timeout_s=timeout_s) for case in cases]
 
 
 def run_live_rows(*, state_dir: Path, top_k: int, timeout_s: int) -> list[dict[str, Any]]:
-    signal.signal(signal.SIGALRM, live._alarm)
+    live.install_alarm_handler()
     engine = GovernedRetrievalEngine(state_dir=state_dir)
     return [live.run_case(engine, case, top_k=top_k, timeout_s=timeout_s) for case in live.LIVE_CASES]
 

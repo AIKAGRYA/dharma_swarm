@@ -9,6 +9,7 @@ import re
 import signal
 import sqlite3
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -95,6 +96,22 @@ def _alarm(_signum: int, _frame: object) -> None:
     raise QueryTimeout()
 
 
+def alarm_usable() -> bool:
+    """SIGALRM handlers may only be installed on the main thread.
+
+    Off the main thread (Textual TUI worker, gateway cron tick) the per-case
+    ``elapsed_ms > max_ms`` check remains the timeout backstop.
+    """
+    return hasattr(signal, "SIGALRM") and threading.current_thread() is threading.main_thread()
+
+
+def install_alarm_handler() -> bool:
+    if not alarm_usable():
+        return False
+    signal.signal(signal.SIGALRM, _alarm)
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, default=Path.home() / ".dharma")
@@ -106,7 +123,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    signal.signal(signal.SIGALRM, _alarm)
+    install_alarm_handler()
     state_dir = args.state_dir.expanduser()
     rows = load_indexed_rows(state_dir)
     cases = build_cases(
@@ -136,19 +153,26 @@ def main() -> int:
 
 
 def load_indexed_rows(state_dir: Path) -> list[IndexedRow]:
+    # Read-only open: a health check must not create an empty vectors.db,
+    # and a missing file/table means an empty indexed-row set, not a crash.
     db_path = Path(state_dir).expanduser() / "vectors.db"
-    conn = sqlite3.connect(db_path)
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute(
-            """
-            SELECT vec_doc_id, source, layer, content
-            FROM memory_retrieval_docs
-            WHERE valid_until IS NULL
-              AND layer IN ('memory_context', 'memory_graph', 'source_file')
-            ORDER BY layer, vec_doc_id
-            """
-        ).fetchall()
+        try:
+            rows = conn.execute(
+                """
+                SELECT vec_doc_id, source, layer, content
+                FROM memory_retrieval_docs
+                WHERE valid_until IS NULL
+                  AND layer IN ('memory_context', 'memory_graph', 'source_file')
+                ORDER BY layer, vec_doc_id
+                """
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return []
     finally:
         conn.close()
     return [
@@ -229,16 +253,23 @@ def _negative_cases(count: int) -> tuple[BroadCase, ...]:
         "crystal ledger fakehandle qqqvoidtopic",
         "zephyr checksum impossible zzzmissingtopic",
     )
-    return tuple(
-        BroadCase(
-            name=f"negative_{index:02d}",
-            query=seed,
-            case_kind="adversarial_negative",
-            expect_empty=True,
-            max_ms=1200.0,
+    # Every requested case is generated: beyond the seed set, deterministic
+    # distinct variants keep score_broad_recall's expected_cases attainable.
+    cases: list[BroadCase] = []
+    for index in range(max(0, count)):
+        seed = seeds[index % len(seeds)]
+        if index >= len(seeds):
+            seed = f"{seed} variant{index // len(seeds):02d} qq{index:03d}neverindexed"
+        cases.append(
+            BroadCase(
+                name=f"negative_{index:02d}",
+                query=seed,
+                case_kind="adversarial_negative",
+                expect_empty=True,
+                max_ms=1200.0,
+            )
         )
-        for index, seed in enumerate(seeds[: max(0, count)])
-    )
+    return tuple(cases)
 
 
 def _spread_sample(rows: list[IndexedRow], count: int) -> tuple[IndexedRow, ...]:
@@ -389,10 +420,13 @@ def run_case(
     timeout_s: int,
 ) -> dict[str, Any]:
     started = time.perf_counter()
+    use_alarm = alarm_usable()
     try:
-        signal.alarm(timeout_s)
+        if use_alarm:
+            signal.alarm(timeout_s)
         result = engine.retrieve(RetrievalQuery(text=case.query, top_k=top_k, include_content=True))
-        signal.alarm(0)
+        if use_alarm:
+            signal.alarm(0)
     except QueryTimeout:
         signal.alarm(0)
         return {

@@ -187,7 +187,12 @@ def render_memory_ingest(*, state_dir: Path | None = None) -> str:
     from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
 
     resolved_state_dir = Path(state_dir or DEFAULT_STATE_DIR).expanduser()
-    receipt = ingest_wiki_concepts(state_dir=resolved_state_dir)
+    # Pass the concepts dir explicitly (as the metabolism path does) so a
+    # configured state dir reads its own wiki tree, not the global default.
+    receipt = ingest_wiki_concepts(
+        state_dir=resolved_state_dir,
+        wiki_concepts_dir=resolved_state_dir / "knowledge" / "wiki" / "concepts",
+    )
     payload = receipt.to_json()
     return "\n".join(
         [
@@ -356,13 +361,34 @@ def create_memory_common_cron_job(
     *,
     schedule: str = "every 24h",
     top_k: int = 10,
+    state_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Create the recurring Memory Common metabolism cron job if missing."""
+    """Create or refresh the recurring Memory Common metabolism cron job."""
 
-    from dharma_swarm.cron_scheduler import create_job, list_jobs
+    from dharma_swarm.cron_scheduler import (
+        compute_next_run,
+        create_job,
+        list_jobs,
+        parse_schedule,
+        save_jobs,
+    )
 
-    for job in list_jobs(include_disabled=True):
+    resolved_state_dir = Path(state_dir or DEFAULT_STATE_DIR).expanduser()
+    jobs = list_jobs(include_disabled=True)
+    for job in jobs:
         if job.get("name") == MEMORY_COMMON_CRON_NAME:
+            # Rescheduling must win over the stored row: refresh cadence,
+            # handler, top_k, and state_dir, and re-enable a disabled job —
+            # an early return here silently kept the stale configuration.
+            parsed = parse_schedule(schedule)
+            job["schedule"] = parsed
+            job["schedule_display"] = parsed.get("display", schedule)
+            job["next_run_at"] = compute_next_run(parsed)
+            job["handler"] = "memory_common_metabolism"
+            job["top_k"] = max(1, int(top_k))
+            job["state_dir"] = str(resolved_state_dir)
+            job["enabled"] = True
+            save_jobs(jobs)
             return job
 
     return create_job(
@@ -373,6 +399,9 @@ def create_memory_common_cron_job(
         deliver="local",
         urgent=False,
         top_k=max(1, int(top_k)),
+        # Persisted so the cron handler metabolizes the same store this door
+        # observes instead of falling back to the global default.
+        state_dir=str(resolved_state_dir),
     )
 
 
@@ -380,8 +409,9 @@ def render_memory_schedule(
     *,
     schedule: str = "every 24h",
     top_k: int = 10,
+    state_dir: Path | None = None,
 ) -> str:
-    job = create_memory_common_cron_job(schedule=schedule, top_k=top_k)
+    job = create_memory_common_cron_job(schedule=schedule, top_k=top_k, state_dir=state_dir)
     return "\n".join(
         [
             "# Memory Common Schedule",
@@ -422,7 +452,9 @@ def render_memory_common_command(
     if mode in {"metabolize", "metabolism", "cycle"}:
         return render_memory_metabolism(state_dir=state_dir, top_k=max(1, top_k))
     if mode == "schedule":
-        return render_memory_schedule(schedule=rest or "every 24h", top_k=max(10, top_k))
+        return render_memory_schedule(
+            schedule=rest or "every 24h", top_k=max(10, top_k), state_dir=state_dir
+        )
     if not parts:
         return render_memory_common_status(state_dir=state_dir)
     return "\n".join(

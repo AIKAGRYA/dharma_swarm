@@ -124,6 +124,39 @@ def test_memory_common_schedule_registers_idempotent_cron_job(monkeypatch, tmp_p
     assert job1["handler"] == "memory_common_metabolism"
     assert job1["top_k"] == 7
     assert job1["schedule_display"] == "every 720m"
+    # Rescheduling refreshes the stored row instead of returning it stale.
+    assert job2["top_k"] == 3
+    assert job2["schedule_display"] == "every 360m"
+
+
+def test_memory_common_schedule_refreshes_disabled_job_and_state_dir(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from dharma_swarm.cron_scheduler import load_jobs, save_jobs
+
+    _redirect_cron_storage(tmp_path, monkeypatch)
+    state_dir = tmp_path / "custom-state"
+
+    created = create_memory_common_cron_job(schedule="every 24h", top_k=10, state_dir=state_dir)
+    assert created["state_dir"] == str(state_dir)
+
+    jobs = load_jobs()
+    jobs[0]["enabled"] = False
+    save_jobs(jobs)
+
+    other_state = tmp_path / "other-state"
+    refreshed = create_memory_common_cron_job(
+        schedule="every 6h", top_k=4, state_dir=other_state
+    )
+
+    assert refreshed["id"] == created["id"]
+    assert refreshed["enabled"] is True
+    assert refreshed["top_k"] == 4
+    assert refreshed["state_dir"] == str(other_state)
+    persisted = load_jobs()[0]
+    assert persisted["enabled"] is True
+    assert persisted["schedule_display"] == "every 360m"
+    assert persisted["state_dir"] == str(other_state)
 
 
 def test_memory_common_command_dispatches_schedule(monkeypatch, tmp_path: Path) -> None:
@@ -267,3 +300,75 @@ def test_memory_common_cron_run_fn_fails_when_gate_receipt_fails(monkeypatch) ->
     assert ok is False
     assert "Passed: `False`" in output
     assert error == "Memory Common metabolism gate failed"
+
+
+def test_broad_sweep_negative_count_above_seed_pool_generates_distinct_cases() -> None:
+    from scripts.memory_retrieval_broad_sweep import _negative_cases
+
+    cases = _negative_cases(11)
+
+    assert len(cases) == 11
+    assert len({case.query for case in cases}) == 11
+    assert all(case.expect_empty for case in cases)
+
+
+def test_broad_sweep_missing_store_yields_empty_rows_without_creating_db(tmp_path: Path) -> None:
+    from scripts.memory_retrieval_broad_sweep import load_indexed_rows
+
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir()
+
+    assert load_indexed_rows(state_dir) == []
+    assert not (state_dir / "vectors.db").exists()
+
+
+def test_system_gate_skip_live_is_neutral_not_unattainable(tmp_path: Path) -> None:
+    from scripts.memory_retrieval_system_gate import run_system_gate
+
+    payload = run_system_gate(state_dir=tmp_path / ".dharma", run_live=False, top_k=1)
+
+    live_check = next(
+        check for check in payload["checks"] if check["name"] == "live_semantic_gate"
+    )
+    assert live_check["max_score"] == 0.0
+    assert live_check["passed"] is True
+    assert live_check["details"] == {"skipped": True}
+    # 20 live points are excluded from the attainable maximum, not forfeited.
+    assert payload["max_score"] == 80.0
+
+
+def test_gate_run_case_survives_worker_thread(tmp_path: Path) -> None:
+    import threading
+
+    from scripts.memory_retrieval_broad_sweep import BroadCase, alarm_usable, run_case
+
+    class _StubResult:
+        candidates = ()
+        timings_ms = {"total": 1.0}
+
+    class _StubEngine:
+        def retrieve(self, _query):
+            return _StubResult()
+
+    case = BroadCase(
+        name="negative_thread",
+        query="xyzzq impossible",
+        case_kind="adversarial_negative",
+        expect_empty=True,
+    )
+    outcome: dict = {}
+
+    def worker() -> None:
+        outcome["alarm_usable"] = alarm_usable()
+        try:
+            outcome["row"] = run_case(_StubEngine(), case, top_k=1, timeout_s=1)
+        except Exception as exc:  # pragma: no cover - the regression under test
+            outcome["error"] = exc
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join(timeout=10)
+
+    assert "error" not in outcome, f"run_case raised off main thread: {outcome.get('error')}"
+    assert outcome["alarm_usable"] is False
+    assert outcome["row"]["passed"] is True
