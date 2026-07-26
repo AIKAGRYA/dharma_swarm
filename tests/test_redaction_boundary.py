@@ -479,3 +479,82 @@ def test_boundary_scan_result_secret_flag() -> None:
     assert not BoundaryScanResult(
         text="x", sensitive_count=1, quarantined=False, categories=("email",)
     ).has_secret
+
+
+# Secret shapes the write-boundary precision gate deliberately passes (hex,
+# all-alpha, slash-bearing) — the default/training-export path must still
+# scrub every one of them, exactly like the pre-promotion verifier_ranker_v0
+# scrubber did.
+EXPORT_RECALL_SECRETS = pytest.mark.parametrize(
+    "secret",
+    [
+        "deadbeefcafebabe0123456789abcdef",
+        "abcdefghijklmnopqrstuvwxyzabcdefghij",
+        "Ab0cD1eF2gH3cD1eF2gH3cD1eF2gH3x/Zy9Wv8Ut7",
+    ],
+    ids=["hex", "alpha", "slash"],
+)
+
+
+@EXPORT_RECALL_SECRETS
+def test_default_redact_text_redacts_all_long_runs(secret: str) -> None:
+    result = redaction_mod.redact_text(f"free text with {secret} inline")
+    assert secret not in result.redacted
+    assert result.fail_closed
+    assert any(f.category == "token_like" for f in result.findings)
+
+
+@EXPORT_RECALL_SECRETS
+def test_redact_record_scrubs_long_secrets_in_free_fields(secret: str) -> None:
+    from dharma_swarm.verifier_ranker_v0.redaction import redact_record as compat_redact_record
+
+    result = compat_redact_record({"free_note": f"observed {secret} in logs"})
+    assert secret not in json.dumps(result.redacted)
+    assert result.fail_closed
+
+
+def test_write_boundary_keeps_precision_gate() -> None:
+    sha = "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287"
+    scan = scan_text_for_write(f"see commit {sha}")
+    assert sha in scan.text
+    assert scan.sensitive_count == 0
+
+
+def test_scan_json_values_recurses_tuples() -> None:
+    scan = scan_json_values_for_write(
+        {"nested": (SK_TOKEN,), "deep": {"pair": ("ok", GHP_TOKEN)}}
+    )
+    dumped = json.dumps(scan.value)
+    assert SK_TOKEN not in dumped
+    assert GHP_TOKEN not in dumped
+    assert scan.sensitive_count >= 2
+    assert scan.value["deep"]["pair"][0] == "ok"
+
+
+def test_redact_record_recurses_tuples() -> None:
+    result = redaction_mod.redact_record(
+        {"free_note": ("deadbeefcafebabe0123456789abcdef",)}
+    )
+    assert "deadbeefcafebabe0123456789abcdef" not in json.dumps(result.redacted)
+    assert result.fail_closed
+
+
+@pytest.mark.asyncio
+async def test_ingest_envelope_preserves_producer_redaction_field(tmp_path) -> None:
+    store = EventMemoryStore(tmp_path / "memory_plane.db")
+    await store.init_db()
+    producer_marker = {"app_policy": "producer-owned", "version": 2}
+    envelope = _action_envelope(
+        {"note": f"leak {SK_TOKEN}", "_redaction": producer_marker},
+        event_id="evt-collision",
+    )
+    assert await store.ingest_envelope(envelope) is True
+
+    with sqlite3.connect(str(tmp_path / "memory_plane.db")) as db:
+        payload_json = db.execute("SELECT payload_json FROM event_log").fetchone()[0]
+
+    assert SK_TOKEN not in payload_json
+    payload = json.loads(payload_json)
+    marker = payload["_redaction"]
+    assert marker["pii_risk"] == "high"
+    assert marker["producer_redaction_field"] == producer_marker

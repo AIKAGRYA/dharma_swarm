@@ -297,12 +297,19 @@ class EventMemoryStore:
         else:
             persisted_payload = dict(scan.value)
             if scan.sensitive_count:
-                persisted_payload["_redaction"] = {
+                marker: dict[str, Any] = {
                     "pii_risk": PII_RISK_HIGH,
                     "sensitive_count": scan.sensitive_count,
                     "checksum_scope": "producer_payload",
                     "payload_sha256": stable_hash(data["payload"]),
                 }
+                if "_redaction" in persisted_payload:
+                    # `_redaction` is boundary-reserved only on rows the
+                    # boundary actually marks; a producer-owned field of the
+                    # same name is preserved inside the marker so replay /
+                    # export can restore it instead of losing it wholesale.
+                    marker["producer_redaction_field"] = persisted_payload["_redaction"]
+                persisted_payload["_redaction"] = marker
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         async with aiosqlite.connect(self.db_path) as db:

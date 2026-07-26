@@ -202,12 +202,17 @@ def redact_text(text: str, *, preserve_infra: bool = False) -> RedactionResult:
     """Redact sensitive spans in free text.
 
     Long token-like strings are treated as uncertain sensitive material and set
-    ``fail_closed=True`` so callers can quarantine the record for review.
+    ``fail_closed=True`` so callers can quarantine the record for review. On
+    the default (training-export) path every 32+-char run is redacted — recall
+    over precision, matching the pre-promotion ``verifier_ranker_v0`` scrubber.
 
     ``preserve_infra=True`` is the write-boundary policy: infrastructure
     references (IPs, URLs, home paths, account ids) are recorded in
     ``detected`` but left in place — replacing them was measured to mangle
-    nearly every substantive memory-plane row on this estate.
+    nearly every substantive memory-plane row on this estate — and the
+    ``token_like`` matcher applies the ``_is_high_entropy_token`` precision
+    gate so benign estate identifiers (commit SHAs, UUIDs, row ids, slugs)
+    survive.
     """
     findings: list[RedactionFinding] = []
     detected: list[RedactionFinding] = []
@@ -230,8 +235,16 @@ def redact_text(text: str, *, preserve_infra: bool = False) -> RedactionResult:
         redacted = _redact_with_regex(redacted, _ACCOUNT_ID_RE, "account_id", findings)
 
     before_entropy = len(findings)
+    # The precision gate is write-boundary policy only: ungated, benign
+    # 32+-char estate identifiers would mangle nearly every memory row.
+    # The default path backs redact_record / training export, where a missed
+    # secret is worse than a mangled benign token — no gate there.
     redacted = _redact_with_regex(
-        redacted, _HIGH_ENTROPY_RE, "token_like", findings, gate=_is_high_entropy_token
+        redacted,
+        _HIGH_ENTROPY_RE,
+        "token_like",
+        findings,
+        gate=_is_high_entropy_token if preserve_infra else None,
     )
     fail_closed = len(findings) > before_entropy
     return RedactionResult(
@@ -265,7 +278,9 @@ def redact_record(record: Any, *, key_hint: str = "") -> RedactionResult:
             return replacement
         if isinstance(value, dict):
             return {str(k): walk(v, str(k)) for k, v in value.items()}
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple)):
+            # json.dumps serializes tuples as arrays — an unscanned tuple
+            # would carry its members to disk verbatim
             return [walk(item, key) for item in value]
         if isinstance(value, str):
             result = redact_text(value)
@@ -367,7 +382,9 @@ def scan_json_values_for_write(value: Any) -> BoundaryRecordScanResult:
     def walk(item: Any) -> Any:
         if isinstance(item, dict):
             return {scan_string(str(key)): walk(child) for key, child in item.items()}
-        if isinstance(item, list):
+        if isinstance(item, (list, tuple)):
+            # json.dumps serializes tuples as arrays — an unscanned tuple
+            # would carry its members to disk verbatim
             return [walk(child) for child in item]
         if isinstance(item, str):
             return scan_string(item)
