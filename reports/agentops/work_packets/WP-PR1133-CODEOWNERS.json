@@ -6,6 +6,7 @@
   "intent": "PR #1133 repair: regenerate .github/CODEOWNERS from measured blast radius. Decomposing vector_store.py back under the Rule-10 line budget introduces vector_store_dedupe.py and vector_store_query_support.py inside its import graph (blast=180 each), so the CODEOWNERS gate requires explicit routing entries committed in the same PR.",
   "allowed_files": [
     ".github/CODEOWNERS",
+    "dharma_swarm/archaeology_ingest_state.py",
     "dharma_swarm/archaeology_ingestion.py",
     "dharma_swarm/memory_kernel/write_policy.py",
     "dharma_swarm/memory_palace.py",
@@ -83,6 +84,6 @@
     ],
     "honest_blockers": [],
     "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
-    "packet_digest": "6bc352e21d041e8a7257f318ad40c9769887f38cc520fcb486de962d702e9ad8"
+    "packet_digest": "175a0fffb1445bb06ae2b5e255ef77ea1c76273709e20693d6499e7cf1c11d9a"
   }
 }
