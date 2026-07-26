@@ -305,9 +305,7 @@ def assess_runtime_admission(
         "--ignore-submodules=none",
         environ=environ,
     )
-    tracked_changes = tuple(
-        line for line in tracked_status.splitlines() if line.strip()
-    )
+    tracked_changes = tuple(line for line in tracked_status.splitlines() if line.strip())
     if tracked_changes:
         raise RuntimeAdmissionError(
             f"checkout has uncommitted paths ({len(tracked_changes)} path(s))"
@@ -378,9 +376,7 @@ def _loaded_package_root() -> Path:
     package = sys.modules.get(__package__ or "dharma_swarm")
     package_file = getattr(package, "__file__", None)
     if package_file is None:
-        raise RuntimeAdmissionError(
-            "loaded dharma_swarm package has no file origin"
-        )
+        raise RuntimeAdmissionError("loaded dharma_swarm package has no file origin")
     package_root = Path(package_file).resolve().parent
     if package_root != module_root:
         raise RuntimeAdmissionError(
@@ -438,11 +434,7 @@ def require_runtime_admission(
         if expected_commit is None
         else expected_commit
     )
-    root = (
-        Path(__file__).resolve().parents[1]
-        if repo_root is None
-        else repo_root
-    )
+    root = Path(__file__).resolve().parents[1] if repo_root is None else repo_root
     return assess_runtime_admission(
         root,
         expected_commit=expected,
