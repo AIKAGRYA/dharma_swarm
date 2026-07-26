@@ -19,6 +19,10 @@ terminal/.dharma-terminal-preview-cache.json
 # Keep the Claude Code on the web SessionStart hook + its registration tracked.
 !.claude/hooks/
 !.claude/settings.json
+# Keep the /pr skill tracked; other personal .claude/skills stay local-only.
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/pr.md
 .swarm/
 .dharma_baseline/
 .dharma_test/
