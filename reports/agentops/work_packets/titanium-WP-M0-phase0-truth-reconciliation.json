@@ -1,9 +1,9 @@
 {
   "id": "titanium-WP-M0-phase0-truth-reconciliation",
-  "base_ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+  "base_ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
   "branch": "agent/titanium-m0-phase0-truth-20260725",
   "worktree": ".",
-  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1125, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
+  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1144, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
   "allowed_files": [
     "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
     "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
@@ -92,7 +92,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "checked_at_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "details": []
     },
     "interface_mismatches": [
@@ -116,6 +116,6 @@
       "The PR 1112 sequence-allocation and durable-delivery defects require a separate owner-safe corrective PR."
     ],
     "rollback": "Revert this packet, receipt, canonical next-item reconciliation, and generated projections as one unit, then allow the rolling DocOps lane to regenerate counts; do not alter historical packet receipts.",
-    "packet_digest": "0b73e300fde6659d709912aec559090078dcc5620d181a5ec53518c40cde34a1"
+    "packet_digest": "a86256af2f6e57006e1ed26352d4ecf5a71a9fc45f77c104a0fa66d67613309c"
   }
 }

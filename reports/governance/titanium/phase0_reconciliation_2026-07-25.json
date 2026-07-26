@@ -1,38 +1,44 @@
 {
   "schema": "dharma.titanium.phase0-reconciliation.v1",
-  "observed_at": "2026-07-26T16:26:31Z",
+  "observed_at": "2026-07-26T16:49:17Z",
   "initial_observed_at": "2026-07-25T12:37:53Z",
   "track_id": "repository-titanium-hardening-2026-07",
   "reviewed_main": {
     "ref": "origin/main",
-    "sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-    "tree": "37345bd12df4beed352ab7f3f8dac8c40081ed66"
+    "sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+    "tree": "2d08a5ffb99f98764e714442f4b2e65db6342e75"
   },
   "generated_status": {
     "authority": "projection_only",
-    "commit": "1b9ab8f42296fbd9d68c8351c5a06d8c44de8680",
-    "derived_from_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-    "generated_at": "2026-07-26T16:22:56Z",
+    "commit": "98d5b17effd617615b239ef7f267fa63793c44f7",
+    "derived_from_main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+    "generated_at": "2026-07-26T16:49:17Z",
     "completion": {
       "passed": 4,
       "total": 8
     },
-    "verify": "test \"$(git rev-parse origin/generated/status)\" = 1b9ab8f42296fbd9d68c8351c5a06d8c44de8680 && git log -1 --format=%B origin/generated/status | rg -q ' @ 59a4bcf9403af83b069b4c0e595e47c403fdbbfe$'",
+    "verify": "test \"$(git rev-parse origin/generated/status)\" = 98d5b17effd617615b239ef7f267fa63793c44f7 && git log -1 --format=%B origin/generated/status | rg -q ' @ 08ce7e208c9ac7502f81ab340e806749b7b55ffd$'",
     "previous_projection": {
       "classification": "STALE_DERIVED",
-      "commit": "a09f6ef5faceb21addf85bcfae51b21b731dda0e",
-      "derived_from_main_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
-      "generated_at": "2026-07-26T14:32:34Z",
+      "commit": "1b9ab8f42296fbd9d68c8351c5a06d8c44de8680",
+      "derived_from_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "generated_at": "2026-07-26T16:22:56Z",
       "previous_projection": {
         "classification": "STALE_DERIVED",
-        "commit": "c7804e5295733a0d12fa3ed3e69c77bf105e805a",
-        "derived_from_main_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
-        "generated_at": "2026-07-25T21:37:52Z",
+        "commit": "a09f6ef5faceb21addf85bcfae51b21b731dda0e",
+        "derived_from_main_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
+        "generated_at": "2026-07-26T14:32:34Z",
         "previous_projection": {
           "classification": "STALE_DERIVED",
-          "commit": "684f73458dbfb3661c634f6a7543099c638a2edb",
-          "derived_from_main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
-          "generated_at": "2026-07-25T11:33:12Z"
+          "commit": "c7804e5295733a0d12fa3ed3e69c77bf105e805a",
+          "derived_from_main_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
+          "generated_at": "2026-07-25T21:37:52Z",
+          "previous_projection": {
+            "classification": "STALE_DERIVED",
+            "commit": "684f73458dbfb3661c634f6a7543099c638a2edb",
+            "derived_from_main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+            "generated_at": "2026-07-25T11:33:12Z"
+          }
         }
       }
     }
@@ -94,7 +100,7 @@
         "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         "jq -e '.admission.squash_merge_sha == \"82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89\"' reports/governance/titanium/wp00_baseline.json"
       ],
       "evidence_observation_ids": [
@@ -109,7 +115,7 @@
         "a47c110ca38155390b04a7d85654d0a1840b0cce"
       ],
       "evidence": [
-        "git merge-base --is-ancestor a47c110ca38155390b04a7d85654d0a1840b0cce 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor a47c110ca38155390b04a7d85654d0a1840b0cce 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         "jq -e '.schema_version == \"titanium-wp00b-baseline/v1\" and .claim_boundary != null' reports/governance/titanium/wp00_baseline.json"
       ],
       "evidence_observation_ids": [
@@ -124,7 +130,7 @@
         "1e71e1d4e09c7871a8feec62ca3486f4ea06a173"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 1e71e1d4e09c7871a8feec62ca3486f4ea06a173 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 1e71e1d4e09c7871a8feec62ca3486f4ea06a173 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_api_auth.py tests/test_verify_api.py -q",
         "rg -n 'WEBHOOK_SECRET|return True' dharma_swarm/verify/github_app.py"
       ],
@@ -140,7 +146,7 @@
         "6b1c5438e0fe541ad89ea4aab8f1559528d07a86"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 6b1c5438e0fe541ad89ea4aab8f1559528d07a86 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 6b1c5438e0fe541ad89ea4aab8f1559528d07a86 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_bootstrap_contract.py -q"
       ],
       "remaining": [
@@ -155,12 +161,12 @@
         "524a0caabc264cf5d46ce7ec4471b01d6dde58cb"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 524a0caabc264cf5d46ce7ec4471b01d6dde58cb 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 524a0caabc264cf5d46ce7ec4471b01d6dde58cb 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_verifier_selfcheck_contract.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
       ],
       "evidence_observation_ids": [
         "exact-main-tests-59a4",
-        "m0-focused-local-186"
+        "m0-focused-local-59a4"
       ],
       "remaining": []
     },
@@ -171,7 +177,7 @@
         "35b11a30f69d35712b82f70ff581959f5619f2e3"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 35b11a30f69d35712b82f70ff581959f5619f2e3 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 35b11a30f69d35712b82f70ff581959f5619f2e3 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         "rg -n 'Typed verdict for WP-0C1R.*BLOCKED_OPERATOR|OWNER_DEFERRED' reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md"
       ],
       "remaining": [
@@ -186,7 +192,7 @@
         "edf9dec1e6364209fce90e0fa2185ac41d480619"
       ],
       "evidence": [
-        "git merge-base --is-ancestor edf9dec1e6364209fce90e0fa2185ac41d480619 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor edf9dec1e6364209fce90e0fa2185ac41d480619 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
       ],
       "remaining": [
@@ -201,7 +207,7 @@
         "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_go_adapter_contracts.py tests/test_github_ingestor_runner.py tests/test_world_radar_go_bridge.py -q"
       ],
       "evidence_observation_ids": [
@@ -217,8 +223,8 @@
         "2154aa100b03a80f9192d644207227ee773a8126"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 280fc251e99915062be19db48129b44d703402b1 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-        "git merge-base --is-ancestor 2154aa100b03a80f9192d644207227ee773a8126 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 280fc251e99915062be19db48129b44d703402b1 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "git merge-base --is-ancestor 2154aa100b03a80f9192d644207227ee773a8126 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         "test ! -e tests/test_fast_suite_isolation.py"
       ],
       "remaining": [
@@ -248,8 +254,8 @@
         "2447ca565bfbd80258f7acfafb6121da7ab20886"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 1021b9cc60156b725e291904674e09e91ee97e69 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-        "git merge-base --is-ancestor 2447ca565bfbd80258f7acfafb6121da7ab20886 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 1021b9cc60156b725e291904674e09e91ee97e69 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "git merge-base --is-ancestor 2447ca565bfbd80258f7acfafb6121da7ab20886 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q"
       ],
       "remaining": [
@@ -266,8 +272,8 @@
         "f4fd8e3e097e7df0333a176d990a95a136d74fcf"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 845443786da0786ca185fd477d274410b4372419 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-        "git merge-base --is-ancestor f4fd8e3e097e7df0333a176d990a95a136d74fcf 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 845443786da0786ca185fd477d274410b4372419 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "git merge-base --is-ancestor f4fd8e3e097e7df0333a176d990a95a136d74fcf 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py -q"
       ],
       "evidence_observation_ids": [
@@ -286,8 +292,8 @@
         "4c613db1625bea016586930eb28a247d3d805f17"
       ],
       "evidence": [
-        "git merge-base --is-ancestor 944dc89565edc9262574947abe8d93598f7bbaf3 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-        "git merge-base --is-ancestor 4c613db1625bea016586930eb28a247d3d805f17 59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+        "git merge-base --is-ancestor 944dc89565edc9262574947abe8d93598f7bbaf3 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "git merge-base --is-ancestor 4c613db1625bea016586930eb28a247d3d805f17 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
         ".venv/bin/python -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q",
         "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
       ],
@@ -451,6 +457,34 @@
       "main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
       "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30210233313",
       "claim": "The post-merge tests workflow completed successfully on the exact reviewed main SHA, including pytest 3.11 and 3.12; this is repository CI evidence, not production evidence."
+    },
+    {
+      "id": "m0-focused-local-59a4",
+      "result": "PASS",
+      "observed_at": "2026-07-26T16:45:14Z",
+      "main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "candidate_head": "994c6496e2d08b83a9c309405966f71459083fac",
+      "evidence_handle": "local:.venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_bootstrap_contract.py tests/test_api_auth.py tests/test_verify_api.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py",
+      "track_evidence_handle": "local:.venv/bin/python scripts/governance/check_track_status.py --reports-dir \"$M0_REPORTS\"",
+      "track_evaluator_exit": 1,
+      "unrelated_portfolio_regression": "regression:orchestration-arena-v1-2026-06:arena_truth_receipt_valid",
+      "claim": "221 tests passed with one deprecation warning on the clean rebased candidate commit. The portfolio evaluator reported Titanium at 4/8; its nonzero exit came from an unrelated Arena receipt crossing its 21-day freshness TTL."
+    },
+    {
+      "id": "exact-main-docops-08ce",
+      "result": "BLOCKED_OPERATOR",
+      "observed_at": "2026-07-26T16:49:05Z",
+      "main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+      "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30211216489",
+      "claim": "The DocOps reconciler regenerated current counts and refreshed PR 1118, then failed because its rolling branch still lacks a check-triggering credential path."
+    },
+    {
+      "id": "exact-main-generated-status-08ce",
+      "result": "PASS",
+      "observed_at": "2026-07-26T16:49:17Z",
+      "main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+      "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/commit/98d5b17effd617615b239ef7f267fa63793c44f7",
+      "claim": "The projection-only generated/status head binds exact reviewed main and still reports Titanium Phase 0 at 4/8; it grants no selection, merge, or production authority."
     }
   ],
   "completion_snapshot": [
@@ -496,12 +530,63 @@
   ],
   "docops_reconcile": {
     "pull_request": 1118,
-    "observed_head": "84dff05af44c63b2462daf4e9dd996e9e46dbc4c",
+    "observed_head": "e93e022b1722d24190b6fe0822b06080d8c3faa6",
     "classification": "BLOCKED_OPERATOR",
     "integration_strategy": "M0 independently regenerates current-main DocOps counts; PR 1118 remains checkless and may be closed as superseded only after M0 merges.",
     "verify": "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
   },
   "main_refresh": {
+    "observed_at": "2026-07-26T16:49:17Z",
+    "previous_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+    "current_main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+    "intervening_merges": [
+      {
+        "pull_request": 1144,
+        "commit": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "title": "fix(runtime): default health API to loopback [impact-checked]",
+        "direct_m0_path_overlap": false,
+        "changed_paths": [
+          "dharma_swarm/swarm_health_api.py",
+          "docker-compose.yml",
+          "tests/test_swarm_health_api.py"
+        ],
+        "authority_context": "The runtime repair belongs to the organism-rewire/loop-closure boundary already responsible for the 7433 redeploy precondition. It changes no Titanium authority source and proves no deployment state.",
+        "phase0_impact": "No M0 completion criterion, residual ID/classification, modality, or missing artifact changed; the code-side loopback repair supplies neither a Titanium completion transition nor production/redeploy evidence."
+      }
+    ],
+    "excluded_non_main_observation": {
+      "pull_request": 1137,
+      "reported_merge_commit": "719bdba3c3872a18cadb6a4f182201a79b98ffb9",
+      "classification": "NOT_ON_REVIEWED_MAIN",
+      "verify": "! git merge-base --is-ancestor 719bdba3c3872a18cadb6a4f182201a79b98ffb9 08ce7e208c9ac7502f81ab340e806749b7b55ffd"
+    },
+    "generated_count_delta": {
+      "dharma_python_modules": 0,
+      "dharma_top_level_python_modules": 0,
+      "total_python_loc": 15,
+      "test_files": 0,
+      "test_def_occurrences": 5,
+      "markdown_files": 0,
+      "markdown_total_lines": 0,
+      "authority_candidate_docs": 0
+    },
+    "candidate_counts": {
+      "dharma_python_modules": 1035,
+      "dharma_top_level_python_modules": 452,
+      "total_python_loc": 371141,
+      "test_files": 932,
+      "test_def_occurrences": 14019,
+      "markdown_files": 1450,
+      "markdown_total_lines": 305181,
+      "authority_candidate_docs": 656,
+      "bridge_files": 32,
+      "adapter_files": 29,
+      "orchestrator_files": 7,
+      "router_files": 19
+    },
+    "phase0_impact": "No canonical Titanium completion criterion, residual node, modality, or missing artifact changed; Phase 0 remains BLOCKED at 4/8 and targets CLOSED_NOT_PROD.",
+    "historical_observation_policy": "Existing bb3-, 1ce-, 186-, and 59a4-bound verification observations remain immutable historical observations; the refreshed projection binds current main while all four prior projections are retained explicitly as STALE_DERIVED.",
+    "previous_refresh": {
     "observed_at": "2026-07-26T16:26:31Z",
     "previous_main_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
     "current_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
@@ -641,37 +726,38 @@
         }
       }
     }
+    }
   },
   "source_objects": [
     {
       "path": "docs/governance/ACTIVE_TRACK.yaml",
-      "ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "git_object": "1332208f885585f0b515eb3dd3a7c2c687391838"
     },
     {
       "path": "CLAUDE.md",
-      "ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "git_object": "36d07ed94025851881703cd26680e7008b10b057"
     },
     {
       "path": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "git_object": "6b581fe0965291aed368f9882cdb6c94021c5355"
     },
     {
       "path": "reports/governance/titanium/wp00_baseline.json",
-      "ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "git_object": "48a4ee7ae6e0ff68231027e4aa9832359b9a5ed8"
     },
     {
       "path": "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md",
-      "ref": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+      "ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "git_object": "05a081e488cc6c633ca8ba1208e6adca4a23aaa6"
     }
   ],
   "local_replay": {
-    "observed_at": "2026-07-26T15:44:07Z",
-    "candidate_head": "0f379f16cc2407b11724575eb7a80326c54712d4",
+    "observed_at": "2026-07-26T16:45:14Z",
+    "candidate_head": "994c6496e2d08b83a9c309405966f71459083fac",
     "test_command": ".venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_bootstrap_contract.py tests/test_api_auth.py tests/test_verify_api.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py",
     "test_result": "221 passed, 1 warning",
     "command": ".venv/bin/python scripts/governance/check_track_status.py --reports-dir \"$M0_REPORTS\"",
