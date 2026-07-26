@@ -1,0 +1,88 @@
+{
+  "id": "WP-PR1133-CODEOWNERS",
+  "base_ref": "c28f00c160053a6d0a60b396a95019f82684a840",
+  "branch": "repair/pr11",
+  "worktree": ".",
+  "intent": "PR #1133 repair: regenerate .github/CODEOWNERS from measured blast radius. Decomposing vector_store.py back under the Rule-10 line budget introduces vector_store_dedupe.py and vector_store_query_support.py inside its import graph (blast=180 each), so the CODEOWNERS gate requires explicit routing entries committed in the same PR.",
+  "allowed_files": [
+    ".github/CODEOWNERS",
+    "dharma_swarm/archaeology_ingestion.py",
+    "dharma_swarm/memory_kernel/write_policy.py",
+    "dharma_swarm/memory_palace.py",
+    "dharma_swarm/vector_store.py",
+    "dharma_swarm/vector_store_dedupe.py",
+    "dharma_swarm/vector_store_query_support.py",
+    "reports/agentops/work_packets/WP-PR1133-CODEOWNERS.json",
+    "reports/governance/store_inventory_census.json",
+    "tests/test_archaeology_ingestion.py",
+    "tests/test_memory_palace.py",
+    "tests/test_store_inventory_census.py",
+    "tests/test_vector_store.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "archaeology-vector-store",
+      "command": "python3 -m pytest tests/test_archaeology_ingestion.py tests/test_vector_store.py -q",
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "no-selector-outside-envelope",
+      "command": "python3 -m pytest tests/test_archaeology_ingestion.py -q -k selector_that_matches_nothing",
+      "expected_exit": 5
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "chore(codeowners): regenerate from measured blast radius (PR #1133 repair)"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PR1133-CODEOWNERS",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c28f00c160053a6d0a60b396a95019f82684a840",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      ".github/CODEOWNERS",
+      "scripts/governance/codeowners_blast_radius.py"
+    ],
+    "honest_blockers": [],
+    "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
+    "packet_digest": "6bc352e21d041e8a7257f318ad40c9769887f38cc520fcb486de962d702e9ad8"
+  }
+}
