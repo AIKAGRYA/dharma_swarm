@@ -402,10 +402,27 @@ def _ensure_retrieval_telemetry_table(conn: sqlite3.Connection) -> None:
             memory_kernel_text_query_supported INTEGER NOT NULL DEFAULT 0,
             memory_kernel_admitted_count INTEGER NOT NULL DEFAULT 0,
             degraded_reasons_json TEXT NOT NULL DEFAULT '[]',
-            top_channels_json TEXT NOT NULL DEFAULT '[]'
+            top_channels_json TEXT NOT NULL DEFAULT '[]',
+            abstained INTEGER NOT NULL DEFAULT 0,
+            abstained_reason TEXT NOT NULL DEFAULT '',
+            shadow_abstained INTEGER,
+            shadow_min_score REAL
         )
         """
     )
+    # Additive shadow-abstention columns for pre-existing telemetry tables
+    # (31k+ live rows); older writers keep working because inserts name
+    # their columns explicitly.
+    for ddl in (
+        "ALTER TABLE memory_retrieval_query_log ADD COLUMN abstained INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE memory_retrieval_query_log ADD COLUMN abstained_reason TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE memory_retrieval_query_log ADD COLUMN shadow_abstained INTEGER",
+        "ALTER TABLE memory_retrieval_query_log ADD COLUMN shadow_min_score REAL",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS memory_retrieval_query_log_time_idx

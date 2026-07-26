@@ -68,10 +68,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.consistency_guard import run_task_consistency_guard
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.guardian_runtime_checks import (
     run_guardian_warning_checks,
     runtime_context_bundle_injection_findings,
@@ -82,6 +82,11 @@ from dharma_swarm.guardian_runtime_checks import (
 logger = logging.getLogger(__name__)
 
 _GUARDIAN_INTERVAL = int(os.environ.get("GUARDIAN_INTERVAL_SECONDS", "14400"))  # 4 hours
+
+
+def _default_src_root() -> Path:
+    """Return the package tree loaded by this running Guardian process."""
+    return Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
 # Finding dataclass
@@ -1188,7 +1193,7 @@ async def run_guardian_cycle(
     Returns:
         Dict with finding counts, report path, and issue creation results.
     """
-    src_root = src_root or Path.home() / "dharma_swarm" / "dharma_swarm"
+    src_root = src_root or _default_src_root()
     state_dir = state_dir or dharma_state_dir()
     generated_at = datetime.now(timezone.utc).isoformat()
 
