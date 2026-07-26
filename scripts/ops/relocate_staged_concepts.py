@@ -149,6 +149,16 @@ def main(argv: list[str] | None = None) -> int:
         "rollback": (
             "for each entry in moves: mv <after> <before>; verify sha256 matches"
         ),
+        "post_apply_reconciliation": [
+            "moving the .md alone does NOT retract projections the old promote",
+            "path already emitted: wiki/index.md + backlink entries and any",
+            "previously ingested vec_documents/memory_retrieval_docs rows",
+            "remain until reconciled. Regenerate + re-sign the wiki trust",
+            "manifest (OP-3) so every manifest-gated reader drops the",
+            "relocated paths, then re-run the wiki cross-update for the",
+            "trusted tree; vector-row invalidation is tracked in the audit",
+            "follow-up (rows carry the relocated source ids in this receipt).",
+        ],
     }
 
     if not args.apply:
