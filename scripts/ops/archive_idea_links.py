@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -83,6 +84,28 @@ def _write_receipt(receipt_dir: Path, receipt: dict) -> Path:
     return path
 
 
+def _reserve_receipt(receipt_dir: Path, action: str) -> Path:
+    """Reserve the receipt path BEFORE any applied mutation.
+
+    An unwritable receipt dir, a full disk, or a same-second filename
+    collision must fail the run while the database is still untouched —
+    not after a committed rename/drop.
+    """
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    path = receipt_dir / f"archive_idea_links_{action}_{_utc_time_stamp()}.json"
+    with path.open("x") as handle:  # exclusive create = reservation
+        handle.write(json.dumps({"action": action, "status": "in_progress"}) + "\n")
+    return path
+
+
+def _finalize_receipt(path: Path, receipt: dict) -> Path:
+    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+_ARCHIVE_NAME_RE = re.compile(r"^idea_links_archive_\d{8}$")
+
+
 def phase_archive(db_path: Path, *, apply: bool, receipt_dir: Path) -> int:
     archive_name = f"idea_links_archive_{_utc_stamp()}"
     with _connect(db_path) as db:
@@ -99,6 +122,7 @@ def phase_archive(db_path: Path, *, apply: bool, receipt_dir: Path) -> int:
         if not apply:
             print("DRY RUN — nothing changed (pass --apply to execute)")
             return 0
+        receipt_path = _reserve_receipt(receipt_dir, "archive")
         db.execute(plan)
         db.commit()
         after_exists = _table_exists(db, "idea_links")
@@ -116,7 +140,7 @@ def phase_archive(db_path: Path, *, apply: bool, receipt_dir: Path) -> int:
         "timestamp": _utc_now_iso(),
         "rollback": f'ALTER TABLE "{archive_name}" RENAME TO idea_links (drop the empty recreated idea_links first if schema-ensure ran)',
     }
-    path = _write_receipt(receipt_dir, receipt)
+    path = _finalize_receipt(receipt_path, receipt)
     print(f"archived {archived} rows -> {archive_name}; receipt: {path}")
     return 0
 
@@ -131,12 +155,16 @@ def phase_drop(
     offhost_copy: str,
 ) -> int:
     with _connect(db_path) as db:
+        # LIKE underscores are single-char wildcards; validate every returned
+        # name against the exact archive format so an unrelated table can
+        # never be selected for backup+DROP.
         archives = [
             row[0]
             for row in db.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
                 " AND name LIKE 'idea_links_archive_%' ORDER BY name"
             ).fetchall()
+            if _ARCHIVE_NAME_RE.fullmatch(row[0])
         ]
         if not archives:
             print("no idea_links_archive_* table found; run phase archive first")
@@ -162,9 +190,34 @@ def phase_drop(
         if not apply:
             print("DRY RUN — nothing changed (pass --apply to execute)")
             return 0
+        receipt_path = _reserve_receipt(receipt_dir, "drop")
         backup_dir.mkdir(parents=True, exist_ok=True)
+        # Preserve the declared schema in the backup: CREATE TABLE AS SELECT
+        # keeps rows only (no PK / NOT NULL / declared types), so a rollback
+        # from that copy would drop the original invariants. Recreate from
+        # the source DDL, then copy rows; index DDLs ride in the receipt.
+        table_ddl = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (archive_name,),
+        ).fetchone()[0]
+        index_ddls = [
+            row[0]
+            for row in db.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'index'"
+                " AND tbl_name = ? AND sql IS NOT NULL",
+                (archive_name,),
+            ).fetchall()
+        ]
+        backup_table_ddl = re.sub(
+            r"^\s*CREATE\s+TABLE\s+(\"[^\"]+\"|\S+)",
+            f'CREATE TABLE backup."{archive_name}"',
+            table_ddl,
+            count=1,
+            flags=re.IGNORECASE,
+        )
         db.execute("ATTACH DATABASE ? AS backup", (str(backup_path),))
-        db.execute(f'CREATE TABLE backup."{archive_name}" AS SELECT * FROM "{archive_name}"')
+        db.execute(backup_table_ddl)
+        db.execute(f'INSERT INTO backup."{archive_name}" SELECT * FROM "{archive_name}"')
         db.commit()
         backed_up = int(
             db.execute(f'SELECT COUNT(*) FROM backup."{archive_name}"').fetchone()[0]
@@ -202,10 +255,15 @@ def phase_drop(
         },
         "offhost_copy_attestation": offhost_copy,
         "sha256s": {"backup": backup_sha},
+        "schema": {"table_ddl": table_ddl, "index_ddls": index_ddls},
         "timestamp": _utc_now_iso(),
-        "rollback": f'ATTACH "{backup_path}" AS backup; CREATE TABLE "{archive_name}" AS SELECT * FROM backup."{archive_name}"',
+        "rollback": (
+            f'ATTACH "{backup_path}" AS backup; recreate via schema.table_ddl; '
+            f'INSERT INTO "{archive_name}" SELECT * FROM backup."{archive_name}"; '
+            "re-apply schema.index_ddls"
+        ),
     }
-    path = _write_receipt(receipt_dir, receipt)
+    path = _finalize_receipt(receipt_path, receipt)
     print(f"dropped {archive_name}; backup sha256={backup_sha}; receipt: {path}")
     return 0
 
