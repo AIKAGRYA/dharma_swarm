@@ -151,23 +151,16 @@ def test_tracked_dirty_checkout_is_rejected(tmp_path: Path) -> None:
         assess_runtime_admission(repo)
 
 
-def test_unpinned_ahead_branch_is_rejected_but_exact_release_pin_is_admitted(
+def test_release_pin_cannot_authorize_an_unmerged_descendant(
     tmp_path: Path,
 ) -> None:
-    repo, base = _runtime_repo(tmp_path)
+    repo, _base = _runtime_repo(tmp_path)
     release_head = _commit(repo, "release fix")
 
     with pytest.raises(RuntimeAdmissionError, match="must equal origin/main"):
         assess_runtime_admission(repo)
-
-    admission = assess_runtime_admission(
-        repo,
-        expected_commit=release_head,
-    )
-    assert admission.origin_main == base
-    assert admission.head == release_head
-    assert admission.expected_commit == release_head
-    assert (admission.ahead, admission.behind) == (1, 0)
+    with pytest.raises(RuntimeAdmissionError, match="must equal origin/main"):
+        assess_runtime_admission(repo, expected_commit=release_head)
 
 
 def test_stale_checkout_is_rejected_even_when_pinned_to_its_old_head(
@@ -180,7 +173,7 @@ def test_stale_checkout_is_rejected_even_when_pinned_to_its_old_head(
 
     with pytest.raises(RuntimeAdmissionError, match="must equal origin/main"):
         assess_runtime_admission(repo)
-    with pytest.raises(RuntimeAdmissionError, match="not a current-main descendant"):
+    with pytest.raises(RuntimeAdmissionError, match="must equal origin/main"):
         assess_runtime_admission(repo, expected_commit=old_head)
 
 

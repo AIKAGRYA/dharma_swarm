@@ -1,9 +1,8 @@
 """Fail-closed provenance admission for the live swarm runtime.
 
-The live daemon may run only from a clean tracked checkout that is either
-exactly ``origin/main`` or an explicitly pinned descendant of the current
-local ``origin/main``.  The pin is intended for immutable release worktrees;
-ordinary development checkouts receive no branch-ahead exception.
+The live daemon may run only from a clean tracked checkout exactly at
+``origin/main``. An immutable release pin confirms that canonical commit; it
+never grants an unmerged descendant additional execution authority.
 """
 
 from __future__ import annotations
@@ -334,31 +333,15 @@ def assess_runtime_admission(
             "git ahead/behind probe returned non-integer output"
         ) from exc
 
-    if expected is None:
-        if head != origin_main:
-            raise RuntimeAdmissionError(
-                "unpinned runtime must equal origin/main "
-                f"(ahead={ahead}, behind={behind})"
-            )
-    else:
-        if head != expected:
-            raise RuntimeAdmissionError(
-                f"runtime HEAD {head} does not match pinned commit {expected}"
-            )
-        ancestor = _git(
-            root,
-            "merge-base",
-            "--is-ancestor",
-            base_ref,
-            "HEAD",
-            environ=environ,
+    if head != origin_main:
+        mode = "pinned" if expected is not None else "unpinned"
+        raise RuntimeAdmissionError(
+            f"{mode} runtime must equal origin/main (ahead={ahead}, behind={behind})"
         )
-        if ancestor.returncode not in {0, 1}:
-            raise RuntimeAdmissionError("git ancestry probe failed")
-        if ancestor.returncode != 0 or behind != 0:
-            raise RuntimeAdmissionError(
-                f"pinned runtime is not a current-main descendant (behind={behind})"
-            )
+    if expected is not None and head != expected:
+        raise RuntimeAdmissionError(
+            f"runtime HEAD {head} does not match pinned commit {expected}"
+        )
 
     return RuntimeAdmission(
         repo_root=root,
