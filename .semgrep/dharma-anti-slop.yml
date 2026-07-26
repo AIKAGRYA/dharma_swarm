@@ -36,6 +36,10 @@ rules:
         - "scripts/consume_review_marks.py"
         - "scripts/hermes_heartbeat_poll.py"
         - "scripts/check_provider_credits.py"
+        # Quality-quarantine shadow receipts (owned surface:
+        # state_dir.quarantine_shadow_receipts in ACTIVE_SURFACE_MANIFEST.yaml;
+        # ANTI_SLOP Rule-2 derived-view JSONL, PR #1134)
+        - "dharma_swarm/memory_quarantine.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================

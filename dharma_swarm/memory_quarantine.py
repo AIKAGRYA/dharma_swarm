@@ -1,4 +1,4 @@
-"""Quality-quarantine gate for StrangeLoop / latent-gold recall surfaces.
+"""Quality-quarantine gate for StrangeLoop / context recall surfaces.
 
 2026-07-25 memory audit §5.11: quality tags were cosmetic — every recall
 surface served ``low_quality`` rows into context bundles. 11,897 of 12,065
@@ -11,6 +11,13 @@ the Always-On section of every bundle fleet-wide. Hence three modes via
              counts into a JSONL receipt for 1wk+ before any enforce flip.
   enforce  — quarantined rows excluded from recall (still readable via
              explicit ``include_quarantined=True``).
+
+The latent-gold (idea shard) gate is deliberately NOT wired here: any
+import of this module from engine/conversation_memory enters the
+DharmaGraph seam-ledger workload closure and its bypass ratchet
+(tests/test_graph_seam_ledger.py) can never rise. Gating that surface
+needs a write-time shard quality tag (SQL predicate, no new imports) or
+a consumer-side gate in swarm.py — a cross-track follow-up.
 
 Receipt store role (ANTI_SLOP Rule 2): derived-view telemetry only —
 append-only JSONL at ``<state>/witness/memory_quarantine_shadow.jsonl``,
@@ -75,13 +82,6 @@ def is_quarantined(
     if witness_quality is not None:
         return witness_quality < QUALITY_FLOOR
     return False
-
-
-def is_shard_quarantined(text: str) -> bool:
-    """Quarantine predicate for idea shards (no write-time quality tag)."""
-    from dharma_swarm.memory import _assess_quality
-
-    return _assess_quality(text) < QUALITY_FLOOR
 
 
 def record_shadow_receipt(

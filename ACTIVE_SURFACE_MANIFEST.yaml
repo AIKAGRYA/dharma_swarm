@@ -32,6 +32,7 @@ state_dir:
   a2a_bus_queue: "~/.dharma/a2a_bus/queue.jsonl"
   promote_log: "~/.dharma/logs/consume_review_marks.jsonl"
   provider_credits_log: "~/.dharma/logs/provider_credits_latest.json"
+  quarantine_shadow_receipts: "~/.dharma/witness/memory_quarantine_shadow.jsonl"
 
 api_routers:
   - id: holon

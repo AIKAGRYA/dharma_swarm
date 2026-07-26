@@ -5,13 +5,10 @@ import json
 import os
 import sqlite3
 from datetime import datetime, timezone
-from uuid import uuid4
 
 import pytest
 
 from dharma_swarm.context import read_memory_context, read_recent_memories
-from dharma_swarm.engine.conversation_memory import ConversationMemoryStore
-from dharma_swarm.engine.event_memory import ensure_memory_plane_schema_sync
 from dharma_swarm.memory import StrangeLoopMemory
 from dharma_swarm.memory_quarantine import (
     MODE_ENFORCE,
@@ -20,7 +17,6 @@ from dharma_swarm.memory_quarantine import (
     QUARANTINE_ENV,
     RECEIPT_RELPATH,
     is_quarantined,
-    is_shard_quarantined,
     quarantine_mode,
 )
 from dharma_swarm.models import MemoryLayer
@@ -81,11 +77,6 @@ def test_is_quarantined_quality_fallback_when_tags_unknown():
     assert is_quarantined(None, 0.3) is True
     assert is_quarantined(None, 0.7) is False
     assert is_quarantined(None, None) is False
-
-
-def test_is_shard_quarantined():
-    assert is_shard_quarantined(BAD_TEXT) is True
-    assert is_shard_quarantined(GOOD_TEXT) is False
 
 
 def test_shadow_receipt_write_failure_is_counted(tmp_path):
@@ -274,63 +265,3 @@ def test_read_recent_memories_legacy_schema_falls_back(tmp_path, monkeypatch):
     # Pre-tags schema has nothing tagged: serve legacy instead of erroring.
     out = read_recent_memories(tmp_path)
     assert "profound amazing" in out
-
-
-# ── latent_gold ──────────────────────────────────────────────────────
-
-
-def _seed_shards(store: ConversationMemoryStore) -> None:
-    now = datetime.now(timezone.utc).isoformat()
-    with sqlite3.connect(str(store.db_path)) as db:
-        ensure_memory_plane_schema_sync(db)
-        for text in (GOOD_TEXT, BAD_TEXT):
-            db.execute(
-                "INSERT INTO idea_shards"
-                " (shard_id, turn_id, session_id, task_id, shard_kind, state,"
-                "  text, salience, novelty, flow_score, source_span,"
-                "  metadata_json, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    f"shard_{uuid4().hex}", f"turn_{uuid4().hex}", "sess", "task",
-                    "insight", "orphaned", text, 0.9, 0.5, 0.5, "", "{}", now,
-                ),
-            )
-        db.commit()
-
-
-@pytest.fixture
-def shard_store(tmp_path):
-    store = ConversationMemoryStore(tmp_path / "db" / "memory_plane.db")
-    _seed_shards(store)
-    return store
-
-
-def test_latent_gold_off_serves_all(shard_store, monkeypatch):
-    monkeypatch.setenv(QUARANTINE_ENV, MODE_OFF)
-    shards = shard_store.latent_gold("", limit=10)
-    assert {s.text for s in shards} == {GOOD_TEXT, BAD_TEXT}
-
-
-def test_latent_gold_shadow_serves_and_stamps(shard_store, tmp_path, monkeypatch):
-    monkeypatch.setenv(QUARANTINE_ENV, MODE_SHADOW)
-    shards = shard_store.latent_gold("", limit=10)
-    assert {s.text for s in shards} == {GOOD_TEXT, BAD_TEXT}
-    lines = [
-        ln for ln in _receipt_lines(tmp_path)
-        if ln["site"] == "conversation_memory.latent_gold"
-    ]
-    assert lines
-    assert lines[-1]["served"] == 2
-    assert lines[-1]["would_be_excluded"] == 1
-
-
-def test_latent_gold_enforce_excludes(shard_store, monkeypatch):
-    monkeypatch.setenv(QUARANTINE_ENV, MODE_ENFORCE)
-    shards = shard_store.latent_gold("", limit=10)
-    assert [s.text for s in shards] == [GOOD_TEXT]
-
-
-def test_latent_gold_include_quarantined_override(shard_store, monkeypatch):
-    monkeypatch.setenv(QUARANTINE_ENV, MODE_ENFORCE)
-    shards = shard_store.latent_gold("", limit=10, include_quarantined=True)
-    assert {s.text for s in shards} == {GOOD_TEXT, BAD_TEXT}

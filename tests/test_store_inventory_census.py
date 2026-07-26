@@ -38,7 +38,10 @@ BASELINE_DB_NAMES = 39
 # 216 -> 217 (2026-07-24): episode_ledger.jsonl — the session ledger's Episode
 # Ledger producer file (B1 producer slice; schema landed in #1062). One new
 # versioned validated store, not proliferation of an unversioned one.
-BASELINE_JSONL_NAMES = 217
+# 217 -> 218 (2026-07-26): memory_quarantine_shadow.jsonl — the quality-
+# quarantine shadow receipts (#1134). ANTI_SLOP Rule-2 derived-view telemetry:
+# append-only, truncatable at will, never read back by runtime code.
+BASELINE_JSONL_NAMES = 218
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12
