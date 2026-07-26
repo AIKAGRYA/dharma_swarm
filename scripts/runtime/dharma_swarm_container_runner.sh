@@ -23,7 +23,11 @@ if [[ -n "$(find "${source_root}" -type l -print -quit)" ]]; then
     fail "image source tree contains a symlink"
 fi
 
-observed_manifest="$(mktemp)"
+temp_root="${TMPDIR:-/tmp}"
+[[ -d "${temp_root}" && -w "${temp_root}" ]] \
+    || fail "temporary directory is unavailable"
+observed_manifest="$(mktemp "${temp_root%/}/dharma-runtime-manifest.XXXXXX")" \
+    || fail "temporary manifest is unavailable"
 trap 'rm -f "${observed_manifest}"' EXIT
 (
     cd "${source_root}"

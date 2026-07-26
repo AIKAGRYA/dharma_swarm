@@ -73,6 +73,7 @@ def test_container_runner_verifies_manifest_before_python(tmp_path: Path) -> Non
     )
     environment = os.environ.copy()
     environment["CONTAINER_RUNNER_CALL_LOG"] = str(call_log)
+    environment["TMPDIR"] = str(tmp_path)
 
     result = subprocess.run(
         ["/bin/bash", str(runner)],
@@ -113,6 +114,7 @@ def test_container_runner_denies_source_tampering_before_python(
     (source / "worker.py").write_text("VALUE = 2\n", encoding="utf-8")
     environment = os.environ.copy()
     environment["CONTAINER_RUNNER_CALL_LOG"] = str(call_log)
+    environment["TMPDIR"] = str(tmp_path)
 
     result = subprocess.run(
         ["/bin/bash", str(runner)],
