@@ -215,6 +215,25 @@ class TestVectorStoreSearch:
         contents = [r["content"] for r in results]
         assert any("heartbeat" in c for c in contents)
 
+    def test_search_fts_skips_globally_ranked_scan_for_large_store(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        """A SQL LIMIT must not disguise an unbounded BM25 projection scan."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FTS_MAX_ROWS", "1")
+
+        def _explode(_query_text):
+            raise AssertionError("FTS query construction should not run")
+
+        monkeypatch.setattr(
+            "dharma_swarm.vector_store._fts_match_query",
+            _explode,
+        )
+
+        assert store.search_fts("organism heartbeat", top_k=3) == []
+
     def test_search_hybrid_returns_scored_results(self, tmp_path):
         store = self._seed_store(tmp_path)
         results = store.search_hybrid("organism heartbeat running", top_k=3)
