@@ -48,6 +48,11 @@ if [[ "${1-}" == "--verify-only" ]]; then
     [[ "$#" -eq 1 ]] || fail "unsupported argument"
     echo "container runner: source manifest verified: ${source_digest}"
     exit 0
+elif [[ "$#" -eq 2 && "$1" == "dgc" && "$2" == "orchestrate-live" ]]; then
+    # Preserve the documented pre-ENTRYPOINT Docker invocation. The fixed
+    # entrypoint owns this command now, so these arguments are an exact alias
+    # for the zero-argument launch path after provenance verification.
+    :
 elif [[ "$#" -ne 0 ]]; then
     fail "unsupported argument"
 fi

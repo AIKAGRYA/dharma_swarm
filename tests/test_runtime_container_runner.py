@@ -90,6 +90,19 @@ def test_container_runner_verifies_manifest_before_python(tmp_path: Path) -> Non
     assert calls[2] == hashlib.sha256(manifest.read_bytes()).hexdigest()
 
     call_log.unlink()
+    documented = subprocess.run(
+        ["/bin/bash", str(runner), "dgc", "orchestrate-live"],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    assert documented.returncode == 0, documented.stderr
+    assert call_log.read_text(encoding="utf-8").splitlines()[0] == (
+        "-B -I -m dharma_swarm.orchestrate_live"
+    )
+
+    call_log.unlink()
     verify = subprocess.run(
         ["/bin/bash", str(runner), "--verify-only"],
         capture_output=True,
