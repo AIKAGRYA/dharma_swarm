@@ -22,6 +22,9 @@ STAGING_ROOT = Path.home() / ".dharma" / "knowledge" / "staging"
 QUARANTINE_ROOT = Path.home() / ".dharma" / "knowledge" / "quarantine"
 WIKI_ROOT = Path.home() / ".dharma" / "knowledge" / "wiki"
 TRUSTED_DEFAULT = WIKI_ROOT / "concepts"
+# Promoted-but-not-approved atoms live here. Nothing that reads the trusted
+# projection (concepts/) may read pending/ — only approve moves atoms across.
+WIKI_PENDING_ROOT = WIKI_ROOT / "pending"
 
 
 def staging_path_for(atom_id: str, when: date | None = None) -> Path:
@@ -64,20 +67,32 @@ def write_trusted(
     target = trusted_path_for(slug or _derive_slug(schema.title), root=root)
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
-        existing_id = None
+        # Fail closed on every collision except a rewrite of the SAME atom:
+        # unreadable file or a legacy page without atom_id must never be
+        # silently clobbered (the wiki holds ~251 pre-chetana concepts).
+        new_id = getattr(schema, "atom_id", None) or "<unknown>"
         try:
             existing_text = target.read_text(encoding="utf-8")
-            for line in existing_text.splitlines()[:30]:
-                if line.startswith("atom_id:"):
-                    existing_id = line.split(":", 1)[1].strip()
-                    break
-        except Exception:
-            pass
-        new_id = getattr(schema, "atom_id", None) or "<unknown>"
-        if existing_id and existing_id != str(new_id):
+        except OSError as e:
+            raise FileExistsError(
+                f"slug collision: {target} already exists but could not be read "
+                f"({type(e).__name__}: {e}); refusing overwrite (new atom_id={new_id})."
+            ) from e
+        existing_id = None
+        for line in existing_text.splitlines()[:30]:
+            if line.startswith("atom_id:"):
+                existing_id = line.split(":", 1)[1].strip()
+                break
+        if existing_id is None:
+            raise FileExistsError(
+                f"slug collision: {target} already exists without an atom_id "
+                f"(legacy page); refusing overwrite (new atom_id={new_id}). "
+                f"Pass an explicit slug= to write_trusted() or rename the title."
+            )
+        if existing_id != str(new_id):
             raise FileExistsError(
                 f"slug collision: {target} already exists with atom_id={existing_id} "
-                f"(new atom_id={new_id}). Pass an explicit slug= to write_trusted_atom() "
+                f"(new atom_id={new_id}). Pass an explicit slug= to write_trusted() "
                 f"or rename the title."
             )
     target.write_text(assemble_atom(schema, body), encoding="utf-8")
@@ -101,8 +116,27 @@ def list_staged() -> list[Path]:
     return sorted(p for p in STAGING_ROOT.rglob("*.md") if p.is_file())
 
 
-def list_trusted(root: Path | None = None) -> list[Path]:
+def list_trusted(root: Path | None = None, *, apply_manifest: bool = True) -> list[Path]:
+    """List the trusted projection: on-disk pages ∩ signed trust manifest.
+
+    apply_manifest=False is for audit tooling that must see raw disk state
+    (e.g. manifest-drift reports); every consumer that treats the result as
+    trusted MUST keep the default.
+    """
     root = root or TRUSTED_DEFAULT
+    if not root.exists():
+        return []
+    files = sorted(p for p in root.glob("*.md") if p.is_file())
+    if not apply_manifest:
+        return files
+    from .manifest import load_manifest
+
+    manifest = load_manifest(root)
+    return [p for p in files if manifest.is_trusted(p)]
+
+
+def list_pending(root: Path | None = None) -> list[Path]:
+    root = root or WIKI_PENDING_ROOT
     if not root.exists():
         return []
     return sorted(p for p in root.glob("*.md") if p.is_file())

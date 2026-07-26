@@ -242,10 +242,14 @@ def _coerce_decision(raw: Any) -> GateResult:
     """Map any of {Enum, str, value} to chetana's GateResult literal.
 
     Handles GateDecision.ALLOW / .BLOCK / .REVIEW (the dharma_swarm enum), plus
-    string variants. REVIEW maps to WARN (chetana's middle tier).
+    string variants. REVIEW maps to WARN (chetana's middle tier). Anything
+    unrecognized fails closed to BLOCK — chetana writes trust, so an unknown
+    gate verdict must never promote. That includes None: a GateCheckResult
+    whose ``decision`` attribute is missing (interface drift) must not read
+    as ALLOW.
     """
     if raw is None:
-        return "ALLOW"
+        return "BLOCK"
     # Try the enum's .value first ('allow' | 'block' | 'review')
     val = getattr(raw, "value", None)
     if isinstance(val, str):
@@ -258,7 +262,33 @@ def _coerce_decision(raw: Any) -> GateResult:
         return "WARN"
     if s in ("BLOCK", "DENY", "REJECT", "FAIL"):
         return "BLOCK"
-    return "WARN"  # conservative default
+    return "BLOCK"  # unknown verdict → fail closed
+
+
+def current_kernel_signature() -> str:
+    """Load the current kernel signature via a plain file read (event-loop safe).
+
+    Returns the 64-zero placeholder when the kernel is unavailable or fails
+    integrity — callers treat placeholder-signed material as zero-sig.
+    """
+    placeholder = "0" * 64
+    try:
+        from dharma_swarm.dharma_kernel import DharmaKernel, KernelGuard  # type: ignore
+
+        kernel_path = KernelGuard().path
+        text = kernel_path.read_text(encoding="utf-8")
+        kernel = DharmaKernel.model_validate_json(text)
+        if kernel.verify_integrity() and kernel.signature:
+            return kernel.signature
+    except (ImportError, OSError, ValueError) as exc:
+        # Kernel missing/unreadable/invalid (pydantic ValidationError is a
+        # ValueError): fall back to the zero-sig placeholder, explicitly.
+        # Anything else propagates — an unexpected failure should fail the
+        # approval loudly, not silently downgrade to placeholder-signed
+        # material.
+        logger.debug("chetana kernel signature unavailable, using placeholder: %s", exc)
+        return placeholder
+    return placeholder
 
 
 def _run_sync_awaitable(awaitable: Any) -> Any:
