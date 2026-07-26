@@ -289,7 +289,9 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
       operator companion (audit + spec: docs/plans/MOBILE_OPERATOR_PWA_AUDIT_SPEC_2026-07-25.md).
       Serves the standing phone-first operator context (ACTIVE_TRACK.yaml:2023).
       Not a third website (dashboard/README.md:15): same app, same routes.
-    completion_criteria:
+    prerequisites:
+      # Existence-grade gates deliberately live HERE, not in completion_criteria —
+      # file-existence is never closure (docs/governance/evidence_grades.yaml:8-10).
       - id: viewport_export_exists
         kind: file_contains
         file: dashboard/src/app/layout.tsx
@@ -297,12 +299,42 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
       - id: manifest_exists
         kind: file_exists
         file: dashboard/src/app/manifest.ts
-      - id: mobile_visual_baseline_exists
-        kind: file_exists
-        file: dashboard/playwright/mobile-shell.spec.ts
+    completion_criteria:
+      # Outcome-bound, in live-track grammar (command_passes, as helm uses at
+      # ACTIVE_TRACK.yaml:1332). If this block is parked as a formal file in
+      # docs/governance/proposed_tracks/, its README (:23-25) requires downgrading
+      # command_passes to file_exists/file_contains/pr_merged shapes until
+      # admission — and any pr_merged criterion MUST carry a numeric pr: the
+      # checker calls int(crit["pr"]) (scripts/governance/check_track_status.py:1087),
+      # so a placeholder string crashes the track-status gate.
+      # Oracle note: these suites are claimant-run; evidence_grades downgrades
+      # oracle-dependent passes to S2 (evidence_grades.yaml:34-38) — same posture
+      # as helm's bun-test gate.
+      - id: mobile_shell_and_p0_baselines_green
+        # Phases 0/1/3: shell + P0 routes render at 390px with no horizontal
+        # scroll, >=44px action targets, visual baselines green on the mobile
+        # Playwright project (spec sections 7.0, 7.1, 7.3 acceptance).
+        kind: command_passes
+        command: ["bash", "-c", "cd dashboard && npx playwright test --project=mobile --reporter=line"]
+        timeout_s: 1200
+      - id: pwa_install_offline_green
+        # Phase 2: installability (manifest + SW + icons) and airplane-mode
+        # last-known-state labeled STALE (spec section 7.2 acceptance).
+        kind: command_passes
+        command: ["bash", "-c", "cd dashboard && npx playwright test playwright/pwa-install.spec.ts --project=mobile --reporter=line"]
+        timeout_s: 600
+      - id: ws_resilience_green
+        # Phase 4: background -> sever network -> restore -> foreground
+        # reconnects without manual reload (spec section 7.4 acceptance).
+        kind: command_passes
+        command: ["bash", "-c", "cd dashboard && npx playwright test playwright/ws-resilience.spec.ts --project=mobile --reporter=line"]
+        timeout_s: 600
       - id: phase5_ratified_or_descoped
-        kind: pr_merged
-        pr: "TBD — Phase 5 remote-access seam PR, or a descope note in this spec"
+        # Phase 5 is operator-gated: this file is written by the ratify-or-descope
+        # decision itself (replaces a non-numeric pr_merged placeholder that would
+        # have crashed the checker — see int() note above).
+        kind: file_exists
+        file: docs/plans/decisions/MOBILE_PWA_PHASE5_DECISION.md
     next_items:
       - { id: 1, what: "Phase 0: playwright device projects + viewport export + nav integrity sweep", kind: test, blocker: true }
       - { id: 2, what: "Phase 1: responsive shell (sidebar drawer + bottom nav + ui primitives + effect gating)", kind: code, blocker: true }
