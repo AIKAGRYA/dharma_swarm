@@ -1,6 +1,6 @@
 {
   "schema": "dharma.titanium.phase0-reconciliation.v1",
-  "observed_at": "2026-07-26T16:49:17Z",
+  "observed_at": "2026-07-26T17:09:39Z",
   "initial_observed_at": "2026-07-25T12:37:53Z",
   "track_id": "repository-titanium-hardening-2026-07",
   "reviewed_main": {
@@ -104,7 +104,7 @@
         "jq -e '.admission.squash_merge_sha == \"82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89\"' reports/governance/titanium/wp00_baseline.json"
       ],
       "evidence_observation_ids": [
-        "exact-main-tests-59a4"
+        "exact-main-tests-08ce"
       ],
       "remaining": []
     },
@@ -119,7 +119,7 @@
         "jq -e '.schema_version == \"titanium-wp00b-baseline/v1\" and .claim_boundary != null' reports/governance/titanium/wp00_baseline.json"
       ],
       "evidence_observation_ids": [
-        "exact-main-tests-59a4"
+        "exact-main-tests-08ce"
       ],
       "remaining": []
     },
@@ -165,8 +165,8 @@
         ".venv/bin/python -m pytest tests/test_verifier_selfcheck_contract.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
       ],
       "evidence_observation_ids": [
-        "exact-main-tests-59a4",
-        "m0-focused-local-59a4"
+        "exact-main-tests-08ce",
+        "m0-focused-local-08ce"
       ],
       "remaining": []
     },
@@ -211,7 +211,7 @@
         ".venv/bin/python -m pytest tests/test_go_adapter_contracts.py tests/test_github_ingestor_runner.py tests/test_world_radar_go_bridge.py -q"
       ],
       "evidence_observation_ids": [
-        "exact-main-tests-59a4"
+        "exact-main-tests-08ce"
       ],
       "remaining": []
     },
@@ -277,7 +277,7 @@
         ".venv/bin/python -m pytest tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py -q"
       ],
       "evidence_observation_ids": [
-        "exact-main-tests-59a4"
+        "exact-main-tests-08ce"
       ],
       "remaining": [
         "Reprove every consumer against the operator-ratified final set."
@@ -485,6 +485,26 @@
       "main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
       "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/commit/98d5b17effd617615b239ef7f267fa63793c44f7",
       "claim": "The projection-only generated/status head binds exact reviewed main and still reports Titanium Phase 0 at 4/8; it grants no selection, merge, or production authority."
+    },
+    {
+      "id": "exact-main-tests-08ce",
+      "result": "PASS",
+      "observed_at": "2026-07-26T17:06:48Z",
+      "main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+      "evidence_handle": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30211216516",
+      "claim": "The post-merge tests workflow completed successfully on the exact reviewed main SHA, including pytest 3.11 and 3.12; this is repository CI evidence, not production evidence."
+    },
+    {
+      "id": "m0-focused-local-08ce",
+      "result": "PASS",
+      "observed_at": "2026-07-26T17:09:39Z",
+      "main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+      "candidate_head": "682c023b4b7473a1702335380e97de8c3a245d1e",
+      "evidence_handle": "local:.venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_bootstrap_contract.py tests/test_api_auth.py tests/test_verify_api.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py",
+      "track_evidence_handle": "local:.venv/bin/python scripts/governance/check_track_status.py --reports-dir \"$M0_REPORTS\"",
+      "track_evaluator_exit": 1,
+      "unrelated_portfolio_regression": "regression:orchestration-arena-v1-2026-06:arena_truth_receipt_valid",
+      "claim": "221 tests passed with one deprecation warning on the clean rebased candidate commit. The portfolio evaluator reported Titanium at 4/8; its nonzero exit came from an unrelated Arena receipt crossing its 21-day freshness TTL."
     }
   ],
   "completion_snapshot": [
@@ -756,8 +776,8 @@
     }
   ],
   "local_replay": {
-    "observed_at": "2026-07-26T16:45:14Z",
-    "candidate_head": "994c6496e2d08b83a9c309405966f71459083fac",
+    "observed_at": "2026-07-26T17:09:39Z",
+    "candidate_head": "682c023b4b7473a1702335380e97de8c3a245d1e",
     "test_command": ".venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_bootstrap_contract.py tests/test_api_auth.py tests/test_verify_api.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py",
     "test_result": "221 passed, 1 warning",
     "command": ".venv/bin/python scripts/governance/check_track_status.py --reports-dir \"$M0_REPORTS\"",
