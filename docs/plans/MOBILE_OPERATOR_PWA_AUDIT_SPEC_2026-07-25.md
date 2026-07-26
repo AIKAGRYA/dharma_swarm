@@ -11,7 +11,7 @@ Every claim below carries a `file:line` citation (observed in this checkout) or 
 
 ## 0. Executive summary
 
-The dashboard (`dashboard/`, Next.js 16.1.6 / React 19.2.3 / Tailwind 4 — `dashboard/package.json:29-30,48`) is a modern, desktop-only web operator surface. **Mobile/PWA readiness is 0%**: no viewport export (`dashboard/src/app/layout.tsx:36-39` exports `metadata` only), no manifest, no service worker, no icons (`dashboard/public/` contains only 5 Next scaffold SVGs), and a shell hard-wired to a fixed 260px sidebar (`dashboard/src/app/layout.tsx:64`; `dashboard/src/components/layout/Sidebar.tsx:86`). Phones today render a zoomed-out desktop page.
+The dashboard (`dashboard/`, Next.js 16.1.6 / React 19.2.3 / Tailwind 4 — `dashboard/package.json:29-30,48`) is a modern, desktop-only web operator surface. **Mobile/PWA readiness is 0%**: no viewport export (`dashboard/src/app/layout.tsx:36-39` exports `metadata` only), no manifest, no service worker, no icons (`dashboard/public/` contains only 5 Next scaffold SVGs), and a shell hard-wired to a fixed 260px sidebar (`dashboard/src/app/layout.tsx:64`; `dashboard/src/components/layout/Sidebar.tsx:86`). Phones get Next's default `width=device-width` viewport (App Router emits it when no export exists), but the fixed shell leaves ~130px of usable content width on a 390px screen.
 
 The renovation is nonetheless tractable because the stack needs no migration, the nav is data-driven (`dashboard/src/lib/dashboardNav.ts:47-98`), and a minority of routes carry the operator value. The plan: a 6-phase renovation converting the existing dashboard into an installable, offline-tolerant, touch-first **operator companion** for the phone-first operator context recorded in `docs/governance/ACTIVE_TRACK.yaml:2023` ("operator walking Japan … ~15% interaction, phone-first").
 
@@ -19,7 +19,7 @@ Hard blockers found beyond CSS:
 
 1. **Realtime is loopback-locked with no config escape.** The WS session minter rejects any non-localhost origin via a hardcoded set (`dashboard/src/lib/wsSession.ts:12`; `dashboard/src/app/dharma-internal/ws-auth/route.ts:13-23`). Every live feature is dead on LAN/tunnel until this is configurable.
 2. **No configuration authenticates both transports from a browser.** With `DASHBOARD_API_KEY` set (the only safe off-loopback mode), WS works via cookie but the Next rewrite proxy injects no `Authorization` header (`dashboard/src/lib/dashboardProxy.ts:10-19`; zero `Authorization` hits in `dashboard/src`), so every REST call 401s (`api/main.py:484-486`).
-3. **No mobile-network resilience.** WS reconnect gives up permanently after 10 attempts (`dashboard/src/lib/ws.ts:188-190`), no visibility/online handlers exist anywhere in `dashboard/src` (§9 cmd 6), and phone unlock triggers a synchronized refetch storm (`dashboard/src/app/providers.tsx:17-20` + ~40 polling queries, §4.3).
+3. **No mobile-network resilience.** WS reconnect gives up permanently after 10 attempts (`dashboard/src/lib/ws.ts:188-190`), no visibility/online handlers exist anywhere in `dashboard/src` (§9 cmd 6), and phone unlock refires every query mounted on the active route at once (`dashboard/src/app/providers.tsx:17-20`; the runtime surfaces alone mount a 6-request fan-out per tick and telemetry mounts 9 keys, §4.3).
 
 Governance: the active portfolio is at its hard ceiling (`max_active: 10`, `docs/governance/ACTIVE_TRACK.yaml:80`; 10 tracks ACTIVE per the generated digest in `CLAUDE.md`), so the draft track in §8 is a **proposal**, not an admission — an 11th ACTIVE track is a CI ERROR (`scripts/governance/check_track_status.py:1651-1654`).
 
@@ -56,7 +56,7 @@ Vision hook (why this serves declared intent, not invented scope): the standing 
 2. Sidebar `fixed left-0 top-0 z-40 flex h-screen w-[260px]` — no drawer, no collapse, no toggle (`dashboard/src/components/layout/Sidebar.tsx:86`).
 3. ChatOverlay `SIDEBAR_OFFSET = 280` / `MIN_WIDTH = 380` (`dashboard/src/components/chat/ChatOverlay.tsx:21,24`) — a *divergent duplicate* of the sidebar width; `clampRect` pins the window's `minX` to 280 (`ChatOverlay.tsx:44`), so the chat window is mathematically unreachable on any phone viewport. Default rect `x: 920` (`dashboard/src/hooks/useChatWorkspace.ts:16`).
 
-No `export const viewport` exists (`dashboard/src/app/layout.tsx:36-39` is metadata-only), so mobile browsers render at the ~980px fallback. `overflow-x: hidden` on body masks the resulting overflow (`dashboard/src/app/globals.css:55`).
+No `export const viewport` exists (`dashboard/src/app/layout.tsx:36-39` is metadata-only). App Router emits the default `width=device-width, initial-scale=1` meta on its own, so the page is *not* rendered at a desktop-fallback width — an explicit export matters for `themeColor` and `viewportFit: "cover"` (safe-area insets), not for device-width. `overflow-x: hidden` on body masks the horizontal overflow the fixed shell creates (`dashboard/src/app/globals.css:55`).
 
 ### 2.2 Design system
 
@@ -131,11 +131,11 @@ The prior SSOT fidelity map corroborates this cut: the LIVE-fidelity routes (`do
 
 ### 4.3 Mobile-network behavior
 
-- Global query defaults `staleTime: 10_000, refetchInterval: 30_000, retry: 2, refetchOnWindowFocus: true` (`dashboard/src/app/providers.tsx:17-20`) over ~40 registered polling queries, six of them at 5s (`useOverview.ts:11`, `useHealth.ts:11`, `useAgents.ts:11`, `useTasks.ts:11`, `useTraces.ts:11`, `useAgent.ts:57`) — every phone unlock fires a synchronized 30-60-request burst; `retry: 2` triples it on a flaky link. `useRuntimeControlPlane` fans out 6 requests per tick (`dashboard/src/hooks/useRuntimeControlPlane.ts:20-42`); `useTelemetry` mounts 9 keys (`dashboard/src/hooks/useTelemetry.ts:19-69`).
+- Global query defaults `staleTime: 10_000, refetchInterval: 30_000, retry: 2, refetchOnWindowFocus: true` (`dashboard/src/app/providers.tsx:17-20`). Focus refetch fires only the queries *mounted on the active route* — routes are mutually exclusive, so the burst size is per-route, not the repo-wide ~40-hook count. It is still material on the operator core: `useRuntimeControlPlane` fans out 6 requests per invocation (`dashboard/src/hooks/useRuntimeControlPlane.ts:20-42`) and is mounted by runtime/command-post/observatory/qwen35; `useTelemetry` mounts 9 keys (`dashboard/src/hooks/useTelemetry.ts:19-69`); the home route mounts five 5s pollers (`useOverview.ts:11`, `useHealth.ts:11`, `useAgents.ts:11`, `useTraces.ts:11`, plus `FitnessTrend`). `retry: 2` multiplies each failed burst on a flaky link. Phase 4 sizing should measure the mounted set per P0 route, not the global count.
 - **No** `visibilitychange`, `online`/`offline`, `refetchOnReconnect`, or `networkMode` handling anywhere in `dashboard/src` (§9 cmd 6).
 - No client heartbeat; the chat WS channel has no server keepalive either (`api/routers/chat.py:1381-1382` blocks on receive) — half-open sockets after cellular NAT timeout are detected only on failed send (`api/ws.py:228-235`).
 - WS messages and API responses are unvalidated casts (`ws.ts:159-167`; `api.ts:91-114`); captive-portal HTML interception on mobile makes this a real crash source, and `zod` is already installed.
-- Chat streams (SSE-over-POST, `dashboard/src/hooks/useChat.ts:303-308,398-420`) have no resume token; a cell↔wifi handoff mid-answer loses the turn.
+- Chat streams (SSE-over-POST, `dashboard/src/hooks/useChat.ts:303-308,398-420`) have no resume token. Partial streamed text *survives* a disconnect (`trimTrailingEmptyAssistant` removes a trailing assistant turn only when content AND tool events are both empty, `useChat.ts:69-78`) — what's lost is the remainder of the answer, silently: no interrupted marker, no retry affordance.
 
 ---
 
@@ -174,15 +174,15 @@ Every phase below that touches `dashboard/` or `api/` is hot-path (`scripts/runt
 
 ### Phase 0 — Safety net + viewport truth (prerequisite for everything)
 
-1. Create `dashboard/playwright/` with smoke + screenshot specs for the P0 routes; add device projects (390×844 mobile, 1680×1050 desktop) to `playwright.config.ts`; wire `test:visual` into CI so regressions are visible before renovation begins.
-2. Add `export const viewport` (`width=device-width, initial-scale=1`, `themeColor`, `viewportFit: "cover"`) to `dashboard/src/app/layout.tsx`. This single change makes every other mobile defect *visible* in a real browser.
+1. Create `dashboard/playwright/` with smoke + screenshot specs for the P0 routes; add device projects (390×844 mobile, 1680×1050 desktop) to `playwright.config.ts`; wire `test:visual` into CI so regressions are visible before renovation begins. **The suite must run against deterministic data**: the current `webServer` starts only Next (`dashboard/playwright.config.ts:16-20`) while rewrites target a separately-run FastAPI on 8420 — and the documented launcher 401s without the undocumented no-auth opt-in (§4.2) — so naive screenshots would baseline empty/401 states. Either start a fixture-seeded FastAPI (with `DASHBOARD_API_KEY` wired) as a second `webServer`, or serve recorded fixtures via Playwright route interception; pick one and pin it in the spec files themselves.
+2. Add `export const viewport` to `dashboard/src/app/layout.tsx` for `themeColor` and `viewportFit: "cover"` (safe-area insets). Note: App Router already emits the default `width=device-width, initial-scale=1` meta, so this is PWA polish, not the defect-visibility gate — the 390px defects are visible today in any device emulator.
 3. Integrity sweep: remove the duplicate + dead `/dashboard/opportunities` nav entries, add `/dashboard/timeline` to nav or record why not (manifest agreement rule, `ACTIVE_SURFACE_MANIFEST.yaml:3-4`); drop dead deps `elkjs`, `react-resizable-panels`; either wire `cmdk` to the dead `dharma:cmd-k` event or remove both; delete the 5 orphaned operator-coherence components; dedupe the `ScanLines` component vs `body::after`.
 
 **Acceptance:** `npm --prefix dashboard run test:visual` executes >0 specs on both viewports; no nav entry without a page; `npm --prefix dashboard run lint` clean.
 
 ### Phase 1 — Responsive shell
 
-1. Breakpoint-gate the shell: sidebar `hidden md:flex`, main `md:ml-[260px]`; below `md`, a bottom nav with ≤5 slots (Cockpit, Chat, Agents, Approvals, More) sourced from the existing `dashboardNav.ts` data, plus a full-nav drawer using the one already-mobile-safe drawer pattern in the repo (`w-[480px] max-w-[calc(100vw-24px)]`, `dashboard/src/components/operator-coherence/v2/CockpitV2Primitives.tsx:231`).
+1. Breakpoint-gate the shell: sidebar `hidden md:flex`, main `md:ml-[260px]`; below `md`, a bottom nav with ≤5 slots, plus a full-nav drawer using the one already-mobile-safe drawer pattern in the repo (`w-[480px] max-w-[calc(100vw-24px)]`, `dashboard/src/components/operator-coherence/v2/CockpitV2Primitives.tsx:231`). The five slots do NOT all exist as routes today — `dashboardNav.ts` has no Chat or Approvals entry — so extend it with a typed mobile-nav structure mixing route links (Cockpit `/dashboard/cockpit`, Agents `/dashboard/agents`, Approvals → `/dashboard/runtime` until the Phase 3 alerts surface lands, then retargeted) and action entries (Chat opens the chat sheet — it is an overlay, not an href). No invented routes, no duplicated nav state.
 2. ChatOverlay mobile mode: below `md`, the FAB (already 64px, `ChatOverlay.tsx:281`) opens a full-screen sheet instead of a draggable window; derive the desktop offset from one shared sidebar-width constant, deleting the divergent `SIDEBAR_OFFSET = 280`.
 3. Introduce the primitive layer in `dashboard/src/components/ui/`: `Button` (≥44px touch), `Sheet` (bottom sheet), `Card`, `ResponsiveTable` (table→card-list under `md`), `Input` (16px font floor, `enterKeyHint`). New primitives only where the P0 routes need them — no big-bang migration.
 4. Performance gates: mount `AmbientParticles`/`ScanLines`/`OperatorMicrographics` only on `md+` **and** `prefers-reduced-motion: no-preference`; add a `@media (prefers-reduced-motion)` kill-switch for the seven infinite animations; replace `glass-panel` backdrop-blur with an opaque fallback below `md`.
@@ -197,7 +197,7 @@ Every phase below that touches `dashboard/` or `api/` is hot-path (`scripts/runt
 3. TanStack Query persister (localStorage/IDB) so cockpit/overview render **last-known data explicitly labeled STALE with its timestamp** when offline — projection honesty per the claim-language rules (`docs/governance/SWARM_GENOME.md` § projection surfaces): never render cached data as live.
 4. Fix the liveness banner: listen to real `online`/`offline` events AND distinguish "backend unreachable" from "backend 401" (an authenticated probe), replacing the public-endpoint-only poll (`ErrorBanner.tsx:92-96`).
 
-**Acceptance:** installable (Lighthouse PWA pass); airplane-mode shows last-known cockpit labeled stale, not a spinner or a lie.
+**Acceptance:** concrete installability assertions (current Lighthouse has no PWA category, so "Lighthouse PWA pass" is not executable): Playwright asserts the manifest is served and parses with required fields + icons, a service worker is registered and controlling the page, `display: standalone` metadata is present, and offline navigation lands on the fallback route; airplane-mode shows last-known cockpit labeled stale, not a spinner or a lie.
 
 ### Phase 3 — Operator core routes, mobile-first
 
@@ -218,10 +218,10 @@ In value-per-effort order:
 
 ### Phase 4 — Realtime + network resilience
 
-1. `ws.ts`: `visibilitychange` + `online` listeners; reset retry budget and reconnect on resume; remove the permanent give-up (`ws.ts:188-190`) in favor of pause-while-hidden + resume-on-visible; expose connection state; add a client heartbeat with liveness timeout.
-2. Query tuning: `refetchIntervalInBackground: false` semantics verified, focus-refetch damping (tiered `staleTime`), `refetchOnReconnect: true` explicit, `networkMode: "online"`; audit the six 5s polls down to what the phone actually needs (WS `agents_update` already exists as a push channel, `api/routers/agents.py:614-630`).
-3. zod schemas at the two trust boundaries (`ws.ts` message parse; `api.ts` envelope unwrap) — the dependency is already declared.
-4. Chat stream: preserve the partial assistant turn on disconnect instead of trimming it (`useChat.ts:425`), with a visible "stream interrupted — retry" affordance.
+1. `ws.ts`: `visibilitychange` + `online` listeners; reset retry budget and reconnect on resume; remove the permanent give-up (`ws.ts:188-190`) in favor of pause-while-hidden + resume-on-visible; expose connection state. Liveness detection must be channel-appropriate: browsers cannot send protocol-level ping frames, and both server receive loops discard inbound text without replying (`api/routers/agents.py:641-648`, `api/routers/chat.py:1381-1382`) — so a client-only "heartbeat + timeout" would flag healthy chat sockets dead. For `/ws/agents`, derive liveness from the existing 5s `agents_update` cadence; for the chat channel, add an application-level ping→pong echo server-side (an `api/` change: hot-path, packet-bound, coordinate ingress tests).
+2. Query tuning — behavioral changes only, no restating v5 defaults (`refetchOnReconnect: true` and `networkMode: "online"` are already the defaults): tiered `staleTime` for focus-refetch damping, verify `refetchIntervalInBackground` stays off, and audit the 5s polls down to what the phone actually needs (WS `agents_update` already exists as a push channel, `api/routers/agents.py:614-630`). The acceptance test below proves the reconnect transition instead of trusting settings.
+3. zod validation at every response boundary, not just two: `ws.ts` message parse, `api.ts` envelope unwrap, AND the direct stream parsers that bypass both (`useChat.ts`, `useAgentChat.ts`, and the glm5/qwen35 page-local `fetch(apiPath(...))` parsers) — either enumerate schemas at each parser or route them through one validated transport. The dependency is already declared.
+4. Chat stream: partial text already survives disconnects (`trimTrailingEmptyAssistant` trims only fully-empty turns, `useChat.ts:69-78`); the missing behavior is marking the retained partial turn as interrupted and offering a visible "stream interrupted — retry" affordance.
 
 **Acceptance:** scripted Playwright test — background the page, sever network, restore, foreground → socket reconnects and queries settle without a manual reload.
 
@@ -261,20 +261,37 @@ Draft block (proposal-grade criterion kinds per `docs/governance/proposed_tracks
     serves: substrate-nativeness
     complements: [helm-worldclass-terminal-2026-06, repository-titanium-hardening-2026-07]
     owned_surfaces:
+      # Full closure over what Phases 0-4 actually edit (review finding: the
+      # first draft omitted surfaces its own phases touch).
+      - dashboard/package.json
+      - dashboard/next.config.ts
       - dashboard/src/app/layout.tsx
+      - dashboard/src/app/providers.tsx
       - dashboard/src/app/manifest.ts
       - dashboard/src/app/globals.css
       - dashboard/src/app/dharma-internal/**
+      - dashboard/src/app/dashboard/**        # Phase 3 route work; no overlap with titanium's four files (all under components/ and lib/)
       - dashboard/src/components/layout/**
       - dashboard/src/components/ui/**
       - dashboard/src/components/chat/**
+      - dashboard/src/hooks/**
+      - dashboard/src/lib/api.ts
       - dashboard/src/lib/ws.ts
       - dashboard/src/lib/wsSession.ts
       - dashboard/src/lib/dashboardNav.ts
       - dashboard/playwright.config.ts
       - dashboard/playwright/**
       - dashboard/public/**
+      - .github/workflows/dashboard-visual.yml   # new Phase 0 CI lane
       - docs/plans/MOBILE_OPERATOR_PWA_AUDIT_SPEC_2026-07-25.md
+      # Phase-5-gated (operator ratification; claimed only when Phase 5 opens):
+      - api/ws.py
+      - tests/test_api_auth.py
+      - dashboard/README.md
+      # NOT claimed: api/main.py (titanium-owned — the CORS-default fix in
+      # Phase 5 item 3 lands via that track's next-items per the WARN-overlap
+      # coordination policy, ACTIVE_TRACK.yaml:86); the four titanium-owned
+      # Cockpit V2 files (Phase 3 item 8 coordinates likewise).
     moves_vital_signs:
       - tool_coverage
       - security_guardrails
