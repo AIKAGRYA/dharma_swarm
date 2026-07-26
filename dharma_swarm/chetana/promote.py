@@ -364,8 +364,17 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
                 error=str(e),
                 notes=[f"pending copy left untouched at {target}"],
             )
+        # Bind the unlink to the exact bytes that were verified: if another
+        # writer replaced the pending file after the read above, deleting the
+        # path would destroy the newer, unverified atom (TOCTOU).
         try:
-            target.unlink()
+            if target.read_text(encoding="utf-8") != text:
+                notes.append(
+                    "pending file changed after verification; "
+                    f"left in place at {target} (re-promote to approve the new bytes)"
+                )
+            else:
+                target.unlink()
         except OSError as e:
             notes.append(f"failed to remove source file: {type(e).__name__}: {e}")
     else:

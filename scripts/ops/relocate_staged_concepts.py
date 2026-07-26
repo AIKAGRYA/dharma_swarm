@@ -167,6 +167,39 @@ def main(argv: list[str] | None = None) -> int:
         if dest.exists():
             skipped.append({"path": str(src), "reason": "collision appeared at apply time"})
             continue
+        # Revalidate the source against the plan at apply time: an approval
+        # (or any other writer) may have replaced it since plan_moves ran, and
+        # moving the current bytes on stale plan metadata would relocate a
+        # newly approved atom into pending/ while the receipt describes the
+        # previous staged file.
+        if not src.exists():
+            skipped.append({"path": str(src), "reason": "source vanished before apply"})
+            continue
+        current_status = _review_status(src)
+        if current_status not in RELOCATABLE_STATUSES:
+            skipped.append(
+                {
+                    "path": str(src),
+                    "reason": (
+                        "review_status changed to "
+                        f"{current_status!r} after planning (not moved)"
+                    ),
+                }
+            )
+            continue
+        current_sha = _sha256(src)
+        if current_sha != move["sha256"]:
+            skipped.append(
+                {
+                    "path": str(src),
+                    "reason": (
+                        "content changed after planning "
+                        f"(planned sha256 {move['sha256'][:12]}…, "
+                        f"current {current_sha[:12]}…; not moved)"
+                    ),
+                }
+            )
+            continue
         shutil.move(str(src), str(dest))
         applied.append({**move, "sha256_after": _sha256(dest)})
     receipt["moves"] = applied

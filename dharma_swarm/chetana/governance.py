@@ -280,8 +280,8 @@ def current_kernel_signature() -> str:
         kernel = DharmaKernel.model_validate_json(text)
         if kernel.verify_integrity() and kernel.signature:
             return kernel.signature
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("chetana kernel signature unavailable, using placeholder: %s", exc)
     return placeholder
 
 
