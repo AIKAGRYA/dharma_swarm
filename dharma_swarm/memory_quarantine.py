@@ -44,9 +44,12 @@ LOW_QUALITY_TAG = "low_quality"
 # Mirrors StrangeLoopMemory.FITNESS_THRESHOLD; used only when tags are unknown.
 QUALITY_FLOOR = 0.6
 
-# SQL twin of is_quarantined() for sites that filter in the SELECT itself
-# (tags is a JSON-encoded list of strings, so the quoted form is exact).
-SQL_NOT_QUARANTINED = "tags NOT LIKE '%\"low_quality\"%'"
+# SQL twin of is_quarantined() for sites that filter in the SELECT itself.
+# tags is a JSON-encoded list of strings; the underscore is escaped because
+# LIKE treats a bare `_` as a match-any-character wildcard, which would also
+# exclude near-miss tags like "lowXquality" and diverge from the exact
+# list-membership check in is_quarantined() (Devin review, PR #1134).
+SQL_NOT_QUARANTINED = "tags NOT LIKE '%\"low\\_quality\"%' ESCAPE '\\'"
 
 RECEIPT_RELPATH = Path("witness") / "memory_quarantine_shadow.jsonl"
 _RECEIPT_MAX_BYTES = 64 * 1024 * 1024

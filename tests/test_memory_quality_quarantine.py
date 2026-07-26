@@ -79,6 +79,36 @@ def test_is_quarantined_quality_fallback_when_tags_unknown():
     assert is_quarantined(None, None) is False
 
 
+def test_sql_twin_matches_python_predicate_exactly():
+    """Devin review (PR #1134): a bare `_` in LIKE matches any character, so
+    the unescaped pattern also excluded near-miss tags like "lowXquality" —
+    diverging from the exact list-membership check in is_quarantined()."""
+    from dharma_swarm.memory_quarantine import SQL_NOT_QUARANTINED
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE memories (id INTEGER PRIMARY KEY, tags TEXT)")
+    rows = {
+        1: ["low_quality"],       # quarantined
+        2: ["lowXquality"],       # near-miss: must be SERVED
+        3: ["crown_jewel"],       # served
+        4: [],                    # served
+    }
+    for rowid, tags in rows.items():
+        conn.execute(
+            "INSERT INTO memories (id, tags) VALUES (?, ?)",
+            (rowid, json.dumps(tags)),
+        )
+    served = {
+        row[0]
+        for row in conn.execute(
+            f"SELECT id FROM memories WHERE {SQL_NOT_QUARANTINED}"
+        )
+    }
+    conn.close()
+    expected = {rowid for rowid, tags in rows.items() if not is_quarantined(tags, None)}
+    assert served == expected == {2, 3, 4}
+
+
 def test_shadow_receipt_write_failure_is_counted(tmp_path):
     from dharma_swarm.memory_quarantine import (
         RECEIPT_WRITE_FAILURES,
