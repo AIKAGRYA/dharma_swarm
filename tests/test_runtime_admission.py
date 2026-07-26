@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm import runtime_admission as runtime_admission_module
 from dharma_swarm.runtime_admission import (
     ContainerRuntimeAdmission,
     RuntimeAdmissionError,
@@ -217,6 +218,7 @@ def test_container_image_source_manifest_is_a_distinct_admission(
 
 def test_container_image_admission_rejects_tampering_and_mixed_git_pin(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source, manifest, digest = _container_source(tmp_path)
     environment = {
@@ -225,6 +227,11 @@ def test_container_image_admission_rejects_tampering_and_mixed_git_pin(
         "DHARMA_RUNTIME_SOURCE_MANIFEST": str(manifest),
         "DHARMA_RUNTIME_SOURCE_DIGEST": digest,
     }
+    monkeypatch.setattr(
+        runtime_admission_module,
+        "_loaded_package_root",
+        lambda: source,
+    )
 
     assert isinstance(
         require_runtime_admission(environ=environment),
@@ -238,4 +245,20 @@ def test_container_image_admission_rejects_tampering_and_mixed_git_pin(
 
     (source / "worker.py").write_text("VALUE = 2\n", encoding="utf-8")
     with pytest.raises(RuntimeAdmissionError, match="does not match"):
+        require_runtime_admission(environ=environment)
+
+
+def test_container_image_admission_is_execution_bound(tmp_path: Path) -> None:
+    source, manifest, digest = _container_source(tmp_path)
+    environment = {
+        "DHARMA_RUNTIME_PROVENANCE_MODE": "container-image",
+        "DHARMA_RUNTIME_SOURCE_ROOT": str(source),
+        "DHARMA_RUNTIME_SOURCE_MANIFEST": str(manifest),
+        "DHARMA_RUNTIME_SOURCE_DIGEST": digest,
+    }
+
+    with pytest.raises(
+        RuntimeAdmissionError,
+        match="does not supply the loaded runtime",
+    ):
         require_runtime_admission(environ=environment)

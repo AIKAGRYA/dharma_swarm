@@ -365,13 +365,36 @@ def assess_runtime_admission(
     )
 
 
+def _loaded_package_root() -> Path:
+    """Return the directory supplying the running ``dharma_swarm`` package."""
+    module_root = Path(__file__).resolve().parent
+    package = sys.modules.get(__package__ or "dharma_swarm")
+    package_file = getattr(package, "__file__", None)
+    if package_file is None:
+        raise RuntimeAdmissionError(
+            "loaded dharma_swarm package has no file origin"
+        )
+    package_root = Path(package_file).resolve().parent
+    if package_root != module_root:
+        raise RuntimeAdmissionError(
+            "loaded dharma_swarm package is split across directories: "
+            f"{package_root} != {module_root}"
+        )
+    return module_root
+
+
 def require_runtime_admission(
     repo_root: Path | None = None,
     *,
     expected_commit: str | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> RuntimeAdmissionResult:
-    """Require admission using the release pin from the environment by default."""
+    """Require admission using the release pin from the environment by default.
+
+    Container-image admission is execution-bound: the verified source root
+    must be the directory supplying the loaded ``dharma_swarm`` package, so a
+    valid manifest tree elsewhere on disk cannot vouch for unverified code.
+    """
     environment = os.environ if environ is None else environ
     provenance_mode = environment.get(_PROVENANCE_MODE_ENV, "").strip()
     if provenance_mode:
@@ -390,11 +413,18 @@ def require_runtime_admission(
             raise RuntimeAdmissionError(
                 "container-image provenance requires source root, manifest, and digest"
             )
-        return assess_container_runtime_admission(
+        admission = assess_container_runtime_admission(
             Path(source_root),
             manifest=Path(manifest),
             expected_digest=source_digest,
         )
+        loaded_root = _loaded_package_root()
+        if loaded_root != admission.source_root:
+            raise RuntimeAdmissionError(
+                "verified container source root does not supply the loaded "
+                f"runtime: {admission.source_root} != {loaded_root}"
+            )
+        return admission
 
     expected = (
         environment.get(_EXPECTED_COMMIT_ENV)
