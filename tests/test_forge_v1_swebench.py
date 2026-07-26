@@ -14,6 +14,9 @@ Run live too:      FORGE_SWEBENCH=1 PYTHONPATH=. pytest tests/test_forge_v1_sweb
 """
 import json
 import os
+import subprocess
+import sys
+from unittest.mock import patch
 
 import pytest
 
@@ -28,6 +31,66 @@ def _require_swebench_dataset_loader() -> None:
         "swebench.harness.run_evaluation",
         reason="optional swebench package is not installed",
     )
+
+
+def test_forge_imports_do_not_mutate_process_docker_context():
+    """Collecting Forge tests must not redirect unrelated Docker tests."""
+    env = os.environ.copy()
+    env.pop("DOCKER_CONTEXT", None)
+    env.pop("FORGE_DOCKER_CONTEXT", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os; "
+                "import dharma_swarm.forge_v1.autoloop; "
+                "import dharma_swarm.forge_v1.canonical; "
+                "import dharma_swarm.forge_v1.forge_v2.runner; "
+                "print(os.environ.get('DOCKER_CONTEXT', '<unset>'))"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "<unset>"
+
+
+def test_forge_docker_cli_env_is_scoped_and_honors_overrides(monkeypatch):
+    monkeypatch.delenv("DOCKER_CONTEXT", raising=False)
+    monkeypatch.delenv("FORGE_DOCKER_CONTEXT", raising=False)
+
+    scoped = swebench_real.forge_docker_cli_env()
+
+    assert scoped["DOCKER_CONTEXT"] == swebench_real.DEFAULT_DOCKER_CONTEXT
+    assert "DOCKER_CONTEXT" not in os.environ
+    assert swebench_real.forge_docker_cli_env(
+        {"FORGE_DOCKER_CONTEXT": "forge-ci"}
+    )["DOCKER_CONTEXT"] == "forge-ci"
+    assert swebench_real.forge_docker_cli_env(
+        {
+            "DOCKER_CONTEXT": "operator-choice",
+            "FORGE_DOCKER_CONTEXT": "forge-ci",
+        }
+    )["DOCKER_CONTEXT"] == "operator-choice"
+
+
+def test_forge_docker_sdk_environment_restores_host(monkeypatch):
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+
+    with patch.object(
+        swebench_real,
+        "_docker_host_from_context",
+        return_value="unix:///tmp/forge-docker.sock",
+    ):
+        with swebench_real._forge_docker_sdk_environment():
+            assert os.environ["DOCKER_HOST"] == "unix:///tmp/forge-docker.sock"
+
+    assert "DOCKER_HOST" not in os.environ
 
 
 # --------------------------------------------------------------------------- #
