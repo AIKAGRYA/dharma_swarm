@@ -345,6 +345,7 @@ def _expire_legacy_research_key(palace: Any, file_name: str) -> None:
         store.expire_active_source(f"research:{file_name}", "research_key_migrated")
     except Exception as exc:
         logger.debug("Legacy research-key expiry failed for %s: %s", file_name, exc)
+        return None
 
 
 async def ingest_stigmergy_marks(
@@ -724,14 +725,16 @@ class ArchaeologyIngestionDaemon:
                 try:
                     await asyncio.to_thread(vector_store.ensure_dedupe_index_built)
                 except Exception as exc:
+                    prebuild_error = f"{type(exc).__name__}: {exc}"
                     logger.warning(
                         "Dedupe index pre-build failed (per-upsert guard stays fail-closed): %s",
-                        exc,
+                        prebuild_error,
                     )
             if hasattr(vector_store, "db_generation"):
                 try:
                     generation = await asyncio.to_thread(vector_store.db_generation)
                 except Exception as exc:
+                    generation = None
                     logger.debug("vectors.db generation probe failed: %s", exc)
 
         if (
