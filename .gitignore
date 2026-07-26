@@ -23,6 +23,10 @@ terminal/.dharma-terminal-preview-cache.json
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/pr.md
+# Keep the /pr slash command tracked; other personal .claude/commands stay local-only.
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/pr.md
 .swarm/
 .dharma_baseline/
 .dharma_test/
