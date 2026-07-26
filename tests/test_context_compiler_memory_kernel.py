@@ -1012,3 +1012,98 @@ async def test_memory_kernel_shadow_error_never_breaks_compile() -> None:
     assert metadata["shadow_admitted_delta"] is None
     assert metadata["shadow_error"].startswith("RuntimeError")
     assert metadata["ranked_shadow"]["status"] == "error"
+def test_redaction_boundary_preserves_row_ownership_for_scoped_admission() -> None:
+    """Owner ids inside a dropped row/payload dict must survive redaction so
+    scoped admission can still enforce atom ownership in shared scopes."""
+
+    from dharma_swarm.memory_kernel.adapters.read_only import _safe_metadata
+
+    safe = _safe_metadata(
+        {"row": {"agent_id": "agent-a", "summary": "session event"}},
+        include_payloads=False,
+        max_chars=4096,
+    )
+    assert "row" not in safe
+    assert safe["owner_agent_ids"] == ("agent-a",)
+
+    # The hoisted key must also survive the oversized-metadata compact path.
+    compact = _safe_metadata(
+        {"row": {"agent_id": "agent-a"}, "noise": "x" * 5000},
+        include_payloads=False,
+        max_chars=200,
+    )
+    assert compact["metadata_truncated"] is True
+    assert compact["owner_agent_ids"] == ("agent-a",)
+
+    atom = _memory_atom(
+        "other agent shared row",
+        scope=MemoryScope.SWARM,
+        metadata={"owner_agent_ids": ("agent-a",)},
+    )
+    pack = preview_memory_pack(
+        (atom,),
+        budget=MemoryContextBudget(
+            isolation_mode="scoped",
+            allowed_scopes=(MemoryScope.SWARM,),
+            allowed_agent_ids=("agent-b",),
+            allowed_memory_lanes=(MemoryLane.PROVENANCE,),
+            require_source_digest=False,
+            require_source_row_key=False,
+        ),
+    )
+    assert pack.admitted_count == 0
+    assert "agent_not_allowed" in pack.items[0].omission_reasons
+
+
+def test_permuted_explicit_allowances_do_not_stamp_override_warning() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+    from dharma_swarm.memory_kernel.topology_policy import WORKER_SCOPED
+
+    permuted_scopes = [scope.value for scope in reversed(WORKER_SCOPED.allowed_scopes)]
+    permuted_lanes = [
+        lane.value for lane in reversed(WORKER_SCOPED.allowed_memory_lanes)
+    ]
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-a",
+            "memory_kernel_allowed_scopes": permuted_scopes,
+            "memory_kernel_allowed_memory_lanes": permuted_lanes,
+        }
+    )
+    assert "explicit_scopes_override_topology_semantics" not in policy.warnings
+    assert "explicit_lanes_override_topology_semantics" not in policy.warnings
+
+    narrowed = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-a",
+            "memory_kernel_allowed_scopes": ["project"],
+        }
+    )
+    assert "explicit_scopes_override_topology_semantics" in narrowed.warnings
+
+
+def test_scoped_candidate_window_overfetches_beyond_admitted_budget() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        build_memory_kernel_default_context,
+    )
+
+    kernel = _FakeMemoryKernel(pack=_pack())
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="recent work",
+        token_budget=1200,
+    )
+    assert metadata["status"] == "used"
+    query = kernel.kwargs["query"]
+    budget = kernel.kwargs["budget"]
+    # atom_budget for 1200 tokens is 12; the candidate window over-fetches 4x
+    # so scoped rejections cannot starve the admitted budget, while the
+    # admitted cap itself stays unchanged.
+    assert query.limit_total == 48
+    assert query.limit_per_surface == 48
+    assert budget.max_candidate_atoms == 48
+    assert budget.max_admitted_atoms == 8

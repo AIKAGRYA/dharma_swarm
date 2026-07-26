@@ -103,9 +103,11 @@ def memory_kernel_isolation_policy_from_metadata(
     # (pre-existing contract); stamp a warning so the semantics name in the
     # bundle metadata cannot silently claim what the allowances override.
     override_warnings = list(warnings)
-    if explicit_scopes and explicit_scopes != semantics.allowed_scopes:
+    # Set comparison: a reordered permutation of the policy's own allowances
+    # is not an override and must not stamp a spurious audit note.
+    if explicit_scopes and set(explicit_scopes) != set(semantics.allowed_scopes):
         override_warnings.append("explicit_scopes_override_topology_semantics")
-    if explicit_lanes and explicit_lanes != semantics.allowed_memory_lanes:
+    if explicit_lanes and set(explicit_lanes) != set(semantics.allowed_memory_lanes):
         override_warnings.append("explicit_lanes_override_topology_semantics")
 
     return MemoryKernelIsolationPolicy(
@@ -180,8 +182,13 @@ def build_memory_kernel_default_context(
     # never a raise out of the compile.
     try:
         atom_budget = max(4, min(24, int(token_budget) // 100))
+        # Scoped isolation rejects foreign atoms only after iteration, so the
+        # candidate window over-fetches: otherwise atoms this bundle may not
+        # read consume every candidate slot ahead of the worker's own rows
+        # and an eligible record later in stable order is never examined.
+        candidate_budget = atom_budget * 4
         budget = MemoryContextBudget(
-            max_candidate_atoms=atom_budget,
+            max_candidate_atoms=candidate_budget,
             max_admitted_atoms=max(1, min(8, atom_budget)),
             max_total_chars=max(600, min(2400, int(token_budget) * 2)),
             max_atom_chars=420,
@@ -207,8 +214,8 @@ def build_memory_kernel_default_context(
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
                 text_query=recall_query or None,
-                limit_total=atom_budget,
-                limit_per_surface=atom_budget,
+                limit_total=candidate_budget,
+                limit_per_surface=candidate_budget,
                 include_content=True,
                 max_canon_risk=None,
                 max_pii_risk=None,

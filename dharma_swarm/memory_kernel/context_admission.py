@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.atoms import (
+    AGENT_OWNER_METADATA_KEYS,
     AuthorityLevel,
     MemoryAtom,
     MemoryAtomType,
@@ -338,21 +339,16 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append("scope_not_allowed")
     if budget.allowed_agent_ids or scoped:
         atom_agent_ids = _atom_agent_ids(atom)
-        if atom.scope == MemoryScope.AGENT:
-            if not atom_agent_ids:
-                reasons.append("agent_owner_unknown")
-            elif not budget.allowed_agent_ids or not set(atom_agent_ids).intersection(
-                budget.allowed_agent_ids
-            ):
-                reasons.append("agent_not_allowed")
-        elif scoped and atom_agent_ids:
-            # Scoped mode enforces atom ownership in every scope, not only
-            # AGENT: another agent's atoms stay invisible even when shared
-            # into SWARM/SESSION/PROJECT rows.
-            if not budget.allowed_agent_ids or not set(atom_agent_ids).intersection(
-                budget.allowed_agent_ids
-            ):
-                reasons.append("agent_not_allowed")
+        # Scoped mode enforces atom ownership in every scope, not only AGENT:
+        # another agent's atoms stay invisible even when shared into
+        # SWARM/SESSION/PROJECT rows.
+        if atom.scope == MemoryScope.AGENT and not atom_agent_ids:
+            reasons.append("agent_owner_unknown")
+        elif (atom.scope == MemoryScope.AGENT or (scoped and atom_agent_ids)) and (
+            not budget.allowed_agent_ids
+            or not set(atom_agent_ids).intersection(budget.allowed_agent_ids)
+        ):
+            reasons.append("agent_not_allowed")
     if scoped and not budget.allowed_memory_lanes:
         reasons.append("memory_lane_denied_fail_closed")
     elif budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
@@ -487,15 +483,9 @@ def _atom_agent_ids(atom: MemoryAtom) -> tuple[str, ...]:
 
 
 def _extend_agent_ids(ids: list[str], payload: dict[str, object]) -> None:
-    for key in (
-        "agent_id",
-        "agent",
-        "agent_name",
-        "owner_agent_id",
-        "assigned_to",
-        "assigned_agent_id",
-        "worker_agent_id",
-    ):
+    # "owner_agent_ids" is the hoisted key the adapters' redaction boundary
+    # writes when it drops a row/payload dict that carried ownership.
+    for key in (*AGENT_OWNER_METADATA_KEYS, "owner_agent_ids"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             ids.append(value.strip())
