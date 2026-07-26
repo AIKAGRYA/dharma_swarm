@@ -4,7 +4,10 @@ from __future__ import annotations
 import re
 import subprocess
 
-from dharma_swarm.forge_v1.swebench_real import instance_image_key
+from dharma_swarm.forge_v1.swebench_real import (
+    forge_docker_cli_env,
+    instance_image_key,
+)
 
 
 def _target_paths_from_gold(instance: dict) -> list[str]:
@@ -40,6 +43,7 @@ def _read_files_from_image(instance: dict, paths: list[str], *, max_chars: int =
         capture_output=True,
         text=True,
         timeout=1800,
+        env=forge_docker_cli_env(),
     )
     for p in paths:
         try:
@@ -48,6 +52,7 @@ def _read_files_from_image(instance: dict, paths: list[str], *, max_chars: int =
                 capture_output=True,
                 text=True,
                 timeout=300,
+                env=forge_docker_cli_env(),
             )
         except subprocess.TimeoutExpired:
             continue
