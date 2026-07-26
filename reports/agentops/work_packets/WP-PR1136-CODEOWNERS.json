@@ -3,7 +3,7 @@
   "base_ref": "c28f00c160053a6d0a60b396a95019f82684a840",
   "branch": "repair/pr10",
   "worktree": ".",
-  "intent": "PR #1136 repair: regenerate .github/CODEOWNERS from measured blast radius. Promoting verifier_ranker_v0/redaction.py to dharma_swarm/redaction.py wires it into the memory-plane engine import graph (blast=259), so the CODEOWNERS gate requires an explicit routing entry committed in the same PR.",
+  "intent": "PR #1136 repair: regenerate .github/CODEOWNERS from measured blast radius (promoted dharma_swarm/redaction.py measures blast=259) and regenerate the dharmagraph seam ledger (dharma_swarm.redaction joined the graph workload's static import closure via engine/event_memory.py; module_count 67 -> 68, bypass_total unchanged at 232). Bound to dharmagraph-engine-2026-07 because reports/governance/dharmagraph_parity/seam_ledger.json is the only track-owned surface in the committed range and the packet-scope contract requires exactly one packet whose track owns every owned surface it touches.",
   "allowed_files": [
     ".github/CODEOWNERS",
     "dharma_swarm/engine/conversation_memory.py",
@@ -65,7 +65,7 @@
       "owner_files"
     ],
     "work_packet": "WP-PR1136-CODEOWNERS",
-    "active_track": "repository-titanium-hardening-2026-07",
+    "active_track": "dharmagraph-engine-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
@@ -79,6 +79,6 @@
     ],
     "honest_blockers": [],
     "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
-    "packet_digest": "ef2366ec04ea76da13740638cff560d1ccfedb61d4c4d82bc68058730a652a1c"
+    "packet_digest": "922e386cb2362e5855a48fda3c37e898c6d953d08eff9fe8c5acd041e15971e2"
   }
 }
