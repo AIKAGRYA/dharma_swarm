@@ -7,6 +7,7 @@ import argparse
 import json
 import signal
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -62,6 +63,22 @@ def _alarm(_signum: int, _frame: object) -> None:
     raise QueryTimeout()
 
 
+def alarm_usable() -> bool:
+    """SIGALRM handlers may only be installed on the main thread.
+
+    Off the main thread (Textual TUI worker, gateway cron tick) the per-case
+    ``elapsed_ms > max_ms`` check remains the timeout backstop.
+    """
+    return hasattr(signal, "SIGALRM") and threading.current_thread() is threading.main_thread()
+
+
+def install_alarm_handler() -> bool:
+    if not alarm_usable():
+        return False
+    signal.signal(signal.SIGALRM, _alarm)
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, default=Path.home() / ".dharma")
@@ -71,7 +88,7 @@ def main() -> int:
     parser.add_argument("--fail-under", type=float, default=100.0)
     args = parser.parse_args()
 
-    signal.signal(signal.SIGALRM, _alarm)
+    install_alarm_handler()
     engine = GovernedRetrievalEngine(state_dir=args.state_dir.expanduser())
     rows = [run_case(engine, case, top_k=args.top_k, timeout_s=args.timeout_s) for case in LIVE_CASES]
     score = score_rows(rows)
@@ -99,10 +116,13 @@ def run_case(
     timeout_s: int,
 ) -> dict[str, Any]:
     started = time.perf_counter()
+    use_alarm = alarm_usable()
     try:
-        signal.alarm(timeout_s)
+        if use_alarm:
+            signal.alarm(timeout_s)
         result = engine.retrieve(RetrievalQuery(text=case.query, top_k=top_k, include_content=True))
-        signal.alarm(0)
+        if use_alarm:
+            signal.alarm(0)
     except QueryTimeout:
         signal.alarm(0)
         return {

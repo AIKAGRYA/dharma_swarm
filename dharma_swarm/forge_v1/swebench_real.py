@@ -56,11 +56,14 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 DATASET_NAME = "princeton-nlp/SWE-bench_Verified"
 SPLIT = "test"
+DEFAULT_DOCKER_CONTEXT = "colima-forge-swebench"
 
 # Docker Hub namespace that hosts prebuilt amd64 instance images. Setting this
 # makes swebench PULL prebuilt images instead of building locally (huge speedup
@@ -76,14 +79,33 @@ from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 SCRATCH_ROOT = dharma_state_dir() / "forge_v1" / "swebench_runs"
 
 
-def _ensure_docker_host() -> None:
+def forge_docker_cli_env(
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Return a subprocess environment scoped to the Forge Docker context.
+
+    Forge's laptop-only Colima default must not be written into ``os.environ``
+    during module import: pytest imports all test modules in one process, so
+    that side effect redirected unrelated Docker integration tests to a context
+    that does not exist on GitHub's Linux runners.
+
+    An explicit ``DOCKER_CONTEXT`` still wins. ``FORGE_DOCKER_CONTEXT`` only
+    supplies Forge's default for Docker subprocesses launched by this package.
+    """
+    env = dict(os.environ if environ is None else environ)
+    env.setdefault(
+        "DOCKER_CONTEXT",
+        env.get("FORGE_DOCKER_CONTEXT", DEFAULT_DOCKER_CONTEXT),
+    )
+    return env
+
+
+def _docker_host_from_context() -> str | None:
     """swebench uses the Python Docker SDK (`docker.from_env()`), which defaults
     to /var/run/docker.sock and ignores `docker context`. On this machine Docker
     is served by a colima profile at a non-default socket. If DOCKER_HOST is
-    unset, resolve it from the active `docker context` so the SDK finds the
-    daemon the CLI is already using."""
-    if os.environ.get("DOCKER_HOST"):
-        return
+    unset, resolve it from Forge's scoped `docker context` so the SDK finds the
+    same daemon as Forge's Docker CLI subprocesses."""
     import json as _json
     import subprocess as _sp
 
@@ -93,15 +115,34 @@ def _ensure_docker_host() -> None:
             capture_output=True,
             text=True,
             timeout=20,
+            env=forge_docker_cli_env(),
         )
         if out.returncode == 0:
             data = _json.loads(out.stdout)
             host = data[0]["Endpoints"]["docker"]["Host"]
             if host:
-                os.environ["DOCKER_HOST"] = host
+                return str(host)
     except (OSError, KeyError, IndexError, json.JSONDecodeError) as e:
         # Leave DOCKER_HOST unset; swebench will raise a clear DockerException.
         print(f"[swebench] unable to infer DOCKER_HOST from docker context: {e}", flush=True)
+    return None
+
+
+@contextmanager
+def _forge_docker_sdk_environment() -> Iterator[None]:
+    """Temporarily expose Forge's Docker host to the third-party Docker SDK."""
+    previous_host = os.environ.get("DOCKER_HOST")
+    if previous_host is None:
+        inferred_host = _docker_host_from_context()
+        if inferred_host:
+            os.environ["DOCKER_HOST"] = inferred_host
+    try:
+        yield
+    finally:
+        if previous_host is None:
+            os.environ.pop("DOCKER_HOST", None)
+        else:
+            os.environ["DOCKER_HOST"] = previous_host
 
 
 def verified_instances(n: int = 1, instance_ids: list[str] | None = None) -> list[dict[str, Any]]:
@@ -188,8 +229,6 @@ def verify_predictions(
     from swebench.harness.run_evaluation import main as swebench_main
     from swebench.harness.constants import RUN_EVALUATION_LOG_DIR
 
-    _ensure_docker_host()
-
     if run_id is None:
         first_id = predictions[0][0]["instance_id"]
         run_id = f"forge_v1_batch_{first_id}_{int(time.time())}"
@@ -214,23 +253,24 @@ def verify_predictions(
     os.chdir(work_dir)
     try:
         eff_force_rebuild = force_rebuild and namespace is None
-        swebench_main(
-            dataset_name=DATASET_NAME,
-            split=SPLIT,
-            instance_ids=instance_ids,
-            predictions_path=str(preds_path),
-            max_workers=max(1, int(max_workers)),
-            force_rebuild=eff_force_rebuild,
-            cache_level="env",
-            clean=False,
-            open_file_limit=4096,
-            run_id=run_id,
-            timeout=timeout,
-            namespace=namespace,
-            rewrite_reports=False,
-            modal=False,
-            report_dir=str(work_dir),
-        )
+        with _forge_docker_sdk_environment():
+            swebench_main(
+                dataset_name=DATASET_NAME,
+                split=SPLIT,
+                instance_ids=instance_ids,
+                predictions_path=str(preds_path),
+                max_workers=max(1, int(max_workers)),
+                force_rebuild=eff_force_rebuild,
+                cache_level="env",
+                clean=False,
+                open_file_limit=4096,
+                run_id=run_id,
+                timeout=timeout,
+                namespace=namespace,
+                rewrite_reports=False,
+                modal=False,
+                report_dir=str(work_dir),
+            )
         resolved: dict[str, bool] = {}
         for instance, model_patch in predictions:
             instance_id = instance["instance_id"]
