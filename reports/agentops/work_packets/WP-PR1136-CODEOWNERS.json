@@ -1,0 +1,83 @@
+{
+  "id": "WP-PR1136-CODEOWNERS",
+  "base_ref": "c28f00c160053a6d0a60b396a95019f82684a840",
+  "branch": "repair/pr10",
+  "worktree": ".",
+  "intent": "PR #1136 repair: regenerate .github/CODEOWNERS from measured blast radius. Promoting verifier_ranker_v0/redaction.py to dharma_swarm/redaction.py wires it into the memory-plane engine import graph (blast=259), so the CODEOWNERS gate requires an explicit routing entry committed in the same PR.",
+  "allowed_files": [
+    ".github/CODEOWNERS",
+    "dharma_swarm/engine/conversation_memory.py",
+    "dharma_swarm/engine/event_memory.py",
+    "dharma_swarm/engine/unified_index.py",
+    "dharma_swarm/redaction.py",
+    "dharma_swarm/verifier_ranker_v0/redaction.py",
+    "reports/agentops/work_packets/WP-PR1136-CODEOWNERS.json",
+    "tests/test_redaction_boundary.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "redaction-boundary",
+      "command": "python3 -m pytest tests/test_redaction_boundary.py -q",
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "no-selector-outside-envelope",
+      "command": "python3 -m pytest tests/test_redaction_boundary.py -q -k selector_that_matches_nothing",
+      "expected_exit": 5
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "chore(codeowners): regenerate from measured blast radius (PR #1136 repair)"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PR1136-CODEOWNERS",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c28f00c160053a6d0a60b396a95019f82684a840",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      ".github/CODEOWNERS",
+      "scripts/governance/codeowners_blast_radius.py"
+    ],
+    "honest_blockers": [],
+    "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
+    "packet_digest": "c80847ac030809691bd42d34a6ef2edb36f80812e39d5ffa975afefed3636d85"
+  }
+}
