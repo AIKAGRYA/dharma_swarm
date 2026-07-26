@@ -11,6 +11,25 @@ fail() {
     exit 78
 }
 
+# Canonicalize a file path, following file symlinks (macOS bash 3.2 safe;
+# `pwd -P` alone canonicalizes only the parent directory, so a symlinked
+# interpreter FILE would otherwise escape the containment check below).
+resolve_file() {
+    local target="$1" link hops=0
+    while [[ -L "${target}" ]]; do
+        hops=$((hops + 1))
+        [[ "${hops}" -gt 40 ]] && return 1
+        link="$(readlink "${target}")" || return 1
+        case "${link}" in
+            /*) target="${link}" ;;
+            *) target="$(dirname "${target}")/${link}" ;;
+        esac
+    done
+    local dir
+    dir="$(cd "$(dirname "${target}")" 2>/dev/null && pwd -P)" || return 1
+    printf '%s/%s' "${dir}" "$(basename "${target}")"
+}
+
 verify_only=false
 if [[ "${1-}" == "--verify-only" ]]; then
     verify_only=true
@@ -38,6 +57,16 @@ if [[ "${runtime_python_dir}" != "${release_root}/.venv/bin" ]] \
     || [[ "$(basename "${runtime_python}")" != "python" ]]; then
     fail "DHARMA_PYTHON must be the release-local .venv/bin/python"
 fi
+# The FINAL executable must live inside the release too: a `.venv/bin/python`
+# symlink pointing at an outside interpreter would otherwise run before (and
+# perform) provenance admission. Immutable releases carry a copied
+# interpreter (venv --copies); a symlinked one fails loudly here.
+runtime_python="$(resolve_file "${runtime_python}")" \
+    || fail "release interpreter target cannot be resolved"
+case "${runtime_python}" in
+    "${release_root}"/*) ;;
+    *) fail "release interpreter resolves outside the release root" ;;
+esac
 if [[ ! -x "${runtime_python}" ]]; then
     fail "dedicated release interpreter is not executable"
 fi

@@ -280,3 +280,72 @@ def test_release_runner_rejects_blank_commit_pin_before_python(
     assert result.returncode == 78
     assert "full 40-character commit SHA" in result.stderr
     assert not call_log.exists()
+
+
+def test_release_runner_rejects_interpreter_symlinked_outside_release(
+    tmp_path: Path,
+) -> None:
+    """A `.venv/bin/python` symlink to an outside executable must fail before
+    that executable ever runs (review round 2: the dir-only `pwd -P`
+    canonicalization admitted the outside target)."""
+    release, python = _fake_release(tmp_path)
+    outside = tmp_path / "outside-python"
+    outside.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf 'OUTSIDE %s\\n' \"$*\" >> \"${RUNNER_CALL_LOG}\"\n",
+        encoding="utf-8",
+    )
+    outside.chmod(0o755)
+    python.unlink()
+    python.symlink_to(outside)
+    call_log = tmp_path / "calls.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "RUNNER_CALL_LOG": str(call_log),
+        }
+    )
+
+    result = subprocess.run(
+        ["/bin/bash", str(RUNNER), "--verify-only"],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 78, result.stderr
+    assert "resolves outside the release root" in result.stderr
+    assert not call_log.exists(), "outside interpreter must never execute"
+
+
+def test_release_runner_accepts_interpreter_symlinked_within_release(
+    tmp_path: Path,
+) -> None:
+    release, python = _fake_release(tmp_path)
+    real = python.parent / "python3"
+    python.rename(real)
+    python.symlink_to(real.name)
+    call_log = tmp_path / "calls.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "RUNNER_CALL_LOG": str(call_log),
+        }
+    )
+
+    result = subprocess.run(
+        ["/bin/bash", str(RUNNER), "--verify-only"],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = call_log.read_text(encoding="utf-8").splitlines()
+    assert len(calls) == 1 and "runtime_admission.py" in calls[0]
