@@ -1,9 +1,9 @@
 {
   "id": "titanium-WP-M0-phase0-truth-reconciliation",
-  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "base_ref": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
   "branch": "agent/titanium-m0-phase0-truth-20260725",
   "worktree": ".",
-  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact post-PR-1112 main, absorb the exact DocOps count delta from PR 1118, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
+  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1130, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
   "allowed_files": [
     "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
     "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
@@ -92,12 +92,12 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "checked_at_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
       "details": []
     },
     "interface_mismatches": [
       "The canonical track listed thirteen execution and residual nodes although exact merged-main proof reduces them to eight non-duplicated blocking residuals.",
-      "PR 1118 carries the exact post-main DocOps count delta but has no checks because its rolling branch lacks a check-triggering credential path.",
+      "PR 1118's rolling branch was regenerated for current main but still has no checks because it lacks a check-triggering credential path; M0 therefore carries the current generated counts.",
       "PR 1112 merged with two distinct unresolved correctness defects; those require an independent corrective code packet and are not hidden or repaired by this governance-only packet."
     ],
     "closest_existing_implementation": [
@@ -111,10 +111,10 @@
       "M0 keeps Phase 0 at 4/8 and BLOCKED; it closes no completion criterion.",
       "Operator-owned exposure, scanner disposition, CI-policy, Administration-read, and DocOps credential decisions remain BLOCKED_OPERATOR.",
       "WP-0E and WP-0H remain unimplemented; WP-0D lacks final repeatability evidence; WP-0I remains independent final review.",
-      "PR 1118 may be closed as superseded only after this exact DocOps delta merges.",
+      "PR 1118 may be closed as superseded only after M0's freshly regenerated current-main DocOps counts merge.",
       "The PR 1112 sequence-allocation and durable-delivery defects require a separate owner-safe corrective PR."
     ],
     "rollback": "Revert this packet, receipt, canonical next-item reconciliation, and generated projections as one unit, then allow the rolling DocOps lane to regenerate counts; do not alter historical packet receipts.",
-    "packet_digest": "b49ab66eafaa00f3c9142f8aa7ef9aa0bb0150a9fda2710afcd4da83b5f704e5"
+    "packet_digest": "3013a0d3948d538b78b13ebab23373d7713b4aa669b67c12d10278d7bb4ed315"
   }
 }
