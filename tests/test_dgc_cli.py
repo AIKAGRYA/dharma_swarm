@@ -513,6 +513,39 @@ def test_cmd_orchestrate_live_checks_existing_process_without_pid(
     assert called is False
 
 
+def test_cmd_orchestrate_live_requires_runtime_admission_before_start(
+    monkeypatch,
+    tmp_path,
+):
+    """A denied checkout must not create foreground or background work."""
+    from dharma_swarm import dgc_cli
+    from dharma_swarm.terminal_commands import lifecycle
+
+    admission_checked = False
+    event_loop_started = False
+
+    def deny_runtime() -> None:
+        nonlocal admission_checked
+        admission_checked = True
+        raise SystemExit(78)
+
+    def fake_run(_coroutine) -> None:
+        nonlocal event_loop_started
+        event_loop_started = True
+
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(lifecycle, "_first_daemon_like_process", lambda: None)
+    monkeypatch.setattr(lifecycle, "runtime_admission_or_exit", deny_runtime)
+    monkeypatch.setattr(asyncio, "run", fake_run)
+
+    with pytest.raises(SystemExit) as exc:
+        dgc_cli.cmd_orchestrate_live(background=False)
+
+    assert exc.value.code == 78
+    assert admission_checked is True
+    assert event_loop_started is False
+
+
 def test_cmd_up_checks_existing_process_without_pid(monkeypatch, tmp_path, capsys):
     """The daemon launcher should refuse a duplicate start on live process evidence alone."""
     from dharma_swarm import dgc_cli
