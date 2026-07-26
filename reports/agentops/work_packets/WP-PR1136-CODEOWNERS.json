@@ -12,6 +12,7 @@
     "dharma_swarm/redaction.py",
     "dharma_swarm/verifier_ranker_v0/redaction.py",
     "reports/agentops/work_packets/WP-PR1136-CODEOWNERS.json",
+    "reports/governance/dharmagraph_parity/seam_ledger.json",
     "tests/test_redaction_boundary.py"
   ],
   "forbidden_files": [
@@ -78,6 +79,6 @@
     ],
     "honest_blockers": [],
     "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
-    "packet_digest": "c80847ac030809691bd42d34a6ef2edb36f80812e39d5ffa975afefed3636d85"
+    "packet_digest": "ef2366ec04ea76da13740638cff560d1ccfedb61d4c4d82bc68058730a652a1c"
   }
 }
