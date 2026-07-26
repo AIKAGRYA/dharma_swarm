@@ -444,6 +444,47 @@ class MemoryPalace:
         except Exception:
             pass
 
+        _has_persistent_store = hasattr(self, "_state_dir") and not hasattr(self, "_tmp_dir")
+
+        # Dedupe-aware callers (a dedupe_info dict provided) consult the
+        # vector-store guard BEFORE the append-only lattice/LanceDB writes:
+        # their retry loop leaves the cursor un-advanced on guard failure and
+        # re-visits every doc on cursor rebuild, so unconditional secondary
+        # writes would append the same content again every cycle. Legacy
+        # callers (dedupe_info=None) keep the original write order.
+        vec_id_pre: int | None = None
+        if (
+            dedupe_info is not None
+            and self._vector_store is not None
+            and content and content.strip()
+            and hasattr(self._vector_store, "upsert_with_status")
+        ):
+            meta = dict(metadata or {})
+            if tags:
+                meta["tags"] = tags
+            try:
+                vec_id, vec_status = self._vector_store.upsert_with_status(
+                    content=content,
+                    source=source,
+                    layer=layer,
+                    metadata=meta,
+                    event_time=event_time,
+                    dedupe_digest=dedupe_digest,
+                )
+            except Exception as exc:
+                logger.debug("VectorStore upsert failed (non-fatal): %s", exc)
+                vec_id, vec_status = -1, "error"
+            dedupe_info["vec_status"] = vec_status
+            if vec_status != "inserted":
+                # unchanged: the content already landed in a prior cycle;
+                # guard_error/error/rejected: nothing landed and the caller
+                # retries — either way the lattice and LanceDB appends are
+                # skipped so retries cannot accumulate duplicates.
+                if vec_status == "unchanged" and vec_id > 0 and _has_persistent_store:
+                    return f"vec:{vec_id}"
+                return ""
+            vec_id_pre = vec_id
+
         # Existing lattice ingestion (unchanged)
         if self._lattice is not None:
             try:
@@ -481,31 +522,23 @@ class MemoryPalace:
         # We only use the VectorStore's ID as the primary doc_id when an explicit
         # state_dir was provided (persistent mode). In ephemeral mode (no state_dir
         # was given to __init__), we preserve backward-compat and return "".
-        _has_persistent_store = hasattr(self, "_state_dir") and not hasattr(self, "_tmp_dir")
-        if self._vector_store is not None and content and content.strip():
+        # Dedupe-aware callers already wrote via the pre-lattice guard above.
+        if vec_id_pre is not None:
+            if not doc_id and vec_id_pre > 0 and _has_persistent_store:
+                doc_id = f"vec:{vec_id_pre}"
+        elif self._vector_store is not None and content and content.strip():
             try:
                 meta = dict(metadata or {})
                 if tags:
                     meta["tags"] = tags
-                if dedupe_info is not None and hasattr(self._vector_store, "upsert_with_status"):
-                    vec_id, vec_status = self._vector_store.upsert_with_status(
-                        content=content,
-                        source=source,
-                        layer=layer,
-                        metadata=meta,
-                        event_time=event_time,
-                        dedupe_digest=dedupe_digest,
-                    )
-                    dedupe_info["vec_status"] = vec_status
-                else:
-                    vec_id = self._vector_store.upsert(
-                        content=content,
-                        source=source,
-                        layer=layer,
-                        metadata=meta,
-                        event_time=event_time,
-                        dedupe_digest=dedupe_digest,
-                    )
+                vec_id = self._vector_store.upsert(
+                    content=content,
+                    source=source,
+                    layer=layer,
+                    metadata=meta,
+                    event_time=event_time,
+                    dedupe_digest=dedupe_digest,
+                )
                 # Use vec_id as doc_id only in persistent mode when lattice gave nothing
                 if not doc_id and vec_id > 0 and _has_persistent_store:
                     doc_id = f"vec:{vec_id}"
@@ -515,7 +548,16 @@ class MemoryPalace:
                     dedupe_info["vec_status"] = "error"
 
         # Phase 4: Also upsert into LanceDB for persistent cross-session memory.
-        if self._lance is not None and content and content.strip():
+        # Dedupe-aware callers retry un-advanced cursors, so the append-only
+        # LanceDB write only runs when this ingest actually landed somewhere
+        # (a lattice doc_id or a fresh vector insert) — otherwise every retry
+        # cycle would append another duplicate copy.
+        _lance_allowed = (
+            dedupe_info is None
+            or bool(doc_id)
+            or dedupe_info.get("vec_status") == "inserted"
+        )
+        if self._lance is not None and _lance_allowed and content and content.strip():
             try:
                 meta = dict(metadata or {})
                 if tags:

@@ -42,7 +42,11 @@ BASELINE_JSONL_NAMES = 217
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12
-BASELINE_LEDGER_CLASSES = 11
+# 11 -> 12 (2026-07-26): IngestCycleLedger (archaeology_ingestion.py, #1133) —
+# the per-cycle dedupe cursor + insert budget for the archaeology daemon. A
+# derived-view resume cursor over vec_documents (rebuildable by deleting its
+# state file), not a new source of truth.
+BASELINE_LEDGER_CLASSES = 12
 
 
 def test_census_renders_deterministically():

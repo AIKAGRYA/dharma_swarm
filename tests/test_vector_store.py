@@ -720,3 +720,92 @@ class TestDedupeDigest:
         rows_b = self._doc_rows(tmp_path, "research:b/x.md")
         assert [vu for _, vu in rows_a] == [None]
         assert [vu for _, vu in rows_b] == [None]
+
+
+# ---------------------------------------------------------------------------
+# Expiry removes retrieval-index entries (PR #1133 review round 2)
+# ---------------------------------------------------------------------------
+
+
+class TestExpiryRemovesIndexEntries:
+    """search_vector/search_fts filter valid_until only AFTER limiting
+    candidates, so expired rows must leave vec_embeddings/vec_fts entirely."""
+
+    def test_expired_row_leaves_fts_and_embedding_indexes(self, tmp_path):
+        import sqlite3 as _sqlite3
+
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("obsolete alpha content", source="s1", dedupe_digest="da")
+        id2 = store.upsert("replacement beta content", source="s1", dedupe_digest="db")
+        assert id1 > 0 and id2 > 0 and id1 != id2
+
+        with _sqlite3.connect(str(tmp_path / "vectors.db")) as db:
+            # vec_fts is external-content: rowid SELECTs read the backing
+            # table, so probe the inverted index itself via MATCH.
+            fts_old = db.execute(
+                "SELECT count(*) FROM vec_fts WHERE vec_fts MATCH 'obsolete'"
+            ).fetchone()[0]
+            fts_new = db.execute(
+                "SELECT count(*) FROM vec_fts WHERE vec_fts MATCH 'replacement'"
+            ).fetchone()[0]
+            emb_old = 0
+            for table in ("vec_embeddings", "vec_embeddings_fallback"):
+                try:
+                    emb_old += db.execute(
+                        f"SELECT count(*) FROM {table} WHERE rowid = ?", (id1,)
+                    ).fetchone()[0]
+                except _sqlite3.Error:
+                    pass
+        assert fts_old == 0
+        assert fts_new == 1
+        assert emb_old == 0
+
+    def test_expire_active_source_public_api(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        doc_id = store.upsert("legacy keyed row", source="research:x.md", dedupe_digest="da")
+        assert doc_id > 0
+        expired = store.expire_active_source("research:x.md", "research_key_migrated")
+        assert expired == 1
+        doc = store.get_document(doc_id)
+        assert doc["valid_until"] is not None
+        assert store.expire_active_source("research:x.md", "again") == 0
+
+
+class TestDbGeneration:
+    def test_generation_stamped_once_and_stable(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        first = store.db_generation()
+        assert isinstance(first, int) and first > 0
+        assert store.db_generation() == first
+
+    def test_recreated_db_gets_new_generation(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        first = store.db_generation()
+        (tmp_path / "vectors.db").unlink()
+        store2 = VectorStore(state_dir=tmp_path, dim=32)
+        second = store2.db_generation()
+        assert second is not None and second != first
+
+
+class TestEnsureDedupeIndexBuilt:
+    def test_prebuild_creates_index(self, tmp_path):
+        import sqlite3 as _sqlite3
+
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        assert store.ensure_dedupe_index_built() is True
+        with _sqlite3.connect(str(tmp_path / "vectors.db")) as db:
+            row = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+                ("idx_vec_documents_source_active",),
+            ).fetchone()
+        assert row is not None

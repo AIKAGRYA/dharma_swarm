@@ -67,6 +67,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -114,7 +115,10 @@ class IngestCycleLedger:
     skipped_error: int = 0
     state_path: Path | None = None
     flush_every: int = 25
+    min_flush_interval_s: float = 5.0
+    db_generation: int | None = None
     _dirty: int = field(default=0, repr=False)
+    _last_flush_monotonic: float = field(default=0.0, repr=False)
 
     def unchanged(self, source: str, digest: str) -> bool:
         return self.state.get(source) == digest
@@ -138,15 +142,24 @@ class IngestCycleLedger:
 
     def _flush_maybe(self) -> None:
         self._dirty += 1
-        if self.state_path is not None and self._dirty >= max(1, self.flush_every):
-            self.flush()
+        if self.state_path is None or self._dirty < max(1, self.flush_every):
+            return
+        # Time-based checkpoint on top of the mutation count: every flush
+        # rewrites the whole uid→digest map, so a burst of mutations must
+        # not pay that O(cursor) write per flush_every entries.
+        if time.monotonic() - self._last_flush_monotonic < self.min_flush_interval_s:
+            return
+        self.flush()
 
     def flush(self) -> None:
-        if self.state_path is None:
+        # A clean ledger writes nothing — an unchanged cycle must not
+        # rewrite the full cursor file just to store identical bytes.
+        if self.state_path is None or self._dirty == 0:
             return
         try:
-            _write_ingest_state(self.state_path, self.state)
+            _write_ingest_state(self.state_path, self.state, self.db_generation)
             self._dirty = 0
+            self._last_flush_monotonic = time.monotonic()
         except OSError as exc:
             logger.warning(
                 "Failed to persist archaeology ingest state %s: %s",
@@ -158,29 +171,45 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _read_ingest_state(path: Path) -> dict[str, str]:
+def _read_ingest_state(path: Path) -> tuple[dict[str, str], int | None]:
+    """Return ``(cursor, db_generation)``; accepts the legacy flat format."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            return {str(key): str(value) for key, value in payload.items()}
     except FileNotFoundError:
-        return {}
+        return {}, None
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning(
             "Archaeology ingest state %s unreadable (%s); starting fresh",
             path, type(exc).__name__,
         )
-        return {}
-    return {}
+        return {}, None
+    if not isinstance(payload, dict):
+        return {}, None
+    cursor = payload.get("cursor")
+    if isinstance(cursor, dict):
+        generation = payload.get("db_generation")
+        return (
+            {str(key): str(value) for key, value in cursor.items()},
+            generation if isinstance(generation, int) else None,
+        )
+    # Legacy flat uid→digest format (pre-generation-binding).
+    return {str(key): str(value) for key, value in payload.items()}, None
 
 
-def _write_ingest_state(path: Path, state: dict[str, str]) -> None:
+def _write_ingest_state(
+    path: Path, state: dict[str, str], db_generation: int | None = None
+) -> None:
     # Atomic tmp+replace: this runs every cycle in a daemon; a crash
     # mid-write must not corrupt the cursor (which would force a full,
     # slow re-scan next cycle).
     path.parent.mkdir(parents=True, exist_ok=True)
+    state_payload: dict[str, Any] = {"cursor": state}
+    if db_generation is not None:
+        state_payload["db_generation"] = db_generation
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.write_text(
+        json.dumps(state_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     os.replace(tmp, path)
 
 
@@ -330,7 +359,13 @@ async def ingest_evolution_archive(
             if diff_text.strip():
                 doc += f"Diff summary (first 500 chars):\n{diff_text[:500]}\n"
 
-            source_key = f"evolution_archive:{entry_id}"
+            # Id-less entries: content-hash suffix so distinct entries don't
+            # collapse to one key and digest-expire each other (matches the
+            # stigmergy / task-completion fallbacks below).
+            source_key = (
+                f"evolution_archive:{entry_id}" if entry_id
+                else f"evolution_archive:{_sha256(doc)[:16]}"
+            )
             doc_id = await _ingest_into_palace(
                 palace,
                 content=doc,
@@ -412,11 +447,30 @@ async def ingest_shared_research(
                 )
                 if doc_id:
                     ingested += 1
+                    if rel_key != f.name:
+                        _expire_legacy_research_key(palace, f.name)
             except Exception as exc:
                 logger.debug("Failed to ingest %s: %s", f, exc)
 
     logger.info("Shared research: %d files ingested", ingested)
     return ingested
+
+
+def _expire_legacy_research_key(palace: Any, file_name: str) -> None:
+    """One-time migration: pre-#1133 cycles keyed research rows by filename.
+
+    Row expiry matches ``source`` exactly, so rows written under the old
+    ``research:{name}`` key would stay active alongside the new path-keyed
+    row forever. Expire them whenever a new-key row lands (a no-op indexed
+    lookup once the legacy rows are gone).
+    """
+    store = getattr(palace, "_vector_store", None)
+    if store is None or not hasattr(store, "expire_active_source"):
+        return
+    try:
+        store.expire_active_source(f"research:{file_name}", "research_key_migrated")
+    except Exception as exc:
+        logger.debug("Legacy research-key expiry failed for %s: %s", file_name, exc)
 
 
 async def ingest_stigmergy_marks(
@@ -782,24 +836,99 @@ class ArchaeologyIngestionDaemon:
             return {}
 
         state_path = self._state_dir / "meta" / _INGEST_STATE_FILENAME
+        cursor, saved_generation = _read_ingest_state(state_path)
+
+        vector_store = getattr(palace, "_vector_store", None)
+        generation: int | None = None
+        if vector_store is not None:
+            # One-time dedupe-index build OFF the event loop: the lazy
+            # in-upsert build on a large existing DB takes minutes while
+            # holding the write lock, and run_once executes under
+            # orchestrate_live's asyncio.wait_for — a synchronous build
+            # would stall every other loop far past the timeout.
+            if hasattr(vector_store, "ensure_dedupe_index_built"):
+                try:
+                    await asyncio.to_thread(vector_store.ensure_dedupe_index_built)
+                except Exception as exc:
+                    logger.warning(
+                        "Dedupe index pre-build failed (per-upsert guard stays fail-closed): %s",
+                        exc,
+                    )
+            if hasattr(vector_store, "db_generation"):
+                try:
+                    generation = await asyncio.to_thread(vector_store.db_generation)
+                except Exception as exc:
+                    logger.debug("vectors.db generation probe failed: %s", exc)
+
+        if (
+            generation is not None
+            and saved_generation is not None
+            and generation != saved_generation
+        ):
+            # vectors.db was recreated or replaced since the cursor was
+            # written: state-only skips would leave the new DB missing every
+            # "unchanged" document indefinitely. Discard the cursor; the
+            # vec-store "unchanged" statuses rebuild it without re-inserting
+            # rows that do exist.
+            logger.warning(
+                "vectors.db generation changed (%s -> %s); discarding archaeology cursor",
+                saved_generation, generation,
+            )
+            cursor = {}
+
+        total_budget = _cycle_insert_budget()
         ledger = IngestCycleLedger(
-            state=_read_ingest_state(state_path),
-            budget=_cycle_insert_budget(),
+            state=cursor,
+            budget=total_budget,
             state_path=state_path,
+            db_generation=generation if generation is not None else saved_generation,
         )
 
         counts: dict[str, int] = {}
+        streams = (
+            ("evolution_archive", ingest_evolution_archive),
+            ("shared_research", ingest_shared_research),
+            ("stigmergy_marks", ingest_stigmergy_marks),
+            ("task_completions", ingest_task_completions),
+        )
 
         try:
-            counts["evolution_archive"] = await ingest_evolution_archive(palace, self._state_dir, ledger=ledger)
-            counts["shared_research"] = await ingest_shared_research(palace, self._state_dir, ledger=ledger)
-            counts["stigmergy_marks"] = await ingest_stigmergy_marks(palace, self._state_dir, ledger=ledger)
-            counts["task_completions"] = await ingest_task_completions(palace, self._state_dir, ledger=ledger)
+            for index, (name, ingestor) in enumerate(streams):
+                # Fair-share budget: a large backlog in an early stream must
+                # not starve later streams indefinitely — each stream gets a
+                # reserved slice of the remaining budget first.
+                remaining = max(0, total_budget - ledger.inserted)
+                share = max(1, remaining // (len(streams) - index))
+                ledger.budget = min(total_budget, ledger.inserted + share)
+                counts[name] = await ingestor(palace, self._state_dir, ledger=ledger)
+            if ledger.skipped_budget and ledger.inserted < total_budget:
+                # Mop-up pass: streams that left their reserved slice unused
+                # must not strand budget while another stream still has
+                # backlog. Runs only when something was budget-skipped, so
+                # the steady state (nothing skipped) stays a single sweep;
+                # re-visits of already-recorded docs are ledger no-ops.
+                ledger.budget = total_budget
+                inserted_before = ledger.inserted
+                unchanged_before = ledger.skipped_unchanged
+                budget_before = ledger.skipped_budget
+                error_before = ledger.skipped_error
+                for name, ingestor in streams:
+                    if ledger.exhausted():
+                        break
+                    counts[name] += await ingestor(palace, self._state_dir, ledger=ledger)
+                # Every doc was already tallied in the fair-share pass; the
+                # mop-up only converts provisional budget-skips into inserts,
+                # so restore the skip counters to unique-doc counts.
+                mopped = ledger.inserted - inserted_before
+                ledger.skipped_unchanged = unchanged_before
+                ledger.skipped_budget = max(0, budget_before - mopped)
+                ledger.skipped_error = error_before
         finally:
             # orchestrate_live cancels run_once at 120s (asyncio.wait_for);
             # the cursor must survive partial cycles or every cycle restarts
             # from scratch. The write is synchronous, so it completes even
             # during CancelledError unwinding.
+            ledger.budget = total_budget
             ledger.flush()
 
         # Synthesize compressed lessons

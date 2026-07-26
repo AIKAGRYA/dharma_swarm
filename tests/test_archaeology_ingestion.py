@@ -291,7 +291,7 @@ class TestDigestDedupeCycles:
         await daemon.run_once()
         state_path = tmp_path / "meta" / "archaeology_ingest_state.json"
         assert state_path.exists()
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text())["cursor"]
         assert len(state) == 2
         assert all(k.startswith("evolution_archive:") for k in state)
 
@@ -435,7 +435,7 @@ class TestVecStatusBudgeting:
         assert counts["skipped_budget"] == 0
         state = json.loads(
             (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
-        )
+        )["cursor"]
         assert len(state) == 5
 
         calls_after_first = len(fake_palace.ingest_calls)
@@ -456,10 +456,9 @@ class TestVecStatusBudgeting:
         counts = await daemon.run_once()
         assert counts["evolution_archive"] == 0
         assert counts["skipped_error"] == 3
-        state = json.loads(
-            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
-        )
-        assert state == {}
+        # A cycle with zero cursor mutations writes no state file at all —
+        # a clean ledger must not rewrite the full cursor map.
+        assert not (tmp_path / "meta" / "archaeology_ingest_state.json").exists()
 
         counts2 = await daemon.run_once()
         assert counts2["skipped_error"] == 3  # retried, not swallowed
@@ -472,13 +471,13 @@ class TestStatePersistence:
         ledger.record("a", "1")
         assert not path.exists()
         ledger.record("b", "2")
-        assert json.loads(path.read_text()) == {"a": "1", "b": "2"}
+        assert json.loads(path.read_text()) == {"cursor": {"a": "1", "b": "2"}}
 
     def test_write_state_atomic_no_tmp_left(self, tmp_path):
         from dharma_swarm.archaeology_ingestion import _write_ingest_state
         path = tmp_path / "meta" / "state.json"
-        _write_ingest_state(path, {"a": "1"})
-        assert json.loads(path.read_text()) == {"a": "1"}
+        _write_ingest_state(path, {"a": "1"}, 7)
+        assert json.loads(path.read_text()) == {"cursor": {"a": "1"}, "db_generation": 7}
         assert not (tmp_path / "meta" / "state.json.tmp").exists()
 
     @pytest.mark.asyncio
@@ -498,7 +497,7 @@ class TestStatePersistence:
             await daemon.run_once()
         state = json.loads(
             (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
-        )
+        )["cursor"]
         assert len(state) == 3
 
 
@@ -538,3 +537,172 @@ class TestSourceKeyUniqueness:
         counts2 = await daemon.run_once()
         assert counts2["stigmergy_marks"] == 0
         assert counts2["skipped_unchanged"] >= 2
+
+
+# ---------------------------------------------------------------------------
+# Review round 2 (2026-07-26): id-less keys, fair share, generation binding,
+# flush throttling, legacy research-key expiry
+# ---------------------------------------------------------------------------
+
+
+class TestIdlessEvolutionEntries:
+    @pytest.mark.asyncio
+    async def test_idless_entries_get_distinct_sources(self, tmp_path, fake_palace):
+        evo_dir = tmp_path / "evolution"
+        evo_dir.mkdir()
+        entries = [
+            {"component": "router.py", "status": "applied", "diff": "change A"},
+            {"id": "", "component": "cascade.py", "status": "applied", "diff": "change B"},
+        ]
+        (evo_dir / "archive.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in entries)
+        )
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["evolution_archive"] == 2
+        sources = [
+            s for s in fake_palace.ingest_calls if s.startswith("evolution_archive:")
+        ]
+        assert len(set(sources)) == 2
+        assert all(s != "evolution_archive:" for s in sources)
+
+
+class TestFairShareBudget:
+    @pytest.mark.asyncio
+    async def test_later_streams_not_starved(self, tmp_path, fake_palace, monkeypatch):
+        monkeypatch.setenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", "4")
+        _write_archive(tmp_path, 10)
+        stig_dir = tmp_path / "stigmergy"
+        stig_dir.mkdir()
+        marks = [
+            {"id": f"m{i}", "salience": 0.95, "channel": "gnani",
+             "observation": f"critical observation {i}", "agent": "a"}
+            for i in range(2)
+        ]
+        (stig_dir / "marks.jsonl").write_text(
+            "\n".join(json.dumps(m) for m in marks)
+        )
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        # The evolution backlog alone exceeds the budget; the reserved share
+        # guarantees the stigmergy stream still lands at least one mark, and
+        # the mop-up pass spends the rest of the budget.
+        assert counts["stigmergy_marks"] >= 1
+        total_ingested = (
+            counts["evolution_archive"] + counts["shared_research"]
+            + counts["stigmergy_marks"] + counts["task_completions"]
+        )
+        assert total_ingested == 4
+
+
+class _GenerationPalace(_FakePalace):
+    """Duck-typed vector store reporting a controllable db generation."""
+
+    generation = 111
+
+    def __init__(self, state_dir=None, **kwargs):
+        super().__init__(state_dir=state_dir, **kwargs)
+        self._vector_store = self
+
+    def ensure_dedupe_index_built(self):
+        return True
+
+    def db_generation(self):
+        return type(self).generation
+
+
+class TestDbGenerationBinding:
+    @pytest.mark.asyncio
+    async def test_cursor_discarded_on_generation_change(self, tmp_path, monkeypatch):
+        _FakePalace.ingest_calls = []
+        _GenerationPalace.generation = 111
+        monkeypatch.setattr(
+            "dharma_swarm.memory_palace.MemoryPalace", _GenerationPalace
+        )
+        monkeypatch.delenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", raising=False)
+        _write_archive(tmp_path, 2)
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts1 = await daemon.run_once()
+        assert counts1["evolution_archive"] == 2
+        payload = json.loads(
+            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
+        )
+        assert payload["db_generation"] == 111
+
+        # Same generation: cursor honored, nothing re-ingested.
+        counts2 = await daemon.run_once()
+        assert counts2["evolution_archive"] == 0
+        assert counts2["skipped_unchanged"] == 2
+
+        # Changed generation = recreated/replaced vectors.db: the cursor is
+        # discarded so every doc is re-visited instead of skipped forever.
+        _GenerationPalace.generation = 222
+        counts3 = await daemon.run_once()
+        assert counts3["evolution_archive"] == 2
+        payload = json.loads(
+            (tmp_path / "meta" / "archaeology_ingest_state.json").read_text()
+        )
+        assert payload["db_generation"] == 222
+
+
+class TestFlushThrottle:
+    def test_burst_mutations_do_not_rewrite_per_batch(self, tmp_path):
+        path = tmp_path / "state.json"
+        ledger = IngestCycleLedger(state_path=path, flush_every=2)
+        ledger.record("a", "1")
+        ledger.record("b", "2")  # first flush (interval vs monotonic epoch 0)
+        first_mtime = path.stat().st_mtime_ns
+        ledger.record("c", "3")
+        ledger.record("d", "4")  # within min_flush_interval_s → deferred
+        assert path.stat().st_mtime_ns == first_mtime
+        ledger.flush()  # explicit flush ignores the interval
+        assert json.loads(path.read_text())["cursor"] == {
+            "a": "1", "b": "2", "c": "3", "d": "4",
+        }
+
+    def test_clean_flush_writes_nothing(self, tmp_path):
+        path = tmp_path / "state.json"
+        ledger = IngestCycleLedger(state_path=path)
+        ledger.flush()
+        assert not path.exists()
+
+
+class _ExpiryRecordingPalace(_FakePalace):
+    """Duck-typed vector store recording expire_active_source calls."""
+
+    expired: list[tuple[str, str]] = []
+
+    def __init__(self, state_dir=None, **kwargs):
+        super().__init__(state_dir=state_dir, **kwargs)
+        self._vector_store = self
+
+    def ensure_dedupe_index_built(self):
+        return True
+
+    def db_generation(self):
+        return 1
+
+    def expire_active_source(self, source, reason=""):
+        type(self).expired.append((source, reason))
+        return 1
+
+
+class TestLegacyResearchKeyExpiry:
+    @pytest.mark.asyncio
+    async def test_legacy_filename_key_expired_when_new_key_lands(
+        self, tmp_path, monkeypatch,
+    ):
+        _FakePalace.ingest_calls = []
+        _ExpiryRecordingPalace.expired = []
+        monkeypatch.setattr(
+            "dharma_swarm.memory_palace.MemoryPalace", _ExpiryRecordingPalace
+        )
+        monkeypatch.delenv("DHARMA_ARCHAEOLOGY_CYCLE_BUDGET", raising=False)
+        (tmp_path / "shared").mkdir()
+        (tmp_path / "shared" / "analysis.md").write_text("fresh research")
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path)
+        counts = await daemon.run_once()
+        assert counts["shared_research"] == 1
+        assert (
+            "research:analysis.md", "research_key_migrated",
+        ) in _ExpiryRecordingPalace.expired

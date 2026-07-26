@@ -264,6 +264,7 @@
     "AIReciprocityLedger",
     "EconomicLedger",
     "GaiaLedger",
+    "IngestCycleLedger",
     "IterationLedger",
     "Ledger",
     "MemoryPromotionDecisionLedger",
@@ -298,7 +299,7 @@
   "summary": {
     "distinct_db_names": 39,
     "distinct_jsonl_names": 217,
-    "ledger_classes": 11,
+    "ledger_classes": 12,
     "ledger_modules": 12
   }
 }

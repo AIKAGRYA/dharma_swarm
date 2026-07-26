@@ -373,6 +373,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
     return (
         ReviewedWriteBaselineEntry('dharma_swarm/active_inference.py', 'ActiveInferenceEngine._log_prediction_error', 'path_open_write', '55d048f783d0', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/agent_install.py', 'execute_install_plan', 'path_write', '9c658af64661', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/archaeology_ingestion.py', '_write_ingest_state', 'path_write', '20d9da6a593f', 'operational_state', occurrences=1, review_note='Archaeology ingest resume cursor (uid→digest map + db generation) under ~/.dharma/meta/, atomic tmp+os.replace; derived view over vec_documents, rebuildable by deletion (PR #1133).'),
         ReviewedWriteBaselineEntry('dharma_swarm/artifact_manifest.py', 'ArtifactManifestStore.write_manifest', 'path_write', 'b276c0a735d8', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/capital_lab/broker_paper_membrane.py', 'run_goal_b_proof_loop', 'path_write', '4d4d8d8376ae', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/chetana/palace.py', 'render_palace', 'path_write', 'd9a1b85d4e72', 'operational_state', occurrences=1),

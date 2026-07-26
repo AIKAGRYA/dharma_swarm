@@ -369,3 +369,87 @@ def test_search_graph_uses_configured_graph_nexus():
     assert [result.content for result in results] == [
         "[concept] autopoiesis: self-producing system"
     ]
+
+
+# ===========================================================================
+# Dedupe-aware secondary-write gating (PR #1133 review round 2)
+# ===========================================================================
+
+
+class _RecordingLance:
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def upsert(self, content, source, metadata=None):
+        self.calls.append(source)
+
+
+class _StubVecStore:
+    def __init__(self, status: str, vec_id: int = 7):
+        self.status = status
+        self.vec_id = vec_id
+        self.calls = 0
+
+    def upsert_with_status(self, **_kwargs):
+        self.calls += 1
+        if self.status in ("inserted", "unchanged"):
+            return self.vec_id, self.status
+        return -1, self.status
+
+
+class TestDedupeAwareSecondaryWriteGating:
+    """Retried dedupe-aware ingests must not re-append to LanceDB/lattice."""
+
+    def _palace(self, tmp_path, status):
+        palace = MemoryPalace(state_dir=tmp_path)
+        palace._lattice = None
+        palace._lance = _RecordingLance()
+        palace._vector_store = _StubVecStore(status)
+        return palace
+
+    def test_guard_error_skips_lance_append(self, tmp_path):
+        palace = self._palace(tmp_path, "guard_error")
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="retry me", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "guard_error"
+        assert doc_id == ""
+        assert palace._lance.calls == []
+
+    def test_error_skips_lance_append(self, tmp_path):
+        palace = self._palace(tmp_path, "error")
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="retry me", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "error"
+        assert doc_id == ""
+        assert palace._lance.calls == []
+
+    def test_unchanged_skips_lance_append(self, tmp_path):
+        palace = self._palace(tmp_path, "unchanged")
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="already there", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "unchanged"
+        assert doc_id == "vec:7"
+        assert palace._lance.calls == []
+
+    def test_inserted_still_appends_lance(self, tmp_path):
+        palace = self._palace(tmp_path, "inserted")
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="fresh content", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "inserted"
+        assert doc_id == "vec:7"
+        assert palace._lance.calls == ["s1"]
+
+    def test_legacy_callers_keep_lance_append(self, tmp_path):
+        palace = self._palace(tmp_path, "inserted")
+        palace._vector_store = None
+        doc_id = _run(palace.ingest(content="legacy path", source="s2"))
+        assert doc_id == ""
+        assert palace._lance.calls == ["s2"]

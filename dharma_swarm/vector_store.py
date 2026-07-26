@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import sqlite3
 import struct
 from datetime import datetime, timezone
@@ -28,6 +27,7 @@ from typing import Any
 
 import numpy as np
 
+from dharma_swarm import vector_store_dedupe
 from dharma_swarm.embedders import (
     Embedder,
     SentenceTransformerEmbedder as SentenceTransformerEmbedder,
@@ -37,21 +37,18 @@ from dharma_swarm.vector_fallback_guard import (
     fallback_vector_scan_allowed,
     fts_search_allowed,
 )
+from dharma_swarm.vector_store_query_support import (
+    candidate_has_query_lexical_signal as _candidate_has_query_lexical_signal,
+    candidate_query_signal_count as _candidate_query_signal_count,
+    filter_and_rank_vector_results as _filter_and_rank_vector_results,
+    fts_match_query as _fts_match_query,
+    is_degenerate_query_embedding as _is_degenerate_query_embedding,
+    lexical_recovery_search as _lexical_recovery_search,
+    memory_retrieval_prefilter_available as _memory_retrieval_prefilter_available,
+    query_signal_terms as _query_signal_terms,
+)
 
 logger = logging.getLogger(__name__)
-_FTS_TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
-_LOW_SIGNAL_QUERY_TERMS = {
-    "about",
-    "document",
-    "documents",
-    "entry",
-    "memory",
-    "query",
-    "retrieval",
-    "search",
-    "system",
-    "topic",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -64,147 +61,6 @@ def _utc_now() -> datetime:
 
 def _utc_now_iso() -> str:
     return _utc_now().isoformat()
-
-
-def _fts_match_query(query_text: str) -> str:
-    """Return a conservative FTS5 MATCH expression for arbitrary operator text."""
-
-    terms = [term for term in _FTS_TOKEN_RE.findall(query_text) if len(term) > 1]
-    return " OR ".join(f'"{term}"' for term in terms)
-
-
-def _is_degenerate_query_embedding(query_text: str, query_vec: list[float]) -> bool:
-    """Detect low-information query vectors that cause false-positive ANN hits."""
-
-    query_terms = [term for term in _FTS_TOKEN_RE.findall(query_text) if len(term) > 1]
-    if len(query_terms) <= 1:
-        return False
-    active_dims = sum(1 for value in query_vec if abs(float(value)) > 1e-9)
-    return active_dims <= 1
-
-
-def _candidate_has_query_lexical_signal(query_text: str, row: dict[str, Any]) -> bool:
-    query_terms = _query_signal_terms(query_text)
-    if not query_terms:
-        return False
-    return _candidate_query_signal_count(query_terms, row) > 0
-
-
-def _query_signal_terms(query_text: str) -> set[str]:
-    return {
-        term.lower()
-        for term in _FTS_TOKEN_RE.findall(query_text)
-        if len(term) > 1 and term.lower() not in _LOW_SIGNAL_QUERY_TERMS
-    }
-
-
-def _candidate_query_signal_count(
-    query_terms: set[str],
-    row: dict[str, Any],
-    *,
-    field: str = "all",
-) -> int:
-    if not query_terms:
-        return 0
-    if field == "prefix":
-        candidate_text = str(row.get("content", ""))[:360]
-    elif field == "source":
-        candidate_text = str(row.get("source", ""))
-    else:
-        candidate_text = f"{row.get('content', '')} {row.get('source', '')}"
-    candidate_terms = {
-        term.lower()
-        for term in _FTS_TOKEN_RE.findall(candidate_text)
-        if len(term) > 1
-    }
-    return len(query_terms & candidate_terms)
-
-
-def _filter_and_rank_vector_results(
-    query_text: str,
-    results: list[dict[str, Any]],
-    *,
-    degenerate_query: bool,
-    memory_prefilter: bool,
-) -> list[dict[str, Any]]:
-    query_terms = _query_signal_terms(query_text)
-    ranked: list[tuple[tuple[int, int, int, float], dict[str, Any]]] = []
-    min_overlap = 2 if len(query_terms) >= 3 else 1
-    for row in results:
-        distance = float(row.get("distance", 1.0) or 1.0)
-        overlap = _candidate_query_signal_count(query_terms, row)
-        if degenerate_query or memory_prefilter:
-            if overlap < min_overlap:
-                continue
-        prefix_overlap = _candidate_query_signal_count(query_terms, row, field="prefix")
-        source_overlap = _candidate_query_signal_count(query_terms, row, field="source")
-        ranked.append(((-prefix_overlap, -source_overlap, -overlap, distance), row))
-    if not ranked and not (degenerate_query or memory_prefilter):
-        return results
-    ranked.sort(key=lambda item: item[0])
-    return [row for _rank, row in ranked]
-
-
-def _memory_retrieval_prefilter_available(conn: sqlite3.Connection) -> bool:
-    try:
-        row = conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
-        return row is not None
-    except Exception:
-        return False
-
-
-def _lexical_recovery_search(
-    conn: sqlite3.Connection,
-    db_path: Path,
-    query_text: str,
-    top_k: int,
-    include_invalid: bool,
-    *,
-    memory_prefilter: bool,
-) -> list[dict[str, Any]]:
-    """Recover small-store vector searches when embeddings are unavailable."""
-
-    if not fallback_vector_scan_allowed(db_path, conn):
-        return []
-    query_terms = _query_signal_terms(query_text)
-    if not query_terms:
-        return []
-    fts_query = " OR ".join(f'"{term}"' for term in sorted(query_terms))
-    validity_clause = "" if include_invalid else "AND d.valid_until IS NULL"
-    memory_clause = (
-        "AND d.id IN (SELECT vec_doc_id FROM memory_retrieval_docs)"
-        if memory_prefilter
-        else ""
-    )
-    try:
-        rows = conn.execute(f"""
-            SELECT d.id, d.content, d.source, d.layer,
-                   d.metadata_json, d.event_time, d.ingestion_time,
-                   d.valid_until, d.confidence, d.access_count,
-                   d.last_accessed,
-                   bm25(vec_fts) AS bm25_score
-            FROM vec_fts
-            JOIN vec_documents d ON d.id = vec_fts.rowid
-            WHERE vec_fts MATCH ?
-              {validity_clause}
-              {memory_clause}
-            ORDER BY bm25_score
-            LIMIT ?
-        """, (fts_query, max(top_k * 10, 50))).fetchall()
-    except Exception:
-        return []
-
-    results: list[dict[str, Any]] = []
-    for row in rows:
-        bm25 = float(row["bm25_score"] or 0.0)
-        distance = max(0.0, min(1.0, 1.0 + bm25 / 20.0))
-        results.append(VectorStore._row_to_dict_static(row, distance=distance))
-    return _filter_and_rank_vector_results(
-        query_text,
-        results,
-        degenerate_query=True,
-        memory_prefilter=memory_prefilter,
-    )[:top_k]
 
 
 # ---------------------------------------------------------------------------
@@ -507,27 +363,15 @@ class VectorStore:
     def _ensure_dedupe_index(self, conn: sqlite3.Connection) -> None:
         """Partial index over active rows — required by the dedupe guard.
 
-        Without it, _active_row_for_digest/_expire_active_source_rows are
-        full-table scans (measured ~250s per query on the live 61GB
-        vectors.db). The one-time build on a large existing DB takes minutes
-        and holds the write lock; pre-build offline where that matters:
-        sqlite3 vectors.db "CREATE INDEX IF NOT EXISTS
-        idx_vec_documents_source_active ON vec_documents(source)
-        WHERE valid_until IS NULL". Errors propagate to the fail-closed
-        guard handler in upsert_with_status.
+        See vector_store_dedupe.ensure_dedupe_index. Errors propagate to the
+        fail-closed guard handler in upsert_with_status. Event-loop callers
+        pre-build via :meth:`ensure_dedupe_index_built` (asyncio.to_thread)
+        so the minutes-long one-time build on a large DB never blocks the
+        loop inside an upsert.
         """
         if self._dedupe_index_ok:
             return
-        row = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
-            ("idx_vec_documents_source_active",),
-        ).fetchone()
-        if row is None:
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_vec_documents_source_active "
-                "ON vec_documents(source) WHERE valid_until IS NULL"
-            )
-            conn.commit()
+        vector_store_dedupe.ensure_dedupe_index(conn)
         self._dedupe_index_ok = True
 
     def _active_row_for_digest(
@@ -536,20 +380,7 @@ class VectorStore:
         source: str,
         digest: str,
     ) -> int | None:
-        # No try/except: guard errors must surface so upsert_with_status can
-        # fail closed instead of silently inserting.
-        row = conn.execute(
-            """
-            SELECT id FROM vec_documents
-            WHERE source = ?
-              AND valid_until IS NULL
-              AND json_valid(metadata_json)
-              AND json_extract(metadata_json, '$.source_digest') = ?
-            ORDER BY id DESC LIMIT 1
-            """,
-            (source, digest),
-        ).fetchone()
-        return int(row[0]) if row else None
+        return vector_store_dedupe.active_row_for_digest(conn, source, digest)
 
     def _expire_active_source_rows(
         self,
@@ -558,29 +389,59 @@ class VectorStore:
         replacement_digest: str,
         now_iso: str,
     ) -> int:
-        """Expire prior active rows for the same source before a replacing insert.
-
-        No try/except: guard errors must surface so upsert_with_status can
-        fail closed instead of inserting alongside still-active stale rows.
-        """
-        patch = json.dumps({
-            "invalidated_at": now_iso,
-            "invalidated_reason": "source_digest_replaced",
-            "replacement_source_digest": replacement_digest,
-        }, sort_keys=True)
-        cursor = conn.execute(
-            """
-            UPDATE vec_documents
-            SET valid_until = ?,
-                metadata_json = json_patch(
-                    CASE WHEN json_valid(metadata_json) THEN metadata_json ELSE '{}' END,
-                    ?
-                )
-            WHERE source = ? AND valid_until IS NULL
-            """,
-            (now_iso, patch, source),
+        return vector_store_dedupe.expire_active_source_rows(
+            conn, source, replacement_digest, now_iso, has_vec0=self._has_vec0(conn)
         )
-        return max(0, int(cursor.rowcount or 0))
+
+    def ensure_dedupe_index_built(self) -> bool:
+        """Build the dedupe partial index on a dedicated connection.
+
+        The one-time build on a large existing DB takes minutes and holds
+        the write lock; event-loop callers run this via asyncio.to_thread
+        BEFORE ingestion so the lazy in-upsert path never blocks the loop.
+        Returns True when the index is present; on failure the per-upsert
+        guard stays fail-closed (guard_error, no blind inserts).
+        """
+        conn = self._connect()
+        try:
+            self._ensure_dedupe_index(conn)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "VectorStore dedupe index build failed (guard stays fail-closed): %s",
+                exc,
+            )
+            return False
+        finally:
+            conn.close()
+
+    def db_generation(self) -> int | None:
+        """Generation nonce for resume cursors; None when unreadable."""
+        conn = self._connect()
+        try:
+            return vector_store_dedupe.db_generation(conn)
+        except Exception as exc:
+            logger.debug("VectorStore.db_generation failed: %s", exc)
+            return None
+        finally:
+            conn.close()
+
+    def expire_active_source(self, source: str, reason: str = "key_migrated") -> int:
+        """Expire ALL active rows for a source key (one-time key migrations).
+
+        Returns the number of rows expired, or -1 on error.
+        """
+        conn = self._connect()
+        try:
+            self._ensure_dedupe_index(conn)
+            expired = self._expire_active_source_rows(conn, source, reason, _utc_now_iso())
+            conn.commit()
+            return expired
+        except Exception as exc:
+            logger.debug("VectorStore.expire_active_source failed for %s: %s", source, exc)
+            return -1
+        finally:
+            conn.close()
 
     def invalidate(self, doc_id: int, reason: str = "") -> bool:
         """Soft-delete: set valid_until = now. Does NOT remove the record."""
