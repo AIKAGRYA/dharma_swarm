@@ -30,6 +30,10 @@ _CONTAINER_MANIFEST_ENV = "DHARMA_RUNTIME_SOURCE_MANIFEST"
 _CONTAINER_DIGEST_ENV = "DHARMA_RUNTIME_SOURCE_DIGEST"
 _CONTAINER_MANIFEST_NAME = ".dharma-runtime-source.sha256"
 _GIT_TIMEOUT_SECONDS = 10.0
+# Mirrors scripts/runtime/dharma_swarm_release_runner.sh: a fixed root-owned
+# binary and PATH, so a user-writable PATH entry can never substitute git.
+_TRUSTED_GIT_BINARY = "/usr/bin/git"
+_SAFE_GIT_PATH = "/usr/bin:/bin"
 _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 _IGNORED_IMPORT_PATHS = (
     ":(top,glob)sitecustomize.py[co]",
@@ -76,22 +80,23 @@ def runtime_control_enabled(
     return raw is None or raw.strip().lower() not in _FALSE_VALUES
 
 
-def _git_environment(environ: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Return a Git environment without ambient repository/config overrides."""
-    inherited = dict(os.environ if environ is None else environ)
-    environment = {
-        key: value
-        for key, value in inherited.items()
-        if not key.upper().startswith("GIT_")
+def _git_environment() -> dict[str, str]:
+    """Return a hermetic Git environment; ambient variables never leak in."""
+    return {
+        "PATH": _SAFE_GIT_PATH,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
     }
-    environment.update(
-        {
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_OPTIONAL_LOCKS": "0",
-        }
-    )
-    return environment
+
+
+def _trusted_git_binary() -> str:
+    """Return the trusted Git executable; PATH lookup is never used."""
+    if not os.access(_TRUSTED_GIT_BINARY, os.X_OK):
+        raise RuntimeAdmissionError(
+            f"trusted Git executable is unavailable: {_TRUSTED_GIT_BINARY}"
+        )
+    return _TRUSTED_GIT_BINARY
 
 
 def _git(
@@ -99,13 +104,15 @@ def _git(
     *args: str,
     environ: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    del environ  # provenance probes run hermetically; ambient env is ignored
+    git_bin = _trusted_git_binary()
     try:
         return subprocess.run(
-            ["git", "-c", "core.fsmonitor=false", "-C", str(repo_root), *args],
+            [git_bin, "-c", "core.fsmonitor=false", "-C", str(repo_root), *args],
             capture_output=True,
             text=True,
             timeout=_GIT_TIMEOUT_SECONDS,
-            env=_git_environment(environ),
+            env=_git_environment(),
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:

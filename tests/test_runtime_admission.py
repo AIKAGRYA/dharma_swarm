@@ -68,6 +68,38 @@ def _runtime_repo(tmp_path: Path) -> tuple[Path, str]:
     return repo, head
 
 
+def test_git_probe_ignores_ambient_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, head = _runtime_repo(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text("#!/bin/sh\necho fabricated\nexit 0\n", encoding="utf-8")
+    fake_git.chmod(0o755)
+    monkeypatch.setenv("PATH", str(fake_bin))
+
+    admission = assess_runtime_admission(repo)
+
+    assert admission.head == head
+
+
+def test_missing_trusted_git_binary_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, _ = _runtime_repo(tmp_path)
+    monkeypatch.setattr(
+        runtime_admission_module,
+        "_TRUSTED_GIT_BINARY",
+        str(tmp_path / "missing-git"),
+    )
+
+    with pytest.raises(RuntimeAdmissionError, match="trusted Git executable"):
+        assess_runtime_admission(repo)
+
+
 def test_clean_exact_main_checkout_is_admitted(tmp_path: Path) -> None:
     repo, head = _runtime_repo(tmp_path)
 
