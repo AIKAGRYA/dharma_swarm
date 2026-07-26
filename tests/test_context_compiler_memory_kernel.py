@@ -32,6 +32,10 @@ from dharma_swarm.memory_kernel import (
     preview_memory_pack,
 )
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
+from dharma_swarm.memory_kernel.default_context import (
+    build_memory_kernel_default_context,
+    memory_kernel_isolation_policy_from_metadata,
+)
 
 
 def _compiler(memory_kernel: object) -> ContextCompiler:
@@ -703,6 +707,311 @@ async def test_context_compiler_falls_back_when_memory_kernel_fails() -> None:
     assert metadata["error_type"] == "RuntimeError"
 
 
+class _ShadowRankedMemoryKernel(_FakeMemoryKernel):
+    def __init__(
+        self,
+        pack: SimpleNamespace,
+        *,
+        candidates: tuple[SimpleNamespace, ...] = (),
+        shadow_atoms: tuple[MemoryAtom, ...] = (),
+        query_error: Exception | None = None,
+    ) -> None:
+        super().__init__(pack)
+        self.candidates = candidates
+        self.shadow_atoms = shadow_atoms
+        self.query_error = query_error
+        self.query_calls: list[tuple[str, int]] = []
+        self.query_kwargs: list[dict[str, object]] = []
+
+    def query(
+        self, text: str, *, top_k: int = 10, **kwargs: object
+    ) -> SimpleNamespace:
+        self.query_calls.append((text, top_k))
+        self.query_kwargs.append(dict(kwargs))
+        if self.query_error is not None:
+            raise self.query_error
+        return SimpleNamespace(candidates=self.candidates)
+
+    def atoms_for_candidates(self, candidates: object) -> tuple[MemoryAtom, ...]:
+        return self.shadow_atoms
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_unavailable_when_ranked_door_missing() -> None:
+    compiler = _compiler(_FakeMemoryKernel(_pack()))
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_unavailable",
+        task_id="task_shadow_unavailable",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "unavailable"
+    assert metadata["ranked_shadow"]["reason"] == "ranked_door_unavailable"
+    assert "shadow_error" not in metadata
+
+
+def test_memory_kernel_shadow_records_divergence_metrics() -> None:
+    overlapping = SimpleNamespace(
+        doc_id="doc-overlap",
+        source="memory_kernel:home.witness",
+        metadata={},
+    )
+    novel = SimpleNamespace(
+        doc_id="doc-novel",
+        source="receipt:unrelated-lane",
+        metadata={},
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        candidates=(overlapping, novel),
+        shadow_atoms=(
+            _memory_atom(
+                "shadow ranked project memory alpha", scope=MemoryScope.PROJECT
+            ),
+            _memory_atom(
+                "shadow ranked project memory beta", scope=MemoryScope.PROJECT
+            ),
+        ),
+    )
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": "supervisor", "agent_id": "agent-alpha"}
+    )
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+        isolation_policy=policy,
+    )
+
+    assert section is not None
+    # Legacy still serves: the rendered section comes from the legacy pack
+    # only; shadow atoms never reach prompt content in the shadow phase.
+    assert "safe witness note" in section.content
+    assert "shadow ranked project memory alpha" not in section.content
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] == 0.5
+    assert metadata["shadow_admitted_delta"] == 1
+    assert "shadow_error" not in metadata
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    assert detail["top_k"] == 12
+    assert detail["candidate_count"] == 2
+    assert detail["shadow_atom_count"] == 2
+    assert detail["overlap_count"] == 1
+    assert detail["overlap_key_namespace"] == "unredacted_identity_only"
+    assert detail["legacy_identity_key_count"] == 1
+    assert detail["legacy_redacted_ref_count"] == 0
+    assert detail["shadow_admitted_count"] == 2
+    assert detail["legacy_admitted_count"] == 1
+    assert detail["shadow_omission_reason_counts"] == {}
+    assert kernel.query_calls == [("governed memory", 12)]
+    # Shadow must not double kernel I/O: no engine-side admission pass, no
+    # telemetry write.
+    assert kernel.query_kwargs == [
+        {"enable_memory_kernel": False, "record_telemetry": False}
+    ]
+
+
+def test_memory_kernel_shadow_kill_switch_disables_shadow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_RANKED_SHADOW", "0")
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "disabled"
+    assert kernel.query_calls == []
+
+
+def test_memory_kernel_shadow_skips_empty_recall_query() -> None:
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "skipped"
+    assert metadata["ranked_shadow"]["reason"] == "empty_recall_query"
+    assert kernel.query_calls == []
+
+
+def test_memory_kernel_default_context_bad_token_budget_fails_closed() -> None:
+    # Pre-shadow contract: a bad budget loses one section, never the bundle.
+    section, metadata = build_memory_kernel_default_context(
+        _FakeMemoryKernel(_pack()),
+        recall_query="governed memory",
+        token_budget=None,  # type: ignore[arg-type]
+    )
+
+    assert section is None
+    assert metadata["status"] == "failed"
+    assert metadata["error_type"] == "TypeError"
+
+
+def test_memory_kernel_shadow_overlap_excludes_redacted_legacy_refs() -> None:
+    redacted_pack = _pack()
+    redacted_item = SimpleNamespace(
+        admitted=True,
+        rank=2,
+        surface_id="repo.docs",
+        atom_type="source_chunk",
+        truth_state="curated",
+        authority_level="medium",
+        content_snippet="doc chunk",
+        selection_reasons=("truth_state:curated",),
+        omission_reasons=(),
+        content_ref="<local_path_redacted>",
+        source_refs=("<local_path_redacted>",),
+    )
+    redacted_pack = SimpleNamespace(
+        **{
+            **redacted_pack.__dict__,
+            "items": (*redacted_pack.items, redacted_item),
+        }
+    )
+    file_backed_candidate = SimpleNamespace(
+        doc_id="doc-file",
+        source="/Users/example/docs/note.md",
+        metadata={"source_path": "/Users/example/docs/note.md"},
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        redacted_pack,
+        candidates=(file_backed_candidate,),
+        shadow_atoms=(),
+    )
+
+    _, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+    )
+
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    # The redaction sentinel never becomes an identity key (it would
+    # false-match across atoms) — it is counted as the metric's blind spot.
+    assert detail["overlap_count"] == 0
+    assert detail["overlap_key_namespace"] == "unredacted_identity_only"
+    assert detail["legacy_identity_key_count"] == 1
+    assert detail["legacy_redacted_ref_count"] == 2
+    assert metadata["shadow_overlap_at_k"] == 0.0
+
+
+def _projection_surface() -> MemorySurface:
+    # Mirrors the production home.vectors posture (surface_specs_core):
+    # PROJECTION / AuthorityLevel.NONE / canon_risk CRITICAL.
+    return MemorySurface(
+        surface_id="home.vectors",
+        path="/tmp/vectors.db",
+        owner_module="tests",
+        role=MemorySurfaceRole.PROJECTION_INDEX,
+        category=SurfaceCategory.PROJECTION,
+        authority_level=AuthorityLevel.NONE,
+        write_mode=WriteMode.READ_ONLY,
+        adapter_mode=AdapterMode.READ_ONLY,
+        active_status=SurfaceStatus.ACTIVE,
+        health=MemorySurfaceHealth(exists=True, path_type="file"),
+        provenance_quality="test",
+        canon_risk=RiskLevel.CRITICAL,
+        pii_secrets_risk=RiskLevel.MEDIUM,
+    )
+
+
+def test_memory_kernel_shadow_projection_posture_admits_zero_with_reasons() -> None:
+    # The honest-shadow claim under production posture: home.vectors-stamped
+    # atoms run the same scoped budget (allow_projections=False,
+    # allow_high_risk=False) and are OMITTED with stamped WHYs, not silently.
+    shadow_atoms = tuple(
+        MemoryAtom.build(
+            surface=_projection_surface(),
+            atom_type=MemoryAtomType.SOURCE_CHUNK,
+            content_ref=f"retrieval:doc-{index}",
+            content=f"ranked projection chunk {index}",
+            timestamp="2026-05-12T01:00:00Z",
+            source_path="receipt:ranked-shadow",
+            adapter_name="governed_retrieval",
+            read_mode=ReadMode.READ_ONLY,
+            source_row_key=f"doc-{index}",
+        )
+        for index in range(2)
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        candidates=(
+            SimpleNamespace(doc_id="doc-0", source="receipt:ranked-shadow", metadata={}),
+            SimpleNamespace(doc_id="doc-1", source="receipt:ranked-shadow", metadata={}),
+        ),
+        shadow_atoms=shadow_atoms,
+    )
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": "supervisor", "agent_id": "agent-alpha"}
+    )
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+        isolation_policy=policy,
+    )
+
+    assert section is not None
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    assert detail["shadow_atom_count"] == 2
+    assert detail["shadow_admitted_count"] == 0
+    assert "projection_blocked" in detail["shadow_omission_reason_counts"]
+    assert "high_risk_blocked" in detail["shadow_omission_reason_counts"]
+    assert metadata["shadow_admitted_delta"] == -1
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_error_never_breaks_compile() -> None:
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        query_error=RuntimeError("ranked door down"),
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_error",
+        task_id="task_shadow_error",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    assert "## Memory Kernel" in bundle.rendered_text
+    assert "safe witness note" in bundle.rendered_text
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["shadow_error"].startswith("RuntimeError")
+    assert metadata["ranked_shadow"]["status"] == "error"
 def test_redaction_boundary_preserves_row_ownership_for_scoped_admission() -> None:
     """Owner ids inside a dropped row/payload dict must survive redaction so
     scoped admission can still enforce atom ownership in shared scopes."""

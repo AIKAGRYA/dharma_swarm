@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from dharma_swarm.context_compiler_utils import (
     ContextSection,
@@ -17,11 +17,18 @@ from dharma_swarm.memory_kernel import (
     MemoryQuery,
     MemoryScope,
     TruthState,
+    preview_memory_pack,
 )
 from dharma_swarm.memory_kernel.topology_policy import (
     SUPERVISOR_SCOPED,
     isolation_legacy_enabled,
     resolve as resolve_isolation_semantics,
+)
+from dharma_swarm.memory_kernel.ranked_shadow import (
+    RANKED_SHADOW_ENV,
+    clean_text as _clean_text,
+    count_reasons as _count_reasons,
+    ranked_retrieval_shadow,
 )
 
 logger = logging.getLogger(__name__)
@@ -164,6 +171,9 @@ def build_memory_kernel_default_context(
         None
     )
     isolation_mode = "unrestricted" if isolation_legacy_enabled() else "scoped"
+    # Budget construction stays inside the try: a bad token_budget must keep
+    # the pre-shadow failure contract (section omitted, status "failed") —
+    # never a raise out of the compile.
     try:
         atom_budget = max(4, min(24, int(token_budget) // 100))
         # Scoped isolation rejects foreign atoms only after iteration, so the
@@ -171,6 +181,30 @@ def build_memory_kernel_default_context(
         # read consume every candidate slot ahead of the worker's own rows
         # and an eligible record later in stable order is never examined.
         candidate_budget = atom_budget * 4
+        budget = MemoryContextBudget(
+            max_candidate_atoms=candidate_budget,
+            max_admitted_atoms=max(1, min(8, atom_budget)),
+            max_total_chars=max(600, min(2400, int(token_budget) * 2)),
+            max_atom_chars=420,
+            include_content=True,
+            require_context_admissible=False,
+            allow_projections=False,
+            allow_high_risk=False,
+            reject_stale=True,
+            require_source_digest=True,
+            require_source_row_key=True,
+            block_tool_exposure=True,
+            isolation_mode=isolation_mode,
+            allowed_scopes=resolved_isolation.allowed_scopes,
+            allowed_agent_ids=resolved_isolation.allowed_agent_ids,
+            allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
+            allowed_truth_states=(
+                TruthState.OBSERVED,
+                TruthState.CLAIMED,
+                TruthState.CURATED,
+                TruthState.CANONICAL,
+            ),
+        )
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
                 text_query=recall_query or None,
@@ -185,30 +219,7 @@ def build_memory_kernel_default_context(
                 require_source_digest=True,
                 require_source_row_key=True,
             ),
-            budget=MemoryContextBudget(
-                max_candidate_atoms=candidate_budget,
-                max_admitted_atoms=max(1, min(8, atom_budget)),
-                max_total_chars=max(600, min(2400, int(token_budget) * 2)),
-                max_atom_chars=420,
-                include_content=True,
-                require_context_admissible=False,
-                allow_projections=False,
-                allow_high_risk=False,
-                reject_stale=True,
-                require_source_digest=True,
-                require_source_row_key=True,
-                block_tool_exposure=True,
-                isolation_mode=isolation_mode,
-                allowed_scopes=resolved_isolation.allowed_scopes,
-                allowed_agent_ids=resolved_isolation.allowed_agent_ids,
-                allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
-                allowed_truth_states=(
-                    TruthState.OBSERVED,
-                    TruthState.CLAIMED,
-                    TruthState.CURATED,
-                    TruthState.CANONICAL,
-                ),
-            ),
+            budget=budget,
         )
     except Exception as exc:
         logger.debug("Memory Kernel default context failed", exc_info=True)
@@ -223,6 +234,15 @@ def build_memory_kernel_default_context(
     metadata["query_present"] = bool(recall_query)
     metadata["text_query_applied"] = bool(recall_query)
     metadata.update(resolved_isolation.metadata())
+    metadata.update(
+        ranked_retrieval_shadow(
+            memory_kernel,
+            recall_query=recall_query,
+            legacy_pack=pack,
+            budget=budget,
+            top_k=atom_budget,
+        )
+    )
     return (
         ContextSection(
             name="Memory Kernel",
@@ -328,20 +348,6 @@ def _inline_context(value: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max(0, max_chars - 14)].rstrip() + "...<truncated>"
-
-
-def _count_reasons(values: Iterable[str]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for value in values:
-        key = str(value).strip()
-        if not key:
-            continue
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def _clean_text(value: Any) -> str:
-    return str(value or "").strip()
 
 
 def _string_tuple(value: Any) -> tuple[str, ...]:
