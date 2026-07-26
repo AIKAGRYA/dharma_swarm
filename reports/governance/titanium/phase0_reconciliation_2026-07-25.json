@@ -468,7 +468,7 @@
     "pull_request": 1118,
     "observed_head": "42c25024e334a5504f1d2a3343b35d1277a55bc7",
     "classification": "BLOCKED_OPERATOR",
-    "integration_strategy": "M0 carries the same current-main generated counts as PR 1118's one-commit rolling head; PR 1118 may be closed as superseded only after M0 merges.",
+    "integration_strategy": "M0 independently regenerates current-main DocOps counts; PR 1118 remains checkless and may be closed as superseded only after M0 merges.",
     "verify": "gh pr view 1118 --json headRefOid,statusCheckRollup,body"
   },
   "main_refresh": {
@@ -499,7 +499,7 @@
             "role": "authority_source_observation"
           }
         ],
-        "phase0_impact": "No M0 completion criterion, residual, modality, or missing artifact changed; this merge supplies neither completion evidence nor a new canonical next item."
+        "phase0_impact": "No M0 completion criterion, residual ID/classification, modality, or missing artifact changed; PR 1135 adds authority-policy debt carried under existing WP-0F1 and supplies neither completion evidence nor a new canonical next item."
       },
       {
         "pull_request": 1138,
