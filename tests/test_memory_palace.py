@@ -453,3 +453,29 @@ class TestDedupeAwareSecondaryWriteGating:
         doc_id = _run(palace.ingest(content="legacy path", source="s2"))
         assert doc_id == ""
         assert palace._lance.calls == ["s2"]
+
+    def test_missing_vector_store_fails_closed_for_dedupe_callers(self, tmp_path):
+        """Greptile round 4: with no usable vector store a dedupe-aware
+        ingest must write nothing and stamp 'unavailable', so the caller's
+        cursor stays un-advanced instead of permanently skipping the
+        vector row once the store recovers."""
+        palace = self._palace(tmp_path, "inserted")
+        palace._vector_store = None
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="no vec store", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "unavailable"
+        assert doc_id == ""
+        assert palace._lance.calls == []
+
+    def test_statusless_vector_store_fails_closed_for_dedupe_callers(self, tmp_path):
+        palace = self._palace(tmp_path, "inserted")
+        palace._vector_store = object()  # no upsert_with_status
+        info: dict = {}
+        doc_id = _run(palace.ingest(
+            content="old store api", source="s1", dedupe_digest="d1", dedupe_info=info,
+        ))
+        assert info["vec_status"] == "unavailable"
+        assert doc_id == ""
+        assert palace._lance.calls == []

@@ -455,6 +455,22 @@ class MemoryPalace:
         vec_id_pre: int | None = None
         if (
             dedupe_info is not None
+            and content and content.strip()
+            and (
+                self._vector_store is None
+                or not hasattr(self._vector_store, "upsert_with_status")
+            )
+        ):
+            # Dedupe-aware ingestion is vector-first: with no usable vector
+            # store there is nothing to dedupe against. Writing the
+            # lattice/Lance copies anyway would either duplicate them on every
+            # retry (cursor left behind) or permanently skip the vector row
+            # once the store recovers (cursor advanced). Fail closed instead;
+            # the caller leaves its cursor untouched and retries next cycle.
+            dedupe_info["vec_status"] = "unavailable"
+            return ""
+        if (
+            dedupe_info is not None
             and self._vector_store is not None
             and content and content.strip()
             and hasattr(self._vector_store, "upsert_with_status")

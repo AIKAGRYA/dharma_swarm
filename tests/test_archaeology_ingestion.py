@@ -392,6 +392,28 @@ class TestIngestIntoPalaceLedger:
         assert ledger.inserted == 0
         assert ledger.state == {}
 
+    @pytest.mark.asyncio
+    async def test_vector_store_unavailable_leaves_cursor_untouched(self):
+        """Greptile round 4: a lattice-only success must not advance the
+        vector cursor — 'unavailable' means nothing landed anywhere and the
+        document is retried once the vector store recovers."""
+
+        async def _ingest(**kwargs):
+            kwargs["dedupe_info"]["vec_status"] = "unavailable"
+            return ""
+
+        palace = AsyncMock()
+        palace.ingest = AsyncMock(side_effect=_ingest)
+        ledger = IngestCycleLedger()
+        doc_id = await _ingest_into_palace(
+            palace, content="hello", source="s1", layer="working",
+            tags=[], metadata={}, ledger=ledger,
+        )
+        assert doc_id is None
+        assert ledger.state == {}
+        assert ledger.inserted == 0
+        assert ledger.skipped_error == 1
+
 
 class _UnchangedVecPalace(_FakePalace):
     """Vec store already holds every doc — the state-file-lost recovery path."""

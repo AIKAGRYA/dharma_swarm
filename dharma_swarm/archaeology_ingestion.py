@@ -160,9 +160,10 @@ async def _ingest_into_palace(
         ledger.note(source, digest)
         ledger.skipped_unchanged += 1
         return None
-    if vec_status in ("guard_error", "error"):
-        # Nothing landed in the vector store; leave the cursor untouched so
-        # the document is retried next cycle.
+    if vec_status in ("guard_error", "error", "unavailable"):
+        # Nothing landed in the vector store ("unavailable": the palace has no
+        # usable vector store and wrote nothing anywhere); leave the cursor
+        # untouched so the document is retried next cycle.
         ledger.skipped_error += 1
         return None
     if doc_id:
