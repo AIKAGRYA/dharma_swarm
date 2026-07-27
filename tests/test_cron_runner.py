@@ -455,6 +455,21 @@ def test_run_cron_job_dispatches_doctor_assurance():
     mock.assert_called_once()
 
 
+def test_run_cron_job_dispatches_memory_common_metabolism():
+    with patch(
+        "dharma_swarm.memory_common.memory_common_cron_run_fn",
+        return_value=(True, "# Memory Metabolism", None),
+    ) as mock:
+        success, output, error = run_cron_job(
+            {"handler": "memory_common_metabolism", "top_k": 6}
+        )
+
+    assert success is True
+    assert output == "# Memory Metabolism"
+    assert error is None
+    mock.assert_called_once()
+
+
 def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
     script = repo_root / "scripts" / "system_map_populator.py"

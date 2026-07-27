@@ -19,10 +19,19 @@ fi
 
 _DHARMA_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 
+# Prefer the repo .venv so the canonical loader runs in the dependency-
+# complete interpreter; fall back to any python3 when .venv is absent.
+if [[ -x "$_DHARMA_REPO_ROOT/.venv/bin/python" ]]; then
+    _DHARMA_PYTHON="$_DHARMA_REPO_ROOT/.venv/bin/python"
+else
+    _DHARMA_PYTHON="$(command -v python3 2>/dev/null || echo python3)"
+fi
+export DHARMA_PYTHON="$_DHARMA_PYTHON"
+
 _dharma_exports="$(
     cd "$_DHARMA_REPO_ROOT" 2>/dev/null && \
     PYTHONPATH="$_DHARMA_REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
-        python3 -m dharma_swarm.runtime_env_loader emit-exports 2>/dev/null
+        "$_DHARMA_PYTHON" -m dharma_swarm.runtime_env_loader emit-exports 2>/dev/null
 )" || _dharma_exports=""
 
 if [[ -n "$_dharma_exports" ]]; then
