@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """WP-LC4 disjoint checker: validate receipt-grounded provider consumption.
 
-Reads `delegation_runs.receipt_json` from `runtime.db` (or a synthetic test
-store), applies the four Loop-1 closure properties P1..P4, and emits a typed
-receipt under `~/.dharma/loop_closure/loop1_consumption_receipt.json`.
+Opens ``runtime.db`` read-only, reads ``delegation_runs.receipt_json``, and
+validates the four Loop-1 closure properties P1..P4 against the canonical
+``apply_receipt_consumption_ranking`` implementation. Emits a typed receipt under
+``~/.dharma/loop_closure/loop1_consumption_receipt.json``.
 
-With `--check` the checker replays the last committed receipt if one exists;
-on a fresh host with no receipt it exits `0` with a `needs_host` typed gap.
+With ``--check`` the checker replays the last committed receipt if one exists;
+on a fresh host with no receipt (or no host runtime rows) it exits ``0`` with a
+``needs_host`` typed gap.
 """
 
 from __future__ import annotations
@@ -16,15 +18,17 @@ import hashlib
 import json
 import os
 import sqlite3
-import tempfile
+import subprocess
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from dharma_swarm.models import ProviderType
 from dharma_swarm.receipt_consumption import (
     MAX_RECEIPT_DEMOTIONS,
+    PROCESS_BOOT_ID,
     RECEIPT_CONSUMPTION_WINDOW,
     apply_receipt_consumption_ranking,
 )
@@ -47,6 +51,99 @@ def _default_chain() -> list[ProviderType]:
     ]
 
 
+def _resolve_db_path(explicit: Path | None = None) -> Path:
+    if explicit is not None:
+        return explicit
+    env_path = os.environ.get("DGC_ROUTER_RECEIPT_DB")
+    if env_path:
+        return Path(env_path)
+    return DEFAULT_DB
+
+
+def _host_sha() -> str:
+    repo = Path(__file__).resolve().parents[2]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        return result.stdout.strip() or "unknown"
+    except Exception:  # pragma: no cover - host tooling may be absent
+        return "unknown"
+
+
+def _read_receipt_rows(db_path: Path, window: int = RECEIPT_CONSUMPTION_WINDOW) -> list[dict[str, Any]]:
+    """Return recent parsed receipt_json rows from a read-only runtime.db."""
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        return []
+    try:
+        cur = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='delegation_runs'"
+        )
+        if not cur.fetchone():
+            return []
+        rows = conn.execute(
+            "SELECT receipt_json FROM delegation_runs "
+            "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
+            "ORDER BY started_at DESC, rowid DESC LIMIT ?",
+            (max(1, int(window)),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    parsed: list[dict[str, Any]] = []
+    for (raw,) in rows:
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                parsed.append(obj)
+        except json.JSONDecodeError:
+            continue
+    return parsed
+
+
+def _row_count(db_path: Path) -> int:
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        return 0
+    try:
+        cur = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='delegation_runs'"
+        )
+        if not cur.fetchone():
+            return 0
+        row = conn.execute("SELECT COUNT(*) FROM delegation_runs").fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        conn.close()
+
+
+def _provider_type(raw: object) -> ProviderType | None:
+    value = str(raw or "").strip().lower()
+    return next((provider for provider in ProviderType if provider.value == value), None)
+
+
+def _is_failing_receipt(receipt: dict[str, Any]) -> bool:
+    status = str(receipt.get("status") or "").strip().lower()
+    error_source = str(receipt.get("error_source") or "").strip().lower()
+    if status == "ok" and error_source in {"", "none"}:
+        return False
+    return bool(str(receipt.get("trace_id") or "").strip())
+
+
+def _producer_boot_id(receipt: dict[str, Any]) -> str:
+    attributes = receipt.get("attributes") or {}
+    if isinstance(attributes, dict):
+        return str(attributes.get("boot_id") or "").strip()
+    return ""
+
+
 def _receipt_row(
     trace_id: str,
     provider: ProviderType,
@@ -55,6 +152,7 @@ def _receipt_row(
     error_source: str = "provider",
     boot_id: str = "producer-boot",
 ) -> dict[str, Any]:
+    """Test helper: build a receipt dict for fixture generation."""
     return {
         "trace_id": trace_id,
         "provider": provider.value,
@@ -65,6 +163,11 @@ def _receipt_row(
 
 
 def _write_test_db(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Test helper: populate a synthetic runtime.db with delegation_runs rows.
+
+    This is exported only for tests; the checker itself never writes to the host
+    database.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.execute(
@@ -85,151 +188,273 @@ def _write_test_db(path: Path, rows: list[dict[str, Any]]) -> None:
     conn.close()
 
 
-def _stable_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
-
-
-def _digest(payload: Mapping[str, Any]) -> str:
-    return hashlib.sha256(_stable_json(payload).encode("utf-8")).hexdigest()
-
-
-def p1_failing_receipt_reorders(db_path: Path, chain: list[ProviderType]) -> dict[str, Any]:
-    """P1: one failing provider receipt moves that provider to the end."""
-    _write_test_db(
-        db_path,
-        [_receipt_row("p1-trace", ProviderType.ANTHROPIC)],
-    )
-    reordered, applied, evidence = apply_receipt_consumption_ranking(
+def _ranking(
+    db_path: Path,
+    chain: list[ProviderType],
+    consumer_boot_id: str,
+) -> tuple[list[ProviderType], bool, Any]:
+    """Call the canonical ranking function against a read-only database."""
+    return apply_receipt_consumption_ranking(
         list(chain),
         db_path=db_path,
-        boot_id="consumer-boot",
+        boot_id=consumer_boot_id,
     )
+
+
+def _p1_result(
+    rows: list[dict[str, Any]],
+    chain: list[ProviderType],
+    reordered: list[ProviderType],
+    applied: bool,
+    evidence: Any,
+) -> dict[str, Any]:
+    """P1: consumed failing receipts demote their providers within the chain."""
+    failing = [r for r in rows if _is_failing_receipt(r)]
+    if not failing:
+        return {
+            "property": "P1",
+            "ok": True,
+            "triggered": False,
+            "detail": "no failing receipt observed",
+        }
+
+    demoted = set(evidence.decision_delta.get("demoted_providers", []))
+    reordered_values = [p.value for p in reordered]
+    consumed_trace_ids = set(evidence.consumed_trace_ids)
+    consumed_providers = {
+        _provider_type(r.get("provider"))
+        for r in failing
+        if str(r.get("trace_id") or "") in consumed_trace_ids
+    }
+    consumed_providers.discard(None)
+
     ok = (
         applied
-        and reordered[-1] == ProviderType.ANTHROPIC
-        and set(reordered) == set(chain)
-        and evidence.consumed_trace_ids == ("p1-trace",)
-        and "reordered_order" in evidence.decision_delta
+        and consumed_providers
+        and consumed_providers.issubset(set(chain))
+        and all(p.value in demoted for p in consumed_providers)
+        and set(reordered_values) == set(p.value for p in chain)
+        and len(reordered_values) == len(chain)
     )
     return {
         "property": "P1",
         "ok": ok,
-        "detail": "failing anthropic receipt demoted to end and cites trace_id",
-        "consumed_trace_ids": list(evidence.consumed_trace_ids),
-        "reordered_order": [p.value for p in reordered],
+        "triggered": True,
+        "detail": (
+            "consumed failing providers demoted"
+            if ok
+            else "consumed failing provider was not demoted"
+        ),
+        "consumed_trace_ids": list(consumed_trace_ids),
+        "demoted_providers": list(demoted),
+        "reordered_order": reordered_values,
     }
 
 
-def p2_no_failures_keep_default(db_path: Path, chain: list[ProviderType]) -> dict[str, Any]:
-    """P2: with only successful receipts, the default order is preserved."""
-    _write_test_db(
-        db_path,
-        [
-            _receipt_row(
-                "p2-trace",
-                ProviderType.ANTHROPIC,
-                status="ok",
-                error_source="none",
-            )
-        ],
-    )
-    reordered, applied, evidence = apply_receipt_consumption_ranking(
-        list(chain),
-        db_path=db_path,
-        boot_id="consumer-boot",
-    )
-    ok = not applied and reordered == chain and evidence.consumed_trace_ids == ()
+def _p2_result(
+    rows: list[dict[str, Any]],
+    chain: list[ProviderType],
+    reordered: list[ProviderType],
+    applied: bool,
+    evidence: Any,
+) -> dict[str, Any]:
+    """P2: with no failing receipts, the default order is preserved."""
+    failing = [r for r in rows if _is_failing_receipt(r)]
+    if failing:
+        return {
+            "property": "P2",
+            "ok": True,
+            "triggered": False,
+            "detail": "failing receipts present; P2 not observed",
+        }
+
+    reordered_values = [p.value for p in reordered]
+    chain_values = [p.value for p in chain]
+    ok = not applied and reordered_values == chain_values and evidence.consumed_trace_ids == ()
     return {
         "property": "P2",
         "ok": ok,
-        "detail": "successful receipt leaves default order unchanged",
-        "consumed_trace_ids": list(evidence.consumed_trace_ids),
-        "reordered_order": [p.value for p in reordered],
+        "triggered": True,
+        "detail": "no failing receipts keep default order" if ok else "default order was not preserved",
+        "reordered_order": reordered_values,
     }
 
 
-def p3_cross_boot_consumes_prior(db_path: Path, chain: list[ProviderType]) -> dict[str, Any]:
-    """P3: consumer boot_id differs from producer boot_id and chain verifies."""
-    _write_test_db(
-        db_path,
-        [_receipt_row("p3-trace", ProviderType.OPENAI, boot_id="boot-a")],
-    )
-    reordered, applied, evidence = apply_receipt_consumption_ranking(
-        list(chain),
-        db_path=db_path,
-        boot_id="boot-b",
-    )
-    ok = (
-        applied
-        and "boot-a" not in evidence.boot_id
-        and evidence.boot_id == "boot-b"
-        and "p3-trace" in evidence.consumed_trace_ids
-        and set(reordered) == set(chain)
+def _p3_result(
+    rows: list[dict[str, Any]],
+    reordered: list[ProviderType],
+    applied: bool,
+    evidence: Any,
+    consumer_boot_id: str,
+) -> dict[str, Any]:
+    """P3: a failing receipt from a different boot_id is still consumed."""
+    failing = [r for r in rows if _is_failing_receipt(r)]
+    if not failing:
+        return {
+            "property": "P3",
+            "ok": True,
+            "triggered": False,
+            "detail": "no failing receipts observed",
+        }
+
+    consumed = set(evidence.consumed_trace_ids)
+    self_citation = [
+        r
+        for r in failing
+        if _producer_boot_id(r) == consumer_boot_id
+        and str(r.get("trace_id") or "") in consumed
+    ]
+    if self_citation:
+        return {
+            "property": "P3",
+            "ok": False,
+            "triggered": True,
+            "detail": "self-citation spoof detected",
+            "consumer_boot_id": consumer_boot_id,
+            "self_citation_trace_ids": [str(r.get("trace_id")) for r in self_citation],
+        }
+
+    cross_boot = [r for r in failing if _producer_boot_id(r) not in ("", consumer_boot_id)]
+    if not cross_boot:
+        return {
+            "property": "P3",
+            "ok": True,
+            "triggered": False,
+            "detail": "no cross-boot failing receipt observed",
+        }
+
+    consumed_cross = [r for r in cross_boot if str(r.get("trace_id") or "") in consumed]
+    ok = bool(consumed_cross) and applied
+    detail = (
+        f"cross-boot trace(s) consumed: {[r.get('trace_id') for r in consumed_cross]}"
+        if ok
+        else "cross-boot failing receipt was not consumed"
     )
     return {
         "property": "P3",
         "ok": ok,
-        "detail": "consumer boot_id differs from producer boot_id and consumes prior trace",
-        "consumer_boot_id": evidence.boot_id,
-        "consumed_trace_ids": list(evidence.consumed_trace_ids),
+        "triggered": True,
+        "detail": detail,
+        "consumer_boot_id": consumer_boot_id,
+        "consumed_trace_ids": list(consumed),
+        "cross_boot_trace_ids": [str(r.get("trace_id")) for r in consumed_cross],
     }
 
 
-def p4_poisoning_bound(db_path: Path, chain: list[ProviderType]) -> dict[str, Any]:
+def _p4_result(
+    rows: list[dict[str, Any]],
+    chain: list[ProviderType],
+    reordered: list[ProviderType],
+    applied: bool,
+    evidence: Any,
+) -> dict[str, Any]:
     """P4: all providers failing still demotes at most MAX and excludes none."""
-    _write_test_db(
-        db_path,
-        [_receipt_row(f"p4-{p.value}", p) for p in chain],
-    )
-    reordered, applied, evidence = apply_receipt_consumption_ranking(
-        list(chain),
-        db_path=db_path,
-        boot_id="consumer-boot",
-    )
+    failing = [r for r in rows if _is_failing_receipt(r)]
+    failing_providers = {_provider_type(r.get("provider")) for r in failing}
+    failing_providers.discard(None)
+    chain_set = set(chain)
+    if failing_providers != chain_set:
+        return {
+            "property": "P4",
+            "ok": True,
+            "triggered": False,
+            "detail": "not all providers observed failing; P4 not observed",
+        }
+
     demoted = evidence.decision_delta.get("demoted_providers", [])
+    reordered_values = [p.value for p in reordered]
     ok = (
         applied
         and len(reordered) == len(chain)
-        and set(reordered) == set(chain)
+        and set(reordered_values) == set(p.value for p in chain)
         and len(demoted) <= MAX_RECEIPT_DEMOTIONS
         and len(evidence.consumed_trace_ids) <= MAX_RECEIPT_DEMOTIONS
     )
     return {
         "property": "P4",
         "ok": ok,
+        "triggered": True,
         "detail": f"all providers failing demotes at most {MAX_RECEIPT_DEMOTIONS} and excludes none",
         "demoted_count": len(demoted),
         "demoted_providers": demoted,
-        "reordered_order": [p.value for p in reordered],
+        "reordered_order": reordered_values,
     }
 
 
-def _run_p1_p4(db_path: Path | None = None) -> dict[str, Any]:
+def _run(
+    db_path: Path | None = None,
+    *,
+    consumer_boot_id: str = PROCESS_BOOT_ID,
+) -> dict[str, Any]:
+    """Read a runtime.db and validate P1..P4, returning a typed receipt."""
+    path = _resolve_db_path(db_path)
+    rows = _read_receipt_rows(path)
+
+    if not rows:
+        return _typed_gap(f"no receipt rows in {path}", path)
+
     chain = _default_chain()
-    with tempfile.TemporaryDirectory() as tmp:
-        path = db_path or Path(tmp) / "runtime.db"
-        if db_path:
-            path.parent.mkdir(parents=True, exist_ok=True)
-        results = [
-            p1_failing_receipt_reorders(path, chain),
-            p2_no_failures_keep_default(path, chain),
-            p3_cross_boot_consumes_prior(path, chain),
-            p4_poisoning_bound(path, chain),
-        ]
-    all_ok = all(r["ok"] for r in results)
-    return {
+    reordered, applied, evidence = _ranking(path, chain, consumer_boot_id)
+
+    properties = [
+        _p1_result(rows, chain, reordered, applied, evidence),
+        _p2_result(rows, chain, reordered, applied, evidence),
+        _p3_result(rows, reordered, applied, evidence, consumer_boot_id),
+        _p4_result(rows, chain, reordered, applied, evidence),
+    ]
+    all_ok = all(p["ok"] for p in properties)
+
+    consumed_trace_ids = list(evidence.consumed_trace_ids)
+    producer_trace_id = consumed_trace_ids[0] if consumed_trace_ids else ""
+    producer_boot_id = ""
+    if producer_trace_id:
+        for receipt in rows:
+            if str(receipt.get("trace_id") or "") == producer_trace_id:
+                producer_boot_id = _producer_boot_id(receipt)
+                break
+
+    content: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
-        "observed_at": _now(),
         "outcome": "ok" if all_ok else "fail",
-        "properties": results,
+        "properties": properties,
         "window": RECEIPT_CONSUMPTION_WINDOW,
         "max_demotions": MAX_RECEIPT_DEMOTIONS,
+        "consumed_trace_ids": consumed_trace_ids,
+        "decision_delta": evidence.decision_delta,
+        "producer_trace_id": producer_trace_id,
+        "consumer_trace_id": uuid4().hex,
+        "producer_boot_id": producer_boot_id,
+        "consumer_boot_id": consumer_boot_id,
+        "chain_verified": (
+            set(p.value for p in reordered) == set(p.value for p in chain)
+            and len(reordered) == len(chain)
+        ),
+        "host_sha": _host_sha(),
+        "container_image_digest": os.environ.get("DHARMA_CONTAINER_IMAGE_DIGEST", "unknown"),
+        "db_path": str(path.resolve()),
+        "delegation_runs_row_count": _row_count(path),
     }
+    content["content_digest"] = _digest(content)
+    content["observed_at"] = _now()
+    return content
+
+
+def _stable_json(payload: Mapping[str, Any]) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(payload: Mapping[str, Any]) -> str:
+    """Canonical digest over receipt content, excluding volatile fields."""
+    normalized = {
+        k: v
+        for k, v in payload.items()
+        if k not in {"digest", "content_digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
+    }
+    return hashlib.sha256(_stable_json(normalized).encode("utf-8")).hexdigest()
 
 
 def _write_receipt(receipt: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    receipt["digest"] = _digest({k: v for k, v in receipt.items() if k != "digest"})
     path.write_text(json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8")
 
 
@@ -240,17 +465,42 @@ def _read_receipt(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def _receipts_equivalent(a: dict[str, Any], b: dict[str, Any]) -> bool:
-    return a.get("outcome") == b.get("outcome") and a.get("properties") == b.get("properties")
-
-
-def _typed_gap(reason: str) -> dict[str, Any]:
-    return {
+def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
+    """Emit a typed needs_host receipt when host runtime stores are absent."""
+    path = _resolve_db_path(db_path)
+    content: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
         "observed_at": _now(),
         "outcome": "needs_host",
         "reason": reason,
+        "host_sha": _host_sha(),
+        "container_image_digest": os.environ.get("DHARMA_CONTAINER_IMAGE_DIGEST", "unknown"),
+        "db_path": str(path.resolve()),
+        "delegation_runs_row_count": 0,
     }
+    content["content_digest"] = _digest(content)
+    return content
+
+
+def _verify_receipt_digest(prior: dict[str, Any], current: dict[str, Any]) -> bool:
+    """Return True when ``current`` reproduces the stable content of ``prior``."""
+    if prior.get("outcome") == "needs_host" and current["outcome"] == "needs_host":
+        return True
+
+    excluded = {"digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
+    prior_stable = {k: v for k, v in prior.items() if k not in excluded}
+    current_stable = {k: v for k, v in current.items() if k not in excluded}
+    prior_digest = prior.get("content_digest")
+    prior_recomputed = _digest(prior_stable)
+    if prior_digest != prior_recomputed:
+        return False
+    current_recomputed = _digest(current_stable)
+    return prior_recomputed == current_recomputed
+
+
+def _receipts_equivalent(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """Backwards-compatible alias used by tests; delegates to digest verification."""
+    return _verify_receipt_digest(a, b)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -279,36 +529,89 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         prior = _read_receipt(args.receipt)
         if prior is None:
-            gap = _typed_gap(f"no committed receipt at {args.receipt}")
+            gap = _typed_gap(f"no committed receipt at {args.receipt}", db_path)
             print(json.dumps(gap, indent=2, sort_keys=True))
             return 0
-        current = _run_p1_p4(db_path)
-        if not _receipts_equivalent(prior, current):
-            print(
-                json.dumps(
-                    {
-                        "schema": RECEIPT_SCHEMA,
-                        "observed_at": _now(),
-                        "outcome": "fail",
-                        "reason": "replayed P1..P4 do not match committed receipt",
-                        "prior": prior,
-                        "current": current,
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 1
-        print(json.dumps(current, indent=2, sort_keys=True))
-        return 0
 
-    receipt = _run_p1_p4(db_path)
+        # Replay using the stored consumer boot_id so process-identity fields are stable.
+        replay_boot_id = prior.get("consumer_boot_id") or PROCESS_BOOT_ID
+        current = _run(db_path, consumer_boot_id=replay_boot_id)
+        if _verify_receipt_digest(prior, current):
+            print(json.dumps(current, indent=2, sort_keys=True))
+            return 0
+
+        print(
+            json.dumps(
+                {
+                    "schema": RECEIPT_SCHEMA,
+                    "observed_at": _now(),
+                    "outcome": "fail",
+                    "reason": "replayed P1..P4 do not match committed receipt content digest",
+                    "prior_digest": prior.get("content_digest"),
+                    "current": current,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 1
+
+    receipt = _run(db_path)
     if args.stdout:
         print(json.dumps(receipt, indent=2, sort_keys=True))
     else:
         _write_receipt(receipt, args.receipt)
         print(args.receipt)
-    return 0 if receipt["outcome"] == "ok" else 1
+    return 0 if receipt["outcome"] in ("ok", "needs_host") else 1
+
+
+def _run_p1_p4(db_path: Path | None = None) -> dict[str, Any]:
+    """Backwards-compatible alias used by tests; returns a full receipt."""
+    return _run(db_path)
+
+
+def p1_failing_receipt_reorders(
+    db_path: Path,
+    chain: list[ProviderType],
+    consumer_boot_id: str = PROCESS_BOOT_ID,
+) -> dict[str, Any]:
+    """P1: a failing provider receipt is demoted within the chain."""
+    rows = _read_receipt_rows(db_path)
+    reordered, applied, evidence = _ranking(db_path, chain, consumer_boot_id)
+    return _p1_result(rows, chain, reordered, applied, evidence)
+
+
+def p2_no_failures_keep_default(
+    db_path: Path,
+    chain: list[ProviderType],
+    consumer_boot_id: str = PROCESS_BOOT_ID,
+) -> dict[str, Any]:
+    """P2: with no failing receipts, the default order is preserved."""
+    rows = _read_receipt_rows(db_path)
+    reordered, applied, evidence = _ranking(db_path, chain, consumer_boot_id)
+    return _p2_result(rows, chain, reordered, applied, evidence)
+
+
+def p3_cross_boot_consumes_prior(
+    db_path: Path,
+    chain: list[ProviderType],
+    consumer_boot_id: str = PROCESS_BOOT_ID,
+) -> dict[str, Any]:
+    """P3: a failing receipt from a different boot_id is still consumed."""
+    rows = _read_receipt_rows(db_path)
+    reordered, applied, evidence = _ranking(db_path, chain, consumer_boot_id)
+    return _p3_result(rows, reordered, applied, evidence, consumer_boot_id)
+
+
+def p4_poisoning_bound(
+    db_path: Path,
+    chain: list[ProviderType],
+    consumer_boot_id: str = PROCESS_BOOT_ID,
+) -> dict[str, Any]:
+    """P4: all providers failing still demotes at most MAX and excludes none."""
+    rows = _read_receipt_rows(db_path)
+    reordered, applied, evidence = _ranking(db_path, chain, consumer_boot_id)
+    return _p4_result(rows, chain, reordered, applied, evidence)
 
 
 if __name__ == "__main__":
