@@ -185,6 +185,8 @@ patterns); the Guide generates explanations on demand anchored to it.
 
 Typography-first: real Japanese type (Shippori Mincho for reading surfaces,
 clean sans for UI), first-class furigana (ruby), optional vertical text.
+Reading surfaces render clean; only Trace-unknown/fragile words carry a quiet
+mark (personal frontier, never global-level rainbow underlining — §10.4).
 Ink-and-paper palette, one vermilion accent, generous *ma*. Centerpiece: the
 **constellation/metro map** where node brightness IS FSRS retrievability — due
 items literally dim; the map growing and glowing is the reward. The map is a
@@ -285,8 +287,35 @@ screens: a kanji page should feel like a museum card, not a spreadsheet row.
   24h) — third tool showing the same over-collection signature, so the
   scheduler must **enforce** sustainable intake, not merely permit binges.
 
-### 10.4 Todaii Japanese — screenshots pending (news-reader angle → Firehose relevance).
-### 10.5 Further apps — operator will supply next batches; append here.
+### 10.4 Todaii Japanese — reviewed 2026-07-27 from screenshots
+- **Keep:** fresh dated news with synced audio + speed/skip controls (read-
+  while-listen suits the operator's listening-forward profile); furigana
+  toggle; difficulty awareness; the instinct to embed AI chat inside the
+  reading surface.
+- **Reject 1 — highlights the language, not the learner:** near-every content
+  word underlined in global-JLPT rainbow colors — when everything is
+  highlighted nothing is. Bunki inverts: clean text, quiet marks only on
+  Trace-unknown/fragile words (personal frontier, not global level).
+- **Reject 2 — AI as bolt-on:** "Tomo Chat" explains but remembers, updates,
+  and schedules nothing. Same placement in Bunki is the Guide: reads through
+  the Trace, logs asked-about words as provenance-carrying encounters, seeds
+  journeys, counts un-looked-up reading as weak implicit review.
+
+### 10.5 Synonyms (類義漢字) + Usage (訓) reference pair — reviewed 2026-07-27
+- Semantic-field kanji grouping (e.g. "arrange": 並比列陳羅揃整理, per-kanji
+  nuance + compounds) is the `contrasts-with` edge set rendered as a static
+  book — strongest external validation of the Atlas contrast dimension.
+- **Metabolize:** groups become **usage-boundary drill generators**, gated by
+  the interference rule (drill discrimination only after ≥2 members are
+  individually stable); Guide explains nuance anchored to the group; semantic
+  fields add a meaning-neighborhood layout dimension to the constellation.
+- Failure mode to avoid: pure reference silo — no learner state, no drills,
+  no personal examples. Operator profile note: the collection (synonyms,
+  usage 使い分け, Kanken aspiration) marks a **nuance collector** — an
+  advanced-learner appetite mainstream apps don't serve; contrast edges +
+  boundary drills serve it natively.
+
+### 10.6 Further apps — operator will supply next batches; append here.
 
 **Cross-tool meta-finding (2026-07-27):** at least five systems currently hold
 unreconciled shards of the operator's learner state (renzo lists, ~12 Anki
