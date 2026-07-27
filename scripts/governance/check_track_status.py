@@ -442,25 +442,51 @@ def _compact_command_output(text: str, *, limit: int = 500) -> str:
     return compact[: limit - 3] + "..."
 
 
+def _repo_venv_python() -> Path | None:
+    """Return the repository-local .venv interpreter if it exists."""
+    candidate = REPO_ROOT / ".venv" / "bin" / "python"
+    try:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    except OSError:
+        pass
+    return None
+
+
+def _resolve_python_executable() -> str:
+    """Prefer the repo .venv interpreter when it exists.
+
+    This keeps track evidence reproducible in local worktrees where the
+    dependency-complete interpreter is `.venv/bin/python`, while still
+    falling back to the current interpreter on CI hosts that install
+    directly into the bootstrap Python (where no `.venv` exists).
+    """
+    venv = _repo_venv_python()
+    if venv is not None and sys.executable != str(venv):
+        return str(venv)
+    return sys.executable
+
+
 def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
     """Keep executable criteria portable across worktrees.
 
     ACTIVE_TRACK criteria are written as literal commands so operators can see
     what is being proven. In isolated worktrees, though, the repository-local
     virtualenv may not exist even when this checker is already running under a
-    dependency-complete Python. Resolve those common Python entrypoints to the
-    current interpreter instead of making track truth depend on one checkout's
-    `.venv` path.
+    dependency-complete Python. Resolve those common Python entrypoints to a
+    dependency-complete interpreter instead of making track truth depend on one
+    checkout's `.venv` path.
     """
     if not command:
         return command
+    resolved_python = _resolve_python_executable()
     executable = command[0]
     if executable in {"python", "python3"}:
-        return [sys.executable, *command[1:]]
+        return [resolved_python, *command[1:]]
     if executable == "pytest":
-        return [sys.executable, "-m", "pytest", *command[1:]]
+        return [resolved_python, "-m", "pytest", *command[1:]]
     if executable in {"./.venv/bin/python", ".venv/bin/python"} and not Path(executable).exists():
-        return [sys.executable, *command[1:]]
+        return [resolved_python, *command[1:]]
     return command
 
 
@@ -498,16 +524,17 @@ def check_command_passes(
                    "DHARMA_TRACK_STATUS_SKIP_COMMANDS=1 (caller owns command execution)")
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
+    resolved_python = _resolve_python_executable()
     if "DHARMA_PYTHON" not in os.environ:
         # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
         # DHARMA_PYTHON; point them at this dependency-complete interpreter so
         # track truth does not depend on one checkout's `.venv` — the same
         # portability doctrine as _resolve_command_for_current_runtime.
-        env = {**os.environ, "DHARMA_PYTHON": sys.executable}
+        env = {**os.environ, "DHARMA_PYTHON": resolved_python}
     try:
         result = subprocess.run(
             resolved_command,
-            cwd=cwd or None,
+            cwd=cwd or str(REPO_ROOT),
             capture_output=True,
             text=True,
             timeout=max(1, timeout_s),
@@ -730,10 +757,12 @@ def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
     """Run a specific pytest target and require it to PASS — not merely exist.
     This is what stops `def test_x(): pass` from satisfying a file_contains check.
     Conservative: an un-runnable / failing test does NOT pass."""
+    resolved_python = _resolve_python_executable()
+    cmd = [resolved_python, "-m", "pytest", test_target, "-q", "--no-header",
+           "-p", "no:cacheprovider"]
     try:
         res = subprocess.run(
-            [sys.executable, "-m", "pytest", test_target, "-q", "--no-header",
-             "-p", "no:cacheprovider"],
+            cmd,
             capture_output=True, text=True, timeout=timeout, cwd=REPO_ROOT,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:

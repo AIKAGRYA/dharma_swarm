@@ -31,7 +31,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS, PROVIDER_BASE_URL_ENV_KEYS
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.api_keys import (
+    PROVIDER_API_KEY_ENV_KEYS,
+    PROVIDER_BASE_URL_ENV_KEYS,
+    bootstrap_runtime_env,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -238,6 +246,12 @@ def main() -> int:
         f"evidence (default: {DEFAULT_WINDOW_HOURS})",
     )
     args = parser.parse_args()
+
+    # Unify provider key visibility through the canonical loader before
+    # diagnosing credit health. This closes the seat where a shell wrapper or
+    # launchd plist sources keys out-of-band and the checker sees a different
+    # environment than the runtime.
+    bootstrap_runtime_env()
 
     results = check_env_keys()
     scan_logs_for_credit_errors(results, window_hours=args.window_hours)

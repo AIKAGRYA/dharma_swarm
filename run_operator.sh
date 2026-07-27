@@ -15,7 +15,13 @@ PID_FILE="${STATE_DIR}/operator.pid"
 LOG_FILE="${STATE_DIR}/logs/operator.log"
 PORT="${OPERATOR_PORT:-8420}"
 HOST="${OPERATOR_HOST:-127.0.0.1}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+    if [[ -x "${SCRIPT_DIR}/.venv/bin/python" ]]; then
+        PYTHON_BIN="${SCRIPT_DIR}/.venv/bin/python"
+    else
+        PYTHON_BIN="python3"
+    fi
+fi
 RUNTIME_ENV_HELPER="${SCRIPT_DIR}/scripts/load_runtime_env.sh"
 
 mkdir -p "${STATE_DIR}/logs" "${STATE_DIR}/db"
