@@ -36,14 +36,15 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from dharma_swarm.stigmergy import StigmergyStore
 
-logger = logging.getLogger(__name__)
-
 from dharma_swarm.config import DEFAULT_CONFIG
 from dharma_swarm.pending_proposals import append_pending_proposals
 from dharma_swarm.runtime_artifacts import (
     freshest_pulse_log_path,
     write_dgc_health_snapshot,
 )
+from dharma_swarm.runtime_admission import runtime_admission_or_exit
+
+logger = logging.getLogger(__name__)
 
 HOME = Path.home()
 STATE_DIR = HOME / ".dharma"
@@ -248,6 +249,32 @@ async def _wait_or_shutdown(shutdown_event: asyncio.Event, delay: float) -> bool
         return True
     except asyncio.TimeoutError:
         return shutdown_event.is_set()
+
+
+_RUNTIME_LOOP_ENV_GATES = {
+    "archaeology": "DGC_ARCHAEOLOGY_INGESTION",
+}
+
+
+def _apply_runtime_loop_env_gates(
+    task_factories: dict[str, Any],
+    supervisor: Any,
+) -> None:
+    """Remove explicitly disabled loops before their task bodies can start.
+
+    These gates are evaluated at task construction rather than inside a loop
+    body. That distinction matters for loops whose constructors call
+    synchronous native libraries: an in-body timeout cannot fire while the
+    event-loop thread is blocked.
+    """
+    false_values = {"0", "false", "no", "off"}
+    for loop_name, env_name in _RUNTIME_LOOP_ENV_GATES.items():
+        raw_value = os.environ.get(env_name)
+        if raw_value is None or raw_value.strip().lower() not in false_values:
+            continue
+        task_factories.pop(loop_name, None)
+        supervisor.mark_disabled(loop_name, f"{env_name}={raw_value}")
+        _log("orchestrator", f"Loop {loop_name} disabled by {env_name}")
 
 
 async def run_swarm_loop(
@@ -2331,6 +2358,7 @@ async def orchestrate(background: bool = False) -> None:
             room_bridge,
             supervisor=_supervisor,
         )
+    _apply_runtime_loop_env_gates(task_factories, _supervisor)
     optional_clean_exit = {"pulse"}
     tasks = {
         name: asyncio.create_task(factory(), name=name)
@@ -2455,10 +2483,17 @@ async def orchestrate(background: bool = False) -> None:
         _log("orchestrator", "All systems stopped")
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> None:
+    """Run the direct module entrypoint behind the same provenance gate as DGC."""
+    runtime_admission_or_exit()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
     )
-    bg = "--background" in sys.argv or "--bg" in sys.argv
+    arguments = sys.argv[1:] if argv is None else argv
+    bg = "--background" in arguments or "--bg" in arguments
     asyncio.run(orchestrate(background=bg))
+
+
+if __name__ == "__main__":
+    main()

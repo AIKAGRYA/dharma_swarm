@@ -33,7 +33,10 @@ from dharma_swarm.embedders import (
     SentenceTransformerEmbedder as SentenceTransformerEmbedder,
     TFIDFEmbedder,
 )
-from dharma_swarm.vector_fallback_guard import fallback_vector_scan_allowed
+from dharma_swarm.vector_fallback_guard import (
+    fallback_vector_scan_allowed,
+    fts_search_allowed,
+)
 
 logger = logging.getLogger(__name__)
 _FTS_TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
@@ -222,6 +225,7 @@ class VectorStore:
     """
 
     _SCHEMA_VERSION = 1
+
     def __init__(
         self,
         state_dir: Path,
@@ -370,6 +374,14 @@ class VectorStore:
             return True
         except Exception:
             return False
+
+    def _fallback_vector_scan_allowed(self, conn: sqlite3.Connection) -> bool:
+        """Compatibility door used by governed retrieval diagnostics."""
+        return fallback_vector_scan_allowed(self._db_path, conn)
+
+    def _fts_search_allowed(self, conn: sqlite3.Connection) -> bool:
+        """Compatibility door used by retrieval diagnostics and FTS callers."""
+        return fts_search_allowed(self._db_path, conn)
 
     # ------------------------------------------------------------------
     # Public write API
@@ -737,6 +749,9 @@ class VectorStore:
             return []
         conn = self._connect()
         try:
+            if not self._fts_search_allowed(conn):
+                return []
+
             fts_query = _fts_match_query(query_text)
             if not fts_query:
                 return []

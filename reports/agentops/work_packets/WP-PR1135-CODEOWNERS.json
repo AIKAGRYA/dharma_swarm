@@ -1,0 +1,106 @@
+{
+  "id": "WP-PR1135-CODEOWNERS",
+  "base_ref": "c28f00c160053a6d0a60b396a95019f82684a840",
+  "branch": "repair/pr06",
+  "worktree": ".",
+  "intent": "PR #1135 repair: regenerate .github/CODEOWNERS from measured blast radius. The chetana staging-boundary changes add manifest-trust import edges from the memory-kernel wiki adapter and wiki_vector_ingest into chetana, pushing modules over the blast threshold; the CODEOWNERS gate and tests/test_hermetic_supply_chain.py require the regenerated file committed in the same PR.",
+  "allowed_files": [
+    ".github/CODEOWNERS",
+    "dharma_swarm/chetana/claude_code_plugin/chetana/commands/chetana-promote.md",
+    "dharma_swarm/chetana/cli.py",
+    "dharma_swarm/chetana/governance.py",
+    "dharma_swarm/chetana/manifest.py",
+    "dharma_swarm/chetana/mcp_server.py",
+    "dharma_swarm/chetana/promote.py",
+    "dharma_swarm/chetana/promote_support.py",
+    "dharma_swarm/chetana/provenance.py",
+    "dharma_swarm/chetana/revival.py",
+    "dharma_swarm/chetana/staging.py",
+    "dharma_swarm/chetana/tests/conftest.py",
+    "dharma_swarm/chetana/tests/test_decay.py",
+    "dharma_swarm/chetana/tests/test_e2e_cli.py",
+    "dharma_swarm/chetana/tests/test_gap_scan.py",
+    "dharma_swarm/chetana/tests/test_ingest_promote.py",
+    "dharma_swarm/chetana/tests/test_mcp_and_palace.py",
+    "dharma_swarm/chetana/tests/test_revival.py",
+    "dharma_swarm/memory_kernel/adapters/read_only.py",
+    "dharma_swarm/wiki_vector_ingest.py",
+    "docs/ops/WIKI_TRUST_MANIFEST.md",
+    "reports/agentops/work_packets/WP-PR1135-CODEOWNERS.json",
+    "reports/governance/store_inventory_census.json",
+    "scripts/ops/relocate_staged_concepts.py",
+    "scripts/wiki_vector_live_gate.py",
+    "tests/test_chetana_staging_boundary.py",
+    "tests/test_chetana_verify_production.py",
+    "tests/test_memory_kernel_adapters.py",
+    "tests/test_store_inventory_census.py",
+    "tests/test_wiki_trust_manifest.py",
+    "tests/test_wiki_vector_live_gate.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "hermetic-supply-chain",
+      "command": "python3 -m pytest tests/test_hermetic_supply_chain.py -q",
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "no-selector-outside-envelope",
+      "command": "python3 -m pytest tests/test_hermetic_supply_chain.py -q -k selector_that_matches_nothing",
+      "expected_exit": 5
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "chore(codeowners): regenerate from measured blast radius (PR #1135 repair)"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PR1135-CODEOWNERS",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c28f00c160053a6d0a60b396a95019f82684a840",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      ".github/CODEOWNERS",
+      "scripts/governance/codeowners_blast_radius.py"
+    ],
+    "honest_blockers": [],
+    "rollback": "revert the packet-scoped CODEOWNERS regeneration commit",
+    "packet_digest": "35dce965d7228e5749e8c1a3d42dc1f321ef14704ea23d01956b6eadf004fa82"
+  }
+}

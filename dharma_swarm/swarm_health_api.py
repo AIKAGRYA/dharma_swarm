@@ -8,8 +8,9 @@ Exposes:
     GET /telos          → TelosGraph progress summary
     GET /archaeology    → latest lessons_learned.md excerpt
 
-Starts on port 7433 (configurable via DHARMA_API_PORT) as a background task
-in orchestrate_live.py. All endpoints are read-only — no mutation exposed.
+Starts on 127.0.0.1:7433 by default as a background task in
+orchestrate_live.py. The host and port are configurable via DHARMA_API_HOST
+and DHARMA_API_PORT. All endpoints are read-only — no mutation exposed.
 
 Usage:
     # Called from orchestrate_live task_factories:
@@ -35,6 +36,11 @@ logger = logging.getLogger(__name__)
 _PORT = int(os.environ.get("DHARMA_API_PORT", "7433"))
 _STATE_DIR = dharma_state_dir("DHARMA_STATE_DIR")
 _START_TIME = time.monotonic()
+
+
+def _bind_host() -> str:
+    """Return the configured bind host, defaulting safely to loopback."""
+    return os.environ.get("DHARMA_API_HOST", "127.0.0.1").strip() or "127.0.0.1"
 
 
 def _uptime() -> str:
@@ -104,8 +110,12 @@ def _telos_summary() -> dict:
     if not obj_path.exists():
         return {"status": "no-data"}
     try:
-        lines = [l for l in obj_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-        objs = [json.loads(l) for l in lines]
+        lines = [
+            line
+            for line in obj_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        objs = [json.loads(line) for line in lines]
         total = len(objs)
         active = sum(1 for o in objs if o.get("status") == "active")
         avg_progress = sum(o.get("progress", 0) for o in objs) / total if total else 0
@@ -131,8 +141,12 @@ def _evolution_summary() -> dict:
     if not arch.exists():
         return {"status": "no-data"}
     try:
-        lines = [l for l in arch.read_text(encoding="utf-8").splitlines() if l.strip()]
-        entries = [json.loads(l) for l in lines[-200:]]
+        lines = [
+            line
+            for line in arch.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        entries = [json.loads(line) for line in lines[-200:]]
         applied = sum(1 for e in entries if e.get("status") == "applied")
         rolled = sum(1 for e in entries if e.get("status") == "rolled_back")
         return {
@@ -220,9 +234,10 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
 
 async def run_health_api(shutdown_event: asyncio.Event) -> None:
     """Run the health API server until shutdown."""
+    host = _bind_host()
     try:
-        server = await asyncio.start_server(_handle, "0.0.0.0", _PORT)
-        logger.info("Swarm health API listening on http://0.0.0.0:%d", _PORT)
+        server = await asyncio.start_server(_handle, host, _PORT)
+        logger.info("Swarm health API listening on http://%s:%d", host, _PORT)
         async with server:
             await shutdown_event.wait()
         logger.info("Swarm health API stopped")
