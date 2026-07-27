@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -106,6 +107,8 @@ def cmd_evolve_auto(
     single_model: bool = False,
     shadow: bool = True,
     token_budget: int = 0,
+    promotion_path: str | None = None,
+    trusted_judge_public_keys: list[str] | None = None,
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
     async def _auto():
@@ -152,6 +155,10 @@ def cmd_evolve_auto(
             print(f"  {sf.name}")
         print()
 
+        promotion_verification = None
+        if promotion_path:
+            promotion_verification = json.loads(Path(promotion_path).read_text(encoding="utf-8"))
+
         result = await swarm._engine.auto_evolve(
             provider=provider,
             source_files=source_files,
@@ -159,6 +166,8 @@ def cmd_evolve_auto(
             context=context,
             router=swarm._router if use_router else None,
             shadow=shadow,
+            promotion_verification=promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys or [],
         )
 
         print(f"\n=== Auto-Evolution Results ===")
@@ -184,6 +193,8 @@ def cmd_evolve_daemon(
     single_model: bool = False,
     shadow: bool = True,
     token_budget: int = 0,
+    promotion_path: str | None = None,
+    trusted_judge_public_keys: list[str] | None = None,
 ) -> None:
     """Run continuous autonomous evolution daemon."""
     async def _daemon():
@@ -216,6 +227,10 @@ def cmd_evolve_daemon(
             print(f"  Token cap: {token_budget:,}")
         print(f"  Ctrl+C to stop\n")
 
+        promotion_verification = None
+        if promotion_path:
+            promotion_verification = json.loads(Path(promotion_path).read_text(encoding="utf-8"))
+
         try:
             await swarm._engine.daemon_loop(
                 think_provider=provider,
@@ -225,6 +240,8 @@ def cmd_evolve_daemon(
                 max_cycles=cycles,
                 router=swarm._router if use_router else None,
                 shadow=shadow,
+                promotion_verification=promotion_verification,
+                trusted_judge_public_keys=trusted_judge_public_keys or [],
             )
         except KeyboardInterrupt:
             pass

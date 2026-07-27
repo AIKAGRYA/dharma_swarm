@@ -2804,3 +2804,43 @@ def test_cmd_gates_json_emits_valid_json(capsys):
     assert "decision" in data
     assert "action" in data
     assert data["action"] == "check status"
+
+
+def test_evolve_auto_parser_honors_live_and_promotion_args():
+    """dgc evolve auto --live --promotion PKT --trusted-judge-key K sets the right namespace."""
+    import dharma_swarm.dgc_cli as cli
+
+    parser = cli._build_parser()
+    args = parser.parse_args(
+        [
+            "evolve",
+            "auto",
+            "--live",
+            "--promotion",
+            "promotion.json",
+            "--trusted-judge-key",
+            "key1",
+            "--trusted-judge-key",
+            "key2",
+        ]
+    )
+    assert args.command == "evolve"
+    assert args.evolve_cmd == "auto"
+    assert args.shadow is False
+    assert args.promotion == "promotion.json"
+    assert args.trusted_judge_key == ["key1", "key2"]
+
+
+def test_evolve_daemon_parser_honors_live_and_promotion_args():
+    """dgc evolve daemon --live --promotion PKT sets shadow=False and carries the promotion path."""
+    import dharma_swarm.dgc_cli as cli
+
+    parser = cli._build_parser()
+    args = parser.parse_args(
+        ["evolve", "daemon", "--live", "--promotion", "promotion.json"]
+    )
+    assert args.command == "evolve"
+    assert args.evolve_cmd == "daemon"
+    assert args.shadow is False
+    assert args.promotion == "promotion.json"
+    assert args.trusted_judge_key == []
