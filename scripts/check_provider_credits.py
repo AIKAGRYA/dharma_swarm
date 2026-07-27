@@ -35,7 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.api_keys import (
+from dharma_swarm.api_keys import (  # noqa: E402
     PROVIDER_API_KEY_ENV_KEYS,
     PROVIDER_BASE_URL_ENV_KEYS,
     bootstrap_runtime_env,
@@ -195,7 +195,9 @@ def scan_logs_for_credit_errors(
             continue
         for log_file in _recent_files(log_dir, "*.jsonl", 10, window_hours, now=now):
             try:
-                lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+                lines = log_file.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
             except OSError:
                 continue
             for line in lines[-100:]:
@@ -281,6 +283,7 @@ def main() -> int:
         text = json.dumps(output, indent=2)
         if args.output:
             from pathlib import Path
+
             out_path = Path(args.output).expanduser()
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(text + "\n", encoding="utf-8")
@@ -299,7 +302,9 @@ def main() -> int:
                 credit_status = f" ⚠ {len(info['credit_errors'])} credit error(s)"
             print(f"{provider:<15} {key_status:<10} {credit_status}")
 
-        print(f"\nSummary: {len(present)} present, {len(missing)} missing, {len(exhausted)} with credit errors")
+        print(
+            f"\nSummary: {len(present)} present, {len(missing)} missing, {len(exhausted)} with credit errors"
+        )
 
         if missing:
             print(f"\nMissing keys: {', '.join(sorted(missing))}")
