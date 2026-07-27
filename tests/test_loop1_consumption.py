@@ -4,7 +4,6 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pytest
 
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.provider_policy import ProviderRouteRequest
