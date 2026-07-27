@@ -187,7 +187,11 @@ Typography-first: real Japanese type (Shippori Mincho for reading surfaces,
 clean sans for UI), first-class furigana (ruby), optional vertical text.
 Ink-and-paper palette, one vermilion accent, generous *ma*. Centerpiece: the
 **constellation/metro map** where node brightness IS FSRS retrievability — due
-items literally dim; the map growing and glowing is the reward. No confetti,
+items literally dim; the map growing and glowing is the reward. The map is a
+live, tappable navigation surface (node → kanji page / journey seed), with a
+**time scrubber** to replay growth history — inspired by Kanji Garden's
+wallpaper export (§10.3), which proved the emotional pull of
+whole-knowledge-at-a-glance while being a dead poster. No confetti,
 no XP; honest metrics (retention rate, comprehension %). Bar for reference
 screens: a kanji page should feel like a museum card, not a spreadsheet row.
 
@@ -197,7 +201,10 @@ screens: a kanji page should feel like a museum card, not a spreadsheet row.
   tap-to-lookup; mine → FSRS reviews; Trace v0 with provenance. Replaces the
   Yomitan+Anki loop; daily-usable immediately.
 - **Phase 1 — The Guide:** AI tutor with belief ledger; mining from
-  conversation; review-by-use; calibration onboarding (probe of §11 style).
+  conversation; review-by-use; calibration onboarding (probe of §11 style);
+  **Anki warm-start import** — ingest collection + review logs, map cards to
+  Atlas nodes, inherit FSRS states (operator already runs FSRS in Anki, so
+  years of memory history transfer instead of cold-starting the Trace).
 - **Phase 2 — The Firehose:** YouTube/RSS/clipper pipelines; personal frequency
   list; comprehension menu.
 - **Phase 3 — The Map:** journey DAG engine; constellation view; contrast
@@ -237,8 +244,56 @@ screens: a kanji page should feel like a museum card, not a spreadsheet row.
 - **Sensibility lesson:** it's a database rendered as table views — no
   hierarchy between headword and index number, no story. §8 is the antidote.
 
-### 10.2 Todaii Japanese — screenshots pending (news-reader angle → Firehose relevance).
-### 10.3 Further apps — operator will supply next batches; append here.
+### 10.2 Anki (operator's live setup) — reviewed 2026-07-27 from screenshots
+- **Meta-finding:** the deck list is an archaeology of methodology reboots
+  (RTK 13, Lazy Kanji + Mod, All in One Kanji, Kanji Radical, Japanese MCD
+  Pro, yearly "2024 NIHONGO" / "2025 漢字検定"). Each reboot orphaned the
+  previous deck's scheduling history → principle: **one Trace, many views** —
+  methods/drill styles are filters over one permanent memory state; a
+  methodology change must never lose memory history again.
+- Cross-deck prioritization is impossible in Anki; new-card backlogs
+  (101/52/50/50/50) hide the true queue → Bunki uses a **single global intake
+  queue**, priority = personal frequency × goal spine, rate-limited by
+  FSRS-projected workload × real time budget.
+- **MCD cards:** right philosophy (one cloze target, rich ambient context),
+  weak execution — generated text is a semantic monoculture (nine
+  near-identical 瞑想と学習/優秀 sentences), violating encoding variability,
+  and wall-of-text reviews cost minutes → the Guide generates *varied*
+  micro-contexts across domains, one retrieval target per card; long-form
+  multi-highlight text becomes a reading exercise, not an SRS unit.
+- **Keep:** operator already runs FSRS in Anki (玉 card intervals 8.7mo/2.4y)
+  → warm-start import (§9 Phase 1). Personal-domain decks (Ashtanga special,
+  NIHON DHARMA) validate personal domains as first-class spines/tags.
+
+### 10.3 Kanji Garden — reviewed 2026-07-27 from screenshots
+- **Keep:** the emotional register — organic growth metaphor ("watered"
+  reviews, garden visuals), the anti-sterile counterexample to §10.1; the
+  **Forgot?** button as an honesty affordance; the trouble queue
+  (就/首/宮/張/盛) as a natural journey-seed feed.
+- **Wallpaper generator = the constellation map's ancestor.** By the
+  operator's own account, the most visually compelling artifact in their
+  entire environment: full kanji inventory colored by knowledge state, ~14
+  months of history on a time scrubber, exportable PNG/video. Yet it is
+  static, non-interactive, arbitrarily laid out, crudely colored, and leaves
+  the app as a file. Bunki's centerpiece is that artifact **alive** (§8):
+  tappable nodes, graph-neighborhood layout, live retrievability brightness,
+  history scrubber retained.
+- **Reject:** multiple-choice recognition as the primary retrieval act (low
+  desirable difficulty; inflates grades fed to the scheduler — MC belongs
+  early in a drill ladder, never at the top); kanji-only silo with private
+  state; unsustainable intake (844 unlocked in 59 days ≈ 14.3/day; 260 due in
+  24h) — third tool showing the same over-collection signature, so the
+  scheduler must **enforce** sustainable intake, not merely permit binges.
+
+### 10.4 Todaii Japanese — screenshots pending (news-reader angle → Firehose relevance).
+### 10.5 Further apps — operator will supply next batches; append here.
+
+**Cross-tool meta-finding (2026-07-27):** at least five systems currently hold
+unreconciled shards of the operator's learner state (renzo lists, ~12 Anki
+decks, Kanji Garden, Todaii, implicit knowledge in the YouTube diet).
+Fragmentation of *state* — five contradictory estimates of "do I know 玉?" —
+is the disease Bunki's single Trace cures; every reviewed tool confirms it
+from a different angle.
 
 ## 11. Operator calibration snapshot (belief ledger seed, 2026-07-27)
 
