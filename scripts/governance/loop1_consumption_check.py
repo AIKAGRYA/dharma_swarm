@@ -484,10 +484,7 @@ def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
 
 def _verify_receipt_digest(prior: dict[str, Any], current: dict[str, Any]) -> bool:
     """Return True when ``current`` reproduces the stable content of ``prior``."""
-    if prior.get("outcome") == "needs_host" and current["outcome"] == "needs_host":
-        return True
-
-    excluded = {"digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
+    excluded = {"digest", "content_digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
     prior_stable = {k: v for k, v in prior.items() if k not in excluded}
     current_stable = {k: v for k, v in current.items() if k not in excluded}
     prior_digest = prior.get("content_digest")
