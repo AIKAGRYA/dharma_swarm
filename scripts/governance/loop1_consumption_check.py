@@ -218,13 +218,15 @@ def _p1_result(
             "detail": "no failing receipt observed",
         }
 
-    demoted = set(evidence.decision_delta.get("demoted_providers", []))
+    demoted_list = evidence.decision_delta.get("demoted_providers", [])
+    demoted_set = set(demoted_list)
     reordered_values = [p.value for p in reordered]
-    consumed_trace_ids = set(evidence.consumed_trace_ids)
+    consumed_trace_ids = list(evidence.consumed_trace_ids)
+    consumed_set = set(consumed_trace_ids)
     consumed_providers = {
         _provider_type(r.get("provider"))
         for r in failing
-        if str(r.get("trace_id") or "") in consumed_trace_ids
+        if str(r.get("trace_id") or "") in consumed_set
     }
     consumed_providers.discard(None)
 
@@ -232,7 +234,7 @@ def _p1_result(
         applied
         and consumed_providers
         and consumed_providers.issubset(set(chain))
-        and all(p.value in demoted for p in consumed_providers)
+        and all(p.value in demoted_set for p in consumed_providers)
         and set(reordered_values) == set(p.value for p in chain)
         and len(reordered_values) == len(chain)
     )
@@ -245,8 +247,8 @@ def _p1_result(
             if ok
             else "consumed failing provider was not demoted"
         ),
-        "consumed_trace_ids": list(consumed_trace_ids),
-        "demoted_providers": list(demoted),
+        "consumed_trace_ids": consumed_trace_ids,
+        "demoted_providers": list(demoted_list),
         "reordered_order": reordered_values,
     }
 
@@ -297,12 +299,13 @@ def _p3_result(
             "detail": "no failing receipts observed",
         }
 
-    consumed = set(evidence.consumed_trace_ids)
+    consumed_trace_ids = list(evidence.consumed_trace_ids)
+    consumed_set = set(consumed_trace_ids)
     self_citation = [
         r
         for r in failing
         if _producer_boot_id(r) == consumer_boot_id
-        and str(r.get("trace_id") or "") in consumed
+        and str(r.get("trace_id") or "") in consumed_set
     ]
     if self_citation:
         return {
@@ -323,7 +326,7 @@ def _p3_result(
             "detail": "no cross-boot failing receipt observed",
         }
 
-    consumed_cross = [r for r in cross_boot if str(r.get("trace_id") or "") in consumed]
+    consumed_cross = [r for r in cross_boot if str(r.get("trace_id") or "") in consumed_set]
     ok = bool(consumed_cross) and applied
     detail = (
         f"cross-boot trace(s) consumed: {[r.get('trace_id') for r in consumed_cross]}"
@@ -336,7 +339,7 @@ def _p3_result(
         "triggered": True,
         "detail": detail,
         "consumer_boot_id": consumer_boot_id,
-        "consumed_trace_ids": list(consumed),
+        "consumed_trace_ids": consumed_trace_ids,
         "cross_boot_trace_ids": [str(r.get("trace_id")) for r in consumed_cross],
     }
 
