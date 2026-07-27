@@ -789,7 +789,7 @@ active_tracks:
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
     status: ACTIVE
     opened_at: "2026-07-02"
-    verified_at: "2026-07-02"
+    verified_at: "2026-07-27"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
