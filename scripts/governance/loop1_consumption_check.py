@@ -23,7 +23,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 from dharma_swarm.models import ProviderType
 from dharma_swarm.receipt_consumption import (
@@ -413,7 +413,7 @@ def _run(
                 producer_boot_id = _producer_boot_id(receipt)
                 break
 
-    content: dict[str, Any] = {
+    core: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
         "outcome": "ok" if all_ok else "fail",
         "properties": properties,
@@ -421,8 +421,6 @@ def _run(
         "max_demotions": MAX_RECEIPT_DEMOTIONS,
         "consumed_trace_ids": consumed_trace_ids,
         "decision_delta": evidence.decision_delta,
-        "producer_trace_id": producer_trace_id,
-        "consumer_trace_id": uuid4().hex,
         "producer_boot_id": producer_boot_id,
         "consumer_boot_id": consumer_boot_id,
         "chain_verified": (
@@ -434,6 +432,9 @@ def _run(
         "db_path": str(path.resolve()),
         "delegation_runs_row_count": _row_count(path),
     }
+    content = dict(core)
+    content["producer_trace_id"] = producer_trace_id
+    content["consumer_trace_id"] = _trace_id(core)
     content["content_digest"] = _digest(content)
     content["observed_at"] = _now()
     return content
@@ -443,12 +444,15 @@ def _stable_json(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
 
+def _trace_id(core: Mapping[str, Any]) -> str:
+    """Deterministic trace id for a receipt from its stable core content."""
+    return uuid5(NAMESPACE_URL, _stable_json(core)).hex
+
+
 def _digest(payload: Mapping[str, Any]) -> str:
     """Canonical digest over receipt content, excluding volatile fields."""
     normalized = {
-        k: v
-        for k, v in payload.items()
-        if k not in {"digest", "content_digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
+        k: v for k, v in payload.items() if k not in {"digest", "content_digest", "observed_at"}
     }
     return hashlib.sha256(_stable_json(normalized).encode("utf-8")).hexdigest()
 
@@ -468,9 +472,8 @@ def _read_receipt(path: Path) -> dict[str, Any] | None:
 def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
     """Emit a typed needs_host receipt when host runtime stores are absent."""
     path = _resolve_db_path(db_path)
-    content: dict[str, Any] = {
+    core: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
-        "observed_at": _now(),
         "outcome": "needs_host",
         "reason": reason,
         "host_sha": _host_sha(),
@@ -478,13 +481,17 @@ def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
         "db_path": str(path.resolve()),
         "delegation_runs_row_count": 0,
     }
+    content = dict(core)
+    content["producer_trace_id"] = ""
+    content["consumer_trace_id"] = _trace_id(core)
     content["content_digest"] = _digest(content)
+    content["observed_at"] = _now()
     return content
 
 
 def _verify_receipt_digest(prior: dict[str, Any], current: dict[str, Any]) -> bool:
     """Return True when ``current`` reproduces the stable content of ``prior``."""
-    excluded = {"digest", "content_digest", "observed_at", "producer_trace_id", "consumer_trace_id"}
+    excluded = {"digest", "content_digest", "observed_at"}
     prior_stable = {k: v for k, v in prior.items() if k not in excluded}
     current_stable = {k: v for k, v in current.items() if k not in excluded}
     prior_digest = prior.get("content_digest")
