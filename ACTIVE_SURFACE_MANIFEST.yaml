@@ -32,6 +32,11 @@ state_dir:
   a2a_bus_queue: "~/.dharma/a2a_bus/queue.jsonl"
   promote_log: "~/.dharma/logs/consume_review_marks.jsonl"
   provider_credits_log: "~/.dharma/logs/provider_credits_latest.json"
+  # Memory Common door (dharma_swarm/memory_common.py) + retrieval gate
+  # scripts (scripts/memory_retrieval_*.py): read vectors_db, write
+  # metabolism/gate receipts into memory_kernel_reports only.
+  vectors_db: "~/.dharma/vectors.db"
+  memory_kernel_reports: "~/.dharma/reports/memory_kernel"
 
 api_routers:
   - id: holon

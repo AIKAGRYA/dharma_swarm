@@ -24,7 +24,6 @@ from pathlib import Path
 WT = Path(__file__).resolve().parents[3]
 if str(WT) not in sys.path:
     sys.path.insert(0, str(WT))
-os.environ.setdefault("DOCKER_CONTEXT", os.environ.get("FORGE_DOCKER_CONTEXT", "colima-forge-swebench"))
 
 from dharma_swarm.api_keys import bootstrap_runtime_env  # noqa: E402
 

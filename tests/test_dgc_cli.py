@@ -513,6 +513,39 @@ def test_cmd_orchestrate_live_checks_existing_process_without_pid(
     assert called is False
 
 
+def test_cmd_orchestrate_live_requires_runtime_admission_before_start(
+    monkeypatch,
+    tmp_path,
+):
+    """A denied checkout must not create foreground or background work."""
+    from dharma_swarm import dgc_cli
+    from dharma_swarm.terminal_commands import lifecycle
+
+    admission_checked = False
+    event_loop_started = False
+
+    def deny_runtime() -> None:
+        nonlocal admission_checked
+        admission_checked = True
+        raise SystemExit(78)
+
+    def fake_run(_coroutine) -> None:
+        nonlocal event_loop_started
+        event_loop_started = True
+
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(lifecycle, "_first_daemon_like_process", lambda: None)
+    monkeypatch.setattr(lifecycle, "runtime_admission_or_exit", deny_runtime)
+    monkeypatch.setattr(asyncio, "run", fake_run)
+
+    with pytest.raises(SystemExit) as exc:
+        dgc_cli.cmd_orchestrate_live(background=False)
+
+    assert exc.value.code == 78
+    assert admission_checked is True
+    assert event_loop_started is False
+
+
 def test_cmd_up_checks_existing_process_without_pid(monkeypatch, tmp_path, capsys):
     """The daemon launcher should refuse a duplicate start on live process evidence alone."""
     from dharma_swarm import dgc_cli
@@ -656,7 +689,81 @@ def test_dgc_cli_memory_command():
     with patch("sys.argv", ["dgc", "memory"]):
         with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
             main()
-            mock.assert_called_once()
+            mock.assert_called_once_with(None, text="", top_k=5, as_json=False)
+
+
+def test_dgc_cli_memory_status_json_flag_works_in_both_positions():
+    """`memory status --json` and `memory --json status` both set as_json."""
+    from dharma_swarm.dgc_cli import main
+
+    for argv in (
+        ["dgc", "memory", "status", "--json"],
+        ["dgc", "memory", "--json", "status"],
+    ):
+        with patch("sys.argv", argv):
+            with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+                main()
+                mock.assert_called_once_with("status", text="", top_k=5, as_json=True)
+
+
+def test_dgc_cli_memory_query_command():
+    """main() dispatches `memory query` to cmd_memory with joined query text."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "memory", "--top-k", "3", "query", "mixture", "experts"]):
+        with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+            main()
+            mock.assert_called_once_with(
+                "query",
+                text="mixture experts",
+                top_k=3,
+                as_json=False,
+            )
+
+
+def test_dgc_cli_memory_common_command():
+    """main() dispatches `memory common` as an agent handoff pack request."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "memory", "common", "agent", "task"]):
+        with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+            main()
+            mock.assert_called_once_with(
+                "common",
+                text="agent task",
+                top_k=5,
+                as_json=False,
+            )
+
+
+def test_dgc_cli_memory_metabolize_command():
+    """main() dispatches `memory metabolize` to the common memory cycle."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "memory", "--top-k", "10", "metabolize"]):
+        with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+            main()
+            mock.assert_called_once_with(
+                "metabolize",
+                text="",
+                top_k=10,
+                as_json=False,
+            )
+
+
+def test_dgc_cli_memory_schedule_command():
+    """main() dispatches `memory schedule` with the requested recurring schedule."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "memory", "--top-k", "8", "schedule", "--schedule", "every 12h"]):
+        with patch("dharma_swarm.dgc_cli.cmd_memory") as mock:
+            main()
+            mock.assert_called_once_with(
+                "schedule",
+                text="every 12h",
+                top_k=8,
+                as_json=False,
+            )
 
 
 def test_dgc_cli_spine_tail_command_dispatch():

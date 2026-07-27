@@ -4,6 +4,8 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -334,6 +336,41 @@ async def test_no_deps():
     orch = Orchestrator()
     dispatches = await orch.route_next()
     assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_task_memory_palace_ingestion_gate_skips_constructor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A false runtime control must not enter the native constructor."""
+    memory_palace_constructor = MagicMock(
+        side_effect=AssertionError("disabled MemoryPalace constructor called")
+    )
+    monkeypatch.setenv("DGC_TASK_MEMORY_PALACE_INGESTION", "0")
+    monkeypatch.setattr(
+        "dharma_swarm.memory_palace.MemoryPalace",
+        memory_palace_constructor,
+    )
+    orch = Orchestrator(
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=tmp_path / "state" / "runtime.db",
+        shared_dir=tmp_path / "shared",
+        stigmergy_dir=tmp_path / "stigmergy",
+        session_id="memory-palace-gate",
+    )
+    orch._runtime_lifecycle.record_artifact = AsyncMock()
+
+    await orch._persist_result(
+        agent_name="agent-test",
+        model_name="test-model",
+        provider_name="test-provider",
+        task=Task(id="memory-gate-task", title="Memory gate task"),
+        result="constructor must stay cold",
+    )
+
+    memory_palace_constructor.assert_not_called()
+    orch._runtime_lifecycle.record_artifact.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

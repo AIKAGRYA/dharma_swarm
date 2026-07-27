@@ -8,9 +8,9 @@ Exposes 9 tools to agents:
     chetana_gap_scan(focus_topic) -> {gaps, open_questions}
     chetana_decay_check() -> {stale_count, stale_atoms}
     chetana_palace_state() -> {pillar_rooms, total_atoms, coverage_gaps}
-    chetana_verify(path) -> {verified, zero_sig, kernel_drift, ...}      [Slice 7]
+    chetana_verify(path, mode) -> {verdict, verdict_reasons, buckets, ...} [Slice 7]
     chetana_revive(path|all, apply, reviewer) -> {proposals, applied}    [Slice 7]
-    chetana_approve(path, reviewer) -> {decision, trusted_path}          [Slice 7]
+    chetana_approve(path, reviewer_token) -> {decision, trusted_path}    [Slice 7; token-gated]
 
 This is a thin wrapper over the chetana package functions. The server is
 launched via `python -m dharma_swarm.chetana.mcp_server` from an .mcp.json
@@ -23,8 +23,11 @@ runs on it. Otherwise it prints a setup hint and exits non-zero.
 
 from __future__ import annotations
 
+import asyncio
+import hmac
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -71,12 +74,13 @@ def tool_promote(
     staged_path: str,
     confidence: float | None = None,
     requester: str = "mcp_caller",
-    auto_promote: bool = False,
 ) -> dict:
+    # No auto_promote from MCP: unauthenticated agent callers must not be able
+    # to mint auto_promoted atoms. Promoted atoms land in the pending root
+    # until an operator approves them (chetana_approve, token-gated).
     result = promote_fn(
         staged_path=Path(staged_path),
         promoted_by=requester,
-        auto_promote=auto_promote,
         confidence_override=confidence,
     )
     return {
@@ -167,71 +171,72 @@ def _current_kernel_signature() -> str:
     return placeholder
 
 
-def tool_verify(path: str | None = None) -> dict:
+def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
     """Round-trip axiom signatures against the current kernel.
 
     Args:
         path: Optional atom path. If None or ".", verifies all trusted atoms.
+        mode: "compat" (verdict fails only on zero-sig/schema-error — the
+            legacy rule) or "production" (fail-closed: verdict also fails on
+            no-provenance, kernel-drift, unapproved review_status, an
+            approved atom on a forgeable v1 signature, an unavailable
+            kernel, or an empty scan).
 
-    Returns four buckets: verified, zero-sig, kernel-drift, no-provenance,
-    schema-error.
+    Returns the five signature buckets (verified, zero-sig, kernel-drift,
+    no-provenance, schema-error) plus the overlapping ``unapproved`` list,
+    and a ``verdict`` field: "pass" | "fail" with ``verdict_reasons``.
+    ``buckets["unapproved"]`` overlaps the five disjoint buckets — never sum
+    the bucket lists for a total.
     """
-    from .provenance import compute_axiom_signature, parse_frontmatter
+    from .provenance import production_verdict, scan_verify_targets
     from .staging import list_trusted
 
-    placeholder = "0" * 64
+    if mode not in {"compat", "production"}:
+        raise ValueError(f"unknown verify mode: {mode!r} (expected 'compat' or 'production')")
+
     current_kernel_sig = _current_kernel_signature()
 
+    projection_empty = False
     if path and path != ".":
         targets = [Path(path).expanduser().resolve()]
     else:
         targets = list_trusted()
+        if not targets and list_trusted(apply_manifest=False):
+            # mirror of the CLI compat guard: atoms on disk, empty manifest
+            # projection — green attestation here would fail open
+            projection_empty = True
 
-    buckets: dict[str, list[str]] = {
-        "verified": [],
-        "zero-sig": [],
-        "kernel-drift": [],
-        "no-provenance": [],
-        "schema-error": [],
-    }
-    for p in targets:
-        try:
-            text = p.read_text(encoding="utf-8")
-            try:
-                schema, body = parse_frontmatter(text, source_path=str(p))
-            except Exception:
-                if text.lstrip().startswith("---"):
-                    buckets["no-provenance"].append(str(p))
-                else:
-                    buckets["schema-error"].append(str(p))
-                continue
+    buckets, unapproved, v1_approved = scan_verify_targets(
+        targets, kernel_signature=current_kernel_sig
+    )
 
-            if schema.provenance is None:
-                buckets["no-provenance"].append(str(p))
-                continue
-
-            stored = schema.provenance.axiom_signature or ""
-            if stored == placeholder:
-                buckets["zero-sig"].append(str(p))
-                continue
-
-            if compute_axiom_signature(body, current_kernel_sig) == stored:
-                buckets["verified"].append(str(p))
-            elif compute_axiom_signature(body, placeholder) == stored:
-                buckets["zero-sig"].append(str(p))
-            else:
-                buckets["kernel-drift"].append(str(p))
-        except Exception:
-            buckets["schema-error"].append(str(p))
+    if mode == "production":
+        verdict, reasons = production_verdict(
+            buckets, unapproved, kernel_signature=current_kernel_sig, v1_approved=v1_approved
+        )
+    else:
+        reasons = [
+            f"{label}: {len(buckets[label])}"
+            for label in ("zero-sig", "schema-error")
+            if buckets[label]
+        ]
+        if projection_empty:
+            reasons.append("empty-manifest-projection")
+        verdict = "pass" if not reasons else "fail"
 
     return {
         "kernel_signature": current_kernel_sig,
+        "mode": mode,
+        "verdict": verdict,
+        "verdict_reasons": reasons,
         "verified_count": len(buckets["verified"]),
         "zero_sig_count": len(buckets["zero-sig"]),
         "kernel_drift_count": len(buckets["kernel-drift"]),
         "no_provenance_count": len(buckets["no-provenance"]),
         "schema_error_count": len(buckets["schema-error"]),
-        "buckets": buckets,
+        "unapproved_count": len(unapproved),
+        "v1_signed_approved_count": len(v1_approved),
+        "buckets": {**buckets, "unapproved": unapproved},
     }
 
 
@@ -291,96 +296,44 @@ def tool_revive(
     }
 
 
-def tool_approve(path: str, reviewer: str) -> dict:
-    """Human-explicit approval transitioning staged → approved.
+REVIEWER_TOKEN_ENV = "DHARMA_CHETANA_REVIEWER_TOKEN"
 
-    Slice 7 of Plan v3: NO auto-approve. ``reviewer`` is required and must be
-    a non-empty string identifying the human (or named agent) accepting
-    responsibility for the approval.
+
+def tool_approve(path: str, reviewer_token: str, reviewer: str = "") -> dict:
+    """Operator-token-gated approval transitioning staged/pending → approved.
+
+    Authorization comes ONLY from ``reviewer_token`` matching the operator-set
+    DHARMA_CHETANA_REVIEWER_TOKEN env var; token unset ⇒ approval via MCP is
+    disabled entirely (fail closed). ``reviewer`` is an optional display name
+    recorded in provenance so the approval trail keeps a human identity — it
+    grants nothing.
     """
-    if not reviewer or not reviewer.strip():
+    expected = os.environ.get(REVIEWER_TOKEN_ENV, "")
+    if not expected.strip():
         return {
-            "error": "reviewer required for approve (no auto-approve)",
+            "error": f"approve disabled: {REVIEWER_TOKEN_ENV} is not configured",
             "decision": "REJECTED",
         }
-    from .provenance import assemble_atom, now_iso, parse_frontmatter
-    from .staging import STAGING_ROOT, write_trusted
+    if not reviewer_token or not hmac.compare_digest(
+        reviewer_token.encode("utf-8"), expected.encode("utf-8")
+    ):
+        return {"error": "invalid reviewer token", "decision": "REJECTED"}
 
-    target = Path(path).expanduser().resolve()
-    if not target.exists():
-        candidates = (
-            list(STAGING_ROOT.rglob(f"{path}.md")) if STAGING_ROOT.exists() else []
-        )
-        if candidates:
-            target = candidates[0]
-    if not target.exists():
-        return {"error": f"{path} not found", "decision": "NOT_FOUND"}
+    from .promote import approve_atom
 
-    text = target.read_text(encoding="utf-8")
+    name = (reviewer or "").strip()
+    recorded = f"operator-token:{name}" if name else "operator-token"
     try:
-        schema, body = parse_frontmatter(text, source_path=str(target))
+        result = approve_atom(path=path, reviewer=recorded)
     except Exception as e:
-        return {"error": f"parse failed: {e}", "decision": "PARSE_ERROR"}
-
-    if schema.provenance is None:
-        return {
-            "error": "atom has no provenance — promote first",
-            "decision": "NEEDS_PROMOTE",
-        }
-
-    current_status = schema.provenance.review_status
-    if current_status == "approved":
-        return {
-            "decision": "ALREADY_APPROVED",
-            "reviewer": schema.provenance.reviewer,
-            "trusted_path": str(target),
-        }
-    if current_status == "rejected":
-        return {"decision": "REJECTED_PRIOR", "trusted_path": str(target)}
-    if current_status not in ("staged", "auto_promoted"):
-        return {
-            "decision": "BAD_STATE",
-            "current_status": current_status,
-        }
-
-    approval_entry = {
-        "event": "approve",
-        "ts": now_iso(),
-        "reviewer": reviewer,
-        "prior_status": current_status,
-    }
-    new_revival_chain = list(schema.provenance.revival_chain) + [approval_entry]
-    new_provenance = schema.provenance.model_copy(update={
-        "review_status": "approved",
-        "reviewer": reviewer,
-        "revival_chain": new_revival_chain,
-    })
-    new_schema = schema.model_copy(update={"provenance": new_provenance})
-
-    try:
-        target.relative_to(STAGING_ROOT.resolve())
-        is_staged = True
-    except ValueError:
-        is_staged = False
-
-    if is_staged:
-        trusted_path = write_trusted(new_schema, body=body)
-        try:
-            target.unlink()
-        except OSError:
-            pass
-        return {
-            "decision": "APPROVED",
-            "prior_status": current_status,
-            "reviewer": reviewer,
-            "trusted_path": str(trusted_path),
-        }
-    target.write_text(assemble_atom(new_schema, body), encoding="utf-8")
+        return {"error": f"{type(e).__name__}: {e}", "decision": "ERROR"}
     return {
-        "decision": "APPROVED",
-        "prior_status": current_status,
-        "reviewer": reviewer,
-        "trusted_path": str(target),
+        "decision": result.decision,
+        "prior_status": result.prior_status,
+        "reviewer": result.reviewer,
+        "trusted_path": str(result.trusted_path) if result.trusted_path else None,
+        "error": result.error,
+        "notes": result.notes,
     }
 
 
@@ -432,7 +385,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "requester": {"type": "string", "default": "mcp_caller"},
-            "auto_promote": {"type": "boolean", "default": False},
         },
         "required": ["staged_path"],
         "additionalProperties": False,
@@ -475,6 +427,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 "type": "string",
                 "description": "Specific atom path; omit or '.' to verify all trusted atoms.",
             },
+            "mode": {
+                "type": "string",
+                "enum": ["compat", "production"],
+                "default": "compat",
+                "description": (
+                    "compat: verdict fails only on zero-sig/schema-error. "
+                    "production: fail-closed (also fails on no-provenance, "
+                    "kernel-drift, unapproved review_status, v1-signed "
+                    "approved atoms, unavailable kernel, or an empty scan)."
+                ),
+            },
         },
         "additionalProperties": False,
     },
@@ -495,14 +458,24 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to staged or trusted atom needing human approval.",
+                "description": "Path to pending/staged atom needing operator approval.",
+            },
+            "reviewer_token": {
+                "type": "string",
+                "description": (
+                    "REQUIRED: operator token matching DHARMA_CHETANA_REVIEWER_TOKEN. "
+                    "Approval is disabled when the env var is unset."
+                ),
             },
             "reviewer": {
                 "type": "string",
-                "description": "REQUIRED: identifier for the human (or named agent) accepting responsibility. No auto-approve.",
+                "description": (
+                    "Optional display name recorded in provenance as "
+                    "'operator-token:<name>'. Grants nothing; the token authorizes."
+                ),
             },
         },
-        "required": ["path", "reviewer"],
+        "required": ["path", "reviewer_token"],
         "additionalProperties": False,
     },
 }
@@ -546,7 +519,11 @@ def main() -> int:
         if fn is None:
             raise ValueError(f"unknown tool: {name}")
         try:
-            result = fn(**(arguments or {}))
+            # Worker thread, not the event loop: the sync tools reach
+            # KernelGuard.load(), whose _run_sync_awaitable deliberately
+            # refuses to run while a loop is active — calling them inline
+            # turns every gate-checked MCP approval into GATE_BLOCKED.
+            result = await asyncio.to_thread(fn, **(arguments or {}))
         except Exception as e:
             return [{"type": "text", "text": json.dumps({"error": str(e)})}]
         return [{"type": "text", "text": json.dumps(result)}]
