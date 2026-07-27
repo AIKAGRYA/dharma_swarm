@@ -154,6 +154,22 @@ def test_terminal_bridge_bootstraps_commands_and_adapters() -> None:
         asyncio.run(bridge.close())
 
 
+def test_terminal_bridge_materializes_memory_common(monkeypatch) -> None:
+    bridge = TerminalBridge()
+    monkeypatch.setattr(
+        "dharma_swarm.memory_common.render_memory_common_command",
+        lambda arg, **kwargs: f"memory common rendered: {arg}",
+        raising=True,
+    )
+
+    try:
+        output = bridge._materialize_async_command("memory common agent task", "async:memory:common agent task")
+    finally:
+        asyncio.run(bridge.close())
+
+    assert output == "memory common rendered: common agent task"
+
+
 def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "dharma_swarm.key_oracle.live_providers",

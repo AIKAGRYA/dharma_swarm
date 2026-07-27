@@ -4,6 +4,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.memory_kernel import (
     CensusConfig,
     MemoryContextBudget,
@@ -16,6 +18,21 @@ from dharma_swarm.memory_kernel import (
     TruthState,
 )
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
+
+_MANIFEST_KERNEL_SIG = "f" * 64
+
+
+@pytest.fixture(autouse=True)
+def _manifest_kernel(monkeypatch: pytest.MonkeyPatch):
+    # PR-08: the wiki adapter only serves manifest-trusted files
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    monkeypatch.setattr(
+        manifest_mod, "_resolve_kernel_signature", lambda: _MANIFEST_KERNEL_SIG
+    )
+    manifest_mod.clear_manifest_cache()
+    yield
+    manifest_mod.clear_manifest_cache()
 
 
 def _write(path: Path, text: str) -> None:
@@ -72,6 +89,18 @@ def _fixture_memory_home(tmp_path: Path) -> tuple[Path, Path]:
     )
     _write(home / ".dharma/witness/2026-05-11.jsonl", '{"event": "witnessed", "timestamp": "2026-05-11T04:00:00Z"}\n')
     _write(home / ".dharma/knowledge/wiki/concept.md", "# Concept\n\nCurated note.\n")
+    from dharma_swarm.chetana import manifest as manifest_mod
+
+    wiki_root = home / ".dharma/knowledge/wiki"
+    manifest_mod.write_manifest(
+        [
+            manifest_mod.manifest_entry_for_file(
+                wiki_root / "concept.md", root=wiki_root, tier="gold"
+            )
+        ],
+        manifest_file=wiki_root / "MANIFEST.jsonl",
+        kernel_signature=_MANIFEST_KERNEL_SIG,
+    )
     _write(home / ".codex/memories/mcp-memory.jsonl", '{"text": "codex memory", "timestamp": "2026-05-11T05:00:00Z"}\n')
     _write(home / ".dharma/conversation_log/2026-05-11.jsonl", '{"content": "private long transcript"}\n')
     return home, repo

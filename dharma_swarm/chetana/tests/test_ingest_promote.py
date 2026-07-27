@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.chetana.ingest import ingest
-from dharma_swarm.chetana.promote import promote
+from dharma_swarm.chetana.promote import approve_atom, promote
 from dharma_swarm.chetana.provenance import parse_frontmatter
 
 
@@ -81,7 +81,7 @@ def test_ingest_webclip_uses_existing_extractor(chetana_sandbox: Path, tmp_path:
     assert body == "Clipped body only.\n"
 
 
-def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
+def test_promote_writes_pending_atom_with_provenance(chetana_sandbox: Path):
     ingested = ingest(
         source="atom body for promotion",
         source_kind="note",
@@ -93,12 +93,16 @@ def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
     pr = promote(staged_path=staged, promoted_by="tester")
     assert pr.decision in {"ALLOW", "WARN"}  # not BLOCK
     assert pr.trusted_path is not None and pr.trusted_path.exists()
+    # Non-approved atoms land in pending, NEVER in the trusted projection.
+    assert pr.trusted_path.parent == chetana_sandbox / "wiki" / "pending"
+    assert list((chetana_sandbox / "wiki" / "concepts").glob("*.md")) == []
 
     parsed, body = parse_frontmatter(pr.trusted_path.read_text(encoding="utf-8"))
     assert parsed is not None
     assert parsed.provenance is not None
     assert parsed.provenance.gate_check.result == pr.decision
-    assert len(parsed.provenance.axiom_signature) == 64
+    assert parsed.provenance.review_status in {"staged", "auto_promoted"}
+    assert parsed.provenance.axiom_signature.startswith("v2:")
     assert "atom body for promotion" in body
     log_text = (chetana_sandbox / "wiki" / "log.md").read_text(encoding="utf-8")
     assert "promote | Promotion test" in log_text
@@ -107,7 +111,7 @@ def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
     assert not staged.exists()
 
 
-def test_promote_runs_cross_update_index_backlinks_and_contradiction_ledger(
+def test_approve_moves_pending_atom_into_trusted_and_runs_cross_update(
     chetana_sandbox: Path,
 ):
     related = ingest(
@@ -117,6 +121,8 @@ def test_promote_runs_cross_update_index_backlinks_and_contradiction_ledger(
         confidence=0.8,
     )
     related_promoted = promote(staged_path=related.atoms[0], promoted_by="tester")
+    related_approved = approve_atom(path=related_promoted.trusted_path, reviewer="tester")
+    assert related_approved.decision == "APPROVED"
 
     main = ingest(
         source="This contradicts older synthesis and relates to the bridge hypothesis.",
@@ -126,12 +132,20 @@ def test_promote_runs_cross_update_index_backlinks_and_contradiction_ledger(
         related=["Bridge Hypothesis"],
     )
     promoted = promote(staged_path=main.atoms[0], promoted_by="tester")
+    # Pending: nothing in the trusted projection yet, no index entry.
+    index_path = chetana_sandbox / "wiki" / "index.md"
+    if index_path.exists():
+        assert "Main Cross Update" not in index_path.read_text(encoding="utf-8")
+    approved = approve_atom(path=promoted.trusted_path, reviewer="tester")
+    assert approved.decision == "APPROVED"
+    assert approved.trusted_path.parent == chetana_sandbox / "wiki" / "concepts"
+    assert not promoted.trusted_path.exists()  # pending copy removed
 
-    index_text = (chetana_sandbox / "wiki" / "index.md").read_text(encoding="utf-8")
+    index_text = index_path.read_text(encoding="utf-8")
     assert "Main Cross Update" in index_text
-    assert str(promoted.trusted_path.name).removesuffix(".md") in index_text
+    assert str(approved.trusted_path.name).removesuffix(".md") in index_text
 
-    related_text = related_promoted.trusted_path.read_text(encoding="utf-8")
+    related_text = related_approved.trusted_path.read_text(encoding="utf-8")
     assert "## Backlinks" in related_text
     assert "Main Cross Update" in related_text
 

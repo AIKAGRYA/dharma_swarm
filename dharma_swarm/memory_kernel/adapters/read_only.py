@@ -417,7 +417,10 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
         ):
             return
         atoms: list[MemoryAtom] = []
-        files = _ordered_paths(_markdown_files(self.path, self.config.max_files), resolved_query.order_by)
+        files = _ordered_paths(
+            _manifest_trusted_markdown_files(self.path, self.config.max_files),
+            resolved_query.order_by,
+        )
         for file_path in files:
             stat = file_path.stat()
             content: str | None = None
@@ -664,19 +667,36 @@ def _jsonl_files(path: Path, max_files: int) -> tuple[Path, ...]:
     return tuple(files)
 
 
-def _markdown_files(path: Path, max_files: int) -> tuple[Path, ...]:
+def _iter_markdown_files(path: Path) -> Iterator[Path]:
     if path.is_file() and path.suffix.lower() in {".md", ".markdown"}:
-        return (path,)
+        yield path
+        return
     if not path.is_dir():
-        return ()
-    files: list[Path] = []
+        return
     for current, dirs, filenames in os.walk(path):
         dirs[:] = sorted(name for name in dirs if name not in {".git", "__pycache__"})
         for filename in sorted(filenames):
             if Path(filename).suffix.lower() in {".md", ".markdown"}:
-                files.append(Path(current) / filename)
-                if len(files) >= max_files:
-                    return tuple(files)
+                yield Path(current) / filename
+
+
+def _manifest_trusted_markdown_files(path: Path, max_files: int) -> tuple[Path, ...]:
+    """Wiki-tree listing gated by the signed trust manifest.
+
+    The manifest filter runs BEFORE the max_files truncation so untrusted
+    alphabetically-early scratch files can never crowd out trusted pages.
+    Fail-closed: no valid signed manifest → no files.
+    """
+    from dharma_swarm.chetana.manifest import load_manifest
+
+    manifest = load_manifest(path)
+    files: list[Path] = []
+    for candidate in _iter_markdown_files(path):
+        if not manifest.is_trusted(candidate):
+            continue
+        files.append(candidate)
+        if len(files) >= max_files:
+            break
     return tuple(files)
 
 
