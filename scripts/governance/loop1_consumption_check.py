@@ -16,7 +16,6 @@ import hashlib
 import json
 import os
 import sqlite3
-import sys
 import tempfile
 from collections.abc import Mapping
 from datetime import datetime, timezone
@@ -27,7 +26,6 @@ from dharma_swarm.models import ProviderType
 from dharma_swarm.receipt_consumption import (
     MAX_RECEIPT_DEMOTIONS,
     RECEIPT_CONSUMPTION_WINDOW,
-    ReceiptConsumptionEvidence,
     apply_receipt_consumption_ranking,
 )
 

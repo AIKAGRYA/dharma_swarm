@@ -13,7 +13,6 @@ import pytest
 
 from dharma_swarm.models import ProviderType
 from scripts.governance.loop1_consumption_check import (
-    DEFAULT_RECEIPT,
     _default_chain,
     _digest,
     _read_receipt,
