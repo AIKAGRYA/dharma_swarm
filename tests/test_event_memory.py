@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
-from dharma_swarm.engine.event_memory import EventMemoryStore
+from dharma_swarm.engine.event_memory import (
+    EventMemoryStore,
+    ensure_memory_plane_schema_sync,
+)
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 
 
@@ -121,3 +126,31 @@ async def test_search_events_matches_payload_and_type(store: EventMemoryStore) -
     assert len(rows) == 1
     assert rows[0]["source"] == "orchestrator.lifecycle"
     assert rows[0]["payload"]["task_id"] == "task-123"
+
+
+def _index_names(db_path) -> set[str]:
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master"
+            " WHERE type = 'index' AND tbl_name = 'idea_uptake'"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {name for (name,) in rows}
+
+
+def test_sync_schema_creates_idx_uptake_shard(tmp_path) -> None:
+    db_path = tmp_path / "memory_plane.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        ensure_memory_plane_schema_sync(conn)
+    finally:
+        conn.close()
+    assert "idx_uptake_shard" in _index_names(db_path)
+
+
+@pytest.mark.asyncio
+async def test_async_schema_creates_idx_uptake_shard(store: EventMemoryStore, tmp_path) -> None:
+    # `store` is requested for its side effect: init_db() runs the async schema installer.
+    assert "idx_uptake_shard" in _index_names(tmp_path / "memory_plane.db")
