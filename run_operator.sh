@@ -22,6 +22,7 @@ if [[ -z "${PYTHON_BIN:-}" ]]; then
         PYTHON_BIN="python3"
     fi
 fi
+export DHARMA_PYTHON="${PYTHON_BIN}"
 RUNTIME_ENV_HELPER="${SCRIPT_DIR}/scripts/load_runtime_env.sh"
 
 mkdir -p "${STATE_DIR}/logs" "${STATE_DIR}/db"

@@ -26,6 +26,7 @@ if [[ -x "$_DHARMA_REPO_ROOT/.venv/bin/python" ]]; then
 else
     _DHARMA_PYTHON="$(command -v python3 2>/dev/null || echo python3)"
 fi
+export DHARMA_PYTHON="$_DHARMA_PYTHON"
 
 _dharma_exports="$(
     cd "$_DHARMA_REPO_ROOT" 2>/dev/null && \
