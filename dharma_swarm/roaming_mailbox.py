@@ -51,6 +51,12 @@ class MailboxTask:
     claimed_by: str = ""
     responded_at: str = ""
     response_ref: str = ""
+    # Task-medium join (2026-07-29 decision record in
+    # docs/architecture/WIRING_AND_LOOPS.md): dependency edges by task_id,
+    # with ready-set semantics mirroring task_board.py — a task is claimable
+    # only when every dependency has status "responded". Unknown dependency
+    # ids fail closed (never ready) rather than silently unblocking.
+    depends_on: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -71,6 +77,7 @@ class MailboxTask:
             claimed_by=str(data.get("claimed_by", "")),
             responded_at=str(data.get("responded_at", "")),
             response_ref=str(data.get("response_ref", "")),
+            depends_on=[str(dep) for dep in (data.get("depends_on") or [])],
         )
 
 
@@ -124,6 +131,7 @@ class RoamingMailbox:
         body: str,
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        depends_on: list[str] | None = None,
     ) -> MailboxTask:
         task = MailboxTask(
             task_id=self._new_task_id(),
@@ -133,6 +141,7 @@ class RoamingMailbox:
             body=body,
             capabilities=list(capabilities or []),
             metadata=dict(metadata or {}),
+            depends_on=[str(dep) for dep in (depends_on or [])],
         )
         self._write_json(self.task_path(task.task_id), task.to_dict())
         return task
@@ -170,11 +179,64 @@ class RoamingMailbox:
         self._write_json(self.task_path(task_id), claimed.to_dict())
         return claimed
 
+    def _dependency_satisfied(self, dep_id: str) -> bool:
+        """A dependency is satisfied only by a terminal "responded" record.
+
+        Unknown ids fail closed (mirrors task_board.py's ready query, where a
+        dependency row must exist COMPLETED before the dependent is ready).
+        """
+        path = self.task_path(dep_id)
+        if not path.exists():
+            return False
+        try:
+            dep = MailboxTask.from_dict(self._read_json(path))
+        except (OSError, json.JSONDecodeError):
+            return False
+        return dep.status == "responded"
+
+    def ready_tasks(self, *, recipient: str | None = None) -> list[MailboxTask]:
+        """Queued tasks whose every dependency is responded, oldest first."""
+        return [
+            task
+            for task in self.list_tasks(recipient=recipient, status="queued")
+            if all(self._dependency_satisfied(dep) for dep in task.depends_on)
+        ]
+
+    def validate_dependencies(self) -> list[str]:
+        """Diagnostics: unknown dependency ids and dependency cycles."""
+        tasks = {task.task_id: task for task in self.list_tasks()}
+        issues: list[str] = []
+        for task in tasks.values():
+            for dep in task.depends_on:
+                if dep not in tasks:
+                    issues.append(f"{task.task_id}: unknown dependency {dep}")
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {task_id: WHITE for task_id in tasks}
+
+        def visit(task_id: str, trail: list[str]) -> None:
+            color[task_id] = GRAY
+            for dep in tasks[task_id].depends_on:
+                if dep not in tasks:
+                    continue
+                if color[dep] == GRAY:
+                    cycle = trail[trail.index(dep):] if dep in trail else trail
+                    issues.append(
+                        f"dependency cycle: {' -> '.join([*cycle, task_id, dep])}"
+                    )
+                elif color[dep] == WHITE:
+                    visit(dep, [*trail, dep])
+            color[task_id] = BLACK
+
+        for task_id in tasks:
+            if color[task_id] == WHITE:
+                visit(task_id, [task_id])
+        return issues
+
     def claim_next_task(self, recipient: str) -> MailboxTask | None:
-        queued = self.list_tasks(recipient=recipient, status="queued")
-        if not queued:
+        ready = self.ready_tasks(recipient=recipient)
+        if not ready:
             return None
-        return self.claim_task(queued[0].task_id, claimed_by=recipient)
+        return self.claim_task(ready[0].task_id, claimed_by=recipient)
 
     def respond_to_task(
         self,
@@ -219,9 +281,15 @@ def _parser() -> argparse.ArgumentParser:
     enqueue.add_argument("--summary", required=True)
     enqueue.add_argument("--body", required=True)
     enqueue.add_argument("--capability", action="append", default=[])
+    enqueue.add_argument("--depends-on", action="append", default=[])
 
     claim = sub.add_parser("claim-next")
     claim.add_argument("--recipient", required=True)
+
+    ready = sub.add_parser("ready")
+    ready.add_argument("--recipient", default="")
+
+    sub.add_parser("validate")
 
     respond = sub.add_parser("respond")
     respond.add_argument("--task-id", required=True)
@@ -247,9 +315,23 @@ def main(argv: list[str] | None = None) -> int:
             summary=args.summary,
             body=args.body,
             capabilities=list(args.capability or []),
+            depends_on=list(args.depends_on or []),
         )
         print(_json_dump(task.to_dict()).rstrip())
         return 0
+
+    if args.command == "ready":
+        tasks = [
+            task.to_dict()
+            for task in mailbox.ready_tasks(recipient=args.recipient or None)
+        ]
+        print(_json_dump(tasks).rstrip())
+        return 0
+
+    if args.command == "validate":
+        issues = mailbox.validate_dependencies()
+        print(_json_dump(issues).rstrip())
+        return 0 if not issues else 1
 
     if args.command == "claim-next":
         task = mailbox.claim_next_task(args.recipient)
