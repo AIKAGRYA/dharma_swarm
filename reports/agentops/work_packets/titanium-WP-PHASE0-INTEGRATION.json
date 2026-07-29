@@ -1,0 +1,118 @@
+{
+  "id": "titanium-WP-PHASE0-INTEGRATION",
+  "base_ref": "2bc461eb201c75445b43fc1ac98b5edfe3539286",
+  "branch": "claude/titanium-hardening-status-bm7th5",
+  "worktree": ".",
+  "intent": "Operator-authorized consolidated Titanium Phase 0 integration: land WP-0D (fast-suite determinism contract + two consecutive clean make test-fast proofs), WP-0E (hermetic/live NATS verification split, absorbing closed PR #1121 verbatim), WP-0S code half (fail-closed webhook ingress, absorbing closed PR #1127, plus its two flagged stale fail-open comments), WP-0H (pinned polyglot CI orchestration + supply-chain contract tests), the WP-0C1R pinned strict Semgrep re-run adjudication DRAFT, and the WP-0G generated-count reconvergence, as one reviewable candidate. Includes the ambient-PATH fix to the non-root unshare confinement probe surfaced by the WP-0D proof runs. No Phase 1-7, production, deployment, or complete-security claim; BLOCKED_OPERATOR, NEEDS_HOST, and FINAL_REVIEW states are not promoted.",
+  "allowed_files": [
+    ".github/workflows/tests.yml",
+    "Makefile",
+    "api/main.py",
+    "dharma_swarm/verify/github_app.py",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/titanium-WP-PHASE0-INTEGRATION.json",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md",
+    "scripts/governance/check_nats_live_production_evidence.py",
+    "scripts/governance/check_nats_substrate_contract.py",
+    "scripts/governance/run_agent_work_packet.py",
+    "scripts/governance/run_nats_live_production_matrix.py",
+    "tests/test_api_auth.py",
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_hermetic_supply_chain.py",
+    "tests/test_model_key_routing_guard.py",
+    "tests/test_nats_live_contact.py",
+    "tests/test_nats_live_production_evidence.py",
+    "tests/test_nats_substrate_contract.py",
+    "tests/test_nats_verification_split.py",
+    "tests/test_polyglot_ci_contract.py",
+    "tests/test_pr_ci_safe_rebase_mutations.py",
+    "tests/test_verify_api.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    "dharma_swarm/coordination/",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/graph/",
+    "packages/telos-kernel/",
+    "scripts/runtime/pr_merge_control.py",
+    "terminal/"
+  ],
+  "gates": [
+    {
+      "name": "titanium-criteria-battery",
+      "command": "python3 -m pytest tests/test_bootstrap_contract.py tests/test_verifier_selfcheck_contract.py tests/test_fast_suite_isolation.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py tests/test_api_auth.py tests/test_verify_api.py tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "touched-python-ruff-correctness",
+      "command": "python3 -m ruff check dharma_swarm/verify/github_app.py scripts/governance/run_agent_work_packet.py scripts/governance/check_nats_live_production_evidence.py scripts/governance/check_nats_substrate_contract.py scripts/governance/run_nats_live_production_matrix.py tests/test_fast_suite_isolation.py tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py --select=E9,F63,F7,F82",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "working-diff-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "webhook-fail-open-revert-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/verify/github_app.py'); t=p.read_text(); anchor='return False'; anchor in t or sys.exit(3); p.write_text(t.replace(anchor,'return True',1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_verify_api.py','-q'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "titanium(phase0): integrated candidate"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PHASE0-INTEGRATION",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "2bc461eb201c75445b43fc1ac98b5edfe3539286",
+      "details": []
+    },
+    "interface_mismatches": [
+      "PRs #1121 and #1127 carried this content as separate stacked packets; both are closed as absorbed and their historical packet JSONs deliberately do not ride in this range (a high-risk PR must change exactly one Session Entry packet)."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/verify/github_app.py:VerifyWebhookHandler.verify_signature",
+      "scripts/governance/run_agent_work_packet.py:_negative_confinement",
+      "tests/test_fast_suite_isolation.py:REPO_SCALE_OVERRIDES",
+      "scripts/governance/check_nats_live_production_evidence.py",
+      ".github/workflows/tests.yml:pytest"
+    ],
+    "honest_blockers": [
+      "WP-0I (independent fresh non-shallow clone proof on merged main, author-not-sole-reviewer) is not claimed by this packet and starts only after merge.",
+      "The WP-0S exposure verdict remains BLOCKED_OPERATOR; the WP-0C1R adjudication draft carries 21 OWNER_DEFERRED dispositions pending operator ratification; WP-0F1 required-check ratification remains an operator decision.",
+      "Live NATS evidence remains typed NEEDS_HOST on non-live hosts and is never promoted by this change.",
+      "Human merge authority remains required."
+    ],
+    "rollback": "Revert the integration merge commits and this packet together; the five titanium-fleet packet branches remain intact for individual re-landing. Rollback restores fail-open webhook ingress and must not be represented as safe ingress.",
+    "packet_digest": "12611e1a4ee8aea2a8ff0e9a7c0f37c7ea24bb970e7be74a4502d8ab6833da05"
+  }
+}
