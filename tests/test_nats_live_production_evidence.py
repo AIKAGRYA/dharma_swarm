@@ -401,6 +401,55 @@ def test_common_contract_rejects_unbound_evidence(
         )
 
 
+def test_repeated_host_mode_last_live_is_accepted(tmp_path: Path, monkeypatch) -> None:
+    # argparse takes the last occurrence of a repeated flag: a wrapper default
+    # followed by an explicit --host-mode live runs live and must validate.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "non-live",
+        "--host-mode",
+        "live",
+    ]
+
+    rows = _MODULE.validate_common(
+        payload,
+        24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert set(rows) == set(_MODULE.REQUIRED_ROWS)
+
+
+def test_repeated_host_mode_last_non_live_is_rejected(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # The inverse ordering runs non-live under argparse; grading the first
+    # occurrence would wrongly accept it as live evidence.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "live",
+        "--host-mode",
+        "non-live",
+    ]
+
+    with pytest.raises(
+        _MODULE.EvidenceError, match="did not declare --host-mode live"
+    ):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )
+
+
 def test_source_hash_change_invalidates_evidence(tmp_path: Path, monkeypatch) -> None:
     payload = _common_payload(tmp_path, monkeypatch)
     (tmp_path / "source.py").write_text("SOURCE = 'changed'\n", encoding="utf-8")
