@@ -213,6 +213,7 @@ REPO_SCALE_OVERRIDES = (
     ("tests/test_memory_writer_sentinel.py", "test_writer_sentinel_cli_writes_markdown_report"),
     ("tests/test_xray.py", "test_on_dharma_swarm"),
     ("tests/test_agent_work_packet.py", "test_external_entry_packet_bootstrap_and_digest_binding"),
+    ("tests/test_model_key_routing_guard.py", "test_model_literals_do_not_escape_canonical_registries"),
 )
 
 
