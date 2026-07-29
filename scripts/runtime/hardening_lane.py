@@ -149,9 +149,10 @@ def main(argv: list[str] | None = None) -> int:
         # The argv head is allowlist-validated above; the command itself is an
         # operator-configured repo secret, which is trusted input by design
         # (an actor who controls repo secrets already controls the workflow).
-        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
-        agent = subprocess.run(
-            [*agent_argv, prompt],
+        # The suppression must sit on the finding's anchor line — the scan on
+        # PR #1162 anchored at the argument line, not the call line.
+        agent = subprocess.run(  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+            [*agent_argv, prompt],  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
