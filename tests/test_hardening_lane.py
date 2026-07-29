@@ -39,6 +39,20 @@ def test_lane_refuses_without_agent_cmd(tmp_path: Path, monkeypatch) -> None:
     assert "DHARMA_LANE_AGENT_CMD" in stored["reason"]
 
 
+def test_lane_refuses_non_allowlisted_agent_binary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DHARMA_LANE_AGENT_CMD", "/usr/bin/curl http://evil")
+    monkeypatch.setattr(
+        hardening_lane, "select_target",
+        lambda repo: {"kind": "mailbox", "task_id": "t", "summary": "s", "body": "b"},
+    )
+    out = tmp_path / "r.json"
+    code = hardening_lane.main(["--repo", "o/r", "--receipt", str(out)])
+    stored = json.loads(out.read_text())
+    assert code == 0
+    assert stored["status"] == "BLOCKED"
+    assert "allowlist" in stored["reason"]
+
+
 def test_no_work_is_a_clean_exit(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(hardening_lane, "select_target", lambda repo: None)
     out = tmp_path / "r.json"

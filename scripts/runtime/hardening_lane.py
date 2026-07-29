@@ -38,6 +38,11 @@ MAX_AGENT_SECONDS = int(os.environ.get("LANE_MAX_AGENT_SECONDS", "1200"))
 LANE_BRANCH_PREFIX = "lane/hardening-"
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
 RECIPIENT = "hardening-lane"
+# The operator-configured agent command may only invoke one of these
+# binaries (basename of argv[0]). This is a real constraint, not scanner
+# appeasement: the lane refuses to improvise or launder an arbitrary
+# executable even if the secret is mis-set (PR #1162 Semgrep finding).
+ALLOWED_AGENT_BINARIES = frozenset({"claude", "codex", "npx", "python3"})
 
 
 def _utc_stamp() -> str:
@@ -120,6 +125,14 @@ def main(argv: list[str] | None = None) -> int:
                  "reason": "DHARMA_LANE_AGENT_CMD secret not configured — "
                            "lane refuses to improvise an agent"}, out)
         return 0
+    agent_argv = shlex.split(agent_cmd)
+    agent_binary = Path(agent_argv[0]).name if agent_argv else ""
+    if agent_binary not in ALLOWED_AGENT_BINARIES:
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": f"agent binary {agent_binary!r} is not in the "
+                           f"allowlist {sorted(ALLOWED_AGENT_BINARIES)} — "
+                           "lane refuses non-approved executables"}, out)
+        return 0
 
     branch = f"{LANE_BRANCH_PREFIX}{_utc_stamp()}"
     _run(["git", "checkout", "-B", branch])
@@ -133,8 +146,12 @@ def main(argv: list[str] | None = None) -> int:
         "pr_merge_control.py, or any referee-layer path."
     )
     try:
+        # The argv head is allowlist-validated above; the command itself is an
+        # operator-configured repo secret, which is trusted input by design
+        # (an actor who controls repo secrets already controls the workflow).
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         agent = subprocess.run(
-            [*shlex.split(agent_cmd), prompt],
+            [*agent_argv, prompt],
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
