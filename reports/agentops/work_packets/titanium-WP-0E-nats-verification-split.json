@@ -1,0 +1,105 @@
+{
+  "id": "titanium-WP-0E-nats-verification-split",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/titanium-wp0e-nats-split-20260725",
+  "worktree": ".",
+  "intent": "WP-0E / TIT-009: split deterministic repository NATS verification from live-host production evidence. Remove live receipt freshness from governance-all and nats-substrate-contract, make the hermetic contract use only repository sources, fakes, and fixture tests, and make the separate live matrix/evidence lane return typed PASS, FAIL, or NEEDS_HOST with source, broker, profile, row, and command binding. This packet establishes at most CLOSED_NOT_PROD for repository verification; it does not claim a live daemon host or fresh production evidence.",
+  "allowed_files": [
+    "Makefile",
+    "scripts/governance/check_nats_substrate_contract.py",
+    "scripts/governance/check_nats_live_production_evidence.py",
+    "scripts/governance/run_nats_live_production_matrix.py",
+    "tests/test_nats_verification_split.py",
+    "tests/test_nats_substrate_contract.py",
+    "tests/test_nats_live_production_evidence.py",
+    "tests/test_nats_live_contact.py",
+    "reports/agentops/work_packets/titanium-WP-0E-nats-verification-split.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "wp0e-nats-contract-tests",
+      "command": "python3 -m pytest tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py tests/test_nats_live_contact.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "wp0e-touched-python-ruff",
+      "command": "python3 -m ruff check scripts/governance/check_nats_substrate_contract.py scripts/governance/check_nats_live_production_evidence.py scripts/governance/run_nats_live_production_matrix.py tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py tests/test_nats_live_contact.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "wp0e-working-diff-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "live-evidence-rewired-into-hermetic-target-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('Makefile'); t=p.read_text(); anchor='\\t$(REPO_PYTHON) scripts/governance/check_nats_substrate_contract.py\\n'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor, anchor+'\\t$(REPO_PYTHON) scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24\\n', 1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_nats_verification_split.py','-q'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "needs-host-exit-promotion-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('scripts/governance/check_nats_live_production_evidence.py'); t=p.read_text(); anchor='EXIT_NEEDS_HOST = 2'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'EXIT_NEEDS_HOST = 0',1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_nats_live_production_evidence.py','-q','-k','missing_evidence'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): split hermetic and live NATS verification"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0E",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "INTERFACE_MISMATCH_MAP.md carries no current NATS/TIT-009 mismatch entry at base bb3eb9f4fb9f3ccd413eadd55cfada1b92354287.",
+      "Observed executable mismatch: Makefile:nats-substrate-contract and check_nats_substrate_contract._check_current_repo_behavior both require the author-local live evidence artifact, while the target is a governance-all prerequisite and therefore cannot be hermetic."
+    ],
+    "closest_existing_implementation": [
+      "Makefile:nats-substrate-contract",
+      "Makefile:nats-live-production-matrix",
+      "scripts/governance/check_nats_substrate_contract.py:check_contract",
+      "scripts/governance/check_nats_live_production_evidence.py:validate",
+      "scripts/governance/run_nats_live_production_matrix.py:async_main",
+      "tests/test_nats_substrate_contract.py",
+      "tests/test_nats_live_contact.py"
+    ],
+    "honest_blockers": [
+      "No live NATS daemon-host authority or broker contact is claimed in this packet. The live command may finish NEEDS_HOST on a clean non-daemon host, and that typed non-closure must not be promoted to PASS.",
+      "The worktree currently exposes a stale author-local reports/governance/nats_live_production_matrix/latest.json dated 2026-07-01. It is not copied, refreshed, committed, or used as repository proof.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required after the draft PR opens.",
+      "GitNexus impact used the exact-base indexed sibling /Users/dhyana/ds_titanium_m0_20260725 because the new isolated worktree was not separately indexed; all planned edited functions/classes were LOW risk and affected only their own governance CLI call chain."
+    ],
+    "rollback": "Revert Makefile, the three NATS governance scripts, the four focused NATS test files, and this exact packet together. Rollback restores the known TIT-009 defect: governance-all again depends on live receipt freshness. Do not restore or copy any live receipt as part of rollback.",
+    "packet_digest": "ea23c7b81b9508a343432b2ae7b4d433ab4e06247adacf0682f282f4250ea8c4"
+  }
+}
