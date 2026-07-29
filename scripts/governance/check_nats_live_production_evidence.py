@@ -167,13 +167,15 @@ def validate_source_freshness(
     # must grade the same occurrence the runner actually used: a wrapper
     # default followed by an explicit ``--host-mode live`` runs live, and the
     # inverse ordering runs non-live regardless of the first token.
-    host_mode_values = [
-        command[index + 1 : index + 2]
-        for index, argument in enumerate(command)
-        if argument == "--host-mode"
-    ]
+    host_mode_values: list[str] = []
+    for index, argument in enumerate(command):
+        if argument == "--host-mode":
+            window = command[index + 1 : index + 2]
+            host_mode_values.append(str(window[0]) if window else "")
+        elif isinstance(argument, str) and argument.startswith("--host-mode="):
+            host_mode_values.append(argument.split("=", 1)[1])
     require(
-        bool(host_mode_values) and host_mode_values[-1] == [HOST_MODE_LIVE],
+        bool(host_mode_values) and host_mode_values[-1] == HOST_MODE_LIVE,
         "evidence command did not declare --host-mode live",
     )
     fingerprints = payload.get("source_fingerprints")

@@ -552,3 +552,44 @@ def test_malformed_model_timeout_does_not_break_non_live_parse(monkeypatch) -> N
     args = _RUNNER.parse_args([])
     assert args.host_mode == "non-live"
     assert args.model_timeout == "ninety"
+
+
+def test_equals_form_host_mode_live_is_accepted(tmp_path: Path, monkeypatch) -> None:
+    # argparse accepts --host-mode=live; the validator must not reject it
+    # as a missing declaration.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + ["--host-mode=live"]
+
+    rows = _MODULE.validate_common(
+        payload,
+        24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert set(rows) == set(_MODULE.REQUIRED_ROWS)
+
+
+def test_equals_form_last_non_live_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    # A trailing equals-form non-live override runs non-live under argparse;
+    # a scan blind to the equals form would grade the earlier live token.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "live",
+        "--host-mode=non-live",
+    ]
+
+    with pytest.raises(
+        _MODULE.EvidenceError, match="did not declare --host-mode live"
+    ):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )
