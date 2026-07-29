@@ -20,6 +20,7 @@ from urllib.parse import quote
 
 from dharma_swarm.memory_kernel.adapters.base import SurfaceProbe
 from dharma_swarm.memory_kernel.atoms import (
+    AGENT_OWNER_METADATA_KEYS,
     MemoryAtom,
     MemoryAtomType,
     MemoryOrder,
@@ -773,6 +774,15 @@ def _safe_metadata(
     for key, value in metadata.items():
         if key in {"row", "payload"} and not include_payloads:
             redacted_keys.append(key)
+            # Ownership must survive payload redaction: scoped context
+            # admission enforces owner identity from atom metadata, and
+            # silently dropping the row would skip that check for
+            # shared-scope records whose owner lives only in the row.
+            if isinstance(value, dict):
+                owner_ids = _payload_owner_ids(value)
+                if owner_ids:
+                    merged = (*safe.get("owner_agent_ids", ()), *owner_ids)
+                    safe["owner_agent_ids"] = tuple(dict.fromkeys(merged))
             continue
         safe_value, child_redactions = _redacted_value(key, value)
         safe[key] = safe_value
@@ -790,12 +800,25 @@ def _safe_metadata(
     compact = {
         key: value
         for key, value in safe.items()
-        if key in STRUCTURAL_METADATA_KEYS or key.startswith("redaction_")
+        if key in STRUCTURAL_METADATA_KEYS
+        or key.startswith("redaction_")
+        or key == "owner_agent_ids"
     }
     compact["metadata_truncated"] = True
     compact["redaction_status"] = safe["redaction_status"]
     compact["redacted_keys"] = safe["redacted_keys"]
     return compact
+
+
+def _payload_owner_ids(payload: dict[str, Any]) -> tuple[str, ...]:
+    ids: list[str] = []
+    for key in AGENT_OWNER_METADATA_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            ids.append(value.strip())
+        elif isinstance(value, (list, tuple, set)):
+            ids.extend(str(item).strip() for item in value if str(item).strip())
+    return tuple(dict.fromkeys(ids))
 
 
 def _redacted_value(key: str, value: Any) -> tuple[Any, list[str]]:

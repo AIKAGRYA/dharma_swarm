@@ -383,6 +383,139 @@ def test_governed_retrieval_prefers_source_identity_for_source_files(tmp_path):
     assert result[0].metadata["retrieval_source_match"] > 0
 
 
+def test_atoms_for_candidates_maps_ranked_candidates_to_projection_atoms(tmp_path):
+    from dharma_swarm.memory_kernel import (
+        CensusConfig,
+        MemoryAtomType,
+        MemoryKernel,
+        MemoryKernelConfig,
+    )
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    ranked = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.91,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="semantic inbox drains require a verified reply receipt",
+    )
+    unidentified = RetrievalCandidate(
+        doc_id="",
+        rank=2,
+        score=0.4,
+        source="receipt:no-doc-id",
+        layer="working",
+        channels=("vector",),
+        content="candidate without a doc id is skipped",
+    )
+
+    atoms = kernel.atoms_for_candidates((ranked, unidentified))
+
+    assert len(atoms) == 1
+    atom = atoms[0]
+    assert atom.surface_id == "home.vectors"
+    assert atom.atom_type == MemoryAtomType.SOURCE_CHUNK
+    assert atom.content_ref == "retrieval:doc-a2a"
+    assert atom.source_row_key == "doc-a2a"
+    assert atom.source_refs == ("receipt:a2a-consumer-liveness",)
+    assert atom.content == "semantic inbox drains require a verified reply receipt"
+    assert atom.metadata["retrieval_rank"] == 1
+    assert atom.metadata["retrieval_score"] == 0.91
+    assert atom.metadata["retrieval_layer"] == "working"
+    assert atom.metadata["retrieval_channels"] == ["fts"]
+    assert atom.source_digest
+    assert atom.promotion_allowed is False
+    assert atom.context_admissible is False
+
+
+def test_atoms_for_candidates_fails_loud_when_projection_surface_missing(tmp_path):
+    import pytest
+
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    kernel.surfaces_by_id = {
+        surface_id: surface
+        for surface_id, surface in kernel.surfaces_by_id.items()
+        if surface_id != "home.vectors"
+    }
+    candidate = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.9,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="chunk",
+    )
+
+    # A silent () would make shadow receipts read admitted=0 with no WHY;
+    # the missing-surface anomaly must surface as a stamped shadow_error.
+    with pytest.raises(LookupError, match="home.vectors"):
+        kernel.atoms_for_candidates((candidate,))
+
+
+def test_memory_kernel_query_forwards_shadow_flags(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import dharma_swarm.memory_retrieval as memory_retrieval_module
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+
+    captured: dict[str, object] = {}
+
+    class _CaptureEngine:
+        def __init__(self, *, state_dir, memory_kernel):
+            captured["state_dir"] = state_dir
+
+        def retrieve(self, query):
+            captured["query"] = query
+            return SimpleNamespace(candidates=())
+
+    monkeypatch.setattr(
+        memory_retrieval_module, "GovernedRetrievalEngine", _CaptureEngine
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+
+    kernel.query(
+        "governed memory",
+        top_k=6,
+        enable_memory_kernel=False,
+        record_telemetry=False,
+    )
+
+    query = captured["query"]
+    assert query.text == "governed memory"
+    assert query.top_k == 6
+    assert query.enable_memory_kernel is False
+    assert query.record_telemetry is False
 def test_nonsense_query_abstains_when_calibrated_config_enabled(tmp_path):
     store = _seed_vector_store(tmp_path)
     engine = GovernedRetrievalEngine(
