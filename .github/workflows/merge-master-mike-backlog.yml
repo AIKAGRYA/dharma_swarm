@@ -87,7 +87,7 @@ jobs:
             echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
             echo "## 🔴 HALTED BY KILLSWITCH — no backlog fanout" >> "$GITHUB_STEP_SUMMARY"
             exit 1
-          elif echo "$response" | grep -qi "Not Found"; then
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
             echo "kill-switch absent; proceeding"
           else
             echo "kill-switch state UNKNOWN — failing closed: $response" >&2

@@ -51,6 +51,12 @@ def test_guard_is_first_step_of_every_chain_workflow():
         run = first["run"]
         assert SWITCH_URL_FRAGMENT in run, f"{workflow}: guard must read the loop-control switch path"
         assert "exit 1" in run, f"{workflow}: guard must exit non-zero when engaged/unknown"
+        # The GitHub 404 for a missing BRANCH says "No commit found for the
+        # ref loop-control" (observed live on PR #1157 run 30433704716), not
+        # "Not Found" — the guard must treat both as absent, plus the generic
+        # HTTP 404 markers, or a fresh repo fails closed forever.
+        assert "No commit found" in run, f"{workflow}: guard must treat a missing loop-control branch as absent"
+        assert "HTTP 404" in run, f"{workflow}: guard must match gh's HTTP 404 marker"
         assert "Not Found" in run, f"{workflow}: guard must proceed only on an explicit 404"
 
 
