@@ -4,50 +4,63 @@
 auto-merge-door execution prompt. Owns no authority. Re-read after any
 context compaction; refresh after every workstream state change.
 **Design doc:** `docs/plans/GRAPH_OF_LOOPS_DESIGN_2026-07-29.md` (draft
-PR #1156, branch `claude/graph-of-loops-audit-design-eh3lz5`).
+PR #1156, this branch).
 **Operator ruling in force:** DOOR = AUTO_WITH_DECORRELATED_REVIEW
-(§0 of the execution prompt, 2026-07-29). Tier 2 = operator hand-merge
-forever. Ruling record to be committed verbatim in PR-A.
+(2026-07-29). Tier 2 = operator hand-merge forever. Ruling record committed
+verbatim in PR-A:
+`docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md`.
 
-## Reconciled state (Phase 0, 2026-07-29)
+## Workstream ledger (2026-07-29, session 1 complete)
 
-- No prior progress file existed (`git ls-files | grep -i progress` — only
-  unrelated capital_lab artifact and a loop template).
-- No open branches or PRs matched the six workstreams (checked all 30 open
-  PRs on 2026-07-29; #1156 is the design doc itself). Fresh start.
-- PR #1156: open, draft, all 43 checks green, mergeable_state clean.
-- `docs/ops/loop_control/` does not exist yet (PR-B creates it).
-- `make onboard`: READY on this checkout.
+| PR | Branch | PR # | State |
+|---|---|---|---|
+| Design + this file | claude/graph-of-loops-audit-design-eh3lz5 | #1156 | draft, all green, awaiting operator |
+| PR-B kill-switch | claude/loop-pr-b-killswitch | #1157 | draft, all green (guard 404-variant fixed live), awaiting operator |
+| PR-C brief | claude/loop-pr-c-walking-brief | #1158 | draft, all green, awaiting operator |
+| PR-D task join | claude/loop-pr-d-task-join | #1159 | draft, all green, awaiting operator |
+| PR-A door | claude/loop-pr-a-door | #1160 | draft, all green (bootstrap case added live), **the constitutive hand-merge** |
+| PR-E hardening lane | claude/loop-pr-e-hardening-lane | #1162 | draft; Semgrep taint arc resolved at head d7a40dc (prompt on stdin; argv purely literal) — verify next scan |
+| PR-F watcher/canary | claude/loop-pr-f-watcher | #1163 | draft, opened, CI in flight |
 
-## Workstream ledger
+Every PR: Session Entry packet bound (preflight at base `ea190e2` passed;
+closeout evaluator passed at final head), verification transcripts in body,
+linked to #1156. Full `make agent-build-closeout` bundles blocked only by
+two pre-existing main-state failures (NATS evidence staleness; docops count
+drift) — documented with transcripts on the PR bodies.
 
-| PR | Branch | State | PR # | Notes |
-|---|---|---|---|---|
-| PR-B kill-switch | — | NOT STARTED | — | first: safety before capability |
-| PR-C brief | — | NOT STARTED | — | depends on PR-B label vocabulary only |
-| PR-A door | — | NOT STARTED | — | operator hand-merge only |
-| PR-D task join | — | NOT STARTED | — | read WIRING_AND_LOOPS.md:64 first |
-| PR-E hardening lane | — | NOT STARTED | — | after PR-D ready-set |
-| PR-F watcher/ingest/canary | — | NOT STARTED | — | canary duty per §9 |
+## Recommended merge order for the operator
 
-## Standing constraints (verified on disk this session)
+B (safety) → C (visibility) → A (the door; then: add "Automerge tier
+policy" to branch protection + titanium-track manifest row) → D → E (then
+set the `DHARMA_LANE_AGENT_CMD` secret to `claude`, `claude-npx`, or
+`codex`) → F. After B+C: dispatch loop-emergency-stop, watch the chain go
+red, loop-resume — the kill-switch acceptance tap.
 
-- Hot paths (`.github/`, `scripts/runtime/`, `scripts/governance/`,
-  `Makefile`) require packet-bound preflight
-  (`scripts/runtime/pr_merge_control.py:94-109`;
-  `docs/governance/BUILD_SESSION_ENTRYPOINT.md:67-74`).
-- Surface-ownership tension, flagged not hidden: automerge.yml,
-  codex-mention-router.yml, pr_merge_control.py are owned by track
-  `merge-master-mike-d4-2026-06`; the execution prompt lands everything
-  under `loop-closure-2026-06`. PR-A/PR-B bodies must name this and the
-  operator adjudicates at hand-merge.
-- Prohibitions in force: `alive_claim` stays False; no `shadow=False` near
-  `verify_promotion`; loops 12/13 stay BLOCKED; no new track; no Beads
-  adoption (PR-D records the fence decision); Tier-2 PRs never
-  auto-merged; KILLSWITCH presence halts all lane/automation work.
+## Incidents caught live by CI during the build (all fixed + pinned by test)
+
+1. Kill-switch guard failed closed on a missing loop-control branch
+   ("No commit found" 404 variant) — automerge run 30433704716.
+2. Tier-policy check crashed on its own introducing PR (trusted checkout
+   predates the policy) — run 30436464851; bootstrap case added.
+3. Semgrep taint arc on the hardening lane (alerts 537-541): real flow was
+   argparse → select_target return → prompt → argv, not the env secret.
+   Final design: secret = template selector; prompt on stdin; nothing
+   suppressed.
+
+## Standing constraints (unchanged)
+
+Hot-path packet discipline per `pr_merge_control.py:94-109`; Mike-owned
+surfaces ride Mike-track packets (B, A), loop-closure otherwise (C, E, F);
+`Makefile:264` help text still shows the old token (titanium-owned; one-line
+follow-up under that track). Prohibitions all honored: `alive_claim` False,
+no `shadow=False`, loops 12/13 blocked, no new track, Beads fence AFFIRMED
+(decision record in `docs/architecture/WIRING_AND_LOOPS.md`), Tier-2 PRs
+never auto-merged, KILLSWITCH halts lanes.
 
 ## Session log
 
-- 2026-07-29 (session 1): grounding audit → design doc → PR #1156 (green,
-  draft). Execution prompt received with §0 ruling. Phase 0 reconciliation
-  complete; this file created. Next: PR-B.
+- 2026-07-29 (session 1): grounding audit → design doc → #1156. Execution
+  prompt with §0 ruling received. Phase 0 reconciled (fresh start). All six
+  workstream PRs built, opened as drafts, driven through CI; three live CI
+  incidents fixed. Gate-10 evidence: this ledger + PR receipts accumulate;
+  nothing flipped.
