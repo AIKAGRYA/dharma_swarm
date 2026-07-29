@@ -506,3 +506,49 @@ def test_non_live_default_does_not_inherit_ambient_stale_evidence(
     output = capsys.readouterr()
     assert result == _MODULE.EXIT_NEEDS_HOST == 2
     assert "tracked or ambient live artifacts are not inherited" in output.out
+
+
+# ── matrix runner argv/environment hygiene (Codex P2s on PR #1164) ──
+
+_RUNNER_PATH = _CHECKER_PATH.with_name("run_nats_live_production_matrix.py")
+_RUNNER_SPEC = importlib.util.spec_from_file_location(
+    "run_nats_live_production_matrix_under_test", _RUNNER_PATH
+)
+_RUNNER = importlib.util.module_from_spec(_RUNNER_SPEC)
+sys.modules[_RUNNER_SPEC.name] = _RUNNER
+_RUNNER_SPEC.loader.exec_module(_RUNNER)
+
+
+def test_invalid_env_host_mode_fails_closed(monkeypatch, capsys) -> None:
+    # choices= does not validate environment-supplied defaults; an
+    # unrecognized mode must never fall through to the live branch.
+    monkeypatch.setenv("DHARMA_NATS_HOST_MODE", "lvie")
+    with pytest.raises(SystemExit) as excinfo:
+        _RUNNER.parse_args([])
+    assert excinfo.value.code == 2
+    assert "must be 'non-live' or 'live'" in capsys.readouterr().err
+
+
+def test_env_live_mode_is_recorded_in_command_argv(monkeypatch) -> None:
+    # An environment-only live invocation must still record the explicit
+    # flag its own post-run evidence validation requires.
+    monkeypatch.setenv("DHARMA_NATS_HOST_MODE", "live")
+    args = _RUNNER.parse_args([])
+    assert args.host_mode == "live"
+    assert args.command_argv[-2:] == ["--host-mode", "live"]
+
+
+def test_explicit_host_mode_flag_is_not_duplicated(monkeypatch) -> None:
+    monkeypatch.delenv("DHARMA_NATS_HOST_MODE", raising=False)
+    args = _RUNNER.parse_args(["--host-mode", "live"])
+    assert args.command_argv.count("--host-mode") == 1
+
+
+def test_malformed_model_timeout_does_not_break_non_live_parse(monkeypatch) -> None:
+    # The live-only timeout must stay unconverted at parse time so a
+    # non-live host with inherited junk still reaches its typed verdict.
+    monkeypatch.setenv("DHARMA_MATRIX_MODEL_TIMEOUT", "ninety")
+    monkeypatch.delenv("DHARMA_NATS_HOST_MODE", raising=False)
+    args = _RUNNER.parse_args([])
+    assert args.host_mode == "non-live"
+    assert args.model_timeout == "ninety"
