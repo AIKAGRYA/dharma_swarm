@@ -166,11 +166,11 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **1,038** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Total Python modules | **1,039** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **453 (43.6%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **372,210** | wc -l across dharma_swarm Python modules |
-| Test files | **933** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **14,072 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **372,354** | wc -l across dharma_swarm Python modules |
+| Test files | **934** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **14,081 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,451** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
