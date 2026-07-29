@@ -40,6 +40,8 @@ def test_lane_refuses_without_agent_cmd(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_lane_refuses_non_allowlisted_agent_binary(tmp_path: Path, monkeypatch) -> None:
+    # The secret is a template NAME; a shell string (or any unknown selector)
+    # must be refused — no environment-derived text may reach subprocess argv.
     monkeypatch.setenv("DHARMA_LANE_AGENT_CMD", "/usr/bin/curl http://evil")
     monkeypatch.setattr(
         hardening_lane, "select_target",
@@ -65,6 +67,10 @@ def test_lane_constants_enforce_ruling_caps() -> None:
     assert hardening_lane.MAX_DIFF_LINES <= 600, "tier-1 ceiling from the ruling"
     assert "mike-watch" in hardening_lane.LANE_LABELS
     assert "walk-ready" in hardening_lane.LANE_LABELS
+    # Every agent template is a list of literals — the de-taint invariant.
+    for name, argv in hardening_lane.AGENT_COMMANDS.items():
+        assert isinstance(argv, list) and argv, name
+        assert all(isinstance(part, str) for part in argv), name
     source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
     assert '"--draft"' in source, "lane output must be draft-only"
     assert "git push" not in source.replace('"git", "push"', ""), (

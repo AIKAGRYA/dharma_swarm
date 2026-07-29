@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -38,11 +37,16 @@ MAX_AGENT_SECONDS = int(os.environ.get("LANE_MAX_AGENT_SECONDS", "1200"))
 LANE_BRANCH_PREFIX = "lane/hardening-"
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
 RECIPIENT = "hardening-lane"
-# The operator-configured agent command may only invoke one of these
-# binaries (basename of argv[0]). This is a real constraint, not scanner
-# appeasement: the lane refuses to improvise or launder an arbitrary
-# executable even if the secret is mis-set (PR #1162 Semgrep finding).
-ALLOWED_AGENT_BINARIES = frozenset({"claude", "codex", "npx", "python3"})
+# The DHARMA_LANE_AGENT_CMD secret selects one of these literal argv
+# templates by key — it is a NAME, not a shell string. No environment-derived
+# text ever enters the subprocess argv (PR #1162 alerts 537-540), and a
+# mis-set secret cannot smuggle flags or executables: extending this table is
+# a code change through the normal review door.
+AGENT_COMMANDS: dict[str, list[str]] = {
+    "claude": ["claude", "-p"],
+    "claude-npx": ["npx", "-y", "@anthropic-ai/claude-code", "-p"],
+    "codex": ["codex", "exec"],
+}
 
 
 def _utc_stamp() -> str:
@@ -119,19 +123,18 @@ def main(argv: list[str] | None = None) -> int:
                  "reason": "no ready mailbox task, nightly green"}, out)
         return 0
 
-    agent_cmd = os.environ.get("DHARMA_LANE_AGENT_CMD", "").strip()
-    if not agent_cmd:
+    agent_choice = os.environ.get("DHARMA_LANE_AGENT_CMD", "").strip()
+    if not agent_choice:
         receipt({"status": "BLOCKED", "target": target,
                  "reason": "DHARMA_LANE_AGENT_CMD secret not configured — "
                            "lane refuses to improvise an agent"}, out)
         return 0
-    agent_argv = shlex.split(agent_cmd)
-    agent_binary = Path(agent_argv[0]).name if agent_argv else ""
-    if agent_binary not in ALLOWED_AGENT_BINARIES:
+    agent_argv = AGENT_COMMANDS.get(agent_choice)
+    if agent_argv is None:
         receipt({"status": "BLOCKED", "target": target,
-                 "reason": f"agent binary {agent_binary!r} is not in the "
-                           f"allowlist {sorted(ALLOWED_AGENT_BINARIES)} — "
-                           "lane refuses non-approved executables"}, out)
+                 "reason": f"agent selector {agent_choice!r} is not in the "
+                           f"allowlist {sorted(AGENT_COMMANDS)} — the secret "
+                           "names a template, never a shell string"}, out)
         return 0
 
     branch = f"{LANE_BRANCH_PREFIX}{_utc_stamp()}"
@@ -146,14 +149,11 @@ def main(argv: list[str] | None = None) -> int:
         "pr_merge_control.py, or any referee-layer path."
     )
     try:
-        # The argv head is allowlist-validated above; the command itself is an
-        # operator-configured repo secret, which is trusted input by design
-        # (an actor who controls repo secrets already controls the workflow).
-        # Bare nosemgrep: the qualified rule-id form failed to suppress under
-        # the registry-pack scan (PR #1162 alerts 537-539); bare markers
-        # suppress any rule on these two anchor lines.
-        agent = subprocess.run(  # nosemgrep
-            [*agent_argv, prompt],  # nosemgrep
+        # agent_argv is a literal template from AGENT_COMMANDS; prompt is
+        # composed above from repo-internal task data. Nothing here derives
+        # from the environment.
+        agent = subprocess.run(
+            [*agent_argv, prompt],
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
