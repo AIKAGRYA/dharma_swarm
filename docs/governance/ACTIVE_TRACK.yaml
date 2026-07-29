@@ -1736,7 +1736,7 @@ active_tracks:
     name: Titanium-grade repository hardening — truthful verification and clean-room closure
     status: ACTIVE
     opened_at: "2026-07-17"
-    verified_at: "2026-07-17"
+    verified_at: "2026-07-25"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1831,6 +1831,11 @@ active_tracks:
       WP-00 changes governance, evidence, and projections only; it implements
       none of the Phase 0 packets.
 
+      M0 reconciles the current Phase 0 packet modalities against exact merged
+      main in reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
+      That receipt is point-in-time evidence, not a substitute for the eight
+      completion criteria or authority to promote a blocked external decision.
+
     completion_criteria:
       - id: titanium_bootstrap_contract_passes
         kind: command_passes
@@ -1870,55 +1875,35 @@ active_tracks:
 
     next_items:
       - id: WP-0S
-        what: "Minimum fail-closed ingress: production-shaped startup and every enabled mutation transport reject missing or invalid authentication; operator records CONTAINED, PRIVATE_ONLY, or NOT_DEPLOYED."
-        kind: code
-        blocker: true
-      - id: WP-0A
-        what: "Hermetic Python bootstrap from the frozen lock with a pinned uv version and clean-clone contract proof."
-        kind: code
-        blocker: true
-      - id: WP-0B
-        what: "Verifier truth: required behavioral gates execute and missing tools, skips, timeouts, or malformed configuration cannot report green."
+        what: "Record the FastAPI exposure verdict and resolve or owner-route the handler-level keyless webhook residual; BLOCKED_OPERATOR remains non-passing. Recheck with python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q."
         kind: code
         blocker: true
       - id: WP-0C1R
-        what: "Adjudicate Semgrep findings before changing scanner policy; every finding receives an owner-safe typed disposition."
+        what: "Re-run pinned strict Semgrep on current main and resolve every current owner-deferred finding through its governing owner; the historical baseline at reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md may not be promoted to a current clean result."
         kind: governance
         blocker: true
-      - id: WP-0C1
-        what: "Required scanners and governance subprocesses fail closed, receive closed stdin, and have finite timeouts."
-        kind: code
-        blocker: true
-      - id: WP-0C2
-        what: "CROSS-OWNER organism-rewire packet: version-aware Go capability and the governed Go-trigger seam; no Titanium ownership transfer."
-        kind: code
-        blocker: true
       - id: WP-0D
-        what: "Fast-suite determinism: reproduce the suite-context timeout, kill the failure mode, and pass two consecutive runs."
+        what: "Add tests/test_fast_suite_isolation.py and prove two consecutive clean make test-fast runs plus make test on the merged candidate."
         kind: code
         blocker: true
       - id: WP-0E
-        what: "Split hermetic repository verification from live-host NATS evidence without promoting NEEDS_HOST to PASS."
+        what: "Separate hermetic NATS repository verification from live-host evidence and add tests/test_nats_verification_split.py plus tests/test_nats_live_production_evidence.py without promoting NEEDS_HOST."
         kind: code
         blocker: true
       - id: WP-0F1
-        what: "Establish one required-check manifest and prove committed CI Truth/parity agrees with live branch protection; Administration-read access and operator approval remain explicit gates."
+        what: "Ratify the final required-check and human-review policies, provision bounded Administration-read parity, and reprove every WP-0F2 consumer against the ratified set with python3 scripts/governance/check_ci_parity.py."
         kind: governance
         blocker: true
-      - id: WP-0F2
-        what: "CROSS-OWNER Mike packet: every automerge, manual Mike, and workflow-dispatch entry path consumes WP-0F1 required-check truth and fails closed on absent or non-success checks."
-        kind: code
-        blocker: true
       - id: WP-0G
-        what: "Strict DocOps convergence on main, including generated blocks and repair-PR check preservation."
+        what: "Choose the DocOps credential or reviewed-PR delivery authority, prove the rolling reconcile head receives checks, and reconverge generated counts after remaining implementation merges with python3 scripts/docops/check_docops_integrity.py."
         kind: code
         blocker: true
       - id: WP-0H
-        what: "Polyglot orchestration: required Python, Go, dashboard, and terminal lanes run on declared pinned toolchains."
+        what: "Add pinned and locally reproducible Go, dashboard, and terminal orchestration, including frontend-check, terminal-check, required CI execution, and tests/test_polyglot_ci_contract.py."
         kind: code
         blocker: true
       - id: WP-0I
-        what: "Independent fresh non-shallow clone proof on merged main; implementation author may not be the sole reviewer and unavailable live evidence remains typed."
+        what: "Run the independent fresh non-shallow clone proof on final merged main, include WP-0A clean-container evidence, and commit reports/governance/titanium/phase0_clean_room_receipt.json."
         kind: governance
         blocker: true
 
