@@ -15,6 +15,7 @@ from dharma_swarm.memory_kernel import (
     CensusConfig,
     MemoryAtom,
     MemoryAtomType,
+    MemoryContextBudget,
     MemoryKernel,
     MemoryKernelConfig,
     MemoryLane,
@@ -31,6 +32,10 @@ from dharma_swarm.memory_kernel import (
     preview_memory_pack,
 )
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
+from dharma_swarm.memory_kernel.default_context import (
+    build_memory_kernel_default_context,
+    memory_kernel_isolation_policy_from_metadata,
+)
 
 
 def _compiler(memory_kernel: object) -> ContextCompiler:
@@ -247,6 +252,7 @@ async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
         task_description="Use governed memory.",
         query="alpha governed memory",
         token_budget=1200,
+        metadata={"topology": "supervisor"},
     )
 
     assert "## Memory Kernel" in bundle.rendered_text
@@ -260,7 +266,18 @@ async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("topology", ["swarm", "supervisor", "subagents_as_tools"])
+@pytest.mark.parametrize(
+    "topology",
+    [
+        "swarm",
+        "supervisor",
+        "subagents_as_tools",
+        "fan_out",
+        "fan_in",
+        "pipeline",
+        "broadcast",
+    ],
+)
 async def test_context_compiler_applies_live_topology_agent_memory_isolation(
     topology: str,
 ) -> None:
@@ -312,10 +329,248 @@ async def test_context_compiler_applies_live_topology_agent_memory_isolation(
     assert metadata["allowed_agent_ids"] == ["agent-alpha"]
     assert "agent" in metadata["allowed_scopes"]
     assert "project" in metadata["allowed_scopes"]
+    expected_semantics = (
+        "supervisor_scoped" if topology == "supervisor" else "worker_scoped"
+    )
+    assert metadata["isolation_semantics"] == expected_semantics
+    assert metadata["isolation_warnings"] == []
+    assert ("session" in metadata["allowed_scopes"]) == (topology == "supervisor")
     assert metadata["admitted_count"] == 2
     assert metadata["omitted_count"] == 2
     budget = kernel.kwargs["budget"]
     assert getattr(budget, "allowed_agent_ids") == ("agent-alpha",)
+    assert getattr(budget, "isolation_mode") == "scoped"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topology", ["dispatch", "warlock_mode", None])
+async def test_context_compiler_fails_closed_on_unknown_topology(
+    topology: str | None,
+) -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "alpha governed memory for the active agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-alpha",
+            ),
+            _memory_atom(
+                "beta private memory for another agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-beta",
+            ),
+            _memory_atom(
+                "shared project memory for the graph",
+                scope=MemoryScope.PROJECT,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    metadata_in: dict[str, object] = {"agent_id": "agent-alpha"}
+    if topology is not None:
+        metadata_in["topology"] = topology
+    bundle = await compiler.compile_bundle(
+        session_id="sess_unknown_topology",
+        task_id="task_unknown_topology",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata=metadata_in,
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["isolation_applied"] is True
+    assert metadata["isolation_semantics"] == "fail_closed_minimal"
+    assert metadata["allowed_scopes"] == ["project", "repo"]
+    assert metadata["allowed_memory_lanes"] == ["semantic", "procedural"]
+    expected_warning = (
+        "topology_missing_fail_closed"
+        if topology is None
+        else f"unknown_topology_fail_closed:{topology}"
+    )
+    assert metadata["isolation_warnings"] == [expected_warning]
+    # PROVENANCE-lane fixtures are outside the minimal curated lanes; the
+    # unknown-topology bundle admits nothing instead of everything.
+    assert metadata["admitted_count"] == 0
+    assert "alpha governed memory for the active agent" not in bundle.rendered_text
+    assert "beta private memory for another agent" not in bundle.rendered_text
+    assert "shared project memory for the graph" not in bundle.rendered_text
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "isolation_mode") == "scoped"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topology", ["fan_out", "supervisor"])
+async def test_worker_topologies_exclude_session_scope(topology: str) -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "session memory from the originating run",
+                scope=MemoryScope.SESSION,
+            ),
+            _memory_atom(
+                "shared project memory for the graph",
+                scope=MemoryScope.PROJECT,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id=f"sess_session_scope_{topology}",
+        task_id=f"task_session_scope_{topology}",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata={"topology": topology, "agent_id": "agent-alpha"},
+    )
+
+    assert "shared project memory for the graph" in bundle.rendered_text
+    session_visible = "session memory from the originating run" in bundle.rendered_text
+    assert session_visible == (topology == "supervisor")
+    if topology != "supervisor":
+        assert "scope_not_allowed" in bundle.rendered_text
+
+
+@pytest.mark.asyncio
+async def test_scoped_isolation_hides_other_agents_atoms_in_shared_scopes() -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "beta owned note shared into the swarm scope",
+                scope=MemoryScope.SWARM,
+                agent_id="agent-beta",
+            ),
+            _memory_atom(
+                "ownerless swarm coordination note",
+                scope=MemoryScope.SWARM,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_cross_scope_ownership",
+        task_id="task_cross_scope_ownership",
+        task_description="Use governed memory.",
+        query="swarm",
+        token_budget=4000,
+        metadata={"topology": "fan_out", "agent_id": "agent-alpha"},
+    )
+
+    assert "ownerless swarm coordination note" in bundle.rendered_text
+    assert "beta owned note shared into the swarm scope" not in bundle.rendered_text
+    assert "agent_not_allowed" in bundle.rendered_text
+
+
+@pytest.mark.asyncio
+async def test_isolation_legacy_env_restores_pre_typed_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY", "1")
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "beta private memory for another agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-beta",
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_legacy_escape_hatch",
+        task_id="task_legacy_escape_hatch",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata={"topology": "fan_out"},
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["isolation_applied"] is False
+    assert metadata["isolation_semantics"] == "legacy"
+    assert "beta private memory for another agent" in bundle.rendered_text
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "isolation_mode") == "unrestricted"
+
+
+def test_isolation_semantics_map_is_total_over_topology_type() -> None:
+    from dharma_swarm.memory_kernel.topology_policy import ISOLATION_SEMANTICS
+    from dharma_swarm.models import TopologyType
+
+    assert set(ISOLATION_SEMANTICS) == set(TopologyType)
+
+
+def test_resolve_unmapped_topology_member_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dharma_swarm.memory_kernel import topology_policy
+    from dharma_swarm.models import TopologyType
+
+    monkeypatch.delitem(
+        topology_policy.ISOLATION_SEMANTICS, TopologyType.FAN_OUT
+    )
+    semantics, warnings = topology_policy.resolve(TopologyType.FAN_OUT)
+    assert semantics is topology_policy.FAIL_CLOSED_MINIMAL
+    assert warnings == ("unmapped_topology_fail_closed:fan_out",)
+    semantics, warnings = topology_policy.resolve("fan_out")
+    assert semantics is topology_policy.FAIL_CLOSED_MINIMAL
+    assert warnings == ("unmapped_topology_fail_closed:fan_out",)
+
+
+def test_scoped_budget_denies_on_empty_allowances() -> None:
+    budget = MemoryContextBudget(
+        isolation_mode="scoped",
+        allowed_scopes=(),
+        allowed_memory_lanes=(),
+    )
+    pack = preview_memory_pack(
+        (_memory_atom("orphaned atom", scope=MemoryScope.PROJECT),),
+        budget=budget,
+    )
+    assert pack.admitted_count == 0
+    reasons = pack.items[0].omission_reasons
+    assert "scope_denied_fail_closed" in reasons
+    assert "memory_lane_denied_fail_closed" in reasons
+
+
+def test_budget_rejects_unknown_isolation_mode() -> None:
+    with pytest.raises(ValueError, match="isolation_mode"):
+        MemoryContextBudget(isolation_mode="scopedd")
+
+
+def test_explicit_allowance_override_stamps_warning() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-alpha",
+            "memory_kernel_allowed_scopes": ["session"],
+        }
+    )
+    assert policy.semantics == "worker_scoped"
+    assert policy.allowed_scopes == (MemoryScope.SESSION,)
+    assert "explicit_scopes_override_topology_semantics" in policy.warnings
+
+
+def test_enum_topology_metadata_stamps_enum_value() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+    from dharma_swarm.models import TopologyType
+
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": TopologyType.FAN_OUT, "agent_id": "agent-alpha"}
+    )
+    assert policy.topology == "fan_out"
+    assert policy.semantics == "worker_scoped"
+    assert policy.warnings == ()
 
 
 @pytest.mark.asyncio
@@ -450,3 +705,405 @@ async def test_context_compiler_falls_back_when_memory_kernel_fails() -> None:
     metadata = bundle.metadata["memory_kernel_default"]
     assert metadata["status"] == "failed"
     assert metadata["error_type"] == "RuntimeError"
+
+
+class _ShadowRankedMemoryKernel(_FakeMemoryKernel):
+    def __init__(
+        self,
+        pack: SimpleNamespace,
+        *,
+        candidates: tuple[SimpleNamespace, ...] = (),
+        shadow_atoms: tuple[MemoryAtom, ...] = (),
+        query_error: Exception | None = None,
+    ) -> None:
+        super().__init__(pack)
+        self.candidates = candidates
+        self.shadow_atoms = shadow_atoms
+        self.query_error = query_error
+        self.query_calls: list[tuple[str, int]] = []
+        self.query_kwargs: list[dict[str, object]] = []
+
+    def query(
+        self, text: str, *, top_k: int = 10, **kwargs: object
+    ) -> SimpleNamespace:
+        self.query_calls.append((text, top_k))
+        self.query_kwargs.append(dict(kwargs))
+        if self.query_error is not None:
+            raise self.query_error
+        return SimpleNamespace(candidates=self.candidates)
+
+    def atoms_for_candidates(self, candidates: object) -> tuple[MemoryAtom, ...]:
+        return self.shadow_atoms
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_unavailable_when_ranked_door_missing() -> None:
+    compiler = _compiler(_FakeMemoryKernel(_pack()))
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_unavailable",
+        task_id="task_shadow_unavailable",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "unavailable"
+    assert metadata["ranked_shadow"]["reason"] == "ranked_door_unavailable"
+    assert "shadow_error" not in metadata
+
+
+def test_memory_kernel_shadow_records_divergence_metrics() -> None:
+    overlapping = SimpleNamespace(
+        doc_id="doc-overlap",
+        source="memory_kernel:home.witness",
+        metadata={},
+    )
+    novel = SimpleNamespace(
+        doc_id="doc-novel",
+        source="receipt:unrelated-lane",
+        metadata={},
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        candidates=(overlapping, novel),
+        shadow_atoms=(
+            _memory_atom(
+                "shadow ranked project memory alpha", scope=MemoryScope.PROJECT
+            ),
+            _memory_atom(
+                "shadow ranked project memory beta", scope=MemoryScope.PROJECT
+            ),
+        ),
+    )
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": "supervisor", "agent_id": "agent-alpha"}
+    )
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+        isolation_policy=policy,
+    )
+
+    assert section is not None
+    # Legacy still serves: the rendered section comes from the legacy pack
+    # only; shadow atoms never reach prompt content in the shadow phase.
+    assert "safe witness note" in section.content
+    assert "shadow ranked project memory alpha" not in section.content
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] == 0.5
+    assert metadata["shadow_admitted_delta"] == 1
+    assert "shadow_error" not in metadata
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    assert detail["top_k"] == 12
+    assert detail["candidate_count"] == 2
+    assert detail["shadow_atom_count"] == 2
+    assert detail["overlap_count"] == 1
+    assert detail["overlap_key_namespace"] == "unredacted_identity_only"
+    assert detail["legacy_identity_key_count"] == 1
+    assert detail["legacy_redacted_ref_count"] == 0
+    assert detail["shadow_admitted_count"] == 2
+    assert detail["legacy_admitted_count"] == 1
+    assert detail["shadow_omission_reason_counts"] == {}
+    assert kernel.query_calls == [("governed memory", 12)]
+    # Shadow must not double kernel I/O: no engine-side admission pass, no
+    # telemetry write.
+    assert kernel.query_kwargs == [
+        {"enable_memory_kernel": False, "record_telemetry": False}
+    ]
+
+
+def test_memory_kernel_shadow_kill_switch_disables_shadow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_RANKED_SHADOW", "0")
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "disabled"
+    assert kernel.query_calls == []
+
+
+def test_memory_kernel_shadow_skips_empty_recall_query() -> None:
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "skipped"
+    assert metadata["ranked_shadow"]["reason"] == "empty_recall_query"
+    assert kernel.query_calls == []
+
+
+def test_memory_kernel_default_context_bad_token_budget_fails_closed() -> None:
+    # Pre-shadow contract: a bad budget loses one section, never the bundle.
+    section, metadata = build_memory_kernel_default_context(
+        _FakeMemoryKernel(_pack()),
+        recall_query="governed memory",
+        token_budget=None,  # type: ignore[arg-type]
+    )
+
+    assert section is None
+    assert metadata["status"] == "failed"
+    assert metadata["error_type"] == "TypeError"
+
+
+def test_memory_kernel_shadow_overlap_excludes_redacted_legacy_refs() -> None:
+    redacted_pack = _pack()
+    redacted_item = SimpleNamespace(
+        admitted=True,
+        rank=2,
+        surface_id="repo.docs",
+        atom_type="source_chunk",
+        truth_state="curated",
+        authority_level="medium",
+        content_snippet="doc chunk",
+        selection_reasons=("truth_state:curated",),
+        omission_reasons=(),
+        content_ref="<local_path_redacted>",
+        source_refs=("<local_path_redacted>",),
+    )
+    redacted_pack = SimpleNamespace(
+        **{
+            **redacted_pack.__dict__,
+            "items": (*redacted_pack.items, redacted_item),
+        }
+    )
+    file_backed_candidate = SimpleNamespace(
+        doc_id="doc-file",
+        source="/Users/example/docs/note.md",
+        metadata={"source_path": "/Users/example/docs/note.md"},
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        redacted_pack,
+        candidates=(file_backed_candidate,),
+        shadow_atoms=(),
+    )
+
+    _, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+    )
+
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    # The redaction sentinel never becomes an identity key (it would
+    # false-match across atoms) — it is counted as the metric's blind spot.
+    assert detail["overlap_count"] == 0
+    assert detail["overlap_key_namespace"] == "unredacted_identity_only"
+    assert detail["legacy_identity_key_count"] == 1
+    assert detail["legacy_redacted_ref_count"] == 2
+    assert metadata["shadow_overlap_at_k"] == 0.0
+
+
+def _projection_surface() -> MemorySurface:
+    # Mirrors the production home.vectors posture (surface_specs_core):
+    # PROJECTION / AuthorityLevel.NONE / canon_risk CRITICAL.
+    return MemorySurface(
+        surface_id="home.vectors",
+        path="/tmp/vectors.db",
+        owner_module="tests",
+        role=MemorySurfaceRole.PROJECTION_INDEX,
+        category=SurfaceCategory.PROJECTION,
+        authority_level=AuthorityLevel.NONE,
+        write_mode=WriteMode.READ_ONLY,
+        adapter_mode=AdapterMode.READ_ONLY,
+        active_status=SurfaceStatus.ACTIVE,
+        health=MemorySurfaceHealth(exists=True, path_type="file"),
+        provenance_quality="test",
+        canon_risk=RiskLevel.CRITICAL,
+        pii_secrets_risk=RiskLevel.MEDIUM,
+    )
+
+
+def test_memory_kernel_shadow_projection_posture_admits_zero_with_reasons() -> None:
+    # The honest-shadow claim under production posture: home.vectors-stamped
+    # atoms run the same scoped budget (allow_projections=False,
+    # allow_high_risk=False) and are OMITTED with stamped WHYs, not silently.
+    shadow_atoms = tuple(
+        MemoryAtom.build(
+            surface=_projection_surface(),
+            atom_type=MemoryAtomType.SOURCE_CHUNK,
+            content_ref=f"retrieval:doc-{index}",
+            content=f"ranked projection chunk {index}",
+            timestamp="2026-05-12T01:00:00Z",
+            source_path="receipt:ranked-shadow",
+            adapter_name="governed_retrieval",
+            read_mode=ReadMode.READ_ONLY,
+            source_row_key=f"doc-{index}",
+        )
+        for index in range(2)
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        candidates=(
+            SimpleNamespace(doc_id="doc-0", source="receipt:ranked-shadow", metadata={}),
+            SimpleNamespace(doc_id="doc-1", source="receipt:ranked-shadow", metadata={}),
+        ),
+        shadow_atoms=shadow_atoms,
+    )
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": "supervisor", "agent_id": "agent-alpha"}
+    )
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+        isolation_policy=policy,
+    )
+
+    assert section is not None
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    assert detail["shadow_atom_count"] == 2
+    assert detail["shadow_admitted_count"] == 0
+    assert "projection_blocked" in detail["shadow_omission_reason_counts"]
+    assert "high_risk_blocked" in detail["shadow_omission_reason_counts"]
+    assert metadata["shadow_admitted_delta"] == -1
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_error_never_breaks_compile() -> None:
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        query_error=RuntimeError("ranked door down"),
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_error",
+        task_id="task_shadow_error",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    assert "## Memory Kernel" in bundle.rendered_text
+    assert "safe witness note" in bundle.rendered_text
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["shadow_error"].startswith("RuntimeError")
+    assert metadata["ranked_shadow"]["status"] == "error"
+def test_redaction_boundary_preserves_row_ownership_for_scoped_admission() -> None:
+    """Owner ids inside a dropped row/payload dict must survive redaction so
+    scoped admission can still enforce atom ownership in shared scopes."""
+
+    from dharma_swarm.memory_kernel.adapters.read_only import _safe_metadata
+
+    safe = _safe_metadata(
+        {"row": {"agent_id": "agent-a", "summary": "session event"}},
+        include_payloads=False,
+        max_chars=4096,
+    )
+    assert "row" not in safe
+    assert safe["owner_agent_ids"] == ("agent-a",)
+
+    # The hoisted key must also survive the oversized-metadata compact path.
+    compact = _safe_metadata(
+        {"row": {"agent_id": "agent-a"}, "noise": "x" * 5000},
+        include_payloads=False,
+        max_chars=200,
+    )
+    assert compact["metadata_truncated"] is True
+    assert compact["owner_agent_ids"] == ("agent-a",)
+
+    atom = _memory_atom(
+        "other agent shared row",
+        scope=MemoryScope.SWARM,
+        metadata={"owner_agent_ids": ("agent-a",)},
+    )
+    pack = preview_memory_pack(
+        (atom,),
+        budget=MemoryContextBudget(
+            isolation_mode="scoped",
+            allowed_scopes=(MemoryScope.SWARM,),
+            allowed_agent_ids=("agent-b",),
+            allowed_memory_lanes=(MemoryLane.PROVENANCE,),
+            require_source_digest=False,
+            require_source_row_key=False,
+        ),
+    )
+    assert pack.admitted_count == 0
+    assert "agent_not_allowed" in pack.items[0].omission_reasons
+
+
+def test_permuted_explicit_allowances_do_not_stamp_override_warning() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        memory_kernel_isolation_policy_from_metadata,
+    )
+    from dharma_swarm.memory_kernel.topology_policy import WORKER_SCOPED
+
+    permuted_scopes = [scope.value for scope in reversed(WORKER_SCOPED.allowed_scopes)]
+    permuted_lanes = [
+        lane.value for lane in reversed(WORKER_SCOPED.allowed_memory_lanes)
+    ]
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-a",
+            "memory_kernel_allowed_scopes": permuted_scopes,
+            "memory_kernel_allowed_memory_lanes": permuted_lanes,
+        }
+    )
+    assert "explicit_scopes_override_topology_semantics" not in policy.warnings
+    assert "explicit_lanes_override_topology_semantics" not in policy.warnings
+
+    narrowed = memory_kernel_isolation_policy_from_metadata(
+        {
+            "topology": "fan_out",
+            "agent_id": "agent-a",
+            "memory_kernel_allowed_scopes": ["project"],
+        }
+    )
+    assert "explicit_scopes_override_topology_semantics" in narrowed.warnings
+
+
+def test_scoped_candidate_window_overfetches_beyond_admitted_budget() -> None:
+    from dharma_swarm.memory_kernel.default_context import (
+        build_memory_kernel_default_context,
+    )
+
+    kernel = _FakeMemoryKernel(pack=_pack())
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="recent work",
+        token_budget=1200,
+    )
+    assert metadata["status"] == "used"
+    query = kernel.kwargs["query"]
+    budget = kernel.kwargs["budget"]
+    # atom_budget for 1200 tokens is 12; the candidate window over-fetches 4x
+    # so scoped rejections cannot starve the admitted budget, while the
+    # admitted cap itself stays unchanged.
+    assert query.limit_total == 48
+    assert query.limit_per_surface == 48
+    assert budget.max_candidate_atoms == 48
+    assert budget.max_admitted_atoms == 8

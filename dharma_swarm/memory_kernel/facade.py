@@ -39,6 +39,7 @@ from dharma_swarm.memory_kernel.surfaces import default_surface_specs
 
 
 AdapterFactory = Callable[[MemorySurface], MemorySurfaceAdapter]
+RETRIEVAL_PROJECTION_SURFACE_ID = "home.vectors"
 DEFAULT_REQUIRED_ADAPTER_SURFACE_IDS = (
     "home.codex_memory",
     "home.conversation_log",
@@ -241,6 +242,8 @@ class MemoryKernel:
         top_k: int = 10,
         include_content: bool = True,
         min_score: float = 0.01,
+        enable_memory_kernel: bool = True,
+        record_telemetry: bool = True,
     ):
         """Query the governed wiki/vector retrieval door for ranked context."""
 
@@ -254,8 +257,62 @@ class MemoryKernel:
                 top_k=max(1, top_k),
                 include_content=include_content,
                 min_score=min_score,
+                enable_memory_kernel=enable_memory_kernel,
+                record_telemetry=record_telemetry,
             )
         )
+
+    def atoms_for_candidates(self, candidates: Iterable[object]) -> tuple[MemoryAtom, ...]:
+        """Map ranked retrieval candidates onto MemoryAtoms for admission preview.
+
+        Candidates come from the vector retrieval projection, so the atoms are
+        stamped with the ``home.vectors`` surface (projection authority/risk
+        posture preserved) and run through the same admission gates as any
+        other atom — this helper never bypasses ``preview_memory_pack``.
+        """
+
+        surface = self.surfaces_by_id.get(RETRIEVAL_PROJECTION_SURFACE_ID)
+        if surface is None:
+            # Fail closed and loud: a silent () here would make shadow receipts
+            # read admitted=0 with no stamped WHY, poisoning the flip decision.
+            raise LookupError(
+                "retrieval projection surface "
+                f"{RETRIEVAL_PROJECTION_SURFACE_ID!r} missing from census"
+            )
+        atoms: list[MemoryAtom] = []
+        for candidate in candidates:
+            doc_id = str(getattr(candidate, "doc_id", "") or "")
+            if not doc_id:
+                continue
+            source = str(getattr(candidate, "source", "") or "")
+            content = getattr(candidate, "content", None) or None
+            atoms.append(
+                MemoryAtom.build(
+                    surface=surface,
+                    atom_type=MemoryAtomType.SOURCE_CHUNK,
+                    content_ref=f"retrieval:{doc_id}",
+                    content=content,
+                    timestamp=(
+                        getattr(candidate, "event_time", None)
+                        or getattr(candidate, "ingestion_time", None)
+                    ),
+                    source_path=source or None,
+                    adapter_name="governed_retrieval",
+                    read_mode=ReadMode.READ_ONLY,
+                    source_row_key=doc_id,
+                    source_refs=(source,) if source else None,
+                    metadata={
+                        "retrieval_rank": getattr(candidate, "rank", None),
+                        "retrieval_score": getattr(candidate, "score", None),
+                        "retrieval_layer": str(getattr(candidate, "layer", "") or ""),
+                        "retrieval_channels": [
+                            str(channel)
+                            for channel in (getattr(candidate, "channels", ()) or ())
+                        ],
+                    },
+                )
+            )
+        return tuple(atoms)
 
     def search(
         self,
