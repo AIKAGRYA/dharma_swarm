@@ -157,11 +157,15 @@ def main(argv: list[str] | None = None) -> int:
         "pr_merge_control.py, or any referee-layer path."
     )
     try:
-        # agent_argv is a literal template from AGENT_COMMANDS; prompt is
-        # composed above from repo-internal task data. Nothing here derives
-        # from the environment.
+        # The command argv is purely the literal template; the prompt travels
+        # on stdin (claude -p and codex exec both read piped input). Task
+        # text — which transitively derives from CLI args via select_target —
+        # therefore never enters the command-argument position at all
+        # (PR #1162 alerts 537-541: the taint flow was args.repo ->
+        # select_target return -> prompt -> argv, present since v1).
         agent = subprocess.run(
-            [*agent_argv, prompt],
+            agent_argv,
+            input=prompt,
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
