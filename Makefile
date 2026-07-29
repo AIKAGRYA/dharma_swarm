@@ -482,10 +482,11 @@ test-contracts:
 
 nats-substrate-contract:
 	$(REPO_PYTHON) scripts/governance/check_nats_substrate_contract.py
-	$(REPO_PYTHON) scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24
 	$(PYTEST) -q \
 		tests/test_nats_live_contact.py \
+		tests/test_nats_live_production_evidence.py \
 		tests/test_nats_substrate_contract.py \
+		tests/test_nats_verification_split.py \
 		tests/test_nats_transport.py \
 		tests/test_a2a_send.py \
 		tests/test_a2a_inbox_bridge.py \
@@ -495,7 +496,10 @@ nats-substrate-contract:
 		--tb=line
 
 nats-live-production-matrix:
-	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py --endpoint $${NATS_URL:-nats://127.0.0.1:4222} --broker-profile $${NATS_PROFILE:-local-live-jetstream}
+	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py \
+		--host-mode $${DHARMA_NATS_HOST_MODE:-non-live} \
+		--endpoint $${NATS_URL:-nats://127.0.0.1:4222} \
+		--broker-profile $${NATS_PROFILE:-local-live-jetstream}
 
 uplift-guards:
 	$(REPO_PYTHON) scripts/uplift_guards/run_pre_commit.py
