@@ -234,7 +234,7 @@ jobs:
                 --method "${MERGE_METHOD}" \
                 --auto \
                 --execute \
-                --confirm "merge-pr-${PR_NUMBER}"
+                --confirm "automerge-policy-pass-${PR_NUMBER}"
               merge_exit="$?"
               set -e
             fi

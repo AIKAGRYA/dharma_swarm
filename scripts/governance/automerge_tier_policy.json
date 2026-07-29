@@ -1,0 +1,58 @@
+{
+  "schema": "dharma.automerge_tier_policy.v1",
+  "ruling": "DOOR = AUTO_WITH_DECORRELATED_REVIEW (operator, 2026-07-29)",
+  "ruling_record": "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md",
+  "confirmation_token_prefix": "automerge-policy-pass-",
+  "rate_limit_automerges_per_day": 20,
+  "reviewer_families": {
+    "codex": "openai",
+    "copilot": "github-copilot"
+  },
+  "author_families": {
+    "devin-ai-integration[bot]": "cognition",
+    "github-actions[bot]": "automation",
+    "Copilot": "github-copilot"
+  },
+  "tiers": {
+    "tier0": {
+      "description": "docs, test additions, formatting-only, config comments",
+      "max_diff_lines": 300,
+      "required_decorrelated_reviews": 1,
+      "doc_only_paths": ["docs/", "*.md"]
+    },
+    "tier1": {
+      "description": "source code, refactors, dependency bumps, lane outputs",
+      "max_diff_lines": 600,
+      "required_decorrelated_reviews": 2,
+      "test_deletion_needs_named_signoff": true
+    },
+    "tier2": {
+      "description": "referee layer — operator hand-merge FOREVER; automation is structurally unable to amend its own referees",
+      "merge": "operator_hand_merge_forever",
+      "paths": [
+        ".github/workflows/**",
+        "scripts/governance/automerge_tier_policy.json",
+        "scripts/governance/check_automerge_tier_policy.py",
+        "scripts/governance/ci_parity_manifest.json",
+        "scripts/governance/check_ci_parity.py",
+        "docs/governance/CI_TRUTH_CONTRACT.json",
+        "scripts/runtime/ci_truth.py",
+        "scripts/runtime/pr_merge_control.py",
+        "scripts/runtime/merge_master_mike_daemon.py",
+        "docs/governance/MMM_CHARTER.md",
+        "docs/ops/loop_control/**",
+        "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md",
+        "dharma_swarm/forge_v1/forge_v2/**",
+        "dharma_swarm/evolution_safety.py",
+        "dharma_swarm/dharma_kernel.py",
+        "dharma_swarm/telos_gates.py",
+        "dharma_swarm/holon_system/observability/proof_gates.py",
+        "docs/sarathi_apex_build/06_PROOF_GATES.md",
+        "dharma_swarm/revenue/**",
+        "dharma_swarm/a2a/**",
+        "docs/governance/ACTIVE_TRACK.yaml",
+        ".github/CODEOWNERS"
+      ]
+    }
+  }
+}

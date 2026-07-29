@@ -1605,7 +1605,7 @@ def render_github_comment(
             "```bash",
             f"make pr-packet PR={pr['number']}",
             f"make pr-gate PR={pr['number']}",
-            f'make pr-merge PR={pr["number"]} ARGS="--confirm merge-pr-{pr["number"]}"',
+            f'make pr-merge PR={pr["number"]} ARGS="--confirm automerge-policy-pass-{pr["number"]}"',
             "```",
         ]
     )
@@ -1798,7 +1798,13 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
 
 
 def cmd_merge(args: argparse.Namespace) -> int:
-    expected = f"merge-pr-{args.pr}"
+    # Operator ruling 2026-07-29 (docs/ops/OPERATOR_RULING_2026-07-29_
+    # AUTO_WITH_DECORRELATED_REVIEW.md): the old merge-pr-{N} token claimed
+    # operator consent it never received (CI synthesized it from the PR
+    # number). automerge-policy-pass-{N} is honest: it asserts machine policy
+    # plus decorrelated review verdicts, and claims nothing about the
+    # operator.
+    expected = f"automerge-policy-pass-{args.pr}"
     if args.confirm != expected:
         raise PRControlError(f"merge requires --confirm {expected!r}")
     gate = build_gate(args)

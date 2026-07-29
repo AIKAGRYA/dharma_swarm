@@ -1,0 +1,96 @@
+{
+  "allowed_files": [
+    ".github/workflows/automerge-tier-policy.yml",
+    ".github/workflows/codex-mention-router.yml",
+    "docs/governance/MMM_CHARTER.md",
+    "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md",
+    "docs/ops/PR_REVIEW_CONTROL.md",
+    "reports/agentops/work_packets/merge-master-mike-WP-LOOPA-door.json",
+    "scripts/governance/automerge_tier_policy.json",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/runtime/pr_merge_control.py",
+    "tests/test_automerge_tier_policy.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "ea190e2a83cef62a2dab3aec9434088048395987",
+  "branch": "claude/loop-pr-a-door",
+  "commit": {
+    "allowed": false,
+    "message": "feat(door): AUTO_WITH_DECORRELATED_REVIEW \u2014 tier policy, guard, honest token"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "Makefile",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/ci_parity_manifest.json"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_automerge_tier_policy.py -q",
+      "expected_exit": 0,
+      "name": "tier-policy-contract",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "python3 -m pytest tests/test_pr_merge_control.py -q",
+      "expected_exit": 0,
+      "name": "mike-control-regression",
+      "timeout_seconds": 600
+    }
+  ],
+  "id": "merge-master-mike-WP-LOOPA-door",
+  "intent": "PR-A of the walking-mode loop-closure plan: implement the operator ruling of 2026-07-29 (DOOR = AUTO_WITH_DECORRELATED_REVIEW). Frozen tier policy file; required tier-policy guard (tier-2 structural freeze, diff ceilings, decorrelated review quorum, test-deletion sign-off, 20/day rate limit, canary hard-fail); rename the CI-synthesized confirmation token merge-pr-N to automerge-policy-pass-N at every site; verbatim ruling record in docs/ops/. This PR grants automation its merge policy, therefore automation can never merge it: operator hand-merge only.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import json,subprocess,sys; from pathlib import Path; p=Path('scripts/governance/automerge_tier_policy.json'); orig=p.read_text(); d=json.loads(orig); d['tiers']['tier2']['paths']=[]; p.write_text(json.dumps(d)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_automerge_tier_policy.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "emptying-tier2-paths-breaks-contract-test",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/pr_merge_control.py",
+      ".github/workflows/automerge.yml",
+      "scripts/governance/check_agentops_packet_scope.py",
+      "scripts/governance/ci_parity_manifest.json"
+    ],
+    "collision": {
+      "checked_at_sha": "ea190e2a83cef62a2dab3aec9434088048395987",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Structural enforcement completes only with two operator actions after hand-merge: add the 'Automerge tier policy' context to branch protection, and land the matching ci_parity_manifest.json row via the titanium track (that file is titanium-owned and deliberately untouched here).",
+      "Decorrelated review v1 counts native APPROVED reviews from policy reviewer families on the head SHA; the full structured-verdict schema (checked-items + re-run receipts) is a named next step in the ruling record.",
+      "Tier-0 third-model tiebreak and auto-draft-conversion on tier-1 disagreement are not automated; the guard fails red instead (fail-closed superset), with watcher automation landing in PR-F.",
+      "Makefile:264 help text still shows the old token; Makefile is titanium-owned and excluded from this packet \u2014 one-line follow-up under that track."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "c5c61dd6dc34554df289a5e16ae709ed2abb5b83dec5c18261b2548e93b53a2a",
+    "rollback": "Revert the single commit: the guard workflow, policy file, and ruling record disappear and the confirmation token returns to merge-pr-N. No branch-protection state is touched by the revert.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPA"
+  },
+  "worktree": "."
+}
