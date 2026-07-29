@@ -31,8 +31,9 @@ from dharma_swarm.vector_store import _fts_match_query
 class _SearchMixin:
     """Vector/FTS/sidecar search methods for ``GovernedRetrievalEngine``.
 
-    Relies on ``self.vector_store`` and ``self._sidecar_scan_cache`` being
-    set by the composing class's ``__init__``.
+    Relies on ``self.vector_store``, ``self._sidecar_scan_cache``, and
+    ``self.abstention`` (a ``RetrievalAbstentionConfig``) being set by the
+    composing class's ``__init__``.
     """
 
     def _safe_search_vector(self, query_text: str, top_k: int) -> list[dict[str, Any]]:
@@ -95,7 +96,12 @@ class _SearchMixin:
                 if rows_by_id:
                     break
             if rows_by_id:
-                return [self.vector_store._row_to_dict(row, distance=0.5) for row in rows_by_id.values()]
+                return [
+                    self.vector_store._row_to_dict(
+                        row, distance=self._bounded_row_distance(query_text, row)
+                    )
+                    for row in rows_by_id.values()
+                ]
 
             general_query = _fts_match_query(query_text)
             if general_query and _bounded_general_fts_allowed(conn, self.vector_store._db_path):
@@ -115,11 +121,23 @@ class _SearchMixin:
                 ).fetchall()
                 for row in rows:
                     rows_by_id.setdefault(int(row["id"]), row)
-            return [self.vector_store._row_to_dict(row, distance=0.5) for row in rows_by_id.values()]
+            return [
+                self.vector_store._row_to_dict(
+                    row, distance=self._bounded_row_distance(query_text, row)
+                )
+                for row in rows_by_id.values()
+            ]
         except Exception:
             return []
         finally:
             conn.close()
+
+    def _bounded_row_distance(self, query_text: str, row: sqlite3.Row) -> float:
+        # Legacy floor: every bounded-FTS row pretends similarity 0.5. With
+        # floors off, the real token-overlap score reaches fusion instead.
+        if self.abstention.apply_score_floors:
+            return 0.5
+        return max(0.0, min(1.0, 1.0 - _sidecar_scan_score(query_text, row)))
 
     def _safe_search_memory_sidecar_fts(
         self,
@@ -143,7 +161,7 @@ class _SearchMixin:
                 conn,
                 query_text,
                 limit,
-                include_below_threshold=True,
+                include_below_threshold=self.abstention.include_below_threshold,
                 row_terms=self._cached_sidecar_scan_rows(conn),
             )
             if scanned:
@@ -171,7 +189,9 @@ class _SearchMixin:
                 continue
             for row in rows:
                 row_id = int(row["id"])
-                score = max(0.5, _sidecar_scan_score(query_text, row))
+                score = _sidecar_scan_score(query_text, row)
+                if self.abstention.apply_score_floors:
+                    score = max(0.5, score)
                 rows_by_id.setdefault(row_id, row)
                 scores_by_id[row_id] = max(float(scores_by_id.get(row_id, 0.0)), score)
             if len(rows_by_id) >= limit:
@@ -193,10 +213,14 @@ class _SearchMixin:
             key=lambda row: (float(scores_by_id.get(int(row["id"]), 0.0)), int(row["id"])),
             reverse=True,
         )
+        default_score = 0.5 if self.abstention.apply_score_floors else 0.0
         return [
             self.vector_store._row_to_dict(
                 row,
-                distance=max(0.0, min(1.0, 1.0 - float(scores_by_id.get(int(row["id"]), 0.5)))),
+                distance=max(
+                    0.0,
+                    min(1.0, 1.0 - float(scores_by_id.get(int(row["id"]), default_score))),
+                ),
             )
             for row in ranked_rows[:limit]
         ]

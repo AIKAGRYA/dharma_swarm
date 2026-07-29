@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from dharma_swarm.context_compiler_utils import (
     ContextSection,
@@ -17,28 +17,26 @@ from dharma_swarm.memory_kernel import (
     MemoryQuery,
     MemoryScope,
     TruthState,
+    preview_memory_pack,
+)
+from dharma_swarm.memory_kernel.topology_policy import (
+    SUPERVISOR_SCOPED,
+    isolation_legacy_enabled,
+    resolve as resolve_isolation_semantics,
+)
+from dharma_swarm.memory_kernel.ranked_shadow import (
+    RANKED_SHADOW_ENV,
+    clean_text as _clean_text,
+    count_reasons as _count_reasons,
+    ranked_retrieval_shadow,
 )
 
 logger = logging.getLogger(__name__)
 
 
-_LIVE_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
-_LIVE_TOPOLOGY_SCOPES = (
-    MemoryScope.PROJECT,
-    MemoryScope.REPO,
-    MemoryScope.WORKTREE,
-    MemoryScope.SESSION,
-    MemoryScope.AGENT,
-    MemoryScope.SWARM,
-)
-_LIVE_TOPOLOGY_LANES = (
-    MemoryLane.WORKING,
-    MemoryLane.EPISODIC,
-    MemoryLane.SEMANTIC,
-    MemoryLane.PROCEDURAL,
-    MemoryLane.REFLECTION,
-    MemoryLane.PROVENANCE,
-)
+# Pre-typed isolation vocabulary, kept ONLY for the one-release
+# DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY=1 escape hatch. Remove with it.
+_LEGACY_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
 
 
 @dataclass(frozen=True)
@@ -49,12 +47,16 @@ class MemoryKernelIsolationPolicy:
     allowed_agent_ids: tuple[str, ...] = ()
     allowed_scopes: tuple[MemoryScope, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
+    semantics: str = ""
+    warnings: tuple[str, ...] = ()
 
     def metadata(self) -> dict[str, Any]:
         return {
             "isolation_applied": self.applied,
             "isolation_topology": self.topology,
             "isolation_agent_id": self.agent_id,
+            "isolation_semantics": self.semantics,
+            "isolation_warnings": list(self.warnings),
             "allowed_agent_ids": list(self.allowed_agent_ids),
             "allowed_scopes": [item.value for item in self.allowed_scopes],
             "allowed_memory_lanes": [item.value for item in self.allowed_memory_lanes],
@@ -64,9 +66,59 @@ class MemoryKernelIsolationPolicy:
 def memory_kernel_isolation_policy_from_metadata(
     metadata: dict[str, Any] | None,
 ) -> MemoryKernelIsolationPolicy:
-    """Derive the MemoryKernel read policy for one live agent context bundle."""
+    """Derive the MemoryKernel read policy for one live agent context bundle.
+
+    Every bundle gets an applied policy: known topologies map through
+    ``topology_policy.ISOLATION_SEMANTICS``; unknown/missing topology fails
+    closed to minimal shared allowances with a stamped warning.
+    """
 
     source = metadata or {}
+    if isolation_legacy_enabled():
+        return _legacy_isolation_policy_from_metadata(source)
+
+    raw_topology = (
+        source.get("topology")
+        or source.get("topology_mode")
+        or source.get("topology_type")
+    )
+    topology = _clean_text(getattr(raw_topology, "value", raw_topology))
+    semantics, warnings = resolve_isolation_semantics(raw_topology)
+    agent_id = _clean_text(
+        source.get("agent_id")
+        or source.get("active_agent")
+        or source.get("parent_agent_id")
+    )
+    explicit_agent_ids = _string_tuple(source.get("memory_kernel_allowed_agent_ids"))
+    allowed_agent_ids = explicit_agent_ids or ((agent_id,) if agent_id else ())
+    explicit_scopes = _memory_scope_tuple(source.get("memory_kernel_allowed_scopes"))
+    explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
+    # Explicit metadata allowances take precedence over the typed semantics
+    # (pre-existing contract); stamp a warning so the semantics name in the
+    # bundle metadata cannot silently claim what the allowances override.
+    override_warnings = list(warnings)
+    # Set comparison: a reordered permutation of the policy's own allowances
+    # is not an override and must not stamp a spurious audit note.
+    if explicit_scopes and set(explicit_scopes) != set(semantics.allowed_scopes):
+        override_warnings.append("explicit_scopes_override_topology_semantics")
+    if explicit_lanes and set(explicit_lanes) != set(semantics.allowed_memory_lanes):
+        override_warnings.append("explicit_lanes_override_topology_semantics")
+
+    return MemoryKernelIsolationPolicy(
+        applied=True,
+        topology=topology,
+        agent_id=agent_id,
+        allowed_agent_ids=allowed_agent_ids,
+        allowed_scopes=explicit_scopes or semantics.allowed_scopes,
+        allowed_memory_lanes=explicit_lanes or semantics.allowed_memory_lanes,
+        semantics=semantics.name,
+        warnings=tuple(override_warnings),
+    )
+
+
+def _legacy_isolation_policy_from_metadata(
+    source: dict[str, Any],
+) -> MemoryKernelIsolationPolicy:
     topology = _clean_text(
         source.get("topology")
         or source.get("topology_mode")
@@ -84,21 +136,24 @@ def memory_kernel_isolation_policy_from_metadata(
     explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
 
     should_apply = (
-        topology in _LIVE_TOPOLOGY_MODES
+        topology in _LEGACY_TOPOLOGY_MODES
         or bool(explicit_agent_ids)
         or bool(explicit_scopes)
         or bool(explicit_lanes)
     )
     if not should_apply:
-        return MemoryKernelIsolationPolicy(topology=topology, agent_id=agent_id)
+        return MemoryKernelIsolationPolicy(
+            topology=topology, agent_id=agent_id, semantics="legacy"
+        )
 
     return MemoryKernelIsolationPolicy(
         applied=True,
         topology=topology,
         agent_id=agent_id,
         allowed_agent_ids=allowed_agent_ids,
-        allowed_scopes=explicit_scopes or _LIVE_TOPOLOGY_SCOPES,
-        allowed_memory_lanes=explicit_lanes or _LIVE_TOPOLOGY_LANES,
+        allowed_scopes=explicit_scopes or SUPERVISOR_SCOPED.allowed_scopes,
+        allowed_memory_lanes=explicit_lanes or SUPERVISOR_SCOPED.allowed_memory_lanes,
+        semantics="legacy",
     )
 
 
@@ -112,14 +167,49 @@ def build_memory_kernel_default_context(
     if memory_kernel is None:
         return None, {"status": "not_configured"}
 
-    resolved_isolation = isolation_policy or MemoryKernelIsolationPolicy()
+    resolved_isolation = isolation_policy or memory_kernel_isolation_policy_from_metadata(
+        None
+    )
+    isolation_mode = "unrestricted" if isolation_legacy_enabled() else "scoped"
+    # Budget construction stays inside the try: a bad token_budget must keep
+    # the pre-shadow failure contract (section omitted, status "failed") —
+    # never a raise out of the compile.
     try:
         atom_budget = max(4, min(24, int(token_budget) // 100))
+        # Scoped isolation rejects foreign atoms only after iteration, so the
+        # candidate window over-fetches: otherwise atoms this bundle may not
+        # read consume every candidate slot ahead of the worker's own rows
+        # and an eligible record later in stable order is never examined.
+        candidate_budget = atom_budget * 4
+        budget = MemoryContextBudget(
+            max_candidate_atoms=candidate_budget,
+            max_admitted_atoms=max(1, min(8, atom_budget)),
+            max_total_chars=max(600, min(2400, int(token_budget) * 2)),
+            max_atom_chars=420,
+            include_content=True,
+            require_context_admissible=False,
+            allow_projections=False,
+            allow_high_risk=False,
+            reject_stale=True,
+            require_source_digest=True,
+            require_source_row_key=True,
+            block_tool_exposure=True,
+            isolation_mode=isolation_mode,
+            allowed_scopes=resolved_isolation.allowed_scopes,
+            allowed_agent_ids=resolved_isolation.allowed_agent_ids,
+            allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
+            allowed_truth_states=(
+                TruthState.OBSERVED,
+                TruthState.CLAIMED,
+                TruthState.CURATED,
+                TruthState.CANONICAL,
+            ),
+        )
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
                 text_query=recall_query or None,
-                limit_total=atom_budget,
-                limit_per_surface=atom_budget,
+                limit_total=candidate_budget,
+                limit_per_surface=candidate_budget,
                 include_content=True,
                 max_canon_risk=None,
                 max_pii_risk=None,
@@ -129,29 +219,7 @@ def build_memory_kernel_default_context(
                 require_source_digest=True,
                 require_source_row_key=True,
             ),
-            budget=MemoryContextBudget(
-                max_candidate_atoms=atom_budget,
-                max_admitted_atoms=max(1, min(8, atom_budget)),
-                max_total_chars=max(600, min(2400, int(token_budget) * 2)),
-                max_atom_chars=420,
-                include_content=True,
-                require_context_admissible=False,
-                allow_projections=False,
-                allow_high_risk=False,
-                reject_stale=True,
-                require_source_digest=True,
-                require_source_row_key=True,
-                block_tool_exposure=True,
-                allowed_scopes=resolved_isolation.allowed_scopes,
-                allowed_agent_ids=resolved_isolation.allowed_agent_ids,
-                allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
-                allowed_truth_states=(
-                    TruthState.OBSERVED,
-                    TruthState.CLAIMED,
-                    TruthState.CURATED,
-                    TruthState.CANONICAL,
-                ),
-            ),
+            budget=budget,
         )
     except Exception as exc:
         logger.debug("Memory Kernel default context failed", exc_info=True)
@@ -166,6 +234,15 @@ def build_memory_kernel_default_context(
     metadata["query_present"] = bool(recall_query)
     metadata["text_query_applied"] = bool(recall_query)
     metadata.update(resolved_isolation.metadata())
+    metadata.update(
+        ranked_retrieval_shadow(
+            memory_kernel,
+            recall_query=recall_query,
+            legacy_pack=pack,
+            budget=budget,
+            top_k=atom_budget,
+        )
+    )
     return (
         ContextSection(
             name="Memory Kernel",
@@ -271,20 +348,6 @@ def _inline_context(value: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max(0, max_chars - 14)].rstrip() + "...<truncated>"
-
-
-def _count_reasons(values: Iterable[str]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for value in values:
-        key = str(value).strip()
-        if not key:
-            continue
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def _clean_text(value: Any) -> str:
-    return str(value or "").strip()
 
 
 def _string_tuple(value: Any) -> tuple[str, ...]:

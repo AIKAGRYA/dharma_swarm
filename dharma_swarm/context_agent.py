@@ -36,6 +36,7 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
+from dharma_swarm.runtime_admission import runtime_control_enabled
 from dharma_swarm.signal_bus import SignalBus
 from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
 
@@ -790,7 +791,15 @@ class ContextAgent:
     def __init__(self, signal_bus: SignalBus | None = None, base_path: Path | None = None) -> None:
         self._base = base_path or _DHARMA
         self.nervous = NervousSystem(base_path=self._base)
-        self.intelligence = Intelligence(base_path=self._base)
+        self.intelligence: Intelligence | None = (
+            Intelligence(base_path=self._base)
+            if runtime_control_enabled("DGC_CONTEXT_AGENT_INTELLIGENCE")
+            else None
+        )
+        if self.intelligence is None:
+            logger.info(
+                "Context intelligence disabled; pure-Python nervous system remains active"
+            )
         self.bus = signal_bus or SignalBus.get()
         self.store = StigmergyStore()
         self._cycle_count = 0
@@ -818,7 +827,10 @@ class ContextAgent:
         actions: list[str] = []
 
         # Distill bloated notes (at most every 30 min)
-        if time.time() - self._last_distill_time > 1800:
+        if (
+            self.intelligence is not None
+            and time.time() - self._last_distill_time > 1800
+        ):
             bloated = self.nervous.find_bloated_notes()
             if bloated:
                 for role, path, size_kb in bloated[:2]:  # max 2 per cycle
@@ -835,7 +847,10 @@ class ContextAgent:
                 self._last_distill_time = time.time()
 
         # Cross-pollinate (at most every 2 hours)
-        if time.time() - self._last_cross_pollinate_time > 7200:
+        if (
+            self.intelligence is not None
+            and time.time() - self._last_cross_pollinate_time > 7200
+        ):
             bridge = await self.intelligence.cross_pollinate()
             if bridge:
                 actions.append(f"bridge:{bridge.name}")
@@ -850,7 +865,10 @@ class ContextAgent:
             self._last_cross_pollinate_time = time.time()
 
         # Generate questions (at most every 4 hours)
-        if self._cycle_count % 12 == 0:  # ~every 12 cycles
+        if (
+            self.intelligence is not None
+            and self._cycle_count % 12 == 0
+        ):  # ~every 12 cycles
             questions = await self.intelligence.generate_questions(freshness)
             if questions:
                 actions.append(f"questions:{len(questions)}")
@@ -863,7 +881,10 @@ class ContextAgent:
                 )
 
         # Dream during quiet hours (at most once per night)
-        if time.time() - self._last_dream_time > 86400:  # 24h
+        if (
+            self.intelligence is not None
+            and time.time() - self._last_dream_time > 86400
+        ):  # 24h
             dream = await self.intelligence.dream()
             if dream:
                 actions.append(f"dream:{dream.name}")

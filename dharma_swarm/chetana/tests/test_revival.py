@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from dharma_swarm.chetana.ingest import ingest
-from dharma_swarm.chetana.promote import promote
+from dharma_swarm.chetana.promote import approve_atom, promote
 from dharma_swarm.chetana.provenance import parse_frontmatter
 from dharma_swarm.chetana.revival import (
     apply_revival,
@@ -36,10 +36,13 @@ def _seed_promoted_atom(
     )
     pr = promote(staged_path=ing.atoms[0], promoted_by="seeder")
     assert pr.trusted_path is not None
-    text = pr.trusted_path.read_text(encoding="utf-8")
+    approved = approve_atom(path=pr.trusted_path, reviewer="seeder")
+    assert approved.decision == "APPROVED"
+    trusted = approved.trusted_path
+    text = trusted.read_text(encoding="utf-8")
     text = text.replace(_extract_field(text, "stale_after"), stale_after, 1)
-    pr.trusted_path.write_text(text, encoding="utf-8")
-    return pr.trusted_path
+    trusted.write_text(text, encoding="utf-8")
+    return trusted
 
 
 def _extract_field(text: str, name: str) -> str:
@@ -110,10 +113,12 @@ def test_apply_revival_writes_refreshed_atom_with_chain(chetana_sandbox: Path):
     assert parsed.stale_after >= date.today().isoformat()
     assert parsed.provenance is not None
     chain = parsed.provenance.revival_chain
-    assert len(chain) == 1
-    assert chain[0]["reviewed_by"] == "test-reviewer"
-    assert chain[0]["prior_signature"]
-    assert "neighbors_added" in chain[0]
+    # Chain also carries the approve event from seeding; filter to revivals.
+    revivals = [c for c in chain if "revival_id" in c]
+    assert len(revivals) == 1
+    assert revivals[0]["reviewed_by"] == "test-reviewer"
+    assert revivals[0]["prior_signature"]
+    assert "neighbors_added" in revivals[0]
 
 
 def test_revive_then_revive_again_appends_chain(chetana_sandbox: Path):
@@ -135,9 +140,10 @@ def test_revive_then_revive_again_appends_chain(chetana_sandbox: Path):
     parsed, _ = parse_frontmatter(target.read_text(encoding="utf-8"))
     assert parsed is not None and parsed.provenance is not None
     chain = parsed.provenance.revival_chain
-    assert len(chain) == 2
-    assert chain[0]["reviewed_by"] == "r1"
-    assert chain[1]["reviewed_by"] == "r2"
+    revivals = [c for c in chain if "revival_id" in c]
+    assert len(revivals) == 2
+    assert revivals[0]["reviewed_by"] == "r1"
+    assert revivals[1]["reviewed_by"] == "r2"
 
 
 def test_propose_revival_marks_questions_as_open(chetana_sandbox: Path):

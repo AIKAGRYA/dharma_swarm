@@ -173,6 +173,20 @@ class TruthState(StrEnum):
     REJECTED = "rejected"
 
 
+# Metadata keys that identify an atom's owning agent(s). Shared between the
+# adapters' redaction boundary (which must preserve ownership when dropping
+# row/payload dicts) and scoped context admission (which enforces it).
+AGENT_OWNER_METADATA_KEYS = (
+    "agent_id",
+    "agent",
+    "agent_name",
+    "owner_agent_id",
+    "assigned_to",
+    "assigned_agent_id",
+    "worker_agent_id",
+)
+
+
 @dataclass(frozen=True)
 class MemoryQuery:
     limit_total: int | None = 100

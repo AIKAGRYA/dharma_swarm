@@ -36,6 +36,13 @@ rules:
         - "scripts/consume_review_marks.py"
         - "scripts/hermes_heartbeat_poll.py"
         - "scripts/check_provider_credits.py"
+        # Memory Common door + retrieval gates (own memory_kernel_reports receipt
+        # sink and read the vector store; surface declared in
+        # ACTIVE_SURFACE_MANIFEST.yaml state_dir, PR #1132)
+        - "dharma_swarm/memory_common.py"
+        - "scripts/memory_retrieval_broad_sweep.py"
+        - "scripts/memory_retrieval_live_gate.py"
+        - "scripts/memory_retrieval_system_gate.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================

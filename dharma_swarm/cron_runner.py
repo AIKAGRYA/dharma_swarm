@@ -870,6 +870,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         tcs_heartbeat   — local IdentityMonitor time-series sample
         world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
+        memory_common_metabolism — ingest promoted memory and gate retrieval
         provider_starvation_alert — emit algedonic signal for provider-chain starvation
         algedonic_triage — drain pain-signal cursor and write P0 alert summary
     """
@@ -925,6 +926,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return run_provider_starvation_alert(job)
     if handler == "algedonic_triage":
         return run_algedonic_triage(job)
+    if handler == "memory_common_metabolism":
+        from dharma_swarm.memory_common import memory_common_cron_run_fn
+        return _result_from_legacy(*memory_common_cron_run_fn(job))
     if handler == "shell":
         return _run_shell_command(job)
 

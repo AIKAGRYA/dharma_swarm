@@ -11,7 +11,7 @@ from dharma_swarm.chetana.palace import (
     palace_summary,
     render_palace,
 )
-from dharma_swarm.chetana.promote import promote
+from dharma_swarm.chetana.promote import approve_atom, promote
 
 
 def test_palace_renders_with_real_atoms(chetana_sandbox: Path, tmp_path: Path):
@@ -36,7 +36,9 @@ def test_palace_renders_with_real_atoms(chetana_sandbox: Path, tmp_path: Path):
         ing = ingest(
             source=body, source_kind="note", title=title, confidence=0.6, tags=tags
         )
-        promote(staged_path=ing.atoms[0], promoted_by="palace_test")
+        pr = promote(staged_path=ing.atoms[0], promoted_by="palace_test")
+        approved = approve_atom(path=pr.trusted_path, reviewer="palace_test")
+        assert approved.decision == "APPROVED"
 
     out_path, snap = render_palace(out_path=tmp_path / "palace.canvas")
     assert out_path.exists()
@@ -74,7 +76,9 @@ def test_mcp_tool_registry_completeness():
     assert set(TOOL_SCHEMAS.keys()) == expected
     assert TOOL_SCHEMAS["chetana_ingest"]["required"] == ["source_text"]
     assert TOOL_SCHEMAS["chetana_promote"]["required"] == ["staged_path"]
-    assert TOOL_SCHEMAS["chetana_approve"]["required"] == ["path", "reviewer"]
+    # auto_promote is deliberately absent from the MCP surface.
+    assert "auto_promote" not in TOOL_SCHEMAS["chetana_promote"]["properties"]
+    assert TOOL_SCHEMAS["chetana_approve"]["required"] == ["path", "reviewer_token"]
     assert TOOL_SCHEMAS["chetana_palace_state"]["additionalProperties"] is False
 
 
@@ -126,9 +130,19 @@ def test_mcp_tool_verify_works_inside_event_loop(chetana_sandbox: Path):
     assert result["kernel_drift_count"] == 0
 
 
-def test_mcp_tool_approve_requires_reviewer():
-    from dharma_swarm.chetana.mcp_server import tool_approve
+def test_mcp_tool_approve_fails_closed_without_token(monkeypatch):
+    from dharma_swarm.chetana.mcp_server import REVIEWER_TOKEN_ENV, tool_approve
 
-    result = tool_approve(path="missing", reviewer="")
+    monkeypatch.delenv(REVIEWER_TOKEN_ENV, raising=False)
+    result = tool_approve(path="missing", reviewer_token="anything")
     assert result["decision"] == "REJECTED"
-    assert "reviewer required" in result["error"]
+    assert "approve disabled" in result["error"]
+
+
+def test_mcp_tool_approve_rejects_wrong_token(monkeypatch):
+    from dharma_swarm.chetana.mcp_server import REVIEWER_TOKEN_ENV, tool_approve
+
+    monkeypatch.setenv(REVIEWER_TOKEN_ENV, "correct-token")
+    result = tool_approve(path="missing", reviewer_token="wrong-token")
+    assert result["decision"] == "REJECTED"
+    assert "invalid reviewer token" in result["error"]
