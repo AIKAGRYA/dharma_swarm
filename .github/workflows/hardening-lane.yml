@@ -1,0 +1,93 @@
+name: hardening-lane
+
+# Loop lane (loop-closure-2026-06): capped, draft-only hardening runs.
+# PR-E of the walking-mode loop-closure plan (operator ruling 2026-07-29).
+#
+# Caps live HERE, not in any prompt: timeout-minutes bounds the run,
+# LANE_MAX_* bound the agent and the diff, one target per run, and the
+# kill-switch guard halts the lane before any work. Output is only ever a
+# draft PR labeled mike-watch + walk-ready entering the §5 review pipeline.
+# Receipts are artifacts + step summary — never committed (CLAUDE.md:
+# runtime receipts never enter git).
+
+on:
+  schedule:
+    - cron: "0 18 * * 1,3,5"  # Mon/Wed/Fri 18:00 UTC = 03:00 JST overnight
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: hardening-lane
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    name: One capped hardening run
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      LANE_MAX_DIFF_LINES: "600"
+      LANE_MAX_AGENT_SECONDS: "1200"
+      DHARMA_LANE_AGENT_CMD: ${{ secrets.DHARMA_LANE_AGENT_CMD }}
+    steps:
+      - name: Halt on loop kill-switch
+        run: |
+          set -euo pipefail
+          # Loop kill-switch (docs/ops/loop_control/README.md): file present on
+          # the loop-control branch => HALT (exit 1, red-while-halted); absent
+          # (404 on file or branch) => proceed; any other error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — no lane run" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
+      - name: Checkout default branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Overlay operator-ingested tasks (loop-tasks branch)
+        run: |
+          set -euo pipefail
+          # PR-F ingestion writes mailbox tasks to the loop-tasks branch;
+          # overlay them read-only so the ready-set sees operator notes.
+          git fetch origin loop-tasks 2>/dev/null || { echo "no loop-tasks branch yet"; exit 0; }
+          git checkout origin/loop-tasks -- roaming_mailbox/tasks/ 2>/dev/null || true
+          git reset -q roaming_mailbox/tasks/ || true
+
+      - name: Run the lane
+        run: |
+          set -euo pipefail
+          git config user.name "hardening-lane"
+          git config user.email "hardening-lane@users.noreply.github.com"
+          python3 scripts/runtime/hardening_lane.py \
+            --repo "${GH_REPO}" \
+            --receipt "${RUNNER_TEMP}/hardening_lane_receipt.json"
+          {
+            echo "## Hardening lane receipt"
+            echo '```json'
+            cat "${RUNNER_TEMP}/hardening_lane_receipt.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload receipt artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hardening-lane-receipt
+          path: ${{ runner.temp }}/hardening_lane_receipt.json
+          if-no-files-found: warn
