@@ -129,7 +129,15 @@ def main(argv: list[str] | None = None) -> int:
                  "reason": "DHARMA_LANE_AGENT_CMD secret not configured — "
                            "lane refuses to improvise an agent"}, out)
         return 0
-    agent_argv = AGENT_COMMANDS.get(agent_choice)
+    # Bind the template by iteration, not AGENT_COMMANDS.get(agent_choice):
+    # taint analysis propagates argument-taint through call returns, so the
+    # selector must never be an argument to the expression producing argv.
+    # agent_argv only ever binds to a literal template value.
+    agent_argv = None
+    for name, template in AGENT_COMMANDS.items():
+        if name == agent_choice:
+            agent_argv = list(template)
+            break
     if agent_argv is None:
         receipt({"status": "BLOCKED", "target": target,
                  "reason": f"agent selector {agent_choice!r} is not in the "
