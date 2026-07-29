@@ -157,6 +157,12 @@ def test_workflow_contract():
     assert job["name"] == "Automerge tier policy"
     checkout = job["steps"][0]
     assert "ref" in checkout["with"], "policy must load from the trusted default branch"
+    bootstrap, evaluate = job["steps"][1], job["steps"][2]
+    assert bootstrap["id"] == "bootstrap", "introducing-PR bootstrap case must exist"
+    assert "check_automerge_tier_policy.py" in bootstrap["run"]
+    assert evaluate["if"] == "steps.bootstrap.outputs.bootstrap == 'false'", (
+        "real evaluation must be gated on the policy existing on the default branch"
+    )
 
 
 def test_confirmation_token_is_honest_everywhere():

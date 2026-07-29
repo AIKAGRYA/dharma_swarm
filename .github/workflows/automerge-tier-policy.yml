@@ -48,7 +48,26 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
+      - name: Bootstrap check — is the policy on the default branch yet?
+        id: bootstrap
+        run: |
+          set -euo pipefail
+          # The introducing PR (PR-A) runs this workflow before the guard and
+          # policy exist on the default branch — the trusted checkout has
+          # nothing to run (observed live: run 30436464851 on PR #1160). A
+          # vacuous, loudly-labeled pass is honest here: pre-landing the
+          # check cannot be authoritative anyway; real evaluation begins the
+          # moment PR-A lands on main. Post-landing this branch never fires.
+          if [ -f scripts/governance/check_automerge_tier_policy.py ] \
+             && [ -f scripts/governance/automerge_tier_policy.json ]; then
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+            echo "## ⚪ Tier policy bootstrap — guard not on the default branch yet; vacuous pass until PR-A lands" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Evaluate tier policy
+        if: steps.bootstrap.outputs.bootstrap == 'false'
         run: |
           set -euo pipefail
           python3 scripts/governance/check_automerge_tier_policy.py \
