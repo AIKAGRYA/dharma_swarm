@@ -82,19 +82,31 @@ def load_backlog(path: str | None) -> tuple[dict, ...]:
     return tuple(items)
 
 
-def _next_run_id(sarathi_root: Path) -> int:
-    """A monotonic run id persisted under the state root (evidence retention)."""
-    counter = sarathi_root / "run_counter"
-    prev = 0
-    if counter.exists():
+def reserve_run(sarathi_root: Path) -> tuple[int, Path]:
+    """Atomically reserve a fresh run id + its brief directory.
+
+    Concurrency-safe (Greptile P1 on PR #1170): a bare read/increment/write
+    counter let two daemons sharing ``--state-root`` pick the same id and
+    overwrite each other's evidence. ``mkdir`` is atomic on POSIX, so we
+    reserve the per-run directory itself — the loser of any race gets
+    ``FileExistsError`` and retries with the next id. No lock, no counter.
+    """
+    briefs_root = sarathi_root / "briefs"
+    briefs_root.mkdir(parents=True, exist_ok=True)
+    existing = [
+        int(path.name[4:])
+        for path in briefs_root.glob("run_*")
+        if path.name[4:].isdigit()
+    ]
+    candidate = (max(existing) + 1) if existing else 1
+    while True:
+        run_dir = briefs_root / f"run_{candidate:04d}"
         try:
-            prev = int(counter.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            prev = 0
-    run_id = prev + 1
-    sarathi_root.mkdir(parents=True, exist_ok=True)
-    counter.write_text(str(run_id), encoding="utf-8")
-    return run_id
+            run_dir.mkdir()  # atomic reservation
+        except FileExistsError:
+            candidate += 1
+            continue
+        return candidate, run_dir
 
 
 def _spent_ledger(sarathi_root: Path) -> Path:
@@ -127,9 +139,8 @@ async def run_daemon(
     spent_seed: float,
 ) -> dict:
     sarathi_root = state_root / "sarathi"
-    run_id = _next_run_id(sarathi_root)
-    briefs_dir = sarathi_root / "briefs" / f"run_{run_id:04d}"
-    briefs_dir.mkdir(parents=True, exist_ok=True)
+    sarathi_root.mkdir(parents=True, exist_ok=True)
+    run_id, briefs_dir = reserve_run(sarathi_root)
     mailbox = RoamingMailbox(queue_root=sarathi_root / "mailbox")
     audit = (
         json.loads(AUDIT_PATH.read_text(encoding="utf-8"))

@@ -92,6 +92,19 @@ def test_monotonic_run_ids_retain_evidence(tmp_path, monkeypatch) -> None:
     assert len(reports) == 2
 
 
+def test_run_id_reservation_is_atomic_against_collision(tmp_path) -> None:
+    """Greptile P1: a pre-existing run dir must not be reused — reserve_run
+    reserves the next free id via atomic mkdir, so concurrent daemons can never
+    select the same id and overwrite evidence."""
+    sarathi_root = tmp_path / "sarathi"
+    (sarathi_root / "briefs" / "run_0001").mkdir(parents=True)  # taken
+    run_id, run_dir = daemon.reserve_run(sarathi_root)
+    assert run_id == 2 and run_dir.name == "run_0002"
+    # A second reservation skips the one just reserved.
+    run_id2, run_dir2 = daemon.reserve_run(sarathi_root)
+    assert run_id2 == 3 and run_dir2 != run_dir
+
+
 def test_budget_cap_carried_and_enforced(tmp_path, monkeypatch) -> None:
     """Codex/Greptile P1: a real cumulative spend snapshot (not hardcoded 0)
     reaches the guard, so the cap halts."""
