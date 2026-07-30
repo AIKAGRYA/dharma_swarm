@@ -185,6 +185,16 @@ def test_latest_approvals_state_transitions():
         "headsha",
     )
     assert [r["login"] for r in rows] == [COPILOT]
+    # A dismissal surfacing as a separate later row (rather than mutating the
+    # original review's state) must still clear the standing approval.
+    rows = guard.latest_approvals(
+        [
+            _rest_review(CODEX, "APPROVED", submitted="t1"),
+            _rest_review(CODEX, "DISMISSED", submitted="t2"),
+        ],
+        "headsha",
+    )
+    assert rows == []
 
 
 def test_assume_unattended_binds_unlabeled_and_draft_prs():

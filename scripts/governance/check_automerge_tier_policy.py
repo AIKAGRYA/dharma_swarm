@@ -104,8 +104,11 @@ def _normalize_login(login: str) -> str:
 
 # Review states that carry a standing verdict. A later COMMENTED review does
 # not overwrite an approval (GitHub keeps the approval standing); a later
-# CHANGES_REQUESTED does. DISMISSED approvals lose their state entirely.
-_STATE_BEARING = {"APPROVED", "CHANGES_REQUESTED"}
+# CHANGES_REQUESTED does. DISMISSED is state-bearing too: the REST API
+# normally mutates the dismissed review's own state to DISMISSED, but if a
+# dismissal ever surfaces as a separate later row it must still clear the
+# login's standing approval (Greptile review on PR #1160).
+_STATE_BEARING = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
 
 
 def latest_approvals(reviews: list[dict], head_sha: str) -> list[dict]:
