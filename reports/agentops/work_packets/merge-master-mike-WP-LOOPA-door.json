@@ -15,7 +15,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "2912a9a5f955bf204473197f8d080ce8b5679f9d",
+  "base_ref": "2980fa2cff6f88ea03362efec77fbe59b67c9842",
   "branch": "claude/loop-pr-a-door",
   "commit": {
     "allowed": false,
@@ -80,7 +80,7 @@
       "scripts/governance/ci_parity_manifest.json"
     ],
     "collision": {
-      "checked_at_sha": "2912a9a5f955bf204473197f8d080ce8b5679f9d",
+      "checked_at_sha": "2980fa2cff6f88ea03362efec77fbe59b67c9842",
       "details": [],
       "status": "clear"
     },
@@ -92,7 +92,7 @@
     ],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "7e08deef4a10087b3d35cc8f8304bc38551877622e50c8073383556f3091507f",
+    "packet_digest": "d5767ae923b9599f223e343fbc21496aa713f01849405c8edcdbbbdcc4dbe46f",
     "rollback": "Revert the single commit: the guard workflow, policy file, and ruling record disappear and the confirmation token returns to merge-pr-N. No branch-protection state is touched by the revert.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
