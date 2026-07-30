@@ -27,7 +27,8 @@
     "tests/test_nats_verification_split.py",
     "tests/test_polyglot_ci_contract.py",
     "tests/test_pr_ci_safe_rebase_mutations.py",
-    "tests/test_verify_api.py"
+    "tests/test_verify_api.py",
+    "reports/governance/titanium/phase0_premerge_triple_check_2026-07-30.md"
   ],
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -113,6 +114,6 @@
       "Human merge authority remains required."
     ],
     "rollback": "Revert the integration merge commits and this packet together; the five titanium-fleet packet branches remain intact for individual re-landing. Rollback restores fail-open webhook ingress and must not be represented as safe ingress.",
-    "packet_digest": "12611e1a4ee8aea2a8ff0e9a7c0f37c7ea24bb970e7be74a4502d8ab6833da05"
+    "packet_digest": "a6289cdd96d3fc3bb85fa207f781fa73a80413da7c499b0165d96207a809058f"
   }
 }
