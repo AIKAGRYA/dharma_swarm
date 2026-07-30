@@ -1,0 +1,64 @@
+name: loop-resume
+
+# Tier 2 / referee layer (operator ruling 2026-07-29): operator hand-merge
+# forever on this file.
+#
+# Removes docs/ops/loop_control/KILLSWITCH from the `loop-control` branch,
+# re-arming the guarded lane and unattended-merge workflows. Requires typing
+# `resume` so a stray tap cannot re-open the lanes.
+#
+# workflow_dispatch ONLY — this can never fire on a schedule or event.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type: resume"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: loop-control
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Remove KILLSWITCH
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      CONTROL_BRANCH: loop-control
+      SWITCH_PATH: docs/ops/loop_control/KILLSWITCH
+      ACTOR: ${{ github.actor }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Verify confirmation
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRM}" != "resume" ]; then
+            echo "refused: confirmation input must be exactly 'resume' (got '${CONFIRM}')" >&2
+            exit 1
+          fi
+      - name: Remove KILLSWITCH from the loop-control branch
+        run: |
+          set -euo pipefail
+          existing_sha="$(gh api \
+            "repos/${GH_REPO}/contents/${SWITCH_PATH}?ref=${CONTROL_BRANCH}" \
+            --jq '.sha' 2>/dev/null || true)"
+          if [ -z "${existing_sha}" ]; then
+            echo "## 🟢 KILLSWITCH already absent — nothing to remove" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh api -X DELETE "repos/${GH_REPO}/contents/${SWITCH_PATH}" \
+            -f message="ops(loop-control): resume — remove KILLSWITCH (${ACTOR})" \
+            -f sha="${existing_sha}" -f branch="${CONTROL_BRANCH}" >/dev/null
+          {
+            echo "## 🟢 KILLSWITCH REMOVED"
+            echo ""
+            echo "Removed by ${ACTOR} at $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo "Guarded workflows resume at their next scheduled or event-driven run."
+          } >> "$GITHUB_STEP_SUMMARY"
