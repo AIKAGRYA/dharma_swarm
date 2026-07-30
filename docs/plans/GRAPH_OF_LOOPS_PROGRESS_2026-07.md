@@ -19,7 +19,7 @@ verbatim in PR-A:
 | PR-C brief | claude/loop-pr-c-walking-brief | #1158 | **MERGED** (a979b721); open reviewer findings carried to follow-up #1166 |
 | PR-C2 brief hardening | claude/loop-pr-c2-walking-brief-hardening | #1166 | draft; fixes all 11 reviewer findings left open at #1158's merge (tri-state gatherers, kill-switch missing-branch variant, duplicate-issue guard, GraphQL pin, md-escaped titles, idempotent posting, pending nightly) |
 | PR-D task join | claude/loop-pr-d-task-join | #1159 | ready-for-review (operator); review-hardened at 1ebff0fa: traversal-confined ids, blocked-status encoding for legacy pollers, claim gates (deps + claimable state), decision record moved to ADR-010 |
-| PR-A door | claude/loop-pr-a-door | #1160 | review-hardened at e3a3ec4f (exact trusted logins mirroring Mike, head-SHA-pinned paginated approvals, fail-closed gather, deduped rate limit, trusted-only deletion sign-off incl. async, pull_request_review trigger, router --assume-unattended gate, tier-2 referee scripts); **the constitutive hand-merge** |
+| PR-A door | claude/loop-pr-a-door | #1160 | **MERGED** (the constitutive hand-merge, 2026-07-30). Final hardening rounds: exact trusted logins mirroring Mike, head-SHA-pinned paginated approvals, fail-closed gather incl. paginated changed-files, deduped rate limit, fully decorrelated deletion sign-off incl. async, pull_request_review trigger, router --assume-unattended gate, tier-2 referee scripts. **Enforcement completes only with two operator actions:** add "Automerge tier policy" to branch protection; land the ci_parity_manifest.json row via the titanium track |
 | PR-E hardening lane | claude/loop-pr-e-hardening-lane | #1162 | draft; Semgrep taint arc resolved at head d7a40dc (prompt on stdin; argv purely literal) — verify next scan |
 | PR-F watcher/canary | claude/loop-pr-f-watcher | #1163 | draft, all green, awaiting operator |
 
@@ -77,6 +77,14 @@ never auto-merged, KILLSWITCH halts lanes.
   rebinds: WP-LOOPA re-preflighted at 2912a9a5 after ACTIVE_TRACK sibling
   surfaces grew; WP-LOOPC2 minted for #1166. All closeout evaluators
   passed at final heads.
+
+- 2026-07-30 (later): operator hand-merged #1160 (PR-A — THE DOOR IS ON
+  MAIN). Second review-hardening wave fixed same-day with pinning tests:
+  decorrelated deletion sign-off (2958ca34), paginated changed-files fetch
+  (a8ea84a9), dismissal-row clearing (e3a3ec4f), review pagination.
+  WP-LOOPA packet rebased twice (2912a9a5 → 2980fa2c) as main advanced;
+  closeout evaluator passed at the merged head. Remaining open: #1156,
+  #1159 (D), #1162 (E), #1163 (F), #1166 (C2).
 
 ## New operator follow-up (found 2026-07-30, not fixable from the repo)
 
