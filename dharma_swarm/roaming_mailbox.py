@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -208,6 +209,31 @@ class RoamingMailbox:
             raise ValueError(
                 f"task {task_id} has unsatisfied dependencies: {unsatisfied}"
             )
+        # Atomic claim fence: load/check/write alone lets two same-checkout
+        # pollers both pass the checks and both "win", last writer keeping
+        # claimed_by (Greptile review on PR #1159). Exclusive creation of a
+        # per-task receipt makes exactly one claimant succeed. NOTE: this
+        # fences one filesystem only — cross-checkout git sync stays
+        # eventually consistent (the receipt travels with the sync). If a
+        # worker dies between fence and work, an operator deletes the
+        # receipt to release the claim.
+        fence = self.receipts_dir / f"{_validated_task_id(task_id)}.claim"
+        try:
+            fd = os.open(fence, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise ValueError(
+                f"task {task_id} already claimed (fence {fence.name} exists)"
+            ) from None
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(
+                _json_dump(
+                    {
+                        "task_id": task_id,
+                        "claimed_by": claimed_by,
+                        "claimed_at": _utc_now_iso(),
+                    }
+                )
+            )
         claimed = MailboxTask(
             **{
                 **task.to_dict(),
@@ -281,10 +307,14 @@ class RoamingMailbox:
         return issues
 
     def claim_next_task(self, recipient: str) -> MailboxTask | None:
-        ready = self.ready_tasks(recipient=recipient)
-        if not ready:
-            return None
-        return self.claim_task(ready[0].task_id, claimed_by=recipient)
+        for candidate in self.ready_tasks(recipient=recipient):
+            try:
+                return self.claim_task(candidate.task_id, claimed_by=recipient)
+            except ValueError:
+                # Lost the claim race (or state moved under us) — the next
+                # ready task is still fair game.
+                continue
+        return None
 
     def respond_to_task(
         self,

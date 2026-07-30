@@ -255,3 +255,43 @@ def test_terminal_and_active_tasks_cannot_be_reclaimed(tmp_path: Path) -> None:
     except ValueError:
         pass
     assert mailbox.load_task(active.task_id).claimed_by == "worker-a"
+
+def test_concurrent_claims_yield_exactly_one_winner(tmp_path: Path) -> None:
+    """The O_EXCL claim fence makes exactly one claimant win regardless of
+    interleaving — load/check/write alone let both win with last-writer's
+    claimed_by (Greptile P1 on PR #1159)."""
+    import threading
+
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    task = mailbox.enqueue_task(recipient="r", sender="s", summary="t", body="b")
+    barrier = threading.Barrier(2)
+    winners: list[str] = []
+
+    def worker(name: str) -> None:
+        barrier.wait()
+        try:
+            winners.append(mailbox.claim_task(task.task_id, claimed_by=name).claimed_by)
+        except ValueError:
+            pass
+
+    threads = [
+        threading.Thread(target=worker, args=(name,))
+        for name in ("worker-a", "worker-b")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len(winners) == 1, f"expected exactly one winner, got {winners}"
+    assert mailbox.load_task(task.task_id).claimed_by == winners[0]
+    assert (mailbox.receipts_dir / f"{task.task_id}.claim").exists()
+
+
+def test_claim_next_skips_fenced_task_for_the_next_ready_one(tmp_path: Path) -> None:
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    first = mailbox.enqueue_task(recipient="r", sender="s", summary="1", body="b")
+    second = mailbox.enqueue_task(recipient="r", sender="s", summary="2", body="b")
+    # Another poller's fence exists but its task write has not landed yet.
+    (mailbox.receipts_dir / f"{first.task_id}.claim").write_text("{}", encoding="utf-8")
+    claimed = mailbox.claim_next_task("r")
+    assert claimed is not None and claimed.task_id == second.task_id
