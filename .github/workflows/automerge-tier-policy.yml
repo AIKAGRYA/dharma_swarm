@@ -22,6 +22,12 @@ name: automerge-tier-policy
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  # Approvals arrive as pull_request_review events, not pull_request
+  # activity — without this trigger a required red check would stay stale
+  # after quorum is reached and the unattended lane could never proceed
+  # (Codex review on PR #1160). Both payloads carry event.pull_request.
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 permissions:
   contents: read

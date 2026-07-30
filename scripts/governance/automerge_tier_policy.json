@@ -5,8 +5,8 @@
   "confirmation_token_prefix": "automerge-policy-pass-",
   "rate_limit_automerges_per_day": 20,
   "reviewer_families": {
-    "codex": "openai",
-    "copilot": "github-copilot"
+    "chatgpt-codex-connector[bot]": "openai",
+    "copilot-pull-request-reviewer[bot]": "github-copilot"
   },
   "author_families": {
     "devin-ai-integration[bot]": "cognition",
@@ -15,7 +15,7 @@
   },
   "tiers": {
     "tier0": {
-      "description": "docs, test additions, formatting-only, config comments",
+      "description": "docs/markdown-only changes (doc_only_paths). The ruling's tier-0 also names test additions; until an additions-only classifier exists they deliberately ride tier1 (stricter: 2 reviews) rather than risk misclassifying test edits as tier0",
       "max_diff_lines": 300,
       "required_decorrelated_reviews": 1,
       "doc_only_paths": ["docs/", "*.md"]
@@ -35,6 +35,11 @@
         "scripts/governance/check_automerge_tier_policy.py",
         "scripts/governance/ci_parity_manifest.json",
         "scripts/governance/check_ci_parity.py",
+        "scripts/governance/check_pr_coherence_delta.py",
+        "scripts/docops/check_docops_integrity.py",
+        "scripts/governance/hygiene/check_hygiene_integrity.py",
+        "scripts/governance/check_track_status.py",
+        "scripts/governance/render_active_track_includes.py",
         "docs/governance/CI_TRUTH_CONTRACT.json",
         "scripts/runtime/ci_truth.py",
         "scripts/runtime/pr_merge_control.py",

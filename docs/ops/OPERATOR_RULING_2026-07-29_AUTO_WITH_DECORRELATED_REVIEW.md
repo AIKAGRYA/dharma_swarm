@@ -10,6 +10,12 @@ draft, per its own §0.
 **Implementation:** `scripts/governance/automerge_tier_policy.json` (frozen
 policy), `scripts/governance/check_automerge_tier_policy.py` (required
 guard), token rename in `scripts/runtime/pr_merge_control.py`.
+**Authority note:** this file is a WITNESS RECORD of the operator's ruling,
+not a competing authority source — the binding enforcement lives in the
+policy JSON + evaluator + branch protection, all under the operator's
+authority per the canonical instruction stack (`CLAUDE.md` /
+`docs/AGENTS.md`). Agents resolve conflicts against the enforced policy
+files, never against this prose.
 
 ---
 
@@ -72,3 +78,22 @@ passes a canary is dropped from rotation until fixed (fixes are Tier 2).
    yet wired; the nightly-main status renders in the daily brief (PR-C)
    and a red nightly is an operator EMERGENCY STOP away from freezing the
    lanes. Automating that edge is a named next step.
+4. §5's tier-1 "coverage non-regression" is NOT yet enforced: no required
+   CI context measures coverage (`.github/workflows/tests.yml` runs pytest
+   without coverage; `scripts/governance/ci_parity_manifest.json` declares
+   no coverage context). Until a coverage gate lands (titanium-owned CI
+   surface), the evaluator's test-regression check is deleted-test
+   detection only. Named next step; do not read the §5 quote as a claim of
+   current enforcement.
+5. The mention-router's merge path now runs the tier evaluator in binding
+   mode before arming the `automerge-policy-pass-<N>` token. Mike's
+   backlog-fanout auto-when-clean mode (merge_mode input, default off)
+   still synthesizes tokens without the evaluator; closing that seam
+   inside `pr_merge_control.py` is a named next step and Tier 2 when it
+   lands.
+6. Tier-2 now also freezes the executable implementations behind required
+   CI contexts (coherence-delta, DocOps, hygiene, track-status scripts).
+   The full closure — every script any required context executes, kept in
+   lockstep with `ci_parity_manifest.json` — is not yet mechanically
+   derived; regenerating the tier-2 list from the manifest is a named next
+   step.
