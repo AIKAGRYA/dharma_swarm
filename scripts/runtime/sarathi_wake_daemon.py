@@ -21,7 +21,14 @@ Safety envelope (unchanged from the organs it composes):
   writes to, so ``loop-emergency-stop`` from the phone always halts the loop.
 - Budget: cumulative spend is carried across cycles AND across daemon restarts
   (a persisted ledger, seeded by ``--spent-usd``), never a hardcoded 0, so the
-  cap actually enforces.
+  cap actually enforces. Concurrent daemons sharing ``--state-root`` are
+  serialized by an advisory ``flock`` around the whole read/check/work/write
+  sequence: two overlapping invocations can never both authorize spend from one
+  stale snapshot — the second halts ``budget-contended`` (Greptile P1 on #1170).
+- Closeback linkage is folded into the per-run report (a JSON artifact already
+  emitted, rewritten after every cycle), NOT a separate ``.jsonl`` store, so it
+  neither raises the store-inventory census ratchet nor trips the memory-writer
+  sentinel for a non-memory operational write.
 - ``delegate_all`` runs the reversibility gate before every delegation;
   ``git push`` / ``merge pr`` are NEVER_AUTO, so even at ``full`` Sarathi only
   enqueues mailbox tasks and requests automerge labels that Merge Master Mike
@@ -44,8 +51,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+
+try:  # POSIX advisory locking; the daemon runs server-side (Linux/macOS).
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback (no cross-proc lock)
+    fcntl = None  # type: ignore[assignment]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -63,6 +77,9 @@ AUDIT_PATH = REPO_ROOT / "reports/loop_closure/cybernetics_codex/latest_audit.js
 DEFAULT_AGENTS_ROOT = Path.home() / ".dharma" / "agents"
 SENDER = "sarathi"
 _ERROR_STATUSES = frozenset({"halted:error", "halted:unverified"})
+# A pre-dispatch governed halt (the budget lock was held by another daemon):
+# no wake cycle was invoked, so it must not count toward ``cycles_run``.
+_CONTENDED_STATUS = "halted:budget-contended"
 
 DEFAULT_BACKLOG: tuple[dict, ...] = (
     {
@@ -128,6 +145,39 @@ def _write_spend(sarathi_root: Path, value: float) -> None:
     _spent_ledger(sarathi_root).write_text(f"{value:.6f}", encoding="utf-8")
 
 
+@contextmanager
+def _spend_lock(sarathi_root: Path):
+    """Cross-process budget lock (Greptile P1 security on PR #1170).
+
+    Two daemons sharing ``--state-root`` must not both read one ``spent_usd``
+    snapshot, both pass the cap guard, and both overwrite the ledger — that
+    lost-update race lets concurrent runs spend past ``--cap-usd`` while the
+    ledger retains only one update. An advisory ``flock`` serializes the WHOLE
+    read/check/work/write sequence: the first daemon holds it for its entire
+    run; a second daemon fails the non-blocking acquire and yields ``False`` so
+    its caller halts (``budget-contended``) instead of authorizing spend from a
+    stale snapshot. ``flock`` is released by the kernel if the holder dies, so a
+    crash never strands the lock (unlike an ``O_EXCL`` lockfile).
+    """
+    if fcntl is None:  # pragma: no cover - non-POSIX: no cross-process lock
+        yield True
+        return
+    sarathi_root.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(sarathi_root / "spend.lock"), os.O_CREAT | os.O_RDWR, 0o600)
+    acquired = False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            acquired = False
+        yield acquired
+    finally:
+        if acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 async def run_daemon(
     *,
     cycles: int,
@@ -150,9 +200,6 @@ async def run_daemon(
     roster = load_roster() or DEFAULT_ROSTER
     level = current_autonomy_level()
 
-    # Cumulative spend carried across cycles AND restarts (never hardcoded 0).
-    spent = read_cumulative_spend(sarathi_root, spent_seed)
-
     def load_boot_pack() -> BootPack:
         # Dedup against EVERY task this sender has open OR completed, not just
         # currently-claimable ones: a claimed/responded task's summary must
@@ -172,77 +219,102 @@ async def run_daemon(
         brief_counter["n"] += 1
         return str(path)
 
-    closeback_ledger = sarathi_root / "closeback_ledger.jsonl"
+    # Durable closeback linkage lives in the per-run report (rewritten after
+    # every cycle), NOT a dedicated ``closeback_ledger.jsonl``: a separate store
+    # raised the store-inventory census ratchet and tripped the memory-writer
+    # sentinel (action-required, decision=deny) for a non-memory operational
+    # append. Folding it into the report we already emit keeps the same
+    # per-cycle durability with zero new store footprint.
+    closeback_records: list[dict] = []
 
     def closeback(outcomes, brief_ref) -> None:
-        # Durable lifecycle linkage: every cycle's outcomes + brief ref are
-        # appended to a persistent ledger (not left in closeback=none mode).
-        with closeback_ledger.open("a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "run_id": run_id,
-                        "brief_ref": brief_ref,
-                        "outcomes": [outcome.to_dict() for outcome in outcomes],
-                    },
-                    default=str,
-                )
-                + "\n"
-            )
+        closeback_records.append(
+            {
+                "run_id": run_id,
+                "brief_ref": brief_ref,
+                "outcomes": [outcome.to_dict() for outcome in outcomes],
+            }
+        )
 
     statuses: list[str] = []
     replies: list[str] = []
-    for _ in range(cycles):
-        work = make_wake_work_fn(
-            load_boot_pack=load_boot_pack,
-            mailbox=mailbox,
-            level=level,
-            operator_reachable=operator_reachable,
-            brief_sink=brief_sink,
-            closeback=closeback,
-            context_id=f"sarathi-wake-daemon:run{run_id}",
-        )
-        result = await holon_wake_cycle(
-            "sarathi",
-            work,
-            spent_usd=spent,
-            cap_usd=cap_usd,
-            agents_root=agents_root,  # canonical kill + persistence home
-            persist=True,
-        )
-        statuses.append(str(result.get("status")))
-        if result.get("reply"):
-            replies.append(str(result.get("reply")))
-        # Carry per-cycle cost forward (0 until the runtime wires a real cost
-        # source; the mechanism — persisted, non-zero-carrying — is the point).
-        spent += float(result.get("cost_usd") or 0.0)
-        _write_spend(sarathi_root, spent)
-        if result.get("status") != "ran":
-            break
+    # Provisional value for the report if the budget lock is contended; the
+    # authorizing read happens fresh UNDER the lock below.
+    spent = read_cumulative_spend(sarathi_root, spent_seed)
 
-    had_error = any(status in _ERROR_STATUSES for status in statuses)
-    report = {
-        "schema_version": "dharma.sarathi.wake_daemon_report.v1",
-        "run_id": run_id,
-        "autonomy_level": level.value,
-        "wake_loop_active": False,  # never claimed here; Gate-10 earns it
-        "cycles_run": len(statuses),
-        "statuses": statuses,
-        "spent_usd": round(spent, 6),
-        "cap_usd": cap_usd,
-        "had_error": had_error,
-        "last_reply": replies[-1] if replies else "",
-        "briefs_dir": str(briefs_dir),
-        "agents_root": str(agents_root),
-    }
-    blob = json.dumps(report, indent=2, sort_keys=True) + "\n"
-    (sarathi_root / f"wake_daemon_report_run_{run_id:04d}.json").write_text(
-        blob, encoding="utf-8"
-    )  # retained per run
-    (sarathi_root / "wake_daemon_report.json").write_text(
-        blob, encoding="utf-8"
-    )  # latest-pointer convenience
-    return report
+    def build_report() -> dict:
+        had_error = any(status in _ERROR_STATUSES for status in statuses)
+        cycles_run = sum(1 for status in statuses if status != _CONTENDED_STATUS)
+        return {
+            "schema_version": "dharma.sarathi.wake_daemon_report.v1",
+            "run_id": run_id,
+            "autonomy_level": level.value,
+            "wake_loop_active": False,  # never claimed here; Gate-10 earns it
+            "cycles_run": cycles_run,
+            "statuses": statuses,
+            "spent_usd": round(spent, 6),
+            "cap_usd": cap_usd,
+            "had_error": had_error,
+            "last_reply": replies[-1] if replies else "",
+            "briefs_dir": str(briefs_dir),
+            "agents_root": str(agents_root),
+            "closeback": closeback_records,
+        }
+
+    def persist_report() -> dict:
+        report = build_report()
+        blob = json.dumps(report, indent=2, sort_keys=True, default=str) + "\n"
+        (sarathi_root / f"wake_daemon_report_run_{run_id:04d}.json").write_text(
+            blob, encoding="utf-8"
+        )  # retained per run
+        (sarathi_root / "wake_daemon_report.json").write_text(
+            blob, encoding="utf-8"
+        )  # latest-pointer convenience
+        return report
+
+    with _spend_lock(sarathi_root) as have_budget_lock:
+        if not have_budget_lock:
+            # Another Sarathi wake loop holds the budget lock. Do NOT read the
+            # spend snapshot or dispatch — the safe answer to "cannot authorize
+            # from a stale snapshot" is to not run this overlapping invocation.
+            # A governed halt (exit 0), never an error.
+            statuses.append(_CONTENDED_STATUS)
+            return persist_report()
+
+        # Cumulative spend read FRESH under the lock (never a stale snapshot),
+        # carried across cycles AND restarts, never a hardcoded 0.
+        spent = read_cumulative_spend(sarathi_root, spent_seed)
+        for _ in range(cycles):
+            work = make_wake_work_fn(
+                load_boot_pack=load_boot_pack,
+                mailbox=mailbox,
+                level=level,
+                operator_reachable=operator_reachable,
+                brief_sink=brief_sink,
+                closeback=closeback,
+                context_id=f"sarathi-wake-daemon:run{run_id}",
+            )
+            result = await holon_wake_cycle(
+                "sarathi",
+                work,
+                spent_usd=spent,
+                cap_usd=cap_usd,
+                agents_root=agents_root,  # canonical kill + persistence home
+                persist=True,
+            )
+            statuses.append(str(result.get("status")))
+            if result.get("reply"):
+                replies.append(str(result.get("reply")))
+            # Carry per-cycle cost forward (0 until the runtime wires a real
+            # cost source; the mechanism — persisted, non-zero-carrying,
+            # serialized under the lock — is the point).
+            spent += float(result.get("cost_usd") or 0.0)
+            _write_spend(sarathi_root, spent)
+            persist_report()  # per-cycle durability (report rewritten each cycle)
+            if result.get("status") != "ran":
+                break
+
+    return persist_report()
 
 
 def main(argv: list[str] | None = None) -> int:

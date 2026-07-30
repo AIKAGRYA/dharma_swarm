@@ -161,15 +161,44 @@ def test_error_cycle_exits_nonzero(tmp_path, monkeypatch) -> None:
     assert report["statuses"] == ["halted:error"]
 
 
-def test_closeback_ledger_records_outcomes(tmp_path, monkeypatch) -> None:
-    """Codex P2: cycles bind a durable closeback ledger, not closeback=none."""
+def test_closeback_records_bind_into_the_report(tmp_path, monkeypatch) -> None:
+    """Codex P2: cycles bind durable closeback linkage. It is folded into the
+    per-run report (a JSON artifact already emitted, rewritten per cycle) rather
+    than a separate ``closeback_ledger.jsonl`` — the dedicated store raised the
+    store-inventory census ratchet and tripped the memory-writer sentinel for a
+    non-memory operational append (CI on PR #1170)."""
     monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
     backlog = tmp_path / "backlog.json"
     backlog.write_text(
         json.dumps([{"kind": "build", "summary": "one build", "body": "b"}])
     )
-    _run(tmp_path, cycles=1, backlog=str(backlog))
-    ledger = tmp_path / "sarathi" / "closeback_ledger.jsonl"
-    assert ledger.exists()
-    rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
-    assert rows and rows[0]["outcomes"]
+    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
+    assert code == 0
+    assert report["closeback"] and report["closeback"][0]["outcomes"]
+    # No separate ledger store is introduced (census/sentinel stay clean).
+    assert not (tmp_path / "sarathi" / "closeback_ledger.jsonl").exists()
+
+
+def test_concurrent_daemon_halts_budget_contended(tmp_path) -> None:
+    """Greptile P1 security on PR #1170: while one daemon holds the advisory
+    budget flock, a second sharing ``--state-root`` must NOT read the same spend
+    snapshot and double-authorize. It halts ``budget-contended`` (exit 0,
+    governed) and dispatches nothing."""
+    import fcntl
+    import os
+
+    sarathi_root = tmp_path / "sarathi"
+    sarathi_root.mkdir(parents=True)
+    held = os.open(str(sarathi_root / "spend.lock"), os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(held, fcntl.LOCK_EX)
+    try:
+        code, report = _run(tmp_path, cycles=3)
+        assert code == 0  # a governed halt is healthy
+        assert report["statuses"] == ["halted:budget-contended"]
+        assert report["cycles_run"] == 0
+        # Nothing dispatched: no per-cycle brief for the contended run.
+        briefs = list((tmp_path / "sarathi" / "briefs").rglob("brief_cycle_*.md"))
+        assert briefs == []
+    finally:
+        fcntl.flock(held, fcntl.LOCK_UN)
+        os.close(held)
