@@ -120,6 +120,8 @@ go green, and never add prose to satisfy one; fix the thing it measures.
 Python 3.11+, Pydantic 2, async-first (aiosqlite, aiofiles), typed public
 APIs, `pytest-asyncio` with `asyncio_mode = "auto"`.
 
+### Key Abstractions
+
 - **Organism** (`dharma_swarm/organism.py`) — the living system: VSM,
   identity, memory, router, strange loop, attractor.
 - **SwarmManager** (`dharma_swarm/swarm.py`) — agent pool, task board,
