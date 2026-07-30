@@ -73,6 +73,20 @@ def test_walk_ready_draft_carries_flip_instruction():
     assert "flip ready" in body
 
 
+def test_automerge_log_is_newest_first_with_overflow():
+    merged = [
+        {"number": i, "title": f"t{i}", "url": f"https://x/{i}",
+         "mergedAt": f"2026-07-29T{i:02d}:00:00Z"}
+        for i in range(1, 11)
+    ]
+    # newest first (as gather_automerge_log now orders) must survive the
+    # MAX_ROWS truncation, and overflow must be explicit.
+    body = walking_brief.compose_brief(_base_data(automerge_log=merged[::-1]))
+    assert "#10" in body, "newest merge must be visible"
+    assert "…and 2 more" in body, "overflow must be explicit, never silent"
+    assert "newest first" in body
+
+
 def test_red_nightly_renders_red():
     body = walking_brief.compose_brief(
         _base_data(nightly_main={"conclusion": "failure", "url": "u", "completed_at": "t"})

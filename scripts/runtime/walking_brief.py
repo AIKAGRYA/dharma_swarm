@@ -93,9 +93,12 @@ def gather_automerge_log(repo: str) -> list[dict]:
         )
         if isinstance(data, list):
             rows.extend(data)
+    # Newest first: the brief truncates this list, and the most recent
+    # automerges are the ones most likely to need a one-tap revert
+    # (Devin review on PR #1158).
     seen: set[int] = set()
     unique = []
-    for row in sorted(rows, key=lambda r: r.get("mergedAt", "")):
+    for row in sorted(rows, key=lambda r: r.get("mergedAt", ""), reverse=True):
         if row.get("number") not in seen:
             seen.add(row.get("number"))
             unique.append(row)
@@ -182,12 +185,15 @@ def compose_brief(data: dict) -> str:
     if merged is None:
         out += _section("🤖 Automerges (24h)", _not_landed("query failed"))
     elif merged:
+        merged_rows = [
+            f"- #{p['number']} [{p['title'][:60]}]({p['url']}) at {p.get('mergedAt', '?')}"
+            for p in merged[:MAX_ROWS]
+        ]
+        if len(merged) > MAX_ROWS:
+            merged_rows.append(f"- …and {len(merged) - MAX_ROWS} more")
         out += _section(
-            "🤖 Automerges (24h) — tap PR → Revert to undo",
-            [
-                f"- #{p['number']} [{p['title'][:60]}]({p['url']}) at {p.get('mergedAt', '?')}"
-                for p in merged[:MAX_ROWS]
-            ],
+            "🤖 Automerges (24h, newest first) — tap PR → Revert to undo",
+            merged_rows,
         )
     else:
         out += _section("🤖 Automerges (24h)", ["none"])
