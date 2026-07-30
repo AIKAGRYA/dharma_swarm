@@ -10,9 +10,11 @@ disagree — including this file — the code is the truth.
 ## Session start
 
 Run `make onboard` once (sub-second). It prints session status: checkout,
-portfolio digest, broken-register tally, toolchain. Then start working — there
-is no further mandatory reading. Read deeper docs when your task touches them
-(see "Read when relevant" below).
+portfolio digest, broken-register tally, toolchain — plus a canonical
+first-read list. Treat that list as reference surfaces to consult when your
+task touches them, not a per-session reading gate; this file is the behavioral
+contract and wins on behavior. Then start working — read deeper docs when your
+task touches them (see "Read when relevant" below).
 
 **What an onboard run does and does not prove:** READY is evidence about the
 local session evaluation only. It is NOT proof of edit admission, CI admission,
@@ -22,7 +24,10 @@ Deeper read-only projection: `make organism-status`.
 Packet ceremony is required only when your changed paths match
 `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`: bind scope with
 `make agent-build-preflight PACKET=<path>`, close with
-`make agent-build-closeout PACKET=<path>`. Everything else: edit, test, push.
+`make agent-build-closeout PACKET=<path>`. A narrower lane or campaign
+contract may require packets more broadly (the Titanium campaign does, per
+`docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md`); when one
+binds your work, it wins. Everything else: edit, test, push.
 Command boundaries: `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
 
 <!-- ACTIVE_TRACK:START -->
@@ -97,7 +102,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 
 ```bash
 python3 -m pytest tests/ -q             # full suite
-python3 -m pytest tests/test_foo.py -q  # one file
+python3 -m pytest tests/test_cascade.py -q  # one file
 make test-fast                          # 10s per-test timeout, first failure stops
 make test                               # excludes slow/docker/network markers
 python3 scripts/repo_xray.py            # live module inventory (never cite counts from prose)
@@ -166,7 +171,12 @@ prefer damping to mandates.
 ## CLI entry points
 
 ```bash
-dgc status | health | stigmergy | hum | evolve trend | dharma status
+dgc status           # system status
+dgc health           # health diagnostics
+dgc stigmergy        # read stigmergy marks
+dgc hum              # subconscious dreams
+dgc evolve trend     # evolution fitness trend
+dgc dharma status    # kernel integrity check
 uvicorn api.main:app --host 127.0.0.1 --port 8420 --reload
 npm --prefix dashboard run dev
 bash run_operator.sh
