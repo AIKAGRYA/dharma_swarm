@@ -295,3 +295,26 @@ def test_claim_next_skips_fenced_task_for_the_next_ready_one(tmp_path: Path) -> 
     (mailbox.receipts_dir / f"{first.task_id}.claim").write_text("{}", encoding="utf-8")
     claimed = mailbox.claim_next_task("r")
     assert claimed is not None and claimed.task_id == second.task_id
+
+def test_failed_claim_write_releases_the_fence(tmp_path: Path, monkeypatch) -> None:
+    """A fence without a persisted claim must not strand the task: the
+    receipt created by a failed claim_task is removed and the original
+    error surfaces (Greptile P1 on PR #1159)."""
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    task = mailbox.enqueue_task(recipient="r", sender="s", summary="t", body="b")
+
+    def boom(path: Path, payload: dict) -> None:
+        raise OSError("disk hiccup")
+
+    monkeypatch.setattr(mailbox, "_write_json", boom)
+    try:
+        mailbox.claim_task(task.task_id, claimed_by="worker-a")
+        raise AssertionError("claim_task swallowed the write failure")
+    except OSError:
+        pass
+    monkeypatch.undo()
+
+    assert not (mailbox.receipts_dir / f"{task.task_id}.claim").exists()
+    assert mailbox.load_task(task.task_id).status == "queued"
+    claimed = mailbox.claim_task(task.task_id, claimed_by="worker-b")
+    assert claimed.claimed_by == "worker-b"

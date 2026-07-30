@@ -224,25 +224,33 @@ class RoamingMailbox:
             raise ValueError(
                 f"task {task_id} already claimed (fence {fence.name} exists)"
             ) from None
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(
-                _json_dump(
-                    {
-                        "task_id": task_id,
-                        "claimed_by": claimed_by,
-                        "claimed_at": _utc_now_iso(),
-                    }
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(
+                    _json_dump(
+                        {
+                            "task_id": task_id,
+                            "claimed_by": claimed_by,
+                            "claimed_at": _utc_now_iso(),
+                        }
+                    )
                 )
+            claimed = MailboxTask(
+                **{
+                    **task.to_dict(),
+                    "status": "claimed",
+                    "claimed_by": claimed_by,
+                    "claimed_at": _utc_now_iso(),
+                }
             )
-        claimed = MailboxTask(
-            **{
-                **task.to_dict(),
-                "status": "claimed",
-                "claimed_by": claimed_by,
-                "claimed_at": _utc_now_iso(),
-            }
-        )
-        self._write_json(self.task_path(task_id), claimed.to_dict())
+            self._write_json(self.task_path(task_id), claimed.to_dict())
+        except BaseException:
+            # A fence without a persisted claim strands the task: still
+            # queued, yet every later claim is rejected by the receipt.
+            # Release the fence this invocation created and surface the
+            # original error (Greptile review on PR #1159).
+            fence.unlink(missing_ok=True)
+            raise
         return claimed
 
     def _dependency_satisfied(self, dep_id: str) -> bool:
