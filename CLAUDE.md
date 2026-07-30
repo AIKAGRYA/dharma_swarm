@@ -114,11 +114,16 @@ pushing.
 
 ## Where enforcement actually lives
 
-Merge is blocked only by the checks marked `required` in
-`docs/governance/CI_TRUTH_CONTRACT.json`; everything else in CI is advisory.
-That JSON carries the local reproduction command and autofix policy for every
-gate — read it instead of guessing which red matters. Never weaken a gate to
-go green, and never add prose to satisfy one; fix the thing it measures.
+Among CI checks, only those marked `required` in
+`docs/governance/CI_TRUTH_CONTRACT.json` block merge; every other CI job is
+advisory. That JSON carries the local reproduction command and autofix policy
+for every gate — read it instead of guessing which red matters. Merge
+admission is wider than CI: Merge Master's gate
+(`scripts/runtime/pr_merge_control.py`) also blocks a green-CI PR on
+conflicts, requested-changes reviews, unresolved review threads, missing
+agent-review receipts, and HIGH/CRITICAL risk without human approval. Never
+weaken a gate to go green, and never add prose to satisfy one; fix the thing
+it measures.
 
 ## Architecture
 
