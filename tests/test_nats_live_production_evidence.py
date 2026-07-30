@@ -380,7 +380,7 @@ def test_common_contract_binds_source_broker_profile_command_and_rows(
         ),
         (
             lambda payload: payload.__setitem__("command", [sys.executable, "other.py"]),
-            "canonical live matrix runner",
+            "runner cannot be resolved",
         ),
     ],
 )
