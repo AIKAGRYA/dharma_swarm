@@ -235,8 +235,14 @@ def evaluate(
         family = families.get(login)
         if family is None:
             continue
+        if family == author_family:
+            # Same-family approvals are excluded EVERYWHERE, including the
+            # deletion sign-off pool below — a Copilot-family approval must
+            # not authorize deletions on a Copilot-authored PR (Greptile
+            # review on PR #1160).
+            continue
         trusted_reviews.append(row)
-        if family == author_family or family in seen_families:
+        if family in seen_families:
             continue
         seen_families.add(family)
         qualifying.append(login)

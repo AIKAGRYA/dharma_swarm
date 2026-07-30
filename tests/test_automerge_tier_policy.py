@@ -327,3 +327,20 @@ def test_router_runs_binding_evaluation_before_arming_token():
     token_at = router.index("automerge-policy-pass-${PR_NUMBER}")
     assert gate_at < token_at, "evaluator gate must precede the armed token"
     assert "check_automerge_tier_policy.py" in router
+
+
+def test_same_family_as_author_cannot_sign_off_test_deletion():
+    """The deletion sign-off pool is decorrelated too: a Copilot-family
+    approval naming the deleted tests must not authorize a deletion on a
+    Copilot-authored PR (Greptile P1 on PR #1160)."""
+    diff = "-def test_removed(self):\n"
+    report = _evaluate(
+        author="Copilot",
+        diff_text=diff,
+        approved_reviews=[
+            {"login": CODEX, "state": "APPROVED", "body": ""},
+            {"login": COPILOT, "state": "APPROVED",
+             "body": "sign-off on test_removed"},
+        ],
+    )
+    assert any("test deletions" in v for v in report["violations"])
