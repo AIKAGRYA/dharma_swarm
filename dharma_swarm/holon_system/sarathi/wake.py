@@ -19,27 +19,44 @@ lets receipts speak.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from dharma_swarm.operator_core.autonomy_dial import AutonomyLevel
 
 from .brief import build_operator_brief
 from .delegate import DelegationOutcome, delegate_all
+
 from .plan import BootPack, build_plan
 from .pulse import sarathi_pulse
 
+# Consumption markers live beside the mailbox state so a completed response is
+# reported in exactly ONE brief (Greptile P1: an un-cursored sweep re-counted
+# every prior completion in every later brief).
+SWEPT_MARKER_DIRNAME = "sarathi_swept_responses"
+
+
+def _swept_marker_path(mailbox: Any, task_id: str) -> Path:
+    return Path(mailbox.queue_root) / SWEPT_MARKER_DIRNAME / f"{task_id}.json"
+
 
 def sweep_responses(mailbox: Any, *, sender: str = "sarathi") -> list[dict[str, Any]]:
-    """Collect terminal responses to tasks this sender delegated.
+    """Return this sender's NEWLY-completed responses (not yet reported).
 
-    Pure projection over the mailbox: tasks with status ``responded`` whose
-    ``sender`` matches. Returns plain dicts for the brief's completed rows.
+    A projection over the mailbox for ``responded`` tasks this sender sent,
+    minus any already carrying a consumption marker. This call does NOT write
+    markers — the caller marks them consumed only after the brief that reports
+    them is durably recorded (see ``mark_responses_consumed``), so a reporting
+    failure re-surfaces the response next wake rather than dropping it.
     """
     if mailbox is None:
         return []
     swept: list[dict[str, Any]] = []
     for task in mailbox.list_tasks(status="responded"):
         if task.sender != sender:
+            continue
+        if _swept_marker_path(mailbox, task.task_id).exists():
             continue
         swept.append(
             {
@@ -51,6 +68,22 @@ def sweep_responses(mailbox: Any, *, sender: str = "sarathi") -> list[dict[str, 
             }
         )
     return swept
+
+
+def mark_responses_consumed(mailbox: Any, responses: Sequence[Mapping[str, Any]]) -> None:
+    """Write a consumption marker per reported response (idempotent)."""
+    if mailbox is None:
+        return
+    for response in responses:
+        task_id = str(response.get("task_id") or "")
+        if not task_id:
+            continue
+        path = _swept_marker_path(mailbox, task_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"task_id": task_id, "reported": True}, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
 
 async def run_wake_unit(
@@ -91,9 +124,25 @@ async def run_wake_unit(
         responses=responses,
         audit=effective_audit,
     )
-    brief_ref = "unrecorded"
-    if brief_sink is not None:
-        brief_ref = str(brief_sink(brief))
+
+    # Dispatch above already happened. A brief-persistence failure must NOT
+    # escape this function (that would make holon_wake_cycle record
+    # halted:error and skip closeback, so a later wake re-dispatches the same
+    # work — Codex P1). Contain the sink failure, still close back the
+    # outcomes, and only mark responses consumed when the brief that reports
+    # them was actually recorded.
+    brief_recorded = False
+    if brief_sink is None:
+        brief_ref = "unrecorded"
+    else:
+        try:
+            brief_ref = str(brief_sink(brief))
+            brief_recorded = True
+        except Exception as exc:  # noqa: BLE001 - contained, never lost work
+            brief_ref = f"unrecorded:brief_sink_error:{str(exc)[:100]}"
+
+    if brief_recorded:
+        mark_responses_consumed(mailbox, responses)
 
     closeback_note = "closeback=none"
     if closeback is not None:
@@ -133,4 +182,9 @@ def make_wake_work_fn(
     return _work
 
 
-__all__ = ["sweep_responses", "run_wake_unit", "make_wake_work_fn"]
+__all__ = [
+    "sweep_responses",
+    "mark_responses_consumed",
+    "run_wake_unit",
+    "make_wake_work_fn",
+]

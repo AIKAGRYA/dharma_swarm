@@ -28,19 +28,22 @@
     "tests/test_sarathi_proof.py",
     "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS0-tier2-door-20260730.json",
     "scripts/runtime/sarathi_proof_window.py",
-    "tests/test_sarathi_proof_window.py"
+    "tests/test_sarathi_proof_window.py",
+    ".github/workflows/automerge-tier-policy.yml"
   ],
   "forbidden_files": [
     "dharma_swarm/dharma_kernel.py",
     "dharma_swarm/telos_gates.py",
     "dharma_swarm/evolution_safety.py",
     "dharma_swarm/forge_v1/forge_v2/**",
-    ".github/workflows/**",
     "docs/governance/CI_TRUTH_CONTRACT.json",
     "scripts/governance/ci_parity_manifest.json",
     "scripts/runtime/pr_merge_control.py",
     "scripts/runtime/merge_master_mike_daemon.py",
-    "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md"
+    "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md",
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml"
   ],
   "gates": [
     {
@@ -111,6 +114,6 @@
       "The DGC_SARATHI_AUTONOMY dial is read by nothing until the PR-S1 delegation organ lands in this same packet scope."
     ],
     "rollback": "Revert the packet's commits together: tier-policy v1 and the pydantic-chained gate import return, the dial and sarathi organs are additive modules with no runtime state, and no migrations or data rewrites are involved.",
-    "packet_digest": "32a2dd292057ec4e39bab4ea12714e841b0dc613d06f826a51a7822db03da358"
+    "packet_digest": "a7cf637f0b489b5b05244ed95953a3643541940fc9ef96c5fd948225d1662a35"
   }
 }

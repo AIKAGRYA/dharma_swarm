@@ -33,6 +33,9 @@ Every outcome carries the full gate decision — no silent action.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import dataclasses
+import json
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from dharma_swarm.operator_core.autonomy_dial import (
@@ -48,6 +51,55 @@ from .plan import PlannedDelegation
 
 GATED_CLASSES = (ActionClass.IRREVERSIBLE, ActionClass.OPERATOR_ONLY)
 
+# Where durable invoke-receipt evidence lands, relative to the mailbox queue
+# root. The sakshi auditor resolves invoke receipt_refs here, so a direct
+# dispatch leaves resolvable evidence just like a mailbox task does.
+INVOKE_RECEIPTS_DIRNAME = "sarathi_invoke_receipts"
+
+
+def _gate_input(delegation: PlannedDelegation) -> str:
+    """The exact text the reversibility gate classifies for one delegation.
+
+    Greptile/Codex P1: classifying only the derived ``action`` let a benign
+    ``kind``/``summary`` smuggle an operator-only instruction through the
+    ``body``/``metadata`` that the worker actually executes. The gate input
+    must cover the COMPLETE payload the recipient receives — except for merge
+    intents, whose body/summary are constructed display text handed to Merge
+    Master Mike's lane (which re-gates under the tier policy); their caller
+    summary/body may legitimately contain "merge" and are not worker-executed.
+    """
+    parts: list[str] = [delegation.action]
+    if delegation.channel != "merge_intent":
+        parts.extend([delegation.summary, delegation.body])
+    for key, value in sorted(delegation.metadata.items()):
+        parts.append(f"{key}={value}")
+    return "\n".join(str(part) for part in parts if part)
+
+
+def _persist_invoke_receipt(mailbox: Any, receipt: Any) -> str:
+    """Write a durable JSON copy of an EvidenceReceipt; return its resolvable ref.
+
+    Codex P1: ``invoke_agent`` is a pass-through and stores nothing, so a bare
+    receipt UUID cannot be resolved after the process exits and the auditor
+    would (correctly) flag the dispatched row as unbacked. Persist the receipt
+    beside the mailbox state so ``invoke_receipt_exists`` can resolve it.
+    """
+    receipt_id = str(receipt.receipt_id)
+    root = Path(mailbox.queue_root) / INVOKE_RECEIPTS_DIRNAME
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"{receipt_id}.json"
+    payload = dataclasses.asdict(receipt) if dataclasses.is_dataclass(receipt) else {}
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+        encoding="utf-8",
+    )
+    return receipt_id
+
+
+def invoke_receipt_path(mailbox: Any, receipt_ref: str) -> Path:
+    """Resolve the durable path for an invoke receipt_ref (auditor helper)."""
+    return Path(mailbox.queue_root) / INVOKE_RECEIPTS_DIRNAME / f"{receipt_ref}.json"
+
 
 @dataclass(frozen=True)
 class DelegationOutcome:
@@ -55,7 +107,7 @@ class DelegationOutcome:
 
     delegation: PlannedDelegation
     gate: Mapping[str, Any]
-    status: str  # "gated" | "logged" | "proposed" | "dispatched"
+    status: str  # "gated" | "logged" | "proposed" | "dispatched" | "failed"
     receipt_ref: str = ""
     detail: str = ""
 
@@ -91,6 +143,7 @@ async def _dispatch_invoke(
     *,
     invoker: Any,
     context_id: str,
+    mailbox: Any,
 ) -> DelegationOutcome:
     from dharma_swarm.spine.invoke import invoke_agent
     from dharma_swarm.spine.routing import RoutingDecision
@@ -113,12 +166,15 @@ async def _dispatch_invoke(
         routing=routing,
         invoker=invoker,
     )
+    # Durable receipt: the auditor requires a resolvable ref, so persist the
+    # EvidenceReceipt beside the mailbox state before reducing it to an id.
+    receipt_ref = _persist_invoke_receipt(mailbox, receipt)
     return DelegationOutcome(
         delegation=delegation,
         gate=gate,
         status="dispatched",
-        receipt_ref=str(receipt.receipt_id),
-        detail=f"invoke_agent receipt status={receipt.status}",
+        receipt_ref=receipt_ref,
+        detail=f"invoke_agent receipt status={receipt.status} (persisted)",
     )
 
 
@@ -142,8 +198,11 @@ async def delegate_all(
     effective = level if level is not None else current_autonomy_level()
     outcomes: list[DelegationOutcome] = []
     for delegation in plan:
+        # Classify the COMPLETE dispatched payload, not just the derived action
+        # (Greptile/Codex P1). Display still uses delegation.action; the gate
+        # dict records exactly what was classified.
         decision = classify_action(
-            delegation.action, operator_reachable=operator_reachable
+            _gate_input(delegation), operator_reachable=operator_reachable
         )
         gate = decision.to_dict()
 
@@ -192,56 +251,87 @@ async def delegate_all(
             )
             continue
 
-        # (3) Live channels.
-        if delegation.channel == "invoke" and decision.may_execute_unattended:
-            if invoker is None:
+        # (3) Live channels. A channel failure (provider timeout, disk error)
+        # must NOT abort the batch — each delegation yields exactly one outcome
+        # (Codex P2), so any exception becomes an explicit ``failed`` outcome
+        # and the loop continues.
+        try:
+            # The invoke channel needs a mailbox to persist its receipt
+            # durably; without one it cannot leave resolvable evidence, so it
+            # falls back to the mailbox path (and is logged if that too is
+            # absent) rather than claiming an unbacked dispatch.
+            if (
+                delegation.channel == "invoke"
+                and decision.may_execute_unattended
+                and mailbox is not None
+            ):
+                if invoker is None:
+                    outcomes.append(
+                        DelegationOutcome(
+                            delegation=delegation,
+                            gate=gate,
+                            status="logged",
+                            detail="invoke channel unavailable: no invoker injected",
+                        )
+                    )
+                    continue
+                outcomes.append(
+                    await _dispatch_invoke(
+                        delegation,
+                        gate,
+                        invoker=invoker,
+                        context_id=context_id,
+                        mailbox=mailbox,
+                    )
+                )
+                continue
+
+            # Everything else admissible rides the mailbox: the claim fence is
+            # the execution lease (NEEDS_LEASE work, merge intents, invoke-grade
+            # items without a durable receipt sink).
+            if mailbox is None:
                 outcomes.append(
                     DelegationOutcome(
                         delegation=delegation,
                         gate=gate,
                         status="logged",
-                        detail="invoke channel unavailable: no invoker injected",
+                        detail="mailbox channel unavailable: no mailbox injected",
                     )
                 )
                 continue
-            outcomes.append(
-                await _dispatch_invoke(
-                    delegation, gate, invoker=invoker, context_id=context_id
-                )
+            task = mailbox.enqueue_task(
+                recipient=delegation.recipient,
+                sender=sender,
+                summary=delegation.summary,
+                body=delegation.body,
+                metadata=_task_metadata(delegation, gate, effective),
+                depends_on=list(delegation.depends_on),
             )
-            continue
-
-        # Everything else admissible rides the mailbox: the claim fence is the
-        # execution lease (NEEDS_LEASE work, merge intents, and invoke-channel
-        # items that only earned a leased grade).
-        if mailbox is None:
             outcomes.append(
                 DelegationOutcome(
                     delegation=delegation,
                     gate=gate,
-                    status="logged",
-                    detail="mailbox channel unavailable: no mailbox injected",
+                    status="dispatched",
+                    receipt_ref=task.task_id,
+                    detail=f"mailbox task enqueued (status={task.status})",
                 )
             )
-            continue
-        task = mailbox.enqueue_task(
-            recipient=delegation.recipient,
-            sender=sender,
-            summary=delegation.summary,
-            body=delegation.body,
-            metadata=_task_metadata(delegation, gate, effective),
-            depends_on=list(delegation.depends_on),
-        )
-        outcomes.append(
-            DelegationOutcome(
-                delegation=delegation,
-                gate=gate,
-                status="dispatched",
-                receipt_ref=task.task_id,
-                detail=f"mailbox task enqueued (status={task.status})",
+        except Exception as exc:  # noqa: BLE001 - one bad channel != lost batch
+            outcomes.append(
+                DelegationOutcome(
+                    delegation=delegation,
+                    gate=gate,
+                    status="failed",
+                    detail=f"channel dispatch failed: {str(exc)[:160]}",
+                )
             )
-        )
     return outcomes
 
 
-__all__ = ["GATED_CLASSES", "DelegationOutcome", "delegate_all"]
+__all__ = [
+    "GATED_CLASSES",
+    "INVOKE_RECEIPTS_DIRNAME",
+    "DelegationOutcome",
+    "delegate_all",
+    "invoke_receipt_path",
+]

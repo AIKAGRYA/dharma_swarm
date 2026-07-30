@@ -91,9 +91,17 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
             pr_number = str(item.get("pr") or "").strip()
             target = f"pull request #{pr_number}" if pr_number else summary
             action = f"queue unattended-lane label request for {target}"
+            # The body is CONSTRUCTED, not passed through: a merge item's caller
+            # body/summary never becomes a worker-executed instruction, so the
+            # gate cannot be smuggled via a merge kind (Greptile/Codex P1).
+            body = (
+                f"Add the unattended-lane review label to {target} so the "
+                "decorrelated-review door can evaluate it."
+            )
         else:
             recipient = str(item.get("recipient") or default_recipient)
             action = f"{kind}: {summary}"
+            body = str(item.get("body") or summary)
         metadata: dict[str, Any] = dict(item.get("metadata") or {})
         metadata["sarathi_kind"] = kind
         if recipient not in pack.roster and channel != "merge_intent":
@@ -104,7 +112,7 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
                 recipient=recipient,
                 channel=channel,
                 summary=summary,
-                body=str(item.get("body") or summary),
+                body=body,
                 depends_on=tuple(str(dep) for dep in (item.get("depends_on") or [])),
                 metadata=metadata,
             )

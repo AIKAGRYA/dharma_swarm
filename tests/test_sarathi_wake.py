@@ -15,6 +15,7 @@ from dharma_swarm.holon_system.sarathi.brief import build_operator_brief
 from dharma_swarm.holon_system.sarathi.plan import BootPack
 from dharma_swarm.holon_system.sarathi.wake import (
     make_wake_work_fn,
+    mark_responses_consumed,
     run_wake_unit,
     sweep_responses,
 )
@@ -144,6 +145,64 @@ async def test_sweep_responses_projects_only_this_senders_terminal_tasks(tmp_pat
     assert [row["task_id"] for row in swept] == [mine.task_id]
     assert swept[0]["responder"] == "hermes-m5"
     assert sweep_responses(None) == []
+
+
+async def test_sweep_reports_each_completion_exactly_once(tmp_path) -> None:
+    """Greptile P1: a consumed response must not re-appear in later briefs."""
+    mailbox = RoamingMailbox(queue_root=tmp_path)
+    task = mailbox.enqueue_task(
+        recipient="hermes-m5", sender="sarathi", summary="one", body="b"
+    )
+    mailbox.claim_task(task.task_id, claimed_by="hermes-m5")
+    mailbox.respond_to_task(
+        task_id=task.task_id, responder="hermes-m5", summary="ok", body="ok"
+    )
+    first = sweep_responses(mailbox, sender="sarathi")
+    assert [r["task_id"] for r in first] == [task.task_id]
+    # Not yet consumed -> still returned on a re-sweep.
+    assert [r["task_id"] for r in sweep_responses(mailbox, sender="sarathi")] == [
+        task.task_id
+    ]
+    mark_responses_consumed(mailbox, first)
+    # After consumption it never re-appears.
+    assert sweep_responses(mailbox, sender="sarathi") == []
+
+
+async def test_brief_sink_failure_preserves_dispatch_and_closeback(tmp_path) -> None:
+    """Codex P1: a brief-persistence failure must not escape run_wake_unit
+    (which would halt the cycle and re-dispatch next wake). Outcomes still
+    close back; responses are NOT marked consumed."""
+    mailbox = RoamingMailbox(queue_root=tmp_path)
+    resp = mailbox.enqueue_task(
+        recipient="hermes-m5", sender="sarathi", summary="done work", body="b"
+    )
+    mailbox.claim_task(resp.task_id, claimed_by="hermes-m5")
+    mailbox.respond_to_task(
+        task_id=resp.task_id, responder="hermes-m5", summary="ok", body="ok"
+    )
+    closed: list = []
+
+    def boom_sink(_text: str) -> str:
+        raise OSError("state volume full")
+
+    task, reply = await run_wake_unit(
+        load_boot_pack=lambda: BootPack(
+            roster=ROSTER,
+            open_items=({"kind": "build", "summary": "extend gym battery"},),
+        ),
+        mailbox=mailbox,
+        level=AutonomyLevel.DISPATCH,
+        brief_sink=boom_sink,
+        closeback=lambda outcomes, ref: closed.append((outcomes, ref)),
+    )
+    # No exception escaped; the dispatch is recorded via closeback.
+    assert "brief_sink_error" in reply
+    assert closed and closed[0][0]  # outcomes handed to closeback
+    # The response was NOT consumed (brief that would report it failed), so it
+    # re-surfaces on the next wake rather than being silently dropped.
+    assert [r["task_id"] for r in sweep_responses(mailbox, sender="sarathi")] == [
+        resp.task_id
+    ]
 
 
 def test_brief_v2_never_fabricates_audit_state() -> None:

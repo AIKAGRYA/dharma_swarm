@@ -26,14 +26,20 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
+
+# A kill-path receipt's verified_at must look like a real timestamp, not any
+# nonempty string (Codex P2). Require at least YYYY-MM-DDThh:mm.
+_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
+from dharma_swarm.holon_system.sarathi.delegate import invoke_receipt_path  # noqa: E402
 from dharma_swarm.holon_system.sarathi.plan import BootPack  # noqa: E402
 from dharma_swarm.holon_system.sarathi.proof import (  # noqa: E402
     REQUIRED_UNATTENDED_CYCLES,
@@ -65,7 +71,13 @@ DEFAULT_BACKLOG: tuple[dict, ...] = (
 
 
 def read_kill_path_receipt(state_root: Path) -> dict | None:
-    """The operator-created receipt, or None. Never created here."""
+    """The operator-created receipt, or None. Never created here.
+
+    Fully validated (Codex P2): a truncated/partial file must not authorize a
+    pass. Requires ``verified is True``, a ``verified_at`` that matches a real
+    timestamp shape, and a nonempty ``method`` describing HOW the mobile
+    emergency stop was confirmed.
+    """
     path = state_root / "sarathi" / "kill_path_receipt.json"
     if not path.exists():
         return None
@@ -73,9 +85,15 @@ def read_kill_path_receipt(state_root: Path) -> dict | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if payload.get("verified") is True and str(payload.get("verified_at") or ""):
-        return payload
-    return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("verified") is not True:
+        return None
+    if not _TIMESTAMP_RE.match(str(payload.get("verified_at") or "")):
+        return None
+    if not str(payload.get("method") or "").strip():
+        return None
+    return payload
 
 
 def load_backlog(path: str | None) -> tuple[dict, ...]:
@@ -122,10 +140,14 @@ async def run_window(
         current["outcomes"] = [outcome.to_dict() for outcome in outcomes]
 
     def receipt_exists(ref: str) -> bool:
+        # A dispatched row is backed by either a mailbox task file or a
+        # durable invoke-receipt file (both resolvable after the process exits).
         try:
-            return mailbox.task_path(ref).exists()
+            if mailbox.task_path(ref).exists():
+                return True
         except ValueError:
-            return False
+            pass
+        return invoke_receipt_path(mailbox, ref).exists()
 
     records: list[ProofCycleRecord] = []
     for cycle in range(cycles):
@@ -157,8 +179,15 @@ async def run_window(
         )
 
     receipt = read_kill_path_receipt(state_root)
+    # The verdict is ALWAYS judged against the full 14-cycle requirement —
+    # the invocation must not be able to lower its own threshold. --cycles
+    # only controls how many cycles THIS run executes: fewer than 14 is a
+    # smoke run that can never pass (Greptile P1 on PR #1167, verified by
+    # execution: --cycles 1 + receipt previously produced a passing verdict).
     verdict = evaluate_unattended_proof(
-        records, kill_path_verified=receipt is not None, required_cycles=cycles
+        records,
+        kill_path_verified=receipt is not None,
+        required_cycles=REQUIRED_UNATTENDED_CYCLES,
     )
     report = {
         "schema_version": "dharma.sarathi.proof_window_report.v1",
@@ -173,8 +202,12 @@ async def run_window(
         "failures": list(verdict.failures),
         "briefs_dir": str(briefs_dir),
         "next_on_pass": (
-            "set DGC_SARATHI_AUTONOMY=dispatch for the live loop; full only "
-            "after one clean week at dispatch (operator ruling 2026-07-30)"
+            "Bind the wake organs into a standing loop (this runner, or an "
+            "equivalent runtime wrapper calling make_wake_work_fn on a "
+            "schedule), THEN set DGC_SARATHI_AUTONOMY=dispatch; full only after "
+            "one clean week at dispatch (operator ruling 2026-07-30). The env "
+            "var alone changes nothing until a loop invokes the organs — "
+            "codex_composer_wake_loop.run_once still publishes read-only status."
         ),
     }
     (sarathi_root / "proof_window_report.json").write_text(
@@ -185,7 +218,13 @@ async def run_window(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--cycles", type=int, default=REQUIRED_UNATTENDED_CYCLES)
+    parser.add_argument(
+        "--cycles",
+        type=int,
+        default=REQUIRED_UNATTENDED_CYCLES,
+        help="cycles to RUN this invocation; the verdict always requires the "
+        "full 14-cycle window, so fewer than 14 is a smoke run that cannot pass",
+    )
     parser.add_argument("--state-root", default="~/.dharma")
     parser.add_argument("--backlog", default="", help="JSON file of open items")
     parser.add_argument("--cap-usd", type=float, default=1.0)
