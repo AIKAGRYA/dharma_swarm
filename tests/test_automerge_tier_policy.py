@@ -344,3 +344,29 @@ def test_same_family_as_author_cannot_sign_off_test_deletion():
         ],
     )
     assert any("test deletions" in v for v in report["violations"])
+
+
+def test_fetch_all_pages_concatenates_and_fails_closed(monkeypatch):
+    """A 100-row page must trigger a next-page fetch (a truncated file list
+    could hide a tier-2 path at position 101); any failed page fails the
+    whole fetch (Greptile P1 on PR #1160)."""
+    pages = {
+        1: [{"filename": f"f{i}"} for i in range(100)],
+        2: [{"filename": "scripts/runtime/pr_merge_control.py"}],
+    }
+
+    def fake(args):
+        query = args[-1]
+        page = int(query.rsplit("page=", 1)[-1])
+        return pages.get(page)
+
+    monkeypatch.setattr(guard, "_gh_json", fake)
+    rows = guard._fetch_all_pages("repos/o/r/pulls/1/files")
+    assert rows is not None and len(rows) == 101
+    assert rows[-1]["filename"] == "scripts/runtime/pr_merge_control.py"
+    # A failed second page fails the whole fetch, never a silent 100-row cap.
+    monkeypatch.setattr(
+        guard, "_gh_json",
+        lambda args: pages[1] if args[-1].endswith("page=1") else None,
+    )
+    assert guard._fetch_all_pages("repos/o/r/pulls/1/files") is None

@@ -300,16 +300,17 @@ def _gh_json(args: list[str]) -> object | None:
         return None
 
 
-def _fetch_all_reviews(repo: str, pr: int) -> list | None:
-    """Every REST review row, all pages. A single 100-row page could hide a
-    reviewer's newer CHANGES_REQUESTED on page 2 behind a stale page-1
-    approval (Greptile on PR #1160). Fails closed (None) if any page fails."""
+def _fetch_all_pages(resource: str) -> list | None:
+    """Every row of a REST list resource, all pages, fail closed (None) on
+    any failed page. One 100-row page is never treated as complete: a
+    truncated review list could hide a newer CHANGES_REQUESTED, and a
+    truncated file list could hide a tier-2 referee path at position 101
+    (Greptile reviews on PR #1160)."""
     rows: list = []
     page = 1
     while True:
-        data = _gh_json(
-            ["api", f"repos/{repo}/pulls/{pr}/reviews?per_page=100&page={page}"]
-        )
+        joiner = "&" if "?" in resource else "?"
+        data = _gh_json(["api", f"{resource}{joiner}per_page=100&page={page}"])
         if not isinstance(data, list):
             return None
         rows.extend(data)
@@ -326,7 +327,7 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     view = _gh_json(
         [
             "pr", "view", str(pr), "--repo", repo, "--json",
-            "labels,isDraft,files,additions,deletions,author,headRefOid",
+            "labels,isDraft,additions,deletions,author,headRefOid",
         ]
     )
     if not isinstance(view, dict):
@@ -334,8 +335,14 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     # Same REST source pr_merge_control.py trusts (fetch_pr_reviews): it
     # carries commit_id — the exact SHA each review saw — and App logins in
     # their "<app>[bot]" form, matching the policy's trusted identities.
-    reviews = _fetch_all_reviews(repo, pr)
+    reviews = _fetch_all_pages(f"repos/{repo}/pulls/{pr}/reviews")
     if reviews is None:
+        return None
+    # Changed paths via the paginated REST files endpoint — `gh pr view
+    # --json files` silently stops at 100 files, which would let a large PR
+    # hide a tier-2 path from the freeze.
+    files = _fetch_all_pages(f"repos/{repo}/pulls/{pr}/files")
+    if files is None:
         return None
     diff = subprocess.run(
         ["gh", "pr", "diff", str(pr), "--repo", repo],
@@ -360,7 +367,7 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     return {
         "labels": [row["name"] for row in view.get("labels", [])],
         "is_draft": bool(view.get("isDraft")),
-        "changed_paths": [f["path"] for f in view.get("files", [])],
+        "changed_paths": [str(row.get("filename") or "") for row in files],
         "diff_lines": int(view.get("additions", 0)) + int(view.get("deletions", 0)),
         "diff_text": diff.stdout,
         "approved_reviews": latest_approvals(
