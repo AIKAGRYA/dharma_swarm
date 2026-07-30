@@ -66,7 +66,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
-from dharma_swarm.holon_system.sarathi.plan import BootPack  # noqa: E402
+from dharma_swarm.holon_system.sarathi.plan import BootPack, plan_dedup_key  # noqa: E402
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
 from dharma_swarm.holon_system.sarathi.wake import make_wake_work_fn  # noqa: E402
 from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level  # noqa: E402
@@ -202,13 +202,17 @@ async def run_daemon(
 
     def load_boot_pack() -> BootPack:
         # Dedup against EVERY task this sender has open OR completed, not just
-        # currently-claimable ones: a claimed/responded task's summary must
-        # still suppress re-planning the same backlog item.
+        # currently-claimable ones: a claimed/responded task must still suppress
+        # re-planning the SAME backlog item. Keyed on the CONTENT fingerprint
+        # (summary + body), not summary alone, so a revised backlog item with an
+        # unchanged summary re-plans instead of being dropped (Greptile P1 L209).
         seen = frozenset(
-            task.summary for task in mailbox.list_tasks() if task.sender == SENDER
+            plan_dedup_key(task.summary, task.body)
+            for task in mailbox.list_tasks()
+            if task.sender == SENDER
         )
         return BootPack(
-            roster=roster, open_items=backlog, ready_summaries=seen, audit=audit
+            roster=roster, open_items=backlog, ready_keys=seen, audit=audit
         )
 
     brief_counter = {"n": 0}

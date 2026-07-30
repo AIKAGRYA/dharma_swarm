@@ -40,7 +40,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
 from dharma_swarm.holon_system.sarathi.delegate import invoke_receipt_path  # noqa: E402
-from dharma_swarm.holon_system.sarathi.plan import BootPack  # noqa: E402
+from dharma_swarm.holon_system.sarathi.plan import BootPack, plan_dedup_key  # noqa: E402
 from dharma_swarm.holon_system.sarathi.proof import (  # noqa: E402
     REQUIRED_UNATTENDED_CYCLES,
     ProofCycleRecord,
@@ -126,9 +126,11 @@ async def run_window(
     current: dict = {"cycle": 0, "outcomes": []}
 
     def load_boot_pack() -> BootPack:
-        ready = frozenset(task.summary for task in mailbox.ready_tasks())
+        ready = frozenset(
+            plan_dedup_key(task.summary, task.body) for task in mailbox.ready_tasks()
+        )
         return BootPack(
-            roster=roster, open_items=backlog, ready_summaries=ready, audit=audit
+            roster=roster, open_items=backlog, ready_keys=ready, audit=audit
         )
 
     def brief_sink(text: str) -> str:

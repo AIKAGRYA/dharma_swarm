@@ -10,11 +10,27 @@ runtime paths, no liveness constants, no unattended claims.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 VALID_KINDS = ("experiment", "build", "review", "publication", "merge")
 VALID_CHANNELS = ("mailbox", "invoke", "merge_intent")
+
+
+def plan_dedup_key(summary: str, body: str) -> str:
+    """Content fingerprint that identifies one unit of backlog work.
+
+    Summary text alone is NOT the work identity. Deduping on summary against
+    every historical mailbox task reconciled the "completed work re-enqueues"
+    finding but silently dropped REVISED work: a reopened backlog item with the
+    same summary but changed instructions was suppressed forever (Greptile P1
+    line 209, T-Rex verified). The fingerprint folds in the planned body, so an
+    unchanged item stays suppressed while a revised one re-plans. Callers must
+    compute this over the SAME (summary, body) the planner enqueues — for a
+    stored mailbox task that is ``task.summary`` + ``task.body``.
+    """
+    return hashlib.sha256(f"{summary}\x1e{body}".encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -28,7 +44,10 @@ class BootPack:
 
     roster: tuple[str, ...]
     open_items: tuple[Mapping[str, Any], ...] = ()
-    ready_summaries: frozenset[str] = frozenset()
+    # Content fingerprints (see ``plan_dedup_key``) of work already represented
+    # by an in-flight or completed mailbox task — NOT bare summaries, so a
+    # revised backlog item re-plans while an unchanged one stays suppressed.
+    ready_keys: frozenset[str] = frozenset()
     audit: Mapping[str, Any] | None = None
     lodestone_excerpt: str = ""
 
@@ -59,8 +78,9 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
     Rules (in order, per item):
     - an item must be a mapping with a ``kind`` in :data:`VALID_KINDS` and a
       non-empty ``summary`` — anything else is skipped, never repaired;
-    - an item whose summary is already live in the mailbox ready-set
-      (``ready_summaries``) is skipped — the mailbox is the dedup surface;
+    - an item whose CONTENT fingerprint (``plan_dedup_key`` of summary + planned
+      body) is already represented by a mailbox task (``ready_keys``) is skipped
+      — the mailbox is the dedup surface, but a revised body re-plans;
     - ``kind == "merge"`` always routes to the ``merge_intent`` channel
       addressed to Merge Master Mike's lane; Sarathi never plans a direct
       merge or push (those verbs are NEVER_AUTO in the gate anyway);
@@ -83,8 +103,6 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
         summary = str(item.get("summary") or "").strip()
         if kind not in VALID_KINDS or not summary:
             continue
-        if summary in pack.ready_summaries:
-            continue
         channel = _planned_channel(kind, item.get("channel"))
         if channel == "merge_intent":
             recipient = str(item.get("recipient") or "merge_master_mike")
@@ -102,6 +120,11 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
             recipient = str(item.get("recipient") or default_recipient)
             action = f"{kind}: {summary}"
             body = str(item.get("body") or summary)
+        # Dedup on the CONTENT fingerprint (summary + the body actually enqueued),
+        # computed after the body is constructed so it matches the key a stored
+        # task yields; a revised body is a new key and re-plans (Greptile P1 L209).
+        if plan_dedup_key(summary, body) in pack.ready_keys:
+            continue
         metadata: dict[str, Any] = dict(item.get("metadata") or {})
         metadata["sarathi_kind"] = kind
         if recipient not in pack.roster and channel != "merge_intent":
@@ -126,4 +149,5 @@ __all__ = [
     "BootPack",
     "PlannedDelegation",
     "build_plan",
+    "plan_dedup_key",
 ]

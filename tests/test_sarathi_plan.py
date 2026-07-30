@@ -6,13 +6,14 @@ from dharma_swarm.holon_system.sarathi.plan import (
     BootPack,
     PlannedDelegation,
     build_plan,
+    plan_dedup_key,
 )
 
 ROSTER = ("hermes-m5", "codex_composer")
 
 
 def _pack(**overrides):
-    base = dict(roster=ROSTER, open_items=(), ready_summaries=frozenset())
+    base = dict(roster=ROSTER, open_items=(), ready_keys=frozenset())
     base.update(overrides)
     return BootPack(**base)
 
@@ -60,10 +61,36 @@ def test_mailbox_ready_set_is_the_dedup_surface() -> None:
                 {"kind": "review", "summary": "already queued"},
                 {"kind": "review", "summary": "new work"},
             ),
-            ready_summaries=frozenset({"already queued"}),
+            # No explicit body -> the planned body defaults to the summary, so
+            # the dedup key is the fingerprint of (summary, summary).
+            ready_keys=frozenset({plan_dedup_key("already queued", "already queued")}),
         )
     )
     assert [d.summary for d in plan] == ["new work"]
+
+
+def test_revised_body_replans_despite_same_summary() -> None:
+    """Greptile P1 line 209: a reopened backlog item with the SAME summary but
+    CHANGED body must re-plan (its content fingerprint differs), while an
+    unchanged item stays suppressed. Deduping on summary alone dropped the
+    revision silently."""
+    # The historical task recorded the ORIGINAL body.
+    original_key = plan_dedup_key("audit the arena", "look at scoreboard v1")
+    plan = build_plan(
+        _pack(
+            open_items=(
+                # Same summary, unchanged body -> suppressed.
+                {"kind": "review", "summary": "audit the arena",
+                 "body": "look at scoreboard v1"},
+                # Same summary, REVISED body -> re-planned.
+                {"kind": "review", "summary": "audit the arena",
+                 "body": "look at scoreboard v2 with the new metric"},
+            ),
+            ready_keys=frozenset({original_key}),
+        )
+    )
+    assert len(plan) == 1
+    assert plan[0].body == "look at scoreboard v2 with the new metric"
 
 
 def test_merge_kind_becomes_label_intent_for_mikes_lane() -> None:
