@@ -57,3 +57,59 @@ jobs:
               echo "::warning::Commit subject not in conventional form: '$line'"
             fi
           done <<< "$subjects"
+
+  phase0-triple-check-ephemeral:
+    name: independent Phase 0 triple-check (ephemeral)
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      OPENROUTER_API_KEY: sk-or-stub
+      ANTHROPIC_API_KEY: sk-ant-stub
+      TINY_ROUTER_BACKEND: heuristic
+      DHARMA_EVOLUTION_SHADOW: "1"
+      DGC_AUTONOMY_LEVEL: "0"
+      AGENTOPS_REPORT_ROOT: ${{ runner.temp }}/dharma-agentops-triple-check
+      DHARMA_OPS_DIR: ${{ runner.temp }}/dharma-ops-triple-check
+      TMPDIR: ${{ runner.temp }}/dharma-tmp-triple-check
+    steps:
+      - name: Checkout audit controller
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: controller
+          fetch-depth: 1
+
+      - name: Checkout exact integrated candidate with full history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: e4b74411c21efa47c635b29517a8798e99d0e77c
+          path: target
+          fetch-depth: 0
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Run independent Phase 0 triple-check
+        shell: bash
+        run: |
+          set -uo pipefail
+          umask 022
+          mkdir -p "$TMPDIR" "$AGENTOPS_REPORT_ROOT" "$DHARMA_OPS_DIR" "$GITHUB_WORKSPACE/triple-check-artifacts"
+          unset PYTHONPATH
+          python "$GITHUB_WORKSPACE/controller/scripts/governance/phase0_triple_check_ephemeral.py" \
+            --repo "$GITHUB_WORKSPACE/target" \
+            --out "$GITHUB_WORKSPACE/triple-check-artifacts" \
+            --target-sha e4b74411c21efa47c635b29517a8798e99d0e77c \
+            --base-sha e891baa59baab3815d3de44806ff3137d33cd321
+
+      - name: Upload raw verification logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: titanium-phase0-triple-check-${{ github.run_id }}
+          path: triple-check-artifacts/
+          if-no-files-found: error
+          retention-days: 7
