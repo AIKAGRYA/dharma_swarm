@@ -25,6 +25,7 @@
     "tests/test_sarathi_plan.py",
     "tests/test_sarathi_delegate.py",
     "tests/test_sarathi_wake.py",
+    "tests/test_sarathi_proof.py",
     "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS0-tier2-door-20260730.json"
   ],
   "forbidden_files": [
@@ -108,6 +109,6 @@
       "The DGC_SARATHI_AUTONOMY dial is read by nothing until the PR-S1 delegation organ lands in this same packet scope."
     ],
     "rollback": "Revert the packet's commits together: tier-policy v1 and the pydantic-chained gate import return, the dial and sarathi organs are additive modules with no runtime state, and no migrations or data rewrites are involved.",
-    "packet_digest": "d6b3c2c3ac69aed7ee12c312edb51b2a57c47db7a5e9ae66d1619535f065c853"
+    "packet_digest": "c9fcb671d80ad45f787c465bf5b4e8eaf770e8b323fc420688e2979be727549e"
   }
 }
