@@ -70,9 +70,18 @@ def _gate_input(delegation: PlannedDelegation) -> str:
     """
     parts: list[str] = [delegation.action]
     if delegation.channel != "merge_intent":
+        # Non-merge channels deliver summary + body + metadata to a worker that
+        # may execute them, so all of it must face the floor. Merge intents
+        # carry only a constructed label request to Mike's lane (he re-gates
+        # under the tier policy); their caller summary/body AND planner
+        # bookkeeping metadata (e.g. sarathi_kind=merge) are not worker-executed
+        # — and including that metadata mis-classified the benign label request
+        # as a direct "merge" (IRREVERSIBLE), gating every planner-produced
+        # merge intent (Codex P1 on PR #1170). Merge intents classify on the
+        # constructed action alone.
         parts.extend([delegation.summary, delegation.body])
-    for key, value in sorted(delegation.metadata.items()):
-        parts.append(f"{key}={value}")
+        for key, value in sorted(delegation.metadata.items()):
+            parts.append(f"{key}={value}")
     return "\n".join(str(part) for part in parts if part)
 
 
@@ -264,17 +273,8 @@ async def delegate_all(
                 delegation.channel == "invoke"
                 and decision.may_execute_unattended
                 and mailbox is not None
+                and invoker is not None
             ):
-                if invoker is None:
-                    outcomes.append(
-                        DelegationOutcome(
-                            delegation=delegation,
-                            gate=gate,
-                            status="logged",
-                            detail="invoke channel unavailable: no invoker injected",
-                        )
-                    )
-                    continue
                 outcomes.append(
                     await _dispatch_invoke(
                         delegation,
@@ -285,6 +285,10 @@ async def delegate_all(
                     )
                 )
                 continue
+            # An invoke item without a live invoker is NOT dropped to "logged":
+            # it falls through to the leased mailbox below so the planner's
+            # invoke channel still executes via a claiming worker (Codex P2 on
+            # PR #1170). Only a fully absent mailbox degrades to logged.
 
             # Everything else admissible rides the mailbox: the claim fence is
             # the execution lease (NEEDS_LEASE work, merge intents, invoke-grade

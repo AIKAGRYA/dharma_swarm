@@ -173,14 +173,33 @@ async def test_missing_infrastructure_degrades_honestly(tmp_path) -> None:
     )
     assert [o.status for o in outcomes] == ["logged", "logged"]
     assert all("no mailbox injected" in o.detail for o in outcomes)
-    # Mailbox present but no invoker: the invoke-grade item honestly logs the
-    # missing invoker rather than silently riding the mailbox.
+    # Mailbox present but no invoker: the invoke-grade item is NOT dropped to
+    # logged — it rides the leased mailbox so the channel still executes via a
+    # claiming worker (Codex P2 on PR #1170).
     mailbox = RoamingMailbox(queue_root=tmp_path)
     outcomes = await delegate_all(
         [SAFE_INVOKE], level=AutonomyLevel.FULL, mailbox=mailbox, invoker=None
     )
-    assert outcomes[0].status == "logged"
-    assert "no invoker injected" in outcomes[0].detail
+    assert outcomes[0].status == "dispatched"
+    assert outcomes[0].receipt_ref.startswith("mbx_")
+
+
+async def test_planner_merge_metadata_does_not_regate(tmp_path) -> None:
+    """Codex P1 on PR #1170: a planner-produced merge intent carries
+    metadata['sarathi_kind']='merge'; that bookkeeping must not re-classify the
+    constructed label request as a direct IRREVERSIBLE merge and gate it."""
+    from dharma_swarm.holon_system.sarathi.plan import BootPack, build_plan
+
+    plan = build_plan(
+        BootPack(roster=("merge_master_mike",),
+                 open_items=({"kind": "merge", "summary": "land PR", "pr": 7},))
+    )
+    assert plan and plan[0].metadata["sarathi_kind"] == "merge"
+    mailbox = RoamingMailbox(queue_root=tmp_path)
+    outcomes = await delegate_all(plan, level=AutonomyLevel.FULL, mailbox=mailbox)
+    # Not gated: the constructed label request dispatches to Mike's lane.
+    assert outcomes[0].status == "dispatched"
+    assert outcomes[0].gate["action_class"] != "irreversible"
 
 
 async def test_gate_covers_the_full_dispatched_payload(tmp_path) -> None:

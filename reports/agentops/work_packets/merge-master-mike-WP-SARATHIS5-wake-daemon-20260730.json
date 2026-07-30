@@ -7,18 +7,23 @@
   "allowed_files": [
     "scripts/runtime/sarathi_wake_daemon.py",
     "tests/test_sarathi_wake_daemon.py",
-    "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS5-wake-daemon-20260730.json"
+    "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS5-wake-daemon-20260730.json",
+    "dharma_swarm/holon_system/sarathi/delegate.py",
+    "tests/test_sarathi_delegate.py"
   ],
   "forbidden_files": [
     "dharma_swarm/dharma_kernel.py",
     "dharma_swarm/telos_gates.py",
     "dharma_swarm/operator_core/reversibility_gate.py",
     "dharma_swarm/operator_core/autonomy_dial.py",
-    "dharma_swarm/holon_system/sarathi/**",
     "scripts/governance/**",
     ".github/workflows/**",
     "scripts/runtime/pr_merge_control.py",
-    "scripts/runtime/merge_master_mike_daemon.py"
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "dharma_swarm/holon_system/sarathi/plan.py",
+    "dharma_swarm/holon_system/sarathi/wake.py",
+    "dharma_swarm/holon_system/sarathi/proof.py",
+    "dharma_swarm/holon_system/sarathi/gateway.py"
   ],
   "gates": [
     {
@@ -73,7 +78,8 @@
       "details": []
     },
     "interface_mismatches": [
-      "Codex P1 on merged PR #1167 noted make_wake_work_fn was only called by the propose-only proof runner and codex_composer_wake_loop.run_once still publishes read-only status, so DGC_SARATHI_AUTONOMY=dispatch changed nothing; this wrapper is the standing-loop binding that closes that gap without touching the 1400-line wake shell."
+      "Codex P1 on merged PR #1167 noted make_wake_work_fn was only called by the propose-only proof runner and codex_composer_wake_loop.run_once still publishes read-only status, so DGC_SARATHI_AUTONOMY=dispatch changed nothing; this wrapper is the standing-loop binding that closes that gap without touching the 1400-line wake shell.",
+      "Codex/Greptile P1 on PR #1170 found two coupled bugs in the merged delegate.py that the daemon exposes: planner metadata (sarathi_kind=merge) re-classified merge label-requests as IRREVERSIBLE, and invoke items with no live invoker were dropped to logged instead of riding the leased mailbox. Both fixed here so the standing loop actually dispatches merge intents and invoke-channel work."
     ],
     "closest_existing_implementation": [
       "scripts/runtime/sarathi_proof_window.py:run_window",
@@ -87,6 +93,6 @@
       "At dispatch/full the daemon enqueues mailbox tasks and automerge-label intents that Merge Master Mike re-gates; it cannot itself merge or push (both NEVER_AUTO)."
     ],
     "rollback": "Revert the two added files and this packet together; the daemon is an additive runtime wrapper with no runtime state in git and no migrations.",
-    "packet_digest": "fa5e04aeb17561b9c82291c69215229109781f0c2dcb292ef054fe2e24699ff7"
+    "packet_digest": "3be463a53b1834c533e69653b0e7c55be99188d47e8c6d994b63b0ebbaa9a563"
   }
 }

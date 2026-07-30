@@ -1,8 +1,9 @@
 """Standing wake-loop runtime wrapper (PR-S5): dial-gated, kill-honoring, thin.
 
 The daemon binds the merged organs into a governed loop so the dial drives
-real work — but it never claims liveness (Gate-10) and honors the safety
-envelope of the organs it composes.
+real work — but it never claims liveness (Gate-10), honors the safety envelope
+of the organs it composes, carries budget across restarts, dedups against all
+of its own tasks, retains per-run evidence, and exits nonzero on error cycles.
 """
 
 from __future__ import annotations
@@ -17,14 +18,18 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "runtime"))
 import sarathi_wake_daemon as daemon  # noqa: E402
 
 
-def _run(tmp_path: Path, cycles: int = 2, backlog: str = "") -> tuple[int, dict]:
-    argv = ["--cycles", str(cycles), "--state-root", str(tmp_path), "--json"]
+def _run(tmp_path: Path, cycles: int = 2, backlog: str = "", extra=None) -> tuple[int, dict]:
+    argv = [
+        "--cycles", str(cycles),
+        "--state-root", str(tmp_path),
+        "--agents-root", str(tmp_path / "agents"),  # isolate kill/persistence
+        "--json",
+    ]
     if backlog:
         argv += ["--backlog", backlog]
+    argv += extra or []
     code = daemon.main(argv)
-    report = json.loads(
-        (tmp_path / "sarathi" / "wake_daemon_report.json").read_text()
-    )
+    report = json.loads((tmp_path / "sarathi" / "wake_daemon_report.json").read_text())
     return code, report
 
 
@@ -33,12 +38,11 @@ def test_propose_default_runs_but_dispatches_nothing(tmp_path, monkeypatch) -> N
     code, report = _run(tmp_path, cycles=2)
     assert code == 0
     assert report["autonomy_level"] == "propose"
-    assert report["wake_loop_active"] is False  # never claimed here
+    assert report["wake_loop_active"] is False
     assert report["statuses"] == ["ran", "ran"]
-    # Propose holds dispatch: the shared mailbox stays empty.
-    mailbox_dir = tmp_path / "sarathi" / "mailbox" / "tasks"
-    assert not mailbox_dir.exists() or not list(mailbox_dir.glob("*.json"))
-    briefs = sorted((tmp_path / "sarathi" / "briefs").glob("brief_cycle_*.md"))
+    tasks_dir = tmp_path / "sarathi" / "mailbox" / "tasks"
+    assert not tasks_dir.exists() or not list(tasks_dir.glob("*.json"))
+    briefs = list((tmp_path / "sarathi" / "briefs").rglob("brief_cycle_*.md"))
     assert len(briefs) == 2
 
 
@@ -61,7 +65,6 @@ def test_dispatch_dial_enqueues_leased_work(tmp_path, monkeypatch) -> None:
     code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
     assert code == 0
     assert report["autonomy_level"] == "dispatch"
-    # A leased build reaches the mailbox as a real task at dispatch level.
     tasks = list((tmp_path / "sarathi" / "mailbox" / "tasks").glob("*.json"))
     assert len(tasks) == 1
 
@@ -72,7 +75,88 @@ def test_kill_switch_halts_the_loop(tmp_path, monkeypatch) -> None:
 
     holon_killswitch.request_kill("sarathi", agents_root=tmp_path / "agents")
     code, report = _run(tmp_path, cycles=5)
-    assert code == 0
-    # The kill-check runs before work every cycle; the loop stops immediately.
+    assert code == 0  # governed halt is healthy
     assert report["statuses"] == ["halted:kill"]
     assert report["cycles_run"] == 1
+
+
+def test_monotonic_run_ids_retain_evidence(tmp_path, monkeypatch) -> None:
+    """Codex/Greptile P1: a scheduler re-invoking the daemon must not overwrite
+    the prior run's brief; each run gets its own retained directory + report."""
+    monkeypatch.delenv("DGC_SARATHI_AUTONOMY", raising=False)
+    _run(tmp_path, cycles=1)
+    _run(tmp_path, cycles=1)
+    run_dirs = sorted((tmp_path / "sarathi" / "briefs").glob("run_*"))
+    assert [p.name for p in run_dirs] == ["run_0001", "run_0002"]
+    reports = sorted((tmp_path / "sarathi").glob("wake_daemon_report_run_*.json"))
+    assert len(reports) == 2
+
+
+def test_budget_cap_carried_and_enforced(tmp_path, monkeypatch) -> None:
+    """Codex/Greptile P1: a real cumulative spend snapshot (not hardcoded 0)
+    reaches the guard, so the cap halts."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "propose")
+    code, report = _run(
+        tmp_path, cycles=3, extra=["--spent-usd", "0.10", "--cap-usd", "0.10"]
+    )
+    assert code == 0  # budget halt is governed
+    assert report["statuses"] == ["halted:budget"]
+    assert report["spent_usd"] == 0.10
+    # The ledger persists across restarts.
+    assert (tmp_path / "sarathi" / "spent_usd").exists()
+
+
+def test_dedup_suppresses_completed_backlog_item(tmp_path, monkeypatch) -> None:
+    """Codex/Greptile P1: a responded task's summary must still suppress
+    re-planning the same backlog item."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    from dharma_swarm.roaming_mailbox import RoamingMailbox
+
+    mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
+    task = mailbox.enqueue_task(
+        recipient="hermes-m5", sender="sarathi",
+        summary="extend the chamber gym battery", body="x",
+    )
+    mailbox.claim_task(task.task_id, claimed_by="hermes-m5")
+    mailbox.respond_to_task(
+        task_id=task.task_id, responder="hermes-m5", summary="ok", body="ok"
+    )
+    backlog = tmp_path / "backlog.json"
+    backlog.write_text(
+        json.dumps([{"kind": "build", "summary": "extend the chamber gym battery",
+                     "body": "add one scenario"}])
+    )
+    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
+    assert code == 0
+    # No NEW task for the already-completed summary — only the original exists.
+    tasks = list((tmp_path / "sarathi" / "mailbox" / "tasks").glob("*.json"))
+    assert len(tasks) == 1
+
+
+def test_error_cycle_exits_nonzero(tmp_path, monkeypatch) -> None:
+    """Codex P2: an error/unverified cycle must produce a nonzero exit so a
+    service manager alerts; governed kill/budget halts stay 0."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "propose")
+
+    async def _boom(*args, **kwargs):
+        return {"status": "halted:error", "error": "boot pack failed"}
+
+    monkeypatch.setattr(daemon, "holon_wake_cycle", _boom)
+    code, report = _run(tmp_path, cycles=1)
+    assert code == 1
+    assert report["had_error"] is True
+    assert report["statuses"] == ["halted:error"]
+
+
+def test_closeback_ledger_records_outcomes(tmp_path, monkeypatch) -> None:
+    """Codex P2: cycles bind a durable closeback ledger, not closeback=none."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    backlog = tmp_path / "backlog.json"
+    backlog.write_text(
+        json.dumps([{"kind": "build", "summary": "one build", "body": "b"}])
+    )
+    _run(tmp_path, cycles=1, backlog=str(backlog))
+    ledger = tmp_path / "sarathi" / "closeback_ledger.jsonl"
+    assert ledger.exists()
+    rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+    assert rows and rows[0]["outcomes"]
