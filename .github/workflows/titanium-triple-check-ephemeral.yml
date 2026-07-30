@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - claude/titanium-hardening-status-bm7th5
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -26,7 +29,7 @@ jobs:
       - name: Checkout audit controller
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: controller
           fetch-depth: 1
 
