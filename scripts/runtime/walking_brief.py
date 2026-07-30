@@ -25,11 +25,35 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
 BRIEF_MARKER = "<!-- walking-brief:v1 -->"
+
+# Same absent-switch contract as the workflow guards
+# (docs/ops/loop_control/README.md): 404 on the file OR on the branch — a
+# repo where loop-control has never been created answers "No commit found
+# for the ref loop-control" (Codex review on PR #1158).
+_KILLSWITCH_ABSENT_RE = re.compile(
+    r'HTTP 404|"status": *"404"|Not Found|No commit found', re.IGNORECASE
+)
+
+# Markdown metacharacters in externally-authored text (PR titles): a title
+# like 'x](https://attacker.example)' must not rewrite links in the trusted
+# brief (Codex review on PR #1158).
+_MD_ESCAPE_RE = re.compile(r"([\\\[\]`*_<>])")
+
+
+def _md_escape(text: str) -> str:
+    return _MD_ESCAPE_RE.sub(r"\\\1", text)
+
+
+def _date_marker(generated_at: str) -> str:
+    # Keys one comment per day: a rerun updates today's brief instead of
+    # duplicating the phone notification (Codex review on PR #1158).
+    return f"<!-- walking-brief:date:{(generated_at or '')[:10]} -->"
 BRIEF_ISSUE_LABEL = "walking-brief"
 KILLSWITCH_PATH = "docs/ops/loop_control/KILLSWITCH"
 CONTROL_REF = "loop-control"
@@ -64,12 +88,12 @@ def gather_killswitch(repo: str) -> dict:
     result = _gh(["api", f"repos/{repo}/contents/{KILLSWITCH_PATH}?ref={CONTROL_REF}"])
     if result.returncode == 0:
         return {"engaged": True, "detail": "KILLSWITCH present on loop-control"}
-    if "Not Found" in (result.stdout + result.stderr):
+    if _KILLSWITCH_ABSENT_RE.search(result.stdout + result.stderr):
         return {"engaged": False, "detail": ""}
     return {"engaged": None, "detail": "state UNKNOWN (API error) — treat as engaged"}
 
 
-def gather_walk_ready(repo: str) -> list[dict]:
+def gather_walk_ready(repo: str) -> list[dict] | None:
     data = _gh_json(
         [
             "pr", "list", "--repo", repo, "--state", "open",
@@ -77,10 +101,12 @@ def gather_walk_ready(repo: str) -> list[dict]:
             "number,title,isDraft,url,labels", "--limit", "20",
         ]
     )
-    return data if isinstance(data, list) else []
+    # None on failure: an unavailable query must never render as the calm
+    # "nothing awaiting you" (Codex + Greptile reviews on PR #1158).
+    return data if isinstance(data, list) else None
 
 
-def gather_automerge_log(repo: str) -> list[dict]:
+def gather_automerge_log(repo: str) -> list[dict] | None:
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
     rows: list[dict] = []
     for label in ("automerge", "bot-pr"):
@@ -91,8 +117,12 @@ def gather_automerge_log(repo: str) -> list[dict]:
                 "--json", "number,title,url,mergedAt", "--limit", "20",
             ]
         )
-        if isinstance(data, list):
-            rows.extend(data)
+        if not isinstance(data, list):
+            # Fail closed on ANY partial query: an incomplete revert audit
+            # silently omitting automerges is worse than an explicit unknown
+            # (Codex + Devin + Greptile reviews on PR #1158).
+            return None
+        rows.extend(data)
     # Newest first: the brief truncates this list, and the most recent
     # automerges are the ones most likely to need a one-tap revert
     # (Devin review on PR #1158).
@@ -155,6 +185,7 @@ def _not_landed(producer: str) -> list[str]:
 def compose_brief(data: dict) -> str:
     out: list[str] = [
         BRIEF_MARKER,
+        _date_marker(data.get("generated_at", "")),
         f"## 🥾 Walking Brief — {data.get('generated_at', '?')}",
         "",
     ]
@@ -168,10 +199,12 @@ def compose_brief(data: dict) -> str:
     else:
         out += _section("🟢 KILLSWITCH", ["not engaged"])
 
-    ready = data.get("walk_ready") or []
-    if ready:
+    ready = data.get("walk_ready")
+    if ready is None:
+        rows = ["_walk-ready query FAILED — state UNKNOWN, check the Actions run_"]
+    elif ready:
         rows = [
-            f"- #{p['number']} [{p['title'][:60]}]({p['url']})"
+            f"- #{p['number']} [{_md_escape(p['title'][:60])}]({p['url']})"
             + (" *(draft — flip ready, then merge)*" if p.get("isDraft") else "")
             for p in ready[:MAX_ROWS]
         ]
@@ -183,10 +216,14 @@ def compose_brief(data: dict) -> str:
 
     merged = data.get("automerge_log")
     if merged is None:
-        out += _section("🤖 Automerges (24h)", _not_landed("query failed"))
+        out += _section(
+            "🤖 Automerges (24h)",
+            ["_automerge-log query FAILED — state UNKNOWN, check the Actions run_"],
+        )
     elif merged:
         merged_rows = [
-            f"- #{p['number']} [{p['title'][:60]}]({p['url']}) at {p.get('mergedAt', '?')}"
+            f"- #{p['number']} [{_md_escape(p['title'][:60])}]({p['url']}) "
+            f"at {p.get('mergedAt', '?')}"
             for p in merged[:MAX_ROWS]
         ]
         if len(merged) > MAX_ROWS:
@@ -202,7 +239,15 @@ def compose_brief(data: dict) -> str:
     if night is None:
         out += _section("🌙 Nightly main", ["no run found"])
     else:
-        icon = "🟢" if night.get("conclusion") == "success" else "🔴"
+        conclusion = str(night.get("conclusion") or "").lower()
+        if conclusion == "success":
+            icon = "🟢"
+        elif conclusion in {"queued", "in_progress", "waiting", "pending", "requested"}:
+            # Nonterminal statuses are pending, not failures — red is
+            # reserved for a finished unsuccessful run (Greptile on #1158).
+            icon = "🟡"
+        else:
+            icon = "🔴"
         out += _section(
             "🌙 Nightly main",
             [f"{icon} [{night.get('conclusion')}]({night.get('url')}) "
@@ -232,6 +277,25 @@ def compose_brief(data: dict) -> str:
 # ---------------------------------------------------------------- delivery
 
 
+def _pin_issue(repo: str, issue_number: int) -> bool:
+    """Best-effort GraphQL pin: the bootstrap thread should reach the phone
+    pinned, not merely ask to be pinned (Codex review on PR #1158)."""
+    node = _gh_json(["api", f"repos/{repo}/issues/{issue_number}"])
+    node_id = node.get("node_id") if isinstance(node, dict) else None
+    if not node_id:
+        return False
+    result = _gh(
+        [
+            "api", "graphql",
+            "-f",
+            "query=mutation($id: ID!) "
+            "{ pinIssue(input: {issueId: $id}) { issue { number } } }",
+            "-f", f"id={node_id}",
+        ]
+    )
+    return result.returncode == 0
+
+
 def find_or_create_brief_issue(repo: str) -> int | None:
     data = _gh_json(
         [
@@ -239,6 +303,15 @@ def find_or_create_brief_issue(repo: str) -> int | None:
             "--label", BRIEF_ISSUE_LABEL, "--json", "number", "--limit", "1",
         ]
     )
+    if data is None:
+        # Lookup FAILED (distinct from "no issue exists"): creating here
+        # would fork a duplicate, unpinned thread the phone never sees
+        # (Devin + Greptile reviews on PR #1158).
+        print(
+            "walking-brief: issue lookup failed — refusing to create a duplicate",
+            file=sys.stderr,
+        )
+        return None
     if isinstance(data, list) and data:
         return int(data[0]["number"])
     _gh(
@@ -254,7 +327,7 @@ def find_or_create_brief_issue(repo: str) -> int | None:
             "--title", "Walking Ops — Daily Brief",
             "--label", BRIEF_ISSUE_LABEL,
             "--body",
-            "Daily walking-mode brief lands here as comments. Pin this issue. "
+            "Daily walking-mode brief lands here as comments. "
             "Reply with a dictated comment — that reply is the sole input door "
             "(ingestion lands with PR-F).",
         ]
@@ -262,9 +335,47 @@ def find_or_create_brief_issue(repo: str) -> int | None:
     if result.returncode != 0:
         return None
     try:
-        return int(result.stdout.strip().rstrip("/").rsplit("/", 1)[-1])
+        issue_number = int(result.stdout.strip().rstrip("/").rsplit("/", 1)[-1])
     except ValueError:
         return None
+    if not _pin_issue(repo, issue_number):
+        print(
+            f"walking-brief: could not pin issue #{issue_number} — pin it manually",
+            file=sys.stderr,
+        )
+    return issue_number
+
+
+def find_todays_brief_comment(repo: str, issue_number: int, date_marker: str) -> int | None:
+    """Same-day marker comment id, else None. A rerun UPDATES today's brief
+    instead of duplicating the phone notification; if this lookup itself
+    fails we fall through to posting — one duplicate beats a silent day."""
+    day = date_marker.rsplit(":", 1)[-1].split(" ")[0]
+    data = _gh_json(
+        [
+            "api",
+            f"repos/{repo}/issues/{issue_number}/comments"
+            f"?since={day}T00:00:00Z&per_page=100",
+        ]
+    )
+    if not isinstance(data, list):
+        return None
+    for row in reversed(data):
+        if date_marker in str(row.get("body") or ""):
+            ident = row.get("id")
+            return int(ident) if ident is not None else None
+    return None
+
+
+def update_brief_comment(repo: str, comment_id: int, body: str) -> bool:
+    result = _gh(
+        [
+            "api", "-X", "PATCH",
+            f"repos/{repo}/issues/comments/{comment_id}",
+            "-f", f"body={body}",
+        ]
+    )
+    return result.returncode == 0
 
 
 def post_brief(repo: str, issue_number: int, body: str) -> bool:
@@ -292,10 +403,19 @@ def main(argv: list[str] | None = None) -> int:
         if issue is None:
             print("walking-brief: could not find or create the brief issue", file=sys.stderr)
             return 2
-        if not post_brief(args.repo, issue, body):
-            print("walking-brief: failed to post the brief comment", file=sys.stderr)
-            return 2
-        print(f"walking-brief: posted to issue #{issue}")
+        marker = _date_marker(data.get("generated_at", ""))
+        existing = find_todays_brief_comment(args.repo, issue, marker)
+        if existing is not None:
+            if not update_brief_comment(args.repo, existing, body):
+                print("walking-brief: failed to update today's brief comment",
+                      file=sys.stderr)
+                return 2
+            print(f"walking-brief: updated today's brief on issue #{issue}")
+        else:
+            if not post_brief(args.repo, issue, body):
+                print("walking-brief: failed to post the brief comment", file=sys.stderr)
+                return 2
+            print(f"walking-brief: posted to issue #{issue}")
     else:
         print(body)
     return 0

@@ -1,5 +1,6 @@
 """Walking brief: pure-composition tests + workflow contract pins (PR-C)."""
 
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -112,3 +113,91 @@ def test_workflow_contract():
     # Deliberate KILLSWITCH exception: the brief is read-only visibility and
     # must keep publishing during an emergency stop — documented in-file.
     assert "KILLSWITCH exception" in text
+
+# ---------------------------------------------------------------- PR-C2
+# Review-hardening pins (Codex, Devin, Greptile on the merged PR #1158).
+
+
+def _fake_gh(stdout="", stderr="", returncode=1):
+    def runner(args, **kwargs):
+        return subprocess.CompletedProcess(args, returncode, stdout, stderr)
+    return runner
+
+
+def test_failed_walk_ready_query_renders_unknown_not_calm():
+    body = walking_brief.compose_brief(_base_data(walk_ready=None))
+    assert "nothing awaiting you" not in body
+    assert "UNKNOWN" in body
+
+
+def test_failed_automerge_query_renders_unknown_not_none():
+    body = walking_brief.compose_brief(_base_data(automerge_log=None))
+    assert "UNKNOWN" in body
+    # The genuinely-empty case still reads as calm.
+    calm = walking_brief.compose_brief(_base_data(automerge_log=[]))
+    assert "none" in calm
+
+
+def test_killswitch_missing_branch_is_disengaged(monkeypatch):
+    # A repo where loop-control has never been created returns
+    # "No commit found for the ref loop-control" — the switch contract
+    # (docs/ops/loop_control/README.md) reads that as absent/disengaged.
+    monkeypatch.setattr(
+        walking_brief, "_gh",
+        _fake_gh(stderr="gh: No commit found for the ref loop-control (HTTP 404)"),
+    )
+    assert walking_brief.gather_killswitch("o/r")["engaged"] is False
+
+
+def test_killswitch_other_error_stays_unknown(monkeypatch):
+    monkeypatch.setattr(walking_brief, "_gh", _fake_gh(stderr="HTTP 500 boom"))
+    assert walking_brief.gather_killswitch("o/r")["engaged"] is None
+
+
+def test_issue_lookup_failure_never_creates_duplicate(monkeypatch):
+    created = []
+    monkeypatch.setattr(walking_brief, "_gh_json", lambda args: None)
+    monkeypatch.setattr(
+        walking_brief, "_gh",
+        lambda args, **kw: created.append(args)
+        or subprocess.CompletedProcess(args, 0, "", ""),
+    )
+    assert walking_brief.find_or_create_brief_issue("o/r") is None
+    assert created == [], "a failed lookup must not reach the create path"
+
+
+def test_titles_are_markdown_escaped():
+    body = walking_brief.compose_brief(
+        _base_data(
+            walk_ready=[
+                {"number": 7, "title": "x](https://attacker.example)",
+                 "url": "https://x/7", "isDraft": False}
+            ]
+        )
+    )
+    assert "x](https://attacker.example)" not in body
+    assert "\\]" in body
+
+
+def test_brief_carries_date_marker_for_idempotent_posting():
+    body = walking_brief.compose_brief(_base_data())
+    assert "<!-- walking-brief:date:2026-07-29 -->" in body
+
+
+def test_todays_comment_is_updated_not_duplicated(monkeypatch):
+    marker = "<!-- walking-brief:date:2026-07-29 -->"
+    comments = [
+        {"id": 11, "body": "unrelated"},
+        {"id": 22, "body": f"{marker}\nold brief"},
+    ]
+    monkeypatch.setattr(walking_brief, "_gh_json", lambda args: comments)
+    assert walking_brief.find_todays_brief_comment("o/r", 5, marker) == 22
+
+
+def test_pending_nightly_renders_pending_not_red():
+    body = walking_brief.compose_brief(
+        _base_data(nightly_main={"conclusion": "in_progress", "url": "u",
+                                 "completed_at": "t"})
+    )
+    assert "🟡" in body
+    assert "🔴" not in body
