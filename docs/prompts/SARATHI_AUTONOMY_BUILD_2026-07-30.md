@@ -17,7 +17,7 @@ decision 2026-07-30: replace it with a *decorrelated-review + reversibility*
 gate that Sarathi can clear autonomously. Nothing is off-limits to her except
 what is genuinely irreversible or genuinely illegal. Ship it.
 
-## GROUND TRUTH FIRST (do this before writing code)
+## GROUND-TRUTH FIRST (do this before writing code)
 
 Read, in order, and write a 15-line CURRENT_STATE note reconciling any drift:
 1. `dharma_swarm/holon_system/sarathi/*.py` (all of it — ~139 lines: pulse,
