@@ -120,19 +120,22 @@ def _full_valid_payload(tmp_path: Path, monkeypatch) -> dict[str, object]:
         }
     )
 
+    happy = rows["happy_path"]
     receipt = tmp_path / "semantic_receipt.json"
     receipt.write_text(
         json.dumps(
             {
                 "schema": "dharma.nats.live_matrix.semantic_receipt.v1",
+                "task_id": happy["task_id"],
+                "trace_id": happy["trace_id"],
                 "provider": "deterministic",
+                "requested_model": "test",
                 "response_model": "fixture-model",
                 "content": '{"ok": true}',
             }
         ),
         encoding="utf-8",
     )
-    happy = rows["happy_path"]
     happy.update(
         {
             "publish_ack": ack,
@@ -399,6 +402,71 @@ def test_common_contract_rejects_unbound_evidence(
             expected_broker_profile="daemon-production",
             repo_root=tmp_path,
         )
+
+
+def test_common_contract_rejects_alternate_existing_runner_with_canonical_basename(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    payload = _common_payload(tmp_path, monkeypatch)
+    attacker = tmp_path / "attacker" / "run_nats_live_production_matrix.py"
+    attacker.parent.mkdir()
+    attacker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    payload["command"][1] = str(attacker)
+
+    with pytest.raises(_MODULE.EvidenceError, match="canonical live matrix runner"):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value", "expected"),
+    [
+        ("task_id", "forged-task", "semantic receipt task_id mismatch"),
+        ("trace_id", "forged-trace", "semantic receipt trace_id mismatch"),
+        ("provider", "forged-provider", "semantic receipt provider mismatch"),
+        (
+            "requested_model",
+            "forged-model",
+            "semantic receipt requested_model mismatch",
+        ),
+    ],
+)
+def test_happy_path_rejects_semantic_receipt_identity_mismatch(
+    tmp_path: Path,
+    monkeypatch,
+    field: str,
+    forged_value: str,
+    expected: str,
+) -> None:
+    payload = _full_valid_payload(tmp_path, monkeypatch)
+    rows = {row["name"]: row for row in payload["rows"]}
+    receipt_path = Path(rows["happy_path"]["receipt_path"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt[field] = forged_value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    evidence = tmp_path / f"mismatched-{field}.json"
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+
+    assessment = _MODULE.evaluate_evidence(
+        evidence,
+        host_mode="live",
+        max_age_hours=24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert assessment.verdict == _MODULE.VERDICT_FAIL
+    assert assessment.exit_code == _MODULE.EXIT_FAIL
+    assert expected in assessment.reason
 
 
 def test_repeated_host_mode_last_live_is_accepted(tmp_path: Path, monkeypatch) -> None:
