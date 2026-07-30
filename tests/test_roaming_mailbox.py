@@ -153,3 +153,81 @@ def test_depends_on_round_trips_through_json(tmp_path: Path) -> None:
     legacy = {k: v for k, v in stored.items() if k != "depends_on"}
     mailbox._write_json(mailbox.task_path(task.task_id), legacy)
     assert mailbox.load_task(task.task_id).depends_on == []
+
+def test_dependent_tasks_are_encoded_blocked_for_legacy_pollers(tmp_path: Path) -> None:
+    """Older checkouts ignore depends_on and claim anything "queued" — a
+    dependent task must be written in a status they can never claim."""
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    dep = mailbox.enqueue_task(recipient="r", sender="s", summary="dep", body="b")
+    dependent = mailbox.enqueue_task(
+        recipient="r", sender="s", summary="t", body="b", depends_on=[dep.task_id]
+    )
+    assert dependent.status == "blocked"
+    assert _load_json(mailbox.task_path(dependent.task_id))["status"] == "blocked"
+    queued_ids = [t.task_id for t in mailbox.list_tasks(status="queued")]
+    assert dependent.task_id not in queued_ids
+    # New readers still surface it once the dependency responds.
+    mailbox.respond_to_task(task_id=dep.task_id, responder="r", summary="d", body="d")
+    assert [t.task_id for t in mailbox.ready_tasks(recipient="r")] == [
+        dependent.task_id
+    ]
+
+
+def test_traversal_dependency_never_satisfies_ready_gate(tmp_path: Path) -> None:
+    """A depends_on like "../responses/<id>.<responder>" must not resolve a
+    response JSON into a satisfied dependency (Greptile P1 on PR #1159)."""
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    dep = mailbox.enqueue_task(recipient="r", sender="s", summary="dep", body="b")
+    mailbox.respond_to_task(task_id=dep.task_id, responder="worker", summary="d", body="d")
+    traversal = f"../responses/{dep.task_id}.worker"
+    assert (mailbox.responses_dir / f"{dep.task_id}.worker.json").exists()
+    victim = mailbox.enqueue_task(
+        recipient="r", sender="s", summary="victim", body="b",
+        depends_on=[traversal],
+    )
+    ready_ids = [t.task_id for t in mailbox.ready_tasks(recipient="r")]
+    assert victim.task_id not in ready_ids
+    assert mailbox.claim_next_task("r") is None
+    assert any("unknown dependency" in issue for issue in mailbox.validate_dependencies())
+
+
+def test_dependency_record_must_match_its_own_id(tmp_path: Path) -> None:
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    dep = mailbox.enqueue_task(recipient="r", sender="s", summary="dep", body="b")
+    mailbox.respond_to_task(task_id=dep.task_id, responder="r", summary="d", body="d")
+    # A copied/renamed responded record whose embedded id differs never counts.
+    forged = {**_load_json(mailbox.task_path(dep.task_id)), "task_id": "mbx_other"}
+    mailbox._write_json(mailbox.tasks_dir / "mbx_forged.json", forged)
+    victim = mailbox.enqueue_task(
+        recipient="r", sender="s", summary="v", body="b", depends_on=["mbx_forged"]
+    )
+    assert victim.task_id not in [t.task_id for t in mailbox.ready_tasks(recipient="r")]
+
+
+def test_invalid_task_ids_are_rejected_at_the_path_boundary(tmp_path: Path) -> None:
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    for bad in ("../responses/x", "a/b", "..", ".hidden", ""):
+        try:
+            mailbox.task_path(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"task_path accepted invalid id: {bad!r}")
+
+
+def test_direct_claim_of_unsatisfied_dependency_is_refused(tmp_path: Path) -> None:
+    """claim_task itself enforces the contract — not only claim_next_task
+    (Codex P2 on PR #1159)."""
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    dep = mailbox.enqueue_task(recipient="r", sender="s", summary="dep", body="b")
+    dependent = mailbox.enqueue_task(
+        recipient="r", sender="s", summary="t", body="b", depends_on=[dep.task_id]
+    )
+    try:
+        mailbox.claim_task(dependent.task_id, claimed_by="r")
+        raise AssertionError("direct claim bypassed the dependency gate")
+    except ValueError:
+        pass
+    assert mailbox.load_task(dependent.task_id).status == "blocked"
+    mailbox.respond_to_task(task_id=dep.task_id, responder="r", summary="d", body="d")
+    claimed = mailbox.claim_task(dependent.task_id, claimed_by="r")
+    assert claimed.status == "claimed"

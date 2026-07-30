@@ -13,11 +13,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+# Task ids are single path components — no separators, no leading dot. This
+# confines every id-derived path to its directory: a dependency such as
+# "../responses/<id>.worker" must never resolve outside tasks/ and satisfy
+# the ready gate via a response record (Greptile + Codex reviews on
+# PR #1159).
+_TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def _validated_task_id(task_id: str) -> str:
+    if not _TASK_ID_RE.fullmatch(task_id or ""):
+        raise ValueError(f"invalid task id: {task_id!r}")
+    return task_id
 
 
 def _utc_now() -> datetime:
@@ -51,11 +65,13 @@ class MailboxTask:
     claimed_by: str = ""
     responded_at: str = ""
     response_ref: str = ""
-    # Task-medium join (2026-07-29 decision record in
-    # docs/architecture/WIRING_AND_LOOPS.md): dependency edges by task_id,
-    # with ready-set semantics mirroring task_board.py — a task is claimable
-    # only when every dependency has status "responded". Unknown dependency
-    # ids fail closed (never ready) rather than silently unblocking.
+    # Task-medium join (ADR-010,
+    # docs/architecture/ADRs/ADR-010-beads-fence-task-medium-join.md):
+    # dependency edges by task_id, with ready-set semantics mirroring
+    # task_board.py — a task is claimable only when every dependency has
+    # status "responded". Unknown/malformed dependency ids fail closed.
+    # Dependent tasks are written with status "blocked" so legacy pollers
+    # that ignore this field can never claim them early.
     depends_on: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -106,7 +122,7 @@ class RoamingMailbox:
         self.receipts_dir.mkdir(parents=True, exist_ok=True)
 
     def task_path(self, task_id: str) -> Path:
-        return self.tasks_dir / f"{task_id}.json"
+        return self.tasks_dir / f"{_validated_task_id(task_id)}.json"
 
     def response_path(self, task_id: str, responder: str) -> Path:
         safe = responder.replace("/", "_").replace("\\", "_")
@@ -133,15 +149,21 @@ class RoamingMailbox:
         metadata: dict[str, Any] | None = None,
         depends_on: list[str] | None = None,
     ) -> MailboxTask:
+        deps = [str(dep) for dep in (depends_on or [])]
         task = MailboxTask(
             task_id=self._new_task_id(),
             recipient=recipient,
             sender=sender,
             summary=summary,
             body=body,
+            # "blocked", not "queued": legacy pollers (older checkouts that
+            # ignore depends_on) claim anything queued, so a dependent task
+            # must be encoded in a status they will never claim (Codex
+            # review on PR #1159). ready_tasks() unblocks it.
+            status="blocked" if deps else "queued",
             capabilities=list(capabilities or []),
             metadata=dict(metadata or {}),
-            depends_on=[str(dep) for dep in (depends_on or [])],
+            depends_on=deps,
         )
         self._write_json(self.task_path(task.task_id), task.to_dict())
         return task
@@ -168,6 +190,16 @@ class RoamingMailbox:
 
     def claim_task(self, task_id: str, *, claimed_by: str) -> MailboxTask:
         task = self.load_task(task_id)
+        # Every claim path enforces the dependency contract — a direct
+        # claim_task call must not bypass the ready gate (Codex review on
+        # PR #1159).
+        unsatisfied = [
+            dep for dep in task.depends_on if not self._dependency_satisfied(dep)
+        ]
+        if unsatisfied:
+            raise ValueError(
+                f"task {task_id} has unsatisfied dependencies: {unsatisfied}"
+            )
         claimed = MailboxTask(
             **{
                 **task.to_dict(),
@@ -184,22 +216,30 @@ class RoamingMailbox:
 
         Unknown ids fail closed (mirrors task_board.py's ready query, where a
         dependency row must exist COMPLETED before the dependent is ready).
+        Malformed ids (path separators, traversal) and records whose own
+        task_id does not match the dependency id also fail closed.
         """
-        path = self.task_path(dep_id)
+        try:
+            path = self.task_path(dep_id)
+        except ValueError:
+            return False
         if not path.exists():
             return False
         try:
             dep = MailboxTask.from_dict(self._read_json(path))
         except (OSError, json.JSONDecodeError):
             return False
-        return dep.status == "responded"
+        return dep.task_id == dep_id and dep.status == "responded"
 
     def ready_tasks(self, *, recipient: str | None = None) -> list[MailboxTask]:
-        """Queued tasks whose every dependency is responded, oldest first."""
+        """Claimable tasks, oldest first: queued or blocked records whose
+        every dependency is responded ("blocked" is the on-disk encoding of
+        a dependent task; see enqueue_task)."""
         return [
             task
-            for task in self.list_tasks(recipient=recipient, status="queued")
-            if all(self._dependency_satisfied(dep) for dep in task.depends_on)
+            for task in self.list_tasks(recipient=recipient)
+            if task.status in {"queued", "blocked"}
+            and all(self._dependency_satisfied(dep) for dep in task.depends_on)
         ]
 
     def validate_dependencies(self) -> list[str]:

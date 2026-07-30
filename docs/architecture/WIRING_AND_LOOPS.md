@@ -106,35 +106,13 @@ fresh proof command with exit code 0, and archived the result with pass_rate
   verified.
 - VentureCell polymorphism is not solved here.
 - Ontology/runtime store synchronization is not solved here.
-## Decision record — Beads fence AFFIRMED, task-medium joined natively (2026-07-29)
+## Beads fence status (2026-07-29)
 
-**Context:** the walking-mode loop-closure plan (PR-D;
-`docs/plans/GRAPH_OF_LOOPS_DESIGN_2026-07-29.md` §2.2) needs a
-dependency-aware, git-shareable task medium for its lanes. The fence above
-("No Beads, LangGraph, CrewAI, or other orchestration dependency") was
-read in full before this change, not routed around.
-
-**Decision:** the fence is **AFFIRMED**. The need is met by joining two
-substrates this repo already owns instead of adopting a dependency:
-`dharma_swarm/task_board.py` contributes the ready-set semantics
-(dependencies must be complete before a task is claimable —
-`task_board.py` `_READY_QUERY`), and `dharma_swarm/roaming_mailbox.py`
-contributes the git-native, one-JSON-file-per-task shareable medium. The
-join is a `depends_on` field plus a `ready_tasks()` reader on the mailbox
-— no new store class (Anti-Slop Rule 2), no external dependency, no new
-board file (this fence's own third clause).
-
-**Falsifiable revisit criteria** — reopen the Beads question explicitly,
-in a dated amendment to this record, if ANY of the following is observed
-after 2–3 weeks of hardening-lane operation:
-
-1. ready-set misbehavior: a lane claims a blocked task or starves a ready
-   one, attributable to the join rather than to task authoring;
-2. a real cross-repo sharing need: a second repository must consume the
-   same task graph and git-sync of `roaming_mailbox/` proves insufficient;
-3. persistent agent fumbling: lane or subagent sessions repeatedly
-   mis-handle the bespoke board where a standard tool's conventions would
-   have been understood.
-
-Absent those observations, the fence stands and silent adoption of an
-orchestration dependency remains a governance violation.
+The fence above was tested against the walking-mode plan's need for a
+dependency-aware, git-shareable task medium and **AFFIRMED** — the need is
+met by joining `task_board.py` ready-set semantics with the roaming
+mailbox, not by adopting a dependency. The decision, its rationale, and
+its falsifiable revisit criteria live in the dedicated record:
+[`docs/architecture/ADRs/ADR-010-beads-fence-task-medium-join.md`](ADRs/ADR-010-beads-fence-task-medium-join.md).
+(One authority role per file — this map stays a wiring map;
+`docs/AGENTS.md`.)
