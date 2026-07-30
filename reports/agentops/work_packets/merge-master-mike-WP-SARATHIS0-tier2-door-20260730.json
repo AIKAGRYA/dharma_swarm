@@ -1,0 +1,112 @@
+{
+  "id": "merge-master-mike-WP-SARATHIS0-tier2-door-20260730",
+  "base_ref": "8305c2419900d2709f0a3aee7307440a81263b79",
+  "branch": "claude/sarathi-autonomy-build-vyr998",
+  "worktree": ".",
+  "intent": "Execute the Sarathi autonomy build (docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md) on merge admission surfaces: implement the operator ruling of 2026-07-30 replacing the tier-2 'operator hand-merge forever' clause with a decorrelated-review-plus-reversibility door (automerge_tier_policy.json schema v2 + check_automerge_tier_policy.py), extract the risk vocabulary to stdlib-only dharma_swarm/risk_patterns.py so the referee workflow's bare python3 can import the reversibility gate, add the DGC_SARATHI_AUTONOMY dial (dharma_swarm/operator_core/autonomy_dial.py), record the ruling and the 15-line CURRENT_STATE drift note, then build the Sarathi plan/delegate/wake organs under dharma_swarm/holon_system/sarathi/ with unit tests (PR-S1/PR-S2 of the same mission), honoring the reversibility gate before every delegation and the autonomy dial as ceiling.",
+  "allowed_files": [
+    "docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md",
+    "docs/ops/OPERATOR_RULING_2026-07-30_SARATHI_AUTONOMY_CEILING.md",
+    "docs/sarathi_apex_build/08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md",
+    "docs/sarathi_apex_build/README.md",
+    "dharma_swarm/risk_patterns.py",
+    "dharma_swarm/adaptive_autonomy.py",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/operator_core/autonomy_dial.py",
+    "dharma_swarm/holon_system/sarathi/**",
+    "scripts/governance/automerge_tier_policy.json",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/runtime/codex_composer_wake_loop.py",
+    "MODEL_ROUTING_MAP.md",
+    "tests/test_automerge_tier_policy.py",
+    "tests/test_reversibility_gate.py",
+    "tests/test_autonomy_dial.py",
+    "tests/test_sarathi_plan.py",
+    "tests/test_sarathi_delegate.py",
+    "tests/test_sarathi_wake.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS0-tier2-door-20260730.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/forge_v1/forge_v2/**",
+    ".github/workflows/**",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md"
+  ],
+  "gates": [
+    {
+      "name": "sarathi-autonomy-touched-suites",
+      "command": "python3 -m pytest -q tests/test_automerge_tier_policy.py tests/test_reversibility_gate.py tests/test_adaptive_autonomy.py tests/test_autonomy_dial.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "hygiene-integrity",
+      "command": "python3 scripts/governance/hygiene/check_hygiene_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "operator-only-title-must-not-clear-unattended-lane",
+      "command": "python3 -c \"import sys; from dharma_swarm.operator_core.reversibility_gate import classify_action, ActionClass; d = classify_action('rotate production credentials', operator_reachable=False); sys.exit(0 if d.action_class is not ActionClass.OPERATOR_ONLY else 1)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(sarathi): autonomy build S0-S2 - tier2 door, dial, organs"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SARATHIS0",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8305c2419900d2709f0a3aee7307440a81263b79",
+      "details": []
+    },
+    "interface_mismatches": [
+      "reversibility_gate imported adaptive_autonomy whose pydantic import made classify_action unimportable on the referee workflow's bare python3; resolved by the stdlib-only risk_patterns extraction with delegating re-exports.",
+      "The mission prompt cites seat-audit docs 08/09 starter drafts (sarathi_plan.py, sarathi_delegate.py) that do not exist anywhere on disk; the organs are written fresh against the real holon_wake_cycle / classify_action / RoamingMailbox / invoke_agent signatures."
+    ],
+    "closest_existing_implementation": [
+      "scripts/governance/check_automerge_tier_policy.py:evaluate",
+      "dharma_swarm/operator_core/reversibility_gate.py:ReversibilityGate.classify",
+      "dharma_swarm/roaming_mailbox.py:RoamingMailbox.enqueue_task",
+      "dharma_swarm/holon_runtime.py:holon_wake_cycle",
+      "dharma_swarm/holon_system/sarathi/pulse.py:sarathi_pulse"
+    ],
+    "honest_blockers": [
+      "This PR changes tier-2 referee paths, so under the policy in force on the default branch it requires operator hand-merge; landing it is the ratifying act of the 2026-07-30 ruling.",
+      "tests/test_holon_system_imports.py::test_all_holon_system_facades_import fails identically on the base checkout in this container (tui/engine/provider_runner.py optional dependency); not introduced or fixed here.",
+      "The DGC_SARATHI_AUTONOMY dial is read by nothing until the PR-S1 delegation organ lands in this same packet scope."
+    ],
+    "rollback": "Revert the packet's commits together: tier-policy v1 and the pydantic-chained gate import return, the dial and sarathi organs are additive modules with no runtime state, and no migrations or data rewrites are involved.",
+    "packet_digest": "d5f74961dce09d8f0016353960b037f49f8139c7aba78fe580994a938cdde53c"
+  }
+}
