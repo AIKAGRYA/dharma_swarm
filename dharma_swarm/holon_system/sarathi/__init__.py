@@ -11,6 +11,7 @@ from .plan import BootPack, PlannedDelegation, build_plan
 from .pulse import sarathi_pulse
 from .roster import load_roster
 from .scoreboard import organ_scoreboard
+from .wake import make_wake_work_fn, run_wake_unit, sweep_responses
 
 __all__ = [
     "BootPack",
@@ -21,6 +22,9 @@ __all__ = [
     "delegate_all",
     "gateway_snapshot",
     "load_roster",
+    "make_wake_work_fn",
     "organ_scoreboard",
+    "run_wake_unit",
     "sarathi_pulse",
+    "sweep_responses",
 ]
