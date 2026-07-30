@@ -291,6 +291,24 @@ def _gh_json(args: list[str]) -> object | None:
         return None
 
 
+def _fetch_all_reviews(repo: str, pr: int) -> list | None:
+    """Every REST review row, all pages. A single 100-row page could hide a
+    reviewer's newer CHANGES_REQUESTED on page 2 behind a stale page-1
+    approval (Greptile on PR #1160). Fails closed (None) if any page fails."""
+    rows: list = []
+    page = 1
+    while True:
+        data = _gh_json(
+            ["api", f"repos/{repo}/pulls/{pr}/reviews?per_page=100&page={page}"]
+        )
+        if not isinstance(data, list):
+            return None
+        rows.extend(data)
+        if len(data) < 100:
+            return rows
+        page += 1
+
+
 def gather_pr(repo: str, pr: int) -> dict | None:
     """Gather the evaluation inputs, failing closed (None) on ANY partial
     read: an unavailable diff is not an empty diff (it would waive the
@@ -307,8 +325,8 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     # Same REST source pr_merge_control.py trusts (fetch_pr_reviews): it
     # carries commit_id — the exact SHA each review saw — and App logins in
     # their "<app>[bot]" form, matching the policy's trusted identities.
-    reviews = _gh_json(["api", f"repos/{repo}/pulls/{pr}/reviews?per_page=100"])
-    if not isinstance(reviews, list):
+    reviews = _fetch_all_reviews(repo, pr)
+    if reviews is None:
         return None
     diff = subprocess.run(
         ["gh", "pr", "diff", str(pr), "--repo", repo],
