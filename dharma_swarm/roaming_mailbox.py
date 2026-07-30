@@ -190,6 +190,14 @@ class RoamingMailbox:
 
     def claim_task(self, task_id: str, *, claimed_by: str) -> MailboxTask:
         task = self.load_task(task_id)
+        # Only queued/blocked records are claimable: claiming a responded
+        # task would overwrite its terminal status (and un-satisfy every
+        # dependent), and claiming a claimed task would steal an active
+        # worker's claim (Greptile review on PR #1159).
+        if task.status not in {"queued", "blocked"}:
+            raise ValueError(
+                f"task {task_id} is not claimable (status: {task.status})"
+            )
         # Every claim path enforces the dependency contract — a direct
         # claim_task call must not bypass the ready gate (Codex review on
         # PR #1159).

@@ -231,3 +231,27 @@ def test_direct_claim_of_unsatisfied_dependency_is_refused(tmp_path: Path) -> No
     mailbox.respond_to_task(task_id=dep.task_id, responder="r", summary="d", body="d")
     claimed = mailbox.claim_task(dependent.task_id, claimed_by="r")
     assert claimed.status == "claimed"
+
+def test_terminal_and_active_tasks_cannot_be_reclaimed(tmp_path: Path) -> None:
+    """A responded task's terminal status must never be overwritten by a
+    claim, and an active claim must not be stealable (Greptile P1 on
+    PR #1159)."""
+    mailbox = RoamingMailbox(queue_root=tmp_path / "mailbox")
+    done = mailbox.enqueue_task(recipient="r", sender="s", summary="done", body="b")
+    mailbox.claim_task(done.task_id, claimed_by="worker-a")
+    mailbox.respond_to_task(task_id=done.task_id, responder="worker-a", summary="d", body="d")
+    try:
+        mailbox.claim_task(done.task_id, claimed_by="worker-b")
+        raise AssertionError("responded task was reclaimed")
+    except ValueError:
+        pass
+    assert mailbox.load_task(done.task_id).status == "responded"
+
+    active = mailbox.enqueue_task(recipient="r", sender="s", summary="active", body="b")
+    mailbox.claim_task(active.task_id, claimed_by="worker-a")
+    try:
+        mailbox.claim_task(active.task_id, claimed_by="worker-b")
+        raise AssertionError("active claim was stolen")
+    except ValueError:
+        pass
+    assert mailbox.load_task(active.task_id).claimed_by == "worker-a"
