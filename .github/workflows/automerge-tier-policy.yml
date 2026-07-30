@@ -1,0 +1,80 @@
+name: automerge-tier-policy
+
+# Tier 2 / referee layer (operator ruling 2026-07-29, DOOR =
+# AUTO_WITH_DECORRELATED_REVIEW): operator hand-merge forever on this file.
+#
+# The door's required check: runs scripts/governance/check_automerge_tier_policy.py
+# against every PR. Green for unlabeled/draft PRs (the operator's own lane);
+# red for any automerge/bot-pr-labeled PR that touches tier-2 referee paths,
+# exceeds its tier's diff ceiling, lacks the decorrelated review quorum,
+# deletes tests without named sign-off, or lands beyond the 20/day rate
+# limit — and always red for canary-sandbox PRs.
+#
+# Policy is loaded from the DEFAULT branch (trusted), never from PR code:
+# a PR editing the policy file cannot loosen its own admission.
+#
+# After this lands on main, the operator adds the "Automerge tier policy"
+# context to branch protection; scripts/governance/ci_parity_manifest.json
+# gains the matching row in the same operator action (see the PR body's
+# two-step note). The manifest-driven automerge lane then requires this
+# context green before any dispatch.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  # Approvals arrive as pull_request_review events, not pull_request
+  # activity — without this trigger a required red check would stay stale
+  # after quorum is reached and the unattended lane could never proceed
+  # (Codex review on PR #1160). Both payloads carry event.pull_request.
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: tier-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tier-policy:
+    name: Automerge tier policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout trusted policy from the default branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Bootstrap check — is the policy on the default branch yet?
+        id: bootstrap
+        run: |
+          set -euo pipefail
+          # The introducing PR (PR-A) runs this workflow before the guard and
+          # policy exist on the default branch — the trusted checkout has
+          # nothing to run (observed live: run 30436464851 on PR #1160). A
+          # vacuous, loudly-labeled pass is honest here: pre-landing the
+          # check cannot be authoritative anyway; real evaluation begins the
+          # moment PR-A lands on main. Post-landing this branch never fires.
+          if [ -f scripts/governance/check_automerge_tier_policy.py ] \
+             && [ -f scripts/governance/automerge_tier_policy.json ]; then
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+            echo "## ⚪ Tier policy bootstrap — guard not on the default branch yet; vacuous pass until PR-A lands" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Evaluate tier policy
+        if: steps.bootstrap.outputs.bootstrap == 'false'
+        run: |
+          set -euo pipefail
+          python3 scripts/governance/check_automerge_tier_policy.py \
+            --repo "${GH_REPO}" --pr "${PR_NUMBER}"

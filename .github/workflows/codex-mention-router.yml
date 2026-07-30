@@ -245,19 +245,39 @@ jobs:
             gate_exit="$?"
             set -e
             if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              # §0 door: the pass token is a policy VERDICT, not a spelling.
+              # Run the tier evaluator in binding mode (--assume-unattended)
+              # before arming the merge — without this, a mention on an
+              # unlabeled tier-2 PR would synthesize the token with no policy
+              # evaluation at all (Codex review on PR #1160). Evaluator +
+              # policy run from this trusted default-branch checkout; if the
+              # guard is not on main yet, this fails closed and no token is
+              # ever passed to the merge command.
               set +e
-              python3 scripts/runtime/pr_merge_control.py \
-                --state-root "${state_root}" \
-                merge \
+              python3 scripts/governance/check_automerge_tier_policy.py \
+                --repo "${GITHUB_REPOSITORY}" \
                 --pr "${PR_NUMBER}" \
-                --packet-dir "${packet_dir}" \
-                --required-reviewers "${REQUIRED_REVIEWERS}" \
-                --method "${MERGE_METHOD}" \
-                --auto \
-                --execute \
-                --confirm "merge-pr-${PR_NUMBER}"
-              merge_exit="$?"
+                --assume-unattended
+              policy_exit="$?"
               set -e
+              if [ "${policy_exit}" != "0" ]; then
+                merge_exit="${policy_exit}"
+                echo "tier policy did not pass (exit ${policy_exit}) — merge token not armed" >&2
+              else
+                set +e
+                python3 scripts/runtime/pr_merge_control.py \
+                  --state-root "${state_root}" \
+                  merge \
+                  --pr "${PR_NUMBER}" \
+                  --packet-dir "${packet_dir}" \
+                  --required-reviewers "${REQUIRED_REVIEWERS}" \
+                  --method "${MERGE_METHOD}" \
+                  --auto \
+                  --execute \
+                  --confirm "automerge-policy-pass-${PR_NUMBER}"
+                merge_exit="$?"
+                set -e
+              fi
             fi
             python3 scripts/runtime/pr_merge_control.py \
               --state-root "${state_root}" \
