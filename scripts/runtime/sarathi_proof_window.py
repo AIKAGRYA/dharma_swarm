@@ -40,7 +40,11 @@ if str(REPO_ROOT) not in sys.path:
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
 from dharma_swarm.holon_system.sarathi.delegate import invoke_receipt_path  # noqa: E402
-from dharma_swarm.holon_system.sarathi.plan import BootPack, stored_dedup_key  # noqa: E402
+from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
+    BootPack,
+    plan_coarse_dedup_key,
+    stored_dedup_key,
+)
 from dharma_swarm.holon_system.sarathi.proof import (  # noqa: E402
     REQUIRED_UNATTENDED_CYCLES,
     ProofCycleRecord,
@@ -133,11 +137,10 @@ async def run_window(
         # emitted as a fresh proposal each cycle (Greptile P1 on PR #1170,
         # parity with the daemon's list_tasks dedup).
         ready = frozenset(
-            key
+            stored_dedup_key(task.metadata)
+            or plan_coarse_dedup_key(task.recipient, task.summary, task.body)
             for task in mailbox.list_tasks()
             if task.sender == "sarathi"
-            for key in (stored_dedup_key(task.metadata),)
-            if key
         )
         return BootPack(
             roster=roster, open_items=backlog, ready_keys=ready, audit=audit

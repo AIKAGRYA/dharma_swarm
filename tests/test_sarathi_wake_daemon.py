@@ -167,6 +167,30 @@ def test_revised_backlog_body_replans_despite_same_summary(tmp_path, monkeypatch
     assert len(_tasks(tmp_path)) == 2
 
 
+def test_legacy_task_without_stored_key_suppresses_redispatch(tmp_path, monkeypatch) -> None:
+    """Greptile P1 plan.py L94: a Sarathi task persisted BEFORE the dedup_key
+    field (no sarathi.dedup_key in metadata) must still suppress the same
+    backlog item via the coarse fallback key, not create a duplicate."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    from dharma_swarm.roaming_mailbox import RoamingMailbox
+
+    mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
+    # A legacy task: enqueued without any sarathi dedup_key metadata.
+    mailbox.enqueue_task(
+        recipient="hermes-m5", sender="sarathi", summary="gym", body="b"
+    )
+    backlog = tmp_path / "backlog.json"
+    backlog.write_text(
+        json.dumps([{"kind": "build", "summary": "gym", "body": "b",
+                     "recipient": "hermes-m5"}])
+    )
+    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
+    assert code == 0
+    # No duplicate: the legacy task's coarse key suppressed the item.
+    assert len(_tasks(tmp_path)) == 1
+    assert report["budget_scope"] == "daemon-direct-spend"
+
+
 def test_revised_backlog_recipient_replans(tmp_path, monkeypatch) -> None:
     """Greptile P1 plan.py L127: a routing revision (same summary+body, changed
     recipient) must re-plan — the persisted key covers the full identity."""

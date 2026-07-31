@@ -67,7 +67,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
-from dharma_swarm.holon_system.sarathi.plan import BootPack, stored_dedup_key  # noqa: E402
+from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
+    BootPack,
+    plan_coarse_dedup_key,
+    stored_dedup_key,
+)
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
 from dharma_swarm.holon_system.sarathi.wake import make_wake_work_fn  # noqa: E402
 from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level  # noqa: E402
@@ -88,7 +92,7 @@ _PRE_DISPATCH_HALTS = frozenset({_CONTENDED_STATUS, _INVALID_LEDGER_STATUS})
 _ERROR_STATUSES = frozenset({"halted:error", "halted:unverified", _INVALID_LEDGER_STATUS})
 
 
-class InvalidSpendLedger(ValueError):
+class InvalidSpendLedgerError(ValueError):
     """The persisted spend ledger is non-finite, negative, or unparseable."""
 
 DEFAULT_BACKLOG: tuple[dict, ...] = (
@@ -149,7 +153,7 @@ def read_cumulative_spend(sarathi_root: Path, seed: float) -> float:
     ``spent >= cap`` comparison against NaN is False — silently bypassing a
     finite cap. Unlike the CLI seed (validated in ``main``), persisted state is
     attacker/corruption-reachable, so a present-but-invalid ledger raises
-    :class:`InvalidSpendLedger` rather than falling back to a value that permits
+    :class:`InvalidSpendLedgerError` rather than falling back to a value that permits
     dispatch. Only a MISSING or empty ledger falls back to the (validated) seed.
     """
     ledger = _spent_ledger(sarathi_root)
@@ -159,11 +163,11 @@ def read_cumulative_spend(sarathi_root: Path, seed: float) -> float:
             try:
                 value = float(raw)
             except ValueError as exc:
-                raise InvalidSpendLedger(
+                raise InvalidSpendLedgerError(
                     f"persisted spend ledger is not a number: {raw!r}"
                 ) from exc
             if not math.isfinite(value) or value < 0:
-                raise InvalidSpendLedger(
+                raise InvalidSpendLedgerError(
                     f"persisted spend ledger is non-finite or negative: {raw!r}"
                 )
             return value
@@ -238,11 +242,10 @@ async def run_daemon(
         # different recipient — re-plans instead of being dropped (Greptile P1
         # plan.py L127 + L209).
         seen = frozenset(
-            key
+            stored_dedup_key(task.metadata)
+            or plan_coarse_dedup_key(task.recipient, task.summary, task.body)
             for task in mailbox.list_tasks()
             if task.sender == SENDER
-            for key in (stored_dedup_key(task.metadata),)
-            if key
         )
         return BootPack(
             roster=roster, open_items=backlog, ready_keys=seen, audit=audit
@@ -296,6 +299,17 @@ async def run_daemon(
             "briefs_dir": str(briefs_dir),
             "agents_root": str(agents_root),
             "closeback": closeback_records,
+            # Honest scope of the USD cap (Greptile P1 on PR #1170): this daemon
+            # runs invoker=None and build_plan is deterministic, so its OWN wake
+            # cycle makes no provider calls — its direct spend is ~$0 and the
+            # persisted ledger advances only if a direct-cost lever is later
+            # added. The cap therefore bounds the DAEMON's direct spend, NOT the
+            # aggregate downstream cost of dispatched work, which is bounded by
+            # the executing sub-holons' own budgets. An aggregate-spend cap would
+            # need an authoritative spend source wired via run_holon_loop's
+            # spend_fn (deferred; the economic spine tracks per-agent tokens,
+            # not global USD).
+            "budget_scope": "daemon-direct-spend",
         }
 
     def persist_report() -> dict:
@@ -325,7 +339,7 @@ async def run_daemon(
         # security). The operator clears the ledger; exit is nonzero.
         try:
             spent = read_cumulative_spend(sarathi_root, spent_seed)
-        except InvalidSpendLedger as exc:
+        except InvalidSpendLedgerError as exc:
             statuses.append(_INVALID_LEDGER_STATUS)
             replies.append(f"halted: {exc}")
             return persist_report()
