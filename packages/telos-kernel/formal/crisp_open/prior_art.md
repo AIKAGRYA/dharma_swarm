@@ -400,3 +400,29 @@ Every entry below was resolved in a publisher page, scholarly index, official pr
 | PA-26 | MODES | DOI 10.1162/artl_a_00280; MIT Press |
 | PA-27 | Hintze 2019 | DOI 10.1162/artl_a_00289; MIT Press |
 | PA-28 | Sayama & Nehaniv 2025 | DOI 10.1162/artl_a_00451; MIT Press/PubMed |
+
+## 10. Iterations 5–6 supersession addendum
+
+This addendum supersedes the Phase-0 construction recommendation where it proposed a Boolean truth table and semantic-support cardinality as the cheapest adequate opening model. That recommendation was useful only as a falsifiable first construction. Iteration 4 showed that the truth-table model separated protected and free coordinates, while Iteration 5 replaced it with a total function language and a mutable AST-rewrite operator.
+
+The Iteration 5 range-based anti-generator condition is also withdrawn. For any effectively checkable finite-path transition system, a fixed certificate-replay interpreter can enumerate every reachable state when its input may carry an arbitrary finite path. This is a negative result about a naive open-endedness criterion, not an impossibility theorem for open-ended evolution.
+
+Iteration 6 isolates the descriptive-complexity consequence at the correct abstraction level. Relative to an explicit object language with a shortest-code function and a fixed composition interpreter, every closed deterministic lineage satisfies:
+
+`K(sₙ) ≤ K(s₀) + K(step) + K(n) + O(1)`.
+
+The mechanized natural-number description uses the self-delimiting length
+
+`bitLength(n) + 2 · bitLength(bitLength(n)) + 1`,
+
+which has the intended `log n + 2 log log n + O(1)` shape. A pure counter attains the same depth-description term while carrying no qualitative novelty. Descriptive complexity at the closed-system ceiling therefore does not distinguish novelty from counting.
+
+Iteration 6 takes the open-system exit. When a lineage consumes an externally supplied input description, the corresponding checked bound is:
+
+`K(s) ≤ K(seed) + K(step) + K(consumed input) + O(1)`.
+
+A separate induction proves invariant preservation across the consumed inputs. The two obligations are independent: the fixed checker constrains what transformations are admitted and how information is processed; it does not determine whether information arrives. This formal separation aligns with the open-ended-evolution literature’s emphasis on environmental and ecological interaction without claiming that the present toy model captures biological evolution.
+
+Surface 8 also lands on the Iteration 5 parity model. Although a successor growth operator increases the shared semantic coordinate, violates the invariant, and is rejected before installation, the constant-description rewrite `.wrapDouble` is reachable from the actual initial state and increases the chosen complexity forever while preserving parity. The formal no-product-decomposition theorem is sound, but the coupling is not load-bearing.
+
+The structural alternative remains open: organizational levels, new observables outside the seed ontology, or growth in the minimum ontology required to describe behavior have not been formalized here. No claim is made that the development defines universal Kolmogorov complexity, proves a biological open-endedness theorem, or resolves von-Neumann-style qualitative novelty. The legitimate result is a crisp open/closed fork and a machine-checked warning against several naive scalar criteria.
