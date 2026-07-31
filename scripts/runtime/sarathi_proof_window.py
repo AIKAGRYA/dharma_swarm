@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -245,6 +246,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cap-usd", type=float, default=1.0)
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
+
+    # Reject a non-finite or negative cap before it can certify a proof. A NaN
+    # cap slips through argparse's float and defeats the budget guard (every
+    # `spent >= NaN` is False), letting an invalid budget control write
+    # passed:true for the unattended proof that gates dial advancement (Greptile
+    # P1 on PR #1170, T-Rex verified). Mirror the standing daemon's guard.
+    if not math.isfinite(args.cap_usd) or args.cap_usd < 0:
+        parser.error(
+            f"--cap-usd must be a finite, non-negative number (got {args.cap_usd!r})"
+        )
 
     report = asyncio.run(
         run_window(
