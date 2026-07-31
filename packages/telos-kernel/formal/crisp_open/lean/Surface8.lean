@@ -6,14 +6,16 @@ namespace CrispOpen.Surface8
 Surface 8 asks whether maintaining the invariant while increasing complexity is
 load-bearing. The answer for the Iteration 5 parity model is negative.
 
-A growth move that wraps the program in `succ` increases the same semantic
-coordinate, violates the invariant, and is rejected. But the fixed one-node
-rewrite `wrapDouble` also increases that coordinate forever while preserving
-the invariant. Therefore the coupling is formal but practically costless.
+A growth move that wraps a program in `succ` increases the same semantic
+coordinate and violates the invariant. The fixed checker rejects installation
+of that future operator. But the one-node rewrite `wrapDouble` is reachable
+from the actual initial state and then increases complexity forever while
+preserving the invariant. Therefore the coupling is formal but practically
+costless.
 -/
 
 def doubledProgram : Nat → Expr
-  | 0 => .lit 2
+  | 0 => .lit 4
   | depth + 1 => .double (doubledProgram depth)
 
 def doublingState (depth : Nat) : State := {
@@ -48,6 +50,21 @@ theorem doublingStateModifierCertified (depth : Nat) :
     ModifierCertified (doublingState depth) := by
   rfl
 
+theorem initialProposesDoublingSeed :
+    ProposedBy initial (doublingState 0) := by
+  rfl
+
+theorem initialToDoublingStateAccepted :
+    Accepted initial (doublingState 0) := by
+  apply checkerComplete
+  exact ⟨
+    rfl,
+    initialInvariant,
+    initialModifierCertified,
+    initialProposesDoublingSeed,
+    doublingStateModifierCertified 0
+  ⟩
+
 theorem fixedGrowthMoveProposesNext (depth : Nat) :
     ProposedBy (doublingState depth) (doublingState (depth + 1)) := by
   rfl
@@ -63,6 +80,17 @@ theorem fixedGrowthMoveAccepted (depth : Nat) :
     doublingStateModifierCertified (depth + 1)
   ⟩
 
+theorem doublingStateReachable :
+    ∀ depth, Reach (depth + 1) (doublingState depth)
+  | 0 => by
+      simpa using
+        Reach.succ (Reach.zero : Reach 0 initial)
+          initialToDoublingStateAccepted
+  | depth + 1 => by
+      simpa using
+        Reach.succ (doublingStateReachable depth)
+          (fixedGrowthMoveAccepted depth)
+
 theorem fixedGrowthMoveIncreasesComplexity (depth : Nat) :
     complexity (doublingState (depth + 1)) >
       complexity (doublingState depth) := by
@@ -70,46 +98,61 @@ theorem fixedGrowthMoveIncreasesComplexity (depth : Nat) :
   simp [complexity, doublingState, doubledProgram, observe, denote, eval]
   omega
 
-/-- A superficially useful pressure witness: successor growth is unsafe. -/
-def unsafeGrowthSource (depth : Nat) : State := {
+/--
+The generic successor wrapper is a complexity-increasing but unsafe rewrite.
+The future state below is what that operator would produce.
+-/
+def unsafeFutureState (depth : Nat) : State := {
   kernelId := 0
-  program := doubledProgram depth
-  modifier := .wrapSucc
-}
-
-def unsafeGrowthTarget (depth : Nat) : State := {
-  kernelId := 0
-  program := .succ (doubledProgram depth)
+  program := .succ (doubledProgram (depth + 1))
   modifier := .wrapDouble
 }
 
-theorem unsafeGrowthIsProposed (depth : Nat) :
-    ProposedBy (unsafeGrowthSource depth) (unsafeGrowthTarget depth) := by
-  rfl
-
-theorem unsafeGrowthIncreasesComplexity (depth : Nat) :
-    complexity (unsafeGrowthTarget depth) >
-      complexity (unsafeGrowthSource depth) := by
-  simp [complexity, unsafeGrowthTarget, unsafeGrowthSource,
+theorem successorGrowthIncreasesComplexity (depth : Nat) :
+    complexity (unsafeFutureState depth) >
+      complexity (doublingState (depth + 1)) := by
+  simp [complexity, unsafeFutureState, doublingState,
     observe, denote, eval]
 
-theorem unsafeGrowthViolatesInvariant (depth : Nat) :
-    ¬ Invariant (unsafeGrowthTarget depth) := by
-  have safe := doubledProgramInvariant depth
+theorem successorGrowthViolatesInvariant (depth : Nat) :
+    ¬ Invariant (unsafeFutureState depth) := by
+  have safe := doubledProgramInvariant (depth + 1)
   unfold HasType at safe
   unfold Invariant HasType
-  simp [unsafeGrowthTarget, observe, denote, eval] at safe ⊢
+  simp [unsafeFutureState, observe, denote, eval] at safe ⊢
   omega
 
-theorem unsafeGrowthRejected (depth : Nat) :
-    K (unsafeGrowthSource depth) (unsafeGrowthTarget depth) = false := by
-  simp [K, Admissible, ModifierCertified, M, unsafeGrowthSource,
+/--
+Attempt to install `wrapSucc` as the next modification operator while executing
+the current safe doubling move. The program proposal is exact, but the fixed
+checker rejects the unsafe future operator before it can run.
+-/
+def unsafeModifierCandidate (depth : Nat) : State := {
+  kernelId := 0
+  program := doubledProgram (depth + 1)
+  modifier := .wrapSucc
+}
+
+theorem unsafeModifierCandidateIsProposed (depth : Nat) :
+    ProposedBy (doublingState depth) (unsafeModifierCandidate depth) := by
+  rfl
+
+theorem unsafeModifierWouldProduceUnsafeGrowth (depth : Nat) :
+    applyRewrite (M (unsafeModifierCandidate depth))
+        (unsafeModifierCandidate depth).program =
+      (unsafeFutureState depth).program := by
+  rfl
+
+theorem unsafeModifierRejected (depth : Nat) :
+    K (doublingState depth) (unsafeModifierCandidate depth) = false := by
+  simp [K, Admissible, ModifierCertified, M, unsafeModifierCandidate,
     HasRewriteType, rewriteSafeBool]
 
-/-- A fixed, constant-description move accepted at every depth. -/
+/-- A fixed, constant-description move accepted at every reachable depth. -/
 def FixedTrivialGrowthExists : Prop :=
   ∃ rewrite : Rewrite,
     ∀ depth,
+      Reach (depth + 1) (doublingState depth) ∧
       M (doublingState depth) = rewrite ∧
       Accepted (doublingState depth) (doublingState (depth + 1)) ∧
       complexity (doublingState (depth + 1)) >
@@ -119,6 +162,7 @@ theorem fixedTrivialGrowthExists : FixedTrivialGrowthExists := by
   refine ⟨.wrapDouble, ?_⟩
   intro depth
   exact ⟨
+    doublingStateReachable depth,
     rfl,
     fixedGrowthMoveAccepted depth,
     fixedGrowthMoveIncreasesComplexity depth
