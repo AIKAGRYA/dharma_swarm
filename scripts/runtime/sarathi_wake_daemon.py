@@ -77,10 +77,19 @@ AUDIT_PATH = REPO_ROOT / "reports/loop_closure/cybernetics_codex/latest_audit.js
 # Canonical kill/persistence home — the same root request_kill(name) writes to.
 DEFAULT_AGENTS_ROOT = Path.home() / ".dharma" / "agents"
 SENDER = "sarathi"
-_ERROR_STATUSES = frozenset({"halted:error", "halted:unverified"})
-# A pre-dispatch governed halt (the budget lock was held by another daemon):
-# no wake cycle was invoked, so it must not count toward ``cycles_run``.
+# A pre-dispatch governed halt (budget lock held by another daemon) OR a
+# fail-closed halt on a corrupt persisted spend ledger: no wake cycle was
+# invoked, so these must not count toward ``cycles_run``.
 _CONTENDED_STATUS = "halted:budget-contended"
+_INVALID_LEDGER_STATUS = "halted:budget-invalid"
+_PRE_DISPATCH_HALTS = frozenset({_CONTENDED_STATUS, _INVALID_LEDGER_STATUS})
+# A corrupt spend ledger is an operational fault the operator must clear, so it
+# exits nonzero like error/unverified — never a silent, budget-bypassing "ran".
+_ERROR_STATUSES = frozenset({"halted:error", "halted:unverified", _INVALID_LEDGER_STATUS})
+
+
+class InvalidSpendLedger(ValueError):
+    """The persisted spend ledger is non-finite, negative, or unparseable."""
 
 DEFAULT_BACKLOG: tuple[dict, ...] = (
     {
@@ -132,13 +141,32 @@ def _spent_ledger(sarathi_root: Path) -> Path:
 
 
 def read_cumulative_spend(sarathi_root: Path, seed: float) -> float:
-    """Cumulative autonomous spend carried across restarts; seed if no ledger."""
+    """Cumulative autonomous spend carried across restarts; seed if no ledger.
+
+    Fails closed on a corrupt persisted ledger (Greptile P1 security on PR
+    #1170): a non-finite (``nan``/``inf``), negative, or unparseable persisted
+    ``spent_usd`` would flow straight into the budget guard, where every
+    ``spent >= cap`` comparison against NaN is False — silently bypassing a
+    finite cap. Unlike the CLI seed (validated in ``main``), persisted state is
+    attacker/corruption-reachable, so a present-but-invalid ledger raises
+    :class:`InvalidSpendLedger` rather than falling back to a value that permits
+    dispatch. Only a MISSING or empty ledger falls back to the (validated) seed.
+    """
     ledger = _spent_ledger(sarathi_root)
     if ledger.exists():
-        try:
-            return float(ledger.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            pass
+        raw = ledger.read_text(encoding="utf-8").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError as exc:
+                raise InvalidSpendLedger(
+                    f"persisted spend ledger is not a number: {raw!r}"
+                ) from exc
+            if not math.isfinite(value) or value < 0:
+                raise InvalidSpendLedger(
+                    f"persisted spend ledger is non-finite or negative: {raw!r}"
+                )
+            return value
     return max(0.0, seed)
 
 
@@ -247,13 +275,13 @@ async def run_daemon(
 
     statuses: list[str] = []
     replies: list[str] = []
-    # Provisional value for the report if the budget lock is contended; the
-    # authorizing read happens fresh UNDER the lock below.
-    spent = read_cumulative_spend(sarathi_root, spent_seed)
+    # Provisional display value only; the AUTHORIZING read happens under the lock
+    # below and is never taken from a corrupt ledger (fail-closed there).
+    spent = 0.0
 
     def build_report() -> dict:
         had_error = any(status in _ERROR_STATUSES for status in statuses)
-        cycles_run = sum(1 for status in statuses if status != _CONTENDED_STATUS)
+        cycles_run = sum(1 for status in statuses if status not in _PRE_DISPATCH_HALTS)
         return {
             "schema_version": "dharma.sarathi.wake_daemon_report.v1",
             "run_id": run_id,
@@ -291,8 +319,16 @@ async def run_daemon(
             return persist_report()
 
         # Cumulative spend read FRESH under the lock (never a stale snapshot),
-        # carried across cycles AND restarts, never a hardcoded 0.
-        spent = read_cumulative_spend(sarathi_root, spent_seed)
+        # carried across cycles AND restarts, never a hardcoded 0. A corrupt
+        # persisted ledger (non-finite/negative/garbage) FAILS CLOSED here — it
+        # must never authorize dispatch by defeating `spent >= cap` (Greptile P1
+        # security). The operator clears the ledger; exit is nonzero.
+        try:
+            spent = read_cumulative_spend(sarathi_root, spent_seed)
+        except InvalidSpendLedger as exc:
+            statuses.append(_INVALID_LEDGER_STATUS)
+            replies.append(f"halted: {exc}")
+            return persist_report()
         for _ in range(cycles):
             work = make_wake_work_fn(
                 load_boot_pack=load_boot_pack,

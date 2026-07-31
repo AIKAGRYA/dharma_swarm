@@ -199,6 +199,27 @@ def test_nonfinite_or_negative_cap_is_rejected(tmp_path, monkeypatch, bad_cap) -
     assert not tasks_dir.exists() or not list(tasks_dir.glob("*.json"))
 
 
+@pytest.mark.parametrize("bad_ledger", ["nan", "inf", "-0.5", "not-a-number"])
+def test_corrupt_persisted_spend_ledger_fails_closed(tmp_path, monkeypatch, bad_ledger) -> None:
+    """Greptile P1 security: a non-finite / negative / unparseable persisted
+    spent_usd must FAIL CLOSED — it can never authorize dispatch by defeating
+    `spent >= cap` (NaN comparisons are False). Halts budget-invalid, exit 1,
+    nothing enqueued."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    sarathi_root = tmp_path / "sarathi"
+    sarathi_root.mkdir(parents=True)
+    (sarathi_root / "spent_usd").write_text(bad_ledger, encoding="utf-8")
+    backlog = tmp_path / "backlog.json"
+    backlog.write_text(json.dumps([{"kind": "build", "summary": "x", "body": "y"}]))
+    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
+    assert code == 1  # operational fault the operator must clear
+    assert report["statuses"] == ["halted:budget-invalid"]
+    assert report["cycles_run"] == 0
+    assert report["had_error"] is True
+    tasks_dir = tmp_path / "sarathi" / "mailbox" / "tasks"
+    assert not tasks_dir.exists() or not list(tasks_dir.glob("*.json"))
+
+
 def test_error_cycle_exits_nonzero(tmp_path, monkeypatch) -> None:
     """Codex P2: an error/unverified cycle must produce a nonzero exit so a
     service manager alerts; governed kill/budget halts stay 0."""
