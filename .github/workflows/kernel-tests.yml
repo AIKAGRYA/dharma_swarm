@@ -35,3 +35,21 @@ jobs:
       - name: Verify legacy shim
         run: |
           pytest packages/telos-kernel/telos_kernel/tests/test_legacy_shim.py -q
+
+  lean:
+    name: crisp-open Lean proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Build with Lean and re-check the environment
+        uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          lake-package-directory: packages/telos-kernel/formal/crisp_open/lean
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+          leanchecker: true
+          use-mathlib-cache: false
+      - name: Count proof escapes and audit theorem dependencies
+        run: bash packages/telos-kernel/formal/crisp_open/lean/verify.sh
