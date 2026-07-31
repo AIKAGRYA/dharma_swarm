@@ -45,8 +45,9 @@ def Admissible (source target : State) : Prop :=
   target.program.length = source.program.length + 1 ∧
   Invariant target.program
 
-instance (source target : State) : Decidable (Admissible source target) :=
-  inferInstance
+instance (source target : State) : Decidable (Admissible source target) := by
+  unfold Admissible Invariant
+  infer_instance
 
 /-- Immutable executable checker.  It is not stored inside `State`. -/
 def K (source target : State) : Bool := decide (Admissible source target)
@@ -136,7 +137,7 @@ theorem supportOnes (depth : Nat) : support (ones depth) = depth := by
   induction depth with
   | zero => rfl
   | succ depth inductionHypothesis =>
-      simp [ones, support, inductionHypothesis]
+      simp [ones, support, inductionHypothesis, Nat.add_comm]
 
 def openProgram (depth : Nat) : Program := false :: ones depth
 
