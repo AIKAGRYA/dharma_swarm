@@ -23,9 +23,10 @@ fi
 
 lake build
 
-# The pinned Lean toolchain bundles an independent comparator that re-checks
-# the built environment without running elaborator or tactic code again.
-lake env leanchecker
+# The package name and Lean library name intentionally differ, so name the
+# built module explicitly instead of relying on leanchecker's package-name
+# capitalization heuristic.
+lake env leanchecker CrispOpen
 
 audit_log="$(mktemp)"
 trap 'rm -f "$audit_log"' EXIT
