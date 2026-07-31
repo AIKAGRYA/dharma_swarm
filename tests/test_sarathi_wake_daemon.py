@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "runtime"))
 
@@ -178,6 +180,23 @@ def test_revised_backlog_recipient_replans(tmp_path, monkeypatch) -> None:
     _run(tmp_path, cycles=1, backlog=str(b1))
     _run(tmp_path, cycles=1, backlog=str(b2))
     assert len(_tasks(tmp_path)) == 2
+
+
+@pytest.mark.parametrize("bad_cap", ["nan", "inf", "-1"])
+def test_nonfinite_or_negative_cap_is_rejected(tmp_path, monkeypatch, bad_cap) -> None:
+    """Greptile P1: a NaN/inf/negative --cap-usd must be rejected at the CLI, not
+    silently defeat the budget floor (every `spent >= NaN` comparison is False,
+    so the cap never halts). parser.error exits nonzero without dispatching."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    with pytest.raises(SystemExit):
+        daemon.main([
+            "--cap-usd", bad_cap,
+            "--state-root", str(tmp_path),
+            "--agents-root", str(tmp_path / "agents"),
+            "--json",
+        ])
+    tasks_dir = tmp_path / "sarathi" / "mailbox" / "tasks"
+    assert not tasks_dir.exists() or not list(tasks_dir.glob("*.json"))
 
 
 def test_error_cycle_exits_nonzero(tmp_path, monkeypatch) -> None:

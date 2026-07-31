@@ -51,6 +51,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import os
 import sys
 from contextlib import contextmanager
@@ -352,6 +353,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
+
+    # Reject a non-finite or negative budget before it reaches the guard. A NaN
+    # cap slips through argparse's ``float`` and defeats the budget floor
+    # entirely — every ``spent >= cap`` comparison against NaN is False, so the
+    # cap never halts and the loop dispatches paid work unbounded (Greptile P1,
+    # T-Rex verified). Fail closed on the operator's most safety-critical dial.
+    for flag, value in (("--cap-usd", args.cap_usd), ("--spent-usd", args.spent_usd)):
+        if not math.isfinite(value) or value < 0:
+            parser.error(f"{flag} must be a finite, non-negative number (got {value!r})")
 
     agents_root = (
         Path(args.agents_root).expanduser() if args.agents_root else DEFAULT_AGENTS_ROOT

@@ -3,12 +3,15 @@
   "base_ref": "c5653967eeae296eba38e90152e04a3742f99997",
   "branch": "claude/sarathi-autonomy-build-vyr998",
   "worktree": ".",
-  "intent": "Add the standing wake-loop runtime wrapper scripts/runtime/sarathi_wake_daemon.py (PR-S5 of the Sarathi autonomy mission, follow-up to merged PR #1167): a thin Gate-9 runtime wrapper that binds the merged wake organs (make_wake_work_fn) into a governed standing loop which READS DGC_SARATHI_AUTONOMY (default propose -> nothing dispatches; invalid -> shadow) so the operator's dial actually drives real work, honoring the kill-switch and budget checks via holon_wake_cycle before every cycle and the reversibility gate before every delegation. It never sets wake_loop_active (Gate-10 earns that via the 14-cycle proof). With unit tests covering propose-holds-dispatch, invalid-dial-fails-closed-to-shadow, dispatch-enqueues-leased-work, and kill-switch-halts-the-loop.",
+  "intent": "Add the standing wake-loop runtime wrapper scripts/runtime/sarathi_wake_daemon.py (PR-S5 of the Sarathi autonomy mission, follow-up to merged PR #1167): a thin Gate-9 runtime wrapper that binds the merged wake organs (make_wake_work_fn) into a governed standing loop which READS DGC_SARATHI_AUTONOMY (default propose -> nothing dispatches; invalid -> shadow) so the operator's dial actually drives real work, honoring the kill-switch and budget checks via holon_wake_cycle before every cycle and the reversibility gate before every delegation. It never sets wake_loop_active (Gate-10 earns that via the 14-cycle proof). With unit tests covering propose-holds-dispatch, invalid-dial-fails-closed-to-shadow, dispatch-enqueues-leased-work, and kill-switch-halts-the-loop. The decorrelated-review round (Greptile+Codex on PR #1170) hardened coupled surfaces under this same packet: a cross-process flock serializing the budget read/check/work/write (concurrent-daemon spend race) with a NaN/negative --cap-usd rejection; closeback linkage folded into the per-run report instead of a dedicated closeback_ledger.jsonl store (store-inventory census + memory-writer-sentinel); and a full-identity backlog dedup key (plan.plan_dedup_key over the whole PlannedDelegation) persisted on the enqueued task and read back via plan.stored_dedup_key, so a revised backlog item — body OR routing — re-plans while an unchanged one stays suppressed. This touched the merged plan.py and the proof-window's dedup read for parity, so both are in allowed_files.",
   "allowed_files": [
     "scripts/runtime/sarathi_wake_daemon.py",
+    "scripts/runtime/sarathi_proof_window.py",
     "tests/test_sarathi_wake_daemon.py",
     "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS5-wake-daemon-20260730.json",
+    "dharma_swarm/holon_system/sarathi/plan.py",
     "dharma_swarm/holon_system/sarathi/delegate.py",
+    "tests/test_sarathi_plan.py",
     "tests/test_sarathi_delegate.py"
   ],
   "forbidden_files": [
@@ -20,7 +23,6 @@
     ".github/workflows/**",
     "scripts/runtime/pr_merge_control.py",
     "scripts/runtime/merge_master_mike_daemon.py",
-    "dharma_swarm/holon_system/sarathi/plan.py",
     "dharma_swarm/holon_system/sarathi/wake.py",
     "dharma_swarm/holon_system/sarathi/proof.py",
     "dharma_swarm/holon_system/sarathi/gateway.py"
@@ -93,6 +95,6 @@
       "At dispatch/full the daemon enqueues mailbox tasks and automerge-label intents that Merge Master Mike re-gates; it cannot itself merge or push (both NEVER_AUTO)."
     ],
     "rollback": "Revert the two added files and this packet together; the daemon is an additive runtime wrapper with no runtime state in git and no migrations.",
-    "packet_digest": "3be463a53b1834c533e69653b0e7c55be99188d47e8c6d994b63b0ebbaa9a563"
+    "packet_digest": "46e386f7319571eef03380f5217b2fe27d04d0c50a2bb1e4bee32352c47d9d61"
   }
 }
