@@ -23,10 +23,11 @@ fi
 
 lake build
 
-# The package name and Lean library name intentionally differ, so name the
-# built module explicitly instead of relying on leanchecker's package-name
+# The package name and Lean library names intentionally differ, so name both
+# built modules explicitly instead of relying on leanchecker's package-name
 # capitalization heuristic.
 lake env leanchecker CrispOpen
+lake env leanchecker AbstractReplay
 
 audit_log="$(mktemp)"
 trap 'rm -f "$audit_log"' EXIT
