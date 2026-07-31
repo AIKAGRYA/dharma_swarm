@@ -1,0 +1,6 @@
+name = "crisp_open"
+version = "0.1.0"
+defaultTargets = ["CrispOpen"]
+
+[[lean_lib]]
+name = "CrispOpen"
