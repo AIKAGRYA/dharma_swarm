@@ -346,7 +346,7 @@ protected and free coordinates, `I` reads only the protected coordinate, and
 structure OrthogonalDecomposition where
   protectedSpace : Type
   freeSpace : Type
-  semanticEquiv : Nat ≃ (protectedSpace × freeSpace)
+  semanticEquiv : Equiv Nat (protectedSpace × freeSpace)
   protectedInvariant : protectedSpace → Prop
   freeComplexity : freeSpace → Nat
   invariantFactors :
@@ -452,7 +452,8 @@ theorem reachableHasReplayCertificate
       rename_i stepDepth stepSource stepTarget
       rcases inductionHypothesis with ⟨certificate, replayed⟩
       refine ⟨stepTarget :: certificate, ?_⟩
-      simp [replayCertificates, replayed, accepted, Accepted]
+      change K stepSource stepTarget = true at accepted
+      simp [replayCertificates, replayed, accepted]
 
 /-- A finite generator language containing the decisive fixed generator. -/
 inductive GeneratorProgram where
