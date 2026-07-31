@@ -4,14 +4,14 @@ import Init.Data.Nat.Log2
 namespace CrispOpen.AbstractReplay
 
 /-!
-Iteration 6 keeps the range-based replay result, but demotes it to what it
-actually proves: one naive anti-generator definition is impossible for every
-effectively checkable finite-path transition system.
+Iteration 6 keeps the certificate-replay theorem, but narrows its meaning: it
+refutes one withdrawn range-based definition of open-endedness.  The main
+result is instead an object-language-relative description-length ceiling.
 
-The main result is now an object-language-relative description-length ceiling.
-A closed deterministic lineage can be described by a shortest seed program, a
-fixed step program, and a self-delimiting description of the depth.  Opening the
-system adds exactly one new term: the description length of the consumed input.
+`MDLModel` does not postulate universal Kolmogorov complexity.  It packages one
+explicit description language together with its shortest-code function, the
+exact length of that code, and the lower-bound law that characterizes the
+minimum.  The closed and open theorems are parametric over every such model.
 -/
 
 -- Finite accepted paths and the withdrawn range condition --------------------
@@ -84,8 +84,7 @@ theorem replayCodeKillsRangeAntiGenerator
     (replayCode : Code)
     (implementsReplay :
       ∀ certificate,
-        run replayCode certificate =
-          replay initial step certificate) :
+        run replayCode certificate = replay initial step certificate) :
     ¬ RangeAntiGenerator initial step complexity run := by
   intro antiGenerator
   rcases antiGenerator replayCode 0 with
@@ -94,8 +93,7 @@ theorem replayCodeKillsRangeAntiGenerator
     ⟨certificate, replayed⟩
   apply escaped certificate
   calc
-    run replayCode certificate =
-        replay initial step certificate :=
+    run replayCode certificate = replay initial step certificate :=
       implementsReplay certificate
     _ = some state := replayed
 
@@ -128,10 +126,7 @@ theorem replayCodeCoversReachable
       runReplayCode initial step .replay certificate = some state := by
   simpa [runReplayCode] using reachableHasReplayCertificate reachable
 
-/--
-Corollary retained from Iteration 5: the withdrawn range-based anti-generator
-condition fails for every fixed Boolean transition checker and every measure.
--/
+/-- The withdrawn range condition fails for every fixed Boolean checker. -/
 theorem rangeAntiGeneratorImpossible
     {State : Type}
     (initial : State)
@@ -145,64 +140,32 @@ theorem rangeAntiGeneratorImpossible
 
 -- Minimal description length over an explicit object language ----------------
 
-structure DescriptionLanguage (Output : Type) where
+/--
+One explicit description language and its minimum-description-length function.
+`shortest` realizes the minimum; `lowerBound` proves no code is shorter.
+-/
+structure MDLModel (Output : Type) where
   Code : Type
   run : Code → Output
   codeLength : Code → Nat
-  quote : Output → Code
-  quoteSound : ∀ output, run (quote output) = output
+  K : Output → Nat
+  shortest : Output → Code
+  shortestRuns : ∀ output, run (shortest output) = output
+  shortestLength : ∀ output, codeLength (shortest output) = K output
+  lowerBound : ∀ code, K (run code) ≤ codeLength code
 
-def DescribedAtLength
+theorem KLeOfCode
     {Output : Type}
-    (language : DescriptionLanguage Output)
-    (output : Output)
-    (size : Nat) : Prop :=
-  ∃ code : language.Code,
-    language.run code = output ∧
-    language.codeLength code = size
+    (language : MDLModel Output)
+    (code : language.Code) :
+    language.K (language.run code) ≤ language.codeLength code :=
+  language.lowerBound code
 
-theorem descriptionExists
-    {Output : Type}
-    (language : DescriptionLanguage Output)
-    (output : Output) :
-    ∃ size, DescribedAtLength language output size := by
-  refine ⟨language.codeLength (language.quote output), ?_⟩
-  exact ⟨language.quote output, language.quoteSound output, rfl⟩
-
-/-- Minimal description length relative to the declared object language. -/
-noncomputable def mdl
-    {Output : Type}
-    (language : DescriptionLanguage Output)
-    (output : Output) : Nat := by
-  classical
-  exact Nat.find (descriptionExists language output)
-
-theorem mdlSpec
-    {Output : Type}
-    (language : DescriptionLanguage Output)
-    (output : Output) :
-    DescribedAtLength language output (mdl language output) := by
-  classical
-  exact Nat.find_spec (descriptionExists language output)
-
-theorem mdlLeOfCode
-    {Output : Type}
-    (language : DescriptionLanguage Output)
-    {code : language.Code}
-    {output : Output}
-    (runs : language.run code = output) :
-    mdl language output ≤ language.codeLength code := by
-  classical
-  exact Nat.find_min' (descriptionExists language output) ⟨code, runs, rfl⟩
-
-/-- Number of bits in the ordinary binary representation, with zero costing one. -/
+/-- Ordinary binary length, charging one bit for zero. -/
 def bitLength (value : Nat) : Nat :=
   Nat.log2 (value + 1) + 1
 
-/--
-An explicit self-delimiting natural-number code.  Its shape is
-`log n + 2 log log n + O(1)`; the shifts make the expression total at zero.
--/
+/-- A total self-delimiting natural-number code length. -/
 def natCodeLength (value : Nat) : Nat :=
   bitLength value + 2 * bitLength (bitLength value) + 1
 
@@ -210,6 +173,23 @@ theorem natCodeLengthShape (value : Nat) :
     natCodeLength value =
       bitLength value + 2 * bitLength (bitLength value) + 1 := by
   rfl
+
+/-- A concrete object language for natural numbers. -/
+def natMDL : MDLModel Nat where
+  Code := Nat
+  run := fun value => value
+  codeLength := natCodeLength
+  K := natCodeLength
+  shortest := fun value => value
+  shortestRuns := fun _ => rfl
+  shortestLength := fun _ => rfl
+  lowerBound := fun _ => Nat.le_refl _
+
+theorem natKIsSelfDelimiting (value : Nat) :
+    natMDL.K value = natCodeLength value := by
+  rfl
+
+-- Closed deterministic systems ------------------------------------------------
 
 def iterate
     {State : Type}
@@ -225,129 +205,135 @@ def ClosedReach
     (state : State) : Prop :=
   iterate step depth seed = state
 
-inductive ClosedProgram (State StepCode : Type) where
-  | quote : State → ClosedProgram State StepCode
-  | iterate :
-      StepCode →
-      ClosedProgram State StepCode →
-      Nat →
-      ClosedProgram State StepCode
-
-def runClosed
-    {State StepCode : Type}
-    (decodeStep : StepCode → State → State) :
-    ClosedProgram State StepCode → State
-  | .quote state => state
-  | .iterate stepCode seedProgram depth =>
-      iterate (decodeStep stepCode) depth (runClosed decodeStep seedProgram)
-
-def closedProgramLength
-    {State StepCode : Type}
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat) :
-    ClosedProgram State StepCode → Nat
-  | .quote state => quoteLength state
-  | .iterate stepCode seedProgram depth =>
-      closedProgramLength quoteLength stepLength seedProgram +
-        stepLength stepCode +
-        natCodeLength depth +
-        1
-
-def closedLanguage
-    {State StepCode : Type}
-    (decodeStep : StepCode → State → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat) :
-    DescriptionLanguage State where
-  Code := ClosedProgram State StepCode
-  run := runClosed decodeStep
-  codeLength := closedProgramLength quoteLength stepLength
-  quote := .quote
-  quoteSound := fun _ => rfl
+/--
+A fixed interpreter that combines descriptions of a seed, deterministic step,
+and depth into a state description.  `overhead` is the fixed interpreter cost.
+-/
+structure ClosedComposer
+    (State : Type)
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → State))
+    (depthLanguage : MDLModel Nat) where
+  overhead : Nat
+  compose :
+    stateLanguage.Code →
+    stepLanguage.Code →
+    depthLanguage.Code →
+    stateLanguage.Code
+  sound : ∀ seedCode stepCode depthCode,
+    stateLanguage.run (compose seedCode stepCode depthCode) =
+      iterate
+        (stepLanguage.run stepCode)
+        (depthLanguage.run depthCode)
+        (stateLanguage.run seedCode)
+  lengthBound : ∀ seedCode stepCode depthCode,
+    stateLanguage.codeLength (compose seedCode stepCode depthCode) ≤
+      stateLanguage.codeLength seedCode +
+        stepLanguage.codeLength stepCode +
+        depthLanguage.codeLength depthCode +
+        overhead
 
 /--
-The logarithmic ceiling for a closed deterministic lineage:
+The exact closed-system ceiling requested by Iteration 6:
 
-`K(state) ≤ K(seed) + K(step) + K(depth) + 1`.
-
-Here each `K` is the minimal description length or declared code length in the
-same explicit object language, and `K(depth)` is `natCodeLength depth`.
+`K(state) ≤ K(seed) + K(step) + K(depth) + O(1)`.
 -/
 theorem closedLogarithmicCeiling
-    {State StepCode : Type}
-    (decodeStep : StepCode → State → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
+    {State : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → State))
+    (depthLanguage : MDLModel Nat)
+    (composer :
+      ClosedComposer State stateLanguage stepLanguage depthLanguage)
     (seed : State)
-    (stepCode : StepCode)
+    (step : State → State)
     {depth : Nat}
     {state : State}
-    (reachable :
-      ClosedReach seed (decodeStep stepCode) depth state) :
-    mdl (closedLanguage decodeStep quoteLength stepLength) state ≤
-      mdl (closedLanguage decodeStep quoteLength stepLength) seed +
-        stepLength stepCode +
-        natCodeLength depth +
-        1 := by
-  classical
-  rcases mdlSpec
-      (closedLanguage decodeStep quoteLength stepLength) seed with
-    ⟨seedProgram, seedRuns, seedLength⟩
-  have generated :
-      runClosed decodeStep
-          (.iterate stepCode seedProgram depth) = state := by
-    change iterate (decodeStep stepCode) depth
-      (runClosed decodeStep seedProgram) = state
-    rw [seedRuns]
+    (reachable : ClosedReach seed step depth state) :
+    stateLanguage.K state ≤
+      stateLanguage.K seed +
+        stepLanguage.K step +
+        depthLanguage.K depth +
+        composer.overhead := by
+  let seedCode := stateLanguage.shortest seed
+  let stepCode := stepLanguage.shortest step
+  let depthCode := depthLanguage.shortest depth
+  let composite := composer.compose seedCode stepCode depthCode
+  have compositeRuns : stateLanguage.run composite = state := by
+    dsimp [composite, seedCode, stepCode, depthCode]
+    rw [composer.sound]
+    rw [stateLanguage.shortestRuns]
+    rw [stepLanguage.shortestRuns]
+    rw [depthLanguage.shortestRuns]
     exact reachable
-  have upper :=
-    mdlLeOfCode
-      (closedLanguage decodeStep quoteLength stepLength) generated
-  change
-    mdl (closedLanguage decodeStep quoteLength stepLength) state ≤
-      closedProgramLength quoteLength stepLength seedProgram +
-        stepLength stepCode +
+  have lower := stateLanguage.lowerBound composite
+  rw [compositeRuns] at lower
+  calc
+    stateLanguage.K state ≤ stateLanguage.codeLength composite := lower
+    _ ≤ stateLanguage.codeLength seedCode +
+          stepLanguage.codeLength stepCode +
+          depthLanguage.codeLength depthCode +
+          composer.overhead :=
+      composer.lengthBound seedCode stepCode depthCode
+    _ = stateLanguage.K seed +
+          stepLanguage.K step +
+          depthLanguage.K depth +
+          composer.overhead := by
+      rw [stateLanguage.shortestLength]
+      rw [stepLanguage.shortestLength]
+      rw [depthLanguage.shortestLength]
+
+/-- Specialization to the explicit self-delimiting natural-number language. -/
+theorem closedSelfDelimitingCeiling
+    {State : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → State))
+    (composer : ClosedComposer State stateLanguage stepLanguage natMDL)
+    (seed : State)
+    (step : State → State)
+    {depth : Nat}
+    {state : State}
+    (reachable : ClosedReach seed step depth state) :
+    stateLanguage.K state ≤
+      stateLanguage.K seed +
+        stepLanguage.K step +
         natCodeLength depth +
-        1 at upper
-  change
-    closedProgramLength quoteLength stepLength seedProgram =
-      mdl (closedLanguage decodeStep quoteLength stepLength) seed at seedLength
-  rw [seedLength] at upper
-  exact upper
+        composer.overhead := by
+  exact closedLogarithmicCeiling
+    stateLanguage stepLanguage natMDL composer seed step reachable
 
 def ClosedCeilingExceeded
-    {State StepCode : Type}
-    (decodeStep : StepCode → State → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
+    {State : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → State))
+    (composer : ClosedComposer State stateLanguage stepLanguage natMDL)
     (seed : State)
-    (stepCode : StepCode)
+    (step : State → State)
     (depth : Nat)
     (state : State) : Prop :=
-  mdl (closedLanguage decodeStep quoteLength stepLength) state >
-    mdl (closedLanguage decodeStep quoteLength stepLength) seed +
-      stepLength stepCode +
+  stateLanguage.K state >
+    stateLanguage.K seed +
+      stepLanguage.K step +
       natCodeLength depth +
-      1
+      composer.overhead
 
 theorem closedCannotExceedDescriptionCeiling
-    {State StepCode : Type}
-    (decodeStep : StepCode → State → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
+    {State : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → State))
+    (composer : ClosedComposer State stateLanguage stepLanguage natMDL)
     (seed : State)
-    (stepCode : StepCode)
+    (step : State → State)
     {depth : Nat}
     {state : State}
-    (reachable :
-      ClosedReach seed (decodeStep stepCode) depth state) :
+    (reachable : ClosedReach seed step depth state) :
     ¬ ClosedCeilingExceeded
-      decodeStep quoteLength stepLength seed stepCode depth state := by
+      stateLanguage stepLanguage composer seed step depth state := by
   exact Nat.not_lt_of_ge
-    (closedLogarithmicCeiling
-      decodeStep quoteLength stepLength seed stepCode reachable)
+    (closedSelfDelimitingCeiling
+      stateLanguage stepLanguage composer seed step reachable)
 
--- A pure counter receives the same upper bound -------------------------------
+-- A pure counter spends exactly the depth-description term -------------------
 
 def counterStep (state : Nat) : Nat :=
   state + 1
@@ -364,40 +350,14 @@ theorem iterateCounterFromZero (depth : Nat) :
     iterate counterStep depth 0 = depth := by
   simpa using iterateCounter depth 0
 
-inductive CounterStepCode where
-  | increment
-
-def decodeCounter : CounterStepCode → Nat → Nat
-  | .increment => counterStep
-
-def counterStepLength : CounterStepCode → Nat
-  | .increment => 1
-
-def counterQuoteLength (state : Nat) : Nat :=
-  natCodeLength state + 1
-
 /--
-The closed ceiling does not distinguish a novelty-producing process from a
-counter: the depth itself is a complete description of the counter state.
+The counter contains no structure beyond its depth, yet its declared descriptive
+complexity is the same self-delimiting depth code used in the closed ceiling.
 -/
-theorem pureCounterHasClosedCeiling (depth : Nat) :
-    mdl
-        (closedLanguage
-          decodeCounter counterQuoteLength counterStepLength)
-        depth ≤
-      mdl
-          (closedLanguage
-            decodeCounter counterQuoteLength counterStepLength)
-          0 +
-        counterStepLength .increment +
-        natCodeLength depth +
-        1 := by
-  exact closedLogarithmicCeiling
-    decodeCounter counterQuoteLength counterStepLength
-    0 .increment
-    (by
-      simpa [ClosedReach, decodeCounter] using
-        iterateCounterFromZero depth)
+theorem pureCounterComplexityIsDepthCode (depth : Nat) :
+    natMDL.K (iterate counterStep depth 0) = natCodeLength depth := by
+  rw [iterateCounterFromZero]
+  rfl
 
 -- Exit 1: open systems and explicit information accounting -------------------
 
@@ -417,122 +377,79 @@ def OpenReach
     (state : State) : Prop :=
   consumeInputs step inputs seed = state
 
-def inputInformation
-    {Input : Type}
-    (inputLength : Input → Nat) : List Input → Nat
-  | [] => 0
-  | input :: rest =>
-      inputLength input + inputInformation inputLength rest
-
-inductive OpenProgram (State StepCode Input : Type) where
-  | quote : State → OpenProgram State StepCode Input
-  | consume :
-      StepCode →
-      OpenProgram State StepCode Input →
-      List Input →
-      OpenProgram State StepCode Input
-
-def runOpen
-    {State StepCode Input : Type}
-    (decodeStep : StepCode → State → Input → State) :
-    OpenProgram State StepCode Input → State
-  | .quote state => state
-  | .consume stepCode seedProgram inputs =>
-      consumeInputs (decodeStep stepCode) inputs
-        (runOpen decodeStep seedProgram)
-
-def openProgramLength
-    {State StepCode Input : Type}
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
-    (inputLength : Input → Nat) :
-    OpenProgram State StepCode Input → Nat
-  | .quote state => quoteLength state
-  | .consume stepCode seedProgram inputs =>
-      openProgramLength quoteLength stepLength inputLength seedProgram +
-        stepLength stepCode +
-        inputInformation inputLength inputs +
-        1
-
-def openLanguage
-    {State StepCode Input : Type}
-    (decodeStep : StepCode → State → Input → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
-    (inputLength : Input → Nat) :
-    DescriptionLanguage State where
-  Code := OpenProgram State StepCode Input
-  run := runOpen decodeStep
-  codeLength :=
-    openProgramLength quoteLength stepLength inputLength
-  quote := .quote
-  quoteSound := fun _ => rfl
+/-- A fixed interpreter for seed, step, and externally supplied input. -/
+structure OpenComposer
+    (State Input : Type)
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → Input → State))
+    (inputLanguage : MDLModel (List Input)) where
+  overhead : Nat
+  compose :
+    stateLanguage.Code →
+    stepLanguage.Code →
+    inputLanguage.Code →
+    stateLanguage.Code
+  sound : ∀ seedCode stepCode inputCode,
+    stateLanguage.run (compose seedCode stepCode inputCode) =
+      consumeInputs
+        (stepLanguage.run stepCode)
+        (inputLanguage.run inputCode)
+        (stateLanguage.run seedCode)
+  lengthBound : ∀ seedCode stepCode inputCode,
+    stateLanguage.codeLength (compose seedCode stepCode inputCode) ≤
+      stateLanguage.codeLength seedCode +
+        stepLanguage.codeLength stepCode +
+        inputLanguage.codeLength inputCode +
+        overhead
 
 /--
-Opening the lineage replaces the depth-code term with the information actually
-consumed from outside:
-
-`K(state) ≤ K(seed) + K(step) + I(inputs) + 1`.
+Exit 1 replaces the depth term by the description length of information
+actually consumed from outside the lineage.
 -/
 theorem openInformationBound
-    {State StepCode Input : Type}
-    (decodeStep : StepCode → State → Input → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
-    (inputLength : Input → Nat)
+    {State Input : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → Input → State))
+    (inputLanguage : MDLModel (List Input))
+    (composer :
+      OpenComposer State Input stateLanguage stepLanguage inputLanguage)
     (seed : State)
-    (stepCode : StepCode)
+    (step : State → Input → State)
     {inputs : List Input}
     {state : State}
-    (reachable :
-      OpenReach seed (decodeStep stepCode) inputs state) :
-    mdl
-        (openLanguage
-          decodeStep quoteLength stepLength inputLength)
-        state ≤
-      mdl
-          (openLanguage
-            decodeStep quoteLength stepLength inputLength)
-          seed +
-        stepLength stepCode +
-        inputInformation inputLength inputs +
-        1 := by
-  classical
-  rcases mdlSpec
-      (openLanguage
-        decodeStep quoteLength stepLength inputLength)
-      seed with
-    ⟨seedProgram, seedRuns, seedLength⟩
-  have generated :
-      runOpen decodeStep
-          (.consume stepCode seedProgram inputs) = state := by
-    change consumeInputs (decodeStep stepCode) inputs
-      (runOpen decodeStep seedProgram) = state
-    rw [seedRuns]
+    (reachable : OpenReach seed step inputs state) :
+    stateLanguage.K state ≤
+      stateLanguage.K seed +
+        stepLanguage.K step +
+        inputLanguage.K inputs +
+        composer.overhead := by
+  let seedCode := stateLanguage.shortest seed
+  let stepCode := stepLanguage.shortest step
+  let inputCode := inputLanguage.shortest inputs
+  let composite := composer.compose seedCode stepCode inputCode
+  have compositeRuns : stateLanguage.run composite = state := by
+    dsimp [composite, seedCode, stepCode, inputCode]
+    rw [composer.sound]
+    rw [stateLanguage.shortestRuns]
+    rw [stepLanguage.shortestRuns]
+    rw [inputLanguage.shortestRuns]
     exact reachable
-  have upper :=
-    mdlLeOfCode
-      (openLanguage
-        decodeStep quoteLength stepLength inputLength)
-      generated
-  change
-    mdl
-        (openLanguage
-          decodeStep quoteLength stepLength inputLength)
-        state ≤
-      openProgramLength
-          quoteLength stepLength inputLength seedProgram +
-        stepLength stepCode +
-        inputInformation inputLength inputs +
-        1 at upper
-  change
-    openProgramLength quoteLength stepLength inputLength seedProgram =
-      mdl
-        (openLanguage
-          decodeStep quoteLength stepLength inputLength)
-        seed at seedLength
-  rw [seedLength] at upper
-  exact upper
+  have lower := stateLanguage.lowerBound composite
+  rw [compositeRuns] at lower
+  calc
+    stateLanguage.K state ≤ stateLanguage.codeLength composite := lower
+    _ ≤ stateLanguage.codeLength seedCode +
+          stepLanguage.codeLength stepCode +
+          inputLanguage.codeLength inputCode +
+          composer.overhead :=
+      composer.lengthBound seedCode stepCode inputCode
+    _ = stateLanguage.K seed +
+          stepLanguage.K step +
+          inputLanguage.K inputs +
+          composer.overhead := by
+      rw [stateLanguage.shortestLength]
+      rw [stepLanguage.shortestLength]
+      rw [inputLanguage.shortestLength]
 
 theorem consumeInputsPreserves
     {State Input : Type}
@@ -551,62 +468,59 @@ theorem consumeInputsPreserves
       simpa [consumeInputs] using seedSafe
   | cons input rest inductionHypothesis =>
       simp only [consumeInputs]
-      exact inductionHypothesis
-        (preserves seed input seedSafe)
+      exact inductionHypothesis (preserves seed input seedSafe)
 
 /--
-The fixed-kernel closure proof and the information budget are independent
-obligations.  Closure constrains every result of consuming input; it does not
-bound how much input arrives.
+Closure and information supply are formally independent conjuncts: preservation
+constrains every consumed input, while the description bound charges the input.
 -/
 theorem openClosureAndInformationAccounting
-    {State StepCode Input : Type}
-    (decodeStep : StepCode → State → Input → State)
-    (quoteLength : State → Nat)
-    (stepLength : StepCode → Nat)
-    (inputLength : Input → Nat)
+    {State Input : Type}
+    (stateLanguage : MDLModel State)
+    (stepLanguage : MDLModel (State → Input → State))
+    (inputLanguage : MDLModel (List Input))
+    (composer :
+      OpenComposer State Input stateLanguage stepLanguage inputLanguage)
     (seed : State)
-    (stepCode : StepCode)
+    (step : State → Input → State)
     (Invariant : State → Prop)
     (preserves :
       ∀ state input,
         Invariant state →
-        Invariant (decodeStep stepCode state input))
+        Invariant (step state input))
     (seedSafe : Invariant seed)
     {inputs : List Input}
     {state : State}
-    (reachable :
-      OpenReach seed (decodeStep stepCode) inputs state) :
+    (reachable : OpenReach seed step inputs state) :
     Invariant state ∧
-      mdl
-          (openLanguage
-            decodeStep quoteLength stepLength inputLength)
-          state ≤
-        mdl
-            (openLanguage
-              decodeStep quoteLength stepLength inputLength)
-            seed +
-          stepLength stepCode +
-          inputInformation inputLength inputs +
-          1 := by
+      stateLanguage.K state ≤
+        stateLanguage.K seed +
+          stepLanguage.K step +
+          inputLanguage.K inputs +
+          composer.overhead := by
   constructor
   · rw [← reachable]
     exact consumeInputsPreserves
-      (decodeStep stepCode) Invariant preserves seedSafe inputs
+      step Invariant preserves seedSafe inputs
   · exact openInformationBound
-      decodeStep quoteLength stepLength inputLength
-      seed stepCode reachable
+      stateLanguage stepLanguage inputLanguage composer
+      seed step reachable
 
+/-- A simple information ledger whose cost grows one unit per input. -/
 def unitInputs : Nat → List Unit
   | 0 => []
   | count + 1 => () :: unitInputs count
 
+def unitInputInformation : List Unit → Nat
+  | [] => 0
+  | () :: rest => 1 + unitInputInformation rest
+
 theorem unitInputsCarryLinearInformation (count : Nat) :
-    inputInformation (fun _ : Unit => 1) (unitInputs count) = count := by
+    unitInputInformation (unitInputs count) = count := by
   induction count with
   | zero =>
       rfl
   | succ count inductionHypothesis =>
-      simp [unitInputs, inputInformation, inductionHypothesis]
+      simp [unitInputs, unitInputInformation, inductionHypothesis, Nat.add_comm]
 
 end CrispOpen.AbstractReplay
