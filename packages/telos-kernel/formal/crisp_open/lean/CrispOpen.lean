@@ -346,39 +346,40 @@ protected and free coordinates, `I` reads only the protected coordinate, and
 structure OrthogonalDecomposition where
   protectedSpace : Type
   freeSpace : Type
-  split : Nat ≃ protectedSpace × freeSpace
+  semanticEquiv : Nat ≃ (protectedSpace × freeSpace)
   protectedInvariant : protectedSpace → Prop
   freeComplexity : freeSpace → Nat
   invariantFactors :
     ∀ value, SemanticInvariant value ↔
-      protectedInvariant (split value).1
+      protectedInvariant (semanticEquiv value).1
   complexityFactors :
     ∀ value, SemanticComplexity value =
-      freeComplexity (split value).2
+      freeComplexity (semanticEquiv value).2
 
 /--
 Because `C` is the identity semantic coordinate, a fixed free coordinate can
-correspond to only one semantic value.  Surjectivity of `split` therefore
-forces the protected factor to be a subsingleton.
+correspond to only one semantic value.  Surjectivity of the equivalence
+therefore forces the protected factor to be a subsingleton.
 -/
 theorem orthogonalProtectedSubsingleton
     (decomposition : OrthogonalDecomposition) :
     ∀ left right : decomposition.protectedSpace, left = right := by
   intro left right
-  let free : decomposition.freeSpace := (decomposition.split 0).2
-  let leftValue : Nat := decomposition.split.symm (left, free)
-  let rightValue : Nat := decomposition.split.symm (right, free)
+  let free : decomposition.freeSpace := (decomposition.semanticEquiv 0).2
+  let leftValue : Nat := decomposition.semanticEquiv.symm (left, free)
+  let rightValue : Nat := decomposition.semanticEquiv.symm (right, free)
   have leftFree :
-      (decomposition.split leftValue).2 = free := by
+      (decomposition.semanticEquiv leftValue).2 = free := by
     simp [leftValue]
   have rightFree :
-      (decomposition.split rightValue).2 = free := by
+      (decomposition.semanticEquiv rightValue).2 = free := by
     simp [rightValue]
   have leftMeasure :
       leftValue = decomposition.freeComplexity free := by
     calc
       leftValue =
-          decomposition.freeComplexity (decomposition.split leftValue).2 := by
+          decomposition.freeComplexity
+            (decomposition.semanticEquiv leftValue).2 := by
             simpa [SemanticComplexity] using
               decomposition.complexityFactors leftValue
       _ = decomposition.freeComplexity free := by rw [leftFree]
@@ -386,7 +387,8 @@ theorem orthogonalProtectedSubsingleton
       rightValue = decomposition.freeComplexity free := by
     calc
       rightValue =
-          decomposition.freeComplexity (decomposition.split rightValue).2 := by
+          decomposition.freeComplexity
+            (decomposition.semanticEquiv rightValue).2 := by
             simpa [SemanticComplexity] using
               decomposition.complexityFactors rightValue
       _ = decomposition.freeComplexity free := by rw [rightFree]
@@ -394,9 +396,10 @@ theorem orthogonalProtectedSubsingleton
     leftMeasure.trans rightMeasure.symm
   have pairsEqual : (left, free) = (right, free) := by
     calc
-      (left, free) = decomposition.split leftValue := by
+      (left, free) = decomposition.semanticEquiv leftValue := by
         simp [leftValue]
-      _ = decomposition.split rightValue := congrArg decomposition.split valuesEqual
+      _ = decomposition.semanticEquiv rightValue :=
+        congrArg decomposition.semanticEquiv valuesEqual
       _ = (right, free) := by
         simp [rightValue]
   exact congrArg Prod.fst pairsEqual
@@ -406,17 +409,20 @@ theorem coordinateOrthogonalityImpossible :
     ¬ Nonempty OrthogonalDecomposition := by
   rintro ⟨decomposition⟩
   have protectedEqual :
-      (decomposition.split 1).1 = (decomposition.split 0).1 :=
+      (decomposition.semanticEquiv 1).1 =
+        (decomposition.semanticEquiv 0).1 :=
     orthogonalProtectedSubsingleton decomposition _ _
   have safeOne : SemanticInvariant 1 := by
     simp [SemanticInvariant]
   have unsafeZero : ¬ SemanticInvariant 0 := by
     simp [SemanticInvariant]
   have protectedOne :
-      decomposition.protectedInvariant (decomposition.split 1).1 :=
+      decomposition.protectedInvariant
+        (decomposition.semanticEquiv 1).1 :=
     (decomposition.invariantFactors 1).mp safeOne
   have protectedZero :
-      decomposition.protectedInvariant (decomposition.split 0).1 := by
+      decomposition.protectedInvariant
+        (decomposition.semanticEquiv 0).1 := by
     rw [← protectedEqual]
     exact protectedOne
   exact unsafeZero ((decomposition.invariantFactors 0).mpr protectedZero)
@@ -443,8 +449,9 @@ theorem reachableHasReplayCertificate
   | zero =>
       exact ⟨[], rfl⟩
   | succ previous accepted inductionHypothesis =>
+      rename_i stepDepth stepSource stepTarget
       rcases inductionHypothesis with ⟨certificate, replayed⟩
-      refine ⟨target :: certificate, ?_⟩
+      refine ⟨stepTarget :: certificate, ?_⟩
       simp [replayCertificates, replayed, accepted, Accepted]
 
 /-- A finite generator language containing the decisive fixed generator. -/
