@@ -41,11 +41,12 @@ def M (source target : State) : Prop := K source target = true
 
 theorem checker_sound {source target : State} (accepted : M source target) :
     Admissible source target := by
-  exact of_decide_eq_true accepted
+  apply of_decide_eq_true
+  simpa [M, K] using accepted
 
 inductive Reach : Nat → State → Prop where
   | zero : Reach 0 initial
-  | succ {depth source target : State} :
+  | succ {depth : Nat} {source target : State} :
       Reach depth source → M source target → Reach (depth + 1) target
 
 /-- Limb (A), but only for the deliberately vacuous iteration-1 invariant. -/
