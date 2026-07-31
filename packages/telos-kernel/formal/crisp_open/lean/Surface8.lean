@@ -30,8 +30,10 @@ theorem doubledProgramPositive :
       decide
   | depth + 1 => by
       have previous := doubledProgramPositive depth
-      simpa [doubledProgram, observe, denote, eval] using
-        Nat.add_pos_left previous (observe (doubledProgram depth))
+      change 0 <
+        observe (doubledProgram depth) +
+          observe (doubledProgram depth)
+      exact Nat.add_pos_left previous _
 
 theorem doubledProgramInvariant :
     ∀ depth, HasType (doubledProgram depth) .safe
@@ -95,8 +97,11 @@ theorem fixedGrowthMoveIncreasesComplexity (depth : Nat) :
     complexity (doublingState (depth + 1)) >
       complexity (doublingState depth) := by
   have positive := doubledProgramPositive depth
-  simpa [complexity, doublingState, doubledProgram, observe, denote, eval] using
-    Nat.lt_add_of_pos_right positive
+  change observe (doubledProgram depth) <
+    observe (doubledProgram depth) +
+      observe (doubledProgram depth)
+  exact Nat.lt_add_of_pos_right
+    (n := observe (doubledProgram depth)) positive
 
 /--
 The generic successor wrapper is a complexity-increasing but unsafe rewrite.
