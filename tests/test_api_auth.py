@@ -11,8 +11,9 @@ resolution in dharma_swarm/api_keys.py:
 - WebSocket handshakes are covered at the ASGI layer (BaseHTTPMiddleware
   never sees websocket scope);
 - the public webhook route fails closed in production-shaped mode when its
-  verification material is absent (the handler itself is fail-open keyless:
-  dharma_swarm/verify/github_app.py verify_signature).
+  verification material is absent (the handler itself also fails closed:
+  dharma_swarm/verify/github_app.py verify_signature returns False when
+  DHARMA_VERIFY_WEBHOOK_SECRET is unset).
 
 Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0S).
 """

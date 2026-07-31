@@ -120,19 +120,22 @@ def _full_valid_payload(tmp_path: Path, monkeypatch) -> dict[str, object]:
         }
     )
 
+    happy = rows["happy_path"]
     receipt = tmp_path / "semantic_receipt.json"
     receipt.write_text(
         json.dumps(
             {
                 "schema": "dharma.nats.live_matrix.semantic_receipt.v1",
+                "task_id": happy["task_id"],
+                "trace_id": happy["trace_id"],
                 "provider": "deterministic",
+                "requested_model": "test",
                 "response_model": "fixture-model",
                 "content": '{"ok": true}',
             }
         ),
         encoding="utf-8",
     )
-    happy = rows["happy_path"]
     happy.update(
         {
             "publish_ack": ack,
@@ -377,7 +380,7 @@ def test_common_contract_binds_source_broker_profile_command_and_rows(
         ),
         (
             lambda payload: payload.__setitem__("command", [sys.executable, "other.py"]),
-            "canonical live matrix runner",
+            "runner cannot be resolved",
         ),
     ],
 )
@@ -391,6 +394,120 @@ def test_common_contract_rejects_unbound_evidence(
     mutation(payload)
 
     with pytest.raises(_MODULE.EvidenceError, match=expected):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )
+
+
+def test_common_contract_rejects_alternate_existing_runner_with_canonical_basename(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    payload = _common_payload(tmp_path, monkeypatch)
+    attacker = tmp_path / "attacker" / "run_nats_live_production_matrix.py"
+    attacker.parent.mkdir()
+    attacker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    payload["command"][1] = str(attacker)
+
+    with pytest.raises(_MODULE.EvidenceError, match="canonical live matrix runner"):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value", "expected"),
+    [
+        ("task_id", "forged-task", "semantic receipt task_id mismatch"),
+        ("trace_id", "forged-trace", "semantic receipt trace_id mismatch"),
+        ("provider", "forged-provider", "semantic receipt provider mismatch"),
+        (
+            "requested_model",
+            "forged-model",
+            "semantic receipt requested_model mismatch",
+        ),
+    ],
+)
+def test_happy_path_rejects_semantic_receipt_identity_mismatch(
+    tmp_path: Path,
+    monkeypatch,
+    field: str,
+    forged_value: str,
+    expected: str,
+) -> None:
+    payload = _full_valid_payload(tmp_path, monkeypatch)
+    rows = {row["name"]: row for row in payload["rows"]}
+    receipt_path = Path(rows["happy_path"]["receipt_path"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt[field] = forged_value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    evidence = tmp_path / f"mismatched-{field}.json"
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+
+    assessment = _MODULE.evaluate_evidence(
+        evidence,
+        host_mode="live",
+        max_age_hours=24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert assessment.verdict == _MODULE.VERDICT_FAIL
+    assert assessment.exit_code == _MODULE.EXIT_FAIL
+    assert expected in assessment.reason
+
+
+def test_repeated_host_mode_last_live_is_accepted(tmp_path: Path, monkeypatch) -> None:
+    # argparse takes the last occurrence of a repeated flag: a wrapper default
+    # followed by an explicit --host-mode live runs live and must validate.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "non-live",
+        "--host-mode",
+        "live",
+    ]
+
+    rows = _MODULE.validate_common(
+        payload,
+        24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert set(rows) == set(_MODULE.REQUIRED_ROWS)
+
+
+def test_repeated_host_mode_last_non_live_is_rejected(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # The inverse ordering runs non-live under argparse; grading the first
+    # occurrence would wrongly accept it as live evidence.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "live",
+        "--host-mode",
+        "non-live",
+    ]
+
+    with pytest.raises(
+        _MODULE.EvidenceError, match="did not declare --host-mode live"
+    ):
         _MODULE.validate_common(
             payload,
             24,
@@ -457,3 +574,90 @@ def test_non_live_default_does_not_inherit_ambient_stale_evidence(
     output = capsys.readouterr()
     assert result == _MODULE.EXIT_NEEDS_HOST == 2
     assert "tracked or ambient live artifacts are not inherited" in output.out
+
+
+# ── matrix runner argv/environment hygiene (Codex P2s on PR #1164) ──
+
+_RUNNER_PATH = _CHECKER_PATH.with_name("run_nats_live_production_matrix.py")
+_RUNNER_SPEC = importlib.util.spec_from_file_location(
+    "run_nats_live_production_matrix_under_test", _RUNNER_PATH
+)
+_RUNNER = importlib.util.module_from_spec(_RUNNER_SPEC)
+sys.modules[_RUNNER_SPEC.name] = _RUNNER
+_RUNNER_SPEC.loader.exec_module(_RUNNER)
+
+
+def test_invalid_env_host_mode_fails_closed(monkeypatch, capsys) -> None:
+    # choices= does not validate environment-supplied defaults; an
+    # unrecognized mode must never fall through to the live branch.
+    monkeypatch.setenv("DHARMA_NATS_HOST_MODE", "lvie")
+    with pytest.raises(SystemExit) as excinfo:
+        _RUNNER.parse_args([])
+    assert excinfo.value.code == 2
+    assert "must be 'non-live' or 'live'" in capsys.readouterr().err
+
+
+def test_env_live_mode_is_recorded_in_command_argv(monkeypatch) -> None:
+    # An environment-only live invocation must still record the explicit
+    # flag its own post-run evidence validation requires.
+    monkeypatch.setenv("DHARMA_NATS_HOST_MODE", "live")
+    args = _RUNNER.parse_args([])
+    assert args.host_mode == "live"
+    assert args.command_argv[-2:] == ["--host-mode", "live"]
+
+
+def test_explicit_host_mode_flag_is_not_duplicated(monkeypatch) -> None:
+    monkeypatch.delenv("DHARMA_NATS_HOST_MODE", raising=False)
+    args = _RUNNER.parse_args(["--host-mode", "live"])
+    assert args.command_argv.count("--host-mode") == 1
+
+
+def test_malformed_model_timeout_does_not_break_non_live_parse(monkeypatch) -> None:
+    # The live-only timeout must stay unconverted at parse time so a
+    # non-live host with inherited junk still reaches its typed verdict.
+    monkeypatch.setenv("DHARMA_MATRIX_MODEL_TIMEOUT", "ninety")
+    monkeypatch.delenv("DHARMA_NATS_HOST_MODE", raising=False)
+    args = _RUNNER.parse_args([])
+    assert args.host_mode == "non-live"
+    assert args.model_timeout == "ninety"
+
+
+def test_equals_form_host_mode_live_is_accepted(tmp_path: Path, monkeypatch) -> None:
+    # argparse accepts --host-mode=live; the validator must not reject it
+    # as a missing declaration.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + ["--host-mode=live"]
+
+    rows = _MODULE.validate_common(
+        payload,
+        24,
+        source_grace_seconds=2,
+        expected_broker_url="nats://daemon.internal:4222",
+        expected_broker_profile="daemon-production",
+        repo_root=tmp_path,
+    )
+
+    assert set(rows) == set(_MODULE.REQUIRED_ROWS)
+
+
+def test_equals_form_last_non_live_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    # A trailing equals-form non-live override runs non-live under argparse;
+    # a scan blind to the equals form would grade the earlier live token.
+    payload = _common_payload(tmp_path, monkeypatch)
+    payload["command"] = payload["command"][:2] + [
+        "--host-mode",
+        "live",
+        "--host-mode=non-live",
+    ]
+
+    with pytest.raises(
+        _MODULE.EvidenceError, match="did not declare --host-mode live"
+    ):
+        _MODULE.validate_common(
+            payload,
+            24,
+            source_grace_seconds=2,
+            expected_broker_url="nats://daemon.internal:4222",
+            expected_broker_profile="daemon-production",
+            repo_root=tmp_path,
+        )

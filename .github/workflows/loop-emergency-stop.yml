@@ -1,0 +1,81 @@
+name: loop-emergency-stop
+
+# Tier 2 / referee layer (operator ruling 2026-07-29, DOOR =
+# AUTO_WITH_DECORRELATED_REVIEW): operator hand-merge forever on this file.
+#
+# One-tap EMERGENCY STOP for every loop lane and unattended-merge workflow.
+# Writes docs/ops/loop_control/KILLSWITCH to the dedicated `loop-control`
+# branch (main is branch-protected; an emergency write must not depend on a
+# PR landing). Every guarded workflow checks that file at job start and
+# halts while it exists. See docs/ops/loop_control/README.md.
+#
+# workflow_dispatch ONLY — this can never fire on a schedule or event.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Optional one-line reason (recorded in the switch file)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: loop-control
+  cancel-in-progress: false
+
+jobs:
+  engage:
+    name: Engage KILLSWITCH
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      CONTROL_BRANCH: loop-control
+      SWITCH_PATH: docs/ops/loop_control/KILLSWITCH
+      ACTOR: ${{ github.actor }}
+      REASON: ${{ inputs.reason }}
+    steps:
+      - name: Write KILLSWITCH to the loop-control branch
+        run: |
+          set -euo pipefail
+          # Ensure the control branch exists (created from the default branch
+          # head on first use; never force-moved afterwards).
+          if ! gh api "repos/${GH_REPO}/git/ref/heads/${CONTROL_BRANCH}" >/dev/null 2>&1; then
+            base_sha="$(gh api "repos/${GH_REPO}/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')"
+            gh api -X POST "repos/${GH_REPO}/git/refs" \
+              -f ref="refs/heads/${CONTROL_BRANCH}" -f sha="${base_sha}"
+            echo "created branch ${CONTROL_BRANCH} at ${base_sha}"
+          fi
+          body="ENGAGED at $(date -u +%Y-%m-%dT%H:%M:%SZ) by ${ACTOR}
+          reason: ${REASON:-unspecified}
+          run: ${GITHUB_SERVER_URL}/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}"
+          content_b64="$(printf '%s\n' "$body" | base64 -w0)"
+          # If the file already exists, update in place (needs its blob sha).
+          existing_sha="$(gh api \
+            "repos/${GH_REPO}/contents/${SWITCH_PATH}?ref=${CONTROL_BRANCH}" \
+            --jq '.sha' 2>/dev/null || true)"
+          if [ -n "${existing_sha}" ]; then
+            gh api -X PUT "repos/${GH_REPO}/contents/${SWITCH_PATH}" \
+              -f message="ops(loop-control): re-engage KILLSWITCH (${ACTOR})" \
+              -f content="${content_b64}" -f branch="${CONTROL_BRANCH}" \
+              -f sha="${existing_sha}" >/dev/null
+          else
+            gh api -X PUT "repos/${GH_REPO}/contents/${SWITCH_PATH}" \
+              -f message="ops(loop-control): engage KILLSWITCH (${ACTOR})" \
+              -f content="${content_b64}" -f branch="${CONTROL_BRANCH}" >/dev/null
+          fi
+          {
+            echo "## 🔴 KILLSWITCH ENGAGED"
+            echo ""
+            echo '```'
+            printf '%s\n' "$body"
+            echo '```'
+            echo ""
+            echo "All guarded lane and unattended-merge workflows halt at their next job start."
+            echo "Resume via Actions → loop-resume (type \`resume\` to confirm)."
+          } >> "$GITHUB_STEP_SUMMARY"

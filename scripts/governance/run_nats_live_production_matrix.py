@@ -1284,7 +1284,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--consumer", default="a2a_task_handler")
     parser.add_argument("--provider", default=os.environ.get("DHARMA_MATRIX_PROVIDER", "ollama"))
     parser.add_argument("--model", default=os.environ.get("DHARMA_MATRIX_MODEL", "glm-5.2:cloud"))
-    parser.add_argument("--model-timeout", type=float, default=float(os.environ.get("DHARMA_MATRIX_MODEL_TIMEOUT", "90")))
+    # Deliberately unconverted here: the value is live-only, and a malformed
+    # environment inheritance must not stop a non-live invocation from
+    # emitting its typed verdict. Converted just before MatrixRunner runs.
+    parser.add_argument("--model-timeout", default=os.environ.get("DHARMA_MATRIX_MODEL_TIMEOUT", "90"))
     parser.add_argument("--bad-endpoint", default="nats://127.0.0.1:1")
     parser.add_argument("--max-deliveries", type=int, default=3)
     parser.add_argument("--idempotency-stale-after-s", type=int, default=300)
@@ -1295,7 +1298,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-age-hours", type=float, default=24)
     parser.add_argument("--source-grace-seconds", type=float, default=2.0)
     args = parser.parse_args(argv)
+    # argparse validates ``choices`` only for command-line values; an
+    # environment-supplied default bypasses it, and any unrecognized mode
+    # would otherwise fall through to the live branch. Fail closed instead.
+    if args.host_mode not in ("non-live", "live"):
+        parser.error(
+            "DHARMA_NATS_HOST_MODE must be 'non-live' or 'live', got "
+            f"{args.host_mode!r}"
+        )
     args.command_argv = list(argv)
+    # Record the resolved host mode so evidence generated from an
+    # environment-only live invocation still carries the explicit flag its
+    # own post-run validation requires.
+    if not any(
+        token == "--host-mode" or token.startswith("--host-mode=")
+        for token in args.command_argv
+    ):
+        args.command_argv.extend(["--host-mode", args.host_mode])
     return args
 
 
@@ -1345,6 +1364,23 @@ async def async_main(argv: list[str]) -> int:
         render_evidence_check(completed)
         return completed.returncode
 
+    try:
+        args.model_timeout = float(args.model_timeout)
+    except (TypeError, ValueError):
+        print(
+            "NATS_LIVE_PRODUCTION_MATRIX_CONFIG_ERROR "
+            + json.dumps(
+                {
+                    "exit_code": 2,
+                    "reason": (
+                        "DHARMA_MATRIX_MODEL_TIMEOUT is not a number: "
+                        f"{args.model_timeout!r}"
+                    ),
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
     runner = MatrixRunner(args)
     evidence_path: Path | None = None
     try:

@@ -18,20 +18,25 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from enum import Enum
 
 from pydantic import BaseModel
 
+# The risk vocabulary and RiskLevel enum live in the stdlib-only
+# dharma_swarm.risk_patterns (operator ruling 2026-07-30): the referee
+# workflow's tier-policy guard imports them on a bare python3 where this
+# module's pydantic import is unavailable. Re-exported here so existing
+# importers keep working against the same objects.
+from dharma_swarm.risk_patterns import (  # noqa: F401 - re-exports are the API
+    _CRITICAL_PATTERNS,
+    _HIGH_RISK_PATTERNS,
+    _LOW_RISK_PATTERNS,
+    _MEDIUM_RISK_PATTERNS,
+    _SAFE_PATTERNS,
+    RiskLevel,
+)
+from dharma_swarm.risk_patterns import classify_risk as _classify_risk
+
 logger = logging.getLogger(__name__)
-
-
-class RiskLevel(str, Enum):
-    """Risk classification for an action."""
-    SAFE = "safe"           # Read-only, no side effects
-    LOW = "low"             # Minor changes, easily reversible
-    MEDIUM = "medium"       # File modifications, config changes
-    HIGH = "high"           # Multi-file changes, API calls, deployments
-    CRITICAL = "critical"   # Destructive ops, production changes, credentials
 
 
 class AutonomyDecision(BaseModel):
@@ -46,33 +51,9 @@ class AutonomyDecision(BaseModel):
 
 
 # ── Risk Classification ──────────────────────────────────────────────
-
-_SAFE_PATTERNS = [
-    "read", "list", "show", "display", "search", "grep", "find",
-    "status", "check", "ls", "cat", "head", "tail", "echo",
-]
-
-_LOW_RISK_PATTERNS = [
-    "write note", "log", "append", "create test", "add comment",
-    "format", "lint", "git status", "git diff", "git log",
-]
-
-_MEDIUM_RISK_PATTERNS = [
-    "edit", "modify", "update", "change", "refactor", "rename",
-    "install", "pip install", "npm install", "git add", "git commit",
-]
-
-_HIGH_RISK_PATTERNS = [
-    "deploy", "push", "publish", "migrate", "schema change",
-    "api call", "http request", "subprocess", "exec",
-    "git push", "create pr", "merge",
-]
-
-_CRITICAL_PATTERNS = [
-    "delete", "rm -rf", "drop table", "force push", "reset --hard",
-    "production", "credential", "secret", "api key", "token",
-    "chmod 777", "kill", "terminate",
-]
+# Pattern lists moved to dharma_swarm.risk_patterns (stdlib-only) and
+# re-exported above; classify_risk below delegates to the same single
+# implementation.
 
 
 class AdaptiveAutonomy:
@@ -122,30 +103,8 @@ class AdaptiveAutonomy:
         return self._base
 
     def classify_risk(self, action: str) -> RiskLevel:
-        """Classify the risk level of an action."""
-        action_lower = action.lower()
-
-        for pattern in _CRITICAL_PATTERNS:
-            if pattern in action_lower:
-                return RiskLevel.CRITICAL
-
-        for pattern in _HIGH_RISK_PATTERNS:
-            if pattern in action_lower:
-                return RiskLevel.HIGH
-
-        for pattern in _MEDIUM_RISK_PATTERNS:
-            if pattern in action_lower:
-                return RiskLevel.MEDIUM
-
-        for pattern in _LOW_RISK_PATTERNS:
-            if pattern in action_lower:
-                return RiskLevel.LOW
-
-        for pattern in _SAFE_PATTERNS:
-            if pattern in action_lower:
-                return RiskLevel.SAFE
-
-        return RiskLevel.MEDIUM  # default to medium if unknown
+        """Classify the risk level of an action (delegates to risk_patterns)."""
+        return _classify_risk(action)
 
     def should_auto_approve(
         self,
