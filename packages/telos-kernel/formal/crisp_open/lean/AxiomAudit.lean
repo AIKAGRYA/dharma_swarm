@@ -1,5 +1,6 @@
 import CrispOpen
 import AbstractReplay
+import Surface8
 
 #print axioms CrispOpen.sameSemanticsDenotationEqual
 #print axioms CrispOpen.oneConstructorInvariantDifference
@@ -31,3 +32,11 @@ import AbstractReplay
 #print axioms CrispOpen.AbstractReplay.consumeInputsPreserves
 #print axioms CrispOpen.AbstractReplay.openClosureAndInformationAccounting
 #print axioms CrispOpen.AbstractReplay.unitInputsCarryLinearInformation
+
+#print axioms CrispOpen.Surface8.doubledProgramInvariant
+#print axioms CrispOpen.Surface8.fixedGrowthMoveAccepted
+#print axioms CrispOpen.Surface8.fixedGrowthMoveIncreasesComplexity
+#print axioms CrispOpen.Surface8.unsafeGrowthViolatesInvariant
+#print axioms CrispOpen.Surface8.unsafeGrowthRejected
+#print axioms CrispOpen.Surface8.fixedTrivialGrowthExists
+#print axioms CrispOpen.Surface8.couplingLoadBearingFails
