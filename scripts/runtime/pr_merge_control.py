@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.util
 import json
 import os
 import re
@@ -564,64 +565,66 @@ def fetch_pr_diff(pr_number: int) -> str:
     return result.stdout
 
 
-def coherence_results(body: str) -> dict[str, Any]:
-    lines = body.splitlines()
-    results: dict[str, dict[str, Any]] = {}
-    for field in REQUIRED_COHERENCE_FIELDS:
-        prefix_variants = (
-            f"- {field}:",
-            f"* {field}:",
-            f"{field}:",
-            f"- **{field}**:",
-            f"* **{field}**:",
-            f"**{field}**:",
+_COHERENCE_CHECKER_PATH = (
+    REPO_ROOT / "scripts" / "governance" / "check_pr_coherence_delta.py"
+)
+_coherence_checker_module: Any = None
+
+
+def _coherence_checker() -> Any:
+    """The CI Coherence Delta checker, loaded as the gate's parser.
+
+    scripts/governance/check_pr_coherence_delta.py is the single source of
+    truth for Coherence Delta parsing (operator-ratified 2026-07-31): the gate
+    accepts exactly what CI accepts. Fail closed — a missing or broken checker
+    is a repo integrity error, never a silent fallback to a divergent parser.
+    """
+    global _coherence_checker_module
+    if _coherence_checker_module is not None:
+        return _coherence_checker_module
+    module_name = "_dharma_check_pr_coherence_delta"
+    spec = importlib.util.spec_from_file_location(
+        module_name, _COHERENCE_CHECKER_PATH
+    )
+    if spec is None or spec.loader is None:
+        raise PRControlError(
+            f"cannot load Coherence Delta checker at {_COHERENCE_CHECKER_PATH}"
         )
-        value = None
-        for index, line in enumerate(lines):
-            stripped = line.strip()
-            match = next(
-                (prefix for prefix in prefix_variants if stripped.startswith(prefix)),
-                None,
-            )
-            if not match:
-                continue
-            first = stripped[len(match) :].strip()
-            tail: list[str] = []
-            for next_line in lines[index + 1 :]:
-                next_stripped = next_line.strip()
-                if not next_stripped:
-                    continue
-                if any(next_stripped.startswith(prefix) for prefix in prefix_variants):
-                    break
-                if any(
-                    next_stripped.startswith(f"- {other}:")
-                    or next_stripped.startswith(f"- **{other}**:")
-                    for other in REQUIRED_COHERENCE_FIELDS
-                ):
-                    break
-                if next_stripped.startswith("#"):
-                    break
-                tail.append(next_stripped)
-            value = "\n".join(part for part in [first, *tail] if part).strip()
-            break
-        normalized = (value or "").strip().lower().strip("`*_-. ")
-        ok = bool(value) and normalized not in {
-            "",
-            "n/a",
-            "na",
-            "none",
-            "none yet",
-            "tbd",
-            "todo",
-            "unknown",
-            "placeholder",
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+    _coherence_checker_module = module
+    return module
+
+
+def coherence_results(
+    body: str, comments: list[str] | None = None
+) -> dict[str, Any]:
+    """Validate Coherence Delta fields by delegating to the CI checker.
+
+    Accepts everything scripts/governance/check_pr_coherence_delta.py accepts —
+    label aliases, bold/bullet variants (colon inside or outside the bold),
+    HTML-comment stripping, and the PR-comment fallback — so the gate can never
+    reject a body that CI passed."""
+    checker = _coherence_checker()
+    results, source = checker.validate_sources(body or "", list(comments or []))
+    fields = {
+        result.name: {
+            "ok": result.ok,
+            "value": result.value,
+            "reason": "" if result.ok else (result.reason or "missing or placeholder"),
         }
-        results[field] = {
-            "ok": ok,
-            "value": value or "",
-            "reason": "" if ok else "missing or placeholder",
-        }
-    return {"ok": all(item["ok"] for item in results.values()), "fields": results}
+        for result in results
+    }
+    return {
+        "ok": all(result.ok for result in results),
+        "fields": fields,
+        "source": source,
+    }
 
 
 def risk_from_files(files: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1038,6 +1041,33 @@ def fetch_pr_reviews(pr_number: int) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def fetch_pr_comments(pr_number: int) -> list[str]:
+    """Issue-comment bodies for a PR, oldest first.
+
+    The CI Coherence Delta check accepts a PR comment carrying all four fields
+    (for agents that cannot edit the PR description); the gate fetches the same
+    surface so its verdict can never be stricter than CI's. The surface is
+    strictly additive — a failed fetch degrades to body-only validation (the
+    pre-existing behavior), it never blocks."""
+    repo = repo_name()
+    try:
+        data = gh_json(
+            ["api", f"repos/{repo}/issues/{pr_number}/comments", "--paginate"]
+        )
+    except Exception:
+        # Additive surface only: a blocked or failed fetch (offline jail,
+        # missing gh, API error) must degrade to body-only validation, which
+        # is exactly the pre-change gate. It must never block or crash.
+        return []
+    if not isinstance(data, list):
+        return []
+    return [
+        str(item.get("body") or "")
+        for item in data
+        if isinstance(item, dict) and str(item.get("body") or "").strip()
+    ]
+
+
 def _review_login(review: dict[str, Any]) -> str:
     user = review.get("user") or review.get("author") or {}
     return (
@@ -1269,7 +1299,9 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     repo = repo_name()
     current_threads = fetch_review_threads(args.pr, repo)
     current_classification = classify_pr(current_pr)
-    current_coherence = coherence_results(current_pr.get("body") or "")
+    current_coherence = coherence_results(
+        current_pr.get("body") or "", comments=fetch_pr_comments(args.pr)
+    )
     current_ci_truth = ci_truth_for_pr(current_pr, args)
 
     blockers: list[str] = []
