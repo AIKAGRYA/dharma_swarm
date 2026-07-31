@@ -479,3 +479,15 @@ def test_sarathi_once_uses_registered_profile_without_forking_wake_loop(tmp_path
     assert heartbeat["agent_uid"] == "sarathi"
     assert heartbeat["schema_version"] == "dharma.sarathi.wake_heartbeat.v1"
     assert (paths.nest / "README.md").read_text().startswith("# sarathi Wake Nest")
+
+
+def test_sarathi_model_identity_is_frontier_and_honors_override(monkeypatch) -> None:
+    """PR-S3 (operator ruling 2026-07-30): DGC_DIRECTOR_SARATHI_MODEL is the
+    operator override, and the default resolution must never be the retired
+    gemini-2.5-flash flash-tier identity."""
+    monkeypatch.setenv("DGC_DIRECTOR_SARATHI_MODEL", "frontier-override-x")
+    assert wake._sarathi_model_identity() == "frontier-override-x"
+    monkeypatch.delenv("DGC_DIRECTOR_SARATHI_MODEL", raising=False)
+    resolved = wake._sarathi_model_identity()
+    assert resolved
+    assert resolved != "gemini-2.5-flash"

@@ -75,6 +75,36 @@ def test_gate_takes_no_model_input_by_construction() -> None:
     assert params == {"action", "operator_reachable"}
 
 
+def test_gate_import_chain_is_stdlib_only() -> None:
+    """Operator ruling 2026-07-30: the automerge tier-policy guard imports
+    classify_action on the referee workflow's bare python3 (no pip install,
+    no pydantic). A third-party import anywhere in the gate's chain breaks
+    the referee evaluation — pin the property by importing with pydantic
+    blocked in a fresh interpreter."""
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent(
+        """
+        import builtins
+        real_import = builtins.__import__
+        def guarded(name, *args, **kwargs):
+            if name == "pydantic" or name.startswith("pydantic."):
+                raise ImportError("pydantic blocked: gate must stay stdlib-only")
+            return real_import(name, *args, **kwargs)
+        builtins.__import__ = guarded
+        from dharma_swarm.operator_core.reversibility_gate import classify_action
+        decision = classify_action("git status")
+        assert decision.may_execute_unattended is True
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, timeout=60
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_classification_is_total_and_deterministic() -> None:
     gate = ReversibilityGate()
     samples = [
