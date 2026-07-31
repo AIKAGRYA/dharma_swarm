@@ -1,9 +1,12 @@
 name = "crisp_open"
 version = "0.1.0"
-defaultTargets = ["CrispOpen", "AbstractReplay"]
+defaultTargets = ["CrispOpen", "AbstractReplay", "Surface8"]
 
 [[lean_lib]]
 name = "CrispOpen"
 
 [[lean_lib]]
 name = "AbstractReplay"
+
+[[lean_lib]]
+name = "Surface8"
