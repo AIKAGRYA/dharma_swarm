@@ -54,16 +54,18 @@ def test_invalid_items_are_skipped_never_repaired() -> None:
     assert [d.summary for d in plan] == ["real work"]
 
 
+def _key_for(item: dict) -> str:
+    """The dedup key the planner would persist for a single backlog item."""
+    [planned] = build_plan(_pack(open_items=(item,)))
+    return plan_dedup_key(planned)
+
+
 def test_mailbox_ready_set_is_the_dedup_surface() -> None:
+    already = {"kind": "review", "summary": "already queued"}
     plan = build_plan(
         _pack(
-            open_items=(
-                {"kind": "review", "summary": "already queued"},
-                {"kind": "review", "summary": "new work"},
-            ),
-            # No explicit body -> the planned body defaults to the summary, so
-            # the dedup key is the fingerprint of (summary, summary).
-            ready_keys=frozenset({plan_dedup_key("already queued", "already queued")}),
+            open_items=(already, {"kind": "review", "summary": "new work"}),
+            ready_keys=frozenset({_key_for(already)}),
         )
     )
     assert [d.summary for d in plan] == ["new work"]
@@ -71,26 +73,38 @@ def test_mailbox_ready_set_is_the_dedup_surface() -> None:
 
 def test_revised_body_replans_despite_same_summary() -> None:
     """Greptile P1 line 209: a reopened backlog item with the SAME summary but
-    CHANGED body must re-plan (its content fingerprint differs), while an
-    unchanged item stays suppressed. Deduping on summary alone dropped the
-    revision silently."""
-    # The historical task recorded the ORIGINAL body.
-    original_key = plan_dedup_key("audit the arena", "look at scoreboard v1")
+    CHANGED body must re-plan (its identity key differs), while an unchanged
+    item stays suppressed. Deduping on summary alone dropped the revision."""
+    v1 = {"kind": "review", "summary": "audit the arena", "body": "scoreboard v1"}
     plan = build_plan(
         _pack(
             open_items=(
-                # Same summary, unchanged body -> suppressed.
+                v1,  # unchanged -> suppressed
                 {"kind": "review", "summary": "audit the arena",
-                 "body": "look at scoreboard v1"},
-                # Same summary, REVISED body -> re-planned.
-                {"kind": "review", "summary": "audit the arena",
-                 "body": "look at scoreboard v2 with the new metric"},
+                 "body": "scoreboard v2 with the new metric"},  # revised -> re-planned
             ),
-            ready_keys=frozenset({original_key}),
+            ready_keys=frozenset({_key_for(v1)}),
         )
     )
-    assert len(plan) == 1
-    assert plan[0].body == "look at scoreboard v2 with the new metric"
+    assert [d.body for d in plan] == ["scoreboard v2 with the new metric"]
+
+
+def test_revised_recipient_replans_despite_same_summary_and_body() -> None:
+    """Greptile P1 plan.py L127: a routing revision (same summary+body, changed
+    recipient) must re-plan — the dedup key covers the full execution identity,
+    not just summary+body."""
+    base = {"kind": "review", "summary": "audit", "body": "same body",
+            "recipient": "hermes-m5"}
+    plan = build_plan(
+        _pack(
+            open_items=(
+                base,  # unchanged -> suppressed
+                {**base, "recipient": "codex_composer"},  # re-routed -> re-planned
+            ),
+            ready_keys=frozenset({_key_for(base)}),
+        )
+    )
+    assert [d.recipient for d in plan] == ["codex_composer"]
 
 
 def test_merge_kind_becomes_label_intent_for_mikes_lane() -> None:

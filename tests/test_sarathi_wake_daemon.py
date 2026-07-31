@@ -119,60 +119,65 @@ def test_budget_cap_carried_and_enforced(tmp_path, monkeypatch) -> None:
     assert (tmp_path / "sarathi" / "spent_usd").exists()
 
 
+def _tasks(tmp_path) -> list:
+    return list((tmp_path / "sarathi" / "mailbox" / "tasks").glob("*.json"))
+
+
 def test_dedup_suppresses_completed_backlog_item(tmp_path, monkeypatch) -> None:
-    """Codex/Greptile P1: a responded task with the SAME content must still
-    suppress re-planning the same backlog item (dedup keys on the content
-    fingerprint, so the historical task body must match the backlog body)."""
+    """Codex/Greptile P1: an item already dispatched (its full-identity dedup
+    key persisted on the task) is not re-enqueued on a later cycle — even after
+    the task is claimed and responded. Uses a real dispatch cycle so the key is
+    persisted by the delegate, not a hand-built task with no key."""
     monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
     from dharma_swarm.roaming_mailbox import RoamingMailbox
 
-    mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
-    task = mailbox.enqueue_task(
-        recipient="hermes-m5", sender="sarathi",
-        summary="extend the chamber gym battery", body="add one scenario",
-    )
-    mailbox.claim_task(task.task_id, claimed_by="hermes-m5")
-    mailbox.respond_to_task(
-        task_id=task.task_id, responder="hermes-m5", summary="ok", body="ok"
-    )
     backlog = tmp_path / "backlog.json"
     backlog.write_text(
         json.dumps([{"kind": "build", "summary": "extend the chamber gym battery",
                      "body": "add one scenario"}])
     )
-    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
+    # Cycle A dispatches the item; its dedup key is persisted on the task.
+    _run(tmp_path, cycles=1, backlog=str(backlog))
+    mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
+    [task] = mailbox.list_tasks()
+    mailbox.claim_task(task.task_id, claimed_by=task.recipient)
+    mailbox.respond_to_task(
+        task_id=task.task_id, responder=task.recipient, summary="ok", body="ok"
+    )
+    # Cycle B: the responded task's persisted key still suppresses the item.
+    code, _ = _run(tmp_path, cycles=1, backlog=str(backlog))
     assert code == 0
-    # No NEW task for the already-completed item — only the original exists.
-    tasks = list((tmp_path / "sarathi" / "mailbox" / "tasks").glob("*.json"))
-    assert len(tasks) == 1
+    assert len(_tasks(tmp_path)) == 1
 
 
 def test_revised_backlog_body_replans_despite_same_summary(tmp_path, monkeypatch) -> None:
     """Greptile P1 line 209 (T-Rex verified): a reopened backlog item with the
-    SAME summary but REVISED body must re-plan a new task, not be dropped by the
-    historical-summary dedup set."""
+    SAME summary but REVISED body must re-plan a new task."""
     monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
-    from dharma_swarm.roaming_mailbox import RoamingMailbox
+    b1 = tmp_path / "b1.json"
+    b1.write_text(json.dumps([{"kind": "build", "summary": "gym", "body": "v1"}]))
+    b2 = tmp_path / "b2.json"
+    b2.write_text(json.dumps([{"kind": "build", "summary": "gym",
+                               "body": "v2 with the new metric"}]))
+    _run(tmp_path, cycles=1, backlog=str(b1))
+    _run(tmp_path, cycles=1, backlog=str(b2))
+    # v1 persisted + v2 revised = two distinct tasks.
+    assert len(_tasks(tmp_path)) == 2
 
-    mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
-    original = mailbox.enqueue_task(
-        recipient="hermes-m5", sender="sarathi",
-        summary="extend the chamber gym battery", body="add scenario v1",
-    )
-    mailbox.claim_task(original.task_id, claimed_by="hermes-m5")
-    mailbox.respond_to_task(
-        task_id=original.task_id, responder="hermes-m5", summary="ok", body="ok"
-    )
-    backlog = tmp_path / "backlog.json"
-    backlog.write_text(
-        json.dumps([{"kind": "build", "summary": "extend the chamber gym battery",
-                     "body": "add scenario v2 with the new metric"}])
-    )
-    code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
-    assert code == 0
-    tasks = list((tmp_path / "sarathi" / "mailbox" / "tasks").glob("*.json"))
-    # The revised body is genuinely new work: original + revised = two tasks.
-    assert len(tasks) == 2
+
+def test_revised_backlog_recipient_replans(tmp_path, monkeypatch) -> None:
+    """Greptile P1 plan.py L127: a routing revision (same summary+body, changed
+    recipient) must re-plan — the persisted key covers the full identity."""
+    monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
+    b1 = tmp_path / "b1.json"
+    b1.write_text(json.dumps([{"kind": "build", "summary": "gym", "body": "same",
+                               "recipient": "hermes-m5"}]))
+    b2 = tmp_path / "b2.json"
+    b2.write_text(json.dumps([{"kind": "build", "summary": "gym", "body": "same",
+                               "recipient": "codex_composer"}]))
+    _run(tmp_path, cycles=1, backlog=str(b1))
+    _run(tmp_path, cycles=1, backlog=str(b2))
+    assert len(_tasks(tmp_path)) == 2
 
 
 def test_error_cycle_exits_nonzero(tmp_path, monkeypatch) -> None:

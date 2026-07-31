@@ -47,7 +47,7 @@ from dharma_swarm.operator_core.autonomy_dial import (
 )
 from dharma_swarm.operator_core.reversibility_gate import ActionClass, classify_action
 
-from .plan import PlannedDelegation
+from .plan import PlannedDelegation, plan_dedup_key
 
 GATED_CLASSES = (ActionClass.IRREVERSIBLE, ActionClass.OPERATOR_ONLY)
 
@@ -142,6 +142,11 @@ def _task_metadata(
         "autonomy_level": level.value,
         "planned_channel": delegation.channel,
         "gate_action_class": gate.get("action_class"),
+        # Persist the planner's full-identity dedup key so a later wake compares
+        # stored keys instead of reconstructing one from divergent task fields
+        # (Greptile P1 plan.py L127). Keyed on the delegation, not the augmented
+        # task metadata, so it stays stable across dial levels.
+        "dedup_key": plan_dedup_key(delegation),
     }
     return metadata
 
