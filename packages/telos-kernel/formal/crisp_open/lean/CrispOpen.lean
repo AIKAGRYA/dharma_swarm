@@ -1,5 +1,5 @@
 import Std
-import Std.Tactic.Omega
+import Lean.Elab.Tactic.Omega
 
 namespace CrispOpen
 
