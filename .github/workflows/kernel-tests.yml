@@ -41,16 +41,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Build with Lean and re-check the environment
-        uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
-        with:
-          lake-package-directory: packages/telos-kernel/formal/crisp_open/lean
-          auto-config: false
-          build: true
-          test: false
-          lint: false
-          leanchecker: true
-          use-mathlib-cache: false
-          use-github-cache: false
-      - name: Count proof escapes and audit theorem dependencies
-        run: bash packages/telos-kernel/formal/crisp_open/lean/verify.sh
+      - name: Build pinned elan v4.2.1 from source
+        env:
+          ELAN_SOURCE_SHA: 3d5138e1526a569a23901b8ee559032793cf445e
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          git clone --filter=blob:none https://github.com/leanprover/elan.git "$RUNNER_TEMP/elan-src"
+          git -C "$RUNNER_TEMP/elan-src" checkout --detach "$ELAN_SOURCE_SHA"
+          test "$(git -C "$RUNNER_TEMP/elan-src" rev-parse HEAD)" = "$ELAN_SOURCE_SHA"
+          cargo build \
+            --locked \
+            --release \
+            --manifest-path "$RUNNER_TEMP/elan-src/Cargo.toml" \
+            --bin elan-init
+          "$RUNNER_TEMP/elan-src/target/release/elan-init" \
+            -y \
+            --no-modify-path \
+            --default-toolchain none
+          "$HOME/.elan/bin/elan" --version
+          test "$("$HOME/.elan/bin/elan" --version | awk '{print $2}')" = "4.2.1"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Compile, count proof escapes, and audit theorem dependencies
+        run: |
+          set -euo pipefail
+          cd packages/telos-kernel/formal/crisp_open/lean
+          elan show
+          lean --version
+          lake --version
+          bash verify.sh
