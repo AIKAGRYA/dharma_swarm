@@ -1,13 +1,12 @@
 """Walking brief: pure-composition tests + workflow contract pins (PR-C)."""
 
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-import sys
 
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "runtime"))
 import walking_brief  # noqa: E402
@@ -180,15 +179,18 @@ def test_titles_are_markdown_escaped():
 
 
 def test_brief_carries_date_marker_for_idempotent_posting():
+    # _base_data generates at 2026-07-29T21:00:00Z — the 06:00 JST schedule,
+    # which belongs to the 07-30 walk day.
     body = walking_brief.compose_brief(_base_data())
-    assert "<!-- walking-brief:date:2026-07-29 -->" in body
+    assert "<!-- walking-brief:date:2026-07-30 -->" in body
 
 
 def test_todays_comment_is_updated_not_duplicated(monkeypatch):
     marker = "<!-- walking-brief:date:2026-07-29 -->"
+    bot = {"login": "github-actions[bot]"}
     comments = [
-        {"id": 11, "body": "unrelated"},
-        {"id": 22, "body": f"{marker}\nold brief"},
+        {"id": 11, "body": "unrelated", "user": bot},
+        {"id": 22, "body": f"{marker}\nold brief", "user": bot},
     ]
     monkeypatch.setattr(walking_brief, "_gh_json", lambda args: comments)
     assert walking_brief.find_todays_brief_comment("o/r", 5, marker) == 22
@@ -201,3 +203,63 @@ def test_pending_nightly_renders_pending_not_red():
     )
     assert "🟡" in body
     assert "🔴" not in body
+
+
+# --- PR-C2 second review round (Greptile + Codex on #1166) ----------------
+
+
+def test_marker_buckets_by_walk_day_not_raw_utc_date():
+    """The 21:00 UTC schedule is 06:00 JST, so a walk day straddles UTC
+    midnight. The scheduled run and a rerun 3.5h later must share a marker,
+    or the next morning's run edits yesterday's comment."""
+    scheduled = walking_brief._date_marker("2026-07-30T21:00:00Z")
+    rerun_after_midnight = walking_brief._date_marker("2026-07-31T00:30:00Z")
+    assert scheduled == rerun_after_midnight
+    # The next scheduled run is a different bucket.
+    assert walking_brief._date_marker("2026-07-31T21:00:00Z") != scheduled
+    # Unparseable input degrades to the raw date prefix instead of raising.
+    assert "2026-07-30" in walking_brief._date_marker("2026-07-30 weird")
+
+
+def test_todays_comment_lookup_paginates(monkeypatch):
+    marker = "<!-- walking-brief:date:2026-07-31 -->"
+    bot = {"login": "github-actions[bot]"}
+    page1 = [{"id": i, "body": "chatter", "user": bot} for i in range(100)]
+    page2 = [{"id": 999, "body": f"{marker}\nbrief", "user": bot}]
+
+    def fake(args):
+        return page2 if args[-1].endswith("page=2") else page1
+
+    monkeypatch.setattr(walking_brief, "_gh_json", fake)
+    assert walking_brief.find_todays_brief_comment("o/r", 5, marker) == 999
+
+
+def test_only_the_workflows_own_comment_is_updated(monkeypatch):
+    """The marker is predictable and this issue accepts operator replies —
+    a human comment carrying it must never be overwritten."""
+    marker = "<!-- walking-brief:date:2026-07-31 -->"
+    comments = [
+        {"id": 41, "body": f"{marker} spoofed", "user": {"login": "someone"}},
+        {"id": 42, "body": f"{marker} real", "user": {"login": "github-actions[bot]"}},
+        {"id": 43, "body": f"{marker} later spoof", "user": {"login": "other-bot[bot]"}},
+    ]
+    monkeypatch.setattr(walking_brief, "_gh_json", lambda args: comments)
+    assert walking_brief.find_todays_brief_comment("o/r", 5, marker) == 42
+
+
+def test_bootstrap_body_keeps_the_manual_pin_instruction(monkeypatch):
+    """The GraphQL pin is best-effort; if it fails the operator needs a
+    visible remediation in the thread itself."""
+    created = {}
+
+    def fake_gh(args, **kwargs):
+        if args[:2] == ["issue", "create"]:
+            created["body"] = args[args.index("--body") + 1]
+            return subprocess.CompletedProcess(args, 0, "https://x/issues/7", "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(walking_brief, "_gh_json", lambda args: [])
+    monkeypatch.setattr(walking_brief, "_gh", fake_gh)
+    monkeypatch.setattr(walking_brief, "_pin_issue", lambda repo, number: False)
+    assert walking_brief.find_or_create_brief_issue("o/r") == 7
+    assert "Pin this issue" in created["body"]

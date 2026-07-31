@@ -31,6 +31,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 BRIEF_MARKER = "<!-- walking-brief:v1 -->"
+# Only a comment the workflow itself authored may be updated in place. The
+# brief runs with GITHUB_TOKEN, so its comments are attributed to the
+# Actions bot; a PAT-run variant would appear as the token's owner.
+BRIEF_AUTHOR_LOGINS = frozenset({"github-actions[bot]"})
 
 # Same absent-switch contract as the workflow guards
 # (docs/ops/loop_control/README.md): 404 on the file OR on the branch — a
@@ -50,10 +54,29 @@ def _md_escape(text: str) -> str:
     return _MD_ESCAPE_RE.sub(r"\\\1", text)
 
 
+# The schedule fires at 21:00 UTC = 06:00 JST, so one walk-day's brief
+# straddles the UTC midnight boundary. Bucketing on the raw UTC date would
+# give a 21:00 run and a 00:30 rerun different markers, and the next
+# morning's run would then edit the previous comment instead of posting
+# (Codex review on PR #1166). Shifting by +3h puts the 21:00 UTC schedule
+# at the start of its own bucket, which is the operator's walk day.
+WALK_DAY_SHIFT_HOURS = 3
+
+
+def _walk_day(generated_at: str) -> str:
+    try:
+        moment = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except (TypeError, ValueError):
+        return (generated_at or "")[:10]
+    return (moment + timedelta(hours=WALK_DAY_SHIFT_HOURS)).strftime("%Y-%m-%d")
+
+
 def _date_marker(generated_at: str) -> str:
-    # Keys one comment per day: a rerun updates today's brief instead of
-    # duplicating the phone notification (Codex review on PR #1158).
-    return f"<!-- walking-brief:date:{(generated_at or '')[:10]} -->"
+    # Keys one comment per walk day: a rerun updates that day's brief
+    # instead of duplicating the phone notification (Codex on PR #1158).
+    return f"<!-- walking-brief:date:{_walk_day(generated_at)} -->"
 BRIEF_ISSUE_LABEL = "walking-brief"
 KILLSWITCH_PATH = "docs/ops/loop_control/KILLSWITCH"
 CONTROL_REF = "loop-control"
@@ -328,6 +351,10 @@ def find_or_create_brief_issue(repo: str) -> int | None:
             "--label", BRIEF_ISSUE_LABEL,
             "--body",
             "Daily walking-mode brief lands here as comments. "
+            "**Pin this issue** if it is not already pinned — the run pins it "
+            "automatically, but that best-effort pin can fail on token scope "
+            "or the repository's pin limit, and only a pinned thread is one "
+            "tap away on a phone (Codex review on PR #1166). "
             "Reply with a dictated comment — that reply is the sole input door "
             "(ingestion lands with PR-F).",
         ]
@@ -347,20 +374,43 @@ def find_or_create_brief_issue(repo: str) -> int | None:
 
 
 def find_todays_brief_comment(repo: str, issue_number: int, date_marker: str) -> int | None:
-    """Same-day marker comment id, else None. A rerun UPDATES today's brief
-    instead of duplicating the phone notification; if this lookup itself
-    fails we fall through to posting — one duplicate beats a silent day."""
+    """Same-day marker comment id, else None. A rerun UPDATES that day's
+    brief instead of duplicating the phone notification; if this lookup
+    itself fails we fall through to posting — one duplicate beats a silent
+    day.
+
+    Every page is searched: this issue is also the operator's input door, so
+    a busy day can push the brief past the first 100 comments and a
+    single-page lookup would post a duplicate (Greptile on PR #1166). Only a
+    comment authored by the workflow identity is eligible — the marker is
+    predictable, and a human or bot comment carrying it must never be
+    overwritten (Codex on PR #1166)."""
     day = date_marker.rsplit(":", 1)[-1].split(" ")[0]
-    data = _gh_json(
-        [
-            "api",
-            f"repos/{repo}/issues/{issue_number}/comments"
-            f"?since={day}T00:00:00Z&per_page=100",
-        ]
-    )
-    if not isinstance(data, list):
-        return None
-    for row in reversed(data):
+    # The walk-day bucket starts before its UTC date, so widen the window a
+    # day and let the marker itself do the exact matching.
+    since = (
+        datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        - timedelta(days=1)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows: list = []
+    page = 1
+    while True:
+        data = _gh_json(
+            [
+                "api",
+                f"repos/{repo}/issues/{issue_number}/comments"
+                f"?since={since}&per_page=100&page={page}",
+            ]
+        )
+        if not isinstance(data, list):
+            return None
+        rows.extend(data)
+        if len(data) < 100:
+            break
+        page += 1
+    for row in reversed(rows):
+        if str((row.get("user") or {}).get("login") or "") not in BRIEF_AUTHOR_LOGINS:
+            continue
         if date_marker in str(row.get("body") or ""):
             ident = row.get("id")
             return int(ident) if ident is not None else None
