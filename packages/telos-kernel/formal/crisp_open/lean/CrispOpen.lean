@@ -25,6 +25,7 @@ inductive Expr where
   | input : Expr
   | lit : Nat → Expr
   | add : Expr → Expr → Expr
+  | compose : Expr → Expr → Expr
   | double : Expr → Expr
   | succ : Expr → Expr
   | iteZero : Expr → Expr → Expr → Expr
@@ -41,6 +42,7 @@ def eval : Expr → Nat → Nat
   | .input, input => input
   | .lit value, _ => value
   | .add left right, input => eval left input + eval right input
+  | .compose outer inner, input => eval outer (eval inner input)
   | .double term, input => eval term input + eval term input
   | .succ term, input => eval term input + 1
   | .iteZero condition whenZero whenNonzero, input =>
@@ -111,6 +113,13 @@ theorem oneConstructorSyntaxDifference :
 theorem oneConstructorInvariantDifference :
     HasType safeByConstructor .safe ∧
       ¬ HasType unsafeByConstructor .safe := by
+  decide
+
+def compositionExample : Expr :=
+  .compose (.succ .input) (.double .input)
+
+theorem compositionExampleAtThree :
+    eval compositionExample 3 = 7 := by
   decide
 
 def branchingExample : Expr :=
@@ -687,31 +696,56 @@ theorem fixedReplayGeneratorCovers
     reachableHasReplayCertificate reachable
 
 def EscapesGenerator
-    (generator : GeneratorCode)
+    {Code : Type}
+    (run : Code → List State → Option State)
+    (generator : Code)
     (state : State) : Prop :=
   ∀ certificate,
-    runGenerator generator certificate ≠ some state
+    run generator certificate ≠ some state
 
 /--
-The directive's `GEN` alternative, strengthened so the state escaping each
-fixed generator must also witness opening above every requested bound.
+The range-based `GEN` alternative, parameterized by any generator-code
+universe and its interpreter. Opening must be witnessed by states escaping
+every fixed code in that universe.
 -/
-def AntiGenerator : Prop :=
+def AntiGeneratorFor
+    {Code : Type}
+    (run : Code → List State → Option State) : Prop :=
   ∀ generator bound,
     ∃ depth state,
       Reach depth state ∧
       complexity state > bound ∧
-      EscapesGenerator generator state
+      EscapesGenerator run generator state
 
-/-- Fork B lands: one bounded-description replay program covers every reachable state. -/
-theorem antiGeneratorImpossible :
-    ¬ AntiGenerator := by
+/--
+Any generator universe containing one fixed replay code that covers every
+reachable state violates the range-based anti-generator requirement.
+-/
+theorem replayCodeKillsAntiGenerator
+    {Code : Type}
+    (run : Code → List State → Option State)
+    (replayCode : Code)
+    (covers :
+      ∀ {depth : Nat} {state : State},
+        Reach depth state →
+          ∃ certificate,
+            run replayCode certificate = some state) :
+    ¬ AntiGeneratorFor run := by
   intro antiGenerator
-  rcases antiGenerator .replay 0 with
+  rcases antiGenerator replayCode 0 with
     ⟨depth, state, reachable, larger, escaped⟩
-  rcases fixedReplayGeneratorCovers reachable with
+  rcases covers reachable with
     ⟨certificate, generated⟩
   exact escaped certificate generated
+
+def AntiGenerator : Prop :=
+  AntiGeneratorFor runGenerator
+
+/-- Fork B lands for the explicit one-node replay generator. -/
+theorem antiGeneratorImpossible :
+    ¬ AntiGenerator := by
+  exact replayCodeKillsAntiGenerator
+    runGenerator .replay fixedReplayGeneratorCovers
 
 -- Revised target and incompatibility ----------------------------------------
 
