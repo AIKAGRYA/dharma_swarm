@@ -177,3 +177,31 @@ def test_workflow_validates_push_authority_before_rebase():
         "HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
         "secrets.MERGEMASTERMIKE_PAT != '' }}"
     ) not in workflow
+
+
+def test_workflow_rebases_on_merge_to_main_not_only_hourly():
+    """Every merge to main strands every other open PR behind it. If the
+    only rebase trigger is the hourly cron, those PRs wait up to 59 minutes
+    — long enough that the operator hand-taps "Update branch" on each one
+    and restarts full CI. The push trigger must stay, and must run in
+    rebase mode so the merge event is answered in ~1 minute."""
+    import yaml  # noqa: PLC0415
+
+    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    triggers = doc.get("on", doc.get(True))
+    assert "push" in triggers, "merge-to-main must trigger the rebase sweep"
+    assert triggers["push"]["branches"] == ["main"]
+    assert "schedule" in triggers, "the hourly backstop must remain"
+
+    mode = doc["jobs"]["triage-and-heal"]["env"]["MODE"]
+    assert "github.event_name == 'push'" in mode and "'rebase'" in mode, (
+        "push events must select rebase mode"
+    )
+    # The rebase step is what actually unblocks the PRs; it must accept the
+    # mode a push event selects.
+    rebase_step = next(
+        step for step in doc["jobs"]["triage-and-heal"]["steps"]
+        if step.get("name", "").startswith("Rebase conflict-free")
+    )
+    assert "rebase" in rebase_step["if"]
