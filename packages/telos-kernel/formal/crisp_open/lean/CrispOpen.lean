@@ -14,8 +14,8 @@ Iteration 5 replaces the killed truth-table construction with:
   condition.
 
 The positive closure, opening, and coupling limbs are retained only to isolate
-the pre-registered Fork B.  The final theorem in this file is an incompatibility
-result for the revised four-limb target in this model.
+the pre-registered Fork B. The final theorem is an incompatibility result for
+the revised four-limb target in this model.
 -/
 
 -- Object language ------------------------------------------------------------
@@ -67,7 +67,7 @@ inductive Ty where
 
 /--
 `safe` is semantic: the denoted function must return an even number at input
-zero.  Odd values are rejected, so the judgment is non-vacuous.
+zero. Odd values are rejected, so the judgment is non-vacuous.
 -/
 def HasType (program : Expr) : Ty → Prop
   | .nat => True
@@ -138,7 +138,7 @@ theorem boundedRecursionSemanticGap :
 -- Mutable modification-operator language ------------------------------------
 
 /--
-A finite AST-transformer language.  `replace`, `compose`, and `branch` make the
+A finite AST-transformer language. `replace`, `compose`, and `branch` make the
 operator a genuine rewrite over program syntax rather than a data-table update.
 `wrapSucc` is deliberately present but cannot receive the preservation type.
 -/
@@ -169,9 +169,9 @@ inductive RewriteTy where
   deriving DecidableEq, Repr
 
 /--
-A decidable certificate checker for rewrite operators.  Replacement carries a
+A decidable certificate checker for rewrite operators. Replacement carries a
 semantic certificate for its replacement program; composition and branching
-carry certificates recursively.  `wrapSucc` is rejected.
+carry certificates recursively. `wrapSucc` is rejected.
 -/
 def rewriteSafeBool : Rewrite → Bool
   | .keep => true
@@ -245,6 +245,10 @@ def ProposedBy (source target : State) : Prop :=
 def Invariant (state : State) : Prop :=
   HasType state.program .safe
 
+instance (state : State) : Decidable (Invariant state) := by
+  unfold Invariant
+  infer_instance
+
 def ModifierCertified (state : State) : Prop :=
   HasRewriteType (M state) .preservesSafe
 
@@ -264,7 +268,7 @@ def initial : State :=
 /--
 The immutable kernel checks the source invariant, the current operator's
 certificate, the exact AST rewrite, and the proposed next operator's
-certificate.  It does not live inside `State`.
+certificate. It does not live inside `State`.
 -/
 def Admissible (source target : State) : Prop :=
   target.kernelId = source.kernelId ∧
@@ -400,7 +404,7 @@ theorem unsafeRejected :
 
 /--
 This target has the correct next program but proposes an unsafe future
-modification operator.  The fixed kernel rejects the rewrite of `M` itself.
+modification operator. The fixed kernel rejects the rewrite of `M` itself.
 -/
 def badModifierTarget : State := {
   kernelId := 0
@@ -462,6 +466,10 @@ theorem opening (bound : Nat) :
 def SemanticInvariant (value : Nat) : Prop :=
   value % 2 = 0
 
+instance (value : Nat) : Decidable (SemanticInvariant value) := by
+  unfold SemanticInvariant
+  infer_instance
+
 def SemanticComplexity (value : Nat) : Nat :=
   value
 
@@ -518,7 +526,7 @@ structure OrthogonalDecomposition where
 
 /--
 Because complexity is the identity coordinate, fixing the free factor fixes the
-entire semantic value.  Surjectivity therefore collapses the protected factor.
+entire semantic value. Surjectivity therefore collapses the protected factor.
 -/
 theorem orthogonalProtectedSubsingleton
     (decomposition : OrthogonalDecomposition) :
@@ -618,7 +626,7 @@ theorem coordinateOrthogonalityImpossible :
 -- Fork B: effective reachability has a fixed finite generator ----------------
 
 /--
-A fixed program replays a finite reverse-chronological path certificate.  The
+A fixed program replays a finite reverse-chronological path certificate. The
 program does not change; longer inputs carry longer candidate paths.
 -/
 def replayCertificates : List State → Option State
@@ -753,7 +761,7 @@ theorem forkB :
   exact ⟨targetTheorem, antiGeneratorImpossible⟩
 
 /--
-The revised four-limb target is incompatible in this model.  The contradiction
+The revised four-limb target is incompatible in this model. The contradiction
 is direct: `GEN` demands a reachable state outside the range of the fixed replay
 generator, while `reachableHasReplayCertificate` places every reachable state
 inside that range.
