@@ -21,10 +21,12 @@ import AbstractReplay
 
 #print axioms CrispOpen.AbstractReplay.reachableHasReplayCertificate
 #print axioms CrispOpen.AbstractReplay.rangeAntiGeneratorImpossible
-#print axioms CrispOpen.AbstractReplay.mdlLeOfCode
+#print axioms CrispOpen.AbstractReplay.KLeOfCode
+#print axioms CrispOpen.AbstractReplay.natKIsSelfDelimiting
 #print axioms CrispOpen.AbstractReplay.closedLogarithmicCeiling
+#print axioms CrispOpen.AbstractReplay.closedSelfDelimitingCeiling
 #print axioms CrispOpen.AbstractReplay.closedCannotExceedDescriptionCeiling
-#print axioms CrispOpen.AbstractReplay.pureCounterHasClosedCeiling
+#print axioms CrispOpen.AbstractReplay.pureCounterComplexityIsDepthCode
 #print axioms CrispOpen.AbstractReplay.openInformationBound
 #print axioms CrispOpen.AbstractReplay.consumeInputsPreserves
 #print axioms CrispOpen.AbstractReplay.openClosureAndInformationAccounting
