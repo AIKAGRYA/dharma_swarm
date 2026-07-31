@@ -19,12 +19,23 @@ Safety envelope (unchanged from the organs it composes):
 - The kill-switch is checked at the CANONICAL ``~/.dharma/agents`` home
   (``--agents-root``, default) that the operator's ``request_kill(name)``
   writes to, so ``loop-emergency-stop`` from the phone always halts the loop.
-- Budget: cumulative spend is carried across cycles AND across daemon restarts
-  (a persisted ledger, seeded by ``--spent-usd``), never a hardcoded 0, so the
-  cap actually enforces. Concurrent daemons sharing ``--state-root`` are
-  serialized by an advisory ``flock`` around the whole read/check/work/write
-  sequence: two overlapping invocations can never both authorize spend from one
-  stale snapshot — the second halts ``budget-contended`` (Greptile P1 on #1170).
+- Budget SCOPE (read this before trusting ``--cap-usd``): this cap bounds only
+  THIS daemon process's OWN direct spend. The wake cycle is deterministic and
+  runs ``invoker=None`` (it enqueues mailbox tasks; it makes no provider calls),
+  so its direct cost is ~$0 and the cap is effectively slack today. It is NOT a
+  limit on autonomous work: the provider-backed cost of dispatched tasks is
+  incurred later by the executing sub-holons and is bounded by THEIR budgets
+  (``economic_spine`` per-agent tokens), never charged to this ledger. Do not
+  rely on ``--cap-usd`` to bound aggregate autonomous spend — that needs an
+  authoritative downstream-cost source wired via ``run_holon_loop``'s
+  ``spend_fn`` (deferred; Greptile P1 on #1170). The persisted-ledger mechanics
+  below are correct for the daemon's own spend and ready for such a source.
+- Budget mechanics: cumulative direct spend is carried across cycles AND across
+  daemon restarts (a persisted ledger, seeded by ``--spent-usd``), never a
+  hardcoded 0. Concurrent daemons sharing ``--state-root`` are serialized by an
+  advisory ``flock`` around the whole read/check/work/write sequence: two
+  overlapping invocations can never both authorize spend from one stale
+  snapshot — the second halts ``budget-contended`` (Greptile P1 on #1170).
 - Closeback linkage is folded into the per-run report (a JSON artifact already
   emitted, rewritten after every cycle), NOT a separate ``.jsonl`` store, so it
   neither raises the store-inventory census ratchet nor trips the memory-writer
@@ -310,6 +321,12 @@ async def run_daemon(
             # spend_fn (deferred; the economic spine tracks per-agent tokens,
             # not global USD).
             "budget_scope": "daemon-direct-spend",
+            "budget_note": (
+                "cap_usd bounds this daemon's OWN direct spend only (~$0; "
+                "deterministic, invoker=None); it does NOT limit autonomous "
+                "work — dispatched tasks' provider cost is bounded by the "
+                "executing sub-holons' budgets, not this ledger"
+            ),
         }
 
     def persist_report() -> dict:
@@ -388,7 +405,16 @@ def main(argv: list[str] | None = None) -> int:
         "always reaches this loop)",
     )
     parser.add_argument("--backlog", default="", help="JSON file of open items")
-    parser.add_argument("--cap-usd", type=float, default=1.0)
+    parser.add_argument(
+        "--cap-usd",
+        type=float,
+        default=1.0,
+        help="cap on this daemon's OWN direct spend only (deterministic, "
+        "invoker=None wake cycle -> ~$0 today). This is NOT a limit on "
+        "autonomous work: dispatched tasks' provider cost is bounded by the "
+        "executing sub-holons' budgets, not this ledger. Do not rely on it to "
+        "bound aggregate autonomous spend (Greptile P1 on #1170).",
+    )
     parser.add_argument(
         "--spent-usd",
         type=float,
