@@ -1,0 +1,89 @@
+{
+ "allowed_files": [
+  ".github/workflows/codex-mention-router.yml",
+  ".github/workflows/merge-master-mike-backlog.yml",
+  "tests/test_pr_merge_control_github_reviews.py",
+  "reports/agentops/work_packets/mike-WP-REVIEWERS1-codex-only-required.json"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "base_ref": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+ "branch": "agent/mike-required-reviewers-codex-20260801",
+ "commit": {
+  "allowed": false,
+  "message": "fix(mike): required cloud review quorum is codex; copilot accepted but never required [impact-checked]"
+ },
+ "forbidden_files": [
+  "scripts/runtime/pr_merge_control.py",
+  "scripts/runtime/merge_master_mike_daemon.py",
+  ".github/workflows/automerge.yml",
+  "dharma_swarm/dharma_kernel.py",
+  "dharma_swarm/telos_gates.py",
+  "docs/governance/ACTIVE_TRACK.yaml",
+  "Makefile"
+ ],
+ "gates": [
+  {
+   "command": "python3 -m pytest tests/test_pr_merge_control_github_reviews.py -q",
+   "expected_exit": 0,
+   "name": "workflow-contract-tests",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "python3 -m pytest tests/test_pr_merge_control.py -q",
+   "expected_exit": 0,
+   "name": "gate-suite-unbroken",
+   "timeout_seconds": 300
+  }
+ ],
+ "id": "mike-WP-REVIEWERS1-codex-only-required",
+ "intent": "Remove copilot from the required cloud review quorum in the automerge/backlog lanes per operator ratification 2026-07-31 (copilot credits burn fast and reviews are unreliable: zero copilot reviews repo-wide kept the receipt gate permanently unclearable). Required cloud receipt becomes codex (native App review at the exact current head); copilot reviews remain ACCEPTED additively via TRUSTED_REVIEW_LOGINS but are never required. Witness receipt: ~/.dharma/witness/merge_approval/ratification_20260731_repo_wide_automerge.md",
+ "negative_controls": [
+  {
+   "command": "python3 -c \"from pathlib import Path; import re, sys; texts = [Path('.github/workflows/codex-mention-router.yml').read_text(), Path('.github/workflows/merge-master-mike-backlog.yml').read_text()]; bad = [line for text in texts for line in text.splitlines() if ('REQUIRED_REVIEWERS' in line or 'default:' in line) and 'copilot' in line]; sys.exit(1 if bad else 0)\"",
+   "expected_exit": 0,
+   "name": "copilot-never-required-ratchet",
+   "timeout_seconds": 30
+  }
+ ],
+ "session_entry": {
+  "active_track": "merge-master-mike-d4-2026-06",
+  "agent_identity": "claude-fable-main",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   ".github/workflows/codex-mention-router.yml",
+   ".github/workflows/merge-master-mike-backlog.yml",
+   "tests/test_pr_merge_control_github_reviews.py"
+  ],
+  "collision": {
+   "checked_at_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "codex reviews still go stale on every rebase; a single-agent required quorum makes the fresh-final-head receipt (codex re-review or local fanout) the sole receipt path for human PRs in the cloud lane.",
+   "This packet does not change DEFAULT_REQUIRED_REVIEWERS (codex,claude) for the local lane, TRUSTED_REVIEW_LOGINS, or any gate logic.",
+   "PR-A (gate parser unification, #1174) is a sibling packet on different files; no shared surfaces."
+  ],
+  "interface_mismatches": [],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "2e799600dd63414a5aefec5bb26e56752e0a6aa8f745dbacb9f1bd5e84e190a0",
+  "rollback": "git revert the single packet commit; workflow env strings and contract tests return to codex,copilot.",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "git": "2.50.1",
+   "make": "3.81",
+   "python": "3.13.12"
+  },
+  "work_packet": "WP-REVIEWERS1"
+ },
+ "worktree": "."
+}

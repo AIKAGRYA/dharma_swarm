@@ -156,11 +156,15 @@ jobs:
           # Required receipts = the agents that actually review (see #559 pile).
           #
           # D2 (track merge-master-mike-d4): the always-on cloud quorum is
-          # codex,copilot — both have native reviewer Apps the gate can bridge.
-          # claude never posted a receipt in the cloud (no cloud reviewer), so it
-          # was a permanent blocker; it moves to the deep/backup lane. This is
-          # MORE real review than copilot,claude, not less.
-          REQUIRED_REVIEWERS: codex,copilot
+          # codex — its native reviewer App posts real reviews the gate can
+          # bridge at the exact current head. claude never posted a receipt in
+          # the cloud (no cloud reviewer), so it stays the deep/backup lane.
+          # Operator ratification 2026-07-31: copilot is REMOVED as a required
+          # receipt (zero copilot reviews repo-wide kept this gate permanently
+          # unclearable; credits burn fast and reviews are unreliable). Copilot
+          # reviews remain ACCEPTED additively via TRUSTED_REVIEW_LOGINS but
+          # are never required. Ratchet: tests/test_pr_merge_control_github_reviews.py.
+          REQUIRED_REVIEWERS: codex
           # D1: count a trusted installed reviewer-App's native GitHub review
           # (Codex App = codex, Copilot = copilot) as that agent's receipt when
           # no local receipt file exists. Strictly additive — never waives CI,

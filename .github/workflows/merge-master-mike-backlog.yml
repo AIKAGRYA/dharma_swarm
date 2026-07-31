@@ -32,8 +32,9 @@ on:
         description: Required reviewer receipt names before Mike may merge
         required: true
         # Native installed-App reviews are the credential-free cloud quorum.
-        # Claude remains an optional deep/backup lane.
-        default: codex,copilot
+        # Claude remains an optional deep/backup lane. Copilot is accepted but
+        # never required (operator ratification 2026-07-31).
+        default: codex
         type: string
       merge_mode:
         description: Mike merge authority mode
@@ -120,7 +121,7 @@ jobs:
           MAX_PRS: ${{ inputs.max_prs || '5' }}
           LIMIT: ${{ inputs.limit || '100' }}
           STATUSES: ${{ inputs.statuses || 'GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW' }}
-          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex,copilot' }}
+          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex' }}
           MERGE_MODE: ${{ inputs.merge_mode || 'off' }}
           MERGE_METHOD: ${{ inputs.merge_method || 'squash' }}
           NATS_REQUIRED: ${{ inputs.nats_required || false }}
