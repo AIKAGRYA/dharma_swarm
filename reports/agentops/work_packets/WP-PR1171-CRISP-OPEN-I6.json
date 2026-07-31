@@ -1,0 +1,88 @@
+{
+  "id": "WP-PR1171-CRISP-OPEN-I6",
+  "base_ref": "c5653967eeae296eba38e90152e04a3742f99997",
+  "branch": "proof/crisp-open-self-modification-20260731",
+  "worktree": ".",
+  "intent": "Close PR #1171 Iterations 5-6 without changing production runtime behavior: preserve the verified mutable-rewrite model, retain the withdrawn range-based anti-generator theorem as a scoped negative result, add the closed MDL ceiling, open-input information accounting, reachable Surface 8 counterexample, append-only research ledger, prior-art supersession addendum, and bounded CRISP-OPEN verdict.",
+  "allowed_files": [
+    ".github/workflows/kernel-tests.yml",
+    "packages/telos-kernel/formal/crisp_open/**",
+    "reports/agentops/work_packets/WP-PR1171-CRISP-OPEN-I6.json"
+  ],
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "terminal/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "reports/governance/titanium/**",
+    "scripts/governance/**",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "name": "committed-diff-hygiene",
+      "command": "git diff --check",
+      "expected_exit": 0
+    },
+    {
+      "name": "kernel-legacy-shim-regression",
+      "command": "python3 -m pytest packages/telos-kernel/telos_kernel/tests/test_legacy_shim.py -q",
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "scientific-head-is-not-ancestor-of-admission-base",
+      "command": "git merge-base --is-ancestor b3dc4c58506bc9f790634f429799a2f8182ed617 c5653967eeae296eba38e90152e04a3742f99997",
+      "expected_exit": 1
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "formal(crisp-open): close Iteration 6 evidence and governance"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.54.0",
+      "lean": "4.32.2",
+      "lake": "5.0.0",
+      "python": "3.12.13"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PR1171-CRISP-OPEN-I6",
+    "active_track": "sovereign-safety-tcb-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c5653967eeae296eba38e90152e04a3742f99997",
+      "details": []
+    },
+    "interface_mismatches": [
+      "api/main.py appears in the live merge candidate only because main advanced; the PR branch does not modify it and this packet grants no API surface authority."
+    ],
+    "closest_existing_implementation": [
+      "packages/telos-kernel/formal/crisp_open/lean/CrispOpen.lean",
+      "packages/telos-kernel/formal/crisp_open/lean/AbstractReplay.lean",
+      "packages/telos-kernel/formal/crisp_open/lean/Surface8.lean"
+    ],
+    "honest_blockers": [
+      "Human-only merge and acceptance decision remains external to this packet.",
+      "No structural measure of qualitative open-endedness is claimed or discharged."
+    ],
+    "rollback": "Revert the packet-scoped Iteration 6 closeout commit; the prior scientific checkpoint remains at b3dc4c58506bc9f790634f429799a2f8182ed617.",
+    "packet_digest": "59881bd116982b84c2aea8ada1d4ac1fa170c9270ef3f3bf96140af720ab20a3"
+  }
+}
