@@ -23,6 +23,10 @@ fi
 
 lake build
 
+# Lean 4.32.1 bundles the independent comparator used to re-check the built
+# environment without running elaborator or tactic code again.
+lake env leanchecker
+
 audit_log="$(mktemp)"
 trap 'rm -f "$audit_log"' EXIT
 lake env lean AxiomAudit.lean 2>&1 | tee "$audit_log"
