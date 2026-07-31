@@ -2,6 +2,7 @@ import CrispOpen
 
 #print axioms CrispOpen.sameSemanticsDenotationEqual
 #print axioms CrispOpen.oneConstructorInvariantDifference
+#print axioms CrispOpen.compositionExampleAtThree
 #print axioms CrispOpen.rewriteTypeSound
 #print axioms CrispOpen.checkerSound
 #print axioms CrispOpen.acceptedPreservesInvariant
@@ -19,6 +20,7 @@ import CrispOpen
 #print axioms CrispOpen.coordinateOrthogonalityImpossible
 #print axioms CrispOpen.reachableHasReplayCertificate
 #print axioms CrispOpen.fixedReplayGeneratorCovers
+#print axioms CrispOpen.replayCodeKillsAntiGenerator
 #print axioms CrispOpen.antiGeneratorImpossible
 #print axioms CrispOpen.targetTheorem
 #print axioms CrispOpen.forkB
