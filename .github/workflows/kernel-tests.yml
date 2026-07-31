@@ -51,5 +51,6 @@ jobs:
           lint: false
           leanchecker: true
           use-mathlib-cache: false
+          use-github-cache: false
       - name: Count proof escapes and audit theorem dependencies
         run: bash packages/telos-kernel/formal/crisp_open/lean/verify.sh
