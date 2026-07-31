@@ -3,208 +3,530 @@ import Std
 namespace CrispOpen
 
 /-!
-A small proof-carrying self-modification model.
+Iteration 5 replaces the truth-table accumulator with a total expression
+language and formalizes the pre-registered anti-generator fork.
 
-The mutable object is a finite Boolean truth table over natural-number inputs.
-Inputs beyond the stored table evaluate to false.  The checker and invariant
-are Lean definitions outside the mutable state.  Every admitted rewrite grows
-the table by one cell, keeps the checker identity, and carries evidence that
-the distinguished input zero remains false.
+The fixed kernel `K` remains outside mutable state.  The active modification
+operator `M state` is an expression stored inside the state: its denotation is
+the denotation the next program must have.  Every accepted transition may
+replace that operator with another well-typed expression.
+
+The positive limbs establish unbounded-depth closure, unbounded semantic
+magnitude, and a formal non-orthogonality result.  The decisive result is
+negative: because `K` is decidable, a single fixed finite certificate-replay
+generator enumerates every reachable state.  Therefore the requested
+anti-generator condition cannot hold in this model.
 -/
 
-abbrev Program := List Bool
+-- Object language ------------------------------------------------------------
 
-/-- Observable semantics of a finite truth table. -/
-def eval : Program → Nat → Bool
-  | [], _ => false
-  | bit :: _, 0 => bit
-  | _ :: rest, index + 1 => eval rest index
+/-- A small total language with composition, branching, and bounded recursion. -/
+inductive Expr where
+  | lit : Nat → Expr
+  | add : Expr → Expr → Expr
+  | double : Expr → Expr
+  | succ : Expr → Expr
+  | iteZero : Expr → Expr → Expr → Expr
+  | iterDouble : Expr → Expr → Expr
+  deriving DecidableEq, Repr
 
-/-- Semantic safety policy: distinguished input zero must remain false. -/
-def Invariant (program : Program) : Prop := eval program 0 = false
+/-- Bounded recursion used by `Expr.iterDouble`. -/
+def repeatDouble : Nat → Nat → Nat
+  | 0, seed => seed
+  | count + 1, seed => repeatDouble count (seed + seed)
 
-/-- Number of observable inputs on which the program returns true. -/
-def support : Program → Nat
-  | [] => 0
-  | bit :: rest => (if bit then 1 else 0) + support rest
+/-- Total evaluation of closed expressions. -/
+def eval : Expr → Nat
+  | .lit value => value
+  | .add left right => eval left + eval right
+  | .double term => eval term + eval term
+  | .succ term => eval term + 1
+  | .iteZero condition whenZero whenNonzero =>
+      if eval condition = 0 then eval whenZero else eval whenNonzero
+  | .iterDouble count seed => repeatDouble (eval count) (eval seed)
+
+/--
+A denotation is a nullary total function.  Keeping the function layer explicit
+ensures that semantic equality is not syntax equality.
+-/
+abbrev Denotation := Unit → Nat
+
+def denote (program : Expr) : Denotation := fun _ => eval program
+
+def observe (program : Expr) : Nat := denote program ()
+
+/-- Explicit typing judgment.  `safe` programs and `step` operators must denote
+a nonzero result; the judgment is semantic but decidable for this total language.
+-/
+inductive Ty where
+  | nat
+  | safe
+  | step
+  deriving DecidableEq, Repr
+
+def HasType (program : Expr) : Ty → Prop
+  | .nat => True
+  | .safe => observe program ≠ 0
+  | .step => observe program ≠ 0
+
+instance (program : Expr) (ty : Ty) : Decidable (HasType program ty) := by
+  cases ty <;> unfold HasType <;> infer_instance
+
+-- Required denotation-gap witnesses -----------------------------------------
+
+def sameSemanticsLeft : Expr := .add (.lit 0) (.lit 1)
+def sameSemanticsRight : Expr := .lit 1
+
+theorem sameSemanticsSyntaxDistinct :
+    sameSemanticsLeft ≠ sameSemanticsRight := by
+  decide
+
+theorem sameSemanticsDenotationEqual :
+    denote sameSemanticsLeft = denote sameSemanticsRight := by
+  funext input
+  cases input
+  rfl
+
+theorem sameSemanticsInvariantAgrees :
+    HasType sameSemanticsLeft .safe ↔
+      HasType sameSemanticsRight .safe := by
+  rfl
+
+def safeByConstructor : Expr := .succ (.lit 0)
+def unsafeByConstructor : Expr := .double (.lit 0)
+
+theorem oneConstructorSyntaxDifference :
+    safeByConstructor ≠ unsafeByConstructor := by
+  decide
+
+theorem oneConstructorInvariantDifference :
+    HasType safeByConstructor .safe ∧
+      ¬ HasType unsafeByConstructor .safe := by
+  simp [safeByConstructor, unsafeByConstructor, HasType, observe, denote, eval]
+
+def recursiveLarge : Expr := .iterDouble (.lit 3) (.lit 1)
+def recursiveCollapsed : Expr := .iterDouble (.lit 3) (.lit 0)
+
+theorem boundedRecursionSemanticGap :
+    observe recursiveLarge = 8 ∧ observe recursiveCollapsed = 0 := by
+  decide
+
+-- Mutable self-modification model -------------------------------------------
 
 structure State where
   kernelId : Nat
-  program : Program
+  program : Expr
+  modifier : Expr
   deriving DecidableEq, Repr
 
-/-- Initial system: fixed checker identity zero and one protected output. -/
+/-- The active modification operator is mutable state, not a fixed relation. -/
+def M (state : State) : Expr := state.modifier
+
+/-- The current operator proposes the denotation of the next program. -/
+def ProposedBy (source target : State) : Prop :=
+  observe target.program = observe (M source)
+
+/-- The protected semantic invariant. -/
+def Invariant (state : State) : Prop :=
+  HasType state.program .safe
+
+/-- The mutable operator must remain executable in the restricted language. -/
+def ModifierWellTyped (state : State) : Prop :=
+  HasType (M state) .step
+
 def initial : State := {
   kernelId := 0
-  program := [false]
+  program := .lit 1
+  modifier := .lit 1
 }
 
-/-- The proposition certified by every accepted rewrite. -/
+/-- The exact certificate checked by the immutable kernel. -/
 def Admissible (source target : State) : Prop :=
   target.kernelId = source.kernelId ∧
-  target.program.length = source.program.length + 1 ∧
-  Invariant target.program
+  ProposedBy source target ∧
+  Invariant target ∧
+  ModifierWellTyped target
 
 instance (source target : State) : Decidable (Admissible source target) := by
-  unfold Admissible Invariant
+  unfold Admissible ProposedBy Invariant ModifierWellTyped M HasType
   infer_instance
 
-/-- Immutable executable checker.  It is not stored inside `State`. -/
-def K (source target : State) : Bool := decide (Admissible source target)
+/-- Immutable external checker. -/
+def K (source target : State) : Bool :=
+  decide (Admissible source target)
 
-/-- A term of `M source target` is the proof carried by one modification. -/
-def M (source target : State) : Prop := K source target = true
+/-- An accepted proof-carrying rewrite. -/
+def Accepted (source target : State) : Prop :=
+  K source target = true
 
-theorem checkerSound {source target : State} (accepted : M source target) :
+theorem checkerSound {source target : State}
+    (accepted : Accepted source target) :
     Admissible source target := by
   apply of_decide_eq_true
-  simpa [M, K] using accepted
+  simpa [Accepted, K] using accepted
 
 theorem checkerComplete {source target : State}
-    (certificate : Admissible source target) : M source target := by
-  simp [M, K, certificate]
+    (certificate : Admissible source target) :
+    Accepted source target := by
+  simp [Accepted, K, certificate]
 
-/-- Exact-depth reachability; the index is unbounded. -/
+/-- Exact-depth reachability over an unbounded natural index. -/
 inductive Reach : Nat → State → Prop where
   | zero : Reach 0 initial
   | succ {depth : Nat} {source target : State} :
-      Reach depth source → M source target → Reach (depth + 1) target
+      Reach depth source →
+      Accepted source target →
+      Reach (depth + 1) target
 
-/-- Limb (A): every state reachable at any natural depth satisfies `Invariant`. -/
-theorem closure {depth : Nat} {state : State} (reachable : Reach depth state) :
-    Invariant state.program := by
+theorem initialInvariant : Invariant initial := by
+  simp [Invariant, initial, HasType, observe, denote, eval]
+
+theorem initialModifierWellTyped : ModifierWellTyped initial := by
+  simp [ModifierWellTyped, M, initial, HasType, observe, denote, eval]
+
+/-- Limb (A), by structural induction over arbitrary modification depth. -/
+theorem closure {depth : Nat} {state : State}
+    (reachable : Reach depth state) :
+    Invariant state := by
   induction reachable with
-  | zero => rfl
+  | zero =>
+      exact initialInvariant
   | succ previous accepted inductionHypothesis =>
-      exact (checkerSound accepted).2.2
+      exact (checkerSound accepted).2.2.1
 
-/-- No reachable rewrite changes the immutable checker identity. -/
-theorem kernelFixed {depth : Nat} {state : State} (reachable : Reach depth state) :
+theorem modifierTypedClosure {depth : Nat} {state : State}
+    (reachable : Reach depth state) :
+    ModifierWellTyped state := by
+  induction reachable with
+  | zero =>
+      exact initialModifierWellTyped
+  | succ previous accepted inductionHypothesis =>
+      exact (checkerSound accepted).2.2.2
+
+/-- The external kernel identity remains fixed while `M` changes. -/
+theorem kernelFixed {depth : Nat} {state : State}
+    (reachable : Reach depth state) :
     state.kernelId = initial.kernelId := by
   induction reachable with
-  | zero => rfl
+  | zero =>
+      rfl
   | succ previous accepted inductionHypothesis =>
       calc
         _ = _ := (checkerSound accepted).1
         _ = initial.kernelId := inductionHypothesis
 
-/-- Concrete unsafe target with the right growth but a forbidden output. -/
+-- Non-vacuity and actual operator rewriting ---------------------------------
+
 def unsafeState : State := {
   kernelId := 0
-  program := [true, true]
+  program := unsafeByConstructor
+  modifier := .lit 1
 }
 
-theorem unsafeViolatesInvariant : ¬ Invariant unsafeState.program := by
-  simp [Invariant, unsafeState, eval]
-
-theorem unsafeRejected : K initial unsafeState = false := by
-  simp [K, Admissible, initial, unsafeState, Invariant, eval]
-
-/-- Concrete accepted target: the gate does not reject everything. -/
-def acceptedState : State := {
+/-- A source whose operator genuinely proposes semantic zero. -/
+def unsafeSource : State := {
   kernelId := 0
-  program := [false, true]
+  program := .lit 1
+  modifier := unsafeByConstructor
 }
 
-theorem nontrivialAccepted : M initial acceptedState := by
-  simp [M, K, Admissible, initial, acceptedState, Invariant, eval]
+theorem unsafeProposed :
+    ProposedBy unsafeSource unsafeState := by
+  rfl
 
-/-- A later rewrite may alter old mutable outputs, not merely append bytes. -/
-def rewrittenState : State := {
+theorem unsafeViolatesInvariant :
+    ¬ Invariant unsafeState := by
+  simp [Invariant, unsafeState, unsafeByConstructor, HasType, observe, denote, eval]
+
+theorem unsafeRejected :
+    K unsafeSource unsafeState = false := by
+  simp [K, Admissible, ProposedBy, unsafeSource, unsafeState, Invariant,
+    ModifierWellTyped, M, unsafeByConstructor, HasType, observe, denote, eval]
+
+/-- First accepted transition rewrites the modification operator from 1 to 2. -/
+def modifierRewriteState : State := {
   kernelId := 0
-  program := [false, false, true]
+  program := .lit 1
+  modifier := .double (.lit 1)
 }
 
-theorem rewriteExistingCellAccepted : M acceptedState rewrittenState := by
-  simp [M, K, Admissible, acceptedState, rewrittenState, Invariant, eval]
+theorem nontrivialAccepted :
+    Accepted initial modifierRewriteState := by
+  simp [Accepted, K, Admissible, ProposedBy, initial, modifierRewriteState,
+    Invariant, ModifierWellTyped, M, HasType, observe, denote, eval]
 
-theorem rewriteChangesObservableBehavior :
-    eval acceptedState.program 1 ≠ eval rewrittenState.program 1 := by
-  simp [acceptedState, rewrittenState, eval]
+theorem modifierActuallyRewritten :
+    observe (M initial) ≠ observe (M modifierRewriteState) := by
+  simp [M, initial, modifierRewriteState, observe, denote, eval]
 
-/-- A private generator for the canonical opening lineage. -/
-def ones : Nat → List Bool
-  | 0 => []
-  | depth + 1 => true :: ones depth
-
-theorem onesLength (depth : Nat) : (ones depth).length = depth := by
-  induction depth with
-  | zero => rfl
-  | succ depth inductionHypothesis =>
-      simp [ones, inductionHypothesis]
-
-theorem supportOnes (depth : Nat) : support (ones depth) = depth := by
-  induction depth with
-  | zero => rfl
-  | succ depth inductionHypothesis =>
-      simp [ones, support, inductionHypothesis, Nat.add_comm]
-
-def openProgram (depth : Nat) : Program := false :: ones depth
-
-def lineage (depth : Nat) : State := {
+/-- The rewritten operator now proposes 2, which the old operator did not. -/
+def modifierEffectState : State := {
   kernelId := 0
-  program := openProgram depth
+  program := .lit 2
+  modifier := .lit 1
 }
 
-theorem openProgramLength (depth : Nat) :
-    (openProgram depth).length = depth + 1 := by
-  simp [openProgram, onesLength]
+theorem rewriteExistingCellAccepted :
+    Accepted modifierRewriteState modifierEffectState := by
+  simp [Accepted, K, Admissible, ProposedBy, modifierRewriteState,
+    modifierEffectState, Invariant, ModifierWellTyped, M, HasType, observe,
+    denote, eval]
 
-theorem openProgramSupport (depth : Nat) : support (openProgram depth) = depth := by
-  simp [openProgram, support, supportOnes]
+theorem rewrittenOperatorChangesProposal :
+    ProposedBy modifierRewriteState modifierEffectState ∧
+      ¬ ProposedBy initial modifierEffectState := by
+  simp [ProposedBy, M, modifierRewriteState, modifierEffectState, initial,
+    observe, denote, eval]
 
-theorem lineageAdmissible (depth : Nat) :
-    Admissible (lineage depth) (lineage (depth + 1)) := by
-  constructor
-  · rfl
-  constructor
-  · simp [lineage, openProgramLength]
-  · rfl
+-- Positive opening limb ------------------------------------------------------
 
-theorem lineageStep (depth : Nat) : M (lineage depth) (lineage (depth + 1)) :=
-  checkerComplete (lineageAdmissible depth)
+def stage1 (bound : Nat) : State := {
+  kernelId := 0
+  program := .lit 1
+  modifier := .lit (bound + 1)
+}
 
-theorem lineageReachable (depth : Nat) : Reach depth (lineage depth) := by
-  induction depth with
-  | zero =>
-      simpa [lineage, initial, openProgram, ones] using (Reach.zero : Reach 0 initial)
-  | succ depth inductionHypothesis =>
-      simpa [Nat.succ_eq_add_one] using
-        (Reach.succ inductionHypothesis (lineageStep depth))
+def stage2 (bound : Nat) : State := {
+  kernelId := 0
+  program := .lit (bound + 1)
+  modifier := .lit 1
+}
 
-/-- Extensional opening measure for this truth-table language. -/
-def complexity (state : State) : Nat := support state.program
+theorem stage1Accepted (bound : Nat) :
+    Accepted initial (stage1 bound) := by
+  simp [Accepted, K, Admissible, ProposedBy, initial, stage1, Invariant,
+    ModifierWellTyped, M, HasType, observe, denote, eval]
 
-theorem lineageComplexity (depth : Nat) : complexity (lineage depth) = depth := by
-  simp [complexity, lineage, openProgramSupport]
+theorem stage2Accepted (bound : Nat) :
+    Accepted (stage1 bound) (stage2 bound) := by
+  simp [Accepted, K, Admissible, ProposedBy, stage1, stage2, Invariant,
+    ModifierWellTyped, M, HasType, observe, denote, eval]
 
-/-- Appending an observationally false cell cannot inflate the measure. -/
-theorem falsePaddingNoProgress (program : Program) :
-    support (program ++ [false]) = support program := by
-  induction program with
-  | nil => rfl
-  | cons bit rest inductionHypothesis =>
-      simp [support, inductionHypothesis]
+theorem stage1Reachable (bound : Nat) :
+    Reach 1 (stage1 bound) := by
+  simpa using
+    (Reach.succ (Reach.zero : Reach 0 initial) (stage1Accepted bound))
 
-/-- Strong opening witness: every natural complexity occurs at the same depth. -/
-theorem exactOpening (depth : Nat) :
-    ∃ state, Reach depth state ∧ complexity state = depth := by
-  exact ⟨lineage depth, lineageReachable depth, lineageComplexity depth⟩
+theorem stage2Reachable (bound : Nat) :
+    Reach 2 (stage2 bound) := by
+  simpa using
+    (Reach.succ (stage1Reachable bound) (stage2Accepted bound))
 
-/-- Limb (B): reachable semantic support is unbounded. -/
+/-- Complexity is magnitude in the same semantic coordinate constrained by `I`. -/
+def complexity (state : State) : Nat :=
+  observe state.program
+
+/-- Limb (B): semantic magnitude is unbounded among reachable states. -/
 theorem opening (bound : Nat) :
     ∃ depth state, Reach depth state ∧ complexity state > bound := by
-  refine ⟨bound + 1, lineage (bound + 1), lineageReachable (bound + 1), ?_⟩
-  simp [lineageComplexity]
+  refine ⟨2, stage2 bound, stage2Reachable bound, ?_⟩
+  simpa [complexity, stage2, observe, denote, eval] using Nat.lt_succ_self bound
 
-/-- The exact joint target proved by this development. -/
+-- Surface 7: coordinate orthogonality ---------------------------------------
+
+def SemanticInvariant (value : Nat) : Prop :=
+  value ≠ 0
+
+def SemanticComplexity (value : Nat) : Nat :=
+  value
+
+theorem invariantUsesSemanticCoordinate (state : State) :
+    Invariant state ↔ SemanticInvariant (observe state.program) := by
+  rfl
+
+theorem complexityUsesSemanticCoordinate (state : State) :
+    complexity state = SemanticComplexity (observe state.program) := by
+  rfl
+
+/--
+A prohibited orthogonalization: an equivalence splits the semantic space into
+protected and free coordinates, `I` reads only the protected coordinate, and
+`C` reads only the free coordinate.
+-/
+structure OrthogonalDecomposition where
+  protectedSpace : Type
+  freeSpace : Type
+  split : Nat ≃ protectedSpace × freeSpace
+  protectedInvariant : protectedSpace → Prop
+  freeComplexity : freeSpace → Nat
+  invariantFactors :
+    ∀ value, SemanticInvariant value ↔
+      protectedInvariant (split value).1
+  complexityFactors :
+    ∀ value, SemanticComplexity value =
+      freeComplexity (split value).2
+
+/--
+Because `C` is the identity semantic coordinate, a fixed free coordinate can
+correspond to only one semantic value.  Surjectivity of `split` therefore
+forces the protected factor to be a subsingleton.
+-/
+theorem orthogonalProtectedSubsingleton
+    (decomposition : OrthogonalDecomposition) :
+    ∀ left right : decomposition.protectedSpace, left = right := by
+  intro left right
+  let free : decomposition.freeSpace := (decomposition.split 0).2
+  let leftValue : Nat := decomposition.split.symm (left, free)
+  let rightValue : Nat := decomposition.split.symm (right, free)
+  have leftFree :
+      (decomposition.split leftValue).2 = free := by
+    simp [leftValue]
+  have rightFree :
+      (decomposition.split rightValue).2 = free := by
+    simp [rightValue]
+  have leftMeasure :
+      leftValue = decomposition.freeComplexity free := by
+    calc
+      leftValue =
+          decomposition.freeComplexity (decomposition.split leftValue).2 := by
+            simpa [SemanticComplexity] using
+              decomposition.complexityFactors leftValue
+      _ = decomposition.freeComplexity free := by rw [leftFree]
+  have rightMeasure :
+      rightValue = decomposition.freeComplexity free := by
+    calc
+      rightValue =
+          decomposition.freeComplexity (decomposition.split rightValue).2 := by
+            simpa [SemanticComplexity] using
+              decomposition.complexityFactors rightValue
+      _ = decomposition.freeComplexity free := by rw [rightFree]
+  have valuesEqual : leftValue = rightValue :=
+    leftMeasure.trans rightMeasure.symm
+  have pairsEqual : (left, free) = (right, free) := by
+    calc
+      (left, free) = decomposition.split leftValue := by
+        simp [leftValue]
+      _ = decomposition.split rightValue := congrArg decomposition.split valuesEqual
+      _ = (right, free) := by
+        simp [rightValue]
+  exact congrArg Prod.fst pairsEqual
+
+/-- Formal discharge of Surface 7 for the selected `I` and `C`. -/
+theorem coordinateOrthogonalityImpossible :
+    ¬ Nonempty OrthogonalDecomposition := by
+  rintro ⟨decomposition⟩
+  have protectedEqual :
+      (decomposition.split 1).1 = (decomposition.split 0).1 :=
+    orthogonalProtectedSubsingleton decomposition _ _
+  have safeOne : SemanticInvariant 1 := by
+    simp [SemanticInvariant]
+  have unsafeZero : ¬ SemanticInvariant 0 := by
+    simp [SemanticInvariant]
+  have protectedOne :
+      decomposition.protectedInvariant (decomposition.split 1).1 :=
+    (decomposition.invariantFactors 1).mp safeOne
+  have protectedZero :
+      decomposition.protectedInvariant (decomposition.split 0).1 := by
+    rw [← protectedEqual]
+    exact protectedOne
+  exact unsafeZero ((decomposition.invariantFactors 0).mpr protectedZero)
+
+-- Fork B: decidable reachability has a fixed finite generator ----------------
+
+/--
+A fixed program replays a finite reverse-chronological certificate path.
+The generator itself never changes; its input carries the candidate path.
+-/
+def replayCertificates : List State → Option State
+  | [] => some initial
+  | target :: rest =>
+      match replayCertificates rest with
+      | none => none
+      | some source =>
+          if K source target then some target else none
+
+theorem reachableHasReplayCertificate
+    {depth : Nat} {state : State}
+    (reachable : Reach depth state) :
+    ∃ certificate, replayCertificates certificate = some state := by
+  induction reachable with
+  | zero =>
+      exact ⟨[], rfl⟩
+  | succ previous accepted inductionHypothesis =>
+      rcases inductionHypothesis with ⟨certificate, replayed⟩
+      refine ⟨target :: certificate, ?_⟩
+      simp [replayCertificates, replayed, accepted, Accepted]
+
+/-- A finite generator language containing the decisive fixed generator. -/
+inductive GeneratorProgram where
+  | reject
+  | replay
+  deriving DecidableEq, Repr
+
+def runGenerator : GeneratorProgram → List State → Option State
+  | .reject, _ => none
+  | .replay, certificate => replayCertificates certificate
+
+def generatorDescriptionLength : GeneratorProgram → Nat
+  | .reject => 1
+  | .replay => 1
+
+theorem replayGeneratorHasBoundedDescription :
+    generatorDescriptionLength .replay = 1 := by
+  rfl
+
+theorem fixedReplayGeneratorCovers
+    {depth : Nat} {state : State}
+    (reachable : Reach depth state) :
+    ∃ certificate, runGenerator .replay certificate = some state := by
+  simpa [runGenerator] using reachableHasReplayCertificate reachable
+
+/--
+The directive's anti-generator obligation, specialized to a finite generator
+language that includes certificate replay.
+-/
+def AntiGenerator : Prop :=
+  ∀ generator : GeneratorProgram,
+    ∃ depth state,
+      Reach depth state ∧
+      ∀ certificate, runGenerator generator certificate ≠ some state
+
+/-- Fork B lands: the replay generator's range contains every reachable state. -/
+theorem antiGeneratorImpossible :
+    ¬ AntiGenerator := by
+  intro antiGenerator
+  rcases antiGenerator .replay with
+    ⟨depth, state, reachable, escaped⟩
+  rcases fixedReplayGeneratorCovers reachable with
+    ⟨certificate, generated⟩
+  exact escaped certificate generated
+
+-- Revised target and incompatibility ----------------------------------------
+
+def ClosureProperty : Prop :=
+  ∀ depth state, Reach depth state → Invariant state
+
+def OpeningProperty : Prop :=
+  ∀ bound, ∃ depth state,
+    Reach depth state ∧ complexity state > bound
+
+def CouplingProperty : Prop :=
+  ¬ Nonempty OrthogonalDecomposition
+
+theorem closurePropertyHolds : ClosureProperty := by
+  intro depth state reachable
+  exact closure reachable
+
+theorem openingPropertyHolds : OpeningProperty := by
+  intro bound
+  exact opening bound
+
+theorem couplingPropertyHolds : CouplingProperty :=
+  coordinateOrthogonalityImpossible
+
+/-- Positive conjunction retained as an audit boundary; it excludes `GEN`. -/
 theorem targetTheorem :
-    (∀ depth state, Reach depth state → Invariant state.program) ∧
-    (∀ bound, ∃ depth state, Reach depth state ∧ complexity state > bound) := by
-  constructor
-  · intro depth state reachable
-    exact closure reachable
-  · intro bound
-    exact opening bound
+    ClosureProperty ∧ OpeningProperty ∧ CouplingProperty := by
+  exact ⟨closurePropertyHolds, openingPropertyHolds, couplingPropertyHolds⟩
+
+/--
+The revised four-limb target is impossible in this model.  The proof does not
+need to weaken closure, opening, or coupling: `GEN` is contradicted directly by
+the fixed certificate-replay generator forced by decidable checking.
+-/
+theorem revisedTargetImpossible :
+    ¬ (ClosureProperty ∧ OpeningProperty ∧ CouplingProperty ∧ AntiGenerator) := by
+  intro target
+  exact antiGeneratorImpossible target.2.2.2
 
 end CrispOpen
