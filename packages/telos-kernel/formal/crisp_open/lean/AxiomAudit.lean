@@ -34,9 +34,11 @@ import Surface8
 #print axioms CrispOpen.AbstractReplay.unitInputsCarryLinearInformation
 
 #print axioms CrispOpen.Surface8.doubledProgramInvariant
+#print axioms CrispOpen.Surface8.initialToDoublingStateAccepted
 #print axioms CrispOpen.Surface8.fixedGrowthMoveAccepted
+#print axioms CrispOpen.Surface8.doublingStateReachable
 #print axioms CrispOpen.Surface8.fixedGrowthMoveIncreasesComplexity
-#print axioms CrispOpen.Surface8.unsafeGrowthViolatesInvariant
-#print axioms CrispOpen.Surface8.unsafeGrowthRejected
+#print axioms CrispOpen.Surface8.successorGrowthViolatesInvariant
+#print axioms CrispOpen.Surface8.unsafeModifierRejected
 #print axioms CrispOpen.Surface8.fixedTrivialGrowthExists
 #print axioms CrispOpen.Surface8.couplingLoadBearingFails
