@@ -220,11 +220,11 @@ Accordingly, the candidate escape is legitimate only under a precise claim: the 
 
 **Verified record:** *Artificial Life* 6(4), 363–376. DOI: https://doi.org/10.1162/106454600300103683
 
-**Establishes.** A canonical list of fourteen grand challenges in artificial life, including how life generates radical novelty and how evolutionary transitions increase complexity.
+**Establishes.** A widely cited list of fourteen grand challenges in artificial life, including how life generates radical novelty and how evolutionary transitions increase complexity.
 
 **Stops.** It is a challenge list, not a theorem or consensus definition. Its 2000 publication date alone cannot establish that every listed problem remains unsolved today.
 
-**Subsumes target.** It establishes historical canonical status. Later literature below is required to support continued uncertainty about definitions and measures.
+**Subsumes target.** It establishes historical prominence. Later literature below is required to support continued uncertainty about definitions and measures.
 
 ### PA-20 — Taylor et al., “Open-Ended Evolution: Perspectives from the OEE Workshop in York” (2016)
 
@@ -349,7 +349,7 @@ The exact small-model conjunction appears machine-adjudicable and likely constru
 1. `K` is fixed and checks a decidable admissibility proposition.
 2. An accepted step preserves `I` and leaves the kernel identity unchanged.
 3. `Reach n` is indexed by arbitrary `n`; induction proves closure.
-4. A canonical accepted lineage has semantic-support complexity `n` at depth `n`.
+4. An explicit accepted lineage has semantic-support complexity `n` at depth `n`.
 
 This would prove an exact toy theorem. It would **not** settle the scientific open problem of evolutionary growth of qualitative complexity. The likely category error is that the closure invariant and the opening measure can be made nearly orthogonal: protecting one coordinate while activating endlessly many fresh coordinates proves coexistence by construction, not endogenous evolution of novelty.
 
