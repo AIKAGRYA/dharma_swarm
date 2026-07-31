@@ -199,6 +199,33 @@ class TestVerifyStats:
 
 
 class TestWebhookSignature:
+    def test_handler_accepts_valid_signature(self):
+        from dharma_swarm.verify.github_app import VerifyWebhookHandler
+
+        payload = b'{"zen":"testing"}'
+        handler = VerifyWebhookHandler(webhook_secret=WEBHOOK_SECRET)
+
+        assert handler.verify_signature(payload, _make_signature(payload)) is True
+
+    def test_handler_rejects_invalid_signature(self):
+        from dharma_swarm.verify.github_app import VerifyWebhookHandler
+
+        payload = b'{"zen":"testing"}'
+        handler = VerifyWebhookHandler(webhook_secret=WEBHOOK_SECRET)
+
+        assert handler.verify_signature(payload, "sha256=" + ("0" * 64)) is False
+
+    def test_handler_rejects_missing_secret(self, monkeypatch):
+        from dharma_swarm.verify.github_app import VerifyWebhookHandler
+
+        monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
+        payload = b'{"zen":"testing"}'
+
+        assert VerifyWebhookHandler().verify_signature(
+            payload,
+            _make_signature(payload),
+        ) is False
+
     def test_valid_signature(self, client: TestClient, monkeypatch):
         monkeypatch.setenv("DHARMA_VERIFY_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
@@ -265,8 +292,12 @@ class TestWebhookSignature:
         )
         assert resp.status_code == 401
 
-    def test_no_secret_configured_passes(self, client: TestClient, monkeypatch):
-        """When no secret is configured, signature check is skipped."""
+    def test_no_secret_configured_is_rejected(
+        self,
+        client: TestClient,
+        monkeypatch,
+    ):
+        """When no secret is configured, the webhook fails closed."""
         monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
 
         from api.routers.verify import reset_webhook_handler
@@ -283,9 +314,10 @@ class TestWebhookSignature:
                 "Content-Type": "application/json",
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 401
         data = resp.json()
-        assert data["processed"] is True
+        assert data["processed"] is False
+        assert "Invalid webhook signature" in data["error"]
 
 
 # -- Webhook PR Event --------------------------------------------------------
@@ -294,7 +326,7 @@ class TestWebhookSignature:
 class TestWebhookPREvent:
     @patch("dharma_swarm.verify.reviewer.review_pr")
     def test_pr_opened_event(self, mock_review, client: TestClient, monkeypatch):
-        monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("DHARMA_VERIFY_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
         from api.routers.verify import reset_webhook_handler
 
@@ -323,6 +355,7 @@ class TestWebhookPREvent:
             "/api/verify/webhook",
             content=payload,
             headers={
+                "X-Hub-Signature-256": _make_signature(payload),
                 "X-GitHub-Event": "pull_request",
                 "Content-Type": "application/json",
             },
@@ -336,7 +369,7 @@ class TestWebhookPREvent:
         assert data["review"]["score"]["overall"] == 0.68
 
     def test_pr_closed_event_skipped(self, client: TestClient, monkeypatch):
-        monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("DHARMA_VERIFY_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
         from api.routers.verify import reset_webhook_handler
 
@@ -354,6 +387,7 @@ class TestWebhookPREvent:
             "/api/verify/webhook",
             content=payload,
             headers={
+                "X-Hub-Signature-256": _make_signature(payload),
                 "X-GitHub-Event": "pull_request",
                 "Content-Type": "application/json",
             },
@@ -364,7 +398,7 @@ class TestWebhookPREvent:
         assert "non-reviewable" in data["error"]
 
     def test_unhandled_event_type(self, client: TestClient, monkeypatch):
-        monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("DHARMA_VERIFY_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
         from api.routers.verify import reset_webhook_handler
 
@@ -376,6 +410,7 @@ class TestWebhookPREvent:
             "/api/verify/webhook",
             content=payload,
             headers={
+                "X-Hub-Signature-256": _make_signature(payload),
                 "X-GitHub-Event": "issues",
                 "Content-Type": "application/json",
             },
@@ -387,7 +422,7 @@ class TestWebhookPREvent:
 
     def test_pr_no_patch_content(self, client: TestClient, monkeypatch):
         """PR event without _patch_content returns an error."""
-        monkeypatch.delenv("DHARMA_VERIFY_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("DHARMA_VERIFY_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
         from api.routers.verify import reset_webhook_handler
 
@@ -412,6 +447,7 @@ class TestWebhookPREvent:
             "/api/verify/webhook",
             content=payload,
             headers={
+                "X-Hub-Signature-256": _make_signature(payload),
                 "X-GitHub-Event": "pull_request",
                 "Content-Type": "application/json",
             },

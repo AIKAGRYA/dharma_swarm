@@ -1525,7 +1525,11 @@ def _negative_confinement(
     unshare = shutil.which("unshare", path=_TRUSTED_HOST_PATH)
     chroot = shutil.which("chroot", path=_TRUSTED_HOST_PATH)
     if unshare and chroot:
-        probe = run_command([unshare, "--user", "--map-root-user", "true"], cwd=fixture)
+        probe = run_command(
+            [unshare, "--user", "--map-root-user", "true"],
+            cwd=fixture,
+            env={"PATH": _TRUSTED_HOST_PATH},
+        )
         if probe.returncode == 0:
             prefix = [
                 unshare, "--user", "--map-root-user", "--", chroot, str(jail),

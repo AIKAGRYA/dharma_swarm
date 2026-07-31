@@ -12,6 +12,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = ("dharma_swarm", "scripts", "api")
@@ -347,6 +349,7 @@ def _counter_delta(actual: Counter, expected: Counter) -> str:
     return "\n".join(lines)
 
 
+@pytest.mark.timeout(60)
 def test_model_literals_do_not_escape_canonical_registries() -> None:
     actual = _model_literal_debt()
     assert actual == KNOWN_MODEL_LITERAL_DEBT, _counter_delta(

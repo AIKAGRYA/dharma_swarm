@@ -117,11 +117,11 @@ class VerifyWebhookHandler:
             True if the signature is valid, False otherwise.
         """
         if not self.webhook_secret:
-            logger.warning(
+            logger.error(
                 "DHARMA_VERIFY_WEBHOOK_SECRET not configured -- "
-                "skipping signature verification (UNSAFE in production)"
+                "rejecting webhook because its signature cannot be verified"
             )
-            return True
+            return False
 
         if not signature or not signature.startswith("sha256="):
             return False
