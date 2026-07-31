@@ -154,6 +154,88 @@ def test_coherence_results_accepts_substantive_fields():
     assert result["ok"] is True
 
 
+def test_coherence_results_accepts_bold_label_colon_inside():
+    # The format CI accepts and open PR bodies actually use: colon INSIDE the
+    # bold markers (`**Organ touched:**`), per check_pr_coherence_delta.py.
+    body = """
+**Organ touched:** `scripts/runtime/pr_merge_control.py` (merge gate lane)
+**Declared-vs-actual gap closed:** gate parser accepts every CI-accepted format.
+**Proof that re-reads the map:** ran scripts/governance/check_pr_coherence_delta.py on this body.
+**New drift introduced:** none
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
+def test_coherence_results_accepts_ci_checker_aliases():
+    body = """
+- Organs touched: `dharma_swarm/graph/` engine layer
+- Gap closed: BR-201 evidence attached in PR thread
+- Proof: re-ran scripts/governance/check_pr_coherence_delta.py locally
+- New drift: none
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
+def test_coherence_results_accepts_none_for_drift():
+    # 'none' is the CI checker's own recommended answer for the drift field;
+    # the gate must not reject it as a placeholder.
+    body = """
+- Organ touched: `scripts/docops/` projection layer
+- Declared-vs-actual gap closed: reconciles generated DocOps counts.
+- Proof that re-reads the map: ran scripts/docops/check_docops_integrity.py.
+- New drift introduced: none
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
+def test_coherence_results_accepts_comment_fallback():
+    body = "This PR body carries no Coherence Delta block."
+    comment = """
+- Organ touched: `api/main.py` ingress boundary
+- Declared-vs-actual gap closed: closes the keyless webhook residual.
+- Proof that re-reads the map: re-read INTERFACE_MISMATCH_MAP.md for api/main.py.
+- New drift introduced: none
+"""
+
+    result = prc.coherence_results(body, comments=[comment])
+
+    assert result["ok"] is True
+    assert result["source"].startswith("PR comment")
+
+
+def test_coherence_results_fails_closed_without_checker(monkeypatch, tmp_path):
+    # The CI checker is the single source of truth; if it cannot load, the gate
+    # must raise, never silently fall back to a divergent parser.
+    monkeypatch.setattr(prc, "_coherence_checker_module", None)
+    monkeypatch.setattr(prc, "_COHERENCE_CHECKER_PATH", tmp_path / "missing.py")
+
+    with pytest.raises(Exception):
+        prc.coherence_results("- Organ touched: x")
+
+
+def test_coherence_results_strips_html_comments():
+    body = """
+- Organ touched: `scripts/docops/` projection layer
+- Declared-vs-actual gap closed: reconciles generated counts after merges.
+- Proof that re-reads the map: ran scripts/docops/check_docops_integrity.py.
+- New drift introduced: none
+<!-- greptile_comment: injected bot block that must not sweep into the field value -->
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
 def test_risk_from_files_flags_hot_paths():
     files = [
         {"filename": "dharma_swarm/telos_gates.py", "additions": 3, "deletions": 1},
