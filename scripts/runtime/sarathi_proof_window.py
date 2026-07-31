@@ -42,7 +42,6 @@ from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
 from dharma_swarm.holon_system.sarathi.delegate import invoke_receipt_path  # noqa: E402
 from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
     BootPack,
-    plan_coarse_dedup_key,
     stored_dedup_key,
 )
 from dharma_swarm.holon_system.sarathi.proof import (  # noqa: E402
@@ -137,10 +136,11 @@ async def run_window(
         # emitted as a fresh proposal each cycle (Greptile P1 on PR #1170,
         # parity with the daemon's list_tasks dedup).
         ready = frozenset(
-            stored_dedup_key(task.metadata)
-            or plan_coarse_dedup_key(task.recipient, task.summary, task.body)
+            key
             for task in mailbox.list_tasks()
             if task.sender == "sarathi"
+            for key in (stored_dedup_key(task.metadata),)
+            if key  # a keyless (pre-key) task does not dedup — see build_plan
         )
         return BootPack(
             roster=roster, open_items=backlog, ready_keys=ready, audit=audit

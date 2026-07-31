@@ -69,7 +69,6 @@ if str(REPO_ROOT) not in sys.path:
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
 from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
     BootPack,
-    plan_coarse_dedup_key,
     stored_dedup_key,
 )
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
@@ -242,10 +241,11 @@ async def run_daemon(
         # different recipient — re-plans instead of being dropped (Greptile P1
         # plan.py L127 + L209).
         seen = frozenset(
-            stored_dedup_key(task.metadata)
-            or plan_coarse_dedup_key(task.recipient, task.summary, task.body)
+            key
             for task in mailbox.list_tasks()
             if task.sender == SENDER
+            for key in (stored_dedup_key(task.metadata),)
+            if key  # a keyless (pre-key) task does not dedup — see build_plan
         )
         return BootPack(
             roster=roster, open_items=backlog, ready_keys=seen, audit=audit

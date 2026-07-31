@@ -6,7 +6,6 @@ from dharma_swarm.holon_system.sarathi.plan import (
     BootPack,
     PlannedDelegation,
     build_plan,
-    plan_coarse_dedup_key,
     plan_dedup_key,
 )
 
@@ -88,20 +87,6 @@ def test_revised_body_replans_despite_same_summary() -> None:
         )
     )
     assert [d.body for d in plan] == ["scoreboard v2 with the new metric"]
-
-
-def test_legacy_task_coarse_key_dedups_without_stored_key() -> None:
-    """Greptile P1 plan.py L94: a task predating the stored dedup_key (only its
-    coarse recipient/summary/body key is derivable) still suppresses the
-    matching backlog item, while unrelated work still plans."""
-    item = {"kind": "build", "summary": "gym", "body": "b", "recipient": "hermes-m5"}
-    plan = build_plan(
-        _pack(
-            open_items=(item, {"kind": "build", "summary": "new work", "body": "b2"}),
-            ready_keys=frozenset({plan_coarse_dedup_key("hermes-m5", "gym", "b")}),
-        )
-    )
-    assert [d.summary for d in plan] == ["new work"]
 
 
 def test_revised_recipient_replans_despite_same_summary_and_body() -> None:

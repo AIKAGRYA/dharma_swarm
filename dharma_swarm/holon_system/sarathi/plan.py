@@ -81,23 +81,6 @@ def plan_dedup_key(delegation: PlannedDelegation) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def plan_coarse_dedup_key(recipient: str, summary: str, body: str) -> str:
-    """Backward-compatible fallback identity over only the fields a mailbox task
-    reliably stores as top-level columns (recipient, summary, body).
-
-    A task persisted before the full ``dedup_key`` was recorded on its metadata
-    (Greptile P1 plan.py L94) carries no stored key; deriving this coarse key
-    from the task's own columns lets an unchanged item still be suppressed
-    instead of re-planned. It is COARSER than :func:`plan_dedup_key` (blind to
-    channel/action/metadata/deps) and namespaced by a ``coarse`` prefix, so it
-    is used ONLY as a fallback for keyless tasks and never weakens or collides
-    with the full-identity dedup of keyed tasks.
-    """
-    return hashlib.sha256(
-        f"coarse\x1e{recipient}\x1e{summary}\x1e{body}".encode("utf-8")
-    ).hexdigest()
-
-
 def stored_dedup_key(metadata: Mapping[str, Any] | None) -> str:
     """Read the dedup key persisted on an enqueued task's metadata.
 
@@ -180,20 +163,18 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
             depends_on=tuple(str(dep) for dep in (item.get("depends_on") or [])),
             metadata=metadata,
         )
-        # Dedup on the FULL execution identity (action/recipient/channel/summary/
-        # body/deps/metadata), computed after the delegation is built so ANY
-        # revision — body, routing, kind, deps, metadata — yields a new key and
-        # re-plans, while an unchanged item stays suppressed (Greptile P1 L127 +
-        # L209). The full key persisted on the task is compared, never
-        # reconstructed. The coarse fallback additionally suppresses a matching
-        # LEGACY task that predates the stored key (Greptile P1 L94).
-        if (
-            plan_dedup_key(delegation) in pack.ready_keys
-            or plan_coarse_dedup_key(
-                delegation.recipient, delegation.summary, delegation.body
-            )
-            in pack.ready_keys
-        ):
+        # Dedup ONLY on the FULL execution identity (action/recipient/channel/
+        # summary/body/deps/metadata), computed after the delegation is built so
+        # ANY revision — body, routing, kind, deps, metadata — yields a new key
+        # and re-plans, while an unchanged item stays suppressed (Greptile P1
+        # L127 + L209). The full key persisted on the task is compared, never
+        # reconstructed. A keyless task (one persisted before the stored key
+        # existed) deliberately does NOT participate in dedup: a coarse
+        # recipient+summary+body fallback would silently DROP a revision that
+        # changed kind/channel/deps/metadata (Greptile P1 L196), so the safer
+        # failure mode is a harmless duplicate — and no such legacy Sarathi task
+        # exists in practice, since the stored key ships with the dispatch path.
+        if plan_dedup_key(delegation) in pack.ready_keys:
             continue
         plan.append(delegation)
     return plan
@@ -206,6 +187,5 @@ __all__ = [
     "PlannedDelegation",
     "build_plan",
     "plan_dedup_key",
-    "plan_coarse_dedup_key",
     "stored_dedup_key",
 ]

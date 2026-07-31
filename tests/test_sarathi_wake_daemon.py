@@ -167,15 +167,17 @@ def test_revised_backlog_body_replans_despite_same_summary(tmp_path, monkeypatch
     assert len(_tasks(tmp_path)) == 2
 
 
-def test_legacy_task_without_stored_key_suppresses_redispatch(tmp_path, monkeypatch) -> None:
-    """Greptile P1 plan.py L94: a Sarathi task persisted BEFORE the dedup_key
-    field (no sarathi.dedup_key in metadata) must still suppress the same
-    backlog item via the coarse fallback key, not create a duplicate."""
+def test_keyless_task_does_not_over_suppress(tmp_path, monkeypatch) -> None:
+    """Greptile P1 plan.py L196: a keyless (pre-key) Sarathi task must NOT dedup
+    the backlog. A coarse recipient+summary+body fallback would silently DROP a
+    revision that changed kind/channel/deps/metadata, so the safer failure mode
+    is a harmless duplicate — the item still plans. (No such legacy task exists
+    in practice; the stored dedup_key ships with the dispatch path.)"""
     monkeypatch.setenv("DGC_SARATHI_AUTONOMY", "dispatch")
     from dharma_swarm.roaming_mailbox import RoamingMailbox
 
     mailbox = RoamingMailbox(queue_root=tmp_path / "sarathi" / "mailbox")
-    # A legacy task: enqueued without any sarathi dedup_key metadata.
+    # A keyless task: enqueued without any sarathi dedup_key metadata.
     mailbox.enqueue_task(
         recipient="hermes-m5", sender="sarathi", summary="gym", body="b"
     )
@@ -186,8 +188,9 @@ def test_legacy_task_without_stored_key_suppresses_redispatch(tmp_path, monkeypa
     )
     code, report = _run(tmp_path, cycles=1, backlog=str(backlog))
     assert code == 0
-    # No duplicate: the legacy task's coarse key suppressed the item.
-    assert len(_tasks(tmp_path)) == 1
+    # Keyless task does not suppress: the item is planned -> the pre-existing
+    # keyless task plus the newly dispatched (keyed) task = two tasks.
+    assert len(_tasks(tmp_path)) == 2
     assert report["budget_scope"] == "daemon-direct-spend"
 
 
