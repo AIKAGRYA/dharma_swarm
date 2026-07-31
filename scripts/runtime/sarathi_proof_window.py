@@ -126,9 +126,16 @@ async def run_window(
     current: dict = {"cycle": 0, "outcomes": []}
 
     def load_boot_pack() -> BootPack:
+        # Dedup against ALL persisted Sarathi tasks (queued, claimed, OR
+        # responded), not only currently-claimable ones: a claimed/responded
+        # task's persisted dedup key must still suppress re-proposing the same
+        # item during the proof window, otherwise an unchanged backlog item is
+        # emitted as a fresh proposal each cycle (Greptile P1 on PR #1170,
+        # parity with the daemon's list_tasks dedup).
         ready = frozenset(
             key
-            for task in mailbox.ready_tasks()
+            for task in mailbox.list_tasks()
+            if task.sender == "sarathi"
             for key in (stored_dedup_key(task.metadata),)
             if key
         )

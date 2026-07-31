@@ -12,7 +12,8 @@
     "dharma_swarm/holon_system/sarathi/plan.py",
     "dharma_swarm/holon_system/sarathi/delegate.py",
     "tests/test_sarathi_plan.py",
-    "tests/test_sarathi_delegate.py"
+    "tests/test_sarathi_delegate.py",
+    "tests/test_sarathi_proof_window.py"
   ],
   "forbidden_files": [
     "dharma_swarm/dharma_kernel.py",
@@ -95,6 +96,6 @@
       "At dispatch/full the daemon enqueues mailbox tasks and automerge-label intents that Merge Master Mike re-gates; it cannot itself merge or push (both NEVER_AUTO)."
     ],
     "rollback": "Revert the two added files and this packet together; the daemon is an additive runtime wrapper with no runtime state in git and no migrations.",
-    "packet_digest": "46e386f7319571eef03380f5217b2fe27d04d0c50a2bb1e4bee32352c47d9d61"
+    "packet_digest": "d0cdada3a1b5faa9c3d56ee7307e9da76fbcf19be526c9756da6bba81f870bbf"
   }
 }
