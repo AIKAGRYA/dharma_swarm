@@ -30,8 +30,8 @@ theorem doubledProgramPositive :
       decide
   | depth + 1 => by
       have previous := doubledProgramPositive depth
-      simp [doubledProgram, observe, denote, eval]
-      omega
+      simpa [doubledProgram, observe, denote, eval] using
+        Nat.add_pos_left previous (observe (doubledProgram depth))
 
 theorem doubledProgramInvariant :
     ∀ depth, HasType (doubledProgram depth) .safe
@@ -95,8 +95,8 @@ theorem fixedGrowthMoveIncreasesComplexity (depth : Nat) :
     complexity (doublingState (depth + 1)) >
       complexity (doublingState depth) := by
   have positive := doubledProgramPositive depth
-  simp [complexity, doublingState, doubledProgram, observe, denote, eval]
-  omega
+  simpa [complexity, doublingState, doubledProgram, observe, denote, eval] using
+    Nat.lt_add_of_pos_right positive
 
 /--
 The generic successor wrapper is a complexity-increasing but unsafe rewrite.
