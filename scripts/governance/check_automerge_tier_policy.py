@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Automerge tier-policy guard — the door's required CI check (PR-A).
+"""Automerge tier-policy guard — the door's required CI check (PR-A, PR-S0).
 
 Implements §§5-8 of the operator ruling of 2026-07-29
-(DOOR = AUTO_WITH_DECORRELATED_REVIEW; record:
-docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md).
+(DOOR = AUTO_WITH_DECORRELATED_REVIEW) as amended by the operator ruling of
+2026-07-30 (TIER2 REPEAL = DECORRELATED_REVIEW_PLUS_REVERSIBILITY; record:
+docs/ops/OPERATOR_RULING_2026-07-30_SARATHI_AUTONOMY_CEILING.md).
 
 One proposition, checked fail-closed on every pull request:
 
@@ -12,13 +13,23 @@ One proposition, checked fail-closed on every pull request:
     check is red and the manifest-driven automerge lane cannot dispatch it.
 
 Enforced here:
-- Tier 2 structural freeze: an automerge-labeled PR touching any tier-2
-  (referee-layer) path fails outright. The system cannot amend its own
-  referees; those paths are operator hand-merge forever.
-- Diff ceilings: tier 0 <= 300 changed lines, tier 1 <= 600; larger fails
-  (split it or drop the label and go the operator route).
-- Decorrelated review count: tier 0 needs 1 APPROVED review, tier 1 needs 2,
-  from reviewer identities in the policy's reviewer_families whose family
+- Reversibility floor (every tier, 2026-07-30): the declared merge intent —
+  the PR title — is classified by the deterministic reversibility gate
+  (dharma_swarm/operator_core/reversibility_gate.py) with
+  operator_reachable=False, CI being by definition the unattended context.
+  An OPERATOR_ONLY verdict (a NEVER_AUTO denylist hit or CRITICAL-risk
+  vocabulary) bars the unattended lane; the decorrelated review quorum
+  stands in for the execution lease on everything milder. The denylist is
+  the hard irreversible/illegal floor and does not move.
+- Tier 2 door (2026-07-30 repeal of "operator hand-merge forever"): a PR
+  touching referee paths is tier2 — admissible unattended only with the
+  tier2 quorum (2 decorrelated APPROVED reviews), the tier2 diff ceiling,
+  the reversibility floor above, AND every hit referee path clear of
+  NEVER_AUTO substrings. Anything on the floor stays operator hand-merge.
+- Diff ceilings: tier 0 <= 300 changed lines, tier 1 <= 600, tier 2 <= 400;
+  larger fails (split it or drop the label and go the operator route).
+- Decorrelated review count: tier 0 needs 1 APPROVED review, tiers 1-2 need
+  2, from reviewer identities in the policy's reviewer_families whose family
   differs from the author's family (and from each other where possible).
   Native GitHub reviews are the machine-checkable verdict artifact of v1.
   Reviews come from the REST endpoint (the same source pr_merge_control.py
@@ -26,7 +37,7 @@ Enforced here:
   "<app>[bot]" identities, and only a review whose commit_id equals the
   current head SHA counts — an approval of an earlier revision has not seen
   the current changes.
-- Test-deletion sign-off (tier 1): a diff deleting test functions passes
+- Test-deletion sign-off (tiers 1-2): a diff deleting test functions passes
   only if a QUALIFYING (trusted, decorrelated) APPROVED review body names
   every deleted test — an approval from an untrusted account never
   authorizes a deletion.
@@ -51,6 +62,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# The reversibility gate's import chain is stdlib-only by contract
+# (dharma_swarm/risk_patterns.py) so this import works on the referee
+# workflow's bare python3. An ImportError here crashes the check red —
+# fail closed, never "no gate, no floor".
+sys.path.insert(0, str(REPO_ROOT))
+from dharma_swarm.operator_core.reversibility_gate import (  # noqa: E402
+    ActionClass,
+    _never_auto_match,
+    classify_action,
+)
 POLICY_PATH = REPO_ROOT / "scripts" / "governance" / "automerge_tier_policy.json"
 UNATTENDED_LABELS = {"automerge", "bot-pr"}
 # `async def test_*` deletions must match too, or async tests bypass the
@@ -62,7 +84,7 @@ TEST_DELETION_RE = re.compile(
 
 def load_policy(path: Path = POLICY_PATH) -> dict:
     policy = json.loads(path.read_text(encoding="utf-8"))
-    if policy.get("schema") != "dharma.automerge_tier_policy.v1":
+    if policy.get("schema") != "dharma.automerge_tier_policy.v2":
         raise SystemExit(f"unrecognized tier policy schema in {path}")
     return policy
 
@@ -157,6 +179,7 @@ def evaluate(
     *,
     labels: list[str],
     is_draft: bool,
+    title: str,
     changed_paths: list[str],
     diff_lines: int,
     diff_text: str,
@@ -202,14 +225,40 @@ def evaluate(
 
     hits = tier2_hits(changed_paths, policy)
     report["tier2_hits"] = hits
-    if hits:
-        violations.append(
-            f"tier-2 referee paths in an unattended-labeled PR: {hits} — "
-            "operator hand-merge forever; remove the automerge/bot-pr label"
-        )
-
-    tier = classify_tier(changed_paths, policy)
+    tier = "tier2" if hits else classify_tier(changed_paths, policy)
     report["tier"] = tier
+
+    # Reversibility floor (operator ruling 2026-07-30): the gate's verdict on
+    # the declared merge intent, evaluated with operator_reachable=False — CI
+    # is by definition the unattended context. OPERATOR_ONLY (a NEVER_AUTO
+    # denylist hit, or CRITICAL-risk vocabulary) bars the unattended lane at
+    # every tier; the decorrelated quorum stands in for the execution lease on
+    # everything milder. Title text can only ADD floor hits, never remove the
+    # path floor or the quorum, so a crafted title fails closed.
+    decision = classify_action(title, operator_reachable=False)
+    report["reversibility"] = {
+        "action_class": decision.action_class.value,
+        "risk": decision.risk.value,
+        "never_auto_hit": decision.never_auto_hit,
+    }
+    if decision.action_class is ActionClass.OPERATOR_ONLY:
+        detail = (
+            f"never-auto hit '{decision.never_auto_hit}'"
+            if decision.never_auto_hit
+            else f"risk={decision.risk.value}"
+        )
+        violations.append(
+            f"reversibility floor: title classifies OPERATOR_ONLY ({detail}) — "
+            "the irreversible/illegal floor stays operator hand-merge"
+        )
+    if hits:
+        floor_paths = sorted({p for p in hits if _never_auto_match(p.lower())})
+        if floor_paths:
+            violations.append(
+                f"reversibility floor: referee paths on the NEVER_AUTO floor: "
+                f"{floor_paths} — operator hand-merge"
+            )
+
     ceiling = policy["tiers"][tier]["max_diff_lines"]
     if diff_lines > ceiling:
         violations.append(
@@ -254,7 +303,7 @@ def evaluate(
             f"(family != author family '{author_family}'); have {len(qualifying)}: {qualifying}"
         )
 
-    if tier == "tier1" and policy["tiers"]["tier1"]["test_deletion_needs_named_signoff"]:
+    if policy["tiers"][tier].get("test_deletion_needs_named_signoff"):
         removed = deleted_tests(diff_text)
         if removed:
             # Only a TRUSTED reviewer's approval can authorize a deletion —
@@ -327,7 +376,7 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     view = _gh_json(
         [
             "pr", "view", str(pr), "--repo", repo, "--json",
-            "labels,isDraft,additions,deletions,author,headRefOid",
+            "labels,isDraft,title,additions,deletions,author,headRefOid",
         ]
     )
     if not isinstance(view, dict):
@@ -367,6 +416,7 @@ def gather_pr(repo: str, pr: int) -> dict | None:
     return {
         "labels": [row["name"] for row in view.get("labels", [])],
         "is_draft": bool(view.get("isDraft")),
+        "title": str(view.get("title") or ""),
         "changed_paths": [str(row.get("filename") or "") for row in files],
         "diff_lines": int(view.get("additions", 0)) + int(view.get("deletions", 0)),
         "diff_text": diff.stdout,

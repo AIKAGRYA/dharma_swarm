@@ -29,6 +29,7 @@ def _evaluate(**overrides):
     base = dict(
         labels=["bot-pr"],
         is_draft=False,
+        title="chore: routine housekeeping",
         changed_paths=["dharma_swarm/foo.py", "tests/test_foo.py"],
         diff_lines=100,
         diff_text="",
@@ -70,10 +71,60 @@ def test_clean_tier1_bot_pr_passes():
     assert report["tier"] == "tier1"
 
 
-def test_tier2_touch_fails_whatever_else_is_green():
+def test_tier2_with_quorum_and_clean_intent_passes():
+    """2026-07-30 repeal: a referee-path PR with the tier2 quorum, a clean
+    declared intent, and floor-clear paths is admissible unattended."""
     report = _evaluate(changed_paths=[".github/workflows/automerge.yml"])
-    assert report["passed"] is False
+    assert report["tier"] == "tier2"
     assert report["tier2_hits"] == [".github/workflows/automerge.yml"]
+    assert report["passed"] is True
+
+
+def test_tier2_without_quorum_fails():
+    report = _evaluate(
+        changed_paths=[".github/workflows/automerge.yml"],
+        approved_reviews=[{"login": CODEX, "state": "APPROVED", "body": ""}],
+    )
+    assert report["passed"] is False
+    assert any("decorrelated" in v for v in report["violations"])
+
+
+def test_tier2_diff_ceiling_is_400():
+    assert _evaluate(
+        changed_paths=[".github/workflows/automerge.yml"], diff_lines=401
+    )["passed"] is False
+    assert _evaluate(
+        changed_paths=[".github/workflows/automerge.yml"], diff_lines=400
+    )["passed"] is True
+
+
+def test_tier2_path_on_never_auto_floor_stays_operator_only():
+    """A referee path carrying a NEVER_AUTO substring is the hard floor —
+    no quorum admits it."""
+    report = _evaluate(
+        changed_paths=["docs/ops/loop_control/delete_stale_lane.md"],
+    )
+    assert report["tier"] == "tier2"
+    assert report["passed"] is False
+    assert any("NEVER_AUTO floor" in v for v in report["violations"])
+
+
+def test_reversibility_floor_blocks_operator_only_title_at_every_tier():
+    """The declared intent is gate-classified; never-auto / CRITICAL
+    vocabulary bars the unattended lane even at tier1 with a full quorum."""
+    report = _evaluate(title="rotate production credentials")
+    assert report["passed"] is False
+    assert any("reversibility floor" in v for v in report["violations"])
+    assert report["reversibility"]["action_class"] == "operator_only"
+
+
+def test_reversibility_floor_admits_high_risk_verbs():
+    """HIGH-risk verbs (deploy/migrate/merge) describe reviewed content; a
+    reviewed git merge is single-revert reversible, so the quorum stands in
+    for the lease — only OPERATOR_ONLY blocks."""
+    report = _evaluate(title="refactor: migrate tests to pytest fixtures")
+    assert report["reversibility"]["action_class"] == "irreversible"
+    assert report["passed"] is True
 
 
 def test_every_ratified_tier2_surface_is_matched():
@@ -97,6 +148,13 @@ def test_every_ratified_tier2_surface_is_matched():
         "scripts/governance/hygiene/check_hygiene_integrity.py",
         "scripts/governance/check_track_status.py",
         "scripts/governance/render_active_track_includes.py",
+        # 2026-07-30 door: the floor's own implementations are referee
+        # surfaces too — a tier-1 PR must not be able to rewrite the
+        # denylist the tier-2 door trusts.
+        "docs/ops/OPERATOR_RULING_2026-07-30_SARATHI_AUTONOMY_CEILING.md",
+        "dharma_swarm/operator_core/reversibility_gate.py",
+        "dharma_swarm/operator_core/autonomy_dial.py",
+        "dharma_swarm/risk_patterns.py",
     ):
         assert guard.tier2_hits([path], POLICY) == [path], f"uncovered referee path: {path}"
 
@@ -205,9 +263,12 @@ def test_assume_unattended_binds_unlabeled_and_draft_prs():
         is_draft=True,
         assume_unattended=True,
         changed_paths=[".github/workflows/automerge.yml"],
+        approved_reviews=[],
     )
-    assert report["passed"] is False
+    assert report["labeled_for_unattended"] is True
     assert report["tier2_hits"] == [".github/workflows/automerge.yml"]
+    assert report["passed"] is False
+    assert any("decorrelated" in v for v in report["violations"])
 
 
 def test_test_deletion_needs_named_signoff():
@@ -268,11 +329,24 @@ def test_canary_sandbox_is_never_mergeable_unattended():
 
 
 def test_policy_file_pins():
+    assert POLICY["schema"] == "dharma.automerge_tier_policy.v2"
     assert POLICY["rate_limit_automerges_per_day"] == 20
     assert POLICY["confirmation_token_prefix"] == "automerge-policy-pass-"
     assert POLICY["tiers"]["tier0"]["max_diff_lines"] == 300
     assert POLICY["tiers"]["tier1"]["max_diff_lines"] == 600
-    assert POLICY["tiers"]["tier2"]["merge"] == "operator_hand_merge_forever"
+    # 2026-07-30 repeal: tier2 is a door, not a wall — and both tiers 1-2
+    # keep the named test-deletion sign-off.
+    assert POLICY["tiers"]["tier2"]["merge"] == (
+        "auto_with_decorrelated_review_and_reversibility"
+    )
+    assert POLICY["tiers"]["tier2"]["max_diff_lines"] == 400
+    assert POLICY["tiers"]["tier2"]["required_decorrelated_reviews"] == 2
+    assert POLICY["tiers"]["tier2"]["test_deletion_needs_named_signoff"] is True
+    dial = POLICY["autonomy_dial"]
+    assert dial["env"] == "DGC_SARATHI_AUTONOMY"
+    assert dial["levels"] == ["shadow", "propose", "dispatch", "full"]
+    assert dial["default"] == "propose"
+    assert dial["invalid_value_behavior"] == "shadow"
 
 
 def test_workflow_contract():
