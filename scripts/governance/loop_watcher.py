@@ -141,6 +141,34 @@ def _fetch_all_pages(resource: str) -> list | None:
     return door._fetch_all_pages(resource)
 
 
+def fetch_check_run_names(repo: str, sha: str) -> set[str] | None:
+    """Every check-run NAME on *sha*, across ALL pages. None on any failure.
+
+    The check-runs endpoint returns a dict (not a bare list), so it needs its
+    own pager rather than _fetch_all_pages. Reading one page and deriving
+    required-context ABSENCE from it reported a present required check as
+    missing whenever the head carried more than 100 runs — this repo already
+    reports ~45, and re-runs add rows on the same SHA (Greptile on PR #1163).
+    """
+    names: set[str] = set()
+    page = 1
+    while page <= 50:  # 5000 check runs; a bound, not an expected limit
+        payload = _gh_json([
+            "api",
+            f"repos/{repo}/commits/{sha}/check-runs?per_page=100&page={page}",
+        ])
+        if not isinstance(payload, dict):
+            return None
+        rows = payload.get("check_runs")
+        if not isinstance(rows, list):
+            return None
+        names.update(str(row.get("name") or "") for row in rows)
+        if len(rows) < 100:
+            return names
+        page += 1
+    return None  # ran past the bound: treat as unreadable, never as complete
+
+
 def qualified_signoffs(reviews: list[dict], head_sha: str, author: str,
                        policy: dict) -> list[dict]:
     """Standing approvals that could authorize a test deletion.
@@ -184,6 +212,17 @@ def watch_pr(repo: str, pr: dict) -> dict:
         degraded.append("reviews")
 
     diff = _gh(["pr", "diff", str(number), "--repo", repo])
+    if diff.returncode != 0:
+        # An unavailable diff is not an empty diff. Substituting "" waived
+        # the test-deletion control entirely: a PR removing a whole test
+        # file produced no finding and left the sweep healthy, because
+        # nothing distinguished "read it, found nothing" from "could not
+        # read it" (Greptile on PR #1163).
+        findings.append(
+            "diff unavailable — test-deletion state unknown on this head; "
+            "the deletion control did NOT run"
+        )
+        degraded.append("diff")
     diff_text = diff.stdout if diff.returncode == 0 else ""
     diff_lines = diff_text.splitlines()
     removed = sorted(set(TEST_DELETION_RE.findall(diff_text)))
@@ -242,10 +281,8 @@ def watch_pr(repo: str, pr: dict) -> dict:
                     "drop these reviewers from rotation until fixed (ruling §9)"
                 )
 
-    checks = _gh_json([
-        "api", f"repos/{repo}/commits/{head_sha}/check-runs?per_page=100",
-    ])
-    if not isinstance(checks, dict):
+    checks = fetch_check_run_names(repo, head_sha)
+    if checks is None:
         # `checks or {}` made a failed read indistinguishable from "no checks
         # reported": the watcher published a missing-context finding and
         # still returned OK, so the run that LOST required-check visibility
@@ -257,8 +294,7 @@ def watch_pr(repo: str, pr: dict) -> dict:
         )
         degraded.append("checks")
     else:
-        reported = {run.get("name") for run in checks.get("check_runs", [])}
-        missing = [c for c in _required_contexts() if c not in reported]
+        missing = [c for c in _required_contexts() if c not in checks]
         if missing:
             findings.append(f"required contexts not reported on head SHA: {missing}")
 

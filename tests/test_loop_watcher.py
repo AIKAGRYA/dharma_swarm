@@ -455,3 +455,56 @@ def test_no_read_failure_is_coerced_to_empty_data():
                       "(rows or [])", "(data or {})", "(issues or [])",
                       "(comments or [])", "(files or [])"):
         assert fail_open not in code, fail_open
+
+
+def test_failed_diff_read_does_not_clear_the_deletion_control(monkeypatch):
+    """An unavailable diff is not an empty diff: substituting "" waived the
+    test-deletion control and left the sweep healthy."""
+    monkeypatch.setattr(loop_watcher, "_gh",
+                        lambda args, **kw: _proc("", returncode=1))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {"check_runs": []})
+    _pages(monkeypatch, reviews=[], files=[{"filename": "docs/x.md"}])
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 41, "headRefOid": "sha", "additions": 1, "deletions": 0,
+        "author": {"login": "someone"}, "labels": [],
+    })
+    assert "diff" in report["degraded"]
+    assert any("deletion control did NOT run" in f for f in report["findings"])
+
+
+def test_check_runs_are_read_across_every_page(monkeypatch):
+    """A required context on page 2 was reported missing: the single-page
+    read derived ABSENCE from a partial response."""
+    page_one = [{"name": f"filler-{i}"} for i in range(100)]
+    calls: list[str] = []
+
+    def fake(args):
+        calls.append(args[1])
+        # endswith, not `in`: "per_page=100" itself contains "page=1".
+        if args[1].endswith("&page=1"):
+            return {"check_runs": page_one}
+        return {"check_runs": [{"name": "gitleaks"}]}
+
+    monkeypatch.setattr(loop_watcher, "_gh_json", fake)
+    names = loop_watcher.fetch_check_run_names("o/r", "sha")
+    assert "gitleaks" in names
+    assert len(calls) == 2 and calls[1].endswith("&page=2")
+
+
+def test_partial_check_run_page_read_fails_closed(monkeypatch):
+    """A failure on page 2 must not return page 1 as if it were complete."""
+    def fake(args):
+        return {"check_runs": [{"name": f"f-{i}"} for i in range(100)]} \
+            if args[1].endswith("&page=1") else None
+
+    monkeypatch.setattr(loop_watcher, "_gh_json", fake)
+    assert loop_watcher.fetch_check_run_names("o/r", "sha") is None
+
+
+def test_check_run_pagination_is_bounded(monkeypatch):
+    """A response that never shrinks must terminate as unreadable, not loop."""
+    monkeypatch.setattr(
+        loop_watcher, "_gh_json",
+        lambda args: {"check_runs": [{"name": f"f-{i}"} for i in range(100)]},
+    )
+    assert loop_watcher.fetch_check_run_names("o/r", "sha") is None
