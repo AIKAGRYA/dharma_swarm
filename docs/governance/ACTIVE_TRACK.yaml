@@ -1792,6 +1792,8 @@ active_tracks:
       - tests/test_semgrep_wrapper.py
       - tests/test_uplift_guard_subprocess.py
       - tests/test_fast_suite_isolation.py
+      - tests/test_agent_work_packet.py
+      - tests/test_make_onboarding_contract.py
       - tests/test_diff_applier.py
       - tests/test_sandbox.py
       - tests/test_nats_verification_split.py
