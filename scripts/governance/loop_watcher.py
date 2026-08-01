@@ -48,12 +48,32 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 POLICY_PATH = REPO_ROOT / "scripts" / "governance" / "automerge_tier_policy.json"
 MANIFEST_PATH = REPO_ROOT / "scripts" / "governance" / "ci_parity_manifest.json"
-WATCH_LABELS = ("lane-output", "bot-pr", "walk-ready")
+# canary-sandbox is watched for the §9 reviewer-integrity loop: a seeded
+# canary that collects an APPROVED review is the whole signal, and a label
+# the watcher never selects can never produce it (Greptile on PR #1163).
+WATCH_LABELS = ("lane-output", "bot-pr", "walk-ready", "canary-sandbox")
+CANARY_LABEL = "canary-sandbox"
 COMMENT_MARKER = "<!-- loop-watcher:{sha} -->"
 TASKS_BRANCH = "loop-tasks"
 BRIEF_ISSUE_LABEL = "walking-brief"
 INGEST_MARKER = "<!-- loop-watcher-ingested -->"
 TEST_DELETION_RE = re.compile(r"^-\s*def (test_[A-Za-z0-9_]+)", re.MULTILINE)
+# Operator-dictated prerequisites: "depends on: mbx_a, mbx_b" in the comment.
+# Ids are validated against the mailbox's own grammar so a malformed or
+# traversal-shaped id is dropped rather than written into a task record
+# (dharma_swarm/roaming_mailbox.py; Greptile on PR #1163).
+DEPENDS_ON_RE = re.compile(r"^\s*depends[-_ ]on\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def parse_depends_on(body: str) -> list[str]:
+    deps: list[str] = []
+    for match in DEPENDS_ON_RE.finditer(body or ""):
+        for raw in re.split(r"[,\s]+", match.group(1).strip()):
+            token = raw.strip().strip("`")
+            if token and TASK_ID_RE.fullmatch(token):
+                deps.append(token)
+    return sorted(set(deps))
 
 
 def _utc_stamp() -> str:
@@ -101,22 +121,44 @@ def watch_pr(repo: str, pr: dict) -> dict:
 
     diff = _gh(["pr", "diff", str(number), "--repo", repo])
     diff_text = diff.stdout if diff.returncode == 0 else ""
+    diff_lines = diff_text.splitlines()
     removed = sorted(set(TEST_DELETION_RE.findall(diff_text)))
-    deleted_files = [
-        line.split("\t")[-1]
-        for line in diff_text.splitlines()
-        if line.startswith("--- a/tests/") and "+++ /dev/null" not in line
+    # Whole-file deletions under tests/ need sign-off on their own: a file
+    # with no `def test_*` line (a conftest, a fixture module, golden data)
+    # leaves `removed` empty, and the old condition then reported nothing
+    # even though a test file vanished (Greptile on PR #1163).
+    deleted_test_files = [
+        line[len("--- a/"):].strip()
+        for index, line in enumerate(diff_lines)
+        if line.startswith("--- a/tests/")
+        and index + 1 < len(diff_lines)
+        and diff_lines[index + 1].startswith("+++ /dev/null")
     ]
-    if removed or any("/dev/null" in line for line in diff_text.splitlines()
-                      if line.startswith("+++") and "tests/" in diff_text):
+    needs_signoff = sorted(set(removed) | set(deleted_test_files))
+    if needs_signoff:
         approvals = [
             r for r in pr.get("latestReviews", []) if r.get("state") == "APPROVED"
         ]
         named = [r for r in approvals
-                 if all(name in (r.get("body") or "") for name in removed)] if removed else []
-        if removed and not named:
+                 if all(name in (r.get("body") or "") for name in needs_signoff)]
+        if not named:
             findings.append(
-                f"test deletions without named sign-off: {removed}"
+                f"test deletions without named sign-off: {needs_signoff}"
+            )
+
+    # §9 reviewer-integrity: an APPROVED review on a seeded canary means the
+    # reviewer passed a known defect. That is the entire signal the canary
+    # exists to produce, so it is a finding regardless of anything else.
+    labels = {row.get("name") for row in pr.get("labels", [])}
+    if CANARY_LABEL in labels:
+        passers = sorted({
+            (r.get("author") or {}).get("login", "")
+            for r in pr.get("latestReviews", []) if r.get("state") == "APPROVED"
+        } - {""})
+        if passers:
+            findings.append(
+                f"CANARY PASSED by {passers} — a seeded defect was approved; "
+                "drop these reviewers from rotation until fixed (ruling §9)"
             )
 
     checks = _gh_json([
@@ -137,7 +179,7 @@ def watch_pr(repo: str, pr: dict) -> dict:
         findings.append(f"diff over tier-1 ceiling: {lines} > 600 changed lines")
 
     return {"pr": number, "head": pr["headRefOid"], "findings": findings,
-            "deleted_test_files": deleted_files}
+            "deleted_test_files": deleted_test_files}
 
 
 def post_findings(repo: str, pr: dict, findings: list[str]) -> None:
@@ -209,16 +251,29 @@ def run_ingest(repo: str, owner_login: str) -> list[str]:
                and f"ref:{comment.get('id', '')}" in later.get("body", "")
                for later in comments):
             continue
-        task_id = f"mbx_op_{_utc_stamp().lower()}"
+        # The comment id makes the task id collision-resistant: a
+        # second-resolution stamp alone gave two comments ingested in the
+        # same second the same Contents path, and the second create failed
+        # with no task and no confirmation (Greptile on PR #1163).
+        comment_id = re.sub(r"[^A-Za-z0-9_-]", "", str(comment.get("id", "")))
+        task_id = f"mbx_op_{_utc_stamp().lower()}_{comment_id}" if comment_id \
+            else f"mbx_op_{_utc_stamp().lower()}"
+        depends_on = parse_depends_on(body)
         task = {
             "task_id": task_id, "recipient": "hardening-lane",
             "sender": f"operator:{owner_login}",
             "summary": body.strip().splitlines()[0][:80] if body.strip() else "operator note",
-            "body": body, "status": "queued", "capabilities": [],
+            "body": body,
+            # "blocked" mirrors the mailbox's own encoding for dependent
+            # work (dharma_swarm/roaming_mailbox.py): a legacy poller that
+            # ignores depends_on must never claim a task whose prerequisite
+            # is unanswered.
+            "status": "blocked" if depends_on else "queued",
+            "capabilities": [],
             "metadata": {"source": "walking-brief-issue", "comment_id": comment.get("id", "")},
             "created_at": datetime.now(timezone.utc).isoformat(),
             "claimed_at": "", "claimed_by": "", "responded_at": "",
-            "response_ref": "", "depends_on": [],
+            "response_ref": "", "depends_on": depends_on,
         }
         content = base64.b64encode(
             (json.dumps(task, indent=2, sort_keys=True) + "\n").encode()

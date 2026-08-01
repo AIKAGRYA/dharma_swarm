@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +14,11 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "governance"))
 import loop_watcher  # noqa: E402
 
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "loop-watcher.yml"
+
+
+def _proc(stdout: str, returncode: int = 0):
+    """Stand-in for a completed `gh` invocation."""
+    return subprocess.CompletedProcess([], returncode, stdout, "")
 
 
 def test_test_deletion_regex_finds_removed_tests():
@@ -69,3 +75,40 @@ def test_workflow_contract():
     text = WORKFLOW.read_text()
     assert "canary-sandbox" in text
     assert "canary-truth" in text, "canary PR body must carry the hidden truth marker"
+
+
+# --- Greptile review round on #1163 --------------------------------------
+
+
+def test_canary_label_is_watched_and_approval_is_a_finding(monkeypatch):
+    """§9: a seeded canary that collects an APPROVED review is the entire
+    signal — the label must be selected AND the approval reported."""
+    assert loop_watcher.CANARY_LABEL in loop_watcher.WATCH_LABELS
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {})
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 7, "headRefOid": "sha", "files": [], "additions": 1, "deletions": 0,
+        "labels": [{"name": "canary-sandbox"}],
+        "latestReviews": [{"state": "APPROVED", "author": {"login": "codex[bot]"}}],
+    })
+    assert any("CANARY PASSED" in f for f in report["findings"])
+
+
+def test_whole_test_file_deletion_needs_signoff(monkeypatch):
+    """A deleted tests/ file with no `def test_*` line left findings empty."""
+    diff = "--- a/tests/conftest_helpers.py\n+++ /dev/null\n-import os\n"
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(diff))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {})
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 8, "headRefOid": "sha", "files": [], "additions": 0, "deletions": 3,
+        "labels": [], "latestReviews": [],
+    })
+    assert any("tests/conftest_helpers.py" in f for f in report["findings"])
+
+
+def test_parse_depends_on_accepts_ids_and_rejects_junk():
+    assert loop_watcher.parse_depends_on("do X\ndepends on: mbx_a, mbx_b\n") == ["mbx_a", "mbx_b"]
+    assert loop_watcher.parse_depends_on("depends_on: `mbx_c`") == ["mbx_c"]
+    # Traversal-shaped and empty declarations are dropped, never written.
+    assert loop_watcher.parse_depends_on("depends on: ../responses/x") == []
+    assert loop_watcher.parse_depends_on("no prerequisites here") == []
