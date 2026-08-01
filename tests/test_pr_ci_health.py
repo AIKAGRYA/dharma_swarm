@@ -223,6 +223,16 @@ def test_behind_by_zero_is_not_behind_main():
     assert "behind_main" not in triage.categories
 
 
+def test_measured_zero_beats_a_stale_behind_state():
+    """mergeable_state is computed asynchronously and goes stale. A measured
+    behind_by == 0 must not be overridden by a leftover `behind`, or an
+    up-to-date PR gets a no-op rebase attempt — and, with no trusted push
+    token, a false ci-stranded-rebase-skipped label and comment (Greptile
+    and Codex both, on PR #1178)."""
+    triage = classify_pr(_pr(2005, state="behind"), [], behind_by=0)
+    assert "behind_main" not in triage.categories
+
+
 def test_unmeasured_behind_by_falls_back_to_the_state():
     """-1 means "not measured" and must never read as up to date; the
     mergeable_state fallback still catches the plain `behind` case."""

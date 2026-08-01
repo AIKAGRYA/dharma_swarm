@@ -205,11 +205,13 @@ def classify_pr(pr: dict, check_runs: list[dict], behind_by: int = -1) -> PRTria
             categories.append("real_test_lint")
 
     state = triage.mergeable_state
-    # behind_by is authoritative and mergeable_state is a fallback, not the
-    # other way round: "blocked" outranks "behind" in GitHub's single-value
-    # state, so keying only on the state hid most behind-main PRs from the
-    # auto-rebase pass.
-    if triage.behind_by > 0 or state == "behind":
+    # behind_by is authoritative and mergeable_state is only a fallback for
+    # when it could not be measured (-1). "blocked" outranks "behind" in
+    # GitHub's single-value state, so keying on the state hid most behind-main
+    # PRs — but the state is also computed asynchronously and goes stale, so a
+    # measured behind_by == 0 must not be overridden by a leftover "behind"
+    # either. The measurement wins in BOTH directions (Greptile on PR #1178).
+    if triage.behind_by > 0 or (triage.behind_by < 0 and state == "behind"):
         categories.append("behind_main")
     if state == "dirty":
         categories.append("merge_conflict")
