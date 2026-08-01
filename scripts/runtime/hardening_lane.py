@@ -35,6 +35,9 @@ from pathlib import Path
 MAX_DIFF_LINES = int(os.environ.get("LANE_MAX_DIFF_LINES", "600"))
 MAX_AGENT_SECONDS = int(os.environ.get("LANE_MAX_AGENT_SECONDS", "1200"))
 LANE_BRANCH_PREFIX = "lane/hardening-"
+# How many lane drafts may be open at once. One keeps the operator's triage
+# surface to a single PR; raise deliberately.
+MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
 RECIPIENT = "hardening-lane"
 # The DHARMA_LANE_AGENT_CMD secret selects one of these literal argv
@@ -54,8 +57,13 @@ def _utc_stamp() -> str:
 
 
 def _run(cmd: list[str], *, timeout: int = 300, cwd: str | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                          check=False, cwd=cwd)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                              check=False, cwd=cwd)
+    except FileNotFoundError as exc:
+        # A missing binary is a failed command, not a crashed lane: callers
+        # already treat a nonzero return as fail-closed.
+        return subprocess.CompletedProcess(cmd, 127, "", str(exc))
 
 
 def receipt(payload: dict, out: Path) -> None:
@@ -71,7 +79,14 @@ def select_target(repo: str) -> dict | None:
     try:
         from dharma_swarm.roaming_mailbox import RoamingMailbox
 
-        mailbox = RoamingMailbox()
+        # LANE_MAILBOX_ROOT points at the operator-task overlay materialized
+        # OUTSIDE the worktree (see .github/workflows/hardening-lane.yml):
+        # the lane reads the mailbox without those files ever being able to
+        # enter the diff it measures or the commit it delivers.
+        mailbox_root = os.environ.get("LANE_MAILBOX_ROOT", "").strip()
+        mailbox = RoamingMailbox(
+            queue_root=Path(mailbox_root) if mailbox_root else None
+        )
         ready = getattr(mailbox, "ready_tasks", None)
         if callable(ready):
             tasks = [t for t in ready(recipient=RECIPIENT)]
@@ -91,15 +106,71 @@ def select_target(repo: str) -> dict | None:
             runs = json.loads(result.stdout).get("workflow_runs", [])
         except json.JSONDecodeError:
             runs = []
-        if runs and runs[0].get("conclusion") == "failure":
+        # A run must be COMPLETED before its conclusion is final; an
+        # in-progress run reporting a failure is not a verdict yet
+        # (Greptile on PR #1162).
+        if (runs and runs[0].get("status") == "completed"
+                and runs[0].get("conclusion") == "failure"):
             return {"kind": "nightly_failure", "run_url": runs[0].get("html_url", ""),
                     "summary": "repair the failing nightly on main",
                     "body": f"Nightly run failed: {runs[0].get('html_url', '')}"}
     return None
 
 
+# Credentials the lane holds to open its draft PR, which the agent must not
+# inherit: the job grants contents:write and pull-requests:write, so an
+# agent with GH_TOKEN could push branches or alter PRs before the diff cap,
+# the test run, or any review ever applied (Greptile on PR #1162). The agent
+# needs none of them — the lane does every git and GitHub operation itself.
+AGENT_STRIPPED_ENV_PREFIXES = ("GH_", "GITHUB_", "GIT_ASKPASS", "GIT_CONFIG",
+                               "MERGEMASTERMIKE_", "ACTIONS_", "RUNNER_")
+AGENT_STRIPPED_ENV_KEYS = {"GITHUB_TOKEN", "GH_TOKEN", "PR_CI_HEALTH_PUSH_TOKEN"}
+
+
+def open_lane_drafts(repo: str) -> list[int] | None:
+    """Open draft PRs this lane already delivered, or None if the query
+    failed (the caller then refuses to deliver rather than guessing)."""
+    result = _run([
+        "gh", "pr", "list", "--repo", repo, "--state", "open",
+        "--label", "lane-output", "--json", "number,isDraft,headRefName",
+        "--limit", "50",
+    ])
+    if result.returncode != 0:
+        return None
+    try:
+        rows = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [
+        int(row["number"]) for row in rows
+        if row.get("isDraft") and str(row.get("headRefName", "")).startswith(
+            LANE_BRANCH_PREFIX
+        )
+    ]
+
+
+def agent_env() -> dict[str, str]:
+    """The child environment for the coding agent: the lane's own env minus
+    every GitHub/Git credential channel. The agent's model API keys are
+    passed through — they are what it legitimately needs."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in AGENT_STRIPPED_ENV_KEYS
+        and not key.startswith(AGENT_STRIPPED_ENV_PREFIXES)
+    }
+
+
 def diff_line_count() -> int:
-    result = _run(["git", "diff", "--numstat", "HEAD"])
+    """Changed lines in the STAGED set. `git diff HEAD` omits untracked
+    files, so a new-file-only fix measured zero (reported NO_DIFF) and a
+    large new file in a mixed change escaped the cap entirely — and then
+    escaped the commit too, since `git add -u` never stages it. The caller
+    stages the intended set first, so cap and commit measure the same
+    thing (Greptile on PR #1162)."""
+    result = _run(["git", "diff", "--cached", "--numstat"])
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")
@@ -116,6 +187,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt", required=True, help="receipt output path")
     args = parser.parse_args(argv)
     out = Path(args.receipt)
+
+    # Delivery ceiling BEFORE any work: without it every eligible run opened
+    # another draft, so a persistently-failing nightly would produce an
+    # unbounded pile of lane PRs for the operator to triage (Greptile on
+    # PR #1162). Counted from live open lane drafts, not from local state,
+    # so a restarted or concurrent run sees the same number.
+    open_drafts = open_lane_drafts(args.repo)
+    if open_drafts is None:
+        receipt({"status": "BLOCKED",
+                 "reason": "could not enumerate open lane drafts — refusing "
+                           "to deliver without knowing the ceiling"}, out)
+        return 0
+    if len(open_drafts) >= MAX_OPEN_LANE_DRAFTS:
+        receipt({"status": "CAP_HIT", "cap": "open_lane_drafts",
+                 "observed": len(open_drafts), "limit": MAX_OPEN_LANE_DRAFTS,
+                 "open": open_drafts}, out)
+        return 0
 
     target = select_target(args.repo)
     if target is None:
@@ -166,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         agent = subprocess.run(
             agent_argv,
             input=prompt,
+            env=agent_env(),
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
@@ -173,13 +262,19 @@ def main(argv: list[str] | None = None) -> int:
                  "target": target, "limit": MAX_AGENT_SECONDS}, out)
         return 0
 
+    # Stage the intended set FIRST, then measure it: the cap and the commit
+    # must see the same change set, including files the agent created.
+    _run(["git", "add", "-A"])
     lines = diff_line_count()
     if lines == 0:
         receipt({"status": "NO_DIFF", "target": target,
                  "agent_exit": agent.returncode}, out)
         return 0
     if lines > MAX_DIFF_LINES:
-        _run(["git", "checkout", "--", "."])
+        # Unstage and discard, including the agent's new files — a plain
+        # `git checkout -- .` would leave them behind for the next run.
+        _run(["git", "reset", "--hard", "HEAD"])
+        _run(["git", "clean", "-fd"])
         receipt({"status": "CAP_HIT", "cap": "diff_lines", "observed": lines,
                  "limit": MAX_DIFF_LINES, "target": target}, out)
         return 0
@@ -190,7 +285,9 @@ def main(argv: list[str] | None = None) -> int:
                  "tail": tests.stdout[-2000:]}, out)
         return 0
 
-    _run(["git", "add", "-u"])
+    # Re-stage: `make test-fast` may have produced artifacts, and the set
+    # measured above is the set committed.
+    _run(["git", "add", "-A"])
     _run(["git", "commit", "-m",
           f"harden: {target['summary'][:60]} [hardening-lane]"])
     push = _run(["git", "push", "-u", "origin", branch])

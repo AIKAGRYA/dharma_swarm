@@ -60,14 +60,31 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
 
-      - name: Overlay operator-ingested tasks (loop-tasks branch)
+      - name: Overlay operator-ingested tasks (read-only, outside the worktree)
         run: |
           set -euo pipefail
-          # PR-F ingestion writes mailbox tasks to the loop-tasks branch;
-          # overlay them read-only so the ready-set sees operator notes.
-          git fetch origin loop-tasks 2>/dev/null || { echo "no loop-tasks branch yet"; exit 0; }
-          git checkout origin/loop-tasks -- roaming_mailbox/tasks/ 2>/dev/null || true
-          git reset -q roaming_mailbox/tasks/ || true
+          # PR-F ingestion writes mailbox tasks to the loop-tasks branch. The
+          # lane must READ them without the overlay ever becoming part of the
+          # change set it measures and commits: checking them into the
+          # worktree left tracked mailbox files modified, so `git reset` only
+          # unstaged them and the driver still counted them against the diff
+          # cap and committed them into the draft (Greptile on PR #1162).
+          # Materializing the overlay OUTSIDE the repo removes the class of
+          # bug entirely — no worktree path can leak into a commit.
+          mkdir -p "${RUNNER_TEMP}/lane-mailbox/tasks"
+          if git fetch origin loop-tasks 2>/dev/null; then
+            git archive origin/loop-tasks roaming_mailbox/tasks 2>/dev/null \
+              | tar -x -C "${RUNNER_TEMP}/lane-mailbox" --strip-components=1 \
+              || echo "loop-tasks carries no mailbox tasks yet"
+          else
+            echo "no loop-tasks branch yet"
+          fi
+          echo "LANE_MAILBOX_ROOT=${RUNNER_TEMP}/lane-mailbox" >> "$GITHUB_ENV"
+          # Fail closed if anything did land in the worktree despite the above.
+          if ! git diff --quiet -- roaming_mailbox/ 2>/dev/null; then
+            echo "::error::mailbox overlay contaminated the worktree" >&2
+            exit 1
+          fi
 
       - name: Run the lane
         run: |
