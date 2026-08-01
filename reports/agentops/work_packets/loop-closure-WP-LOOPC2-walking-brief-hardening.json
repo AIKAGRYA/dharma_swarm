@@ -1,0 +1,81 @@
+{
+  "allowed_files": [
+    ".github/workflows/walking-brief.yml",
+    "reports/agentops/work_packets/loop-closure-WP-LOOPC2-walking-brief-hardening.json",
+    "scripts/runtime/walking_brief.py",
+    "tests/test_walking_brief.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "a979b721291c06f034bf87ce99e04ae27f4f1f4f",
+  "branch": "claude/loop-pr-c2-walking-brief-hardening",
+  "commit": {
+    "allowed": false,
+    "message": "fix(loop-closure): walking brief review-hardening \u2014 honest failure states"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "scripts/runtime/pr_merge_control.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/ci_parity_manifest.json"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_walking_brief.py -q",
+      "expected_exit": 0,
+      "name": "walking-brief-contract",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "loop-closure-WP-LOOPC2-walking-brief-hardening",
+  "intent": "Follow-up to the merged PR-C (#1158): fix every open reviewer finding from Codex, Devin, and Greptile on the walking brief. Tri-state gatherers (query failure is never rendered as calm emptiness), killswitch missing-branch variant recognized as disengaged, issue-lookup failure no longer creates duplicate unpinned issues, best-effort pin on bootstrap creation, markdown-escaped PR titles, date-keyed idempotent posting, and pending nightlies rendered pending instead of red.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/walking_brief.py'); orig=p.read_text(); mut=orig.replace('return data if isinstance(data, list) else None', 'return data if isinstance(data, list) else []'); assert mut!=orig; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_walking_brief.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "collapsing-walkready-failure-to-empty-breaks-contract-test",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/walking_brief.py",
+      "scripts/runtime/pr_merge_control.py"
+    ],
+    "collision": {
+      "checked_at_sha": "a979b721291c06f034bf87ce99e04ae27f4f1f4f",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Pinning the bootstrap issue needs GraphQL pinIssue; if the token lacks the scope the run warns and proceeds unpinned (the issue body still asks the operator to pin).",
+      "Idempotent posting keys on a same-day marker lookup; if that lookup itself fails the brief posts anyway \u2014 one duplicate beats silence for the operator's only channel."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "0bba62a4e501e54ec315b9abacc399e2b12bf35ccb1e5f321789649f4981edf7",
+    "rollback": "Revert the single commit; the brief returns to the merged #1158 behavior. No runtime state is touched.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPC2"
+  },
+  "worktree": "."
+}

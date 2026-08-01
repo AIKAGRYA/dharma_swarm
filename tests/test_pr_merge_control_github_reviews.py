@@ -57,9 +57,28 @@ def test_backlog_workflow_is_scheduled_and_matches_cloud_review_quorum():
     ).read_text(encoding="utf-8")
 
     assert "schedule:" in workflow
-    assert 'default: codex,copilot' in workflow
-    assert 'REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || \'codex,copilot\' }}' in workflow
+    assert 'default: codex' in workflow
+    assert 'REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || \'codex\' }}' in workflow
     assert 'DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"' in workflow
+
+
+def test_cloud_lanes_never_require_copilot_receipts():
+    # Operator ratification 2026-07-31: copilot reviews are accepted additively
+    # (TRUSTED_REVIEW_LOGINS) but never REQUIRED — copilot posted zero reviews
+    # repo-wide and kept the receipt gate permanently unclearable.
+    repo_root = Path(__file__).resolve().parents[1]
+    for name in (
+        ".github/workflows/codex-mention-router.yml",
+        ".github/workflows/merge-master-mike-backlog.yml",
+    ):
+        workflow = (repo_root / name).read_text(encoding="utf-8")
+        offending = [
+            line
+            for line in workflow.splitlines()
+            if ("REQUIRED_REVIEWERS" in line or "default:" in line)
+            and "copilot" in line
+        ]
+        assert not offending, f"{name} requires copilot receipts: {offending}"
     for fallback in (
         "inputs.mode || 'packet-only'",
         "inputs.max_prs || '5'",

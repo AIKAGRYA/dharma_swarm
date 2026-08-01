@@ -475,7 +475,7 @@ def ensure_runtime_state_schema_sync(
         _OPERATOR_ACTIONS_DDL,
         _SESSION_EVENTS_DDL,
         _SESSION_EVENTS_FTS_DDL,
-        _EXECUTION_IDENTITIES_DDL,
+        _EPISODE_EVENT_OUTBOX_DDL, _EXECUTION_IDENTITIES_DDL,
         _RUNTIME_RECEIPTS_DDL,
         _IDEMPOTENCY_RECORDS_DDL,
     ):
@@ -484,7 +484,7 @@ def ensure_runtime_state_schema_sync(
         ("task_claims", "trace_id TEXT NOT NULL DEFAULT ''"),
         ("delegation_runs", "trace_id TEXT NOT NULL DEFAULT ''"),
         ("delegation_runs", "receipt_json TEXT"),
-        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"), *_EPISODE_OUTBOX_MIGRATIONS,
     ):
         try:
             db.execute(f"ALTER TABLE {tbl} ADD COLUMN {column_sql}")
@@ -494,7 +494,7 @@ def ensure_runtime_state_schema_sync(
         db.execute(idx)
     if include_memory_plane:
         ensure_memory_plane_schema_sync(db)
-    db.commit()
+    _backfill_episode_outbox_keys_and_commit_sync(db)
 
 
 async def ensure_runtime_state_schema_async(
@@ -518,7 +518,7 @@ async def ensure_runtime_state_schema_async(
         _OPERATOR_ACTIONS_DDL,
         _SESSION_EVENTS_DDL,
         _SESSION_EVENTS_FTS_DDL,
-        _EXECUTION_IDENTITIES_DDL,
+        _EPISODE_EVENT_OUTBOX_DDL, _EXECUTION_IDENTITIES_DDL,
         _RUNTIME_RECEIPTS_DDL,
         _IDEMPOTENCY_RECORDS_DDL,
     ):
@@ -528,7 +528,7 @@ async def ensure_runtime_state_schema_async(
         ("task_claims", "trace_id TEXT NOT NULL DEFAULT ''"),
         ("delegation_runs", "trace_id TEXT NOT NULL DEFAULT ''"),
         ("delegation_runs", "receipt_json TEXT"),
-        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"), *_EPISODE_OUTBOX_MIGRATIONS,
     ):
         try:
             await db.execute(f"ALTER TABLE {tbl} ADD COLUMN {column_sql}")
@@ -538,7 +538,7 @@ async def ensure_runtime_state_schema_async(
         await db.execute(idx)
     if include_memory_plane:
         await ensure_memory_plane_schema_async(db)
-    await db.commit()
+    await _backfill_episode_outbox_keys_and_commit_async(db)
 
 
 @dataclass(frozen=True)
@@ -1399,13 +1399,13 @@ class RuntimeStateStore:
         assert loaded is not None
         return loaded
 
-    def record_session_event_sync(self, event: SessionEventRecord) -> SessionEventRecord:
+    def _run_sync_transaction(self, operation: Any, *, immediate: bool = False) -> Any:
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            self._record_session_event_sync_db(db, event)
-            db.commit()
-        return event
+            if immediate:
+                db.execute("BEGIN IMMEDIATE")
+            return operation(db)
 
     async def record_session_event(self, event: SessionEventRecord) -> SessionEventRecord:
         await self.init_db()
@@ -4142,3 +4142,533 @@ class RuntimeStateStore:
     @staticmethod
     def new_action_id() -> str:
         return _new_id("act")
+
+    def record_session_event_sync(self, event: SessionEventRecord) -> SessionEventRecord:
+        def operation(db: sqlite3.Connection) -> SessionEventRecord:
+            self._record_session_event_sync_db(db, event)
+            return event
+
+        return self._run_sync_transaction(operation)
+
+    @staticmethod
+    def _enqueue_episode_outbox_sync_db(
+        db: sqlite3.Connection,
+        *,
+        delivery_key: str,
+        destination_id: str,
+        episode_id: str,
+        attempt_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        session_event_id: str,
+    ) -> EpisodeOutboxRecord:
+        delivery_key = str(delivery_key).strip()
+        destination_id = str(destination_id).strip()
+        episode_id = str(episode_id).strip()
+        attempt_id = str(attempt_id)
+        event_type = str(event_type).strip()
+        if not delivery_key or not episode_id or not event_type:
+            raise ValueError("delivery_key, episode_id, and event_type are required")
+        # The outbox is durable episode-ledger state, so validate and
+        # recursively redact before SQLite sees the payload. The ledger
+        # allocates the durable sequence while holding its append lock.
+        payload = _normalize_episode_outbox_payload(
+            event_type=event_type,
+            payload=payload,
+        )
+        storage_key = _episode_outbox_storage_key(delivery_key, destination_id)
+        created_at = _utc_now_iso()
+        db.execute(
+            "INSERT INTO episode_event_outbox"
+            " (delivery_key, logical_delivery_key, destination_id, episode_id,"
+            " attempt_id, event_type, payload_json, session_event_id, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(delivery_key) DO NOTHING",
+            (
+                storage_key,
+                delivery_key,
+                destination_id,
+                episode_id,
+                attempt_id,
+                event_type,
+                _episode_outbox_json_dump(payload),
+                str(session_event_id),
+                created_at,
+            ),
+        )
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+            " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+            " created_at, acked_at, episode_event_id"
+            " FROM episode_event_outbox WHERE delivery_key = ?",
+            (storage_key,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("episode outbox enqueue did not persist a row")
+        stored = _row_to_episode_outbox(row)
+        if (
+            stored.episode_id != episode_id
+            or stored.attempt_id != attempt_id
+            or stored.event_type != event_type
+            or _episode_outbox_json_dump(stored.payload)
+            != _episode_outbox_json_dump(payload)
+            or stored.session_event_id != str(session_event_id)
+            or stored.destination_id != destination_id
+        ):
+            raise ValueError(
+                f"episode outbox delivery_key {delivery_key!r} was reused with "
+                "different content"
+            )
+        return stored
+
+    def enqueue_episode_event_sync(
+        self,
+        *,
+        delivery_key: str,
+        episode_id: str,
+        attempt_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        destination_id: str = "",
+    ) -> EpisodeOutboxRecord:
+        def operation(db: sqlite3.Connection) -> EpisodeOutboxRecord:
+            return self._enqueue_episode_outbox_sync_db(
+                db,
+                delivery_key=delivery_key,
+                destination_id=destination_id,
+                episode_id=episode_id,
+                attempt_id=attempt_id,
+                event_type=event_type,
+                payload=payload,
+                session_event_id="",
+            )
+
+        return self._run_sync_transaction(operation, immediate=True)
+
+    def record_session_event_with_episode_outbox_sync(
+        self,
+        event: SessionEventRecord,
+        *,
+        delivery_key: str,
+        episode_id: str,
+        attempt_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        destination_id: str = "",
+    ) -> tuple[SessionEventRecord, EpisodeOutboxRecord]:
+        def operation(
+            db: sqlite3.Connection,
+        ) -> tuple[SessionEventRecord, EpisodeOutboxRecord]:
+            self._record_session_event_sync_db(db, event)
+            outbox = self._enqueue_episode_outbox_sync_db(
+                db,
+                delivery_key=delivery_key,
+                destination_id=destination_id,
+                episode_id=episode_id,
+                attempt_id=attempt_id,
+                event_type=event_type,
+                payload=payload,
+                session_event_id=event.event_id,
+            )
+            return event, outbox
+
+        return self._run_sync_transaction(operation, immediate=True)
+
+    def list_pending_episode_events_sync(
+        self,
+        *,
+        episode_id: str | None = None,
+        destination_id: str | None = None,
+        limit: int = 1000,
+    ) -> list[EpisodeOutboxRecord]:
+        clauses = ["acked_at IS NULL"]
+        params: list[Any] = []
+        if episode_id is not None:
+            clauses.append("episode_id = ?")
+            params.append(str(episode_id))
+        if destination_id is not None:
+            clauses.append("destination_id = ?")
+            params.append(str(destination_id).strip())
+        params.append(max(1, min(int(limit), 10_000)))
+
+        def operation(db: sqlite3.Connection) -> list[EpisodeOutboxRecord]:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                f" FROM episode_event_outbox WHERE {' AND '.join(clauses)}"
+                " ORDER BY outbox_id LIMIT ?",
+                params,
+            ).fetchall()
+            return [_row_to_episode_outbox(row) for row in rows]
+
+        return self._run_sync_transaction(operation)
+
+    def list_episode_destination_history_sync(
+        self,
+        *,
+        episode_id: str,
+        destination_id: str,
+    ) -> list[EpisodeOutboxRecord]:
+        """Return every retained delivery for one episode destination in order."""
+        episode_id = str(episode_id).strip()
+        destination_id = str(destination_id).strip()
+        if not episode_id or not destination_id:
+            raise ValueError("episode_id and destination_id are required")
+
+        def operation(db: sqlite3.Connection) -> list[EpisodeOutboxRecord]:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox"
+                " WHERE episode_id = ? AND destination_id = ? ORDER BY outbox_id",
+                (episode_id, destination_id),
+            ).fetchall()
+            return [_row_to_episode_outbox(row) for row in rows]
+
+        return self._run_sync_transaction(operation)
+
+    def get_episode_outbox_sync(
+        self,
+        delivery_key: str,
+        *,
+        destination_id: str | None = None,
+    ) -> EpisodeOutboxRecord | None:
+        def operation(db: sqlite3.Connection) -> EpisodeOutboxRecord | None:
+            db.row_factory = sqlite3.Row
+            select_sql = (
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox"
+            )
+            if destination_id is not None:
+                storage_key = _episode_outbox_storage_key(
+                    delivery_key,
+                    destination_id,
+                )
+                row = db.execute(
+                    select_sql + " WHERE delivery_key = ?",
+                    (storage_key,),
+                ).fetchone()
+                return _row_to_episode_outbox(row) if row is not None else None
+            rows = db.execute(
+                select_sql
+                + " WHERE logical_delivery_key = ? ORDER BY outbox_id DESC LIMIT 2",
+                (str(delivery_key).strip(),),
+            ).fetchall()
+            if len(rows) > 1:
+                raise ValueError(
+                    f"destination_id is required for ambiguous delivery_key "
+                    f"{delivery_key!r}"
+                )
+            return _row_to_episode_outbox(rows[0]) if rows else None
+
+        return self._run_sync_transaction(operation)
+
+    def ack_episode_event_sync(
+        self,
+        delivery_key: str,
+        *,
+        episode_event_id: str,
+        destination_id: str = "",
+    ) -> EpisodeOutboxRecord:
+        delivery_key = str(delivery_key).strip()
+        episode_event_id = str(episode_event_id).strip()
+        if not delivery_key or not episode_event_id:
+            raise ValueError("delivery_key and episode_event_id are required")
+        storage_key = _episode_outbox_storage_key(delivery_key, destination_id)
+
+        def operation(db: sqlite3.Connection) -> EpisodeOutboxRecord:
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox WHERE delivery_key = ?",
+                (storage_key,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"unknown episode outbox delivery_key {delivery_key!r}")
+            current = _row_to_episode_outbox(row)
+            if current.acked_at is not None:
+                if current.episode_event_id != episode_event_id:
+                    raise ValueError(
+                        f"episode outbox delivery_key {delivery_key!r} was acked "
+                        "with a different event_id"
+                    )
+                return current
+            db.execute(
+                "UPDATE episode_event_outbox SET acked_at = ?, episode_event_id = ?"
+                " WHERE delivery_key = ? AND acked_at IS NULL",
+                (_utc_now_iso(), episode_event_id, storage_key),
+            )
+            row = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox WHERE delivery_key = ?",
+                (storage_key,),
+            ).fetchone()
+            assert row is not None
+            return _row_to_episode_outbox(row)
+
+        return self._run_sync_transaction(operation, immediate=True)
+
+    def requeue_episode_event_sync(
+        self,
+        delivery_key: str,
+        *,
+        destination_id: str = "",
+    ) -> EpisodeOutboxRecord:
+        """Clear one destination-scoped ack so a missing file event replays."""
+        delivery_key = str(delivery_key).strip()
+        if not delivery_key:
+            raise ValueError("delivery_key is required")
+        storage_key = _episode_outbox_storage_key(delivery_key, destination_id)
+
+        def operation(db: sqlite3.Connection) -> EpisodeOutboxRecord:
+            db.row_factory = sqlite3.Row
+            current = db.execute(
+                "SELECT outbox_id FROM episode_event_outbox WHERE delivery_key = ?",
+                (storage_key,),
+            ).fetchone()
+            if current is None:
+                raise KeyError(f"unknown episode outbox delivery_key {delivery_key!r}")
+            db.execute(
+                "UPDATE episode_event_outbox SET acked_at = NULL, episode_event_id = ''"
+                " WHERE delivery_key = ?",
+                (storage_key,),
+            )
+            row = db.execute(
+                "SELECT outbox_id, delivery_key, logical_delivery_key, destination_id,"
+                " episode_id, attempt_id, event_type, payload_json, session_event_id,"
+                " created_at, acked_at, episode_event_id"
+                " FROM episode_event_outbox WHERE delivery_key = ?",
+                (storage_key,),
+            ).fetchone()
+            assert row is not None
+            return _row_to_episode_outbox(row)
+
+        return self._run_sync_transaction(operation, immediate=True)
+
+    def requeue_episode_destination_history_sync(
+        self,
+        *,
+        episode_id: str,
+        destination_id: str,
+    ) -> int:
+        """Requeue the retained causal history for one recreated destination."""
+        episode_id = str(episode_id).strip()
+        destination_id = str(destination_id).strip()
+        if not episode_id or not destination_id:
+            raise ValueError("episode_id and destination_id are required")
+
+        def operation(db: sqlite3.Connection) -> int:
+            cursor = db.execute(
+                "UPDATE episode_event_outbox"
+                " SET acked_at = NULL, episode_event_id = ''"
+                " WHERE episode_id = ? AND destination_id = ?",
+                (episode_id, destination_id),
+            )
+            return max(0, int(cursor.rowcount))
+
+        return self._run_sync_transaction(operation, immediate=True)
+
+
+_EPISODE_OUTBOX_EVENT_TYPES = (
+    "episode_opened",
+    "attempt_started",
+    "observation_recorded",
+    "effect_requested",
+    "effect_resolved",
+    "review_recorded",
+    "episode_closed",
+    "post_merge_observation",
+)
+_EPISODE_OUTBOX_EFFECT_EVENT_TYPES = frozenset(("effect_requested", "effect_resolved"))
+_EPISODE_OUTBOX_REDACT_KEY_MARKERS = (
+    "secret",
+    "token",
+    "password",
+    "api_key",
+    "authorization",
+    "credential",
+)
+_EPISODE_OUTBOX_REDACTED = "[REDACTED]"
+
+
+def _episode_outbox_storage_key(delivery_key: str, destination_id: str) -> str:
+    delivery_key = str(delivery_key).strip()
+    destination_id = str(destination_id).strip()
+    if not delivery_key:
+        raise ValueError("delivery_key is required")
+    if not destination_id:
+        return delivery_key
+    digest = hashlib.sha256(
+        f"{destination_id}\0{delivery_key}".encode("utf-8")
+    ).hexdigest()
+    return f"destination:{digest}"
+
+
+def _redact_episode_outbox_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            if any(marker in key.lower() for marker in _EPISODE_OUTBOX_REDACT_KEY_MARKERS):
+                redacted[key] = _EPISODE_OUTBOX_REDACTED
+            else:
+                redacted[key] = _redact_episode_outbox_value(item)
+        return redacted
+    if isinstance(value, (list, tuple)):
+        return [_redact_episode_outbox_value(item) for item in value]
+    return value
+
+
+def _reject_episode_outbox_json_constant(value: str) -> Any:
+    raise ValueError(f"non-finite JSON number {value!r} is not allowed")
+
+
+def _episode_outbox_json_dump(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, ensure_ascii=True, allow_nan=False)
+
+
+def _normalize_episode_outbox_payload(
+    *,
+    event_type: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply the Episode Event persistence boundary before durable enqueue.
+
+    Runtime state intentionally does not import ``episode_ledger``: doing so
+    makes the high-fanout runtime spine depend on the low-level episode schema.
+    The parity test in ``test_runtime_state`` locks this vocabulary and
+    recursive redaction result to ``EpisodeEvent.new``.
+    """
+    if event_type not in _EPISODE_OUTBOX_EVENT_TYPES:
+        raise ValueError(
+            f"unknown event_type {event_type!r}; the lifecycle vocabulary is "
+            f"{_EPISODE_OUTBOX_EVENT_TYPES}"
+        )
+    _episode_outbox_json_dump(payload)
+    redacted = _redact_episode_outbox_value(dict(payload))
+    if event_type in _EPISODE_OUTBOX_EFFECT_EVENT_TYPES and not str(
+        redacted.get("idempotency_key", "")
+    ).strip():
+        raise ValueError(f"{event_type} requires payload.idempotency_key")
+    return redacted
+
+
+_EPISODE_EVENT_OUTBOX_DDL = """
+CREATE TABLE IF NOT EXISTS episode_event_outbox (
+    outbox_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    delivery_key TEXT NOT NULL UNIQUE,
+    logical_delivery_key TEXT NOT NULL DEFAULT '',
+    destination_id TEXT NOT NULL DEFAULT '',
+    episode_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL DEFAULT '',
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    session_event_id TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    acked_at TEXT,
+    episode_event_id TEXT NOT NULL DEFAULT ''
+)"""
+
+_EPISODE_OUTBOX_MIGRATIONS = (
+    (
+        "episode_event_outbox",
+        "logical_delivery_key TEXT NOT NULL DEFAULT ''",
+    ),
+    (
+        "episode_event_outbox",
+        "destination_id TEXT NOT NULL DEFAULT ''",
+    ),
+)
+
+
+def _backfill_episode_outbox_keys_and_commit_sync(db: sqlite3.Connection) -> None:
+    db.execute(
+        "UPDATE episode_event_outbox SET logical_delivery_key = delivery_key"
+        " WHERE logical_delivery_key = ''"
+    )
+    db.commit()
+
+
+async def _backfill_episode_outbox_keys_and_commit_async(
+    db: aiosqlite.Connection,
+) -> None:
+    await db.execute(
+        "UPDATE episode_event_outbox SET logical_delivery_key = delivery_key"
+        " WHERE logical_delivery_key = ''"
+    )
+    await db.commit()
+
+
+@dataclass(frozen=True)
+class EpisodeOutboxRecord:
+    delivery_key: str
+    episode_id: str
+    event_type: str
+    schema_version: str = "episode_outbox_record.v1"
+    destination_id: str = ""
+    storage_key: str = ""
+    attempt_id: str = ""
+    payload: dict[str, Any] = field(default_factory=dict)
+    session_event_id: str = ""
+    outbox_id: int = 0
+    created_at: datetime = field(default_factory=_utc_now)
+    acked_at: datetime | None = None
+    episode_event_id: str = ""
+
+
+def _row_to_episode_outbox(row: sqlite3.Row | aiosqlite.Row) -> EpisodeOutboxRecord:
+    storage_key = str(row["delivery_key"])
+    event_type = str(row["event_type"])
+    try:
+        decoded_payload = json.loads(
+            row["payload_json"],
+            parse_constant=_reject_episode_outbox_json_constant,
+        )
+        if not isinstance(decoded_payload, dict):
+            raise TypeError("payload must decode to an object")
+        payload = _normalize_episode_outbox_payload(
+            event_type=event_type,
+            payload=decoded_payload,
+        )
+        if _episode_outbox_json_dump(payload) != _episode_outbox_json_dump(
+            decoded_payload
+        ):
+            raise ValueError("payload is not normalized")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"episode outbox {storage_key!r} has invalid payload_json"
+        ) from exc
+    return EpisodeOutboxRecord(
+        outbox_id=int(row["outbox_id"]),
+        delivery_key=str(row["logical_delivery_key"] or storage_key),
+        destination_id=str(row["destination_id"] or ""),
+        storage_key=storage_key,
+        episode_id=str(row["episode_id"]),
+        attempt_id=str(row["attempt_id"] or ""),
+        event_type=event_type,
+        payload=payload,
+        session_event_id=str(row["session_event_id"] or ""),
+        created_at=_parse_dt(row["created_at"]) or _utc_now(),
+        acked_at=_parse_dt(row["acked_at"]),
+        episode_event_id=str(row["episode_event_id"] or ""),
+    )
+
+
+_INDEXES.extend(
+    (
+        "CREATE INDEX IF NOT EXISTS idx_episode_outbox_pending "
+        "ON episode_event_outbox(destination_id, acked_at, outbox_id)",
+        "CREATE INDEX IF NOT EXISTS idx_episode_outbox_episode_pending "
+        "ON episode_event_outbox(episode_id, destination_id, acked_at, outbox_id)",
+    )
+)

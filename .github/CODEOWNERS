@@ -129,4 +129,5 @@
 /dharma_swarm/runtime_provider.py       @AmitabhainArunachala  # blast=156
 /dharma_swarm/smart_router.py           @AmitabhainArunachala  # blast=156
 /dharma_swarm/swarm_router.py           @AmitabhainArunachala  # blast=156
+/dharma_swarm/receipt_consumption.py     @AmitabhainArunachala  # blast=156
 /dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala  # blast=156

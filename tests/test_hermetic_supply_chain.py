@@ -10,23 +10,35 @@ Two oracles, matching .github/workflows/hermetic.yml:
 2. A lockfile that drifts from pyproject.toml fails `uv lock --check` while a
    clean tree passes. Skipped when uv is not installed (e.g. the pip-based
    required pytest lane); the hermetic.yml workflow is the CI enforcer.
+
+3. (WP-0H) The hermetic.yml workflow text itself is contract-checked: it must
+   gate pull requests, pin its installer and actions exactly, run the drift
+   oracle before the frozen sync, and contain no false-green pattern. The
+   uv-version lockstep with the Makefile is owned by
+   tests/test_bootstrap_contract.py and is not re-asserted here.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "governance" / "codeowners_blast_radius.py"
 CODEOWNERS = REPO_ROOT / ".github" / "CODEOWNERS"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 LOCKFILE = REPO_ROOT / "uv.lock"
+HERMETIC_TEXT = (
+    REPO_ROOT / ".github" / "workflows" / "hermetic.yml"
+).read_text(encoding="utf-8")
+HERMETIC = yaml.safe_load(HERMETIC_TEXT)
 
 SIX_MEASURED = (
     "dharma_swarm/models.py",
@@ -138,6 +150,70 @@ def test_lockfile_drift_fails_clean_passes(tmp_path):
     assert '"croniter>=2.0",' in text
     pp.write_text(text.replace('"croniter>=2.0",', '"croniter>=2.0",\n    "requests>=2.0",'))
     assert lock_check() != 0, "lockfile drift should fail uv lock --check"
+
+
+# ── WP-0H: hermetic.yml workflow contract (text is the enforceable surface) ─
+
+
+def _hermetic_command_lines() -> list[str]:
+    return [
+        line.strip()
+        for line in HERMETIC_TEXT.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+def test_hermetic_workflow_gates_pull_requests():
+    triggers = HERMETIC.get("on") or HERMETIC[True]
+    assert "pull_request" in triggers
+    assert "merge_group" in triggers
+    assert "hermetic-install" in HERMETIC["jobs"]
+
+
+def test_hermetic_installer_is_version_pinned():
+    uv_pin = HERMETIC["env"]["UV_VERSION"]
+    assert re.match(r"^\d+\.\d+\.\d+$", str(uv_pin)), (
+        f"UV_VERSION {uv_pin!r} is not an exact x.y.z pin"
+    )
+    # The install step must consume that exact pin — no floating `pip install uv`.
+    assert '"uv==${UV_VERSION}"' in HERMETIC_TEXT
+
+
+def test_hermetic_drift_oracle_runs_before_frozen_sync():
+    check = HERMETIC_TEXT.index("uv lock --check")
+    sync = HERMETIC_TEXT.index("uv sync --frozen")
+    assert check < sync, "the drift oracle must run before the frozen sync"
+    assert PYPROJECT.is_file() and LOCKFILE.is_file()
+
+
+def test_hermetic_actions_are_sha_pinned():
+    for job_id, job in HERMETIC["jobs"].items():
+        for step in job["steps"]:
+            uses = step.get("uses")
+            if uses is None:
+                continue
+            assert re.search(r"@[0-9a-f]{40}\b", uses), (
+                f"{job_id} uses unpinned action {uses!r}; pin to a full commit SHA"
+            )
+
+
+def test_hermetic_workflow_has_no_false_green_pattern():
+    lines = _hermetic_command_lines()
+    assert not any("|| true" in line for line in lines)
+    assert not any("continue-on-error" in line for line in lines)
+    pipe_to_shell = re.compile(r"(curl|wget)[^\n|]*\|\s*(ba|z)?sh")
+    assert not any(pipe_to_shell.search(line) for line in lines)
+
+
+def test_hermetic_install_is_bounded_and_serialized():
+    assert HERMETIC["jobs"]["hermetic-install"]["timeout-minutes"] <= 30
+    assert HERMETIC["concurrency"]["group"].startswith("hermetic-")
+
+
+def test_every_polyglot_lane_has_a_committed_lockfile():
+    # One lockfile authority per language lane (WP-0A / WP-0H supply chain).
+    for lockfile in ("uv.lock", "dashboard/package-lock.json", "terminal/bun.lock"):
+        assert (REPO_ROOT / lockfile).is_file(), f"missing lockfile {lockfile}"
 
 
 if __name__ == "__main__":

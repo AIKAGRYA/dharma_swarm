@@ -1,0 +1,86 @@
+{
+  "allowed_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/loop-emergency-stop.yml",
+    ".github/workflows/loop-resume.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "docs/ops/loop_control/README.md",
+    "reports/agentops/work_packets/merge-master-mike-WP-LOOPB-killswitch.json",
+    "tests/test_loop_killswitch_workflows.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "ea190e2a83cef62a2dab3aec9434088048395987",
+  "branch": "claude/loop-pr-b-killswitch",
+  "commit": {
+    "allowed": false,
+    "message": "feat(loop-control): kill-switch guard across the unattended-merge chain + EMERGENCY STOP/RESUME"
+  },
+  "forbidden_files": [
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/forge_v1/forge_v2/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/ci_parity_manifest.json"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_loop_killswitch_workflows.py -q",
+      "expected_exit": 0,
+      "name": "killswitch-workflow-contract",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "merge-master-mike-WP-LOOPB-killswitch",
+  "intent": "PR-B of the walking-mode loop-closure plan (docs/plans/GRAPH_OF_LOOPS_DESIGN_2026-07-29.md, operator ruling 2026-07-29): one-tap EMERGENCY STOP/RESUME workflows writing docs/ops/loop_control/KILLSWITCH on the loop-control branch, plus a fail-closed kill-switch guard as the first step of every unattended-merge chain workflow (automerge, router, backlog).",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('.github/workflows/automerge.yml'); orig=p.read_text(); mut=orig.replace('Halt on loop kill-switch','DISABLED-guard',1); assert mut!=orig; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_loop_killswitch_workflows.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "guard-removal-breaks-contract-test",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/automerge.yml",
+      ".github/workflows/codex-mention-router.yml",
+      ".github/workflows/merge-master-mike-backlog.yml",
+      "dharma_swarm/holon_killswitch.py",
+      "agent_loop.sh"
+    ],
+    "collision": {
+      "checked_at_sha": "ea190e2a83cef62a2dab3aec9434088048395987",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Guard behavior is string/structure-pinned by tests/test_loop_killswitch_workflows.py; live halt behavior is only provable after operator hand-merge, by dispatching loop-emergency-stop and observing the chain workflows go red with HALTED BY KILLSWITCH.",
+      "This PR touches surfaces owned by merge-master-mike-d4-2026-06 while the walking-mode plan files under loop-closure-2026-06; the packet binds to the owning track and the operator adjudicates at hand-merge.",
+      "Tier 2 under the 2026-07-29 ruling: this PR must never be auto-merged; draft until operator hand-merge."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "7c32b399d12c823062228a9cecf410f23c535cbf4df279f3910d64f9874a5f6f",
+    "rollback": "Revert the single commit. The chain workflows lose the guard and return to prior unattended behavior; loop-emergency-stop/loop-resume disappear; any existing loop-control branch state becomes inert.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPB"
+  },
+  "worktree": "."
+}

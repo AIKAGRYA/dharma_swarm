@@ -13,12 +13,17 @@ string and operator reachability -- not an opinion the model can override. The
 gate takes NO model, provider, prompt, or cognition input by construction; its
 only inputs are the action text and whether the operator is reachable.
 
-Reuse, do not rebuild: risk classification is delegated to the existing
-``dharma_swarm.adaptive_autonomy.AdaptiveAutonomy.classify_risk`` / ``RiskLevel``
-enum. This module maps that 5-level enum onto the 4-way action class the wake
-loop needs, and adds a hard ``NEVER_AUTO`` override so a handful of
-irreversible/side-effecting verbs are *always* operator-gated regardless of how
-the pattern classifier scored them.
+Reuse, do not rebuild: risk classification is delegated to the shared
+``dharma_swarm.risk_patterns.classify_risk`` / ``RiskLevel`` vocabulary (the
+same single implementation behind ``AdaptiveAutonomy.classify_risk``). This
+module maps that 5-level enum onto the 4-way action class the wake loop needs,
+and adds a hard ``NEVER_AUTO`` override so a handful of irreversible/
+side-effecting verbs are *always* operator-gated regardless of how the pattern
+classifier scored them.
+
+Import-chain contract (operator ruling 2026-07-30): this module and everything
+it imports stay stdlib-only, so the automerge tier-policy guard can call
+``classify_action`` from the referee workflow's bare python3.
 """
 
 from __future__ import annotations
@@ -26,13 +31,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from dharma_swarm.adaptive_autonomy import (
+from dharma_swarm.risk_patterns import (
     _LOW_RISK_PATTERNS,
     _SAFE_PATTERNS,
-    AdaptiveAutonomy,
     RiskLevel,
+    classify_risk,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only; keeps runtime stdlib-only
+    from dharma_swarm.adaptive_autonomy import AdaptiveAutonomy
 
 
 class ActionClass(str, Enum):
@@ -171,7 +180,12 @@ class ReversibilityGate:
     """
 
     def __init__(self, autonomy: AdaptiveAutonomy | None = None) -> None:
-        self._autonomy = autonomy or AdaptiveAutonomy()
+        # Default path is the pure stdlib classifier (same implementation the
+        # AdaptiveAutonomy engine delegates to); constructing an engine here
+        # would drag pydantic into the referee workflow's import chain.
+        self._classify_risk = (
+            autonomy.classify_risk if autonomy is not None else classify_risk
+        )
 
     def classify(self, action: str, *, operator_reachable: bool = False) -> GateDecision:
         """Classify a single action string into a :class:`GateDecision`.
@@ -181,7 +195,7 @@ class ReversibilityGate:
         default, i.e. ``NEEDS_LEASE`` -- never ``REVERSIBLE_SAFE``.
         """
         action_lower = (action or "").lower()
-        risk = self._autonomy.classify_risk(action_lower)
+        risk = self._classify_risk(action_lower)
         action_class = _RISK_TO_CLASS.get(risk, ActionClass.NEEDS_LEASE)
         reasons: list[str] = [f"risk={risk.value}->class={action_class.value}"]
 
