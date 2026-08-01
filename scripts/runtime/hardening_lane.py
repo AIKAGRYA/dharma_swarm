@@ -70,6 +70,24 @@ def _run(cmd: list[str], *, timeout: int = 300, cwd: str | None = None,
         return subprocess.CompletedProcess(cmd, 127, "", str(exc))
 
 
+# The lane runs git in the SAME checkout the agent just wrote to, and the
+# agent can create .git/hooks/pre-commit or .git/hooks/pre-push — files no
+# path allowlist covers, because they live outside the worktree. Git would
+# then execute them during the lane's privileged commit and push, with the
+# write-enabled GH_TOKEN in scope (Greptile on PR #1162). Every git call
+# therefore disables hook execution on the command line, where it cannot be
+# overridden: `-c` outranks .git/config, which the agent can also edit.
+# core.fsmonitor is the same class of hazard — a configured value is an
+# executable git runs on its own.
+GIT_NO_HOOKS = ("-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false")
+
+
+def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """Every git invocation in this lane, with agent-controlled hook and
+    fsmonitor execution disabled."""
+    return _run(["git", *GIT_NO_HOOKS, *args], **kwargs)
+
+
 def receipt(payload: dict, out: Path) -> None:
     payload.setdefault("schema", "dharma.hardening_lane_receipt.v1")
     payload.setdefault("generated_at", _utc_stamp())
@@ -191,7 +209,7 @@ STAGE_EXCLUDE_NAMES = {".env", "secrets.json"}
 
 def agent_changed_paths() -> list[str]:
     """Every path the agent touched or created, minus the excluded set."""
-    result = _run(["git", "status", "--porcelain", "--untracked-files=all"])
+    result = _git(["status", "--porcelain", "--untracked-files=all"])
     paths: list[str] = []
     for line in result.stdout.splitlines():
         if len(line) < 4:
@@ -214,7 +232,7 @@ def stage_agent_changes() -> list[str]:
     """Stage the agent's change set by explicit path; return what was staged."""
     paths = agent_changed_paths()
     if paths:
-        _run(["git", "add", "--", *paths])
+        _git(["add", "--", *paths])
     return paths
 
 
@@ -222,8 +240,8 @@ def discard_agent_changes(paths: list[str]) -> None:
     """Undo an over-cap or failed agent run: unstage + restore tracked files,
     then remove exactly the untracked paths the agent created (never a
     blanket clean)."""
-    _run(["git", "reset", "-q", "HEAD", "--"])
-    _run(["git", "checkout", "-q", "HEAD", "--", "."])
+    _git(["reset", "-q", "HEAD", "--"])
+    _git(["checkout", "-q", "HEAD", "--", "."])
     for path in paths:
         candidate = Path(path)
         if candidate.is_file():
@@ -237,7 +255,7 @@ def diff_line_count() -> int:
     escaped the commit too, since `git add -u` never stages it. The caller
     stages the intended set first, so cap and commit measure the same
     thing (Greptile on PR #1162)."""
-    result = _run(["git", "diff", "--cached", "--numstat"])
+    result = _git(["diff", "--cached", "--numstat"])
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")
@@ -309,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     branch = f"{LANE_BRANCH_PREFIX}{_utc_stamp()}"
-    _run(["git", "checkout", "-B", branch])
+    _git(["checkout", "-B", branch])
 
     prompt = (
         "You are the hardening lane. ONE task, fresh context, no scope creep.\n"
@@ -384,12 +402,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # Re-stage the same explicit set: `make test-fast` may have produced
     # artifacts, and only the measured paths may reach the commit.
-    _run(["git", "reset", "-q", "HEAD", "--"])
+    _git(["reset", "-q", "HEAD", "--"])
     if staged:
-        _run(["git", "add", "--", *staged])
-    _run(["git", "commit", "-m",
+        _git(["add", "--", *staged])
+    _git(["commit", "-m",
           f"harden: {target['summary'][:60]} [hardening-lane]"])
-    push = _run(["git", "push", "-u", "origin", branch])
+    push = _git(["push", "-u", "origin", branch])
     if push.returncode != 0:
         receipt({"status": "PUSH_FAILED", "target": target,
                  "stderr": push.stderr[-1000:]}, out)

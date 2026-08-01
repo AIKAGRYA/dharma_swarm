@@ -145,14 +145,14 @@ def test_diff_cap_measures_the_staged_set_including_new_files() -> None:
     """git diff HEAD omits untracked files, so a new-file-only fix measured
     zero and a large new file escaped both the cap and the commit."""
     source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
-    assert '"git", "diff", "--cached", "--numstat"' in source
+    assert '_git(["diff", "--cached", "--numstat"])' in source
     # Staging is BY EXPLICIT PATH: this lane stages work produced by an
     # untrusted agent, so a blanket add could sweep in secrets or generated
     # reports (CLAUDE.md hard rule; semgrep dharma.scripts-no-git-add-all).
     assert '"git", "add", "-A"' not in source
     assert '"git", "add", "."' not in source
     assert '"git", "add", "-u"' not in source
-    assert '"git", "add", "--", *' in source
+    assert '_git(["add", "--", *' in source
 
 
 def test_nightly_target_requires_a_completed_run() -> None:
@@ -203,6 +203,35 @@ def test_workflow_installs_dependencies_and_always_reports() -> None:
     assert "lane_exit=" in text, "delivery-failure receipts must reach the summary"
     # Inner budgets must fit the job envelope with receipt-writing margin.
     assert hardening_lane.MAX_AGENT_SECONDS + hardening_lane.MAX_TEST_SECONDS <= 65 * 60
+
+
+def test_no_git_call_can_execute_an_agent_written_hook() -> None:
+    """.git/hooks/ is outside every path allowlist, so an agent could drop a
+    pre-commit hook and have the lane's own privileged commit run it with
+    GH_TOKEN in scope. Hook execution is disabled on the command line, where
+    the agent-writable .git/config cannot override it."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert 'core.hooksPath=/dev/null' in hardening_lane.GIT_NO_HOOKS[1]
+    assert 'core.fsmonitor=false' in hardening_lane.GIT_NO_HOOKS[3]
+    assert '["git", *GIT_NO_HOOKS, *args]' in source
+    # Exactly one raw git invocation: the wrapper itself.
+    assert source.count('_run(["git"') == 1, (
+        "every git call must go through _git so no invocation misses the guard"
+    )
+
+
+def test_git_wrapper_prefixes_every_invocation() -> None:
+    calls: list[list[str]] = []
+    original = hardening_lane._run
+    try:
+        hardening_lane._run = lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
+        hardening_lane._git(["commit", "-m", "x"])
+    finally:
+        hardening_lane._run = original
+    assert calls == [[
+        "git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+        "commit", "-m", "x",
+    ]]
 
 
 def test_verification_runs_without_the_lanes_write_credentials() -> None:
