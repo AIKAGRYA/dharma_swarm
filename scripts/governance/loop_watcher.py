@@ -168,11 +168,14 @@ def watch_pr(repo: str, pr: dict) -> dict:
     author = (pr.get("author") or {}).get("login", "")
     policy = _policy()
     findings: list[str] = []
+    degraded: list[str] = []
 
     # One paginated review read serves both the sign-off qualification and
     # the §9 canary check; it carries commit_id (which SHA each review saw)
     # and the "<app>[bot]" logins the policy's families are keyed to.
     reviews = _fetch_all_pages(f"repos/{repo}/pulls/{number}/reviews")
+    if reviews is None:
+        degraded.append("reviews")
 
     diff = _gh(["pr", "diff", str(number), "--repo", repo])
     diff_text = diff.stdout if diff.returncode == 0 else ""
@@ -212,16 +215,26 @@ def watch_pr(repo: str, pr: dict) -> dict:
     # approving a seeded defect once is the compromise.
     labels = {row.get("name") for row in pr.get("labels", [])}
     if CANARY_LABEL in labels:
-        passers = sorted({
-            str((r.get("user") or {}).get("login") or "")
-            for r in (reviews or [])
-            if str(r.get("state") or "").upper() == "APPROVED"
-        } - {""})
-        if passers:
+        if reviews is None:
+            # `reviews or []` would turn "could not read" into "nobody
+            # approved" and leave the report healthy while the one control
+            # the canary exists to run was never evaluated (Greptile on
+            # PR #1163). Unknown is a finding, and it degrades the run.
             findings.append(
-                f"CANARY PASSED by {passers} — a seeded defect was approved; "
-                "drop these reviewers from rotation until fixed (ruling §9)"
+                "CANARY REVIEW STATE UNKNOWN — review enumeration failed; "
+                "cannot tell whether a seeded defect was approved (ruling §9)"
             )
+        else:
+            passers = sorted({
+                str((r.get("user") or {}).get("login") or "")
+                for r in reviews
+                if str(r.get("state") or "").upper() == "APPROVED"
+            } - {""})
+            if passers:
+                findings.append(
+                    f"CANARY PASSED by {passers} — a seeded defect was approved; "
+                    "drop these reviewers from rotation until fixed (ruling §9)"
+                )
 
     checks = _gh_json([
         "api", f"repos/{repo}/commits/{head_sha}/check-runs?per_page=100",
@@ -236,6 +249,7 @@ def watch_pr(repo: str, pr: dict) -> dict:
     files = _fetch_all_pages(f"repos/{repo}/pulls/{number}/files")
     if files is None:
         findings.append("changed-file enumeration failed — tier classification unknown")
+        degraded.append("files")
         tier = None
     else:
         changed = [row.get("filename", "") for row in files]
@@ -255,6 +269,7 @@ def watch_pr(repo: str, pr: dict) -> dict:
             )
 
     return {"pr": number, "head": head_sha, "tier": tier, "findings": findings,
+            "degraded": sorted(set(degraded)),
             "deleted_test_files": deleted_test_files}
 
 
@@ -328,10 +343,20 @@ def run_watch(repo: str, report_path: Path) -> dict:
             result = watch_pr(repo, pr)
             result["comment"] = sync_findings(repo, pr, result["findings"])
             reports.append(result)
+    # A per-PR read failure degrades the whole run, not just that PR's row:
+    # a control that could not be evaluated is not a control that passed.
+    degraded_prs = sorted(r["pr"] for r in reports if r.get("degraded"))
+    unknown_comments = sorted(
+        r["pr"] for r in reports if r.get("comment") == "unknown"
+    )
     payload = {"schema": "dharma.loop_watcher_report.v1",
                "generated_at": _utc_stamp(), "watched": len(reports),
                "enumeration_failed": sorted(failed_labels),
-               "status": "DEGRADED" if failed_labels else "OK",
+               "degraded_prs": degraded_prs,
+               "comment_state_unknown": unknown_comments,
+               "status": ("DEGRADED"
+                          if failed_labels or degraded_prs or unknown_comments
+                          else "OK"),
                "reports": reports}
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
@@ -359,7 +384,25 @@ def receipted_comment_ids(comments: list[dict]) -> set[str]:
     return receipted
 
 
-def run_ingest(repo: str, owner_login: str) -> list[str] | None:
+def task_path_exists(repo: str, task_id: str) -> bool | None:
+    """Whether this comment's task already exists on the tasks branch.
+
+    None on a read failure — unknown must not read as "not created yet",
+    which would be a licence to write a second copy.
+    """
+    result = _gh([
+        "api",
+        f"repos/{repo}/contents/roaming_mailbox/tasks/{task_id}.json?ref={TASKS_BRANCH}",
+    ])
+    if result.returncode == 0:
+        return True
+    combined = f"{result.stdout}\n{result.stderr}"
+    if re.search(r"HTTP 404|Not Found|No commit found", combined, re.IGNORECASE):
+        return False
+    return None
+
+
+def run_ingest(repo: str, owner_login: str) -> dict | None:
     issues = _gh_json([
         "issue", "list", "--repo", repo, "--state", "open",
         "--label", BRIEF_ISSUE_LABEL, "--json", "number", "--limit", "1",
@@ -367,7 +410,7 @@ def run_ingest(repo: str, owner_login: str) -> list[str] | None:
     if not isinstance(issues, list):
         return None  # outage, not "no brief issue"
     if not issues:
-        return []
+        return {"ingested": [], "failed": []}
     number = issues[0]["number"]
     # REST comments: user.login is the authorship the receipt check needs,
     # and the numeric id is stable across the PATCH/create round trip.
@@ -376,6 +419,7 @@ def run_ingest(repo: str, owner_login: str) -> list[str] | None:
         return None
     receipted = receipted_comment_ids(comments)
     ingested: list[str] = []
+    failed: list[str] = []
     for comment in comments:
         author = str((comment.get("user") or {}).get("login") or "")
         body = str(comment.get("body") or "")
@@ -383,13 +427,24 @@ def run_ingest(repo: str, owner_login: str) -> list[str] | None:
             continue
         if str(comment.get("id", "")) in receipted:
             continue
-        # The comment id makes the task id collision-resistant: a
-        # second-resolution stamp alone gave two comments ingested in the
-        # same second the same Contents path, and the second create failed
-        # with no task and no confirmation (Greptile on PR #1163).
+        # The task path is derived ONLY from the comment id — no timestamp.
+        # With a stamp in it, a run whose Contents PUT succeeded but whose
+        # receipt post failed left the directive un-retired, and the next
+        # run minted a DIFFERENT path for the same comment: two tasks, one
+        # instruction (Greptile on PR #1163). An immutable path makes the
+        # retry converge — the task is already there, so the run only has
+        # the receipt left to post.
         comment_id = re.sub(r"[^A-Za-z0-9_-]", "", str(comment.get("id", "")))
-        task_id = f"mbx_op_{_utc_stamp().lower()}_{comment_id}" if comment_id \
-            else f"mbx_op_{_utc_stamp().lower()}"
+        if not comment_id:
+            # Without a stable id there is no dedupe key, and ingesting
+            # would duplicate on every run. Report it instead.
+            failed.append("comment with no usable id — cannot dedupe, skipped")
+            continue
+        task_id = f"mbx_op_c{comment_id}"
+        exists = task_path_exists(repo, task_id)
+        if exists is None:
+            failed.append(f"{task_id}: could not read existing task state")
+            continue
         depends_on = parse_depends_on(body)
         task = {
             "task_id": task_id, "recipient": "hardening-lane",
@@ -407,25 +462,36 @@ def run_ingest(repo: str, owner_login: str) -> list[str] | None:
             "claimed_at": "", "claimed_by": "", "responded_at": "",
             "response_ref": "", "depends_on": depends_on,
         }
-        content = base64.b64encode(
-            (json.dumps(task, indent=2, sort_keys=True) + "\n").encode()
-        ).decode()
-        put = _gh([
-            "api", "-X", "PUT",
-            f"repos/{repo}/contents/roaming_mailbox/tasks/{task_id}.json",
-            "-f", f"message=watcher: ingest operator note as {task_id}",
-            "-f", f"content={content}", "-f", f"branch={TASKS_BRANCH}",
-        ])
-        if put.returncode == 0:
-            ingested.append(task["summary"])
-            _gh([
-                "issue", "comment", str(number), "--repo", repo, "--body",
-                f"{INGEST_MARKER} ref:{comment.get('id', '')}\n"
-                f"🎙️ Understood as task `{task_id}` for the hardening lane: "
-                f"“{task['summary']}”. It appears in tomorrow's brief.\n\n---\n"
-                "_Generated by [Claude Code](https://claude.ai/code)_",
+        if not exists:
+            content = base64.b64encode(
+                (json.dumps(task, indent=2, sort_keys=True) + "\n").encode()
+            ).decode()
+            put = _gh([
+                "api", "-X", "PUT",
+                f"repos/{repo}/contents/roaming_mailbox/tasks/{task_id}.json",
+                "-f", f"message=watcher: ingest operator note as {task_id}",
+                "-f", f"content={content}", "-f", f"branch={TASKS_BRANCH}",
             ])
-    return ingested
+            if put.returncode != 0:
+                failed.append(f"{task_id}: task write failed")
+                continue
+        # The receipt is what RETIRES the directive, so a failed post is a
+        # reported failure, not a silent success: the summary must not claim
+        # "it appears in tomorrow's brief" when the operator will see the
+        # same comment picked up again (Greptile on PR #1163). Next run the
+        # task already exists, so only the receipt is retried.
+        echo = _gh([
+            "issue", "comment", str(number), "--repo", repo, "--body",
+            f"{INGEST_MARKER} ref:{comment.get('id', '')}\n"
+            f"🎙️ Understood as task `{task_id}` for the hardening lane: "
+            f"“{task['summary']}”. It appears in tomorrow's brief.\n\n---\n"
+            "_Generated by [Claude Code](https://claude.ai/code)_",
+        ])
+        if echo.returncode != 0:
+            failed.append(f"{task_id}: task written but receipt post failed")
+            continue
+        ingested.append(task["summary"])
+    return {"ingested": ingested, "failed": failed}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -438,11 +504,16 @@ def main(argv: list[str] | None = None) -> int:
 
     report_path = Path(args.report)
     payload = run_watch(args.repo, report_path)
-    ingested = [] if args.skip_ingest else run_ingest(args.repo, args.owner_login)
-    if ingested is None:
+    result = ({"ingested": [], "failed": []} if args.skip_ingest
+              else run_ingest(args.repo, args.owner_login))
+    if result is None:
         payload["status"] = "DEGRADED"
-        payload["ingest_failed"] = True
-        ingested = []
+        payload["ingest_failed"] = ["enumeration failed"]
+        result = {"ingested": [], "failed": []}
+    elif result["failed"]:
+        payload["status"] = "DEGRADED"
+        payload["ingest_failed"] = result["failed"]
+    ingested = result["ingested"]
     # The ingested summaries belong IN the report, not only in this job's
     # log: the brief runs as a separate workflow and can only read what was
     # persisted (Codex on PR #1163). Wiring the brief to consume this field

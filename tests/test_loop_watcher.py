@@ -246,3 +246,97 @@ def test_parse_depends_on_accepts_ids_and_rejects_junk():
     # Traversal-shaped and empty declarations are dropped, never written.
     assert loop_watcher.parse_depends_on("depends on: ../responses/x") == []
     assert loop_watcher.parse_depends_on("no prerequisites here") == []
+
+
+def test_canary_review_outage_is_a_finding_not_an_empty_approval_list(monkeypatch):
+    """`reviews or []` turned "could not read" into "nobody approved" and
+    left the report healthy while the canary control never ran."""
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {})
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: None)
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 13, "headRefOid": "sha", "additions": 1, "deletions": 0,
+        "author": {"login": "someone"}, "labels": [{"name": "canary-sandbox"}],
+    })
+    assert any("CANARY REVIEW STATE UNKNOWN" in f for f in report["findings"])
+    assert "reviews" in report["degraded"]
+
+
+def test_a_degraded_pr_degrades_the_whole_run(tmp_path, monkeypatch):
+    """A control that could not be evaluated is not a control that passed."""
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: (
+        [{"number": 14, "headRefOid": "sha", "additions": 1, "deletions": 0,
+          "author": {"login": "someone"}, "labels": []}]
+        if args[:2] == ["pr", "list"] else {}
+    ))
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: None)
+    payload = loop_watcher.run_watch("o/r", tmp_path / "r.json")
+    assert payload["status"] == "DEGRADED"
+    assert payload["degraded_prs"] == [14]
+
+
+def test_task_path_is_derived_from_the_comment_id_alone(monkeypatch):
+    """A timestamped path meant a failed receipt post minted a SECOND task
+    for the same directive on the next run."""
+    source = (REPO_ROOT / "scripts" / "governance" / "loop_watcher.py").read_text()
+    assert 'task_id = f"mbx_op_c{comment_id}"' in source
+    assert "_utc_stamp().lower()" not in source, "no clock in the dedupe key"
+
+
+def test_receipt_failure_is_reported_and_does_not_count_as_ingested(monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_gh(args, **kw):
+        calls.append(args)
+        if args[:1] == ["issue"] and args[1:2] == ["comment"]:
+            return _proc("", returncode=1)      # the receipt post fails
+        if args[:2] == ["api", "-X"]:
+            return _proc("")                    # the task write succeeds
+        return _proc("HTTP 404: Not Found", returncode=1)  # task absent
+
+    monkeypatch.setattr(loop_watcher, "_gh", fake_gh)
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: [{"number": 5}])
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [
+        {"id": 4242, "user": {"login": "op"}, "body": "please harden X"},
+    ])
+    result = loop_watcher.run_ingest("o/r", "op")
+    assert result["ingested"] == []
+    assert any("receipt post failed" in f for f in result["failed"])
+    # The task path carries the comment id and no timestamp, so the retry
+    # converges on the same file instead of writing a duplicate.
+    puts = [c for c in calls if c[:2] == ["api", "-X"]]
+    assert puts and "mbx_op_c4242.json" in puts[0][3]
+
+
+def test_existing_task_is_not_rewritten_only_receipted(monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_gh(args, **kw):
+        calls.append(args)
+        return _proc("")  # every call succeeds, incl. the existence probe
+
+    monkeypatch.setattr(loop_watcher, "_gh", fake_gh)
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: [{"number": 5}])
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [
+        {"id": 4242, "user": {"login": "op"}, "body": "please harden X"},
+    ])
+    result = loop_watcher.run_ingest("o/r", "op")
+    assert result["ingested"] == ["please harden X"]
+    assert not [c for c in calls if c[:2] == ["api", "-X"]], (
+        "an existing task must not be overwritten; only the receipt is retried"
+    )
+
+
+def test_unreadable_task_state_never_writes(monkeypatch):
+    monkeypatch.setattr(
+        loop_watcher, "_gh",
+        lambda args, **kw: _proc("HTTP 500: upstream error", returncode=1),
+    )
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: [{"number": 5}])
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [
+        {"id": 4242, "user": {"login": "op"}, "body": "please harden X"},
+    ])
+    result = loop_watcher.run_ingest("o/r", "op")
+    assert result["ingested"] == []
+    assert any("could not read existing task state" in f for f in result["failed"])
