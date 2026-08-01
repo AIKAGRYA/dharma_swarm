@@ -1,0 +1,257 @@
+name: sarathi-wake-lane
+
+# Tier 2 / referee layer (operator ruling 2026-07-29, DOOR =
+# AUTO_WITH_DECORRELATED_REVIEW): operator hand-merge forever on this file.
+#
+# The DURABLE RUNTIME for Sarathi's standing wake loop (PR-S6 of the autonomy
+# mission). scripts/runtime/sarathi_wake_daemon.py already binds the merged
+# wake organs to the autonomy dial, but it needs a host that runs when the
+# operator's laptop does not. The operator is mobile-only; this lane makes the
+# loop dispatchable and schedulable from a phone, with GitHub as the host.
+#
+# SAFETY ENVELOPE — every limit the daemon has, this lane keeps:
+#   * KILLSWITCH guard is the FIRST step (this lane TAKES ACTION, unlike the
+#     read-only walking-brief). loop-emergency-stop from the phone halts it.
+#   * The dial is an operator-set repository variable DGC_SARATHI_AUTONOMY,
+#     settable from the phone (Settings -> Secrets and variables -> Actions ->
+#     Variables). UNSET => `propose` => plans and writes briefs, dispatches
+#     NOTHING. Invalid => the daemon itself fails closed to `shadow`.
+#   * The reversibility gate still runs before every delegation inside
+#     delegate_all; `git push` / `merge pr` remain NEVER_AUTO.
+#   * This lane never sets wake_loop_active and never merges anything.
+#
+# STATE, and why it lives on a branch: a standing loop needs continuity across
+# runs (dedup keys so unchanged backlog items are not re-dispatched every
+# cycle, the run counter, the spend ledger, the operator's kill-path receipt).
+# Runner filesystems are ephemeral. Per the loop-control precedent (an
+# emergency write must not depend on a PR landing), runtime state lives on a
+# dedicated `sarathi-state` branch under state/sarathi/**. That branch is
+# ORPHAN and is NEVER merged to main, so the "runtime receipts never enter
+# git" rule is honored for the repository proper: main stays clean.
+
+on:
+  schedule:
+    - cron: "30 20 * * *"  # 20:30 UTC = 05:30 JST — runs before the 21:00 walking brief
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daemon (standing wake cycles) or proof (14-cycle unattended proof)"
+        required: false
+        default: "daemon"
+        type: choice
+        options: ["daemon", "proof"]
+      cycles:
+        description: "Wake cycles to run in daemon mode (proof always judges against the full 14)"
+        required: false
+        default: "1"
+      dial:
+        description: "Override the DGC_SARATHI_AUTONOMY repo variable for THIS run only (blank = use the variable)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sarathi-wake-lane
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    name: Sarathi wake lane
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      STATE_BRANCH: sarathi-state
+      STATE_DIR: state/sarathi
+      MODE: ${{ inputs.mode || 'daemon' }}
+      CYCLES: ${{ inputs.cycles || '1' }}
+      DIAL: ${{ inputs.dial || vars.DGC_SARATHI_AUTONOMY || 'propose' }}
+      BRIEF_ISSUE: ${{ vars.SARATHI_BRIEF_ISSUE || '1168' }}
+    steps:
+      - name: Halt on loop kill-switch
+        run: |
+          set -euo pipefail
+          # Mirrors the guard pinned by tests/test_loop_killswitch_workflows.py:
+          # present on the loop-control branch => HALT (exit 1, red-while-halted);
+          # absent (404 on file or branch) => proceed; any other error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — Sarathi wake lane did not run" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
+      - name: Checkout default branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --disable-pip-version-check aiosqlite aiofiles pydantic
+
+      - name: Restore Sarathi state
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/dharma"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch \
+              "$remote" "${RUNNER_TEMP}/state-repo"
+            if [ -d "${RUNNER_TEMP}/state-repo/${STATE_DIR}" ]; then
+              cp -a "${RUNNER_TEMP}/state-repo/${STATE_DIR}" "${RUNNER_TEMP}/dharma/sarathi"
+              echo "restored state from ${STATE_BRANCH}"
+            fi
+          else
+            echo "no ${STATE_BRANCH} branch yet — first run, starting from clean state"
+          fi
+          if [ -f "${RUNNER_TEMP}/dharma/sarathi/kill_path_receipt.json" ]; then
+            echo "kill-path receipt: present (written by the operator attestation lane)"
+          else
+            echo "kill-path receipt: ABSENT — a proof run will fail closed, by design"
+          fi
+
+      - name: Run Sarathi
+        id: run
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma"
+          echo "mode=${MODE} dial=${DIAL} cycles=${CYCLES}"
+          if [ "${MODE}" = "proof" ]; then
+            # The proof runner pins the dial to propose itself, ALWAYS judges
+            # against the full 14-cycle requirement, prints its own verdict
+            # line, and exits non-zero on any non-pass. Its machine report is
+            # written into the state root, so copy that out for the artifact.
+            set +e
+            python3 scripts/runtime/sarathi_proof_window.py --state-root "$state_root"
+            rc=$?
+            set -e
+            cp "$state_root/sarathi/proof_window_report.json" \
+              "${RUNNER_TEMP}/sarathi_result.json" 2>/dev/null || true
+            echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+            exit $rc
+          else
+            DGC_SARATHI_AUTONOMY="${DIAL}" python3 scripts/runtime/sarathi_wake_daemon.py \
+              --cycles "${CYCLES}" --state-root "$state_root" --json \
+              > "${RUNNER_TEMP}/sarathi_result.json"
+            echo "rc=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summarize
+        if: always()
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma"
+          {
+            echo "## Sarathi wake lane — ${MODE} (dial: ${DIAL})"
+            echo ""
+            if [ -f "${RUNNER_TEMP}/sarathi_result.json" ]; then
+              echo '```json'
+              head -c 4000 "${RUNNER_TEMP}/sarathi_result.json"
+              echo ""
+              echo '```'
+            else
+              echo "_No result document — the run halted before writing one._"
+            fi
+            latest="$(find "$state_root/sarathi/briefs" -name '*.md' -printf '%T@ %p\n' 2>/dev/null \
+              | sort -rn | head -1 | cut -d' ' -f2- || true)"
+            if [ -n "${latest:-}" ]; then
+              echo ""
+              echo "### Latest brief"
+              echo ""
+              cat "$latest"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload briefs and reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sarathi-${{ env.MODE }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/dharma/sarathi/briefs/**
+            ${{ runner.temp }}/dharma/sarathi/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Persist Sarathi state
+        if: always()
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma"
+          if [ ! -d "$state_root/sarathi" ]; then
+            echo "no state produced; nothing to persist"
+            exit 0
+          fi
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          repo="${RUNNER_TEMP}/state-push"
+          if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
+          else
+            # Orphan branch: runtime state must never share history with main.
+            git clone --quiet --depth 1 "$remote" "$repo"
+            git -C "$repo" checkout --orphan "$STATE_BRANCH"
+            git -C "$repo" rm -rq --cached . || true
+            find "$repo" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+          fi
+          mkdir -p "$repo/$(dirname "$STATE_DIR")"
+          rm -rf "${repo:?}/${STATE_DIR}"
+          cp -a "$state_root/sarathi" "$repo/${STATE_DIR}"
+          cat > "$repo/README.md" <<'EOF'
+          # sarathi-state — runtime state, NEVER merged to main
+
+          Written by .github/workflows/sarathi-wake-lane.yml. Holds Sarathi's
+          standing-loop continuity: mailbox tasks, per-run briefs and reports,
+          the run counter, the spend ledger, and the operator's kill-path
+          receipt. Orphan by construction (loop-control precedent) so runtime
+          receipts stay out of the repository proper.
+          EOF
+          git -C "$repo" config user.name "sarathi-wake-lane"
+          git -C "$repo" config user.email "noreply@github.com"
+          git -C "$repo" add -A
+          if git -C "$repo" diff --cached --quiet; then
+            echo "state unchanged; nothing to push"
+          else
+            git -C "$repo" commit -q -m "sarathi state: ${MODE} run ${GITHUB_RUN_ID} (dial ${DIAL})"
+            git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"
+            echo "state pushed to ${STATE_BRANCH}"
+          fi
+
+      - name: Post the brief to the operator's pinned issue
+        if: always() && env.MODE == 'daemon' && env.BRIEF_ISSUE != ''
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma"
+          latest="$(find "$state_root/sarathi/briefs" -name '*.md' -printf '%T@ %p\n' 2>/dev/null \
+            | sort -rn | head -1 | cut -d' ' -f2- || true)"
+          if [ -z "${latest:-}" ]; then
+            echo "no brief produced; not commenting"
+            exit 0
+          fi
+          body="${RUNNER_TEMP}/comment.md"
+          {
+            echo "## Sarathi wake cycle — dial \`${DIAL}\`"
+            echo ""
+            echo "Run: https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}"
+            echo ""
+            cat "$latest"
+            echo ""
+            echo "---"
+            echo "_Generated by [Claude Code](https://claude.ai/code)_"
+          } > "$body"
+          gh issue comment "${BRIEF_ISSUE}" --repo "${GH_REPO}" --body-file "$body"

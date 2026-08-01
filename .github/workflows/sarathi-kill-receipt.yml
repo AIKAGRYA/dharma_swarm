@@ -1,0 +1,146 @@
+name: sarathi-kill-receipt
+
+# Tier 2 / referee layer (operator ruling 2026-07-29): operator hand-merge
+# forever on this file.
+#
+# The operator's kill-path attestation, from a phone. Gate 9 refuses to pass
+# the 14-cycle unattended proof unless
+# <state-root>/sarathi/kill_path_receipt.json exists and carries
+# {"verified": true, "verified_at": ..., "method": ...}. By contract the proof
+# runner NEVER creates that file — scripts/runtime/sarathi_proof_window.py is
+# unchanged by this workflow and still never writes it. Only the operator can,
+# and until now "the operator" meant a shell heredoc on the runtime host.
+#
+# The operator is mobile-only, so this lane is the same operator act performed
+# from a phone, and it is STRICTLY STRONGER than the heredoc it replaces:
+#
+#   1. workflow_dispatch ONLY — never a schedule, never an event. A human with
+#      write access must tap Run.
+#   2. The operator must type `verified` (loop-resume's idiom) — a stray tap
+#      cannot attest a safety property.
+#   3. MECHANICAL CORROBORATION, which the heredoc never had: this lane refuses
+#      to write the receipt unless GitHub's own run history shows a SUCCESSFUL
+#      loop-emergency-stop run followed by a SUCCESSFUL loop-resume run. The
+#      recorded `method` cites those run IDs, so the receipt is checkable
+#      against evidence rather than trusted as prose. No corroboration => no
+#      receipt (fail closed).
+#
+# The receipt is written to the orphan `sarathi-state` branch, where
+# sarathi-wake-lane.yml restores it from.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type: verified  (only after YOU confirmed loop-emergency-stop from your phone)"
+        required: true
+      note:
+        description: "Optional one-line note recorded in the receipt method"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: sarathi-state-write
+  cancel-in-progress: false
+
+jobs:
+  attest:
+    name: Record the operator kill-path receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      STATE_BRANCH: sarathi-state
+      STATE_DIR: state/sarathi
+      CONFIRM: ${{ inputs.confirm }}
+      NOTE: ${{ inputs.note }}
+      ACTOR: ${{ github.actor }}
+    steps:
+      - name: Verify confirmation
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRM}" != "verified" ]; then
+            echo "confirmation must be exactly 'verified' (got: '${CONFIRM}')" >&2
+            exit 1
+          fi
+
+      - name: Corroborate the kill path against GitHub run history
+        run: |
+          set -euo pipefail
+          # A receipt is only honest if the kill path actually engaged and
+          # released. Require a successful loop-emergency-stop, then a
+          # successful loop-resume that started no earlier than it.
+          stop_json="$(gh api "repos/${GH_REPO}/actions/workflows/loop-emergency-stop.yml/runs?status=success&per_page=1" 2>/dev/null || echo '{}')"
+          resume_json="$(gh api "repos/${GH_REPO}/actions/workflows/loop-resume.yml/runs?status=success&per_page=1" 2>/dev/null || echo '{}')"
+          stop_id="$(printf '%s' "$stop_json" | jq -r '.workflow_runs[0].id // empty')"
+          stop_at="$(printf '%s' "$stop_json" | jq -r '.workflow_runs[0].run_started_at // empty')"
+          resume_id="$(printf '%s' "$resume_json" | jq -r '.workflow_runs[0].id // empty')"
+          resume_at="$(printf '%s' "$resume_json" | jq -r '.workflow_runs[0].run_started_at // empty')"
+          if [ -z "$stop_id" ]; then
+            echo "no successful loop-emergency-stop run found — engage the kill switch from your phone first" >&2
+            exit 1
+          fi
+          if [ -z "$resume_id" ]; then
+            echo "no successful loop-resume run found — release the kill switch before attesting" >&2
+            exit 1
+          fi
+          # RFC3339 UTC timestamps compare correctly as strings.
+          if [[ "$resume_at" < "$stop_at" ]]; then
+            echo "the newest successful loop-resume ($resume_at) predates the newest loop-emergency-stop ($stop_at); re-run the round trip" >&2
+            exit 1
+          fi
+          method="operator ${ACTOR} verified the kill path from a phone via workflow_dispatch: loop-emergency-stop run ${stop_id} succeeded at ${stop_at} (engaged docs/ops/loop_control/KILLSWITCH on loop-control), then loop-resume run ${resume_id} succeeded at ${resume_at} (released it). Corroborated mechanically against the GitHub Actions run history by .github/workflows/sarathi-kill-receipt.yml; the proof runner never writes this file."
+          if [ -n "${NOTE}" ]; then
+            method="${method} Operator note: ${NOTE}"
+          fi
+          {
+            echo "RECEIPT_METHOD=${method}"
+            echo "STOP_RUN=${stop_id}"
+            echo "RESUME_RUN=${resume_id}"
+          } >> "$GITHUB_ENV"
+          echo "corroborated: ${stop_id} -> ${resume_id}"
+
+      - name: Write the receipt to the state branch
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          repo="${RUNNER_TEMP}/state-repo"
+          if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
+          else
+            # Orphan by construction: runtime state never shares history with main.
+            git clone --quiet --depth 1 "$remote" "$repo"
+            git -C "$repo" checkout --orphan "$STATE_BRANCH"
+            git -C "$repo" rm -rq --cached . || true
+            find "$repo" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+          fi
+          mkdir -p "$repo/${STATE_DIR}"
+          jq -n \
+            --arg at "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+            --arg method "${RECEIPT_METHOD}" \
+            '{verified: true, verified_at: $at, method: $method}' \
+            > "$repo/${STATE_DIR}/kill_path_receipt.json"
+          cat "$repo/${STATE_DIR}/kill_path_receipt.json"
+          git -C "$repo" config user.name "sarathi-kill-receipt"
+          git -C "$repo" config user.email "noreply@github.com"
+          git -C "$repo" add -A
+          if git -C "$repo" diff --cached --quiet; then
+            echo "receipt unchanged; nothing to push"
+          else
+            git -C "$repo" commit -q -m "sarathi kill-path receipt (stop ${STOP_RUN} -> resume ${RESUME_RUN})"
+            git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"
+          fi
+          {
+            echo "## ✅ Kill-path receipt recorded"
+            echo ""
+            echo "- loop-emergency-stop run: \`${STOP_RUN}\`"
+            echo "- loop-resume run: \`${RESUME_RUN}\`"
+            echo "- stored: \`${STATE_BRANCH}:${STATE_DIR}/kill_path_receipt.json\`"
+            echo ""
+            echo "The 14-cycle proof can now pass. Run **sarathi-wake-lane** with mode \`proof\`."
+          } >> "$GITHUB_STEP_SUMMARY"

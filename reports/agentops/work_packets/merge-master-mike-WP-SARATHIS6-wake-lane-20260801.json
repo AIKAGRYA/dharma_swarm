@@ -1,0 +1,122 @@
+{
+  "id": "merge-master-mike-WP-SARATHIS6-wake-lane-20260801",
+  "base_ref": "e1c5dffda158b9f2590567880b8278ee44437e87",
+  "branch": "claude/sarathi-autonomy-build-vyr998",
+  "worktree": ".",
+  "intent": "Add the phone-operated CI wake lane (PR-S6 of the Sarathi autonomy mission, follow-up to merged PR #1170): .github/workflows/sarathi-wake-lane.yml gives the merged standing wake daemon a DURABLE runtime that the mobile-only operator can dispatch and schedule from a phone, and .github/workflows/sarathi-kill-receipt.yml lets the operator record the Gate-9 kill-path receipt from a phone instead of a shell heredoc on a host he cannot reach. The lane carries the same safety envelope as the daemon: the loop kill-switch guard is the FIRST step (so loop-emergency-stop from the phone halts it, unlike the deliberately unguarded read-only walking-brief), the autonomy dial is the operator-set repository variable DGC_SARATHI_AUTONOMY which defaults to propose when unset (plans and briefs, dispatches nothing), the reversibility gate still runs inside delegate_all before every delegation, and the lane never merges, never labels, and never sets wake_loop_active. Standing-loop continuity (dedup keys, run counter, spend ledger, kill receipt) needs to survive ephemeral runners, so runtime state round-trips through an ORPHAN sarathi-state branch under state/sarathi/** following the loop-control precedent that an emergency/runtime write must not depend on a PR landing; that branch is never merged, so main stays free of runtime receipts. The attestation lane is strictly stronger than the heredoc it replaces: workflow_dispatch only, a typed `verified` confirmation, and mechanical corroboration that GitHub's own run history contains a successful loop-emergency-stop followed by a successful loop-resume, whose run IDs are cited in the receipt's method string. scripts/runtime/sarathi_proof_window.py is NOT modified and still never writes the receipt; a regression test pins that contract so this PR cannot be read as weakening Gate 9. Surface-ownership check at e1c5dff: both workflow files are new names, and while the merge-master-mike track owns automerge.yml, codex-mention-router.yml and merge-master-mike-backlog.yml by name and the titanium track owns hermetic/tests/ci-parity/docops/pr-dedupe/bot-pr-limit/a2a-agni-live-contact by name, neither track claims .github/workflows/** as a wildcard, so no owned surface is touched.",
+  "allowed_files": [
+    ".github/workflows/sarathi-wake-lane.yml",
+    ".github/workflows/sarathi-kill-receipt.yml",
+    "tests/test_sarathi_wake_lane_workflow.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS6-wake-lane-20260801.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/operator_core/autonomy_dial.py",
+    "scripts/runtime/sarathi_proof_window.py",
+    "scripts/runtime/sarathi_wake_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/governance/automerge_tier_policy.json",
+    ".github/workflows/loop-emergency-stop.yml",
+    ".github/workflows/loop-resume.yml",
+    ".github/workflows/automerge.yml",
+    "dharma_swarm/holon_system/sarathi/wake.py",
+    "dharma_swarm/holon_system/sarathi/proof.py",
+    "dharma_swarm/holon_system/sarathi/plan.py",
+    "dharma_swarm/holon_system/sarathi/delegate.py"
+  ],
+  "gates": [
+    {
+      "name": "sarathi-wake-lane-contract",
+      "command": "python3 -m pytest -q tests/test_sarathi_wake_lane_workflow.py tests/test_loop_killswitch_workflows.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sarathi-regression",
+      "command": "python3 -m pytest -q tests/test_sarathi_wake_daemon.py tests/test_sarathi_proof_window.py tests/test_sarathi_wake.py tests/test_sarathi_delegate.py tests/test_sarathi_plan.py tests/test_sarathi_proof.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "workflow-cache-token-guard",
+      "command": "python3 scripts/governance/check_workflow_cache_token.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "codeowners-blast-radius",
+      "command": "python3 scripts/governance/codeowners_blast_radius.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "proof-runner-must-still-refuse-to-write-the-receipt",
+      "command": "python3 -m pytest -q tests/test_sarathi_wake_lane_workflow.py::test_proof_runner_still_never_writes_the_receipt",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "unset-dial-must-not-dispatch",
+      "command": "python3 -m pytest -q tests/test_sarathi_wake_lane_workflow.py::test_wake_lane_dial_defaults_to_propose",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(sarathi): PR-S6 phone-operated CI wake lane + kill-path attestation"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SARATHIS6",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "e1c5dffda158b9f2590567880b8278ee44437e87",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The merged daemon assumes a host process re-invokes it per cadence (its own packet listed 'a truly continuous standing loop is the operator's scheduler' as an honest blocker). The operator is mobile-only and walking Japan, so no such host exists; this lane supplies GitHub Actions as that host and makes the cadence a cron plus a phone-tappable workflow_dispatch.",
+      "The daemon's dedup, run counter and spend ledger are per-state-root and assume durable storage, but Actions runners are ephemeral, which would make every scheduled run re-dispatch the same unchanged backlog item. The orphan sarathi-state branch supplies the missing durability; verified locally by simulating the restore/persist round trip against a bare repo (two runs, both briefs retained, orphan branch isolated from main history).",
+      "Gate 9 requires a kill-path receipt the runner may never create, but the documented way to create it was a shell heredoc on the runtime host. The attestation lane resolves that for a mobile operator without touching the runner's contract."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/walking-brief.yml",
+      ".github/workflows/merge-master-mike-backlog.yml",
+      ".github/workflows/loop-emergency-stop.yml",
+      "scripts/runtime/sarathi_wake_daemon.py",
+      "scripts/runtime/sarathi_proof_window.py"
+    ],
+    "honest_blockers": [
+      "This lane does not close item F: at full the daemon still only enqueues a mailbox merge-intent, and nothing yet converts that into the automerge label Merge Master Mike consumes, so the DoD's zero-touch auto-merge remains unreached.",
+      "Mike's unattended lane is still unarmed: 'Automerge tier policy' is absent from scripts/governance/ci_parity_manifest.json required_contexts (verified at e1c5dff) and therefore almost certainly absent from branch protection, and the MIKE_PAT Actions write scope cannot be verified from a container.",
+      "--cap-usd still bounds only daemon-direct spend (item G); the lane inherits that honest limit and the report keeps labelling it budget_scope daemon-direct-spend.",
+      "The lane's shell was exercised against a simulated bare repo, not against GitHub; first live dispatch is the real proof and the operator should run it in daemon mode at the default propose dial before scheduling anything."
+    ],
+    "rollback": "Revert the two workflow files, the test and this packet together, then delete the sarathi-state branch. Nothing on main reads the lane, no runtime state lives on main, and the merged daemon and proof runner are untouched.",
+    "packet_digest": "032390b7831a0d9628bb9ac18bbcb732d21c74605b3e1a4c8d78ece0d64c9d6b"
+  }
+}
