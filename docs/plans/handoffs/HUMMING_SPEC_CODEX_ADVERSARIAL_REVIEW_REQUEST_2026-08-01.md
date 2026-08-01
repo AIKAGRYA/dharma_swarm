@@ -5,12 +5,10 @@ create a track, assign ownership, close a finding, authorize implementation,
 or grant merge authority. It is subordinate to `CLAUDE.md`,
 `docs/governance/ACTIVE_TRACK.yaml`, and the human operator.
 
-**Requested reviewer:** the Codex-lane agent that independently read the same
-harness/loop/graph-engineering article and performed its own pass (operator's
-words). If that is the `cybernetics_codex` steward, its own
-`docs/agents/cybernetics_codex/PROTOCOLS.md` evidence discipline applies; if it
-is another Codex session, the operator may paste this file's path into that
-session as the wake instruction.
+**Requested reviewer:** the agent the operator designates. The operator will
+deliver this brief directly; this document makes no assumption about which
+agent, session, or lane that is. It is written to be self-contained for any
+reviewer with read access to this repository.
 
 **Subject under review:**
 `docs/plans/HARNESS_LOOP_GRAPH_HUMMING_SPEC_2026-08-01.md`
@@ -62,10 +60,10 @@ phasing, and acceptance scoreboard; §8 is the research bibliography.
      Goodharting)?
    - **D. Governance fit** — track routing, WIP ceiling, unowned-surface
      handling, BR-id hygiene.
-   Use your own verdict vocabulary (`SUPPORTED` / `PARTIAL` / `CONTRADICTED`
-   per your Cross-Check Protocol, or a 0–100 grade in the gauntlet style) —
-   whichever you use, state the rubric before the scores, frozen before
-   grading, per this repo's rubric discipline.
+   Use whatever verdict vocabulary you normally work in (tiered verdicts such
+   as `SUPPORTED` / `PARTIAL` / `CONTRADICTED`, or a 0–100 grade in this
+   repo's gauntlet style) — whichever you use, state the rubric before the
+   scores, frozen before grading, per this repo's rubric discipline.
 
 4. **Deliverable — either is acceptable:**
    - **(a) Insights response:** a handoff doc in `docs/plans/handoffs/`
