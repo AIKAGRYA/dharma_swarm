@@ -23,6 +23,7 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: '1'
       PYTEST_ADDOPTS: '-p no:cacheprovider'
+      HUMMING_A0_BASE: e1c5dffda158b9f2590567880b8278ee44437e87
     steps:
       - name: Checkout exact pull-request branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -56,18 +57,18 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           install_source="${RUNNER_TEMP}/humming-a0/package-source"
-          git archive --format=tar HEAD^^ | tar -xf - -C "${install_source}"
+          git archive --format=tar "${HUMMING_A0_BASE}" | tar -xf - -C "${install_source}"
           python -m pip install "${install_source}[dev]"
 
       - name: Verify untouched current-main session boundary
         run: |
           set -euo pipefail
           git status --short
-          test "$(git rev-parse HEAD^^)" = "e1c5dffda158b9f2590567880b8278ee44437e87"
           git fetch origin main
-          test "$(git rev-parse origin/main)" = "e1c5dffda158b9f2590567880b8278ee44437e87"
+          test "$(git rev-parse origin/main)" = "${HUMMING_A0_BASE}"
+          test "$(git merge-base HEAD origin/main)" = "${HUMMING_A0_BASE}"
           base_worktree="${RUNNER_TEMP}/humming-a0-base"
-          git worktree add --detach "${base_worktree}" HEAD^^
+          git worktree add --detach "${base_worktree}" "${HUMMING_A0_BASE}"
           (
             cd "${base_worktree}"
             make onboard
