@@ -149,6 +149,26 @@ jobs:
       - name: Open seeded canary PR
         run: |
           set -euo pipefail
+          # Idempotence: one live canary at a time. Without this, every weekly
+          # (or dispatched) run opened ANOTHER seeded PR while the previous one
+          # was still awaiting review, so several concurrent canaries made the
+          # §9 signal ambiguous — which reviewer failed which defect (Greptile
+          # on PR #1163). Query first; fail CLOSED if the lookup can't complete,
+          # because "could not check" is not "none open".
+          if ! existing="$(gh pr list --repo "${GH_REPO}" --state open \
+                --label canary-sandbox --json number,url --limit 10 2>&1)"; then
+            echo "::error::could not enumerate open canaries — failing closed: ${existing}" >&2
+            exit 1
+          fi
+          if [ "$(echo "${existing}" | jq 'length')" -gt 0 ]; then
+            echo "A live canary is already open; not opening another:" >&2
+            echo "${existing}" | jq -r '.[] | "  #\(.number) \(.url)"' >&2
+            {
+              echo "## 🐤 Canary already open — skipping"
+              echo "${existing}" | jq -r '.[] | "- #\(.number) \(.url)"'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           git config user.name "loop-watcher"
           git config user.email "loop-watcher@users.noreply.github.com"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"

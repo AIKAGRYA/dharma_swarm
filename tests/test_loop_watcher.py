@@ -579,3 +579,21 @@ def test_canary_survives_a_degraded_watch():
     # Ordering is still wanted; the canary carries its own kill-switch guard.
     assert canary["needs"] == "watch"
     assert canary["steps"][0]["name"] == "Halt on loop kill-switch"
+
+
+def test_canary_creation_is_idempotent():
+    """One live canary at a time. Without a pre-check, every weekly/dispatched
+    run opened another seeded PR while the previous awaited review, so
+    concurrent canaries made the §9 signal ambiguous — which reviewer failed
+    which defect (Greptile on PR #1163)."""
+    text = WORKFLOW.read_text()
+    canary_step = text.split("Open seeded canary PR")[1]
+    # Queries open canaries BEFORE creating a branch...
+    assert 'gh pr list' in canary_step
+    assert '--label canary-sandbox' in canary_step
+    assert canary_step.index("gh pr list") < canary_step.index("git checkout -b"), (
+        "the existence check must precede branch creation"
+    )
+    # ...exits 0 when one exists, and fails CLOSED when the lookup can't run.
+    assert "Canary already open" in canary_step
+    assert "failing closed" in canary_step
