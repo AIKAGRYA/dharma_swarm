@@ -562,3 +562,20 @@ def test_changed_lines_come_from_the_same_pages_as_the_tier(monkeypatch):
     })
     assert report["tier"] == "tier0"
     assert any("310 > 300" in f for f in report["findings"])
+
+
+def test_canary_survives_a_degraded_watch():
+    """`needs: watch` carries an implicit "watch succeeded", and the watcher
+    now exits nonzero by design on any degraded read. Without always(), a
+    GitHub API hiccup during the Monday sweep silently cancels that week's
+    reviewer-integrity canary — and a sustained outage cancels it forever,
+    so the §9 loop goes quiet exactly when its evidence matters most."""
+    doc = yaml.safe_load(WORKFLOW.read_text())
+    canary = doc["jobs"]["canary"]
+    condition = canary["if"]
+    assert "always()" in condition, "a degraded watch must not cancel the canary"
+    assert "0 15 * * 1" in condition, "the weekly schedule gate must remain"
+    assert "inputs.canary" in condition, "manual dispatch must still work"
+    # Ordering is still wanted; the canary carries its own kill-switch guard.
+    assert canary["needs"] == "watch"
+    assert canary["steps"][0]["name"] == "Halt on loop kill-switch"

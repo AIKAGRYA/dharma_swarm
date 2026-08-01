@@ -107,7 +107,20 @@ jobs:
 
   canary:
     name: Weekly canary duty
-    if: github.event.schedule == '0 15 * * 1' || inputs.canary == 'true'
+    # always() is required, not cosmetic. `needs: watch` carries an implicit
+    # "watch succeeded", and the watcher now exits NONZERO by design whenever
+    # a read is degraded. Without always(), any GitHub API hiccup during the
+    # Monday sweep silently cancels that week's reviewer-integrity canary —
+    # and a sustained outage cancels it indefinitely. The §9 loop would go
+    # quiet exactly when the evidence it produces is least trustworthy
+    # (Greptile on PR #1163; the skip became reachable when this PR made
+    # DEGRADED exit 1).
+    #
+    # The canary keeps `needs: watch` for ordering only — it carries its own
+    # kill-switch guard, so a halted lane still stops it.
+    if: >-
+      always() &&
+      (github.event.schedule == '0 15 * * 1' || inputs.canary == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: watch
