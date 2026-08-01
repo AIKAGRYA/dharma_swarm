@@ -22,6 +22,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     WIKI_SOURCE_DIR,
     summarize_source_families,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 
 
 USER_AGENT = "DharmaSwarmPalantirPilot/0.1 public-source-index"
@@ -204,7 +205,7 @@ def write_outputs(dharma_home: Path, payload: dict[str, object]) -> dict[str, st
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--max-urls-per-sitemap", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")

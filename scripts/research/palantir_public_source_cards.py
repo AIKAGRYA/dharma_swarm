@@ -23,6 +23,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     WIKI_SOURCE_DIR,
     latest_source_index_path,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 from scripts.research.palantir_public_source_index import classify_url  # noqa: E402
 
 
@@ -649,7 +650,7 @@ def write_outputs(dharma_home: Path, receipt: dict[str, object]) -> dict[str, ob
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--url", action="append", default=[])
     parser.add_argument("--topic", action="append", choices=sorted(TOPIC_PROFILES), default=[])
     parser.add_argument("--family", action="append", default=[])

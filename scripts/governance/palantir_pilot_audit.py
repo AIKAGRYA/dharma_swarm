@@ -17,12 +17,13 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     format_markdown,
     write_wiki_home,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write-wiki", action="store_true")
     args = parser.parse_args(argv)

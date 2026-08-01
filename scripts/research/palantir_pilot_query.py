@@ -17,6 +17,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     index_workspace_to_memory_plane,
     record_query_packet_to_memory_plane,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 
 
 def _format_markdown(packet: dict[str, object]) -> str:
@@ -123,7 +124,7 @@ def _format_answer_markdown(packet: dict[str, object]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query")
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--db-path", default="")
     parser.add_argument("--family", default="")
     parser.add_argument("--limit", type=int, default=10)

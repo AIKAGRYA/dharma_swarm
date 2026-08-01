@@ -17,7 +17,11 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.palantir_pilot import RAW_SOURCE_DIR, WIKI_SOURCE_DIR  # noqa: E402
+from dharma_swarm.palantir_pilot import (  # noqa: E402
+    RAW_SOURCE_DIR,
+    WIKI_SOURCE_DIR,
+)
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 from scripts.research import palantir_public_source_cards as source_cards  # noqa: E402
 from scripts.research.palantir_source_card_quality import build_quality_report  # noqa: E402
 
@@ -350,7 +354,7 @@ def build_learning_backlog(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--limit-per-topic", type=int, default=3)
     parser.add_argument("--max-actions", type=int, default=7)
     parser.add_argument("--json", action="store_true")

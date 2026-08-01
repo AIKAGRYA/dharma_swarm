@@ -1,6 +1,30 @@
+from dharma_swarm.verifier_ranker_v0.inventory import build_inventory
 from dharma_swarm.verifier_ranker_v0.package import verify_json_schema_basics
 from dharma_swarm.verifier_ranker_v0.redaction import redact_record, redact_text
 from dharma_swarm.verifier_ranker_v0.schemas import GRAPH_RECORD_TYPES, MODEL_OUTPUT_SCHEMA
+
+
+def test_inventory_default_root_honors_env_and_explicit_override(
+    tmp_path, monkeypatch
+) -> None:
+    env_home = tmp_path / "env-home"
+    explicit_home = tmp_path / "explicit-home"
+    sis_docs = tmp_path / "sis" / "docs"
+    monkeypatch.setenv("DHARMA_HOME", str(env_home))
+
+    default_inventory = build_inventory(repo_root=tmp_path, sis_docs=sis_docs)
+    explicit_inventory = build_inventory(
+        repo_root=tmp_path,
+        dharma_home=explicit_home,
+        sis_docs=sis_docs,
+    )
+
+    assert default_inventory["sqlite_metadata"]["runtime_state_db"]["path"] == str(
+        env_home / "state" / "runtime.db"
+    )
+    assert explicit_inventory["sqlite_metadata"]["runtime_state_db"]["path"] == str(
+        explicit_home / "state" / "runtime.db"
+    )
 
 
 def test_redact_text_catches_core_sensitive_spans() -> None:

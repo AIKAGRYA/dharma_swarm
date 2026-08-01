@@ -17,6 +17,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     WIKI_SOURCE_DIR,
     latest_source_index_path,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 from scripts.research import palantir_public_source_cards as source_cards  # noqa: E402
 from scripts.research.palantir_public_source_index import classify_url  # noqa: E402
 
@@ -454,7 +455,7 @@ def build_curriculum_maps(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--limit-per-path", type=int, default=12)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)

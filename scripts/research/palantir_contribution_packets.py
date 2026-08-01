@@ -12,7 +12,11 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.palantir_pilot import RAW_SOURCE_DIR, WIKI_SOURCE_DIR  # noqa: E402
+from dharma_swarm.palantir_pilot import (  # noqa: E402
+    RAW_SOURCE_DIR,
+    WIKI_SOURCE_DIR,
+)
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 from scripts.research.palantir_source_card_playbooks import (  # noqa: E402
     PLAYBOOK_SPECS,
     _select_cards,
@@ -286,7 +290,7 @@ def build_contribution_packets(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--anchors-per-packet", type=int, default=8)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)

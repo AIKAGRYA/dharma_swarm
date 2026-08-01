@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import argparse
+import importlib
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
+
+import pytest
 
 from dharma_swarm.palantir_pilot import (
     AGENT_ID,
@@ -17,6 +23,7 @@ from dharma_swarm.palantir_pilot import (
     record_query_packet_to_memory_plane,
     summarize_source_families,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home
 from scripts.research import palantir_public_source_cards as source_cards
 from scripts.research.palantir_pilot_curriculum import build_curriculum_maps
 from scripts.research.palantir_pilot_orientation import build_orientation_maps
@@ -28,6 +35,96 @@ from scripts.research.palantir_playbook_evals import build_eval_suites
 from scripts.research.palantir_source_card_playbooks import build_playbooks
 from scripts.research.palantir_source_card_cleanup import cleanup_source_cards
 from scripts.research.palantir_source_card_quality import build_quality_report, write_quality_outputs
+
+
+PALANTIR_CLI_MODULES = (
+    "scripts.governance.palantir_pilot_audit",
+    "scripts.governance.register_palantir_pilot",
+    "scripts.research.palantir_contribution_packets",
+    "scripts.research.palantir_deep_ingest",
+    "scripts.research.palantir_learning_backlog",
+    "scripts.research.palantir_pilot_curriculum",
+    "scripts.research.palantir_pilot_orientation",
+    "scripts.research.palantir_pilot_query",
+    "scripts.research.palantir_playbook_evals",
+    "scripts.research.palantir_public_source_cards",
+    "scripts.research.palantir_public_source_index",
+    "scripts.research.palantir_query_cookbook",
+    "scripts.research.palantir_source_card_balanced_expand",
+    "scripts.research.palantir_source_card_cleanup",
+    "scripts.research.palantir_source_card_playbooks",
+    "scripts.research.palantir_source_card_quality",
+)
+
+
+class _ParsedDharmaHome(Exception):
+    pass
+
+
+@pytest.mark.parametrize("module_name", PALANTIR_CLI_MODULES)
+def test_cli_dharma_home_default_is_late_bound_and_overrideable(
+    module_name, tmp_path, monkeypatch
+):
+    module = importlib.import_module(module_name)
+    late_home = tmp_path / "late-env-home"
+    explicit_home = tmp_path / "explicit-home"
+    monkeypatch.setenv("DHARMA_HOME", str(late_home))
+    original_parse_args = argparse.ArgumentParser.parse_args
+    cli_override = None
+
+    def capture_dharma_home(parser, _args=None, namespace=None):
+        argv = ["probe"] if any(action.dest == "query" for action in parser._actions) else []
+        if cli_override is not None:
+            argv.extend(("--dharma-home", str(cli_override)))
+        parsed = original_parse_args(parser, argv, namespace)
+        raise _ParsedDharmaHome(parsed.dharma_home)
+
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", capture_dharma_home)
+
+    with pytest.raises(_ParsedDharmaHome) as default_result:
+        module.main([])
+    assert default_result.value.args == (str(late_home),)
+
+    cli_override = explicit_home
+    with pytest.raises(_ParsedDharmaHome) as explicit_result:
+        module.main([])
+    assert explicit_result.value.args == (str(explicit_home),)
+
+
+def test_default_dharma_home_treats_empty_env_as_unset(monkeypatch):
+    monkeypatch.setenv("DHARMA_HOME", "")
+
+    assert default_dharma_home() == Path.home() / ".dharma"
+
+
+def test_default_dharma_home_honors_env_and_explicit_override(tmp_path, monkeypatch):
+    env_home = tmp_path / "env-home"
+    explicit_home = tmp_path / "explicit-home"
+    monkeypatch.setenv("DHARMA_HOME", str(env_home))
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys\n"
+                "from pathlib import Path\n"
+                "from dharma_swarm.palantir_pilot import "
+                "DEFAULT_DHARMA_HOME, build_source_manifest\n"
+                "print(DEFAULT_DHARMA_HOME)\n"
+                "print(build_source_manifest("
+                "repo_root=Path(sys.argv[1]), dharma_home=Path(sys.argv[2])"
+                ")[\"dharma_home\"])\n"
+            ),
+            str(tmp_path),
+            str(explicit_home),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert probe.stdout.splitlines() == [str(env_home), str(explicit_home)]
 
 
 def test_public_source_policy_blocks_learn_autonomous_scrape(tmp_path):

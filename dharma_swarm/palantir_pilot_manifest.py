@@ -8,12 +8,28 @@ forbidden-action policy, `build_source_manifest`, `build_external_worker_registr
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+
+
+def _dharma_home_from_environment() -> Path:
+    if os.getenv("DHARMA_HOME"):
+        return dharma_state_dir("DHARMA_HOME")
+    return dharma_state_dir()
+
+
+DEFAULT_DHARMA_HOME = _dharma_home_from_environment()
+
+
+def default_dharma_home() -> Path:
+    """Resolve the Palantir state root from the current environment."""
+    return _dharma_home_from_environment()
 DHARMA_HOME_SURFACE = str(Path("~") / ".dharma")
 
 AGENT_ID = "palantir_pilot"
@@ -310,7 +326,7 @@ def build_external_worker_registration(
         external_agent_sandbox_root,
     )
 
-    home = Path(dharma_home).expanduser() if dharma_home else DEFAULT_DHARMA_HOME
+    home = Path(dharma_home).expanduser() if dharma_home else default_dharma_home()
     repo = Path(repo_root)
     return ExternalRoamingWorker(
         agent_uid=AGENT_ID,

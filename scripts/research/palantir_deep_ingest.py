@@ -33,6 +33,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     WIKI_SOURCE_DIR,
     _load_latest_source_index,
 )
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 
 _CARDER_PATH = REPO_ROOT / "scripts" / "research" / "palantir_public_source_cards.py"
 _spec = importlib.util.spec_from_file_location("_ppsc_deep", str(_CARDER_PATH))
@@ -118,7 +119,7 @@ def allowed(url: str) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    ap.add_argument("--dharma-home", default=str(default_dharma_home()))
     ap.add_argument("--limit", type=int, default=0, help="0 = all")
     ap.add_argument("--families", default="", help="comma list to restrict, e.g. foundry,gotham")
     ap.add_argument("--delay", type=float, default=0.6, help="seconds between requests (politeness)")

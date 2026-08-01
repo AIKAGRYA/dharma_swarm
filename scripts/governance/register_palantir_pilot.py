@@ -13,7 +13,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.external_agent_registration import register_external_worker  # noqa: E402
-from dharma_swarm.palantir_pilot import build_external_worker_registration  # noqa: E402
+from dharma_swarm.palantir_pilot import (  # noqa: E402
+    build_external_worker_registration,
+)
+from dharma_swarm.palantir_pilot_manifest import default_dharma_home  # noqa: E402
 
 
 def _json(value: object) -> str:
@@ -36,7 +39,7 @@ async def _write_registration(args: argparse.Namespace) -> dict[str, object]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(default_dharma_home()))
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-onboarding", action="store_true")
