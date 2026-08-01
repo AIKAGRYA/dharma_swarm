@@ -226,11 +226,12 @@ def test_no_git_call_can_execute_an_agent_written_hook() -> None:
                 "gpg.program=/dev/null", "gpg.ssh.program=/dev/null",
                 "core.sshCommand=/dev/null"):
         assert key in settings, key
-    assert '["git", *GIT_NO_EXEC, *args]' in source
+    assert '[GIT_BIN, *GIT_NO_EXEC, *args]' in source
     # Exactly one raw git invocation: the wrapper itself.
-    assert source.count('_run(["git"') == 1, (
+    assert source.count("_run([GIT_BIN") == 1, (
         "every git call must go through _git so no invocation misses the guard"
     )
+    assert '_run(["git"' not in source
 
 
 def test_git_wrapper_prefixes_every_invocation() -> None:
@@ -242,9 +243,35 @@ def test_git_wrapper_prefixes_every_invocation() -> None:
     finally:
         hardening_lane._run = original
     cmd, kwargs = calls[0]
-    assert cmd == ["git", *hardening_lane.GIT_NO_EXEC, "commit", "-m", "x"]
+    assert cmd == [
+        hardening_lane.GIT_BIN, *hardening_lane.GIT_NO_EXEC, "commit", "-m", "x",
+    ]
     assert kwargs["env"]["GIT_CONFIG_GLOBAL"] == os.devnull
     assert kwargs["env"]["GIT_CONFIG_SYSTEM"] == os.devnull
+
+
+def test_privileged_binaries_are_resolved_before_the_agent_runs() -> None:
+    """The agent runs as the same user and can drop an executable into any
+    writable PATH directory. A fake `git`/`gh` intercepts the privileged
+    commit/push/pr-create with GH_TOKEN present; a fake `make` is an
+    integrity bypass — exit 0 and every unverified diff reads as green."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    for name in ("GIT_BIN", "GH_BIN", "MAKE_BIN"):
+        assert f'{name} = shutil.which(' in source, name
+    # Resolution must happen at import — i.e. before main() and therefore
+    # before the agent subprocess exists.
+    assert source.index("GIT_BIN = shutil.which(") < source.index("def main("), (
+        "resolving inside main() after the agent ran would defeat the point"
+    )
+    # No bare binary name left in an invocation the LANE makes itself.
+    # AGENT_COMMANDS is untouched on purpose: that subprocess is the agent's
+    # own, PATH-resolved and de-privileged, and none of these names appear
+    # in it.
+    code = "\n".join(
+        line for line in source.splitlines() if not line.lstrip().startswith("#")
+    )
+    for bare in ('"gh", "api"', '"gh", "pr"', '"make", "test-fast"'):
+        assert bare not in code, bare
 
 
 def test_global_and_system_git_config_are_not_loaded(tmp_path) -> None:

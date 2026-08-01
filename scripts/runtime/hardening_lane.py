@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -53,6 +54,23 @@ AGENT_COMMANDS: dict[str, list[str]] = {
     "claude-npx": ["npx", "-y", "@anthropic-ai/claude-code", "-p"],
     "codex": ["codex", "exec"],
 }
+
+
+# Resolved ONCE at import, which is before the agent subprocess exists. The
+# agent runs as the same user as the lane and can write an executable into
+# any writable directory already on PATH; a fake `git` or `gh` would then
+# intercept the privileged commit/push/pr-create with GH_TOKEN in scope, and
+# GIT_CONFIG_GLOBAL=/dev/null offers nothing because the attack never touches
+# git config. A fake `make` is an integrity bypass rather than a credential
+# one: exit 0 and every unverified diff reads as TESTS_GREEN.
+#
+# This removes the drop-a-binary-earlier-in-PATH move. It does NOT make the
+# lane safe against a same-user agent that overwrites the resolved file
+# itself — only a delivery step in a checkout and process the agent never
+# touched does that, and that is still unbuilt (Greptile on PR #1162).
+GIT_BIN = shutil.which("git") or "git"
+GH_BIN = shutil.which("gh") or "gh"
+MAKE_BIN = shutil.which("make") or "make"
 
 
 def _utc_stamp() -> str:
@@ -127,7 +145,7 @@ def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
     keys forced off on the command line, and global/system config not loaded
     at all."""
     kwargs.setdefault("env", git_env())
-    return _run(["git", *GIT_NO_EXEC, *args], **kwargs)
+    return _run([GIT_BIN, *GIT_NO_EXEC, *args], **kwargs)
 
 
 def snapshot_git_config() -> bytes | None:
@@ -190,7 +208,7 @@ def select_target(repo: str) -> dict | None:
     # with the reason "nightly green" — reporting a healthy sensor when the
     # sensor was actually unreadable (Codex on PR #1162).
     result = _run([
-        "gh", "api",
+        GH_BIN, "api",
         f"repos/{repo}/actions/workflows/nightly-tests.yml/runs?branch=main&per_page=1",
     ])
     if result.returncode == 0:
@@ -230,7 +248,7 @@ def open_lane_drafts(repo: str) -> list[int] | None:
     """Open draft PRs this lane already delivered, or None if the query
     failed (the caller then refuses to deliver rather than guessing)."""
     result = _run([
-        "gh", "pr", "list", "--repo", repo, "--state", "open",
+        GH_BIN, "pr", "list", "--repo", repo, "--state", "open",
         "--label", "lane-output", "--json", "number,isDraft,headRefName",
         "--limit", "50",
     ])
@@ -477,7 +495,7 @@ def main(argv: list[str] | None = None) -> int:
     # so this subprocess is agent-controlled code by construction — handing
     # it the lane's write-enabled GH_TOKEN would give the agent the very
     # credential the de-taint was built to withhold (Greptile on PR #1162).
-    tests = _run(["make", "test-fast"], timeout=MAX_TEST_SECONDS, env=agent_env())
+    tests = _run([MAKE_BIN, "test-fast"], timeout=MAX_TEST_SECONDS, env=agent_env())
     if tests.returncode != 0:
         receipt({"status": "TESTS_RED", "target": target,
                  "tail": tests.stdout[-2000:]}, out)
@@ -505,7 +523,7 @@ def main(argv: list[str] | None = None) -> int:
                  "stderr": push.stderr[-1000:]}, out)
         return 1
     pr = _run([
-        "gh", "pr", "create", "--repo", args.repo, "--draft",
+        GH_BIN, "pr", "create", "--repo", args.repo, "--draft",
         "--title", f"harden: {target['summary'][:60]}",
         "--body", (
             "Hardening-lane output (capped, draft-only). Target:\n\n"
