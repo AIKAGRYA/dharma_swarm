@@ -59,10 +59,11 @@ def _utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _run(cmd: list[str], *, timeout: int = 300, cwd: str | None = None) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], *, timeout: int = 300, cwd: str | None = None,
+         env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                              check=False, cwd=cwd)
+                              check=False, cwd=cwd, env=env)
     except FileNotFoundError as exc:
         # A missing binary is a failed command, not a crashed lane: callers
         # already treat a nonzero return as fail-closed.
@@ -369,7 +370,13 @@ def main(argv: list[str] | None = None) -> int:
                  "paths": staged[:20]}, out)
         return 0
 
-    tests = _run(["make", "test-fast"], timeout=MAX_TEST_SECONDS)
+    # Verification runs in the AGENT's de-privileged environment, not the
+    # lane's. `make test-fast` executes a Makefile the agent may just have
+    # edited, and conftest.py and pyproject.toml are equally agent-writable,
+    # so this subprocess is agent-controlled code by construction — handing
+    # it the lane's write-enabled GH_TOKEN would give the agent the very
+    # credential the de-taint was built to withhold (Greptile on PR #1162).
+    tests = _run(["make", "test-fast"], timeout=MAX_TEST_SECONDS, env=agent_env())
     if tests.returncode != 0:
         receipt({"status": "TESTS_RED", "target": target,
                  "tail": tests.stdout[-2000:]}, out)

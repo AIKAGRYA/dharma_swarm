@@ -205,6 +205,26 @@ def test_workflow_installs_dependencies_and_always_reports() -> None:
     assert hardening_lane.MAX_AGENT_SECONDS + hardening_lane.MAX_TEST_SECONDS <= 65 * 60
 
 
+def test_verification_runs_without_the_lanes_write_credentials() -> None:
+    """`make test-fast` executes an agent-writable Makefile (and conftest,
+    and pyproject) — it is agent-controlled code and must not inherit the
+    token that opens the draft."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert 'timeout=MAX_TEST_SECONDS, env=agent_env()' in source
+
+
+def test_agent_env_is_the_only_environment_handed_to_agent_controlled_code(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "write-enabled")
+    monkeypatch.setenv("PR_CI_HEALTH_PUSH_TOKEN", "also-write-enabled")
+    env = hardening_lane.agent_env()
+    assert not any(key.startswith(("GH_", "GITHUB_")) for key in env)
+    assert "PR_CI_HEALTH_PUSH_TOKEN" not in env
+    # PATH/HOME survive — a stripped-bare environment cannot run make.
+    assert "PATH" in env
+
+
 def test_agent_paths_exclude_secrets_reports_and_the_mailbox(monkeypatch) -> None:
     """The staged set is explicit and filtered — the lane must never carry
     an agent-dropped secret, a generated report, or operator task state."""
