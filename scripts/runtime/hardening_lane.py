@@ -70,22 +70,64 @@ def _run(cmd: list[str], *, timeout: int = 300, cwd: str | None = None,
         return subprocess.CompletedProcess(cmd, 127, "", str(exc))
 
 
-# The lane runs git in the SAME checkout the agent just wrote to, and the
-# agent can create .git/hooks/pre-commit or .git/hooks/pre-push — files no
-# path allowlist covers, because they live outside the worktree. Git would
-# then execute them during the lane's privileged commit and push, with the
-# write-enabled GH_TOKEN in scope (Greptile on PR #1162). Every git call
-# therefore disables hook execution on the command line, where it cannot be
-# overridden: `-c` outranks .git/config, which the agent can also edit.
-# core.fsmonitor is the same class of hazard — a configured value is an
-# executable git runs on its own.
-GIT_NO_HOOKS = ("-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false")
+# The lane runs git in the SAME checkout the agent just wrote to, so every
+# git-executes-a-program vector reachable from that checkout is in scope for
+# the privileged commit and push, with the write-enabled GH_TOKEN present.
+# Greptile found three on PR #1162 in succession — .git/hooks/, then
+# core.fsmonitor, then gpg.program via commit.gpgSign — and the list does not
+# end there (filter.*.clean runs on `git add`, credential.helper runs on
+# `git push`, url.*.insteadOf redirects the push itself).
+#
+# So the PRIMARY control is not a denylist: .git/config is captured before the
+# agent runs and restored byte-for-byte afterwards, which neutralizes every
+# config-driven vector at once, including ones not yet named. The `-c` flags
+# below are the second layer for the vectors already known — command-line
+# `-c` outranks file config, so they hold even if a restore silently fails.
+GIT_NO_EXEC = (
+    "-c", "core.hooksPath=/dev/null",
+    "-c", "core.fsmonitor=false",
+    # Signing invokes an agent-nameable program (Greptile on PR #1162).
+    "-c", "commit.gpgSign=false",
+    "-c", "tag.gpgSign=false",
+    "-c", "gpg.program=/dev/null",
+    "-c", "gpg.ssh.program=/dev/null",
+    # ssh transport and the pager are programs too.
+    "-c", "core.sshCommand=/dev/null",
+    "-c", "core.pager=cat",
+)
+# Kept as the old name for callers/tests that referenced it.
+GIT_NO_HOOKS = GIT_NO_EXEC
+GIT_CONFIG_PATH = Path(".git/config")
 
 
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
-    """Every git invocation in this lane, with agent-controlled hook and
-    fsmonitor execution disabled."""
-    return _run(["git", *GIT_NO_HOOKS, *args], **kwargs)
+    """Every git invocation in this lane, with the known program-executing
+    config keys forced off on the command line."""
+    return _run(["git", *GIT_NO_EXEC, *args], **kwargs)
+
+
+def snapshot_git_config() -> bytes | None:
+    """The repository-local git config as it stood before the agent ran."""
+    try:
+        return GIT_CONFIG_PATH.read_bytes()
+    except OSError:
+        return None
+
+
+def git_config_restored(before: bytes | None) -> bool:
+    """Put .git/config back exactly as it was; True if it is now trustworthy.
+
+    False means the lane must not run a privileged git command in this
+    checkout: an unrestorable config is an agent-controlled config.
+    """
+    if before is None:
+        return False
+    try:
+        if GIT_CONFIG_PATH.read_bytes() != before:
+            GIT_CONFIG_PATH.write_bytes(before)
+        return GIT_CONFIG_PATH.read_bytes() == before
+    except OSError:
+        return False
 
 
 def receipt(payload: dict, out: Path) -> None:
@@ -329,6 +371,10 @@ def main(argv: list[str] | None = None) -> int:
     branch = f"{LANE_BRANCH_PREFIX}{_utc_stamp()}"
     _git(["checkout", "-B", branch])
 
+    # Captured AFTER the branch is created and BEFORE the agent runs, so the
+    # restore target is the lane's own config, not whatever the agent leaves.
+    config_before = snapshot_git_config()
+
     prompt = (
         "You are the hardening lane. ONE task, fresh context, no scope creep.\n"
         f"Task: {target['summary']}\n{target['body']}\n"
@@ -362,6 +408,19 @@ def main(argv: list[str] | None = None) -> int:
                  "reason": f"agent binary {agent_argv[0]!r} is not installed "
                            "on this runner"}, out)
         return 0
+
+    # Before ANY further git command touches this checkout: the agent may
+    # have rewritten .git/config to make git run a program of its choosing
+    # (gpg.program, filter.*.clean, credential.helper, url.*.insteadOf...).
+    # Restoring the captured bytes closes the whole class; an unrestorable
+    # config is an agent-controlled config, so the lane stops rather than
+    # committing and pushing under it (Greptile on PR #1162).
+    if not git_config_restored(config_before):
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": ".git/config could not be restored to its "
+                           "pre-agent state — refusing to run privileged git "
+                           "in an agent-controlled configuration"}, out)
+        return 1
 
     # A nonzero agent exit means the work is unfinished — a tool, auth, or
     # context failure can leave a partial diff that happens to keep the
@@ -399,6 +458,15 @@ def main(argv: list[str] | None = None) -> int:
         receipt({"status": "TESTS_RED", "target": target,
                  "tail": tests.stdout[-2000:]}, out)
         return 0
+
+    # `make test-fast` is agent-controlled code too, so the config it ran
+    # under gets restored again before the privileged commit and push — the
+    # test process had every opportunity the agent process had.
+    if not git_config_restored(config_before):
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": ".git/config was altered during the test run and "
+                           "could not be restored — refusing to deliver"}, out)
+        return 1
 
     # Re-stage the same explicit set: `make test-fast` may have produced
     # artifacts, and only the measured paths may reach the commit.

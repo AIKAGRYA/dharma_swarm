@@ -77,9 +77,15 @@ def test_lane_constants_enforce_ruling_caps() -> None:
         assert all(isinstance(part, str) for part in argv), name
     source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
     assert '"--draft"' in source, "lane output must be draft-only"
-    assert "git push" not in source.replace('"git", "push"', ""), (
+    # Scan CODE, not prose: the security comments name `git push` when
+    # explaining which config keys run programs during it.
+    code = "\n".join(
+        line for line in source.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert "git push" not in code.replace('_git(["push"', ""), (
         "only the explicit lane-branch push is allowed"
     )
+    assert code.count('_git(["push"') == 1
 
 
 def test_workflow_contract() -> None:
@@ -211,9 +217,15 @@ def test_no_git_call_can_execute_an_agent_written_hook() -> None:
     GH_TOKEN in scope. Hook execution is disabled on the command line, where
     the agent-writable .git/config cannot override it."""
     source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
-    assert 'core.hooksPath=/dev/null' in hardening_lane.GIT_NO_HOOKS[1]
-    assert 'core.fsmonitor=false' in hardening_lane.GIT_NO_HOOKS[3]
-    assert '["git", *GIT_NO_HOOKS, *args]' in source
+    settings = set(hardening_lane.GIT_NO_EXEC)
+    # Each of these names a program git would otherwise run, chosen from a
+    # file the agent can write. Greptile found them one at a time on #1162.
+    for key in ("core.hooksPath=/dev/null", "core.fsmonitor=false",
+                "commit.gpgSign=false", "tag.gpgSign=false",
+                "gpg.program=/dev/null", "gpg.ssh.program=/dev/null",
+                "core.sshCommand=/dev/null"):
+        assert key in settings, key
+    assert '["git", *GIT_NO_EXEC, *args]' in source
     # Exactly one raw git invocation: the wrapper itself.
     assert source.count('_run(["git"') == 1, (
         "every git call must go through _git so no invocation misses the guard"
@@ -228,10 +240,39 @@ def test_git_wrapper_prefixes_every_invocation() -> None:
         hardening_lane._git(["commit", "-m", "x"])
     finally:
         hardening_lane._run = original
-    assert calls == [[
-        "git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
-        "commit", "-m", "x",
-    ]]
+    assert calls == [
+        ["git", *hardening_lane.GIT_NO_EXEC, "commit", "-m", "x"]
+    ]
+
+
+def test_git_config_is_restored_byte_for_byte(tmp_path, monkeypatch) -> None:
+    """A denylist of config keys is a treadmill — filter.*.clean runs on
+    `git add`, credential.helper on `git push`, url.*.insteadOf redirects
+    the push itself. Restoring the captured config closes the class."""
+    config = tmp_path / "config"
+    config.write_bytes(b"[core]\n\trepositoryformatversion = 0\n")
+    monkeypatch.setattr(hardening_lane, "GIT_CONFIG_PATH", config)
+    before = hardening_lane.snapshot_git_config()
+    config.write_bytes(b"[gpg]\n\tprogram = /tmp/evil\n[commit]\n\tgpgSign = true\n")
+    assert hardening_lane.git_config_restored(before) is True
+    assert config.read_bytes() == before
+
+
+def test_unrestorable_git_config_blocks_delivery(tmp_path, monkeypatch) -> None:
+    """An unrestorable config is an agent-controlled config: stop, don't
+    commit and push under it."""
+    monkeypatch.setattr(hardening_lane, "GIT_CONFIG_PATH", tmp_path / "gone")
+    assert hardening_lane.snapshot_git_config() is None
+    assert hardening_lane.git_config_restored(None) is False
+
+
+def test_config_is_restored_after_the_agent_and_after_the_tests() -> None:
+    """The test subprocess had every opportunity the agent process had."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert source.count("if not git_config_restored(config_before):") == 2
+    assert source.index("config_before = snapshot_git_config()") < source.index(
+        "agent = subprocess.run("
+    ), "the restore target must be captured BEFORE the agent runs"
 
 
 def test_verification_runs_without_the_lanes_write_credentials() -> None:
