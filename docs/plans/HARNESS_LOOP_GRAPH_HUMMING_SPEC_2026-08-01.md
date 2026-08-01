@@ -105,12 +105,21 @@ Item format — **What / How / Enforcement / Acceptance (runnable) / Owner**.
 **H1. Install the PreToolUse gate in the tracked Claude Code settings.**
 What: register `hooks/telos_gate.py` as a `PreToolUse` hook in
 `.claude/settings.json` (currently `SessionStart` only), preserving its
-`SAFE_TOOLS`/`GATED_TOOLS` split (`hooks/telos_gate.py:57-60`).
-How: hook denies on gate BLOCK, logs to `~/.dharma/witness/`.
-Enforcement: a test asserting the hook is registered and denies a seeded
-dangerous tool call.
-Acceptance: `python3 -m pytest tests/test_claude_hooks.py -q` (extend) and a
-recorded denial receipt under `~/.dharma/quarantine/`.
+`SAFE_TOOLS`/`GATED_TOOLS` split (`hooks/telos_gate.py:57-60`) — **after**
+closing its fail-open error paths. Today the hook exits 0 on malformed
+input and on any unexpected exception ("never block on hook failure",
+`hooks/telos_gate.py:167-183`), and only `Bash`/`Write`/`Edit` inputs are
+inspected — a gated tool like `NotebookEdit` passes with empty
+action/content. Installing it as-is would admit gated writes.
+How: hook denies on gate BLOCK, logs to `~/.dharma/witness/`; error paths
+become fail-closed for `GATED_TOOLS` (parse error or exception on a gated
+tool ⇒ deny with reason), stay fail-open for `SAFE_TOOLS`.
+Enforcement: error-path tests (malformed JSON, raised exception) asserting
+denial for gated tools, plus a blocking-coverage test for **every**
+`GATED_TOOLS` member — a single seeded-dangerous-call test is not
+sufficient acceptance.
+Acceptance: `python3 -m pytest tests/test_claude_hooks.py -q` (extended as
+above) and a recorded denial receipt under `~/.dharma/quarantine/`.
 Owner: UNOWNED (`.claude/settings.json`) — needs portfolio adoption;
 nearest track `sovereign-safety-tcb-2026-07`.
 
@@ -127,10 +136,18 @@ them at the existing chokepoints (`api/chat_tool_execution.py:208`,
 `autonomous_agent.py:944-967`). Judge tier is budgeted and fails closed on
 timeout, mirroring the shell-gate semantics already in
 `api/chat_tool_execution.py:216-245`.
-Enforcement: seeded injection corpus test (extend
-`telos_gates.py` INJECTION_PATTERNS fixtures) must show the pattern tier
-unchanged and the judge tier catching ≥1 case the pattern tier misses.
-Acceptance: `python3 -m pytest tests/test_telos_gates* -q`.
+Enforcement: two distinct proofs, because they verify different invariants:
+(a) a seeded injection corpus test (extend `telos_gates.py`
+INJECTION_PATTERNS fixtures) showing the pattern tier unchanged and the
+judge tier catching ≥1 case the pattern tier misses; and (b) an
+**end-to-end control-flow case**: fetched or inbox content attempts to
+change which side-effect tool is selected, and the deterministic
+provenance/policy layer blocks it **independently of the judge tier** —
+this is the defining CaMeL invariant, and (a) alone cannot establish it
+(an implementation could skip provenance propagation entirely and still
+pass the judge test).
+Acceptance: `python3 -m pytest tests/test_telos_gates* -q` including both
+proofs.
 Owner: `dharma_swarm/telos_gates.py` is UNOWNED and merge-CRITICAL
 (`scripts/runtime/pr_merge_control.py:630-665`) — requires human-approved PR
 by construction. BHED_GNAN's hard-pass (BR-014) closes only via
@@ -145,8 +162,13 @@ Enforcement: a parity test that both entry points refuse an identical
 seeded corpus.
 Acceptance: `python3 -m pytest tests/test_sandbox.py tests/test_api_auth.py -q`
 plus the new parity test.
-Owner: `repository-titanium-hardening-2026-07` (owns
-`dharma_swarm/autonomous_agent.py`, `dharma_swarm/sandbox.py`, `api/main.py`).
+Owner: split — `repository-titanium-hardening-2026-07` owns
+`dharma_swarm/autonomous_agent.py`, `dharma_swarm/sandbox.py`, and
+`api/main.py`, but **`api/chat_tool_execution.py` and the new shared policy
+module are UNOWNED** (neither appears in any track's `owns:` list in
+`docs/governance/ACTIVE_TRACK.yaml`), so this item requires cross-track
+adoption: Titanium adopts its owned surfaces and the portfolio adopts the
+unowned two, or the item does not proceed.
 
 **H4. Kernel→gate bridge.**
 What: compile the axioms' `formal_constraint` strings
@@ -155,9 +177,19 @@ What: compile the axioms' `formal_constraint` strings
 enforced at runtime, not only at commit time
 (`scripts/uplift_guards/kernel_guard.py:46`).
 How: additive only — bridge failures degrade to current behavior; no
-existing gate weakens.
-Acceptance: `dgc dharma status` shows kernel consulted; new test asserts at
-least one axiom predicate blocks a seeded violation.
+existing gate weakens. The compiler must produce a **defined result for
+every principle** — `compiled` or `uncompilable(reason)` — and publish a
+coverage report; a silently skipped axiom is fail-open enforcement theater.
+This matters because only a minority of principles carry a
+`structured_predicate` today (7 occurrences in
+`dharma_swarm/dharma_kernel.py`); the remaining `formal_constraint` values
+are heterogeneous prose, not an executable grammar, so full coverage is a
+compiler-design problem, not a wiring afternoon.
+Acceptance: `dgc dharma status` shows kernel consulted **and** the
+per-principle coverage report (compiled/uncompilable counts, zero silent
+skips); new tests assert a seeded violation blocks *and* that an
+uncompilable principle is reported, not dropped. The bridge is not declared
+live on a single seeded block.
 Owner: UNOWNED, merge-CRITICAL surface — human-approved PR required.
 
 **H5. ACE-style context playbooks.**
@@ -167,13 +199,19 @@ instead of being rewritten wholesale, avoiding the paper's documented
 "context collapse" failure (*Agentic Context Engineering*,
 arXiv:2510.04618).
 How: the chetana `PreCompact` recovery manifest
-(`dharma_swarm/chetana/claude_code_plugin/scripts/pre_compact.sh`) becomes
-the ingestion event; playbook sections join the existing priority-ordered
-drop list (`agent_runner.py:1181-1226`) *above* raw recall blocks.
+(`dharma_swarm/chetana/claude_code_plugin/chetana/scripts/pre_compact.sh`)
+becomes the ingestion event; playbook sections join the existing
+priority-ordered drop list (`agent_runner.py:1181-1226`) *above* raw
+recall blocks.
 Enforcement: extend `memory_kernel` context-eval cases
 (`dharma_swarm/memory_kernel/context_eval_cases.py`) with a
-collapse-detection case (playbook length and key-count must not shrink
-across N compactions without an explicit curation receipt).
+collapse-detection case defined as **bounded semantic retention**, not
+non-shrinkage: a hard playbook size budget, plus a frozen probe set of
+semantic facts/tasks that must remain answerable from the playbook across
+N compactions. Ordinary deduplication and replacement are allowed — a
+never-shrink rule would make stale material immortal and recreate the
+context-budget pressure this item exists to relieve, while missing
+semantic collapse that preserves byte counts.
 Acceptance: `python3 -m pytest tests/ -q -k "context"`.
 Owner: context surfaces are UNOWNED; chetana plugin dir is UNOWNED —
 nearest tracks `loop-closure-2026-06` (Loop 4 consolidation) and portfolio
@@ -196,15 +234,26 @@ What: `autonomous_agent._build_system_prompt`
 (`strategy_reinforcer.py:337-359`), bounded (top-k ≤ 3, char-capped inside
 the existing context budget), with an injection receipt naming the strategy
 ids used.
+Security precondition (new): strategy fragments are **untrusted data**.
+`_distill_prompt_fragment` copies raw task-prompt text verbatim into the
+fragment (`strategy_reinforcer.py:280-291`), so a task originating from an
+inbox message or fetched page would have its instructions promoted into
+durable system-prompt content — a privilege escalation. Before injection,
+fragments must be structurally encoded as data (quoted, labeled
+non-instruction) and screened by the gate pattern tier; this lands **with**
+L1, not later with H2.
 Why first: the flywheel already extracts and persists strategies every 30
 minutes (`training_flywheel.py:109-127`); this is a one-hop wire that
 converts Loop 7 from mechanism-proof to behavior-proof.
 Enforcement: Loop 7 closure check re-pointed at the *live* prompt builder;
 the closure harness calling `build_reinforced_prompt` itself no longer
 counts (doctrine delta 1).
-Acceptance:
-`rg -n "build_reinforced_prompt" dharma_swarm/ --glob '!strategy_reinforcer.py'`
-returns ≥1 live caller; `python3 -m pytest tests/ -q -k "reinforc"`.
+Acceptance: a production-path test (or runtime receipt from a live
+dispatch) showing a composed system prompt whose injection receipt names
+both the dispatched prompt hash and the consumed strategy ids — a static
+occurrence check is insufficient, since a dead wrapper or comment would
+satisfy it; plus `python3 -m pytest tests/ -q -k "reinforc"` including the
+fragment-sanitization tests.
 Owner: `loop-closure-2026-06` (Loop 7; closure surfaces under
 `reports/loop_closure/**`). `autonomous_agent.py` is owned by
 `repository-titanium-hardening-2026-07` — cross-track coordination required.
@@ -224,8 +273,18 @@ Judge-reliability caveat: rubric verification by LLM judges is itself
 error-prone under long contexts (RUVER-BENCH, arXiv:2606.29920) — keep
 deterministic checks primary, judges secondary, per the existing scorer
 doctrine (`dharma_swarm/coordination/arena/scorer.py:22-47`).
-Acceptance: judge decisions logged with Brier scores;
-`python3 -m pytest tests/ -q -k "quality"`.
+Calibration grounding (required): Brier scoring needs independently
+resolved binary outcomes — `resolve_prediction` will not score without one
+(`dharma_swarm/ginko_brier.py:133-168`). Merely logging judge verdicts
+would let the judge self-label and gain weight on circular evidence. So
+this item must name its **ground-truth resolver** (deterministic scorer
+verdicts, test exit codes, or operator adjudication — never the judge
+itself), a **minimum resolved-sample count** before any weight increase
+(default ≥50 resolved outcomes), and a **calibration threshold** below
+which the judge's weight is frozen or reduced.
+Acceptance: judge decisions logged as Ginko predictions and later resolved
+against the named ground-truth source; weight changes receipt the resolved
+sample count and Brier score; `python3 -m pytest tests/ -q -k "quality"`.
 Owner: `orchestration-arena-v1-2026-06` (arena scoring) +
 `loop-closure-2026-06` (Loop 2/6 surfaces).
 
@@ -244,8 +303,14 @@ Owner: `loop-closure-2026-06`.
 **L4. Earned acceptance for overnight runs.**
 What: `overnight_director.py:1078-1081` stops equating exit code 0 with
 acceptance; route outcomes through the existing semantic acceptance gate
-(`agent_runner_quality.py:609-715`).
-Acceptance: a seeded produce-nothing-exit-0 run is recorded FAILED.
+(`agent_runner_quality.py:609-715`) **and** bind acceptance to the task's
+declared artifacts, worktree delta, and test receipts — semantic grading of
+returned text alone is charmable by a no-op subprocess that prints a
+polished summary. The artifact contract already exists as a separate step
+in `AgentRunner` (`agent_runner.py:2428-2434`, `_required_artifact_paths`);
+overnight acceptance reuses it rather than reinventing it.
+Acceptance: a seeded produce-nothing-exit-0 run is recorded FAILED on the
+artifact check even when its stdout would pass the semantic gate.
 Owner: UNOWNED — portfolio adoption; nearest `loop-closure-2026-06`.
 
 **L5. Bound the unbounded loop.**
@@ -259,10 +324,20 @@ What: re-run the cybernetics codex audit against a **live** runtime DB (the
 committed `reports/loop_closure/cybernetics_codex/latest_audit.json`
 records `runtime DB missing` — every HARNESS_PROVEN verdict rests on
 bounded replay), then promote loops to `CLOSED_LIVE` one at a time as their
-consumption edges land (L1 closes Loop 7; E2 closes the gauntlet→DGM edge;
-H5 strengthens Loop 4). Target: ≥5 of 13 loops `CLOSED_LIVE`.
+consumption edges land. The five target loops, each bound to the work item
+that creates its consumption edge (naming them is required — otherwise the
+workstreams can complete without `≥ 5` being reachable):
+1. **Loop 7** `training_flywheel` ← L1 (live strategy-injection receipt).
+2. **Loop 1** `swarm_task_loop` ← receipt-consumption edge already live
+   (`providers.py:2917-2933`); promotes on the live-DB audit itself.
+3. **Loop 3** `evolution_loop` ← E2 (repaired emitter + consumer receipt).
+4. **Loop 4** `consolidation_memory` ← H5 + R4 (playbook ingestion and
+   staged-promotion receipts).
+5. **Loop 2** `organism_heartbeat` ← L3 (supervisor actuator receipts
+   consumed by loop bodies at tick).
 Acceptance: `latest_audit.json` shows `runtime.exists: true` and
-`CLOSED_LIVE ≥ 5`; `CYBERNETIC_LOOP_MAP.md` summary regenerated.
+`CLOSED_LIVE ≥ 5` with those five loops' promotions each citing their
+consumption receipt; `CYBERNETIC_LOOP_MAP.md` summary regenerated.
 Owner: `loop-closure-2026-06`.
 
 **L7. Wire the orphaned verification loops.**
@@ -272,6 +347,13 @@ test exit codes as ground truth, cross-model-family diagnosis, max 3
 rounds, currently demo-only), and inject `reflexion` memory
 (`dharma_swarm/reflexion.py`) into semantic repair requests so repeated
 failures carry prior-attempt reflections.
+Isolation requirement: `run_coding_swarm` is not a read-only validator —
+it rewrites `task.workdir / task.edit_file` in place each build round
+(`forge_v1/coding_swarm.py:107`, `:139`). It must therefore run in a
+disposable worktree or sandbox, never against the self-improvement
+checkout, and the validated output must be compared back to the exact
+proposal digest before promotion — otherwise it mutates the baseline
+outside the proposal diff's custody and makes rollback ambiguous.
 Guards preserved: `self_improve` stays behind `DHARMA_SELF_IMPROVE`
 (`self_improve.py:103`) and its proposal/LLM budgets
 (`self_improve.py:46-47`); One Wire untouched.
@@ -291,14 +373,26 @@ Acceptance: `python3 -m pytest tests/test_workflow.py -q` with new
 cycle-raise and crash-during-checkpoint tests.
 Owner: `dharmagraph-engine-2026-07`.
 
-**G2. Execute evolved topologies (close the one-hop gap).**
+**G2. Execute evolved topologies (close the one-hop gap) — honest scope.**
 What: `Orchestrator._dispatch_topology_genome`
 (`orchestrator.py:227-266`) stops metadata-stamping and invokes the
 already-built `execute_topology_genome_workflow` (`workflow.py:612-682`,
 currently zero non-test callers), behind a feature flag defaulting to the
 current behavior until the arena scores the executed path at parity.
-Acceptance: `rg -n "execute_topology_genome_workflow" dharma_swarm/`
+Scope honesty: this bridge compiles genomes into the **legacy DAG
+executor** (`workflow.py:612-671` → `CompiledWorkflow`), not the
+Pregel-class engine under `dharma_swarm/graph/` — so G2 makes topologies
+*executed* but does not make the graph engine *live*. Closing the
+baseline's central graph-path gap is a separate milestone:
+**G2b. Genome → `CompiledGraph` production bridge** — lower
+`TopologyGenome` into `TypedStateGraph`/`CompiledGraph`
+(`graph/schema.py:223-290`, `graph/compiler.py:188-437`) once G3's
+production-relevant facets land, and flag-swap the executor. G2 without
+G2b is legacy-DAG execution and must be reported as such.
+Acceptance (G2): `rg -n "execute_topology_genome_workflow" dharma_swarm/`
 returns ≥1 non-test caller; `python3 -m pytest tests/test_topology_execution.py -q`.
+Acceptance (G2b): one genome executed end-to-end through `CompiledGraph`
+on the flagged path with a dispatch receipt naming the engine.
 Owner: `dharmagraph-engine-2026-07` (workflow/orchestrator) with
 `orchestration-arena-v1-2026-06` (scoring).
 
@@ -314,12 +408,22 @@ Owner: `dharmagraph-engine-2026-07`.
 
 **G4. Agents as nodes.**
 What: a `NodeCallable` adapter wrapping `agent_runner.run_task` so a graph
-node can be a full agent run, fenced by the already-live durable invoker's
-idempotency keys (`graph/durable_invoker.py:122`,
-`orchestrator.py:2526-2560`). This is the article-wave capability the
-runtime is architecturally ready for and does not yet use.
+node can be a full agent run. Fencing must be built, not assumed: the
+durable invoker fences the **outer orchestrator dispatch**
+(`orchestrator.py:2526-2560`), and the graph scheduler has no
+`wrap_invoker` integration today — so graph resume after a crash would
+re-execute an agent node from the top and duplicate its side effects.
+Each agent node needs a node-level side-effect key derived from
+(run_id, superstep, node_id, attempt) — the shape
+`derive_graph_side_effect_key` already provides
+(`graph/durable_invoker.py:122`) — wired into the scheduler's node
+dispatch. This is the article-wave capability the runtime is
+architecturally ready for and does not yet use.
 Acceptance: one compiled graph in tests where a node is a real (mocked
-provider) agent run, resumable across a simulated crash.
+provider) agent run, crashed mid-superstep and resumed, asserting
+**exactly one** provider invocation across the crash — a plain
+resumability test without the invocation-count assertion can pass while
+real side effects duplicate.
 Owner: `dharmagraph-engine-2026-07`.
 
 **G5. One HITL surface.**
@@ -333,22 +437,33 @@ Owner: `dharmagraph-engine-2026-07`.
 ### WS-E — Events
 
 **E1. Cron unification (BR-004).**
-What: one schema, one authority: reconcile `dharma_swarm/cron_jobs.json`
-(28 declared, 16 orphaned) with the live daemon's `~/.dharma/cron/jobs.json`
-via `scripts/cron_unify.py` (`cron_unify.py:4-8` documents the split), and
-add a parity check so the split cannot silently reopen.
-Acceptance: `python3 scripts/cron_unify.py --check` (add flag) exits 0;
-orphan count 0.
+What: one schema, one authority: reconcile the repo declaration — the
+**root** `cron_jobs.json` (28 entries; `dharma_swarm/cron_jobs.json` does
+not exist, and `scripts/cron_unify.py:31` already resolves the root file)
+— with the live daemon's `~/.dharma/cron/jobs.json`, and add a parity
+check so the split cannot silently reopen. `cron_unify.py`'s docstring
+(`:4-8`) still describes 17 declarations and is stale; fix it as part of
+this item, and make `--check` compute the orphan count from the files it
+actually reads — no frozen counts anywhere in the acceptance path.
+Acceptance: `python3 scripts/cron_unify.py --check` (add flag) exits 0
+with a computed orphan count of 0.
 Owner: UNOWNED — portfolio adoption; register progress against BR-004.
 
-**E2. Consume `GAUNTLET_REGRESSION`.**
-What: the signal emitted at `orchestrate_live.py:1811-1828` (currently zero
-consumers) opens a targeted `self_improve` cycle scoped to the regressing
-components, subject to all existing L4 guards (budgets, protected files,
-One Wire). This is the event-driven hill-climb edge: eval regression →
-automatic, bounded repair attempt → receipt.
-Acceptance: seeded regression in a test emits the signal and produces a
-`self_improve` cycle receipt naming the regressing component.
+**E2. Repair, then consume, `GAUNTLET_REGRESSION`.**
+What: the edge is dead at **both** ends. The producer is broken:
+`orchestrate_live.py:1822` calls `SignalBus.get().emit("GAUNTLET_REGRESSION",
+{...})` with two arguments, but `SignalBus.emit` takes a single event dict
+(`dharma_swarm/signal_bus.py:143-150`), so the call raises `TypeError` —
+swallowed by the surrounding exception handler. Step 1 is converting the
+call to `emit({"type": "GAUNTLET_REGRESSION", ...})`. Step 2 is the
+consumer: the signal opens a targeted `self_improve` cycle scoped to the
+regressing components, subject to all existing L4 guards (budgets,
+protected files, One Wire). This is the event-driven hill-climb edge:
+eval regression → automatic, bounded repair attempt → receipt.
+Acceptance: a test through the **real producer path** (seeded regression
+in the gauntlet loop, not a directly-seeded bus event) emits the repaired
+signal and produces a `self_improve` cycle receipt naming the regressing
+component.
 Owner: `loop-closure-2026-06` + `sovereign-safety-tcb-2026-07`.
 
 **E3. A real reviewer in the hourly loop.**
@@ -357,14 +472,17 @@ What: the Mike backlog cron is packet-only with merge off
 `packet_only` in `pr_merge_control.py:2724`) because runners lack reviewer
 binaries; the live quorum already comes from GitHub-App reviews bridged via
 the trusted-login map (`pr_merge_control.py:1013-1032`). Formalize that:
-document App reviews as the cloud reviewer lane, and add a
-`workflow_dispatch` reviewer job (hosted `claude -p --max-turns 8`, the cap
-already in `pr_merge_control.py:741-746`) behind the existing kill-switch
-(`docs/ops/loop_control/`), so review capacity is an event application, not
-an operator-laptop dependency.
-Acceptance: one PR receives a receipted review verdict from the hosted lane
-end-to-end; kill-switch halt test stays green
-(`python3 -m pytest tests/test_loop_killswitch_workflows.py -q`).
+document App reviews as the cloud reviewer lane, and add a hosted reviewer
+job (`claude -p --max-turns 8`, the cap already in
+`pr_merge_control.py:741-746`) behind the existing kill-switch
+(`docs/ops/loop_control/`) — **triggered from the scheduled backlog
+selection**, not `workflow_dispatch`-only. A dispatch-only job never runs
+on the hourly schedule, so it would leave the stated hourly loop open
+while a manual dispatch satisfies a one-PR acceptance; a manual dispatch
+path may exist as backup, but it does not close E3 (EVENTED predicate).
+Acceptance: one PR receives a receipted review verdict produced by a
+**scheduled** (cron-initiated) run end-to-end; kill-switch halt test stays
+green (`python3 -m pytest tests/test_loop_killswitch_workflows.py -q`).
 Owner: `merge-master-mike-d4-2026-06`.
 
 **E4. NATS afferent wiring.**
@@ -410,8 +528,14 @@ deterministic code, not model vigilance.
 hierarchies e.g. TiMem, arXiv:2601.02845).** The organism already has idle
 surfaces (`dgc hum`, subconscious, chetana decay/gap scans). Formalize a
 consolidation cron: off-peak reflection over `~/.dharma/` stores that
-rewrites agent memory blocks and playbooks (H5) with receipts — offline
-policy improvement over data already collected. Owner: Loop 4
+produces revised agent memory blocks and playbooks (H5) with receipts —
+offline policy improvement over data already collected.
+Staging requirement: the cron never rewrites live memory in place.
+Candidates are written to a versioned staging generation, validated
+against the context-eval suite (H5's probe set), and **atomically
+promoted** (tmp+rename) with the prior generation retained for rollback —
+a crash or poorly-scored consolidation must not corrupt the context every
+later agent boots from; a receipt alone is not protection. Owner: Loop 4
 (`loop-closure-2026-06`) + chetana surfaces.
 
 **R5. Automated workflow/architecture search feeding the arena (AFlow,
@@ -434,9 +558,17 @@ clade metaproductivity (CMP) rather than individual fitness — descendants'
 aggregate success, not the parent's score; (b) co-evolve the *evaluators*
 under the same custody discipline as the gauntlet, our structural answer to
 the DGM Appendix F telemetry-attack risk the phased spec already quotes
-(`DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:121-125`); (c) share experience
-across agent lineages through the existing stigmergy/archive substrate.
-All behind One Wire; none of this unblocks Loops 12/13 by itself.
+(`DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:121-125`) — **with an immutable
+anchor outside the co-evolution**: custody proves provenance, not that
+agent and evaluator populations haven't jointly learned a scoring
+shortcut, and One Wire guards archive writes but cannot detect collusion
+when the evaluator itself supplies the accepted fitness signal. Promotion
+therefore gates on an evaluator or hidden holdout set that **neither
+population can modify** (operator-ratified, custody-pinned); co-evolved
+evaluators are candidates only, never the promotion authority; (c) share
+experience across agent lineages through the existing stigmergy/archive
+substrate. All behind One Wire; none of this unblocks Loops 12/13 by
+itself.
 
 **R7. MAST failure taxonomy as audit rubric (arXiv:2503.13657).** The
 14-failure-mode taxonomy (specification, inter-agent misalignment, task
@@ -504,16 +636,16 @@ audit), E4 (NATS afferents), H4 (kernel bridge), H6 (sandbox limits), L6
 
 | # | Criterion | Check |
 |---|---|---|
-| 1 | Loop 7 behavior-proof | `rg -n "build_reinforced_prompt" dharma_swarm/ --glob '!strategy_reinforcer.py'` ≥1 live caller |
-| 2 | `CLOSED_LIVE ≥ 5/13`, audited against a live runtime DB | `reports/loop_closure/cybernetics_codex/latest_audit.json` (`runtime.exists: true`) |
+| 1 | Loop 7 behavior-proof | production-path test + runtime injection receipt naming the dispatched prompt hash and consumed strategy ids (a static `rg` occurrence count is explicitly NOT acceptance — a dead wrapper or comment satisfies it) |
+| 2 | `CLOSED_LIVE ≥ 5/13` on the five named loops (L6), audited against a live runtime DB | `reports/loop_closure/cybernetics_codex/latest_audit.json` (`runtime.exists: true`), each promotion citing its consumption receipt |
 | 3 | No named intervention without an actuator | `tests/test_loop_supervisor_tristate.py` extended suite green |
-| 4 | Zero dead signal edges | every `SignalBus.emit` topic has ≥1 registered consumer or an explicit `observation_only` marker; enforced by a new governance check |
-| 5 | Gauntlet strictly above 58/100 with LG24 non-zero | `python3 scripts/governance/dharmagraph_parity_gauntlet.py --check` |
-| 6 | Topology genomes executed, not stamped | `rg -n "execute_topology_genome_workflow" dharma_swarm/` non-test caller; arena parity receipt |
-| 7 | Cron orphan count 0 | `python3 scripts/cron_unify.py --check` |
-| 8 | Judge tier live with calibration | Brier-scored judge receipts present in `runtime_state`; deterministic checks still primary |
-| 9 | No gate weakened | `git diff` over `telos_gates.py` gate table shows tiers/patterns monotonically non-weakened; BHED_GNAN closed only via `GateRegistry.propose` |
-| 10 | All new checks placed per ratchet | `docs/governance/CI_TRUTH_CONTRACT.json` diff reviewed; no check deleted or demoted |
+| 4 | Zero dead signal edges | every `SignalBus.emit` call site type-checks against `emit(event: dict)` (`signal_bus.py:143`) AND every emitted topic has ≥1 registered consumer or an explicit `observation_only` marker; enforced by a new governance check |
+| 5 | Gauntlet strictly above 58/100 with LG24 non-zero | `python3 scripts/governance/dharmagraph_parity_gauntlet.py --check` green (replay integrity) **plus** a threshold assertion the CLI does not provide today — `check()` only verifies replay-vs-stored equality (`dharmagraph_parity_gauntlet.py:1231-1259`) — added as a governance assertion reading the receipt: total > 58 and LG24 score > 0 |
+| 6 | Topology genomes executed, not stamped | dispatch receipts naming the executing engine: legacy-DAG receipts for G2, ≥1 `CompiledGraph` receipt for G2b; arena parity receipt |
+| 7 | Cron orphan count 0, computed not frozen | `python3 scripts/cron_unify.py --check` derives the count from the root `cron_jobs.json` and the live file it actually reads |
+| 8 | Judge tier live with calibration | judge verdicts logged as Ginko predictions, resolved against the named ground-truth source (L2), ≥ the minimum resolved-sample count, Brier receipts in `runtime_state`; deterministic checks still primary |
+| 9 | No gate weakened — behaviorally | a golden gate-decision regression corpus (seeded ALLOW/WARN/BLOCK cases including malformed input, timeout, and exception paths) passes unchanged across H2/H4; a table-only `git diff` is NOT acceptance, since `check_action` control-flow changes can flip decisions with the table untouched; BHED_GNAN closed only via `GateRegistry.propose` |
+| 10 | All new checks placed per ratchet | inventory-vs-contract comparison: every §4 check added by this campaign has an `advisory` or `required` entry in `docs/governance/CI_TRUTH_CONTRACT.json` with a local reproduction command; and no existing check deleted or demoted |
 
 ---
 
@@ -531,6 +663,10 @@ audit), E4 (NATS afferents), H4 (kernel bridge), H6 (sandbox limits), L6
 - **Prompt-injection surface grows with consumption edges.** Every new
   consumer of external content (E2–E4, R4) inherits H2's provenance
   tagging; until H2 lands, new consumers treat external text as data-only.
+  **L1 is itself such an edge**: strategy fragments carry raw task-prompt
+  text (`strategy_reinforcer.py:280-291`) into the system prompt, and L1
+  ships in P0 before H2 — hence the fragment-sanitization precondition
+  inside L1 rather than a deferred dependency on H2.
 - **Diversity tax.** New gates and judges are paid for in ensemble
   diversity (`CLAUDE.md`, Krogh-Vedelsby). Prefer bounded damping
   (receipt_consumption's reorder-never-filter pattern,
