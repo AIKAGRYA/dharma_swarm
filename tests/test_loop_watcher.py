@@ -413,3 +413,45 @@ def test_every_unpublished_state_is_in_the_degrading_set():
     assert loop_watcher.UNPUBLISHED_STATES == {
         "unknown", "create_failed", "update_failed",
     }
+
+
+def test_check_run_outage_is_degraded_not_green(monkeypatch):
+    """Losing required-check visibility must not look like a healthy run."""
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: None)
+    _pages(monkeypatch, reviews=[], files=[{"filename": "docs/x.md"}])
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 31, "headRefOid": "sha", "additions": 1, "deletions": 0,
+        "author": {"login": "someone"}, "labels": [],
+    })
+    assert "checks" in report["degraded"]
+    assert any("check-run enumeration failed" in f for f in report["findings"])
+
+
+def test_readable_check_runs_still_report_missing_contexts(monkeypatch):
+    """The outage path must not swallow the original absence-is-not-green
+    finding for a successfully decoded response."""
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_gh_json",
+                        lambda args: {"check_runs": [{"name": "gitleaks"}]})
+    _pages(monkeypatch, reviews=[], files=[{"filename": "docs/x.md"}])
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 32, "headRefOid": "sha", "additions": 1, "deletions": 0,
+        "author": {"login": "someone"}, "labels": [],
+    })
+    assert report["degraded"] == []
+    assert any("required contexts not reported" in f for f in report["findings"])
+
+
+def test_no_read_failure_is_coerced_to_empty_data():
+    """Audit pin: every `or {}` / `or []` left in the module is a field
+    default inside a successfully-read row, never a whole API response.
+    Read results are guarded with isinstance or an explicit None check."""
+    source = (REPO_ROOT / "scripts" / "governance" / "loop_watcher.py").read_text()
+    code = "\n".join(
+        line for line in source.splitlines() if not line.lstrip().startswith("#")
+    )
+    for fail_open in ("(checks or {})", "(reviews or [])", "(existing or {})",
+                      "(rows or [])", "(data or {})", "(issues or [])",
+                      "(comments or [])", "(files or [])"):
+        assert fail_open not in code, fail_open

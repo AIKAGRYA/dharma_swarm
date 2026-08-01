@@ -245,10 +245,22 @@ def watch_pr(repo: str, pr: dict) -> dict:
     checks = _gh_json([
         "api", f"repos/{repo}/commits/{head_sha}/check-runs?per_page=100",
     ])
-    reported = {run.get("name") for run in (checks or {}).get("check_runs", [])} if isinstance(checks, dict) else set()
-    missing = [c for c in _required_contexts() if c not in reported]
-    if missing:
-        findings.append(f"required contexts not reported on head SHA: {missing}")
+    if not isinstance(checks, dict):
+        # `checks or {}` made a failed read indistinguishable from "no checks
+        # reported": the watcher published a missing-context finding and
+        # still returned OK, so the run that LOST required-check visibility
+        # looked exactly like a healthy one (Greptile on PR #1163). This is
+        # the absence-is-not-green rule applied to the checker itself.
+        findings.append(
+            "check-run enumeration failed — required-context visibility lost "
+            "on this head; absence of contexts here is unknown, not green"
+        )
+        degraded.append("checks")
+    else:
+        reported = {run.get("name") for run in checks.get("check_runs", [])}
+        missing = [c for c in _required_contexts() if c not in reported]
+        if missing:
+            findings.append(f"required contexts not reported on head SHA: {missing}")
 
     # Paginated REST files, not the `gh pr list --json files` nested
     # connection: that one truncates at 100 and hid tier-2 paths beyond it.
