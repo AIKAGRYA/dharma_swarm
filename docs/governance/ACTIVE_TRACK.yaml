@@ -151,7 +151,8 @@ active_tracks:
       - scripts/governance/loop1_consumption_check.py
       - tests/test_loop_supervisor_tristate.py
       - tests/test_loop1_consumption.py
-      - tests/test_loop1_consumption_check.py      - agent_loop.sh
+      - tests/test_loop1_consumption_check.py
+      - agent_loop.sh
       - cron_jobs.json
       - scripts/cron_unify.py
       - dharma_swarm/cron_job_runtime.py
@@ -1023,7 +1024,8 @@ active_tracks:
       - docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md
       - docs/governance/CAMPAIGN_KERNEL.md   # L-K promotion target (ascent spec Appendix A)
       - tests/oracle_support/scenarios.py    # L-A: port application oracle to the neutral engine
-      - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)      - tests/test_action_effect_graph_adapter.py
+      - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)
+      - tests/test_action_effect_graph_adapter.py
       - tests/test_graph_budget_lineage.py
 
     moves_vital_signs:
@@ -1477,7 +1479,8 @@ active_tracks:
       - tests/test_pramana_probe.py
       - tests/test_pramana.py
       - tests/test_branch_janitor.py
-      - tests/test_verify_corral_findings.py      - dharma_swarm/action_effects/**
+      - tests/test_verify_corral_findings.py
+      - dharma_swarm/action_effects/**
       - dharma_swarm/tool_registry.py
       - dharma_swarm/semantic_governance.py
       - dharma_swarm/shakti_warrant.py
@@ -2001,7 +2004,8 @@ active_tracks:
       - dashboard/src/lib/operatorCoherence.ts
       - dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts
       - dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx
-      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts      - api/chat_tool_execution.py
+      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts
+      - api/chat_tool_execution.py
       - tests/test_shell_policy_consumers.py
       - tests/test_action_provenance.py
       - tests/test_sandbox_limits.py
