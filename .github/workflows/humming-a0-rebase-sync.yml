@@ -108,7 +108,12 @@ jobs:
               tests/test_docops_integrity.py
             git diff --check
 
-            changed="$(git diff --name-only | sort)"
+            changed="$(
+              {
+                git diff --name-only
+                git ls-files --others --exclude-standard
+              } | sort -u
+            )"
             expected="$(printf '%s\n' \
               CLAUDE.md \
               docs/docops/AUTO_INVENTORY.md \
@@ -116,6 +121,7 @@ jobs:
               docs/governance/SOVEREIGN_MANIFEST.md \
               docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md \
               | sort)"
+            printf 'Observed final paths:\n%s\n' "${changed}"
             test "${changed}" = "${expected}"
             test ! -e .github/workflows/humming-a0-repair.yml
             test ! -e .github/workflows/humming-a0-rebase-sync.yml
@@ -123,7 +129,9 @@ jobs:
 
             git config user.name 'humming-a0-rebase[bot]'
             git config user.email 'humming-a0-rebase[bot]@users.noreply.github.com'
-            git add -- ${changed}
+            while IFS= read -r path; do
+              [ -n "${path}" ] && git add -- "${path}"
+            done <<< "${changed}"
             git diff --cached --check
             git commit -m 'rebase(humming): preserve WP-0D amendment in A0 admission'
             git push \
