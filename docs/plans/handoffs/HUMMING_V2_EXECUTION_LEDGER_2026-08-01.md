@@ -39,3 +39,9 @@ they do not rewrite history. It is a projection and cannot overrule an owner.
 - PR #1177 remains a serialized governance collision; its Titanium amendment
   must merge first or this branch must be refreshed while preserving both
   changes before A0 can become Ready.
+
+## A0 controller events
+
+- 2026-08-01: requested the structural-hardening controller after its workflow
+  definition was updated. This append exists only to create a clean branch
+  synchronization event; it grants no authority and makes no completion claim.
