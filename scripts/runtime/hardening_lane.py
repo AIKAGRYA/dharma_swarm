@@ -99,10 +99,34 @@ GIT_NO_EXEC = (
 GIT_NO_HOOKS = GIT_NO_EXEC
 GIT_CONFIG_PATH = Path(".git/config")
 
+# Git reads THREE config scopes: system, global, local. Restoring
+# .git/config covers only the local one, and the agent keeps a writable
+# HOME — so $HOME/.gitconfig (or $XDG_CONFIG_HOME/git/config) could still
+# supply credential.helper or url.*.insteadOf to the privileged push, which
+# Greptile demonstrated end-to-end on PR #1162. These two variables make git
+# load NO system and NO global config at all, which closes the remaining two
+# scopes categorically rather than key by key:
+#
+#   $ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+#       git config --get credential.helper   # exit 1: not found
+#
+# With the local restore, all three scopes are now accounted for.
+GIT_TRUSTED_CONFIG_ENV = {
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_SYSTEM": os.devnull,
+}
+
+
+def git_env() -> dict[str, str]:
+    """The lane's own environment with global and system git config disabled."""
+    return {**os.environ, **GIT_TRUSTED_CONFIG_ENV}
+
 
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
-    """Every git invocation in this lane, with the known program-executing
-    config keys forced off on the command line."""
+    """Every git invocation in this lane: the known program-executing config
+    keys forced off on the command line, and global/system config not loaded
+    at all."""
+    kwargs.setdefault("env", git_env())
     return _run(["git", *GIT_NO_EXEC, *args], **kwargs)
 
 

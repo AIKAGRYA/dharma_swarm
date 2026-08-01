@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -233,16 +234,42 @@ def test_no_git_call_can_execute_an_agent_written_hook() -> None:
 
 
 def test_git_wrapper_prefixes_every_invocation() -> None:
-    calls: list[list[str]] = []
+    calls: list[tuple[list[str], dict]] = []
     original = hardening_lane._run
     try:
-        hardening_lane._run = lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
+        hardening_lane._run = lambda cmd, **kw: calls.append((cmd, kw)) or subprocess.CompletedProcess(cmd, 0, "", "")
         hardening_lane._git(["commit", "-m", "x"])
     finally:
         hardening_lane._run = original
-    assert calls == [
-        ["git", *hardening_lane.GIT_NO_EXEC, "commit", "-m", "x"]
-    ]
+    cmd, kwargs = calls[0]
+    assert cmd == ["git", *hardening_lane.GIT_NO_EXEC, "commit", "-m", "x"]
+    assert kwargs["env"]["GIT_CONFIG_GLOBAL"] == os.devnull
+    assert kwargs["env"]["GIT_CONFIG_SYSTEM"] == os.devnull
+
+
+def test_global_and_system_git_config_are_not_loaded(tmp_path) -> None:
+    """The local restore covers ONE of git's three config scopes, and the
+    agent keeps a writable HOME. Prove against the real git binary that the
+    lane's environment makes global config unreadable."""
+    evil = tmp_path / "gitconfig"
+    evil.write_text('[credential]\n\thelper = "!echo PWNED"\n')
+
+    honored = subprocess.run(
+        ["git", "config", "--get", "credential.helper"],
+        env={**os.environ, "GIT_CONFIG_GLOBAL": str(evil)},
+        capture_output=True, text=True, check=False,
+    )
+    assert honored.returncode == 0 and "PWNED" in honored.stdout, (
+        "control: git must actually honor GIT_CONFIG_GLOBAL, or this proves nothing"
+    )
+
+    blocked = subprocess.run(
+        ["git", "config", "--get", "credential.helper"],
+        env={**hardening_lane.git_env(), "HOME": str(tmp_path)},
+        capture_output=True, text=True, check=False,
+    )
+    assert blocked.returncode == 1, "global/system config must not be loaded"
+    assert "PWNED" not in blocked.stdout
 
 
 def test_git_config_is_restored_byte_for_byte(tmp_path, monkeypatch) -> None:
