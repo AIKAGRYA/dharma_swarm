@@ -134,6 +134,21 @@ class TestRun:
             receipt = _run_p1_p4(missing)
             assert receipt["outcome"] == "needs_host"
 
+    def test_run_with_malformed_receipt_is_needs_host(self, tmp_db: Path) -> None:
+        _fixture_db(tmp_db, [_receipt_row("valid", ProviderType.ANTHROPIC, status="ok", error_source="none")])
+        conn = sqlite3.connect(tmp_db)
+        try:
+            conn.execute(
+                "INSERT INTO delegation_runs(started_at, receipt_json) VALUES (?, ?)",
+                ("2026-07-15T00:01:00Z", "not-valid-json"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        receipt = _run_p1_p4(tmp_db)
+        assert receipt["outcome"] == "needs_host"
+        assert "malformed" in receipt["reason"].lower()
+
 
 class TestReceiptIO:
     def test_write_and_read_round_trip(self, tmp_db: Path) -> None:

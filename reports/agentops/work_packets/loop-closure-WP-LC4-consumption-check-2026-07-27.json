@@ -8,7 +8,7 @@
   "before_commit": false,
   "before_merge": true
  },
- "base_ref": "5586d348315730d170bc4aa9b1a5531e0f7c0cf4",
+ "base_ref": "61df22a85e2083a96a7b0a9500b611e384d40730",
  "branch": "devin/loop1-consumption-check-wp-lc4-2026-07-27",
  "commit": {
   "allowed": true,
@@ -137,7 +137,7 @@
    "tests/test_loop1_consumption.py"
   ],
   "collision": {
-   "checked_at_sha": "5586d348315730d170bc4aa9b1a5531e0f7c0cf4",
+   "checked_at_sha": "61df22a85e2083a96a7b0a9500b611e384d40730",
    "details": [],
    "status": "clear"
   },
@@ -147,7 +147,7 @@
   ],
   "interface_mismatches": [],
   "owner": "@AmitabhainArunachala",
-  "packet_digest": "9d1273aa5257dfa9ee3946def99d51efb15f579b89901d77e0f3ca18e831b6c2",
+  "packet_digest": "beacb9572a6047f2d9a7fdf0ae509f5926268b855bee36b4ba37017663d6543e",
   "rollback": "remove scripts/governance/loop1_consumption_check.py, tests/test_loop1_consumption_check.py, and this packet",
   "schema": "dharma_swarm.session_entry.v1",
   "tool_versions": {

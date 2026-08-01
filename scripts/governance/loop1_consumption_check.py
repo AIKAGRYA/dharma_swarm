@@ -38,6 +38,10 @@ DEFAULT_DB = Path.home() / ".dharma" / "state" / "runtime.db"
 DEFAULT_RECEIPT = Path.home() / ".dharma" / "loop_closure" / "loop1_consumption_receipt.json"
 
 
+class MalformedReceiptError(Exception):
+    """A non-empty delegation_runs.receipt_json value could not be parsed as an object."""
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -76,7 +80,12 @@ def _host_sha() -> str:
 
 
 def _read_receipt_rows(db_path: Path, window: int = RECEIPT_CONSUMPTION_WINDOW) -> list[dict[str, Any]]:
-    """Return recent parsed receipt_json rows from a read-only runtime.db."""
+    """Return recent parsed receipt_json rows from a read-only runtime.db.
+
+    Raises MalformedReceiptError if any selected, non-empty row is not valid
+    JSON or does not decode to a JSON object. The checker must not evaluate
+    partial history.
+    """
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     except sqlite3.OperationalError:
@@ -100,10 +109,11 @@ def _read_receipt_rows(db_path: Path, window: int = RECEIPT_CONSUMPTION_WINDOW) 
     for (raw,) in rows:
         try:
             obj = json.loads(raw)
-            if isinstance(obj, dict):
-                parsed.append(obj)
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as exc:
+            raise MalformedReceiptError(f"invalid JSON in receipt_json: {exc}")
+        if not isinstance(obj, dict):
+            raise MalformedReceiptError(f"receipt_json is not an object: {type(obj).__name__}")
+        parsed.append(obj)
     return parsed
 
 
@@ -391,7 +401,10 @@ def _run(
 ) -> dict[str, Any]:
     """Read a runtime.db and validate P1..P4, returning a typed receipt."""
     path = _resolve_db_path(db_path)
-    rows = _read_receipt_rows(path)
+    try:
+        rows = _read_receipt_rows(path)
+    except MalformedReceiptError as exc:
+        return _typed_gap(f"malformed stored receipt rows in {path}: {exc}", path)
 
     if not rows:
         return _typed_gap(f"no receipt rows in {path}", path)
@@ -472,8 +485,13 @@ def _read_receipt(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
-    """Emit a typed needs_host receipt when host runtime stores are absent."""
+def _typed_gap(
+    reason: str,
+    db_path: Path | None = None,
+    *,
+    row_count: int | None = None,
+) -> dict[str, Any]:
+    """Emit a typed needs_host receipt when host runtime stores are absent or unreadable."""
     path = _resolve_db_path(db_path)
     core: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
@@ -482,7 +500,7 @@ def _typed_gap(reason: str, db_path: Path | None = None) -> dict[str, Any]:
         "host_sha": _host_sha(),
         "container_image_digest": os.environ.get("DHARMA_CONTAINER_IMAGE_DIGEST", "unknown"),
         "db_path": str(path.resolve()),
-        "delegation_runs_row_count": 0,
+        "delegation_runs_row_count": _row_count(path) if row_count is None else row_count,
     }
     content = dict(core)
     content["producer_trace_id"] = ""
