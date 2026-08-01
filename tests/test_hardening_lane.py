@@ -224,7 +224,8 @@ def test_no_git_call_can_execute_an_agent_written_hook() -> None:
     for key in ("core.hooksPath=/dev/null", "core.fsmonitor=false",
                 "commit.gpgSign=false", "tag.gpgSign=false",
                 "gpg.program=/dev/null", "gpg.ssh.program=/dev/null",
-                "core.sshCommand=/dev/null"):
+                "core.sshCommand=/dev/null", "core.gitProxy=",
+                "core.askPass=", "diff.external="):
         assert key in settings, key
     assert '[GIT_BIN, *GIT_NO_EXEC, *args]' in source
     # Exactly one raw git invocation: the wrapper itself.
@@ -420,3 +421,56 @@ def test_agent_paths_exclude_secrets_reports_and_the_mailbox(monkeypatch) -> Non
     )
     paths = hardening_lane.agent_changed_paths()
     assert paths == ["dharma_swarm/fix.py", "renamed.py", "tests/test_new.py"]
+
+
+def test_single_valued_exec_keys_are_actually_overridable(tmp_path) -> None:
+    """The -c guards are only worth anything if command-line config really
+    beats a file value written at any moment — including by a descendant
+    racing the restore. Proven against the real git binary."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull,
+           "GIT_CONFIG_SYSTEM": os.devnull}
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=repo, env=env,
+                              capture_output=True, text=True,
+                              check=False).stdout.strip()
+
+    git("init", "-q", ".")
+    git("config", "core.gitProxy", "/tmp/evil-proxy")
+    assert git("config", "--get", "core.gitProxy") == "/tmp/evil-proxy"
+    assert git("-c", "core.gitProxy=", "config", "--get", "core.gitProxy") == ""
+
+
+def test_the_unclosable_keys_are_named_and_not_pretended_closed() -> None:
+    """credential.helper and url.*.insteadOf are multi-valued: a -c value is
+    appended, not substituted, so the attacker's entry survives. They must
+    stay documented as open rather than listed among the guards."""
+    assert set(hardening_lane.GIT_UNCLOSABLE_IN_SHARED_CHECKOUT) == {
+        "credential.helper", "url.<base>.insteadOf",
+    }
+    joined = " ".join(hardening_lane.GIT_NO_EXEC)
+    assert "credential.helper" not in joined
+    assert "insteadOf" not in joined
+
+
+def test_multivalued_keys_really_do_survive_a_c_override(tmp_path) -> None:
+    repo = tmp_path / "r"
+    repo.mkdir()
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull,
+           "GIT_CONFIG_SYSTEM": os.devnull}
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=repo, env=env,
+                              capture_output=True, text=True,
+                              check=False).stdout
+
+    git("init", "-q", ".")
+    git("config", "credential.helper", "!echo EVIL")
+    survived = git("-c", "credential.helper=", "config",
+                   "--get-all", "credential.helper")
+    assert "EVIL" in survived, (
+        "if this ever stops being true, credential.helper becomes closable "
+        "by -c and should move into GIT_NO_EXEC"
+    )

@@ -112,7 +112,24 @@ GIT_NO_EXEC = (
     # ssh transport and the pager are programs too.
     "-c", "core.sshCommand=/dev/null",
     "-c", "core.pager=cat",
+    # Single-valued execution keys, so a command-line -c genuinely wins over
+    # a file value set at ANY time — including by a descendant racing the
+    # restore. core.gitProxy is the payload Greptile demonstrated executing
+    # with the write token during the push (PR #1162); askPass and
+    # diff.external are the same shape. Verified with git 2.43:
+    #   git -c core.gitProxy= config --get core.gitProxy   -> empty
+    "-c", "core.gitProxy=",
+    "-c", "core.askPass=",
+    "-c", "diff.external=",
 )
+# NOT closable this way, and the reason isolation is still required: both
+# credential.helper and url.<base>.insteadOf are MULTI-valued, so a -c value
+# is APPENDED to the file's list rather than replacing it. Verified: with
+# `credential.helper = !echo EVIL` in .git/config,
+# `git -c credential.helper= config --get-all credential.helper` still lists
+# the attacker's helper first. A descendant that writes either key after the
+# restore check wins, and no in-process guard can prevent that.
+GIT_UNCLOSABLE_IN_SHARED_CHECKOUT = ("credential.helper", "url.<base>.insteadOf")
 # Kept as the old name for callers/tests that referenced it.
 GIT_NO_HOOKS = GIT_NO_EXEC
 GIT_CONFIG_PATH = Path(".git/config")
