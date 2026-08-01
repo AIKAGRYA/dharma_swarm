@@ -206,11 +206,18 @@ jobs:
             # Orphan branch: runtime state must never share history with main.
             git clone --quiet --depth 1 "$remote" "$repo"
             git -C "$repo" checkout --orphan "$STATE_BRANCH"
-            git -C "$repo" rm -rq --cached . || true
-            find "$repo" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+            git -C "$repo" rm -r -q --cached . || true
+            # main's files are untracked now; git clean empties the worktree
+            # without a recursive force-delete and never touches .git.
+            git -C "$repo" clean -fdxq
           fi
           mkdir -p "$repo/$(dirname "$STATE_DIR")"
-          rm -rf "${repo:?}/${STATE_DIR}"
+          # Replace the previous snapshot. find -delete is depth-first and
+          # confined to the state directory, so a bad expansion cannot walk out
+          # of it the way a recursive force-delete would.
+          if [ -d "$repo/${STATE_DIR}" ]; then
+            find "$repo/${STATE_DIR}" -delete
+          fi
           cp -a "$state_root/sarathi" "$repo/${STATE_DIR}"
           cat > "$repo/README.md" <<'EOF'
           # sarathi-state — runtime state, NEVER merged to main

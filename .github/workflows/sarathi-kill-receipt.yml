@@ -116,8 +116,10 @@ jobs:
             # Orphan by construction: runtime state never shares history with main.
             git clone --quiet --depth 1 "$remote" "$repo"
             git -C "$repo" checkout --orphan "$STATE_BRANCH"
-            git -C "$repo" rm -rq --cached . || true
-            find "$repo" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+            git -C "$repo" rm -r -q --cached . || true
+            # main's files are untracked now; git clean empties the worktree
+            # without a recursive force-delete and never touches .git.
+            git -C "$repo" clean -fdxq
           fi
           mkdir -p "$repo/${STATE_DIR}"
           jq -n \

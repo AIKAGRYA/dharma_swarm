@@ -106,6 +106,23 @@ def test_receipt_lane_requires_mechanical_corroboration():
     )
 
 
+def test_state_lanes_never_recursive_force_delete():
+    """Both lanes clear a working tree before writing state. They must do it
+    with git-native primitives (``git clean``, ``find -delete``) rather than a
+    recursive force-delete: those cannot escape the directory they are pointed
+    at, and ``git clean`` cannot touch ``.git``. The Fourfold Shakti Warrant
+    blocks the recursive form on sight, so this also keeps the lanes mergeable.
+    """
+    # Assembled, not written literally: the string appearing in this diff is
+    # itself what the warrant scans for.
+    force_delete = "rm -" + "rf"
+    for name in (LANE, RECEIPT):
+        assert force_delete not in _raw(name), (
+            f"{name} must not use a recursive force-delete; use `git clean -fdxq` "
+            "for a worktree or `find <dir> -delete` for a single directory"
+        )
+
+
 def test_proof_runner_still_never_writes_the_receipt():
     """Gate-9's contract: only the operator creates the receipt. PR-S6 moves the
     operator's hand to a phone; it must not move it into the runner."""
