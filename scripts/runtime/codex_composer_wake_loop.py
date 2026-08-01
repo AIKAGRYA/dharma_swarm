@@ -88,13 +88,17 @@ def _claude_model_identity() -> str:
 
 
 def _sarathi_model_identity() -> str:
+    # PR-S3 (operator ruling 2026-07-30): the apex seat defaults to a frontier
+    # mind, never a flash-tier one. DGC_DIRECTOR_SARATHI_MODEL stays the
+    # operator override; the fallback chain resolves the Anthropic frontier
+    # default from model_hierarchy rather than pinning a dated string here.
     override = os.getenv("DGC_DIRECTOR_SARATHI_MODEL", "").strip()
     if override:
         return override
     try:
-        return default_model(ProviderType.GOOGLE_AI)
+        return default_model(ProviderType.ANTHROPIC)
     except Exception:  # noqa: BLE001 - defensive: never fail wake on model lookup
-        return "gemini-2.5-flash"
+        return "claude-opus-4-6"
 
 
 def _slug(agent_uid: str) -> str:

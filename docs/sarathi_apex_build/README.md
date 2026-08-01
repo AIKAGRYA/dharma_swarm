@@ -20,7 +20,10 @@ Onboarding and `docs/state/LIVE_OPS_DASHBOARD.md` still own live state.
 4. [`05_SARATHI_APEX_MAP.md`](05_SARATHI_APEX_MAP.md) — Sarathi-specific intent.
 5. [`06_PROOF_GATES.md`](06_PROOF_GATES.md) — original gate design.
 6. [`07_BACKLOG.md`](07_BACKLOG.md) — current closure packets.
-7. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) and
+7. [`08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md`](08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md)
+   — drift reconciliation for the 2026-07-30 autonomy build
+   (`docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md`).
+8. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) and
    [`91_SPRAWL_HARNESS_RUNBOOK.md`](91_SPRAWL_HARNESS_RUNBOOK.md) — anti-fork
    policy and enforcement.
 

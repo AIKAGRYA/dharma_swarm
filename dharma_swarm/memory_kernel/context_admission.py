@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.atoms import (
+    AGENT_OWNER_METADATA_KEYS,
     AuthorityLevel,
     MemoryAtom,
     MemoryAtomType,
@@ -48,6 +49,7 @@ _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.CANONICAL,
 )
 _STALE_FRESHNESS_VALUES = {"snapshot", "dormant", "missing", "unknown"}
+_ISOLATION_MODES = ("unrestricted", "scoped")
 
 
 @dataclass(frozen=True)
@@ -66,11 +68,25 @@ class MemoryContextBudget:
     require_source_digest: bool = False
     require_source_row_key: bool = False
     block_tool_exposure: bool = False
+    # "scoped": empty allowed_scopes/allowed_memory_lanes DENY every atom and
+    # agent ownership is enforced across ALL scopes; "unrestricted" keeps the
+    # legacy empty-means-unfiltered semantics for direct callers.
+    isolation_mode: str = "unrestricted"
     allowed_truth_states: tuple[TruthState, ...] = _DEFAULT_ALLOWED_TRUTH_STATES
     allowed_scopes: tuple[MemoryScope, ...] = ()
     allowed_agent_ids: tuple[str, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
     allowed_atom_types: tuple[MemoryAtomType, ...] = ()
+
+    def __post_init__(self) -> None:
+        # An unknown mode must fail loudly at construction; comparing a
+        # typo'd value against "scoped" downstream would silently degrade
+        # to the legacy allow-all semantics.
+        if self.isolation_mode not in _ISOLATION_MODES:
+            raise ValueError(
+                "isolation_mode must be one of "
+                f"{_ISOLATION_MODES}, got {self.isolation_mode!r}"
+            )
 
     def to_json(self) -> dict[str, object]:
         payload = asdict(self)
@@ -313,18 +329,29 @@ def _bounded_candidates(
 
 
 def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[str, ...]:
+    scoped = budget.isolation_mode == "scoped"
     reasons: list[str] = []
     if budget.allowed_atom_types and atom.atom_type not in budget.allowed_atom_types:
         reasons.append("atom_type_not_allowed")
-    if budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
+    if scoped and not budget.allowed_scopes:
+        reasons.append("scope_denied_fail_closed")
+    elif budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
         reasons.append("scope_not_allowed")
-    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+    if budget.allowed_agent_ids or scoped:
         atom_agent_ids = _atom_agent_ids(atom)
-        if not atom_agent_ids:
+        # Scoped mode enforces atom ownership in every scope, not only AGENT:
+        # another agent's atoms stay invisible even when shared into
+        # SWARM/SESSION/PROJECT rows.
+        if atom.scope == MemoryScope.AGENT and not atom_agent_ids:
             reasons.append("agent_owner_unknown")
-        elif not set(atom_agent_ids).intersection(budget.allowed_agent_ids):
+        elif (atom.scope == MemoryScope.AGENT or (scoped and atom_agent_ids)) and (
+            not budget.allowed_agent_ids
+            or not set(atom_agent_ids).intersection(budget.allowed_agent_ids)
+        ):
             reasons.append("agent_not_allowed")
-    if budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
+    if scoped and not budget.allowed_memory_lanes:
+        reasons.append("memory_lane_denied_fail_closed")
+    elif budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
         reasons.append("memory_lane_not_allowed")
     if budget.require_context_admissible and not atom.context_admissible:
         reasons.append("atom_not_context_admissible")
@@ -456,15 +483,9 @@ def _atom_agent_ids(atom: MemoryAtom) -> tuple[str, ...]:
 
 
 def _extend_agent_ids(ids: list[str], payload: dict[str, object]) -> None:
-    for key in (
-        "agent_id",
-        "agent",
-        "agent_name",
-        "owner_agent_id",
-        "assigned_to",
-        "assigned_agent_id",
-        "worker_agent_id",
-    ):
+    # "owner_agent_ids" is the hoisted key the adapters' redaction boundary
+    # writes when it drops a row/payload dict that carried ownership.
+    for key in (*AGENT_OWNER_METADATA_KEYS, "owner_agent_ids"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             ids.append(value.strip())

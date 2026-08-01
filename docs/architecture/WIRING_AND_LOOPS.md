@@ -106,3 +106,13 @@ fresh proof command with exit code 0, and archived the result with pass_rate
   verified.
 - VentureCell polymorphism is not solved here.
 - Ontology/runtime store synchronization is not solved here.
+## Beads fence status (2026-07-29)
+
+The fence above was tested against the walking-mode plan's need for a
+dependency-aware, git-shareable task medium and **AFFIRMED** — the need is
+met by joining `task_board.py` ready-set semantics with the roaming
+mailbox, not by adopting a dependency. The decision, its rationale, and
+its falsifiable revisit criteria live in the dedicated record:
+[`docs/architecture/ADRs/ADR-010-beads-fence-task-medium-join.md`](ADRs/ADR-010-beads-fence-task-medium-join.md).
+(One authority role per file — this map stays a wiring map;
+`docs/AGENTS.md`.)

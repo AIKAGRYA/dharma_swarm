@@ -88,6 +88,24 @@ jobs:
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
       CHECK_SUITE_SHA: ${{ github.event.check_suite.head_sha || '' }}
     steps:
+      - name: Halt on loop kill-switch
+        run: |
+          set -euo pipefail
+          # Loop kill-switch (docs/ops/loop_control/README.md): file present on
+          # the loop-control branch => HALT (exit 1, red-while-halted); absent
+          # (404 on file or branch) => proceed; any other error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — no evaluation, no dispatch" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
       # Load policy data from the trusted default branch, never candidate PR
       # code: this privileged job carries write permissions and a dispatch PAT.
       - name: Checkout trusted automerge policy

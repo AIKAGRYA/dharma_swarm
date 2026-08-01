@@ -13,11 +13,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+# Task ids are single path components — no separators, no leading dot. This
+# confines every id-derived path to its directory: a dependency such as
+# "../responses/<id>.worker" must never resolve outside tasks/ and satisfy
+# the ready gate via a response record (Greptile + Codex reviews on
+# PR #1159).
+_TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def _validated_task_id(task_id: str) -> str:
+    if not _TASK_ID_RE.fullmatch(task_id or ""):
+        raise ValueError(f"invalid task id: {task_id!r}")
+    return task_id
 
 
 def _utc_now() -> datetime:
@@ -51,6 +66,14 @@ class MailboxTask:
     claimed_by: str = ""
     responded_at: str = ""
     response_ref: str = ""
+    # Task-medium join (ADR-010,
+    # docs/architecture/ADRs/ADR-010-beads-fence-task-medium-join.md):
+    # dependency edges by task_id, with ready-set semantics mirroring
+    # task_board.py — a task is claimable only when every dependency has
+    # status "responded". Unknown/malformed dependency ids fail closed.
+    # Dependent tasks are written with status "blocked" so legacy pollers
+    # that ignore this field can never claim them early.
+    depends_on: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -71,6 +94,7 @@ class MailboxTask:
             claimed_by=str(data.get("claimed_by", "")),
             responded_at=str(data.get("responded_at", "")),
             response_ref=str(data.get("response_ref", "")),
+            depends_on=[str(dep) for dep in (data.get("depends_on") or [])],
         )
 
 
@@ -99,7 +123,7 @@ class RoamingMailbox:
         self.receipts_dir.mkdir(parents=True, exist_ok=True)
 
     def task_path(self, task_id: str) -> Path:
-        return self.tasks_dir / f"{task_id}.json"
+        return self.tasks_dir / f"{_validated_task_id(task_id)}.json"
 
     def response_path(self, task_id: str, responder: str) -> Path:
         safe = responder.replace("/", "_").replace("\\", "_")
@@ -124,15 +148,23 @@ class RoamingMailbox:
         body: str,
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        depends_on: list[str] | None = None,
     ) -> MailboxTask:
+        deps = [str(dep) for dep in (depends_on or [])]
         task = MailboxTask(
             task_id=self._new_task_id(),
             recipient=recipient,
             sender=sender,
             summary=summary,
             body=body,
+            # "blocked", not "queued": legacy pollers (older checkouts that
+            # ignore depends_on) claim anything queued, so a dependent task
+            # must be encoded in a status they will never claim (Codex
+            # review on PR #1159). ready_tasks() unblocks it.
+            status="blocked" if deps else "queued",
             capabilities=list(capabilities or []),
             metadata=dict(metadata or {}),
+            depends_on=deps,
         )
         self._write_json(self.task_path(task.task_id), task.to_dict())
         return task
@@ -159,22 +191,138 @@ class RoamingMailbox:
 
     def claim_task(self, task_id: str, *, claimed_by: str) -> MailboxTask:
         task = self.load_task(task_id)
-        claimed = MailboxTask(
-            **{
-                **task.to_dict(),
-                "status": "claimed",
-                "claimed_by": claimed_by,
-                "claimed_at": _utc_now_iso(),
-            }
-        )
-        self._write_json(self.task_path(task_id), claimed.to_dict())
+        # Only queued/blocked records are claimable: claiming a responded
+        # task would overwrite its terminal status (and un-satisfy every
+        # dependent), and claiming a claimed task would steal an active
+        # worker's claim (Greptile review on PR #1159).
+        if task.status not in {"queued", "blocked"}:
+            raise ValueError(
+                f"task {task_id} is not claimable (status: {task.status})"
+            )
+        # Every claim path enforces the dependency contract — a direct
+        # claim_task call must not bypass the ready gate (Codex review on
+        # PR #1159).
+        unsatisfied = [
+            dep for dep in task.depends_on if not self._dependency_satisfied(dep)
+        ]
+        if unsatisfied:
+            raise ValueError(
+                f"task {task_id} has unsatisfied dependencies: {unsatisfied}"
+            )
+        # Atomic claim fence: load/check/write alone lets two same-checkout
+        # pollers both pass the checks and both "win", last writer keeping
+        # claimed_by (Greptile review on PR #1159). Exclusive creation of a
+        # per-task receipt makes exactly one claimant succeed. NOTE: this
+        # fences one filesystem only — cross-checkout git sync stays
+        # eventually consistent (the receipt travels with the sync). If a
+        # worker dies between fence and work, an operator deletes the
+        # receipt to release the claim.
+        fence = self.receipts_dir / f"{_validated_task_id(task_id)}.claim"
+        try:
+            fd = os.open(fence, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise ValueError(
+                f"task {task_id} already claimed (fence {fence.name} exists)"
+            ) from None
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(
+                    _json_dump(
+                        {
+                            "task_id": task_id,
+                            "claimed_by": claimed_by,
+                            "claimed_at": _utc_now_iso(),
+                        }
+                    )
+                )
+            claimed = MailboxTask(
+                **{
+                    **task.to_dict(),
+                    "status": "claimed",
+                    "claimed_by": claimed_by,
+                    "claimed_at": _utc_now_iso(),
+                }
+            )
+            self._write_json(self.task_path(task_id), claimed.to_dict())
+        except BaseException:
+            # A fence without a persisted claim strands the task: still
+            # queued, yet every later claim is rejected by the receipt.
+            # Release the fence this invocation created and surface the
+            # original error (Greptile review on PR #1159).
+            fence.unlink(missing_ok=True)
+            raise
         return claimed
 
+    def _dependency_satisfied(self, dep_id: str) -> bool:
+        """A dependency is satisfied only by a terminal "responded" record.
+
+        Unknown ids fail closed (mirrors task_board.py's ready query, where a
+        dependency row must exist COMPLETED before the dependent is ready).
+        Malformed ids (path separators, traversal) and records whose own
+        task_id does not match the dependency id also fail closed.
+        """
+        try:
+            path = self.task_path(dep_id)
+        except ValueError:
+            return False
+        if not path.exists():
+            return False
+        try:
+            dep = MailboxTask.from_dict(self._read_json(path))
+        except (OSError, json.JSONDecodeError):
+            return False
+        return dep.task_id == dep_id and dep.status == "responded"
+
+    def ready_tasks(self, *, recipient: str | None = None) -> list[MailboxTask]:
+        """Claimable tasks, oldest first: queued or blocked records whose
+        every dependency is responded ("blocked" is the on-disk encoding of
+        a dependent task; see enqueue_task)."""
+        return [
+            task
+            for task in self.list_tasks(recipient=recipient)
+            if task.status in {"queued", "blocked"}
+            and all(self._dependency_satisfied(dep) for dep in task.depends_on)
+        ]
+
+    def validate_dependencies(self) -> list[str]:
+        """Diagnostics: unknown dependency ids and dependency cycles."""
+        tasks = {task.task_id: task for task in self.list_tasks()}
+        issues: list[str] = []
+        for task in tasks.values():
+            for dep in task.depends_on:
+                if dep not in tasks:
+                    issues.append(f"{task.task_id}: unknown dependency {dep}")
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {task_id: WHITE for task_id in tasks}
+
+        def visit(task_id: str, trail: list[str]) -> None:
+            color[task_id] = GRAY
+            for dep in tasks[task_id].depends_on:
+                if dep not in tasks:
+                    continue
+                if color[dep] == GRAY:
+                    cycle = trail[trail.index(dep):] if dep in trail else trail
+                    issues.append(
+                        f"dependency cycle: {' -> '.join([*cycle, task_id, dep])}"
+                    )
+                elif color[dep] == WHITE:
+                    visit(dep, [*trail, dep])
+            color[task_id] = BLACK
+
+        for task_id in tasks:
+            if color[task_id] == WHITE:
+                visit(task_id, [task_id])
+        return issues
+
     def claim_next_task(self, recipient: str) -> MailboxTask | None:
-        queued = self.list_tasks(recipient=recipient, status="queued")
-        if not queued:
-            return None
-        return self.claim_task(queued[0].task_id, claimed_by=recipient)
+        for candidate in self.ready_tasks(recipient=recipient):
+            try:
+                return self.claim_task(candidate.task_id, claimed_by=recipient)
+            except ValueError:
+                # Lost the claim race (or state moved under us) — the next
+                # ready task is still fair game.
+                continue
+        return None
 
     def respond_to_task(
         self,
@@ -219,9 +367,15 @@ def _parser() -> argparse.ArgumentParser:
     enqueue.add_argument("--summary", required=True)
     enqueue.add_argument("--body", required=True)
     enqueue.add_argument("--capability", action="append", default=[])
+    enqueue.add_argument("--depends-on", action="append", default=[])
 
     claim = sub.add_parser("claim-next")
     claim.add_argument("--recipient", required=True)
+
+    ready = sub.add_parser("ready")
+    ready.add_argument("--recipient", default="")
+
+    sub.add_parser("validate")
 
     respond = sub.add_parser("respond")
     respond.add_argument("--task-id", required=True)
@@ -247,9 +401,23 @@ def main(argv: list[str] | None = None) -> int:
             summary=args.summary,
             body=args.body,
             capabilities=list(args.capability or []),
+            depends_on=list(args.depends_on or []),
         )
         print(_json_dump(task.to_dict()).rstrip())
         return 0
+
+    if args.command == "ready":
+        tasks = [
+            task.to_dict()
+            for task in mailbox.ready_tasks(recipient=args.recipient or None)
+        ]
+        print(_json_dump(tasks).rstrip())
+        return 0
+
+    if args.command == "validate":
+        issues = mailbox.validate_dependencies()
+        print(_json_dump(issues).rstrip())
+        return 0 if not issues else 1
 
     if args.command == "claim-next":
         task = mailbox.claim_next_task(args.recipient)

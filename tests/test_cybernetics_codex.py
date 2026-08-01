@@ -708,3 +708,29 @@ def test_external_worker_registration_builder_is_default_deny(tmp_path):
     assert worker.autonomy_policy.can_write_source is False
     assert worker.workspace_policy.repo_writes_allowed is False
     assert worker.metadata["nats_runtime_status"] == "declared_not_started"
+
+
+
+def test_loop1_bounded_replay_stays_harness_proven_without_runtime_db():
+    bounded = {
+        "loop1": {
+            "harness_proven": True,
+            "closed": True,
+            "tasks_completed": 3,
+            "tasks_requested": 3,
+            "dispatch_dropoffs": 0,
+            "evidence_receipts_ok": 3,
+            "completed_runs_with_truth": 3,
+        }
+    }
+    rows = {
+        row["number"]: row
+        for row in build_loop_statuses({}, {}, {}, bounded_replays=bounded)
+    }
+    loop1 = rows[1]
+    assert loop1["verdict"] == "HARNESS_PROVEN"
+    assert "bounded_replays.loop1" in loop1["evidence"]
+    assert "not CLOSED_LIVE" in loop1["blocker"]
+    assert "no completed delegation runs in runtime scope" in loop1["blocker"]
+    assert "no served provider/model truth from completed work" in loop1["blocker"]
+    assert "no later correlated routing/adaptation read" in loop1["blocker"]

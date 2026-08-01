@@ -61,6 +61,12 @@ def test_onboard_returns_its_truth_and_delegates_to_compact_cli() -> None:
     assert "LIVING AXIOMS" in result.stdout
     assert "WHAT TO DO NEXT" in result.stdout
     assert "Authority: none" in result.stdout
+    assert "NATS SUBSTRATE — LOCAL OBSERVATION ONLY" in result.stdout
+    assert "No JetStream ack or live contact is claimed." in result.stdout
+    assert truth["nats_substrate"]["spec_path"] == (
+        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+    )
+    assert truth["nats_substrate"]["mirrors_are_live_transport_proof"] is False
 
 
 def test_loader_selects_bootstrap_mode_by_interpreter() -> None:
@@ -145,6 +151,10 @@ def test_onboard_json_emits_machine_projection() -> None:
     }
     assert "exit_code" in payload
     assert "conditions" in payload
+    assert payload["nats_substrate"]["tcp_host"] == "127.0.0.1"
+    assert payload["nats_substrate"]["tcp_port"] == 4222
+    assert payload["nats_substrate"]["jetstream_ack_verified"] is False
+    assert payload["nats_substrate"]["live_contact_claim"] is False
 
 
 def test_onboard_strict_exits_true_exit_code() -> None:
