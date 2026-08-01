@@ -229,13 +229,18 @@ jobs:
               git -C "$repo" clean -fdxq
             fi
             mkdir -p "$repo/$(dirname "$STATE_DIR")"
-            # kill_path_receipt.json is owned by sarathi-kill-receipt.yml. If the
-            # branch carries one this run never restored, carry it forward — this
-            # lane must never delete another writer's Gate-9 receipt.
+            # kill_path_receipt.json is owned by sarathi-kill-receipt.yml, so the
+            # FRESHLY CLONED BRANCH is always authoritative for it. Never compare
+            # against this run's restored copy: that copy can be stale (restored
+            # before the attestation lane wrote a newer one), and preferring it
+            # would overwrite newer Gate-9 evidence. Two rules, no exceptions:
+            #   branch has a receipt  -> keep exactly that one
+            #   branch has none       -> keep none (never resurrect a stale copy)
             carried=""
-            if [ -f "$repo/${STATE_DIR}/kill_path_receipt.json" ] \
-               && [ ! -f "$state_root/sarathi/kill_path_receipt.json" ]; then
+            had_receipt=0
+            if [ -f "$repo/${STATE_DIR}/kill_path_receipt.json" ]; then
               carried="$(cat "$repo/${STATE_DIR}/kill_path_receipt.json")"
+              had_receipt=1
             fi
             # Replace the previous snapshot. find -delete is depth-first and
             # confined to the state directory, so a bad expansion cannot walk out
@@ -244,9 +249,12 @@ jobs:
               find "$repo/${STATE_DIR}" -delete
             fi
             cp -a "$state_root/sarathi" "$repo/${STATE_DIR}"
-            if [ -n "$carried" ]; then
+            if [ "$had_receipt" -eq 1 ]; then
               printf '%s\n' "$carried" > "$repo/${STATE_DIR}/kill_path_receipt.json"
-              echo "carried forward a kill-path receipt written by the attestation lane"
+              echo "kept the state branch's kill-path receipt (attestation lane owns it)"
+            elif [ -f "$repo/${STATE_DIR}/kill_path_receipt.json" ]; then
+              rm -- "$repo/${STATE_DIR}/kill_path_receipt.json"
+              echo "dropped a stale restored receipt: the state branch no longer carries one"
             fi
             printf '%s' "$STATE_README" > "$repo/README.md"
             git -C "$repo" config user.name "sarathi-wake-lane"

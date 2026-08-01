@@ -131,16 +131,30 @@ def test_state_writers_recover_from_a_losing_push():
         assert "landed first" in raw, f"{name} must explain the retry in its log output"
 
 
-def test_wake_lane_never_deletes_the_kill_receipt():
+def test_wake_lane_treats_the_branch_as_authoritative_for_the_receipt():
     """The wake lane replaces the whole state directory, but the receipt belongs
-    to the attestation lane. Whatever the interleaving, the wake lane must carry
-    an existing receipt forward instead of deleting Gate-9's evidence."""
+    to the attestation lane, so the freshly cloned BRANCH is authoritative — not
+    this run's restored copy.
+
+    Greptile's second P1 (reproduced): guarding on "my snapshot has no receipt"
+    is wrong. A wake run that restored an OLD receipt, then lost its push, would
+    skip preservation on retry and overwrite the NEWER receipt. The condition
+    must not consult the state root at all.
+    """
     raw = _raw(LANE)
-    assert 'carried="$(cat "$repo/${STATE_DIR}/kill_path_receipt.json")"' in raw, (
-        "the wake lane must read an existing receipt before replacing the snapshot"
+    assert '[ ! -f "$state_root/sarathi/kill_path_receipt.json" ]' not in raw, (
+        "preservation must not be conditioned on the (possibly stale) restored copy"
     )
-    assert 'printf \'%s\\n\' "$carried" > "$repo/${STATE_DIR}/kill_path_receipt.json"' in raw, (
-        "the wake lane must write a carried receipt back after replacing the snapshot"
+    assert 'if [ -f "$repo/${STATE_DIR}/kill_path_receipt.json" ]; then' in raw, (
+        "the wake lane must read the receipt straight off the freshly cloned branch"
+    )
+    assert 'if [ "$had_receipt" -eq 1 ]; then' in raw, (
+        "the wake lane must restore the branch's receipt after replacing the snapshot"
+    )
+    # The mirror rule: a receipt the branch no longer carries must not come back.
+    assert 'rm -- "$repo/${STATE_DIR}/kill_path_receipt.json"' in raw, (
+        "a stale restored receipt must be dropped when the branch carries none, "
+        "so the wake lane cannot resurrect revoked Gate-9 evidence"
     )
 
 
