@@ -1880,7 +1880,7 @@ active_tracks:
 
     next_items:
       - id: WP-0D
-        what: "First obtain an approved bounded specification amendment and ownership admission for tests/test_agent_work_packet.py, which is outside WP-0D's ratified allowed-file list. Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios, replace the environment-dependent hollow-module fixture, and prove two consecutive clean make test-fast runs plus make test."
+        what: "First land the 2026-08-01 bounded specification amendment and ownership admission for tests/test_agent_work_packet.py and tests/test_make_onboarding_contract.py (approval is that PR's human merge). Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios in tests/test_agent_work_packet.py, replace its environment-dependent hollow-module fixture with a deterministically absent module, add the measured pytest.mark.timeout repo-scale override for tests/test_make_onboarding_contract.py::test_make_report_root_rejects_hypothesis_cache_symlink registered in REPO_SCALE_OVERRIDES, and prove two consecutive clean make test-fast runs plus make test."
         kind: code
         blocker: true
       - id: WP-0F1
