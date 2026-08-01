@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -40,7 +41,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from dharma_swarm.holon_runtime import holon_wake_cycle  # noqa: E402
 from dharma_swarm.holon_system.sarathi.delegate import invoke_receipt_path  # noqa: E402
-from dharma_swarm.holon_system.sarathi.plan import BootPack  # noqa: E402
+from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
+    BootPack,
+    stored_dedup_key,
+)
 from dharma_swarm.holon_system.sarathi.proof import (  # noqa: E402
     REQUIRED_UNATTENDED_CYCLES,
     ProofCycleRecord,
@@ -126,9 +130,21 @@ async def run_window(
     current: dict = {"cycle": 0, "outcomes": []}
 
     def load_boot_pack() -> BootPack:
-        ready = frozenset(task.summary for task in mailbox.ready_tasks())
+        # Dedup against ALL persisted Sarathi tasks (queued, claimed, OR
+        # responded), not only currently-claimable ones: a claimed/responded
+        # task's persisted dedup key must still suppress re-proposing the same
+        # item during the proof window, otherwise an unchanged backlog item is
+        # emitted as a fresh proposal each cycle (Greptile P1 on PR #1170,
+        # parity with the daemon's list_tasks dedup).
+        ready = frozenset(
+            key
+            for task in mailbox.list_tasks()
+            if task.sender == "sarathi"
+            for key in (stored_dedup_key(task.metadata),)
+            if key  # a keyless (pre-key) task does not dedup — see build_plan
+        )
         return BootPack(
-            roster=roster, open_items=backlog, ready_summaries=ready, audit=audit
+            roster=roster, open_items=backlog, ready_keys=ready, audit=audit
         )
 
     def brief_sink(text: str) -> str:
@@ -230,6 +246,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cap-usd", type=float, default=1.0)
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
+
+    # Reject a non-finite or negative cap before it can certify a proof. A NaN
+    # cap slips through argparse's float and defeats the budget guard (every
+    # `spent >= NaN` is False), letting an invalid budget control write
+    # passed:true for the unattended proof that gates dial advancement (Greptile
+    # P1 on PR #1170, T-Rex verified). Mirror the standing daemon's guard.
+    if not math.isfinite(args.cap_usd) or args.cap_usd < 0:
+        parser.error(
+            f"--cap-usd must be a finite, non-negative number (got {args.cap_usd!r})"
+        )
 
     report = asyncio.run(
         run_window(

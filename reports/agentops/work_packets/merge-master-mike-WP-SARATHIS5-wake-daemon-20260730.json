@@ -1,0 +1,101 @@
+{
+  "id": "merge-master-mike-WP-SARATHIS5-wake-daemon-20260730",
+  "base_ref": "c5653967eeae296eba38e90152e04a3742f99997",
+  "branch": "claude/sarathi-autonomy-build-vyr998",
+  "worktree": ".",
+  "intent": "Add the standing wake-loop runtime wrapper scripts/runtime/sarathi_wake_daemon.py (PR-S5 of the Sarathi autonomy mission, follow-up to merged PR #1167): a thin Gate-9 runtime wrapper that binds the merged wake organs (make_wake_work_fn) into a governed standing loop which READS DGC_SARATHI_AUTONOMY (default propose -> nothing dispatches; invalid -> shadow) so the operator's dial actually drives real work, honoring the kill-switch and budget checks via holon_wake_cycle before every cycle and the reversibility gate before every delegation. It never sets wake_loop_active (Gate-10 earns that via the 14-cycle proof). With unit tests covering propose-holds-dispatch, invalid-dial-fails-closed-to-shadow, dispatch-enqueues-leased-work, and kill-switch-halts-the-loop. The decorrelated-review round (Greptile+Codex on PR #1170) hardened coupled surfaces under this same packet: a cross-process flock serializing the budget read/check/work/write (concurrent-daemon spend race) with a NaN/negative --cap-usd rejection; closeback linkage folded into the per-run report instead of a dedicated closeback_ledger.jsonl store (store-inventory census + memory-writer-sentinel); and a full-identity backlog dedup key (plan.plan_dedup_key over the whole PlannedDelegation) persisted on the enqueued task and read back via plan.stored_dedup_key, so a revised backlog item — body OR routing — re-plans while an unchanged one stays suppressed. This touched the merged plan.py and the proof-window's dedup read for parity, so both are in allowed_files.",
+  "allowed_files": [
+    "scripts/runtime/sarathi_wake_daemon.py",
+    "scripts/runtime/sarathi_proof_window.py",
+    "tests/test_sarathi_wake_daemon.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-SARATHIS5-wake-daemon-20260730.json",
+    "dharma_swarm/holon_system/sarathi/plan.py",
+    "dharma_swarm/holon_system/sarathi/delegate.py",
+    "tests/test_sarathi_plan.py",
+    "tests/test_sarathi_delegate.py",
+    "tests/test_sarathi_proof_window.py"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/operator_core/autonomy_dial.py",
+    "scripts/governance/**",
+    ".github/workflows/**",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "dharma_swarm/holon_system/sarathi/wake.py",
+    "dharma_swarm/holon_system/sarathi/proof.py",
+    "dharma_swarm/holon_system/sarathi/gateway.py"
+  ],
+  "gates": [
+    {
+      "name": "sarathi-wake-daemon-and-regression",
+      "command": "python3 -m pytest -q tests/test_sarathi_wake_daemon.py tests/test_sarathi_wake.py tests/test_sarathi_delegate.py tests/test_sarathi_proof_window.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "hygiene-integrity",
+      "command": "python3 scripts/governance/hygiene/check_hygiene_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "invalid-dial-must-not-resolve-to-full",
+      "command": "python3 -c \"import os; os.environ['DGC_SARATHI_AUTONOMY']='fulll'; from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level, AutonomyLevel; import sys; sys.exit(0 if current_autonomy_level() is AutonomyLevel.SHADOW else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(sarathi): PR-S5 standing wake-loop wrapper binding organs to the dial"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SARATHIS5",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c5653967eeae296eba38e90152e04a3742f99997",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Codex P1 on merged PR #1167 noted make_wake_work_fn was only called by the propose-only proof runner and codex_composer_wake_loop.run_once still publishes read-only status, so DGC_SARATHI_AUTONOMY=dispatch changed nothing; this wrapper is the standing-loop binding that closes that gap without touching the 1400-line wake shell.",
+      "Codex/Greptile P1 on PR #1170 found two coupled bugs in the merged delegate.py that the daemon exposes: planner metadata (sarathi_kind=merge) re-classified merge label-requests as IRREVERSIBLE, and invoke items with no live invoker were dropped to logged instead of riding the leased mailbox. Both fixed here so the standing loop actually dispatches merge intents and invoke-channel work."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sarathi_proof_window.py:run_window",
+      "dharma_swarm/holon_system/sarathi/wake.py:make_wake_work_fn",
+      "dharma_swarm/holon_runtime.py:holon_wake_cycle",
+      "dharma_swarm/operator_core/autonomy_dial.py:current_autonomy_level"
+    ],
+    "honest_blockers": [
+      "The daemon does not set wake_loop_active and does not run the 14-cycle proof; the operator earns liveness via scripts/runtime/sarathi_proof_window.py before advancing the dial.",
+      "A truly continuous standing loop is the operator's scheduler/launchd re-invoking this per cadence; this container is ephemeral and cannot host a persistent daemon.",
+      "At dispatch/full the daemon enqueues mailbox tasks and automerge-label intents that Merge Master Mike re-gates; it cannot itself merge or push (both NEVER_AUTO)."
+    ],
+    "rollback": "Revert the two added files and this packet together; the daemon is an additive runtime wrapper with no runtime state in git and no migrations.",
+    "packet_digest": "d0cdada3a1b5faa9c3d56ee7307e9da76fbcf19be526c9756da6bba81f870bbf"
+  }
+}

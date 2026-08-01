@@ -34,6 +34,17 @@ name: pr-ci-health
 on:
   schedule:
     - cron: "0 * * * *"
+  # Rebase on the event that actually strands PRs. Every merge to main puts
+  # every other open PR behind; with "require branches up to date" on, those
+  # PRs cannot merge (and armed auto-merge cannot fire) until something
+  # rebases them. On the hourly cron alone that wait was up to 59 minutes,
+  # so the operator hand-tapped "Update branch" on each PR instead — which
+  # restarts full CI on all of them, every time. Reacting to the merge
+  # itself closes that window to ~1 minute and the queue drains unattended.
+  # Runs in `rebase` mode only: triage feeds the rebase step, while the
+  # tracking-issue upsert and flake-rerun sweeps stay on the hourly pass.
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -58,7 +69,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-      MODE: ${{ github.event.inputs.mode || 'all' }}
+      MODE: ${{ github.event.inputs.mode || (github.event_name == 'push' && 'rebase' || 'all') }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
