@@ -178,7 +178,16 @@ jobs:
               --description "pr-ci-health skipped an auto-rebase: no configured credential proved push authority" \
               --color "D93F0B" 2>/dev/null || true
           fi
-          mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.mergeable_state == "behind") | "\(.number)\t\(.head)\t\(.base)"' triage.json)
+          # Select on behind_by (the compare API's authoritative count), NOT
+          # on mergeable_state. mergeable_state is a SINGLE value with a
+          # precedence order in which "blocked" (a required check missing or
+          # failing) outranks "behind" — so a PR that is both behind main and
+          # waiting on CI reports "blocked", and this pass skipped it. On this
+          # repo nearly every behind-main PR is simultaneously blocked or
+          # unstable, which is why the auto-rebase reported success while the
+          # operator still had to press "Update branch" by hand on every PR.
+          # Conflicted branches are excluded: a rebase cannot resolve them.
+          mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.categories | index("merge_conflict") | not) | "\(.number)\t\(.head)\t\(.base)"' triage.json)
           for line in "${prs[@]:-}"; do
             [ -z "$line" ] && continue
             pr="$(echo "$line" | cut -f1)"; head="$(echo "$line" | cut -f2)"; base="$(echo "$line" | cut -f3)"

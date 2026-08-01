@@ -77,6 +77,10 @@ class PRTriage:
     draft: bool
     author: str
     mergeable_state: str
+    # Commits on the base branch that the head does not contain, from the
+    # compare API. -1 means "not measured" (the pure-classification path);
+    # it never implies "up to date".
+    behind_by: int = -1
     failing_checks: list[str] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
 
@@ -119,7 +123,33 @@ def commit_check_runs(repo: str, sha: str) -> list[dict]:
     return []
 
 
-def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
+def compare_behind_by(repo: str, base_ref: str, head_sha: str) -> int:
+    """Commits on *base_ref* that *head_sha* does not contain.
+
+    `mergeable_state` cannot answer this. It is a SINGLE value with a
+    precedence order, and "blocked" (a required check missing or failing)
+    outranks "behind" — so a PR that is both behind main and waiting on CI
+    reports `blocked`, and a rebase pass keyed on `mergeable_state ==
+    "behind"` silently skipped it. On this repo nearly every behind-main PR
+    is also blocked or unstable, which is why the auto-rebase looked
+    healthy while the operator still had to press "Update branch" by hand.
+
+    The compare API answers the question directly and independently of
+    merge state. -1 on any read failure: unknown is never "up to date".
+    """
+    try:
+        payload = _gh_json(["api", f"repos/{repo}/compare/{base_ref}...{head_sha}"])
+    except (subprocess.CalledProcessError, json.JSONDecodeError, OSError):
+        return -1
+    if not isinstance(payload, dict) or "behind_by" not in payload:
+        return -1
+    try:
+        return int(payload["behind_by"])
+    except (TypeError, ValueError):
+        return -1
+
+
+def classify_pr(pr: dict, check_runs: list[dict], behind_by: int = -1) -> PRTriage:
     """Pure classification from a PR payload + its head-commit check runs."""
     triage = PRTriage(
         number=int(pr["number"]),
@@ -129,6 +159,7 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
         draft=bool(pr.get("draft", False)),
         author=str(pr.get("user", {}).get("login", "")),
         mergeable_state=str(pr.get("mergeable_state", "unknown")),
+        behind_by=behind_by,
     )
 
     # A check name can appear multiple times when a check is re-run. Keep only
@@ -174,9 +205,13 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
             categories.append("real_test_lint")
 
     state = triage.mergeable_state
-    if state == "behind":
+    # behind_by is authoritative and mergeable_state is a fallback, not the
+    # other way round: "blocked" outranks "behind" in GitHub's single-value
+    # state, so keying only on the state hid most behind-main PRs from the
+    # auto-rebase pass.
+    if triage.behind_by > 0 or state == "behind":
         categories.append("behind_main")
-    elif state == "dirty":
+    if state == "dirty":
         categories.append("merge_conflict")
     elif state == "blocked":
         # GitHub computes "blocked" when required checks are missing/failing
@@ -221,7 +256,9 @@ def collect(repo: str) -> list[PRTriage]:
         detail = pr_detail(repo, int(pr["number"]))
         sha = str(detail.get("head", {}).get("sha", ""))
         runs = commit_check_runs(repo, sha) if sha else []
-        rows.append(classify_pr(detail, runs))
+        base_ref = str(detail.get("base", {}).get("ref", ""))
+        behind = compare_behind_by(repo, base_ref, sha) if sha and base_ref else -1
+        rows.append(classify_pr(detail, runs, behind_by=behind))
     return rows
 
 
