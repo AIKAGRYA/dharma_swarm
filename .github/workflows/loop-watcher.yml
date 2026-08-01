@@ -77,16 +77,25 @@ jobs:
 
       - name: Watch lane PRs and ingest operator comments
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          # A DEGRADED sweep (failed PR/review/file enumeration) exits 1 on
+          # purpose — an outage must not render as a green `watched: 0`. Its
+          # report is the one that most needs to reach the summary, so
+          # capture the status instead of letting `set -e` abort the step.
+          set +e
           python3 scripts/governance/loop_watcher.py \
             --repo "${GH_REPO}" --owner-login "${OWNER_LOGIN}" \
             --report "${RUNNER_TEMP}/loop_watcher_report.json"
+          watch_exit="$?"
+          set -e
           {
             echo "## Loop watcher report"
             echo '```json'
-            cat "${RUNNER_TEMP}/loop_watcher_report.json"
+            cat "${RUNNER_TEMP}/loop_watcher_report.json" \
+              || echo '{"status": "NO_REPORT_WRITTEN"}'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          exit "${watch_exit}"
 
       - name: Upload watcher report
         if: always()
