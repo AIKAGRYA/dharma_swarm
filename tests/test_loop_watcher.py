@@ -198,9 +198,10 @@ def test_diff_ceiling_is_the_prs_own_tier_not_a_blanket_600(monkeypatch):
     monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
     monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {})
     _pages(monkeypatch, reviews=[],
-           files=[{"filename": "docs/plans/BIG.md"}])
+           files=[{"filename": "docs/plans/BIG.md",
+                   "additions": 400, "deletions": 0}])
     report = loop_watcher.watch_pr("o/r", {
-        "number": 11, "headRefOid": "sha", "additions": 400, "deletions": 0,
+        "number": 11, "headRefOid": "sha",
         "author": {"login": "someone"}, "labels": [],
     })
     assert report["tier"] == "tier0"
@@ -221,7 +222,7 @@ def test_failed_file_enumeration_is_a_finding_not_a_clean_tier(monkeypatch):
 
 def test_failed_pr_enumeration_is_degraded_and_red(tmp_path, monkeypatch):
     """An outage must never render as `watched: 0` on a green run."""
-    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: None)
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: None)
     payload = loop_watcher.run_watch("o/r", tmp_path / "report.json")
     assert payload["status"] == "DEGRADED"
     assert payload["watched"] == 0
@@ -294,12 +295,12 @@ def test_canary_review_outage_is_a_finding_not_an_empty_approval_list(monkeypatc
 
 def test_a_degraded_pr_degrades_the_whole_run(tmp_path, monkeypatch):
     """A control that could not be evaluated is not a control that passed."""
-    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: (
-        [{"number": 14, "headRefOid": "sha", "additions": 1, "deletions": 0,
-          "author": {"login": "someone"}, "labels": []}]
-        if args[:2] == ["pr", "list"] else {}
-    ))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {"check_runs": []})
     monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "fetch_watched_prs", lambda repo: [
+        {"number": 14, "headRefOid": "sha",
+         "author": {"login": "someone"}, "labels": []},
+    ])
     monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: None)
     payload = loop_watcher.run_watch("o/r", tmp_path / "r.json")
     assert payload["status"] == "DEGRADED"
@@ -391,12 +392,12 @@ def test_failed_finding_publication_is_not_success(monkeypatch):
 
 
 def test_unpublished_findings_degrade_the_run(tmp_path, monkeypatch):
-    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: (
-        [{"number": 21, "headRefOid": "sha", "additions": 1, "deletions": 0,
-          "author": {"login": "someone"}, "labels": []}]
-        if args[:2] == ["pr", "list"] else {}
-    ))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {"check_runs": []})
     monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "fetch_watched_prs", lambda repo: [
+        {"number": 21, "headRefOid": "sha",
+         "author": {"login": "someone"}, "labels": []},
+    ])
     monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [])
     monkeypatch.setattr(loop_watcher, "watch_pr", lambda repo, pr: {
         "pr": 21, "head": "sha", "tier": "tier1", "findings": ["x"],
@@ -508,3 +509,56 @@ def test_check_run_pagination_is_bounded(monkeypatch):
         lambda args: {"check_runs": [{"name": f"f-{i}"} for i in range(100)]},
     )
     assert loop_watcher.fetch_check_run_names("o/r", "sha") is None
+
+
+def test_lane_pr_enumeration_does_not_truncate_at_100(monkeypatch):
+    """`gh pr list --limit 100` silently dropped PR 101, and the run still
+    reported OK — an unexamined lane PR under a healthy sweep."""
+    rows = [
+        {"number": n, "head": {"sha": f"sha{n}"}, "user": {"login": "someone"},
+         "labels": [{"name": "bot-pr"}]}
+        for n in range(1, 102)
+    ]
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: rows)
+    watched = loop_watcher.fetch_watched_prs("o/r")
+    assert len(watched) == 101
+    assert watched[-1]["number"] == 101
+    assert watched[-1]["headRefOid"] == "sha101"
+
+
+def test_unlabelled_prs_are_not_watched(monkeypatch):
+    rows = [
+        {"number": 1, "head": {"sha": "a"}, "user": {"login": "x"},
+         "labels": [{"name": "bot-pr"}]},
+        {"number": 2, "head": {"sha": "b"}, "user": {"login": "x"},
+         "labels": [{"name": "documentation"}]},
+    ]
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: rows)
+    assert [p["number"] for p in loop_watcher.fetch_watched_prs("o/r")] == [1]
+
+
+def test_a_pr_with_two_watch_labels_is_watched_once(monkeypatch):
+    """The per-label query needed cross-label dedupe; one complete list
+    removes the class."""
+    rows = [{"number": 7, "head": {"sha": "a"}, "user": {"login": "x"},
+             "labels": [{"name": "bot-pr"}, {"name": "walk-ready"}]}]
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: rows)
+    assert len(loop_watcher.fetch_watched_prs("o/r")) == 1
+
+
+def test_changed_lines_come_from_the_same_pages_as_the_tier(monkeypatch):
+    """One paginated source for both, so the count and the classification
+    cannot disagree — and the PR list endpoint (which omits additions and
+    deletions entirely) is no longer consulted for it."""
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {"check_runs": []})
+    _pages(monkeypatch, reviews=[], files=[
+        {"filename": "docs/a.md", "additions": 200, "deletions": 50},
+        {"filename": "docs/b.md", "additions": 60, "deletions": 0},
+    ])
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 51, "headRefOid": "sha",
+        "author": {"login": "someone"}, "labels": [],
+    })
+    assert report["tier"] == "tier0"
+    assert any("310 > 300" in f for f in report["findings"])

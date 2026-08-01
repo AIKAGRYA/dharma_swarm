@@ -307,6 +307,12 @@ def watch_pr(repo: str, pr: dict) -> dict:
         tier = None
     else:
         changed = [row.get("filename", "") for row in files]
+        # Changed lines summed from the SAME paginated pages the tier is
+        # classified from, so the count and the classification can never
+        # disagree — and the PR list endpoint (which omits additions and
+        # deletions) is no longer a second source of truth for it.
+        lines = sum(int(row.get("additions") or 0) + int(row.get("deletions") or 0)
+                    for row in files)
         hits = door.tier2_hits(changed, policy)
         if hits:
             findings.append(f"tier-2 referee paths touched: {hits}")
@@ -315,7 +321,6 @@ def watch_pr(repo: str, pr: dict) -> dict:
         # tier-0 PR is held to 300 and a referee-path PR to tier-2's own
         # ceiling, not a blanket 600 (Codex on PR #1163).
         tier = "tier2" if hits else door.classify_tier(changed, policy)
-        lines = int(pr.get("additions", 0)) + int(pr.get("deletions", 0))
         ceiling = int(policy["tiers"][tier]["max_diff_lines"])
         if lines > ceiling:
             findings.append(
@@ -384,27 +389,47 @@ def sync_findings(repo: str, pr: dict, findings: list[str]) -> str:
 UNPUBLISHED_STATES = frozenset({"unknown", "create_failed", "update_failed"})
 
 
+def fetch_watched_prs(repo: str) -> list[dict] | None:
+    """Every open PR carrying a watch label, from the PAGINATED REST list.
+
+    `gh pr list --limit 100` truncates silently: at 101 open PRs on a label
+    the last one was never watched and the run still reported OK, so an
+    unexamined lane PR could carry missing checks, test deletions or
+    tier-policy changes under a healthy sweep (Greptile on PR #1163).
+    _fetch_all_pages walks every page and fails closed on any of them, so
+    "no lane PRs" and "could not enumerate" stay distinguishable.
+
+    Labels are filtered client-side from the complete set rather than with
+    one capped query per label, which also removes the cross-label dedupe.
+    """
+    rows = _fetch_all_pages(f"repos/{repo}/pulls?state=open")
+    if rows is None:
+        return None
+    watched = []
+    for row in rows:
+        labels = {str(entry.get("name") or "") for entry in row.get("labels", [])}
+        if not labels & set(WATCH_LABELS):
+            continue
+        watched.append({
+            "number": int(row["number"]),
+            "headRefOid": str((row.get("head") or {}).get("sha") or ""),
+            "author": {"login": str((row.get("user") or {}).get("login") or "")},
+            "labels": [{"name": name} for name in sorted(labels)],
+        })
+    return watched
+
+
 def run_watch(repo: str, report_path: Path) -> dict:
     reports = []
-    seen: set[int] = set()
     failed_labels: list[str] = []
-    for label in WATCH_LABELS:
-        rows = _gh_json([
-            "pr", "list", "--repo", repo, "--state", "open", "--label", label,
-            "--json",
-            "number,headRefOid,additions,deletions,author,labels",
-            "--limit", "100",
-        ])
-        if not isinstance(rows, list):
-            # A failed enumeration is an OUTAGE, not "no lane PRs". Reporting
-            # watched: 0 on an auth failure or a rate limit made a blind run
-            # indistinguishable from a quiet one (Codex on PR #1163).
-            failed_labels.append(label)
-            continue
-        for pr in rows:
-            if pr["number"] in seen:
-                continue
-            seen.add(pr["number"])
+    watched = fetch_watched_prs(repo)
+    if watched is None:
+        # A failed enumeration is an OUTAGE, not "no lane PRs". Reporting
+        # watched: 0 on an auth failure or a rate limit made a blind run
+        # indistinguishable from a quiet one (Codex on PR #1163).
+        failed_labels = sorted(WATCH_LABELS)
+    else:
+        for pr in watched:
             result = watch_pr(repo, pr)
             result["comment"] = sync_findings(repo, pr, result["findings"])
             reports.append(result)
