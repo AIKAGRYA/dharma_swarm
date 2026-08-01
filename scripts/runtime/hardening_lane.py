@@ -542,10 +542,35 @@ def main(argv: list[str] | None = None) -> int:
                            "could not be restored — refusing to deliver"}, out)
         return 1
 
+    # Freezing the tree guaranteed "we deliver what we MEASURED" — and by
+    # itself broke "we deliver what we TESTED". `make test-fast` reads the
+    # working tree, so a test that rewrites a measured file tests one set of
+    # bytes while commit-tree ships the pre-test set: a green run for content
+    # that is not the content delivered (Greptile on PR #1162; the defect was
+    # introduced by the previous commit's fix).
+    #
+    # Re-stage the measured paths and require the tree to hash identically.
+    # Any drift means the verification did not cover the delivery, so nothing
+    # ships. This is a content check, not a security boundary: the delivered
+    # bytes are already immutable, so the worst a late writer achieves is a
+    # refusal.
+    _git(["reset", "-q", "HEAD", "--"])
+    if staged:
+        _git(["add", "--", *staged])
+    post_test_tree = _git(["write-tree"]).stdout.strip()
+    if post_test_tree != measured_tree:
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": "the test run altered the measured content, so the "
+                           "green result does not cover what would be "
+                           "delivered — refusing to ship untested bytes",
+                 "measured_tree": measured_tree,
+                 "post_test_tree": post_test_tree}, out)
+        return 1
+
     # Commit the FROZEN tree, not the working tree. commit-tree takes the
     # content by SHA, so nothing the test run (or anything else) did to the
-    # checkout after the measurement can enter the delivered commit — the
-    # bytes pushed are the bytes the cap and the tests saw.
+    # checkout after the measurement can enter the delivered commit — and the
+    # equality check above proves the tests saw those same bytes.
     commit = _git(["commit-tree", measured_tree, "-p", base_commit, "-m",
                    f"harden: {target['summary'][:60]} [hardening-lane]"])
     new_commit = commit.stdout.strip()

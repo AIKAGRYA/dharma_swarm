@@ -262,11 +262,13 @@ def test_commit_delivers_the_measured_tree_not_the_working_tree() -> None:
     assert source.index('measured_tree = _git(["write-tree"])') < source.index(
         '_run([MAKE_BIN, "test-fast"]'
     ), "the tree must be frozen BEFORE the test process can touch anything"
-    # The post-test re-stage was the bug; it must be gone.
-    assert '_git(["add", "--", *staged])' not in source.split("write-tree")[1]
+    # The bug was COMMITTING the re-staged index. A post-test re-stage still
+    # exists, but only to hash the tree for the equality check below — the
+    # commit takes the frozen SHA and never reads the index.
     assert '_git(["commit", "-m"' not in source, (
         "committing the index re-reads the working tree; commit-tree does not"
     )
+    assert 'commit-tree", measured_tree' in source
 
 
 def test_frozen_tree_survives_a_post_measurement_rewrite(tmp_path) -> None:
@@ -474,3 +476,54 @@ def test_multivalued_keys_really_do_survive_a_c_override(tmp_path) -> None:
         "if this ever stops being true, credential.helper becomes closable "
         "by -c and should move into GIT_NO_EXEC"
     )
+
+
+def test_delivery_requires_the_tested_tree_to_equal_the_measured_tree() -> None:
+    """Freezing the tree fixed "deliver what we measured" and by itself broke
+    "deliver what we tested": make test-fast reads the WORKING tree, so a
+    test that rewrites a measured file greens one set of bytes while
+    commit-tree ships another (Greptile on PR #1162)."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert 'post_test_tree = _git(["write-tree"]).stdout.strip()' in source
+    assert "if post_test_tree != measured_tree:" in source
+    # The equality check must sit BETWEEN the test run and the commit.
+    assert source.index('_run([MAKE_BIN, "test-fast"]') \
+        < source.index("if post_test_tree != measured_tree:") \
+        < source.index('_git(["commit-tree"'), "check must gate the commit"
+
+
+def test_a_test_time_rewrite_changes_the_tree_hash(tmp_path) -> None:
+    """The mechanism, against real git: the equality check can actually
+    detect a rewrite of an already-measured file."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull,
+           "GIT_CONFIG_SYSTEM": os.devnull}
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=repo, env=env,
+                              capture_output=True, text=True,
+                              check=False).stdout.strip()
+
+    git("init", "-q", ".")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (repo / "f.txt").write_text("base\n")
+    git("add", "f.txt")
+    git("commit", "-qm", "base")
+
+    (repo / "f.txt").write_text("measured\n")
+    git("add", "f.txt")
+    measured_tree = git("write-tree")
+
+    # A benign test run leaves the measured content alone: hashes match.
+    git("reset", "-q", "HEAD", "--")
+    git("add", "--", "f.txt")
+    assert git("write-tree") == measured_tree
+
+    # A test that rewrites the measured file: hashes diverge, so the lane
+    # refuses instead of shipping bytes the suite never saw.
+    (repo / "f.txt").write_text("rewritten-by-tests\n")
+    git("reset", "-q", "HEAD", "--")
+    git("add", "--", "f.txt")
+    assert git("write-tree") != measured_tree
