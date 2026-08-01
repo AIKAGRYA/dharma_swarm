@@ -22,10 +22,40 @@ def _proc(stdout: str, returncode: int = 0):
 
 
 def test_test_deletion_regex_finds_removed_tests():
-    diff = "-    def test_removed_alpha(self):\n+    def added(self):\n-def test_removed_beta():\n"
+    diff = (
+        "-    def test_removed_alpha(self):\n"
+        "+    def added(self):\n"
+        "-def test_removed_beta():\n"
+        # asyncio_mode = "auto" makes this the majority shape in this repo;
+        # the watcher's own copy of the regex missed it while the door
+        # matched it (Greptile on PR #1163).
+        "-async def test_removed_gamma():\n"
+        "-    async def test_removed_delta(self):\n"
+    )
     assert loop_watcher.TEST_DELETION_RE.findall(diff) == [
         "test_removed_alpha", "test_removed_beta",
+        "test_removed_gamma", "test_removed_delta",
     ]
+
+
+def test_deletion_regex_is_the_doors_own_object_not_a_copy():
+    """Two implementations of "what counts as a deleted test" is two things
+    to drift; the watcher must measure exactly what the door enforces."""
+    import check_automerge_tier_policy  # noqa: PLC0415
+
+    assert loop_watcher.TEST_DELETION_RE is check_automerge_tier_policy.TEST_DELETION_RE
+
+
+def test_async_test_deletion_needs_signoff(monkeypatch):
+    diff = "-async def test_gone():\n"
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(diff))
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: {})
+    _pages(monkeypatch, reviews=[])
+    report = loop_watcher.watch_pr("o/r", {
+        "number": 15, "headRefOid": "sha", "additions": 0, "deletions": 1,
+        "author": {"login": "someone"}, "labels": [],
+    })
+    assert any("test_gone" in f for f in report["findings"])
 
 
 def test_tier2_source_is_the_ruling_policy_file():

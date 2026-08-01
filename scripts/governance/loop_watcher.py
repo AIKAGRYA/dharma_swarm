@@ -77,7 +77,13 @@ INGEST_MARKER = "<!-- loop-watcher-ingested -->"
 # participant who could read an owner comment's id suppress that directive
 # forever by posting a forged receipt (Codex on PR #1163).
 RECEIPT_AUTHOR_LOGINS = frozenset({"github-actions[bot]"})
-TEST_DELETION_RE = re.compile(r"^-\s*def (test_[A-Za-z0-9_]+)", re.MULTILINE)
+# The door's regex, not a copy of it. The copy here had already drifted: it
+# matched only `-def test_*`, so removing an `async def test_*` — the
+# majority shape in a repo running asyncio_mode = "auto" — produced no
+# finding at all, while the door itself matched it (fixed there on PR
+# #1160). A counter-metric that re-derives what it measures drifts from it;
+# that is the whole lesson of this review round (Greptile on PR #1163).
+TEST_DELETION_RE = door.TEST_DELETION_RE
 # Operator-dictated prerequisites: "depends on: mbx_a, mbx_b" in the comment.
 # Ids are validated against the mailbox's own grammar so a malformed or
 # traversal-shaped id is dropped rather than written into a task record
