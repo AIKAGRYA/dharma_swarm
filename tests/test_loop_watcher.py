@@ -370,3 +370,46 @@ def test_unreadable_task_state_never_writes(monkeypatch):
     result = loop_watcher.run_ingest("o/r", "op")
     assert result["ingested"] == []
     assert any("could not read existing task state" in f for f in result["failed"])
+
+
+def test_failed_finding_publication_is_not_success(monkeypatch):
+    """Publishing IS the watcher's output: a finding computed and never
+    delivered to the PR is a finding nobody has."""
+    monkeypatch.setattr(loop_watcher, "_gh",
+                        lambda args, **kw: _proc("", returncode=1))
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [])
+    assert loop_watcher.sync_findings(
+        "o/r", {"number": 3, "headRefOid": "sha"}, ["a finding"]) == "create_failed"
+
+    marker = loop_watcher.COMMENT_MARKER.format(sha="sha")
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [
+        {"id": 7, "body": loop_watcher.render_findings(marker, ["old"]),
+         "user": {"login": "github-actions[bot]"}},
+    ])
+    assert loop_watcher.sync_findings(
+        "o/r", {"number": 3, "headRefOid": "sha"}, ["new"]) == "update_failed"
+
+
+def test_unpublished_findings_degrade_the_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(loop_watcher, "_gh_json", lambda args: (
+        [{"number": 21, "headRefOid": "sha", "additions": 1, "deletions": 0,
+          "author": {"login": "someone"}, "labels": []}]
+        if args[:2] == ["pr", "list"] else {}
+    ))
+    monkeypatch.setattr(loop_watcher, "_gh", lambda args, **kw: _proc(""))
+    monkeypatch.setattr(loop_watcher, "_fetch_all_pages", lambda resource: [])
+    monkeypatch.setattr(loop_watcher, "watch_pr", lambda repo, pr: {
+        "pr": 21, "head": "sha", "tier": "tier1", "findings": ["x"],
+        "degraded": [], "deleted_test_files": [],
+    })
+    monkeypatch.setattr(loop_watcher, "sync_findings",
+                        lambda repo, pr, findings: "create_failed")
+    payload = loop_watcher.run_watch("o/r", tmp_path / "r.json")
+    assert payload["status"] == "DEGRADED"
+    assert payload["findings_unpublished"] == [21]
+
+
+def test_every_unpublished_state_is_in_the_degrading_set():
+    assert loop_watcher.UNPUBLISHED_STATES == {
+        "unknown", "create_failed", "update_failed",
+    }

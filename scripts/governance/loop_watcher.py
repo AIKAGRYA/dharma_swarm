@@ -298,6 +298,11 @@ def sync_findings(repo: str, pr: dict, findings: list[str]) -> str:
     to the PR forever and could never surface a newly applicable one
     (Codex on PR #1163). The comment is now created, edited, or left alone
     based on whether its rendered body still matches.
+
+    Returns the disposition. "unknown", "create_failed" and "update_failed"
+    all degrade the run: publishing IS the watcher's output, so a finding
+    that was computed and never reached the PR is a finding nobody has
+    (Greptile on PR #1163).
     """
     marker = COMMENT_MARKER.format(sha=pr["headRefOid"])
     desired = render_findings(marker, findings)
@@ -314,15 +319,21 @@ def sync_findings(repo: str, pr: dict, findings: list[str]) -> str:
     if not mine:
         if not findings:
             return "clean"
-        _gh(["pr", "comment", str(pr["number"]), "--repo", repo, "--body", desired])
-        return "created"
+        posted = _gh([
+            "pr", "comment", str(pr["number"]), "--repo", repo, "--body", desired,
+        ])
+        return "created" if posted.returncode == 0 else "create_failed"
     current = mine[-1]
     if str(current.get("body") or "") == desired:
         return "unchanged"
-    _gh(["api", "-X", "PATCH",
-         f"repos/{repo}/issues/comments/{current['id']}",
-         "-f", f"body={desired}"])
-    return "updated"
+    patched = _gh(["api", "-X", "PATCH",
+                   f"repos/{repo}/issues/comments/{current['id']}",
+                   "-f", f"body={desired}"])
+    return "updated" if patched.returncode == 0 else "update_failed"
+
+
+# Dispositions that mean the current findings did NOT reach the PR.
+UNPUBLISHED_STATES = frozenset({"unknown", "create_failed", "update_failed"})
 
 
 def run_watch(repo: str, report_path: Path) -> dict:
@@ -352,16 +363,16 @@ def run_watch(repo: str, report_path: Path) -> dict:
     # A per-PR read failure degrades the whole run, not just that PR's row:
     # a control that could not be evaluated is not a control that passed.
     degraded_prs = sorted(r["pr"] for r in reports if r.get("degraded"))
-    unknown_comments = sorted(
-        r["pr"] for r in reports if r.get("comment") == "unknown"
+    unpublished = sorted(
+        r["pr"] for r in reports if r.get("comment") in UNPUBLISHED_STATES
     )
     payload = {"schema": "dharma.loop_watcher_report.v1",
                "generated_at": _utc_stamp(), "watched": len(reports),
                "enumeration_failed": sorted(failed_labels),
                "degraded_prs": degraded_prs,
-               "comment_state_unknown": unknown_comments,
+               "findings_unpublished": unpublished,
                "status": ("DEGRADED"
-                          if failed_labels or degraded_prs or unknown_comments
+                          if failed_labels or degraded_prs or unpublished
                           else "OK"),
                "reports": reports}
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
