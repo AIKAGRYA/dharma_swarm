@@ -97,7 +97,20 @@ jobs:
               --repo-root "${target}" \
               --main-sha "${HUMMING_MAIN_SHA}" \
               --prior-head "${HUMMING_A0_PARENT_HEAD}"
-            python scripts/governance/check_track_status.py
+
+            track_status_rc=0
+            python scripts/governance/check_track_status.py || track_status_rc=$?
+            if [ "${track_status_rc}" -ne 0 ]; then
+              echo "::group::Exact durable-invoker regression diagnostics"
+              for seed in 1 2 3 4 5; do
+                echo "--- PYTHONHASHSEED=${seed} ---"
+                PYTHONHASHSEED="${seed}" \
+                  python -m pytest -vv -x tests/test_graph_durable_invoker.py || true
+              done
+              echo "::endgroup::"
+              exit "${track_status_rc}"
+            fi
+
             python scripts/governance/render_active_track_includes.py --check
             python scripts/docops/check_docops_integrity.py
             python -m pytest -q \
