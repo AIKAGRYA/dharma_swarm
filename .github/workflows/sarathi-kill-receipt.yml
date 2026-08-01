@@ -109,34 +109,50 @@ jobs:
         run: |
           set -euo pipefail
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
-          repo="${RUNNER_TEMP}/state-repo"
-          if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
-            git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
-          else
-            # Orphan by construction: runtime state never shares history with main.
-            git clone --quiet --depth 1 "$remote" "$repo"
-            git -C "$repo" checkout --orphan "$STATE_BRANCH"
-            git -C "$repo" rm -r -q --cached . || true
-            # main's files are untracked now; git clean empties the worktree
-            # without a recursive force-delete and never touches .git.
-            git -C "$repo" clean -fdxq
-          fi
-          mkdir -p "$repo/${STATE_DIR}"
-          jq -n \
-            --arg at "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
-            --arg method "${RECEIPT_METHOD}" \
-            '{verified: true, verified_at: $at, method: $method}' \
-            > "$repo/${STATE_DIR}/kill_path_receipt.json"
-          cat "$repo/${STATE_DIR}/kill_path_receipt.json"
-          git -C "$repo" config user.name "sarathi-kill-receipt"
-          git -C "$repo" config user.email "noreply@github.com"
-          git -C "$repo" add -A
-          if git -C "$repo" diff --cached --quiet; then
-            echo "receipt unchanged; nothing to push"
-          else
+          # Shares the sarathi-state-write concurrency group with the wake lane,
+          # but a group is not a lock: if a wake snapshot still lands first,
+          # re-clone from the new tip and rewrite the receipt onto it. Gate 9's
+          # receipt must never be the write that gets dropped.
+          attempt=0
+          while [ "$attempt" -lt 3 ]; do
+            attempt=$((attempt + 1))
+            repo="${RUNNER_TEMP}/state-repo-${attempt}"
+            if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
+              git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
+            else
+              # Orphan by construction: runtime state never shares history with main.
+              git clone --quiet --depth 1 "$remote" "$repo"
+              git -C "$repo" checkout --orphan "$STATE_BRANCH"
+              git -C "$repo" rm -r -q --cached . || true
+              # main's files are untracked now; git clean empties the worktree
+              # without a recursive force-delete and never touches .git.
+              git -C "$repo" clean -fdxq
+            fi
+            mkdir -p "$repo/${STATE_DIR}"
+            jq -n \
+              --arg at "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+              --arg method "${RECEIPT_METHOD}" \
+              '{verified: true, verified_at: $at, method: $method}' \
+              > "$repo/${STATE_DIR}/kill_path_receipt.json"
+            cat "$repo/${STATE_DIR}/kill_path_receipt.json"
+            git -C "$repo" config user.name "sarathi-kill-receipt"
+            git -C "$repo" config user.email "noreply@github.com"
+            git -C "$repo" add -A
+            if git -C "$repo" diff --cached --quiet; then
+              echo "receipt unchanged; nothing to push"
+              break
+            fi
             git -C "$repo" commit -q -m "sarathi kill-path receipt (stop ${STOP_RUN} -> resume ${RESUME_RUN})"
-            git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"
-          fi
+            if git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"; then
+              echo "receipt pushed to ${STATE_BRANCH} (attempt ${attempt})"
+              break
+            fi
+            if [ "$attempt" -ge 3 ]; then
+              echo "could not persist the kill-path receipt after ${attempt} attempts" >&2
+              exit 1
+            fi
+            echo "push rejected on attempt ${attempt}: another sarathi-state writer landed first; re-cloning and replaying" >&2
+          done
           {
             echo "## ✅ Kill-path receipt recorded"
             echo ""

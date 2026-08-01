@@ -54,7 +54,10 @@ permissions:
   issues: write
 
 concurrency:
-  group: sarathi-wake-lane
+  # EVERY sarathi-state writer shares this group (see sarathi-kill-receipt.yml)
+  # so a wake snapshot and a kill receipt can never race for the branch tip.
+  # Never cancel: a halted persist would strand runtime state.
+  group: sarathi-state-write
   cancel-in-progress: false
 
 jobs:
@@ -71,6 +74,14 @@ jobs:
       CYCLES: ${{ inputs.cycles || '1' }}
       DIAL: ${{ inputs.dial || vars.DGC_SARATHI_AUTONOMY || 'propose' }}
       BRIEF_ISSUE: ${{ vars.SARATHI_BRIEF_ISSUE || '1168' }}
+      STATE_README: |
+        # sarathi-state — runtime state, NEVER merged to main
+
+        Written by .github/workflows/sarathi-wake-lane.yml. Holds Sarathi's
+        standing-loop continuity: mailbox tasks, per-run briefs and reports,
+        the run counter, the spend ledger, and the operator's kill-path
+        receipt. Orphan by construction (loop-control precedent) so runtime
+        receipts stay out of the repository proper.
     steps:
       - name: Halt on loop kill-switch
         run: |
@@ -199,45 +210,61 @@ jobs:
             exit 0
           fi
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
-          repo="${RUNNER_TEMP}/state-push"
-          if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
-            git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
-          else
-            # Orphan branch: runtime state must never share history with main.
-            git clone --quiet --depth 1 "$remote" "$repo"
-            git -C "$repo" checkout --orphan "$STATE_BRANCH"
-            git -C "$repo" rm -r -q --cached . || true
-            # main's files are untracked now; git clean empties the worktree
-            # without a recursive force-delete and never touches .git.
-            git -C "$repo" clean -fdxq
-          fi
-          mkdir -p "$repo/$(dirname "$STATE_DIR")"
-          # Replace the previous snapshot. find -delete is depth-first and
-          # confined to the state directory, so a bad expansion cannot walk out
-          # of it the way a recursive force-delete would.
-          if [ -d "$repo/${STATE_DIR}" ]; then
-            find "$repo/${STATE_DIR}" -delete
-          fi
-          cp -a "$state_root/sarathi" "$repo/${STATE_DIR}"
-          cat > "$repo/README.md" <<'EOF'
-          # sarathi-state — runtime state, NEVER merged to main
-
-          Written by .github/workflows/sarathi-wake-lane.yml. Holds Sarathi's
-          standing-loop continuity: mailbox tasks, per-run briefs and reports,
-          the run counter, the spend ledger, and the operator's kill-path
-          receipt. Orphan by construction (loop-control precedent) so runtime
-          receipts stay out of the repository proper.
-          EOF
-          git -C "$repo" config user.name "sarathi-wake-lane"
-          git -C "$repo" config user.email "noreply@github.com"
-          git -C "$repo" add -A
-          if git -C "$repo" diff --cached --quiet; then
-            echo "state unchanged; nothing to push"
-          else
+          # The shared concurrency group serializes sarathi-state writers, but a
+          # group is not a lock. If another writer still lands first, re-clone
+          # from the new tip and replay rather than losing this run's state.
+          attempt=0
+          while [ "$attempt" -lt 3 ]; do
+            attempt=$((attempt + 1))
+            repo="${RUNNER_TEMP}/state-push-${attempt}"
+            if git ls-remote --exit-code --heads "$remote" "$STATE_BRANCH" >/dev/null 2>&1; then
+              git clone --quiet --branch "$STATE_BRANCH" --depth 1 --single-branch "$remote" "$repo"
+            else
+              # Orphan branch: runtime state must never share history with main.
+              git clone --quiet --depth 1 "$remote" "$repo"
+              git -C "$repo" checkout --orphan "$STATE_BRANCH"
+              git -C "$repo" rm -r -q --cached . || true
+              # main's files are untracked now; git clean empties the worktree
+              # without a recursive force-delete and never touches .git.
+              git -C "$repo" clean -fdxq
+            fi
+            mkdir -p "$repo/$(dirname "$STATE_DIR")"
+            # kill_path_receipt.json is owned by sarathi-kill-receipt.yml. If the
+            # branch carries one this run never restored, carry it forward — this
+            # lane must never delete another writer's Gate-9 receipt.
+            carried=""
+            if [ -f "$repo/${STATE_DIR}/kill_path_receipt.json" ] \
+               && [ ! -f "$state_root/sarathi/kill_path_receipt.json" ]; then
+              carried="$(cat "$repo/${STATE_DIR}/kill_path_receipt.json")"
+            fi
+            # Replace the previous snapshot. find -delete is depth-first and
+            # confined to the state directory, so a bad expansion cannot walk out
+            # of it the way a recursive force-delete would.
+            if [ -d "$repo/${STATE_DIR}" ]; then
+              find "$repo/${STATE_DIR}" -delete
+            fi
+            cp -a "$state_root/sarathi" "$repo/${STATE_DIR}"
+            if [ -n "$carried" ]; then
+              printf '%s\n' "$carried" > "$repo/${STATE_DIR}/kill_path_receipt.json"
+              echo "carried forward a kill-path receipt written by the attestation lane"
+            fi
+            printf '%s' "$STATE_README" > "$repo/README.md"
+            git -C "$repo" config user.name "sarathi-wake-lane"
+            git -C "$repo" config user.email "noreply@github.com"
+            git -C "$repo" add -A
+            if git -C "$repo" diff --cached --quiet; then
+              echo "state unchanged; nothing to push"
+              exit 0
+            fi
             git -C "$repo" commit -q -m "sarathi state: ${MODE} run ${GITHUB_RUN_ID} (dial ${DIAL})"
-            git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"
-            echo "state pushed to ${STATE_BRANCH}"
-          fi
+            if git -C "$repo" push -q "$remote" "HEAD:${STATE_BRANCH}"; then
+              echo "state pushed to ${STATE_BRANCH} (attempt ${attempt})"
+              exit 0
+            fi
+            echo "push rejected on attempt ${attempt}: another sarathi-state writer landed first; re-cloning and replaying" >&2
+          done
+          echo "could not persist sarathi state after ${attempt} attempts" >&2
+          exit 1
 
       - name: Post the brief to the operator's pinned issue
         if: always() && env.MODE == 'daemon' && env.BRIEF_ISSUE != ''

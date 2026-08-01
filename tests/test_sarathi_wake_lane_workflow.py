@@ -106,6 +106,44 @@ def test_receipt_lane_requires_mechanical_corroboration():
     )
 
 
+def test_every_state_writer_shares_one_concurrency_group():
+    """Both lanes clone, commit and push the same ``sarathi-state`` branch. If
+    they serialize under different groups they can start from the same tip and
+    the second push is rejected, silently dropping either a wake snapshot or —
+    worse — the Gate-9 kill receipt. (Greptile P1 on PR #1188.)"""
+    groups = {name: _load(name)["concurrency"] for name in (LANE, RECEIPT)}
+    names = {name: group["group"] for name, group in groups.items()}
+    assert len(set(names.values())) == 1, (
+        f"all sarathi-state writers must share one concurrency group, got {names}"
+    )
+    for name, group in groups.items():
+        assert group["cancel-in-progress"] is False, (
+            f"{name} must not cancel in progress; a halted persist strands runtime state"
+        )
+
+
+def test_state_writers_recover_from_a_losing_push():
+    """A concurrency group is not a lock. Each writer must re-clone from the new
+    tip and replay rather than losing its write to a non-fast-forward reject."""
+    for name in (LANE, RECEIPT):
+        raw = _raw(name)
+        assert "attempt=$((attempt + 1))" in raw, f"{name} needs a bounded push-retry loop"
+        assert "landed first" in raw, f"{name} must explain the retry in its log output"
+
+
+def test_wake_lane_never_deletes_the_kill_receipt():
+    """The wake lane replaces the whole state directory, but the receipt belongs
+    to the attestation lane. Whatever the interleaving, the wake lane must carry
+    an existing receipt forward instead of deleting Gate-9's evidence."""
+    raw = _raw(LANE)
+    assert 'carried="$(cat "$repo/${STATE_DIR}/kill_path_receipt.json")"' in raw, (
+        "the wake lane must read an existing receipt before replacing the snapshot"
+    )
+    assert 'printf \'%s\\n\' "$carried" > "$repo/${STATE_DIR}/kill_path_receipt.json"' in raw, (
+        "the wake lane must write a carried receipt back after replacing the snapshot"
+    )
+
+
 def test_state_lanes_never_recursive_force_delete():
     """Both lanes clear a working tree before writing state. They must do it
     with git-native primitives (``git clean``, ``find -delete``) rather than a
