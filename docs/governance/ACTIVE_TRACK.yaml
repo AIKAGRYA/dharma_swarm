@@ -1736,7 +1736,7 @@ active_tracks:
     name: Titanium-grade repository hardening — truthful verification and clean-room closure
     status: ACTIVE
     opened_at: "2026-07-17"
-    verified_at: "2026-07-25"
+    verified_at: "2026-07-31"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1831,9 +1831,12 @@ active_tracks:
       WP-00 changes governance, evidence, and projections only; it implements
       none of the Phase 0 packets.
 
-      M0 reconciles the current Phase 0 packet modalities against exact merged
-      main in reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
-      That receipt is point-in-time evidence, not a substitute for the eight
+      M1 refreshes the canonical M0 receipt against exact merged main after
+      PR #1164 in
+      reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
+      The selected post-1164 observation reports the evaluator's mechanical
+      7/8 result separately from no-skip and packet-acceptance evidence. That
+      receipt is point-in-time evidence, not a substitute for the eight
       completion criteria or authority to promote a blocked external decision.
 
     completion_criteria:
@@ -1874,38 +1877,34 @@ active_tracks:
           - verdict
 
     next_items:
-      - id: WP-0S
-        what: "Record the FastAPI exposure verdict and resolve or owner-route the handler-level keyless webhook residual; BLOCKED_OPERATOR remains non-passing. Recheck with python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q."
-        kind: code
-        blocker: true
-      - id: WP-0C1R
-        what: "Re-run pinned strict Semgrep on current main and resolve every current owner-deferred finding through its governing owner; the historical baseline at reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md may not be promoted to a current clean result."
-        kind: governance
-        blocker: true
       - id: WP-0D
-        what: "Add tests/test_fast_suite_isolation.py and prove two consecutive clean make test-fast runs plus make test on the merged candidate."
-        kind: code
-        blocker: true
-      - id: WP-0E
-        what: "Separate hermetic NATS repository verification from live-host evidence and add tests/test_nats_verification_split.py plus tests/test_nats_live_production_evidence.py without promoting NEEDS_HOST."
+        what: "First obtain an approved bounded specification amendment and ownership admission for tests/test_agent_work_packet.py, which is outside WP-0D's ratified allowed-file list. Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios, replace the environment-dependent hollow-module fixture, and prove two consecutive clean make test-fast runs plus make test."
         kind: code
         blocker: true
       - id: WP-0F1
-        what: "Ratify the final required-check and human-review policies, provision bounded Administration-read parity, and reprove every WP-0F2 consumer against the ratified set with python3 scripts/governance/check_ci_parity.py."
+        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
         blocker: true
+        evidence_criterion: titanium_ci_authority_contracts_pass
       - id: WP-0G
-        what: "Choose the DocOps credential or reviewed-PR delivery authority, prove the rolling reconcile head receives checks, and reconverge generated counts after remaining implementation merges with python3 scripts/docops/check_docops_integrity.py."
+        what: "Choose DOCOPS_RECONCILE_TOKEN or a manually reviewed-PR delivery authority and prove the rolling reconcile head receives checks. Current-main run 30606619117 refreshed PR #1118 to a0d4c1ac but found zero checks and failed closed."
         kind: code
         blocker: true
-      - id: WP-0H
-        what: "Add pinned and locally reproducible Go, dashboard, and terminal orchestration, including frontend-check, terminal-check, required CI execution, and tests/test_polyglot_ci_contract.py."
-        kind: code
-        blocker: true
-      - id: WP-0I
-        what: "Run the independent fresh non-shallow clone proof on final merged main, include WP-0A clean-container evidence, and commit reports/governance/titanium/phase0_clean_room_receipt.json."
+        evidence_criterion: titanium_docops_contracts_pass
+      - id: WP-0C1R
+        what: "Ratify and owner-route the exact-current-main strict Semgrep result: exit 1 with 21 OWNER_DEFERRED findings (18 unauthorized state writers and 3 unclassified substrates), 7 parser warnings, and zero security-rule findings. No draft disposition is a PASS."
         kind: governance
         blocker: true
+      - id: WP-0S
+        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret, while docker-compose still declares 8080:8080 and GitHub contains no deployment evidence; actual exposure remains NEEDS_HOST/BLOCKED_OPERATOR."
+        kind: code
+        blocker: true
+        evidence_criterion: titanium_ingress_contracts_pass
+      - id: WP-0I
+        what: "After WP-0D and every operator dependency settle on merged main, nominate an implementation-independent reviewer, run the fresh non-shallow clone proof including WP-0A clean-container evidence, and commit reports/governance/titanium/phase0_clean_room_receipt.json."
+        kind: governance
+        blocker: true
+        evidence_criterion: titanium_independent_clean_room_receipt_valid
 
     non_goals:
       - No Phase 1-7 implementation before the Phase 0 exit gate passes independently on merged main.

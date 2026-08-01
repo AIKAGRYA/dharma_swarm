@@ -10,6 +10,8 @@ runtime paths, no liveness constants, no unattended claims.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -28,7 +30,10 @@ class BootPack:
 
     roster: tuple[str, ...]
     open_items: tuple[Mapping[str, Any], ...] = ()
-    ready_summaries: frozenset[str] = frozenset()
+    # Content fingerprints (see ``plan_dedup_key``) of work already represented
+    # by an in-flight or completed mailbox task — NOT bare summaries, so a
+    # revised backlog item re-plans while an unchanged one stays suppressed.
+    ready_keys: frozenset[str] = frozenset()
     audit: Mapping[str, Any] | None = None
     lodestone_excerpt: str = ""
 
@@ -46,6 +51,50 @@ class PlannedDelegation:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
+def plan_dedup_key(delegation: PlannedDelegation) -> str:
+    """Stable identity of one planned unit of work, over ALL execution-relevant
+    fields — action, recipient, channel, summary, body, dependencies, and the
+    planner's metadata.
+
+    Deduping on summary (then summary+body) alone silently dropped revisions to
+    routing/kind/channel/deps/metadata: a reopened backlog item that only
+    re-routes to a different recipient was treated as already dispatched
+    (Greptile P1 plan.py L127 + line 209, both T-Rex verified). Keying on the
+    whole delegation identity means ANY revision re-plans while an unchanged
+    item stays suppressed. The key is computed once from the delegation and
+    PERSISTED on the enqueued task (``delegate._task_metadata``); the daemon
+    then reads stored keys via :func:`stored_dedup_key`, so the two sides never
+    reconstruct the key from divergent fields.
+    """
+    identity = {
+        "action": delegation.action,
+        "recipient": delegation.recipient,
+        "channel": delegation.channel,
+        "summary": delegation.summary,
+        "body": delegation.body,
+        "depends_on": list(delegation.depends_on),
+        "metadata": {
+            str(key): delegation.metadata[key] for key in sorted(delegation.metadata)
+        },
+    }
+    blob = json.dumps(identity, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def stored_dedup_key(metadata: Mapping[str, Any] | None) -> str:
+    """Read the dedup key persisted on an enqueued task's metadata.
+
+    Returns "" when absent (e.g. a task not enqueued by the Sarathi delegate),
+    so such a task simply does not participate in dedup rather than colliding.
+    """
+    if not isinstance(metadata, Mapping):
+        return ""
+    sarathi = metadata.get("sarathi")
+    if not isinstance(sarathi, Mapping):
+        return ""
+    return str(sarathi.get("dedup_key") or "")
+
+
 def _planned_channel(kind: str, raw_channel: Any) -> str:
     if kind == "merge":
         return "merge_intent"
@@ -59,8 +108,9 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
     Rules (in order, per item):
     - an item must be a mapping with a ``kind`` in :data:`VALID_KINDS` and a
       non-empty ``summary`` — anything else is skipped, never repaired;
-    - an item whose summary is already live in the mailbox ready-set
-      (``ready_summaries``) is skipped — the mailbox is the dedup surface;
+    - an item whose CONTENT fingerprint (``plan_dedup_key`` of summary + planned
+      body) is already represented by a mailbox task (``ready_keys``) is skipped
+      — the mailbox is the dedup surface, but a revised body re-plans;
     - ``kind == "merge"`` always routes to the ``merge_intent`` channel
       addressed to Merge Master Mike's lane; Sarathi never plans a direct
       merge or push (those verbs are NEVER_AUTO in the gate anyway);
@@ -83,8 +133,6 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
         summary = str(item.get("summary") or "").strip()
         if kind not in VALID_KINDS or not summary:
             continue
-        if summary in pack.ready_summaries:
-            continue
         channel = _planned_channel(kind, item.get("channel"))
         if channel == "merge_intent":
             recipient = str(item.get("recipient") or "merge_master_mike")
@@ -106,17 +154,29 @@ def build_plan(pack: BootPack) -> list[PlannedDelegation]:
         metadata["sarathi_kind"] = kind
         if recipient not in pack.roster and channel != "merge_intent":
             metadata["recipient_outside_roster"] = True
-        plan.append(
-            PlannedDelegation(
-                action=action,
-                recipient=recipient,
-                channel=channel,
-                summary=summary,
-                body=body,
-                depends_on=tuple(str(dep) for dep in (item.get("depends_on") or [])),
-                metadata=metadata,
-            )
+        delegation = PlannedDelegation(
+            action=action,
+            recipient=recipient,
+            channel=channel,
+            summary=summary,
+            body=body,
+            depends_on=tuple(str(dep) for dep in (item.get("depends_on") or [])),
+            metadata=metadata,
         )
+        # Dedup ONLY on the FULL execution identity (action/recipient/channel/
+        # summary/body/deps/metadata), computed after the delegation is built so
+        # ANY revision — body, routing, kind, deps, metadata — yields a new key
+        # and re-plans, while an unchanged item stays suppressed (Greptile P1
+        # L127 + L209). The full key persisted on the task is compared, never
+        # reconstructed. A keyless task (one persisted before the stored key
+        # existed) deliberately does NOT participate in dedup: a coarse
+        # recipient+summary+body fallback would silently DROP a revision that
+        # changed kind/channel/deps/metadata (Greptile P1 L196), so the safer
+        # failure mode is a harmless duplicate — and no such legacy Sarathi task
+        # exists in practice, since the stored key ships with the dispatch path.
+        if plan_dedup_key(delegation) in pack.ready_keys:
+            continue
+        plan.append(delegation)
     return plan
 
 
@@ -126,4 +186,6 @@ __all__ = [
     "BootPack",
     "PlannedDelegation",
     "build_plan",
+    "plan_dedup_key",
+    "stored_dedup_key",
 ]
