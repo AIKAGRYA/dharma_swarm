@@ -35,6 +35,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate owned Semgrep rule fixtures
+        run: |
+          scripts/governance/run_semgrep_with_ca.sh --test \
+            --config .semgrep/dharma-anti-slop.yml \
+            .semgrep/tests/test_no_new_substrate.py
+
       - name: Run Semgrep CI
         # In CI we run BOTH the local .semgrep/ rules and the registry
         # security pack. Phase 4 will hard-fail on dharma-anti-slop rules;

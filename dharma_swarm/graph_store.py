@@ -17,6 +17,11 @@ table-name prefixes to avoid ATTACH complexity.
 See ``FOUR_GRAPH_ARCHITECTURE.md`` §II, §III, §VI for the full specification.
 """
 
+# persistence-role: exempt
+# persistence-rationale: MemoryKernel registers ``home.dharma_graphs`` as a
+# low-authority, high-canon-risk projection-write surface with DO_NOT_MIGRATE;
+# this database is derived graph evidence unless separately gated.
+
 from __future__ import annotations
 
 import json

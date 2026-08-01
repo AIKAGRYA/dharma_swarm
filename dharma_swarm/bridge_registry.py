@@ -24,6 +24,11 @@ Integration:
     - ontology.py          -- OntologyRegistry objects bridge everywhere
 """
 
+# persistence-role: exempt
+# persistence-rationale: MemoryKernel registers ``home.bridges`` as a
+# low-authority, high-canon-risk mutable projection of semantic, runtime,
+# ontology, and telos sources. Bridge edges are linking evidence, never canon.
+
 from __future__ import annotations
 
 import json

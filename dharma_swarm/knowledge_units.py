@@ -12,6 +12,11 @@ Environment variables:
   KNOWLEDGE_MAX_TOKENS — max tokens for knowledge block (default: 500)
 """
 
+# persistence-role: exempt
+# persistence-rationale: MemoryKernel registers ``home.state_knowledge`` as a
+# low-authority, high-canon-risk candidate-knowledge surface. Its records are
+# not canon without a later KnowledgeOps promotion gate.
+
 from __future__ import annotations
 
 import json

@@ -1,0 +1,96 @@
+{
+  "id": "titanium-WP-0C1R2-substrate-role-adjudication",
+  "base_ref": "9d792ceacef32a1698838dc01586ed90ecb93666",
+  "branch": "agent/titanium-wp0c1r-substrate-roles-20260801",
+  "worktree": ".",
+  "intent": "Resolve only the three dharma.no-new-substrate findings by binding each already-registered MemoryKernel writer to an explicit non-canonical exemption rationale and excluding only the three exact existing declarations from the direct-constructor detector. The dependency-free verifier pins their declaration multiplicity, single persistence-constructor site (including module-local aliases and direct-return wrappers), and low-authority/high-canon-risk MemoryKernel semantics; the Semgrep fixture covers direct subclasses. It does not create a repository-wide suffix or connector inventory. This packet neither promotes these stores to authority nor touches the separate eighteen state-root findings.",
+  "allowed_files": [
+    ".semgrep/dharma-anti-slop.yml",
+    ".semgrep/tests/test_no_new_substrate.py",
+    ".github/workflows/semgrep.yml",
+    "dharma_swarm/bridge_registry.py",
+    "dharma_swarm/graph_store.py",
+    "dharma_swarm/knowledge_units.py",
+    "scripts/governance/check_registered_substrate_roles.py",
+    "tests/test_semgrep_wrapper.py",
+    "reports/agentops/work_packets/titanium-WP-0C1R2-substrate-role-adjudication.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "substrate-and-rule-contracts",
+      "command": "python3 -m pytest -q tests/test_semgrep_wrapper.py tests/test_bridge_registry.py tests/test_graph_store.py tests/test_knowledge_units.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "touched-python-ruff",
+      "command": "python3 -m ruff check dharma_swarm/bridge_registry.py dharma_swarm/graph_store.py dharma_swarm/knowledge_units.py scripts/governance/check_registered_substrate_roles.py tests/test_semgrep_wrapper.py .semgrep/tests/test_no_new_substrate.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "missing-role-rationale-detected",
+      "command": "python3 scripts/governance/check_registered_substrate_roles.py --negative-control",
+      "expected_exit": 1,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): adjudicate registered substrate roles (WP-0C1R)"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0C1R2",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "9d792ceacef32a1698838dc01586ed90ecb93666",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The anti-slop closure-layer vocabulary has no writable-projection or candidate-store role, while the MemoryKernel registry already classifies BridgeRegistry, SQLiteGraphStore, and KnowledgeStore as low-authority registered writers. An explicit exempt rationale is more truthful than calling their mutable stores read-only derived views."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/memory_kernel/writer_specs.py",
+      "dharma_swarm/memory_kernel/surface_specs_core.py",
+      "scripts/governance/check_registered_substrate_roles.py",
+      ".semgrep/dharma-anti-slop.yml",
+      "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md"
+    ],
+    "honest_blockers": [
+      "This packet addresses only three registered-writer false positives. The eighteen direct state-root findings remain a separate owner-safe repair group and make strict Semgrep nonzero until that group lands.",
+      "The exemption is non-canonical: MemoryKernel keeps all three surfaces low-authority/high-canon-risk, and no production or complete-security claim follows.",
+      "Rule 2 remains a syntax/provenance heuristic. The companion provenance check is deliberately limited to the three exact registered writers so this packet cannot create a repository-wide baseline. Broader alias, getattr, importlib, or dynamic-constructor coverage requires a separate explicit policy and owner-safe adjudication of pre-existing writers.",
+      "Final WP-0C1R promotion requires a pinned strict scan on the combined merged-main result, not this candidate branch alone."
+    ],
+    "rollback": "Revert the three role headers, exact-declaration rule exclusion, focused rule fixture and CI step, companion authority/provenance checks, wrapper contract test, and packet together. A rollback must restore the three typed findings rather than broadening an ignore.",
+    "packet_digest": "bc55a0c9cc7af506d216ddaec90104758018577d404bd92e66ba1c58c3a23065"
+  }
+}

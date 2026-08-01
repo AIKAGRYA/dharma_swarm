@@ -101,9 +101,30 @@ rules:
                       ...
                       self.$X = aiosqlite.connect(...)
                       ...
+          # An inherited registered writer is a new substrate even when the
+          # subclass does not open its own connection.
+          - pattern: |
+              class $NAME(BridgeRegistry):
+                  ...
+          - pattern: |
+              class $NAME(SQLiteGraphStore):
+                  ...
+          - pattern: |
+              class $NAME(KnowledgeStore):
+                  ...
       - metavariable-regex:
           metavariable: $NAME
           regex: '.*(Store|Ledger|Registry|Substrate)$'
+      # These three exact pre-existing writers are already classified by the
+      # MemoryKernel registry as low-authority/high-canon-risk surfaces. The
+      # file headers record why they are exemptions rather than new canon.
+      # The dependency-free companion checker pins exact declaration
+      # multiplicity, corresponding MemoryKernel authority/risk registrations,
+      # and one persistence-constructor site in each registered writer,
+      # including module-local aliases and direct-return wrappers. The explicit
+      # patterns above cover direct subclasses of those writers; this scoped
+      # exemption does not claim repository-wide dynamic-resolution coverage.
+      - pattern-not-regex: '\bclass\s+(?:BridgeRegistry\s*:|SQLiteGraphStore\s*\(\s*GraphStore\s*\)\s*:|KnowledgeStore\s*:)'
 
   # ===========================================================================
   # Rule 4: dharma.scripts-no-git-add-all
