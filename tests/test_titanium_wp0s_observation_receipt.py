@@ -213,10 +213,34 @@ def test_cli_json_success() -> None:
 
     assert result.returncode == 0
     assert json.loads(result.stdout) == {
-        "errors": [],
-        "path": str(RECEIPT_PATH),
-        "receipt_status": "BLOCKED_OPERATOR",
+        "error_count": 0,
+        "receipt_is_operator_blocked": True,
         "validation_status": "VALID",
+    }
+
+
+def test_cli_failure_does_not_log_receipt_derived_diagnostics(tmp_path: Path) -> None:
+    receipt = _load_receipt()
+    marker = "fixture-secret-material"
+    receipt["claim_boundary"] += f" api_key={marker}"
+    invalid_path = tmp_path / "invalid-receipt.json"
+    invalid_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR_PATH), str(invalid_path), "--json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert marker not in result.stdout
+    assert marker not in result.stderr
+    assert json.loads(result.stdout) == {
+        "error_count": 1,
+        "receipt_is_operator_blocked": False,
+        "validation_status": "INVALID",
     }
 
 

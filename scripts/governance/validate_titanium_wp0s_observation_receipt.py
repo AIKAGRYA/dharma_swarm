@@ -394,21 +394,25 @@ def main(argv: list[str] | None = None) -> int:
         receipt = None
 
     valid = not errors
-    receipt_status = receipt.get("status") if isinstance(receipt, dict) else None
+    operator_blocked = bool(
+        valid
+        and isinstance(receipt, dict)
+        and receipt.get("status") == "BLOCKED_OPERATOR"
+    )
     result = {
-        "errors": errors,
-        "path": str(args.receipt),
-        "receipt_status": receipt_status,
+        "error_count": len(errors),
+        "receipt_is_operator_blocked": operator_blocked,
         "validation_status": "VALID" if valid else "INVALID",
     }
     if args.as_json:
         print(json.dumps(result, sort_keys=True))
     elif valid:
-        print(f"VALID: {args.receipt} (receipt status: {receipt_status})")
+        print("VALID: receipt passed structural validation")
     else:
-        print(f"INVALID: {args.receipt}", file=sys.stderr)
-        for error in errors:
-            print(f"- {error}", file=sys.stderr)
+        print(
+            "INVALID: receipt failed structural validation; details are not logged",
+            file=sys.stderr,
+        )
     return 0 if valid else 1
 
 
