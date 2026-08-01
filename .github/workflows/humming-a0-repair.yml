@@ -1,4 +1,4 @@
-name: humming-a0-repair
+name: humming-a0-structural-hardening
 
 on:
   pull_request:
@@ -10,11 +10,11 @@ permissions:
   actions: read
 
 concurrency:
-  group: humming-a0-repair-${{ github.event.pull_request.number }}
+  group: humming-a0-structural-hardening-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  repair:
+  harden:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/humming-v2-a0-portfolio-admission'
@@ -40,20 +40,20 @@ jobs:
       - name: Confine tool state and install declared dependencies
         run: |
           set -euo pipefail
-          repair="${RUNNER_TEMP}/humming-a0-repair"
-          mkdir -p "${repair}"/{pycache,xdg,ruff,pip,hypothesis,ops}
+          harden="${RUNNER_TEMP}/humming-a0-harden"
+          mkdir -p "${harden}"/{pycache,xdg,ruff,pip,hypothesis,ops}
           printf '%s\n' \
-            "PYTHONPYCACHEPREFIX=${repair}/pycache" \
-            "XDG_CACHE_HOME=${repair}/xdg" \
-            "RUFF_CACHE_DIR=${repair}/ruff" \
-            "PIP_CACHE_DIR=${repair}/pip" \
-            "HYPOTHESIS_STORAGE_DIRECTORY=${repair}/hypothesis" \
-            "DHARMA_OPS_DIR=${repair}/ops" \
+            "PYTHONPYCACHEPREFIX=${harden}/pycache" \
+            "XDG_CACHE_HOME=${harden}/xdg" \
+            "RUFF_CACHE_DIR=${harden}/ruff" \
+            "PIP_CACHE_DIR=${harden}/pip" \
+            "HYPOTHESIS_STORAGE_DIRECTORY=${harden}/hypothesis" \
+            "DHARMA_OPS_DIR=${harden}/ops" \
             >> "${GITHUB_ENV}"
           python -m pip install --upgrade pip
           python -m pip install '.[dev]'
 
-      - name: Revalidate live base and repair exact malformed joins
+      - name: Revalidate live base and harden A0 structure
         run: |
           set -euo pipefail
           git fetch origin main
@@ -61,74 +61,264 @@ jobs:
           test "$(git merge-base HEAD origin/main)" = "${HUMMING_A0_BASE}"
           python - <<'PY'
           from pathlib import Path
+          import re
+          import yaml
 
-          path = Path('docs/governance/ACTIVE_TRACK.yaml')
-          text = path.read_text(encoding='utf-8')
-          replacements = {
-              '      - tests/test_loop1_consumption_check.py      - agent_loop.sh\n':
-                  '      - tests/test_loop1_consumption_check.py\n      - agent_loop.sh\n',
-              '      - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)      - tests/test_action_effect_graph_adapter.py\n':
-                  '      - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)\n      - tests/test_action_effect_graph_adapter.py\n',
-              '      - tests/test_verify_corral_findings.py      - dharma_swarm/action_effects/**\n':
-                  '      - tests/test_verify_corral_findings.py\n      - dharma_swarm/action_effects/**\n',
-              '      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts      - api/chat_tool_execution.py\n':
-                  '      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts\n      - api/chat_tool_execution.py\n',
-          }
-          for bad, good in replacements.items():
-              count = text.count(bad)
-              if count != 1:
-                  raise SystemExit(f'expected exactly one malformed join, found {count}: {bad!r}')
-              text = text.replace(bad, good, 1)
-          path.write_text(text, encoding='utf-8')
+          track_path = Path('docs/governance/ACTIVE_TRACK.yaml')
+          text = track_path.read_text(encoding='utf-8')
+
+          def track_span(blob: str, track_id: str) -> tuple[int, int]:
+              marker = f'  - id: {track_id}\n'
+              start = blob.find(marker)
+              if start < 0:
+                  raise SystemExit(f'missing track {track_id}')
+              candidates = [
+                  pos for pos in (
+                      blob.find('\n  - id: ', start + len(marker)),
+                      blob.find('\nclosed_tracks:', start + len(marker)),
+                  ) if pos >= 0
+              ]
+              if not candidates:
+                  raise SystemExit(f'cannot find track end for {track_id}')
+              return start, min(candidates)
+
+          def parsed_track(blob: str, track_id: str) -> dict:
+              data = yaml.safe_load(blob)
+              return next(t for t in data['active_tracks'] if t['id'] == track_id)
+
+          def move_item_to_next_items(blob: str, track_id: str, item_id: str) -> str:
+              current = parsed_track(blob, track_id)
+              next_ids = {str(item.get('id')) for item in current.get('next_items') or []}
+              if item_id in next_ids:
+                  return blob
+
+              start, end = track_span(blob, track_id)
+              track = blob[start:end]
+              marker = f'      - id: {item_id}\n'
+              item_start = track.find(marker)
+              if item_start < 0:
+                  raise SystemExit(f'{track_id}: missing item block {item_id}')
+              boundaries = []
+              for token in (
+                  '\n      - id: ',
+                  '\n    non_goals:',
+                  '\n    next_items:',
+                  '\n    completion_criteria:',
+                  '\n    prerequisites:',
+              ):
+                  pos = track.find(token, item_start + len(marker))
+                  if pos >= 0:
+                      boundaries.append(pos)
+              if not boundaries:
+                  raise SystemExit(f'{track_id}: cannot delimit item {item_id}')
+              item_end = min(boundaries)
+              item = track[item_start:item_end].rstrip('\n') + '\n'
+              track = track[:item_start] + track[item_end:]
+
+              next_marker = '    next_items:\n'
+              next_start = track.find(next_marker)
+              if next_start < 0:
+                  raise SystemExit(f'{track_id}: no next_items field')
+              remainder_start = next_start + len(next_marker)
+              field = re.search(
+                  r'\n    [A-Za-z_][A-Za-z0-9_]*:',
+                  track[remainder_start:],
+              )
+              insert_at = (
+                  remainder_start + field.start()
+                  if field is not None
+                  else len(track)
+              )
+              prefix = track[:insert_at].rstrip('\n') + '\n'
+              suffix = track[insert_at:]
+              track = prefix + item + suffix
+              return blob[:start] + track + blob[end:]
+
+          for owner, item_id in (
+              ('loop-closure-2026-06', 'humming-v2-p0-b-root-loop'),
+              ('loop-closure-2026-06', 'humming-v2-e1-cron-authority'),
+              ('merge-master-mike-d4-2026-06', 'humming-v2-enforcement-ack'),
+          ):
+              text = move_item_to_next_items(text, owner, item_id)
+
+          old_surface = '      - dharma_swarm/action_effects/**\n'
+          exact_surfaces = (
+              '      - dharma_swarm/action_effects/__init__.py\n'
+              '      - dharma_swarm/action_effects/envelope.py\n'
+              '      - dharma_swarm/action_effects/dispatcher.py\n'
+              '      - dharma_swarm/action_effects/budget.py\n'
+          )
+          if text.count(old_surface) != 1:
+              raise SystemExit('expected one broad action_effects ownership glob')
+          text = text.replace(old_surface, exact_surfaces, 1)
+
+          test_anchor = (
+              '      - tests/test_telos_hook.py\n'
+              '      - docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md\n'
+          )
+          test_replacement = (
+              '      - tests/test_telos_hook.py\n'
+              '      - tests/test_action_budget.py\n'
+              '      - docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md\n'
+          )
+          if text.count(test_anchor) != 1:
+              raise SystemExit('cannot bind action-budget test surface')
+          text = text.replace(test_anchor, test_replacement, 1)
+
+          old_kernel = (
+              '          dharma_swarm/action_effects/**, reusing ExecutionIdentity,\n'
+              '          RuntimeStateStore idempotency, Shakti warrants, EvidenceReceipt,\n'
+              '          reversibility gates, and existing runtime storage. The action class,\n'
+              '          never the caller, derives required fields. Initial migrated coverage\n'
+          )
+          new_kernel = (
+              '          dharma_swarm/action_effects/envelope.py and dispatcher.py, reusing\n'
+              '          ExecutionIdentity, RuntimeStateStore idempotency, Shakti warrants,\n'
+              '          EvidenceReceipt, reversibility gates, and existing runtime storage.\n'
+              '          Because semantic_governance.py already owns a semantic-only\n'
+              '          ActionEnvelope, rename that model to SemanticActionProposal and\n'
+              '          retain at most one tested deprecated alias; two unrelated canonical\n'
+              '          ActionEnvelope classes are forbidden. Keep\n'
+              '          dharma_swarm/graph/effects.py reserved for ambient time, randomness,\n'
+              '          and dispatch ordering. The action class, never the caller, derives\n'
+              '          required fields. Initial migrated coverage\n'
+          )
+          if text.count(old_kernel) != 1:
+              raise SystemExit('cannot locate P0-K naming boundary')
+          text = text.replace(old_kernel, new_kernel, 1)
+
+          old_budget = (
+              '          Establish one hierarchical parent/child budget reservation contract\n'
+              '          for loops, graph nodes, retries, provider fallbacks, and\n'
+          )
+          new_budget = (
+              '          Establish one hierarchical parent/child budget reservation contract\n'
+              '          in dharma_swarm/action_effects/budget.py, with contract tests in\n'
+              '          tests/test_action_budget.py, for loops, graph nodes, retries,\n'
+              '          provider fallbacks, and\n'
+          )
+          if text.count(old_budget) != 1:
+              raise SystemExit('cannot locate P0-B exact-surface boundary')
+          text = text.replace(old_budget, new_budget, 1)
+          track_path.write_text(text, encoding='utf-8')
+
+          manifest = Path('docs/governance/SOVEREIGN_MANIFEST.md')
+          manifest_text = manifest.read_text(encoding='utf-8')
+          old_date = '## VERIFIED NUMBERS (2026-07-29 COUNT REFRESH)'
+          new_date = '## VERIFIED NUMBERS (2026-08-01 COUNT REFRESH)'
+          if manifest_text.count(old_date) != 1:
+              raise SystemExit('cannot locate stale verified-number date')
+          manifest.write_text(manifest_text.replace(old_date, new_date, 1), encoding='utf-8')
+
+          ledger = Path('docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md')
+          ledger_text = ledger.read_text(encoding='utf-8')
+          marker = '## A0 pre-merge correction log'
+          if marker not in ledger_text:
+              ledger_text = ledger_text.rstrip() + '''
+
+## A0 pre-merge correction log
+
+- 2026-08-01: the first generated admission joined four newly owned surfaces
+  to the preceding YAML scalar. Generic YAML parsing, track reconciliation,
+  DocOps, and 147 focused tests still passed; an exact-membership negative
+  control caught the false ownership. The four joins were repaired before
+  independent A0 review.
+- 2026-08-01: rendered blocker counts exposed that the Loop Closure and Merge
+  Master additions had parsed under `completion_criteria` because those tracks
+  order `non_goals` before `next_items`. They were moved into the actual owner
+  queues, and the hardening evidence now rejects every Humming item outside its
+  declared track's `next_items`.
+'''
+              ledger.write_text(ledger_text, encoding='utf-8')
           PY
 
-      - name: Assert real ownership rather than parser acceptance
+      - name: Assert exact owner queues, surfaces, names, and provenance
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import yaml
 
-          data = yaml.safe_load(Path('docs/governance/ACTIVE_TRACK.yaml').read_text())
+          track_path = Path('docs/governance/ACTIVE_TRACK.yaml')
+          raw = track_path.read_text(encoding='utf-8')
+          data = yaml.safe_load(raw)
           tracks = {item['id']: item for item in data['active_tracks']}
           if len(tracks) != 10:
               raise SystemExit(f'active-track count changed: {len(tracks)}')
-          expected = {
+          if any(track_id.startswith('humming-') for track_id in tracks):
+              raise SystemExit('A0 created a forbidden Humming active track')
+
+          expected_next = {
               'loop-closure-2026-06': {
-                  'agent_loop.sh', 'cron_jobs.json', 'scripts/cron_unify.py',
-                  'dharma_swarm/cron_job_runtime.py',
+                  'humming-v2-p0-b-root-loop',
+                  'humming-v2-e1-cron-authority',
               },
-              'dharmagraph-engine-2026-07': {
-                  'tests/test_action_effect_graph_adapter.py',
-                  'tests/test_graph_budget_lineage.py',
+              'merge-master-mike-d4-2026-06': {
+                  'humming-v2-enforcement-ack',
               },
+              'organism-rewire-2026-07': {'humming-v2-host-ack'},
+              'dharmagraph-engine-2026-07': {'humming-v2-p0-graph-adapter'},
               'sovereign-safety-tcb-2026-07': {
-                  'dharma_swarm/action_effects/**',
-                  'dharma_swarm/tool_registry.py',
-                  'hooks/telos_gate.py', '.claude/settings.json',
-                  'docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md',
+                  'humming-v2-p0-k', 'humming-v2-p0-h1a',
+                  'humming-v2-p0-h1b', 'humming-v2-p0-h2a',
+                  'humming-v2-p0-h3-contract', 'humming-v2-p0-b-contract',
               },
               'repository-titanium-hardening-2026-07': {
-                  'api/chat_tool_execution.py',
-                  'tests/test_shell_policy_consumers.py',
-                  'tests/test_sandbox_limits.py',
+                  'humming-v2-p0-harness-consumers',
+                  'humming-v2-p0-h6', 'humming-v2-p0-b-adapters',
               },
           }
-          for track_id, required in expected.items():
-              owned = set(tracks[track_id].get('owned_surfaces') or [])
-              missing = sorted(required - owned)
-              if missing:
-                  raise SystemExit(f'{track_id} missing exact owned surfaces: {missing}')
-          bad_fragments = ('      - agent_loop.sh', '      - dharma_swarm/action_effects/**',
-                           '      - api/chat_tool_execution.py',
-                           '      - tests/test_action_effect_graph_adapter.py')
-          raw = Path('docs/governance/ACTIVE_TRACK.yaml').read_text()
-          for fragment in bad_fragments:
-              if raw.count(fragment + '\n') != 1:
-                  raise SystemExit(f'exact surface line count != 1: {fragment!r}')
-          if any(item['id'].startswith('humming-') for item in data['active_tracks']):
-              raise SystemExit('A0 must not create a Humming active track')
-          print('Exact Humming A0 ownership assertions: PASS')
+          all_expected = set().union(*expected_next.values())
+          seen = set()
+          for owner, expected in expected_next.items():
+              next_ids = [str(item.get('id')) for item in tracks[owner].get('next_items') or []]
+              missing = sorted(expected - set(next_ids))
+              duplicates = sorted(item_id for item_id in expected if next_ids.count(item_id) != 1)
+              if missing or duplicates:
+                  raise SystemExit(
+                      f'{owner}: missing={missing} duplicate_or_absent={duplicates}'
+                  )
+              seen.update(expected)
+          if seen != all_expected:
+              raise SystemExit('Humming next-item assertion set drifted')
+
+          for owner, track in tracks.items():
+              criterion_ids = {
+                  str(item.get('id'))
+                  for item in track.get('completion_criteria') or []
+              }
+              misplaced = sorted(criterion_ids & all_expected)
+              if misplaced:
+                  raise SystemExit(f'{owner}: Humming items in completion_criteria: {misplaced}')
+
+          safety_owned = set(tracks['sovereign-safety-tcb-2026-07']['owned_surfaces'])
+          exact_action_files = {
+              'dharma_swarm/action_effects/__init__.py',
+              'dharma_swarm/action_effects/envelope.py',
+              'dharma_swarm/action_effects/dispatcher.py',
+              'dharma_swarm/action_effects/budget.py',
+              'tests/test_action_budget.py',
+          }
+          if exact_action_files - safety_owned:
+              raise SystemExit(
+                  f'missing exact action-effect surfaces: {sorted(exact_action_files - safety_owned)}'
+              )
+          if 'dharma_swarm/action_effects/**' in safety_owned:
+              raise SystemExit('broad action_effects owner expansion remains')
+          if 'SemanticActionProposal' not in raw:
+              raise SystemExit('semantic ActionEnvelope migration is not explicit')
+          if 'dharma_swarm/graph/effects.py reserved' not in raw:
+              raise SystemExit('ambient graph effects non-overload is not explicit')
+          if 'dharma_swarm/action_effects/budget.py' not in raw or 'tests/test_action_budget.py' not in raw:
+              raise SystemExit('budget contract surfaces are not exact')
+
+          manifest = Path('docs/governance/SOVEREIGN_MANIFEST.md').read_text(encoding='utf-8')
+          if '## VERIFIED NUMBERS (2026-08-01 COUNT REFRESH)' not in manifest:
+              raise SystemExit('verified-number date remains stale')
+          ledger = Path('docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md').read_text(encoding='utf-8')
+          if '## A0 pre-merge correction log' not in ledger:
+              raise SystemExit('A0 correction evidence missing from ledger')
+          print('A0 structural, semantic, and provenance assertions: PASS')
           PY
 
       - name: Regenerate projections and run A0 evidence
@@ -147,16 +337,17 @@ jobs:
             tests/test_docops_integrity.py
           git diff --check
 
-      - name: Commit and publish repaired A0 head
+      - name: Commit and publish hardened A0 head
         run: |
           set -euo pipefail
-          git config user.name 'humming-a0-repair[bot]'
-          git config user.email 'humming-a0-repair[bot]@users.noreply.github.com'
+          git config user.name 'humming-a0-hardening[bot]'
+          git config user.email 'humming-a0-hardening[bot]@users.noreply.github.com'
           git add -- \
             docs/governance/ACTIVE_TRACK.yaml \
             CLAUDE.md \
             docs/governance/SOVEREIGN_MANIFEST.md \
-            docs/docops/AUTO_INVENTORY.md
+            docs/docops/AUTO_INVENTORY.md \
+            docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md
           git diff --cached --check
-          git commit -m 'fix(humming): make A0 ownership rows structurally real'
+          git commit -m 'fix(humming): bind A0 items to exact owner queues and surfaces'
           git push origin HEAD:codex/humming-v2-a0-portfolio-admission
