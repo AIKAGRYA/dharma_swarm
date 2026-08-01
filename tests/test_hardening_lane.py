@@ -89,10 +89,18 @@ def test_workflow_contract() -> None:
     assert job["steps"][0]["name"] == "Halt on loop kill-switch"
     assert "contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control" in job["steps"][0]["run"]
     assert "No commit found" in job["steps"][0]["run"], "missing-branch 404 must read as absent"
-    assert job["timeout-minutes"] <= 45, "runtime cap lives in the workflow"
     env = job["env"]
     assert int(env["LANE_MAX_DIFF_LINES"]) <= 600
     assert int(env["LANE_MAX_AGENT_SECONDS"]) <= 1800
+    # The job envelope is a cap, but it must be LONGER than the work it
+    # authorizes or a cap-compliant run is killed before it writes its
+    # receipt — the old 45-minute timeout was shorter than its own
+    # 1200 + 1800 second budgets (Codex on PR #1162).
+    assert job["timeout-minutes"] <= 90, "runtime cap lives in the workflow"
+    inner = int(env["LANE_MAX_AGENT_SECONDS"]) + int(env["LANE_MAX_TEST_SECONDS"])
+    assert inner < job["timeout-minutes"] * 60, (
+        "inner budgets must fit the job envelope with receipt-writing margin"
+    )
     text = WORKFLOW.read_text()
     assert "DHARMA_LANE_AGENT_CMD: ${{ secrets.DHARMA_LANE_AGENT_CMD }}" in text
 
@@ -152,3 +160,40 @@ def test_workflow_keeps_the_mailbox_overlay_out_of_the_worktree() -> None:
     assert "git checkout origin/loop-tasks --" not in text, (
         "overlay must not land in the worktree the lane commits from"
     )
+
+
+def test_nonzero_agent_exit_never_delivers() -> None:
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert '"status": "AGENT_FAILED"' in source
+    assert "if agent.returncode != 0:" in source
+
+
+def test_missing_agent_binary_yields_a_blocked_receipt() -> None:
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert "except FileNotFoundError:" in source
+    assert "is not installed" in source
+
+
+def test_nightly_unknown_is_not_reported_as_green(tmp_path: Path, monkeypatch) -> None:
+    """An unreadable or non-terminal nightly must not read as health."""
+    monkeypatch.setattr(hardening_lane, "open_lane_drafts", lambda repo: [])
+    monkeypatch.setattr(
+        hardening_lane, "select_target",
+        lambda repo: {"kind": "nightly_unknown", "status": "in_progress",
+                      "conclusion": None},
+    )
+    out = tmp_path / "r.json"
+    assert hardening_lane.main(["--repo", "o/r", "--receipt", str(out)]) == 0
+    stored = json.loads(out.read_text())
+    assert stored["status"] == "BLOCKED"
+    assert "not a verdict" in stored["reason"]
+
+
+def test_workflow_installs_dependencies_and_always_reports() -> None:
+    text = (REPO_ROOT / ".github" / "workflows" / "hardening-lane.yml").read_text()
+    assert 'pip install -e ".[dev]"' in text, (
+        "without dev deps make test-fast fails collection and every run is TESTS_RED"
+    )
+    assert "lane_exit=" in text, "delivery-failure receipts must reach the summary"
+    # Inner budgets must fit the job envelope with receipt-writing margin.
+    assert hardening_lane.MAX_AGENT_SECONDS + hardening_lane.MAX_TEST_SECONDS <= 65 * 60

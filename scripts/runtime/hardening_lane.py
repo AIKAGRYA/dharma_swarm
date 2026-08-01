@@ -38,6 +38,9 @@ LANE_BRANCH_PREFIX = "lane/hardening-"
 # How many lane drafts may be open at once. One keeps the operator's triage
 # surface to a single PR; raise deliberately.
 MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
+# Agent + tests must fit inside the job envelope with room to write the
+# receipt: 1200 + 1500 = 45 min under a 65-minute job timeout.
+MAX_TEST_SECONDS = int(os.environ.get("LANE_MAX_TEST_SECONDS", "1500"))
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
 RECIPIENT = "hardening-lane"
 # The DHARMA_LANE_AGENT_CMD secret selects one of these literal argv
@@ -97,6 +100,10 @@ def select_target(repo: str) -> dict | None:
     except Exception as exc:  # noqa: BLE001 - selection must never crash the lane
         print(f"mailbox selection unavailable: {exc}", file=sys.stderr)
 
+    # Nightly selection is TRI-STATE. Returning None for "API failed",
+    # "still running", "cancelled", or "timed out" made main() emit NO_WORK
+    # with the reason "nightly green" — reporting a healthy sensor when the
+    # sensor was actually unreadable (Codex on PR #1162).
     result = _run([
         "gh", "api",
         f"repos/{repo}/actions/workflows/nightly-tests.yml/runs?branch=main&per_page=1",
@@ -114,7 +121,14 @@ def select_target(repo: str) -> dict | None:
             return {"kind": "nightly_failure", "run_url": runs[0].get("html_url", ""),
                     "summary": "repair the failing nightly on main",
                     "body": f"Nightly run failed: {runs[0].get('html_url', '')}"}
-    return None
+        if runs and runs[0].get("status") == "completed" \
+                and runs[0].get("conclusion") == "success":
+            return None  # positively green: genuinely no work
+        return {"kind": "nightly_unknown",
+                "status": runs[0].get("status") if runs else "no runs",
+                "conclusion": runs[0].get("conclusion") if runs else None}
+    return {"kind": "nightly_unknown", "status": "api_error",
+            "conclusion": None}
 
 
 # Credentials the lane holds to open its draft PR, which the agent must not
@@ -208,7 +222,15 @@ def main(argv: list[str] | None = None) -> int:
     target = select_target(args.repo)
     if target is None:
         receipt({"status": "NO_WORK",
-                 "reason": "no ready mailbox task, nightly green"}, out)
+                 "reason": "no ready mailbox task; nightly positively green"}, out)
+        return 0
+    if target.get("kind") == "nightly_unknown":
+        # Unreadable or non-terminal sensor: neither work nor health.
+        receipt({"status": "BLOCKED",
+                 "reason": "nightly state is not a verdict "
+                           f"(status={target.get('status')!r}, "
+                           f"conclusion={target.get('conclusion')!r}) — "
+                           "refusing to claim the nightly is green"}, out)
         return 0
 
     agent_choice = os.environ.get("DHARMA_LANE_AGENT_CMD", "").strip()
@@ -261,6 +283,25 @@ def main(argv: list[str] | None = None) -> int:
         receipt({"status": "CAP_HIT", "cap": "agent_seconds",
                  "target": target, "limit": MAX_AGENT_SECONDS}, out)
         return 0
+    except FileNotFoundError:
+        # The allowlisted selector names a binary the runner does not have.
+        # A missing agent is a BLOCKED lane with a receipt, never an
+        # uncaught crash that leaves no record (Codex on PR #1162).
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": f"agent binary {agent_argv[0]!r} is not installed "
+                           "on this runner"}, out)
+        return 0
+
+    # A nonzero agent exit means the work is unfinished — a tool, auth, or
+    # context failure can leave a partial diff that happens to keep the
+    # suite green. Never deliver that as a fix (Codex on PR #1162).
+    if agent.returncode != 0:
+        _run(["git", "reset", "--hard", "HEAD"])
+        _run(["git", "clean", "-fd"])
+        receipt({"status": "AGENT_FAILED", "target": target,
+                 "agent_exit": agent.returncode,
+                 "tail": (agent.stderr or agent.stdout or "")[-2000:]}, out)
+        return 0
 
     # Stage the intended set FIRST, then measure it: the cap and the commit
     # must see the same change set, including files the agent created.
@@ -279,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
                  "limit": MAX_DIFF_LINES, "target": target}, out)
         return 0
 
-    tests = _run(["make", "test-fast"], timeout=1800)
+    tests = _run(["make", "test-fast"], timeout=MAX_TEST_SECONDS)
     if tests.returncode != 0:
         receipt({"status": "TESTS_RED", "target": target,
                  "tail": tests.stdout[-2000:]}, out)
