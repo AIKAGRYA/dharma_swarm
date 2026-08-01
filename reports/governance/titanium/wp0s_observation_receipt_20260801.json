@@ -1,0 +1,278 @@
+{
+  "schema": "dharma.titanium.wp0s_observation_receipt.v1",
+  "work_packet": "WP-0S",
+  "active_track": "repository-titanium-hardening-2026-07",
+  "generated_at": "2026-08-01T06:54:38Z",
+  "requested_snapshot_at": "2026-08-01T05:57:00Z",
+  "observation_window": {
+    "first_observed_at": "2026-08-01T06:37:15Z",
+    "last_observed_at": "2026-08-01T06:54:29Z"
+  },
+  "base_ref": "61df22a85e2083a96a7b0a9500b611e384d40730",
+  "authority": "implementation_observer",
+  "claim_boundary": "Read-only implementation observations from the named control host and three configured SSH aliases. This receipt asserts neither complete fleet inventory nor operator authorization, and it contains environment-name presence booleans only; no secret values were accessed or recorded.",
+  "inventory_complete": false,
+  "exact_host_scope": [
+    "local_mac",
+    "agni",
+    "rushabdev",
+    "meghadharma"
+  ],
+  "status": "BLOCKED_OPERATOR",
+  "operator_attestation": {
+    "present": false,
+    "attestor": null,
+    "attested_at": null,
+    "exact_host_scope": []
+  },
+  "verdict": {
+    "classification": "BLOCKED_OPERATOR",
+    "live_exposure": "observed",
+    "operator_action": "required",
+    "phase0_promotion": "forbidden"
+  },
+  "secret_policy": {
+    "mode": "environment_names_and_presence_booleans_only",
+    "secret_values_accessed": false,
+    "allowed_environment_names": [
+      "DASHBOARD_API_KEY",
+      "DHARMA_VERIFY_WEBHOOK_SECRET",
+      "DHARMA_API_MODE"
+    ]
+  },
+  "secret_name_observations": [
+    {
+      "host_id": "agni",
+      "runtime_id": "sab-agora",
+      "observed_at": "2026-08-01T06:38:16Z",
+      "source_vantage": "control_host_via_ssh_alias:agni",
+      "names_present": {
+        "DASHBOARD_API_KEY": false,
+        "DHARMA_VERIFY_WEBHOOK_SECRET": false,
+        "DHARMA_API_MODE": false
+      }
+    },
+    {
+      "host_id": "rushabdev",
+      "runtime_id": "dharma-dashboard-api",
+      "observed_at": "2026-08-01T06:39:10Z",
+      "source_vantage": "control_host_via_ssh_alias:rushabdev",
+      "names_present": {
+        "DASHBOARD_API_KEY": true,
+        "DHARMA_VERIFY_WEBHOOK_SECRET": false,
+        "DHARMA_API_MODE": false
+      }
+    },
+    {
+      "host_id": "meghadharma",
+      "runtime_id": "legacy-command-backend",
+      "observed_at": "2026-08-01T06:39:58Z",
+      "source_vantage": "control_host_via_ssh_alias:meghadharma",
+      "names_present": {
+        "DASHBOARD_API_KEY": true,
+        "DHARMA_VERIFY_WEBHOOK_SECRET": false,
+        "DHARMA_API_MODE": false
+      }
+    },
+    {
+      "host_id": "meghadharma",
+      "runtime_id": "dharmic-quant-web",
+      "observed_at": "2026-08-01T06:39:58Z",
+      "source_vantage": "control_host_via_ssh_alias:meghadharma",
+      "names_present": {
+        "DASHBOARD_API_KEY": false,
+        "DHARMA_VERIFY_WEBHOOK_SECRET": false,
+        "DHARMA_API_MODE": false
+      }
+    }
+  ],
+  "evidence": {
+    "live_host": [
+      {
+        "id": "live-local-control-host",
+        "host_id": "local_mac",
+        "hostname": "Johns-MacBook-Pro.local",
+        "observed_at": "2026-08-01T06:54:29Z",
+        "source_vantage": "local_process",
+        "reachable": true,
+        "scope_note": "Control host only; TCP ports 8080, 8420, 8000, and 7433 were checked locally and had no listener."
+      },
+      {
+        "id": "live-agni-ssh",
+        "host_id": "agni",
+        "hostname": "agni-openclaw",
+        "observed_at": "2026-08-01T06:38:16Z",
+        "source_vantage": "control_host_via_ssh_alias:agni",
+        "reachable": true
+      },
+      {
+        "id": "live-rushabdev-ssh",
+        "host_id": "rushabdev",
+        "hostname": "openclaw23onubuntu-s-2vcpu-4gb-120gb-intel-sgp1-01",
+        "observed_at": "2026-08-01T06:39:10Z",
+        "source_vantage": "control_host_via_ssh_alias:rushabdev",
+        "reachable": true
+      },
+      {
+        "id": "live-meghadharma-ssh",
+        "host_id": "meghadharma",
+        "hostname": "meghadharma-cloud",
+        "observed_at": "2026-08-01T06:39:58Z",
+        "source_vantage": "control_host_via_ssh_alias:meghadharma",
+        "reachable": true
+      }
+    ],
+    "listener": [
+      {
+        "id": "listener-agni-sab-agora-8000",
+        "host_id": "agni",
+        "runtime_id": "sab-agora",
+        "observed_at": "2026-08-01T06:38:16Z",
+        "source_vantage": "control_host_via_ssh_alias:agni",
+        "transport": "tcp",
+        "bind_addresses": [
+          "127.0.0.1"
+        ],
+        "port": 8000,
+        "public_bind": false,
+        "service": "sab-agora.service",
+        "working_directory": "/home/openclaw/dharmic-agora-release"
+      },
+      {
+        "id": "listener-rushabdev-dashboard-8420",
+        "host_id": "rushabdev",
+        "runtime_id": "dharma-dashboard-api",
+        "observed_at": "2026-08-01T06:39:10Z",
+        "source_vantage": "control_host_via_ssh_alias:rushabdev",
+        "transport": "tcp",
+        "bind_addresses": [
+          "127.0.0.1"
+        ],
+        "port": 8420,
+        "public_bind": false,
+        "service": "dharma-dashboard-api.service",
+        "working_directory": "/opt/dharma-dashboard"
+      },
+      {
+        "id": "listener-meghadharma-legacy-8420",
+        "host_id": "meghadharma",
+        "runtime_id": "legacy-command-backend",
+        "observed_at": "2026-08-01T06:39:58Z",
+        "source_vantage": "control_host_via_ssh_alias:meghadharma",
+        "transport": "tcp",
+        "bind_addresses": [
+          "127.0.0.1"
+        ],
+        "port": 8420,
+        "public_bind": false,
+        "container": "/dharma-command-backend",
+        "published_ports": false
+      },
+      {
+        "id": "listener-meghadharma-quant-web-8080",
+        "host_id": "meghadharma",
+        "runtime_id": "dharmic-quant-web",
+        "observed_at": "2026-08-01T06:39:58Z",
+        "source_vantage": "control_host_via_ssh_alias:meghadharma",
+        "transport": "tcp",
+        "bind_addresses": [
+          "0.0.0.0",
+          "[::]"
+        ],
+        "port": 8080,
+        "public_bind": true,
+        "container": "/dharmic-quant-web"
+      }
+    ],
+    "public_http": [
+      {
+        "id": "public-http-rushabdev-dashboard-health",
+        "host_id": "rushabdev",
+        "runtime_id": "dharma-dashboard-api",
+        "observed_at": "2026-08-01T06:39:28Z",
+        "source_vantage": "external_control_host_http_client",
+        "endpoint": "https://dashboard.167-172-95-184.nip.io/health",
+        "status_code": 401,
+        "reachable": true,
+        "public_network": true,
+        "route_observation": "Active Caddy configuration names the endpoint host and a loopback port 8420 target."
+      },
+      {
+        "id": "public-http-meghadharma-quant-web-health",
+        "host_id": "meghadharma",
+        "runtime_id": "dharmic-quant-web",
+        "observed_at": "2026-08-01T06:40:22Z",
+        "source_vantage": "external_control_host_http_client",
+        "endpoint": "http://178.128.87.170:8080/health",
+        "status_code": 200,
+        "reachable": true,
+        "public_network": true
+      }
+    ],
+    "code_version": [
+      {
+        "id": "code-agni-release-marker",
+        "host_id": "agni",
+        "runtime_id": "sab-agora",
+        "observed_at": "2026-08-01T06:38:16Z",
+        "source_vantage": "control_host_via_ssh_alias:agni",
+        "version_kind": "release_readme_marker",
+        "observed_ref": "DHARMIC_AGORA SABP/1.0-PILOT"
+      },
+      {
+        "id": "code-rushabdev-api-git-head",
+        "host_id": "rushabdev",
+        "runtime_id": "dharma-dashboard-api",
+        "observed_at": "2026-08-01T06:39:10Z",
+        "source_vantage": "control_host_via_ssh_alias:rushabdev",
+        "version_kind": "git_commit",
+        "observed_ref": "a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466",
+        "integrated_wp0s_ref": "e96674d27",
+        "integrated_ref_is_ancestor": false,
+        "remote_clone_has_integrated_object": false,
+        "comparison_basis": "Local repository commit graph; remote clone was read only and was not fetched or mutated."
+      },
+      {
+        "id": "code-meghadharma-legacy-image",
+        "host_id": "meghadharma",
+        "runtime_id": "legacy-command-backend",
+        "observed_at": "2026-08-01T06:39:58Z",
+        "source_vantage": "control_host_via_ssh_alias:meghadharma",
+        "version_kind": "container_image",
+        "observed_ref": "dharma-command-backend:37310d9c-r2",
+        "started_at": "2026-07-21T15:05:26.877311572Z"
+      },
+      {
+        "id": "code-meghadharma-quant-web-image",
+        "host_id": "meghadharma",
+        "runtime_id": "dharmic-quant-web",
+        "observed_at": "2026-08-01T06:39:58Z",
+        "source_vantage": "control_host_via_ssh_alias:meghadharma",
+        "version_kind": "container_image",
+        "observed_ref": "dharma_swarm-web",
+        "started_at": "2026-07-21T15:05:26.898935465Z"
+      }
+    ]
+  },
+  "reconciliation": {
+    "top_priorities": [
+      "Obtain an operator-attested exact deployment inventory before any WP-0S closure claim.",
+      "Choose and execute an operator-authorized containment posture for the two observed public HTTP routes.",
+      "Require the documented production authentication name set and production-mode declaration on every retained public runtime, then rerun auth tests from an external vantage.",
+      "Reconcile the Rushabdev deployed code version with the integrated WP-0S implementation before treating repository work as deployed protection."
+    ],
+    "latest_work": [
+      "Repository main at the packet base contains the integrated WP-0S implementation reference e96674d27.",
+      "Fresh read-only observations confirm a public Rushabdev route returning HTTP 401 and a public Meghadharma route returning HTTP 200.",
+      "Fresh names-only observations preserve the Meghadharma runtime split: the loopback legacy backend reports DASHBOARD_API_KEY present by name, while the public web runtime reports all three required names absent.",
+      "Rushabdev's observed API head is not descended from the integrated WP-0S reference according to the local commit graph."
+    ]
+  },
+  "actions_not_taken": [
+    "No deployment or code fetch",
+    "No service or container restart",
+    "No firewall, proxy, listener, or repository setting change",
+    "No credential creation, rotation, or value inspection",
+    "No merge or Phase 0 promotion"
+  ]
+}
