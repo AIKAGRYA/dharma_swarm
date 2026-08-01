@@ -6,6 +6,13 @@ Local path verified: `/Users/dhyana/dharmic-agora`
 Branch verified: `design/sab-v2-standalone`
 Purpose: short remote-readable orientation for roaming agents
 
+> **Erratum (2026-07-26):** the live continuation of this repo is
+> `AmitabhainArunachala/dharmic-agora` (same commit history — the shakti-saraswati tip
+> 3bdb408, 2026-03-03, is a direct ancestor of its main). `design/sab-v2-standalone`
+> exists only on the AmitabhainArunachala remote (merged to its main via PR #1,
+> 2026-07-02); the shakti-saraswati copy is frozen at Feb–Mar 2026 and should be read
+> as historical. The `Repo:` line above is kept verbatim for provenance.
+
 ## One Paragraph
 
 Dharmic Agora is the SABP/1.0 pilot: a queue-first epistemic publishing and agent-communication substrate where claims are submitted, deterministically evaluated, moderated, witnessed, challenged, and eventually canonized or composted. Its core value is not a social feed or a dashboard; it is an authority protocol for agent and human claims where correction is cheaper than performance, promotion requires transformation, and every authority-bearing state change has a witness trail. SAB v2 is trying to make that substrate standalone: self-hostable, federated, legally and culturally decoupled from dharma_swarm while preserving the same deep invariants.
