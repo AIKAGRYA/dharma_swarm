@@ -250,6 +250,59 @@ def test_git_wrapper_prefixes_every_invocation() -> None:
     assert kwargs["env"]["GIT_CONFIG_SYSTEM"] == os.devnull
 
 
+def test_commit_delivers_the_measured_tree_not_the_working_tree() -> None:
+    """`make test-fast` runs between the measurement and the commit. The old
+    flow re-staged from the working tree afterwards, so a test-time rewrite
+    of an already-measured file was delivered unmeasured and unverified —
+    Greptile's harness shipped 51 lines under a receipt saying 2."""
+    source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
+    assert '_git(["write-tree"])' in source
+    assert '_git(["commit-tree", measured_tree, "-p", base_commit' in source
+    assert source.index('measured_tree = _git(["write-tree"])') < source.index(
+        '_run([MAKE_BIN, "test-fast"]'
+    ), "the tree must be frozen BEFORE the test process can touch anything"
+    # The post-test re-stage was the bug; it must be gone.
+    assert '_git(["add", "--", *staged])' not in source.split("write-tree")[1]
+    assert '_git(["commit", "-m"' not in source, (
+        "committing the index re-reads the working tree; commit-tree does not"
+    )
+
+
+def test_frozen_tree_survives_a_post_measurement_rewrite(tmp_path) -> None:
+    """The mechanism itself, against the real git binary: a tree SHA is
+    content-addressed, so a later rewrite cannot change what it commits."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        done = subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, check=True,
+            env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull,
+                 "GIT_CONFIG_SYSTEM": os.devnull},
+        )
+        return done.stdout.strip()
+
+    git("init", "-q", ".")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (repo / "f.txt").write_text("base\n")
+    git("add", "f.txt")
+    git("commit", "-qm", "base")
+
+    (repo / "f.txt").write_text("measured\n")
+    git("add", "f.txt")
+    measured_tree = git("write-tree")
+    base_commit = git("rev-parse", "HEAD")
+
+    # The test process rewrites the measured file — and even re-stages it.
+    (repo / "f.txt").write_text("UNMEASURED\n")
+    git("add", "f.txt")
+
+    commit = git("commit-tree", measured_tree, "-p", base_commit, "-m", "x")
+    assert git("show", f"{commit}:f.txt") == "measured"
+    assert (repo / "f.txt").read_text() == "UNMEASURED\n"
+
+
 def test_privileged_binaries_are_resolved_before_the_agent_runs() -> None:
     """The agent runs as the same user and can drop an executable into any
     writable PATH directory. A fake `git`/`gh` intercepts the privileged

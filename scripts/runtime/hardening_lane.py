@@ -489,6 +489,21 @@ def main(argv: list[str] | None = None) -> int:
                  "paths": staged[:20]}, out)
         return 0
 
+    # Freeze the MEASURED content as a tree object, before anything else can
+    # run. A tree SHA is content-addressed, so whatever the test process does
+    # to the working tree afterwards, this identifier still resolves to
+    # exactly the bytes the cap was computed over. The old flow re-staged
+    # from the working tree after the tests, which let `make test-fast`
+    # rewrite an already-measured file: Greptile's harness delivered a
+    # 51-line commit under a receipt that said 2 (PR #1162).
+    measured_tree = _git(["write-tree"]).stdout.strip()
+    base_commit = _git(["rev-parse", "HEAD"]).stdout.strip()
+    if not measured_tree or not base_commit:
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": "could not freeze the measured tree; refusing to "
+                           "deliver content that was never pinned"}, out)
+        return 1
+
     # Verification runs in the AGENT's de-privileged environment, not the
     # lane's. `make test-fast` executes a Makefile the agent may just have
     # edited, and conftest.py and pyproject.toml are equally agent-writable,
@@ -510,14 +525,20 @@ def main(argv: list[str] | None = None) -> int:
                            "could not be restored — refusing to deliver"}, out)
         return 1
 
-    # Re-stage the same explicit set: `make test-fast` may have produced
-    # artifacts, and only the measured paths may reach the commit.
-    _git(["reset", "-q", "HEAD", "--"])
-    if staged:
-        _git(["add", "--", *staged])
-    _git(["commit", "-m",
-          f"harden: {target['summary'][:60]} [hardening-lane]"])
-    push = _git(["push", "-u", "origin", branch])
+    # Commit the FROZEN tree, not the working tree. commit-tree takes the
+    # content by SHA, so nothing the test run (or anything else) did to the
+    # checkout after the measurement can enter the delivered commit — the
+    # bytes pushed are the bytes the cap and the tests saw.
+    commit = _git(["commit-tree", measured_tree, "-p", base_commit, "-m",
+                   f"harden: {target['summary'][:60]} [hardening-lane]"])
+    new_commit = commit.stdout.strip()
+    if commit.returncode != 0 or not new_commit:
+        receipt({"status": "BLOCKED", "target": target,
+                 "reason": "commit-tree failed on the measured tree",
+                 "stderr": commit.stderr[-1000:]}, out)
+        return 1
+    _git(["update-ref", f"refs/heads/{branch}", new_commit])
+    push = _git(["push", "-u", "origin", f"{new_commit}:refs/heads/{branch}"])
     if push.returncode != 0:
         receipt({"status": "PUSH_FAILED", "target": target,
                  "stderr": push.stderr[-1000:]}, out)
