@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -145,8 +146,13 @@ def test_diff_cap_measures_the_staged_set_including_new_files() -> None:
     zero and a large new file escaped both the cap and the commit."""
     source = (REPO_ROOT / "scripts" / "runtime" / "hardening_lane.py").read_text()
     assert '"git", "diff", "--cached", "--numstat"' in source
-    assert '"git", "add", "-A"' in source
+    # Staging is BY EXPLICIT PATH: this lane stages work produced by an
+    # untrusted agent, so a blanket add could sweep in secrets or generated
+    # reports (CLAUDE.md hard rule; semgrep dharma.scripts-no-git-add-all).
+    assert '"git", "add", "-A"' not in source
+    assert '"git", "add", "."' not in source
     assert '"git", "add", "-u"' not in source
+    assert '"git", "add", "--", *' in source
 
 
 def test_nightly_target_requires_a_completed_run() -> None:
@@ -197,3 +203,23 @@ def test_workflow_installs_dependencies_and_always_reports() -> None:
     assert "lane_exit=" in text, "delivery-failure receipts must reach the summary"
     # Inner budgets must fit the job envelope with receipt-writing margin.
     assert hardening_lane.MAX_AGENT_SECONDS + hardening_lane.MAX_TEST_SECONDS <= 65 * 60
+
+
+def test_agent_paths_exclude_secrets_reports_and_the_mailbox(monkeypatch) -> None:
+    """The staged set is explicit and filtered — the lane must never carry
+    an agent-dropped secret, a generated report, or operator task state."""
+    porcelain = (
+        " M dharma_swarm/fix.py\n"
+        "?? tests/test_new.py\n"
+        "?? .env\n"
+        "?? reports/governance/out.json\n"
+        "?? roaming_mailbox/tasks/mbx_op_x.json\n"
+        "?? creds.pem\n"
+        "R  old.py -> renamed.py\n"
+    )
+    monkeypatch.setattr(
+        hardening_lane, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, porcelain, ""),
+    )
+    paths = hardening_lane.agent_changed_paths()
+    assert paths == ["dharma_swarm/fix.py", "renamed.py", "tests/test_new.py"]

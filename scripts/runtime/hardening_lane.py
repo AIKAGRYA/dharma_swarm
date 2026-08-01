@@ -177,6 +177,58 @@ def agent_env() -> dict[str, str]:
     }
 
 
+# Paths the agent's change set may never include. The lane stages work
+# produced by an untrusted agent, so staging is BY EXPLICIT PATH — never
+# `git add -A`, which would sweep in secrets, generated reports, or the
+# operator mailbox (CLAUDE.md hard rule; semgrep
+# dharma.scripts-no-git-add-all; and Codex asked for the mailbox exclusion
+# specifically on PR #1162).
+STAGE_EXCLUDE_PREFIXES = ("roaming_mailbox/", "reports/", ".git/", ".venv/")
+STAGE_EXCLUDE_SUFFIXES = (".env", ".pyc", ".pem", ".key")
+STAGE_EXCLUDE_NAMES = {".env", "secrets.json"}
+
+
+def agent_changed_paths() -> list[str]:
+    """Every path the agent touched or created, minus the excluded set."""
+    result = _run(["git", "status", "--porcelain", "--untracked-files=all"])
+    paths: list[str] = []
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:].strip()
+        if " -> " in path:  # rename: take the destination
+            path = path.split(" -> ", 1)[1]
+        path = path.strip('"')
+        if not path or path.startswith(STAGE_EXCLUDE_PREFIXES):
+            continue
+        if path.endswith(STAGE_EXCLUDE_SUFFIXES):
+            continue
+        if Path(path).name in STAGE_EXCLUDE_NAMES:
+            continue
+        paths.append(path)
+    return sorted(set(paths))
+
+
+def stage_agent_changes() -> list[str]:
+    """Stage the agent's change set by explicit path; return what was staged."""
+    paths = agent_changed_paths()
+    if paths:
+        _run(["git", "add", "--", *paths])
+    return paths
+
+
+def discard_agent_changes(paths: list[str]) -> None:
+    """Undo an over-cap or failed agent run: unstage + restore tracked files,
+    then remove exactly the untracked paths the agent created (never a
+    blanket clean)."""
+    _run(["git", "reset", "-q", "HEAD", "--"])
+    _run(["git", "checkout", "-q", "HEAD", "--", "."])
+    for path in paths:
+        candidate = Path(path)
+        if candidate.is_file():
+            candidate.unlink(missing_ok=True)
+
+
 def diff_line_count() -> int:
     """Changed lines in the STAGED set. `git diff HEAD` omits untracked
     files, so a new-file-only fix measured zero (reported NO_DIFF) and a
@@ -296,8 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     # context failure can leave a partial diff that happens to keep the
     # suite green. Never deliver that as a fix (Codex on PR #1162).
     if agent.returncode != 0:
-        _run(["git", "reset", "--hard", "HEAD"])
-        _run(["git", "clean", "-fd"])
+        discard_agent_changes(agent_changed_paths())
         receipt({"status": "AGENT_FAILED", "target": target,
                  "agent_exit": agent.returncode,
                  "tail": (agent.stderr or agent.stdout or "")[-2000:]}, out)
@@ -305,19 +356,17 @@ def main(argv: list[str] | None = None) -> int:
 
     # Stage the intended set FIRST, then measure it: the cap and the commit
     # must see the same change set, including files the agent created.
-    _run(["git", "add", "-A"])
+    staged = stage_agent_changes()
     lines = diff_line_count()
     if lines == 0:
         receipt({"status": "NO_DIFF", "target": target,
                  "agent_exit": agent.returncode}, out)
         return 0
     if lines > MAX_DIFF_LINES:
-        # Unstage and discard, including the agent's new files — a plain
-        # `git checkout -- .` would leave them behind for the next run.
-        _run(["git", "reset", "--hard", "HEAD"])
-        _run(["git", "clean", "-fd"])
+        discard_agent_changes(staged)
         receipt({"status": "CAP_HIT", "cap": "diff_lines", "observed": lines,
-                 "limit": MAX_DIFF_LINES, "target": target}, out)
+                 "limit": MAX_DIFF_LINES, "target": target,
+                 "paths": staged[:20]}, out)
         return 0
 
     tests = _run(["make", "test-fast"], timeout=MAX_TEST_SECONDS)
@@ -326,9 +375,11 @@ def main(argv: list[str] | None = None) -> int:
                  "tail": tests.stdout[-2000:]}, out)
         return 0
 
-    # Re-stage: `make test-fast` may have produced artifacts, and the set
-    # measured above is the set committed.
-    _run(["git", "add", "-A"])
+    # Re-stage the same explicit set: `make test-fast` may have produced
+    # artifacts, and only the measured paths may reach the commit.
+    _run(["git", "reset", "-q", "HEAD", "--"])
+    if staged:
+        _run(["git", "add", "--", *staged])
     _run(["git", "commit", "-m",
           f"harden: {target['summary'][:60]} [hardening-lane]"])
     push = _run(["git", "push", "-u", "origin", branch])
