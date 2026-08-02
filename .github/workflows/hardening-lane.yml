@@ -35,8 +35,11 @@ on:
         type: boolean
         default: false
 
-# Job-level permissions override this floor. Nothing is granted repo-wide.
-permissions: {}
+# Least-privilege floor. Each job below declares its own block, and those
+# override this one — the floor exists so that a job which ever forgets to
+# declare inherits read, never write.
+permissions:
+  contents: read
 
 concurrency:
   group: hardening-lane
@@ -199,18 +202,30 @@ jobs:
           path: ${{ runner.temp }}/candidate
 
       - name: Verify and deliver
+        # `github` and `inputs` context values reach the script through env
+        # vars, never through ${{ }} inside `run:` — context data is
+        # attacker-influenceable and interpolating it into a shell body is a
+        # code-injection sink (semgrep
+        # yaml.github-actions.security.run-shell-injection).
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
         run: |
           set -uo pipefail
           git config user.name "hardening-lane"
           git config user.email "hardening-lane@users.noreply.github.com"
+          if [ "${DRY_RUN}" = "true" ]; then
+            set -- --dry-run
+          else
+            set --
+          fi
           set +e
           python3 scripts/runtime/lane_deliver.py \
             --repo "${GH_REPO}" \
             --bundle "${RUNNER_TEMP}/candidate/lane_delivery.bundle" \
             --propose-receipt "${RUNNER_TEMP}/candidate/lane_propose_receipt.json" \
             --receipt "${RUNNER_TEMP}/lane_deliver_receipt.json" \
-            --base "${{ github.event.repository.default_branch }}" \
-            ${{ inputs.dry_run && '--dry-run' || '' }}
+            --base "${BASE_BRANCH}" "$@"
           deliver_exit="$?"
           set -e
           {

@@ -369,8 +369,24 @@ def test_workflow_has_two_jobs_with_separated_trust() -> None:
     assert deliver["contents"] == "write"
     assert deliver["pull-requests"] == "write"
 
-    # Repo-wide default grants nothing.
-    assert data["permissions"] == {}
+    # The repo-wide floor is read-only, so a job that ever forgets to declare
+    # its own block inherits read rather than write.
+    assert data["permissions"] == {"contents": "read"}
+    assert "write" not in json.dumps(data["permissions"])
+
+
+def test_no_context_interpolation_inside_any_run_body() -> None:
+    """`${{ ... }}` inside a `run:` body is a shell-injection sink: context
+    data is attacker-influenceable and is pasted into the script before the
+    shell sees it. Context must arrive via `env:` instead (semgrep
+    yaml.github-actions.security.run-shell-injection)."""
+    for job in _workflow()["jobs"].values():
+        for step in job["steps"]:
+            body = step.get("run")
+            if body:
+                assert "${{" not in body, (
+                    f"step {step.get('name')!r} interpolates context into run:"
+                )
 
 
 def test_propose_checkout_does_not_persist_credentials() -> None:
