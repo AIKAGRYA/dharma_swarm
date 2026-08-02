@@ -509,7 +509,22 @@ def main(argv: list[str] | None = None) -> int:
     # what exists rather than inferring it from an exit code, and treat "I
     # cannot tell" as "do not delete" — an orphan branch is recoverable, a
     # deleted PR is not. (Devin on #1200.)
-    if pr.returncode == EXIT_TIMEOUT:
+    #
+    # The probe runs for EVERY non-zero exit, not just the timeout. Gating it
+    # on EXIT_TIMEOUT was my own too-narrow first fix: it closed the reported
+    # instance and left the class open, while the comment above already argued
+    # the general case. A timeout is not the only failure that can follow a
+    # successful mutation — a connection reset while reading the response does
+    # it, and so does the plainest case of all, which needs no race at all:
+    # a retry where `gh` refuses because a PR for this branch ALREADY EXISTS.
+    # That exits non-zero, and a PR provably exists. Rolling back there would
+    # delete the branch and close it. (Devin on #1200, second pass.)
+    #
+    # The one exit that needs no probe is a missing `gh` binary: no process
+    # ran, so no mutation can have happened, and the branch really is an
+    # orphan. Probing with the same missing binary would only ever answer
+    # "unknown" and strand it.
+    if pr.returncode != EXIT_NOT_FOUND:
         existing = _run([GH_BIN, "pr", "list", "--repo", args.repo,
                          "--head", branch, "--state", "all",
                          "--json", "number", "--limit", "5"])

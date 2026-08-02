@@ -481,14 +481,71 @@ def _is(cmd, *tokens) -> bool:
 
 def test_a_clean_pr_create_failure_still_rolls_back(
         lane, tmp_path, monkeypatch) -> None:
-    """The unambiguous case: `gh` said no, so no PR exists and the pushed
-    branch is a genuine orphan the draft ceiling cannot see."""
+    """The unambiguous case: GitHub positively reports no PR for the branch,
+    so the push really is an orphan the draft ceiling cannot see."""
     bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
-    _intercept(monkeypatch, lambda cmd, kw: (
-        subprocess.CompletedProcess(cmd, 1, "", "validation failed")
-        if _is(cmd, "pr", "create") else None))
 
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            return subprocess.CompletedProcess(cmd, 1, "", "validation failed")
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+        return None
+
+    _intercept(monkeypatch, handler)
     code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_FAILED"
+    assert stored["branch_rollback"] == "deleted under lease"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
+def test_a_plain_nonzero_create_with_an_existing_pr_keeps_the_branch(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for the general case (Devin on #1200, second pass).
+
+    The first fix gated the existence probe on EXIT_TIMEOUT, which closed the
+    reported instance and left the class open. The plainest case needs no race
+    at all: a retry where `gh pr create` refuses because a PR for this branch
+    ALREADY EXISTS exits non-zero and is not 124, so the branch was deleted —
+    closing the very PR whose existence caused the error.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            return subprocess.CompletedProcess(
+                cmd, 1, "", "a pull request for branch ... already exists")
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, '[{"number":7}]', "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_AMBIGUOUS"
+    assert "deleting it would close that PR" in stored["branch_rollback"]
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH in refs
+
+
+def test_a_missing_gh_binary_still_rolls_the_orphan_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """The one exit that needs no probe: no process ran, so no mutation can
+    have happened. Probing with the same missing binary would only ever answer
+    "unknown" and strand the orphan forever."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if cmd and cmd[0] == lane_deliver.GH_BIN:
+            raise FileNotFoundError(2, "No such file or directory", cmd[0])
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
     assert code == 1
     assert stored["status"] == "PR_CREATE_FAILED"
     assert stored["branch_rollback"] == "deleted under lease"
