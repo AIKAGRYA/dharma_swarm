@@ -1171,7 +1171,7 @@ active_tracks:
           SHA, host identity, mounts, ports, configuration and scheduler,
           actual isolation tier, live owner-surface observation, negative
           control, post-restart read, and executed rollback receipt. Target
-          closure: host evidence only.
+          closure: VERIFIED_SLICE for host-evidence custody only.
           Non-goals: A0 authorizes no deployment, restart, secret use, paid
           infrastructure, or CLOSED_LIVE promotion.
         kind: ops
@@ -1660,7 +1660,8 @@ active_tracks:
           invariant-specific mutations, total score above 58 and LG24 above
           zero, row-level semantic delta, full migration coverage, and
           rollback. Fixture-only tests cannot prove neutral-engine parity.
-          Target closure: scoped VERIFIED_SLICE; no production-wide promotion.
+          Target closure: VERIFIED_SLICE for the scoped gauntlet; no
+          production-wide promotion.
         kind: governance
         blocker: true
     non_goals:
