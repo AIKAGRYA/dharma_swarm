@@ -739,6 +739,36 @@ def test_a_pure_rename_does_not_consume_the_blob_budget(
     assert stored["status"] == "VERIFIED_DRY_RUN"
 
 
+def test_one_new_blob_at_many_paths_is_charged_once(
+        lane, tmp_path, monkeypatch) -> None:
+    """The unique-OID half of the accounting, which the docstring claimed and
+    nothing pinned (Greptile's follow-up on #1200).
+
+    Delivery never checks the candidate out — `git fetch` of the bundle
+    unpacks OBJECTS — so the cost of the same blob at three paths is one
+    blob, and charging it three times would measure something that never
+    happens. `MAX_CHANGED_FILES` bounds the path-count axis separately.
+    """
+    body = "A" * 2048
+    bundle = _make_bundle(lane, files={
+        "dharma_swarm/one.py": body,
+        "dharma_swarm/two.py": body,
+        "dharma_swarm/three.py": body,
+    })
+    _git(lane["work"], "fetch", "-q", "origin")
+    _git(lane["work"], "fetch", "-q", str(bundle), f"refs/heads/{LANE_BRANCH}")
+    head = _git(lane["work"], "rev-parse", "FETCH_HEAD")
+
+    # Three paths, one object: charged once, not three times.
+    assert lane_deliver.changed_blob_bytes(lane["base"], head) == 2048
+
+    # And a ceiling above one copy but below three still admits it.
+    monkeypatch.setattr(lane_deliver, "MAX_CHANGED_BLOB_BYTES", 3000)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 0, stored
+    assert stored["status"] == "VERIFIED_DRY_RUN"
+
+
 def test_new_content_still_counts_against_the_blob_budget(
         lane, tmp_path, monkeypatch) -> None:
     """The other side of the same measurement: content the base does NOT
