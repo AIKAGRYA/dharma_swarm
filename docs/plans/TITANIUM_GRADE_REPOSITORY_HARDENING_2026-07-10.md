@@ -881,6 +881,8 @@ One version-aware helper determines Go capability for all Go bridges and tests.
 - `dharma_swarm/diff_applier.py`
 - `dharma_swarm/sandbox.py`
 - `Makefile`
+- `tests/test_agent_work_packet.py` (amendment 2026-08-01, repeatability repairs only)
+- `tests/test_make_onboarding_contract.py` (amendment 2026-08-01, repo-scale timeout override only)
 
 Production files may change only after the minimized reproducer proves their causality. If another file owns the leak, stop and amend this specification before editing it.
 
@@ -906,6 +908,45 @@ gh pr view 1068 --repo AmitabhainArunachala/dharma_swarm \
 git diff --check \
   94accf91069466caa787dfa4546a97d49b9cfa34...96f057cea8b3255c9f435b026ff544755f6e8d2d
 ```
+
+**Bounded design amendment (2026-08-01)**
+
+The post-#1164 reconciliation kept WP-0D open with two current-main
+repeatability defects whose owning test file, `tests/test_agent_work_packet.py`,
+was outside this packet's ratified allowed-file list
+(`docs/governance/ACTIVE_TRACK.yaml` WP-0D residual). A 2026-08-01 Linux
+reproduction added a third surface of the same defect class:
+`tests/test_make_onboarding_contract.py::test_make_report_root_rejects_hypothesis_cache_symlink`
+passes alone in ~6s but trips the 10-second fast budget under full-suite load
+(pytest-timeout in `selectors.py` after 8,061 passes), the exact suite-load
+contention family the REPO_SCALE_OVERRIDES registry exists for. Human merge
+of the PR carrying this amendment ratifies exactly three authorities and no
+others:
+
+1. `tests/test_agent_work_packet.py` joins the WP-0D allowed-file list for the
+   two named repeatability repairs only: splitting the six independent AgentOps
+   closeout scenarios in `test_closeout_rejects_each_diff_class_and_packet_swap`
+   into individually budgeted test items, and replacing the
+   environment-dependent hollow-module fixture in
+   `test_negative_control_rejects_hollow_missing_module_collision` (whose
+   `python3 -m pytest` probe result depends on the ambient interpreter's
+   site-packages) with a deterministically absent module. Behavioral coverage
+   must remain identical or stronger; the 10-second item budget is not
+   weakened.
+2. `tests/test_make_onboarding_contract.py` joins the WP-0D allowed-file list
+   for exactly one repair: a `pytest.mark.timeout` repo-scale override on the
+   measured near-budget test above, registered in `REPO_SCALE_OVERRIDES`
+   (`tests/test_fast_suite_isolation.py`) with its causality evidence, per the
+   ratified WP-0D override mechanism (commit 280fc25). No `slow` marker, no
+   global budget change, no other edit to that file.
+3. Both files are admitted into `repository-titanium-hardening-2026-07`
+   ownership in `docs/governance/ACTIVE_TRACK.yaml`, in the same human-merged
+   PR, so the ownership admission and the allowed-file widening cannot drift
+   apart.
+
+This amendment grants no authority over `scripts/governance/run_agent_work_packet.py`
+or any other runtime surface, and does not retire the WP-0D residual; only the
+repair PR's merged-main reverification does that.
 
 **Investigation protocol**
 

@@ -488,6 +488,14 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     )
 
 
+# WP-0D repo-scale override (2026-08-01 amendment): this test spawns real
+# `make` admission subprocesses and passes alone in ~6s, but crosses the
+# blanket fast budget under full-suite load (pytest-timeout in selectors.py
+# after 8,061 passes on 2026-08-01 current main). The override widens THIS
+# test only; the root cause is CPU contention on a fixed-cost test, not a
+# leak or hang. Registered in REPO_SCALE_OVERRIDES
+# (tests/test_fast_suite_isolation.py).
+@pytest.mark.timeout(45)
 def test_make_report_root_rejects_hypothesis_cache_symlink(
     tmp_path: Path,
 ) -> None:

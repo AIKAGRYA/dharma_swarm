@@ -1792,6 +1792,8 @@ active_tracks:
       - tests/test_semgrep_wrapper.py
       - tests/test_uplift_guard_subprocess.py
       - tests/test_fast_suite_isolation.py
+      - tests/test_agent_work_packet.py
+      - tests/test_make_onboarding_contract.py
       - tests/test_diff_applier.py
       - tests/test_sandbox.py
       - tests/test_nats_verification_split.py
@@ -1877,10 +1879,6 @@ active_tracks:
           - verdict
 
     next_items:
-      - id: WP-0D
-        what: "First obtain an approved bounded specification amendment and ownership admission for tests/test_agent_work_packet.py, which is outside WP-0D's ratified allowed-file list. Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios, replace the environment-dependent hollow-module fixture, and prove two consecutive clean make test-fast runs plus make test."
-        kind: code
-        blocker: true
       - id: WP-0F1
         what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
