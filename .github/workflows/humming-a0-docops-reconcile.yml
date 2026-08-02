@@ -1,0 +1,81 @@
+name: humming-a0-docops-reconcile
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: humming-a0-docops-reconcile-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile-parent:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/humming-a0-docops-reconcile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTEST_ADDOPTS: '-p no:cacheprovider'
+      A0_BRANCH: codex/humming-v2-a0-portfolio-admission
+      A0_EXPECTED_HEAD: 328142ce5383c898beed46030c5919d788970f2f
+    steps:
+      - name: Checkout temporary controller branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: codex/humming-a0-docops-reconcile
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install declared dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install '.[dev]'
+
+      - name: Regenerate DocOps from the exact tracked-ledger A0 head
+        run: |
+          set -euo pipefail
+          git fetch origin "${A0_BRANCH}"
+          test "$(git rev-parse origin/${A0_BRANCH})" = "${A0_EXPECTED_HEAD}"
+          target="${RUNNER_TEMP}/humming-a0-docops-parent"
+          git worktree add --detach "${target}" "${A0_EXPECTED_HEAD}"
+          (
+            cd "${target}"
+            python scripts/docops/check_docops_integrity.py \
+              --write-auto-sections --write-manifest-counts
+            python scripts/docops/check_docops_integrity.py
+            git diff --check
+
+            changed="$(git diff --name-only | sort)"
+            expected="$(printf '%s\n' \
+              docs/docops/AUTO_INVENTORY.md \
+              docs/governance/SOVEREIGN_MANIFEST.md \
+              | sort)"
+            printf 'DocOps regenerated paths:\n%s\n' "${changed}"
+            test "${changed}" = "${expected}"
+
+            grep -F '| Markdown files | 1,463 |' docs/docops/AUTO_INVENTORY.md
+            grep -F '| Markdown total lines | 307,450 |' docs/docops/AUTO_INVENTORY.md
+            grep -F '| Authority candidate docs | 662 |' docs/docops/AUTO_INVENTORY.md
+            grep -F '| Markdown files | **1,463** |' docs/governance/SOVEREIGN_MANIFEST.md
+            grep -F '| Markdown total lines | **307,450** |' docs/governance/SOVEREIGN_MANIFEST.md
+
+            git config user.name 'humming-a0-docops[bot]'
+            git config user.email 'humming-a0-docops[bot]@users.noreply.github.com'
+            git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md
+            git diff --cached --check
+            git commit -m 'docs(docops): count tracked Humming A0 ledger'
+            git push \
+              --force-with-lease="refs/heads/${A0_BRANCH}:${A0_EXPECTED_HEAD}" \
+              origin "HEAD:refs/heads/${A0_BRANCH}"
+          )
