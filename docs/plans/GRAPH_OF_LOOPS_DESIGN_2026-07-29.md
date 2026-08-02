@@ -1,13 +1,22 @@
 # Graph of Loops — Grounding Audit + Design (2026-07-29)
 
-**Role:** design doc (proposal). Owns no runtime state, grants no authority.
+**Role:** `working_plan` — a bounded execution plan, per the role vocabulary
+in `docs/AGENTS.md:31-43`. Owns no runtime state, grants no authority.
+**Subordinates to:** `CYBERNETIC_LOOP_MAP.md` (loop-closure truth) and
+`docs/governance/ACTIVE_TRACK.yaml` (portfolio authority). This document
+replaces nothing; where it and either owner disagree, the owner wins and this
+file is the stale one.
 **Produced by:** read-only grounding audit session on branch
 `claude/graph-of-loops-audit-design-eh3lz5` @ `ea190e2` (clean, parity with
 `origin/main`; `make onboard` READY).
 **Method:** every claim below carries a `file:line` citation or a runnable
 command, per the citation-or-silence rule (`CLAUDE.md` §Behavioral Rules).
-Claims about GitHub state come from the GitHub API on 2026-07-29 and are
-labeled as such.
+Negative claims ("X does not exist") carry the command that establishes them
+**and name the scope they were checked against** — a negative verified in
+this checkout is not a claim about every branch, and one such over-claim in
+an earlier draft is corrected in §1 below. Claims about GitHub state come
+from the GitHub API on 2026-07-29, are labeled as such, and are
+point-in-time.
 **Suggested owning track:** `loop-closure-2026-06` (owns
 `CYBERNETIC_LOOP_MAP.md`, `reports/loop_closure/**`; serves
 `substrate-nativeness`). The portfolio is at its WIP ceiling
@@ -20,8 +29,15 @@ work should land as next-items under that track, not as an eleventh track.
 
 ### Apex — GROUNDED as a role qualifier, not a component
 
-There is no `Apex` class, module, or config key anywhere; `apex` never
-appears as a Python identifier. It is a seat description:
+There is no `Apex` class, module, or config key in this checkout, and `apex`
+never appears as a Python identifier — every occurrence is docstring or
+string prose. Verified at `ea190e2`, empty output:
+
+```bash
+git grep -nE '^\s*(def|class)\s+\w*[Aa]pex|^\s*[A-Za-z_]*[Aa]pex[A-Za-z_]*\s*=' -- '*.py'
+```
+
+It is a seat description:
 
 - Dominant usage: "apex holon" = the Sarathi seat.
   `docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md:15` — "Sarathi = apex
@@ -35,9 +51,19 @@ appears as a Python identifier. It is a seat description:
 - Routable alias strings only: `scripts/runtime/codex_composer_wake_loop.py:125-133`
   (`display_name="Sarathi Apex"`, `extra_addresses=("sarathi-apex",
   "apex-holon", "chief-of-staff")`).
-- Dangling: `docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md` is
-  referenced (`reports/governance/worktree_readiness_2026-06-30/promotion_candidates.md:458`)
-  but does not exist on disk or in any branch.
+- Dangling **on the trunk**:
+  `docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md` is referenced
+  (`reports/governance/worktree_readiness_2026-06-30/promotion_candidates.md:458`)
+  but is absent from this checkout and from `origin/main`
+  (`git cat-file -e origin/main:docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md`
+  → exit 1). It is **not** absent from the repository: it was added in
+  `260a1153` and `326b38dc` and still exists on 15 remote branches
+  (`git log --all --oneline --diff-filter=A -- <path>`, then
+  `git branch -r --contains 260a1153`). An earlier draft of this document
+  asserted it existed "in no branch"; that assertion was false — it was a
+  main-only check reported as a repository-wide negative, and it is corrected
+  here. Anyone reviving the apex line should read those branch copies before
+  writing a new spec.
 
 ### Holon system — GROUNDED (code); "holarchy" — UNGROUNDED (prose only)
 
@@ -56,9 +82,20 @@ Implemented, tested runtime primitives:
   (`dharma_swarm/holon_system/__init__.py:1-7`), enforced by
   `tests/test_holon_system_imports.py:69`.
 
-Not implemented: composition. There is no `HolonType` enum, no
-parent/child field anywhere in Python; the only composition object is a flat
-4-name tuple, `dharma_swarm/holon_system/sarathi/roster.py:7`. The named
+Not implemented: **holon** composition. There is no `HolonType` enum
+(`git grep -n HolonType -- '*.py'` → empty) and no parent/child field on any
+holon object; the only holon composition object is a flat 4-name tuple,
+`dharma_swarm/holon_system/sarathi/roster.py:7`. This is a claim about the
+holon layer only. A governed recursive substrate **does** exist elsewhere and
+must not be duplicated: `FractalRoom.parent_id`
+(`dharma_swarm/fractal/fractal_room.py:111`), `RoomRegistry.children` /
+`children_of` (`:506,:529`), and `RoomRegistry.spawn_child` (`:591`) with
+depth and budget validation plus inherited controls, exposed publicly as
+`RoomBridge.spawn_child` (`dharma_swarm/fractal/room_bridge.py:123`). The
+configured hierarchy already nests `revenue-wedge` and `agentops` under
+`core-ops` (`dharma_swarm/fractal/room_configs.py:67,140,179-181`). Any
+holon-composition work should adopt or bridge that substrate rather than
+re-implement it. The named
 "apex holon contract" files (`~/.dharma/agents/sarathi/HOLARCHY_CONTRACT.md`,
 `SUB_HOLON_ROSTER.yaml`, per `docs/sarathi_apex_build/05_SARATHI_APEX_MAP.md:45-52`)
 do not exist in this checkout or the repo. "Holarchy" appears only in prose
@@ -335,11 +372,15 @@ review/merge). The spec therefore runs entirely on GitHub surfaces:
    the kill-switch (§5) fails closed on missing signal only in the sense
    that no operator act ⇒ nothing merges.
 
-Open operator decision (flagged, not assumed): whether lane PRs, once
-flipped ready, may be executed by Mike's arm (label `automerge`) or must be
-tapped merged by hand. Both keep the human decision ahead of the merge; the
-first trades a second tap for reliance on `MERGEMASTERMIKE_PAT`
-(`automerge.yml:85`).
+Operator decision — **SETTLED 2026-07-29; this section asks nothing of the
+operator.** The ruling is DOOR = AUTO_WITH_DECORRELATED_REVIEW, recorded in
+`docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md:22-35`:
+lane PRs, once flipped ready, may be executed by Mike's arm (label
+`automerge`) for eligible Tier 0-1 changes, while Tier 2 stays operator
+hand-merge. The tradeoff accepted with that ruling is reliance on
+`MERGEMASTERMIKE_PAT` (`automerge.yml:85`). The reasoning is retained here
+because it explains a policy now enforced elsewhere — the enforcement, not
+this paragraph, is authoritative.
 
 ---
 
@@ -378,16 +419,34 @@ hot-path (`pr_merge_control.py:94-109`), so every step binds a work packet
   producing and says so in the brief (no silent queue growth — mirrors
   `bot-pr-limit.yml` which already exists for bot PR ceilings).
 
-**Kill-switch mechanism:** one tracked file
-(`docs/ops/loop_control/KILLSWITCH`); every lane workflow's first step is
-`test ! -f docs/ops/loop_control/KILLSWITCH || exit 0`. Creating it from a
-phone via the GitHub web editor stops every lane within one schedule tick;
-deleting it resumes. The file lives on the frozen list (§3.2) so no lane can
-remove it. This adapts the existing local convention (`agent_loop.sh:16`
-loops until `~/.dharma/.STOP`; `holon_killswitch.py`) to the cloud substrate.
-Note the tradeoff honestly: create/delete of this file is itself a commit to
-main by the operator — that is acceptable because it is operator-initiated
-and content-free.
+**Kill-switch mechanism (corrected 2026-08-02 to match what PR-B actually
+shipped — the original sketch below was wrong in a way that could have left
+automation running):** one tracked file, `docs/ops/loop_control/KILLSWITCH`,
+**on the dedicated `loop-control` branch, NOT on `main`.** Every guarded
+workflow's first step queries it by ref:
+
+```
+repos/<owner>/<repo>/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control
+```
+
+(`automerge.yml:97`, `codex-mention-router.yml:58`,
+`merge-master-mike-backlog.yml:86`, `loop-watcher.yml:51,134`). Present ⇒ the
+guard exits non-zero, so a halted lane shows **red with "HALTED BY
+KILLSWITCH"** rather than silently green; absent (404 on file or branch) ⇒
+proceed; any other API error ⇒ fail closed. Contract:
+`docs/ops/loop_control/README.md:1-32`.
+
+**Creating this file on `main` halts nothing.** The supported operator path
+is the phone-dispatchable `loop-emergency-stop` workflow to engage and
+`loop-resume` (confirmation string `resume`) to release
+(`docs/ops/loop_control/README.md:24-32`). The original design sketched a
+single file on `main` guarded by `test ! -f ... || exit 0`; that was
+superseded during PR-B because `main` is branch-protected and an emergency
+write cannot wait for a PR. The superseded form is recorded here only so the
+change is legible — do not follow it. This still adapts the existing local
+convention (`agent_loop.sh:16` loops until `~/.dharma/.STOP`;
+`holon_killswitch.py`) to the cloud substrate, and the surface stays Tier 2:
+operator hand-merge, no automation may modify it.
 
 ---
 
