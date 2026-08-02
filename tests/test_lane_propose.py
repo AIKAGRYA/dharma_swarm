@@ -24,6 +24,68 @@ def _args(tmp_path: Path) -> list[str]:
             "--bundle", str(tmp_path / "d.bundle")]
 
 
+def _intercept(monkeypatch, handler) -> None:
+    """Route lane_propose's subprocess calls through `handler` first.
+
+    Patched at the subprocess layer, not at `_run`/`_git`: those call each
+    other, so patching them recurses.
+    """
+    real_run = subprocess.run
+
+    def dispatch(cmd, *args, **kwargs):
+        verdict = handler(cmd, kwargs)
+        if verdict is not None:
+            return verdict
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(lane_propose.subprocess, "run", dispatch)
+
+
+def _lane_repo_with_stub_agent(tmp_path: Path, monkeypatch,
+                               script: str) -> Path:
+    """A seeded repo and a real on-disk agent binary running `script`.
+
+    Returns the GITHUB_OUTPUT path, so a caller can assert on the job output
+    as well as the receipt. The agent is a real executable rather than a
+    patched subprocess so `main()` exercises its actual argv/stdin path.
+    """
+    repo = tmp_path / "r"
+    repo.mkdir()
+    for cmd in (["git", "init", "-q", "-b", "main"],
+                ["git", "config", "user.email", "t@example.com"],
+                ["git", "config", "user.name", "t"],
+                ["git", "config", "commit.gpgSign", "false"]):
+        subprocess.run(cmd, cwd=repo, check=True)
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+    monkeypatch.chdir(repo)
+
+    outputs = tmp_path / "gh_output"
+    outputs.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(outputs))
+    monkeypatch.setenv("DHARMA_LANE_AGENT_CMD", "claude")
+    monkeypatch.setattr(lane_propose, "open_lane_drafts", lambda repo_: [])
+    monkeypatch.setattr(lane_propose, "select_target",
+                        lambda repo_: dict(TARGET))
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    agent = fake_bin / "fake-agent"
+    agent.write_text(
+        "#!/bin/sh\n"
+        "cat > /dev/null\n"                       # consume the prompt on stdin
+        "mkdir -p dharma_swarm\n" + script,
+        encoding="utf-8",
+    )
+    agent.chmod(0o755)
+    monkeypatch.setattr(lane_propose, "AGENT_COMMANDS", {"claude": [str(agent)]})
+    # `make test-fast` stands in as a green run; the suite itself is not
+    # under test here.
+    monkeypatch.setattr(lane_propose, "MAKE_BIN", "/bin/true")
+    return outputs
+
+
 def test_receipt_writes_schema_and_payload(tmp_path: Path) -> None:
     out = tmp_path / "r.json"
     lane_propose.receipt({"status": "NO_WORK", "reason": "x"}, out)
@@ -268,6 +330,134 @@ def test_an_unmeasurable_staged_diff_blocks_rather_than_claiming_no_diff(
                         if args and args[0] == "diff"
                         else subprocess.CompletedProcess(args, 0, "", ""))
     assert lane_propose.diff_line_count() is None
+
+
+def test_a_binary_file_and_a_submodule_are_measured_not_refused(
+        tmp_path: Path, monkeypatch) -> None:
+    """The negative control for the malformed-numstat refusal below.
+
+    `-` is not a parse failure. git prints it for content it cannot count in
+    lines, and refusing it would make the lane BLOCK on any change that
+    touches a binary file. Measured on git 2.43:
+
+        git diff --cached --no-renames --numstat
+            -\t-\tb.bin
+            1\t0\tt.txt
+
+    The `ls-tree --long` twin nearly cost more: a `-r` listing still yields
+    gitlink entries, and their size column is `-` as well —
+
+        160000 commit 6a755cf8...       -\tmysub
+
+    so a size rule of "digits or refuse" would have turned every repository
+    with a submodule into a REFUSED delivery. Written before the parser was,
+    not after.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+
+    (repo / "b.bin").write_bytes(bytes(range(256)) * 8)
+    (repo / "t.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+
+    # The binary scores zero (MAX_CHANGED_BLOB_BYTES is what bounds it), the
+    # text file scores its one line, and neither is unmeasurable.
+    assert lane_propose.diff_line_count() == 1
+
+
+def test_an_unparseable_numstat_record_is_unmeasurable_not_undercounted(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for a cap that reported the marks it happened to like.
+
+    Greptile's reproduction on #1200: a real 650-line staged file paired with
+    `1\tNOT_A_NUMBER\tgenerated/change.py` measured as ONE line and emitted
+    READY_TO_DELIVER past the 600-line cap, because the parse loop skipped
+    every non-digit cell in silence. An unreadable exit code already refused;
+    an unreadable OUTPUT did not.
+
+    Two things this test deliberately does not claim. Real git cannot emit
+    such a record — counts are decimal and tab-bearing paths are C-quoted, so
+    the first two fields are always the count pair; it is reachable only by
+    replacing the resolved `git` binary, the documented-unfixable residual of
+    #1162. And READY_TO_DELIVER is a proposal, not a delivery: the trusted job
+    re-measures with its own git on its own runner
+    (`lane_deliver.numstat_lines`, refused at MAX_DIFF_LINES), and never reads
+    this number. So this closes the FIRST gate, not the last one.
+    """
+    outputs = _lane_repo_with_stub_agent(
+        tmp_path, monkeypatch,
+        # 650 real lines, well past MAX_DIFF_LINES.
+        "seq 650 | sed 's/^/x = /' > dharma_swarm/fix.py\n")
+
+    def handler(cmd, kwargs):
+        if "--numstat" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 0, "1\tNOT_A_NUMBER\tdharma_swarm/fix.py\n", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code = lane_propose.main(_args(tmp_path))
+    stored = json.loads((tmp_path / "r.json").read_text())
+    assert code == 1, stored
+    assert stored["status"] == "BLOCKED", stored
+    assert "could not measure the staged diff" in stored["reason"], stored
+    assert "READY_TO_DELIVER" not in outputs.read_text()
+    assert not (tmp_path / "d.bundle").exists(), (
+        "an unmeasurable change must not be handed to the delivery phase")
+
+    # And the parser itself, on each shape, so the rule is pinned rather than
+    # inferred from one end-to-end run.
+    assert lane_propose.numstat_record_lines(["1", "2", "p"]) == 3
+    assert lane_propose.numstat_record_lines(["-", "-", "p"]) == 0
+    assert lane_propose.numstat_record_lines(["1", "NOT_A_NUMBER", "p"]) is None
+    assert lane_propose.numstat_record_lines(["1", "2"]) is None, (
+        "a truncated record is malformed too")
+
+
+def test_an_unreadable_restage_listing_is_not_blamed_on_the_test_run(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for a checked-but-not-propagated exit code (Devin, #1200).
+
+    `_stageable()` read `git ls-files`' return code and then degraded on
+    failure instead of refusing: `tracked` stayed empty, so every INDEX-ONLY
+    path — a rename source, a staged deletion — was filtered out. At the
+    post-test re-stage that is most of the set, because `git reset -q HEAD --`
+    has just moved it there. `git add` then succeeded over a partial set,
+    `post_test_tree` diverged from `measured_tree`, and the run reported "the
+    test run altered the measured content" about a staging-infrastructure
+    failure it could have named exactly.
+
+    This is why the AST gate below now demands more than the word
+    `returncode`: the old code inspected it and still fell through.
+
+    The listing is failed on its SECOND call only — the first staging pass
+    must succeed, or the run never reaches the re-stage and the test would
+    pass for the wrong reason.
+    """
+    outputs = _lane_repo_with_stub_agent(
+        tmp_path, monkeypatch, "printf 'x = 1\\n' > dharma_swarm/fix.py\n")
+    seen = {"ls_files": 0}
+
+    def handler(cmd, kwargs):
+        if "ls-files" in cmd:
+            seen["ls_files"] += 1
+            if seen["ls_files"] > 1:
+                return subprocess.CompletedProcess(
+                    cmd, lane_propose.EXIT_TIMEOUT, b"", b"timed out")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code = lane_propose.main(_args(tmp_path))
+    stored = json.loads((tmp_path / "r.json").read_text())
+    assert seen["ls_files"] > 1, "the run never reached the post-test re-stage"
+    assert code == 1, stored
+    assert stored["status"] == "BLOCKED", stored
+    assert "staging-infrastructure failure" in stored["reason"], stored
+    assert "altered the measured content" not in stored["reason"], (
+        "an unreadable listing must not be reported as test-run drift")
+    assert "READY_TO_DELIVER" not in outputs.read_text()
 
 
 def test_an_unreadable_status_listing_blocks_rather_than_claiming_no_change(
@@ -775,42 +965,8 @@ def test_bundle_handoff_is_written_and_status_is_emitted(
         tmp_path: Path, monkeypatch) -> None:
     """End-to-end on the propose side with a stub agent: a real bundle lands
     at the requested path and the job output says READY_TO_DELIVER."""
-    repo = tmp_path / "r"
-    repo.mkdir()
-    for cmd in (["git", "init", "-q", "-b", "main"],
-                ["git", "config", "user.email", "t@example.com"],
-                ["git", "config", "user.name", "t"],
-                ["git", "config", "commit.gpgSign", "false"]):
-        subprocess.run(cmd, cwd=repo, check=True)
-    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
-    monkeypatch.chdir(repo)
-
-    outputs = tmp_path / "gh_output"
-    outputs.write_text("", encoding="utf-8")
-    monkeypatch.setenv("GITHUB_OUTPUT", str(outputs))
-    monkeypatch.setenv("DHARMA_LANE_AGENT_CMD", "claude")
-    monkeypatch.setattr(lane_propose, "open_lane_drafts", lambda repo_: [])
-    monkeypatch.setattr(lane_propose, "select_target", lambda repo_: dict(TARGET))
-
-    # A real agent binary on disk, exercising the real argv/stdin path rather
-    # than a patched subprocess: it writes one file, like a hardening agent.
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    agent = fake_bin / "fake-agent"
-    agent.write_text(
-        "#!/bin/sh\n"
-        "cat > /dev/null\n"                       # consume the prompt on stdin
-        "mkdir -p dharma_swarm\n"
-        "printf 'x = 1\\n' > dharma_swarm/fix.py\n",
-        encoding="utf-8",
-    )
-    agent.chmod(0o755)
-    monkeypatch.setattr(lane_propose, "AGENT_COMMANDS", {"claude": [str(agent)]})
-    # `make test-fast` stands in as a green run; the suite itself is not
-    # under test here.
-    monkeypatch.setattr(lane_propose, "MAKE_BIN", "/bin/true")
+    outputs = _lane_repo_with_stub_agent(
+        tmp_path, monkeypatch, "printf 'x = 1\\n' > dharma_swarm/fix.py\n")
 
     code = lane_propose.main(_args(tmp_path))
     stored = json.loads((tmp_path / "r.json").read_text())

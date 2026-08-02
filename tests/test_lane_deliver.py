@@ -1151,6 +1151,230 @@ def test_every_gate_input_checks_its_return_code() -> None:
         f"returncode, so an unreadable input reads as permissive: {offenders}")
 
 
+def _returncode_success_test(test: ast.expr) -> bool:
+    """True if `test` asks `<something>.returncode == 0`."""
+    for node in ast.walk(test):
+        if not isinstance(node, ast.Compare):
+            continue
+        if not (isinstance(node.left, ast.Attribute)
+                and node.left.attr == "returncode"):
+            continue
+        if (len(node.ops) == 1 and isinstance(node.ops[0], ast.Eq)
+                and len(node.comparators) == 1
+                and isinstance(node.comparators[0], ast.Constant)
+                and node.comparators[0].value == 0):
+            return True
+    return False
+
+
+def _terminates(body: list[ast.stmt]) -> bool:
+    """True if the block cannot fall through to the code after it."""
+    if not body:
+        return False
+    last = body[-1]
+    if isinstance(last, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+        return True
+    if isinstance(last, ast.If):        # both arms must terminate
+        return _terminates(last.body) and _terminates(last.orelse)
+    return False
+
+
+def test_a_checked_return_code_is_also_propagated() -> None:
+    """The blind spot in the gate above, named by Devin on #1200.
+
+    That test asks whether `returncode` is INSPECTED. `_stageable()` inspected
+    it — `if listed.returncode == 0:` — and then fell through on failure with
+    an empty result set, so an unreadable `git ls-files` silently dropped
+    every index-only path and the run blamed the test suite for the divergence
+    it caused itself. The word was present; the handling was not.
+
+    So the success-arm shape has to earn its keep. `if x.returncode == 0:`
+    is only safe when failure cannot reach the code below it: either the arm
+    terminates (both current instances `return` from inside it) or an explicit
+    `else` handles the failure. A guard that merely skips the success work and
+    continues is a degradation wearing a check's clothes.
+
+    What this still cannot prove: that the `!= 0` arms REFUSE rather than
+    log-and-continue. That is a semantic question about each receipt, and it
+    is covered by the behavioural tests above, one refusal at a time — not by
+    this walk.
+    """
+    offenders: list[str] = []
+    for module in ("lane_deliver.py", "lane_propose.py"):
+        source = (REPO_ROOT / "scripts" / "runtime" / module).read_text()
+        for node in ast.walk(ast.parse(source)):
+            if not isinstance(node, ast.If):
+                continue
+            if not _returncode_success_test(node.test):
+                continue
+            if node.orelse or _terminates(node.body):
+                continue
+            offenders.append(f"{module}:{node.lineno}")
+
+    assert not offenders, (
+        "these guard the SUCCESS arm on returncode and then fall through on "
+        "failure, so an unreadable input degrades silently instead of "
+        f"refusing: {offenders}")
+
+
+def test_an_inline_runner_call_is_named_rather_than_invisible() -> None:
+    """The other way past the gate: never bind the result at all.
+
+    `_git([...]).stdout.strip()` is not an Assign-of-a-Call, so the walk above
+    never reaches it and its exit code is unexaminable by construction. Each
+    of these is safe today for the SAME reason — the extracted string is
+    refuted on emptiness at the very next statement, and `_run` synthesizes
+    empty stdout for both 127 and 124 — but "safe by a convention nobody
+    checks" is what this PR keeps finding. Counting them turns a new one into
+    a failing test rather than a reviewer's job.
+
+    Reasons, one per CALL SITE rather than one per function — an exemption
+    argued at the wrong granularity is how the gate above went wrong once
+    already:
+      lane_propose rev-parse  (1) base_commit  -> `if not base_commit`
+      lane_propose write-tree (1) measured_tree-> `if not measured_tree`
+      lane_propose write-tree (2) post_test_tree
+                                  -> compared against measured_tree, and ""
+                                     never equals a real tree hash
+      lane_deliver rev-parse  (1) head_sha
+                                  -> `if not head_sha or head_sha !=
+                                     claimed_sha`
+      lane_deliver rev-parse  (2) base_sha     -> `if not base_sha`
+      lane_deliver rev-parse  (3) parent       -> `if not parent`
+      lane_deliver rev-list   (1) count        -> `if count != "1"`
+    """
+    allowed = {
+        ("lane_propose.py", "rev-parse"): 1,
+        ("lane_propose.py", "write-tree"): 2,
+        ("lane_deliver.py", "rev-parse"): 3,
+        ("lane_deliver.py", "rev-list"): 1,
+    }
+    runners = {"_git", "_run", "_run_bytes"}
+    found: dict[tuple[str, str], int] = {}
+    for module in ("lane_deliver.py", "lane_propose.py"):
+        source = (REPO_ROOT / "scripts" / "runtime" / module).read_text()
+        tree = ast.parse(source)
+        bound = {id(node.value) for node in ast.walk(tree)
+                 if isinstance(node, (ast.Assign, ast.Expr))
+                 and isinstance(node.value, ast.Call)}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if getattr(node.func, "id", "") not in runners or id(node) in bound:
+                continue
+            elts = (node.args[0].elts if node.args
+                    and isinstance(node.args[0], ast.List) else [])
+            # The first string LITERAL, not the first element: `_run([GH_BIN,
+            # "pr", "list", ...])` leads with a Name, and keying on element
+            # zero would have skipped every `gh` call as unrecognised — a hole
+            # in the gate itself, of exactly the kind it exists to close.
+            token = next((e.value for e in elts
+                          if isinstance(e, ast.Constant)
+                          and isinstance(e.value, str)), None)
+            if token is None:
+                continue        # `_run([GIT_BIN, *args])` inside _git itself
+            key = (module, token)
+            found[key] = found.get(key, 0) + 1
+
+    assert found == allowed, (
+        "an inline runner call cannot have its returncode inspected, so each "
+        "one is counted here with the emptiness check that stands in for it; "
+        f"expected {allowed}, found {found}")
+
+
+def test_an_unparseable_numstat_record_refuses_on_the_governing_side(
+        lane, tmp_path, monkeypatch) -> None:
+    """Greptile reported this against the propose-side parser; this is the
+    copy that actually stands between an oversized change and `main`.
+
+    Delivery re-measures with its own git on its own runner and never reads
+    the proposing phase's number, so `numstat_lines()` is the enforcing ruler.
+    Skipping a cell it could not parse made the total SMALLER — the one
+    direction a cap must never be wrong in.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/big.py":
+                                       "".join(f"x{i} = 1\n"
+                                               for i in range(650))})
+
+    def handler(cmd, kw):
+        if "--numstat" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 0, "1\tNOT_A_NUMBER\tdharma_swarm/big.py\n", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "changed lines" in stored["reason"], stored["reason"]
+
+    # The record shapes, pinned. `-` is git's binary marker and a real answer;
+    # the others are records the parser does not understand.
+    assert lane_deliver.numstat_record_lines(["12", "3", "p"]) == 15
+    assert lane_deliver.numstat_record_lines(["-", "-", "p"]) == 0
+    assert lane_deliver.numstat_record_lines(["1", "x", "p"]) is None
+    assert lane_deliver.numstat_record_lines(["1", "2"]) is None
+
+
+def test_a_binary_blob_and_a_gitlink_are_measured_not_refused(
+        lane, tmp_path) -> None:
+    """The negative control for both `-` rules, on real git output.
+
+    Refusing a non-numeric size field outright would have been the obvious
+    fix and a bad one: `git ls-tree -r --long` prints `-` for a gitlink, so
+    every repository carrying a submodule would have become a REFUSED
+    delivery. Measured on git 2.43:
+
+        160000 commit 6a755cf8...       -\tmysub
+        100644 blob   e57fd5b4...    2048\tb.bin
+
+    and the numstat twin prints `-\t-\tb.bin` for the same blob. Both are
+    answers, not parse failures.
+    """
+    binary = "\0" * 4096           # a NUL makes git call it binary
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n",
+                                       "dharma_swarm/data.bin": binary})
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 0, stored
+    assert stored["status"] == "VERIFIED_DRY_RUN", stored
+    # The binary contributes `-\t-` and scores zero lines, so only ok.py is
+    # counted — the split of labour the byte ceiling exists to complete.
+    assert stored["diff_lines"] == 1, stored
+    assert stored["changed_files"] == 2, stored
+    # And the ceiling charged its real bytes rather than dropping the entry.
+    assert lane_deliver.changed_blob_bytes(stored["parent"],
+                                           stored["commit"]) >= 4096
+
+
+def test_an_unparseable_ls_tree_size_cannot_shrink_the_blob_ceiling(
+        lane, tmp_path, monkeypatch) -> None:
+    """Third instance of the same shape, swept rather than reported.
+
+    `entries()` already refused a non-zero `ls-tree` exit. It still dropped
+    any entry whose size field it could not parse, and a dropped entry charges
+    nothing — so the ceiling that exists precisely because binary content is
+    invisible to the line cap could be talked down by malformed output.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if "ls-tree" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 0,
+                "100644 blob 0123456789abcdef0123456789abcdef01234567    "
+                "NOT_A_SIZE\tdharma_swarm/ok.py\0", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "blob bytes" in stored["reason"], stored["reason"]
+
+    _intercept(monkeypatch, handler)
+    assert lane_deliver.changed_blob_bytes("HEAD~1", "HEAD") is None
+
+
 def test_an_unlistable_path_set_cannot_zero_the_blob_ceiling(
         lane, tmp_path, monkeypatch) -> None:
     """Regression for a fail-open my own EXEMPTION created (Devin on #1200).

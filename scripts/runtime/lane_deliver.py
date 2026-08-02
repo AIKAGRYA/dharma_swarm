@@ -227,6 +227,35 @@ def denied_paths(paths: list[str]) -> list[str]:
     return sorted(bad)
 
 
+def numstat_record_lines(parts: list[str]) -> int | None:
+    """Added+removed for ONE `--numstat` record, or None if it is not one.
+
+    git emits exactly two shapes: two decimal counts, or `-\t-` for content it
+    cannot measure in lines. `-` is a real answer meaning "binary" — it
+    correctly scores zero, and MAX_CHANGED_BLOB_BYTES is what bounds that
+    content. Anything else is a record this parser does not understand, and
+    skipping it silently subtracts from the measured total instead of
+    refusing (Greptile on #1200, reported against the propose-side copy).
+
+    Deliberately duplicated rather than imported from `lane_propose`: the two
+    phases run as separate jobs on separate runners precisely so that nothing
+    the untrusted side defines is load-bearing here. Sharing this parser would
+    reintroduce the coupling the split exists to remove.
+    """
+    # Three fields, not two: a numstat record is `add\trem\tpath`, and a
+    # truncated record is exactly the malformed input this refuses.
+    if len(parts) < 3:
+        return None
+    total = 0
+    for cell in parts[:2]:
+        if cell == "-":
+            continue
+        if not cell.isdigit():
+            return None
+        total += int(cell)
+    return total
+
+
 def numstat_lines(base: str, head: str) -> int | None:
     """Changed lines, counting a rename as the delete plus the add it is.
 
@@ -257,11 +286,16 @@ def numstat_lines(base: str, head: str) -> int | None:
         return None
     total = 0
     for line in result.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2:
-            for cell in parts[:2]:
-                if cell.isdigit():
-                    total += int(cell)
+        if not line:
+            continue
+        counted = numstat_record_lines(line.split("\t"))
+        if counted is None:
+            # Unmeasurable, not zero. Greptile reported the propose-side twin
+            # of this loop; this is the copy that GOVERNS, because delivery
+            # re-measures and the propose number is never consulted here.
+            # (#1200.)
+            return None
+        total += counted
     return total
 
 
@@ -355,8 +389,21 @@ def changed_blob_bytes(base: str, head: str) -> int | None:
                 continue
             meta, _, path = entry.partition("\t")
             fields = meta.split()
-            if len(fields) >= 4 and fields[3].isdigit():
-                out[path] = (fields[2], int(fields[3]))
+            # `<mode> <type> <oid>\t<size>` under --long; the size is `-` for
+            # anything that is not a blob (a `-r` listing still yields gitlink
+            # `commit` entries), which charges nothing and is correct.
+            if len(fields) < 4:
+                return None
+            if fields[3] == "-":
+                continue
+            if not fields[3].isdigit():
+                # Third instance of the shape Greptile named in the propose
+                # numstat parser: an unreadable field skipped silently makes
+                # the total SMALLER, so the ceiling it feeds cannot fire. The
+                # exit code was already refused here; the same rule now
+                # applies to the bytes that exit code delivered. (#1200.)
+                return None
+            out[path] = (fields[2], int(fields[3]))
         return out
 
     head_entries = entries(head)

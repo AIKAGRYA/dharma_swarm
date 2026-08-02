@@ -457,7 +457,7 @@ def agent_changed_paths() -> list[str] | None:
     return sorted(set(paths))
 
 
-def _stageable(paths: list[str]) -> list[str]:
+def _stageable(paths: list[str]) -> list[str] | None:
     """The subset `git add` will accept: present in the worktree or the index.
 
     A porcelain R/C record only appears once the rename is ALREADY staged, so
@@ -474,11 +474,19 @@ def _stageable(paths: list[str]) -> list[str]:
     deletion half of the rename. So the filter belongs here, at the call, not
     in the recorded set.
     """
-    tracked: set[str] = set()
     listed = _run_bytes([GIT_BIN, "ls-files", "-z", "--", *paths])
-    if listed.returncode == 0:
-        tracked = {os.fsdecode(part) for part in listed.stdout.split(b"\0")
-                   if part}
+    if listed.returncode != 0:
+        # None, not an empty `tracked` set. Checking the code was never the
+        # point — PROPAGATING the failure is. An unreadable listing silently
+        # dropped every index-only path (rename sources, staged deletions),
+        # so the post-test re-stage added a partial set, the trees diverged,
+        # and the run reported "the test run altered the measured content"
+        # about a staging-infrastructure failure. (Devin on #1200.)
+        print(f"could not list tracked paths: {listed.stderr[-400:]!r}",
+              file=sys.stderr)
+        return None
+    tracked = {os.fsdecode(part) for part in listed.stdout.split(b"\0")
+               if part}
     # `lexists`, not `exists`: the predicate has to match what `git add`
     # ACCEPTS, and `Path.exists()` follows symlinks. A freshly created
     # dangling symlink therefore read as absent and was filtered out of the
@@ -510,6 +518,8 @@ def stage_agent_changes() -> list[str] | None:
     if not paths:
         return []
     stageable = _stageable(paths)
+    if stageable is None:
+        return None
     if stageable:
         added = _git(["add", "--", *stageable])
         if added.returncode != 0:
@@ -518,6 +528,46 @@ def stage_agent_changes() -> list[str] | None:
     # Both sides are returned: the post-test re-stage needs the rename source
     # to reproduce the deletion after `git reset`.
     return paths
+
+
+def numstat_record_lines(parts: list[str]) -> int | None:
+    """Added+removed for ONE `--numstat` record, or None if it is not one.
+
+    git emits exactly two shapes: two decimal counts, or `-\t-` for content it
+    cannot measure in lines. `-` is a real answer, not a parse failure — it
+    means "binary", it correctly scores zero here, and the blob-byte ceiling
+    is what bounds that content instead. ANYTHING else is a record this parser
+    does not understand.
+
+    The old loop skipped every non-digit cell silently, so an unparseable
+    record simply reduced the total: Greptile paired a real 650-line staged
+    file with `1\tNOT_A_NUMBER\tgenerated/change.py` and measured the pair as
+    one line (#1200). A ruler that cannot read a mark must say so, not report
+    the marks it happened to like — the same rule already applied to a
+    non-zero exit, applied one level down to the output.
+
+    Scope, stated honestly: real git cannot produce this. Counts are decimal
+    and a path containing a tab is C-quoted, so the first two fields are
+    always the count pair. It is reachable only by an agent that replaces the
+    resolved `git` binary — the documented-unfixable residual of #1162 — and
+    the answer to THAT is the trust split, not this function: the delivery job
+    re-measures on its own runner (`lane_deliver.numstat_lines`, enforced at
+    the MAX_DIFF_LINES refusal) and never consults this number. So this is
+    fail-closed hygiene on the first gate, not the thing standing between an
+    oversized change and `main`.
+    """
+    # Three fields, not two: a numstat record is `add\trem\tpath`, and a
+    # truncated record is exactly the malformed input this refuses.
+    if len(parts) < 3:
+        return None
+    total = 0
+    for cell in parts[:2]:
+        if cell == "-":
+            continue
+        if not cell.isdigit():
+            return None
+        total += int(cell)
+    return total
 
 
 def diff_line_count() -> int | None:
@@ -549,11 +599,14 @@ def diff_line_count() -> int | None:
         return None
     total = 0
     for line in result.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2:
-            for cell in parts[:2]:
-                if cell.isdigit():
-                    total += int(cell)
+        if not line:
+            continue
+        counted = numstat_record_lines(line.split("\t"))
+        if counted is None:
+            print(f"unparseable numstat record: {line[:200]!r}",
+                  file=sys.stderr)
+            return None
+        total += counted
     return total
 
 
@@ -804,7 +857,14 @@ def main(argv: list[str] | None = None) -> int:
     # And the return code has to be READ, or the abort is invisible and the
     # tree comparison blames the test suite for it. (Devin on #1200.)
     if staged:
-        restage = _git(["add", "--", *_stageable(staged)])
+        restageable = _stageable(staged)
+        if restageable is None:
+            return done("BLOCKED", {
+                "target": target,
+                "reason": "could not list tracked paths for the re-stage; "
+                          "this is a staging-infrastructure failure, not "
+                          "test-run drift"}, 1)
+        restage = _git(["add", "--", *restageable])
         if restage.returncode != 0:
             return done("BLOCKED", {
                 "target": target,
