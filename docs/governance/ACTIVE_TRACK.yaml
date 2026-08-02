@@ -554,9 +554,11 @@ active_tracks:
           owner criterion, missing causal field, aggregate-count substitution,
           or unreviewed promotion. P4 later populates
           reports/loop_closure/humming_v2_named_milestones.json only after the
-          applicable P3/host evidence exists. Target closure: CHECKED criteria
-          contract only. Non-goal: no five-of-thirteen target, early receipt,
-          or aggregate production-readiness claim.
+          applicable P3/host evidence exists. Target closure: VERIFIED_SLICE
+          for the criteria contract only; its enforcement claim remains
+          CHECKED until the later owner evidence exists. Non-goal: no
+          five-of-thirteen target, early receipt, or aggregate
+          production-readiness claim.
         kind: governance
         blocker: true
       - id: humming-v2-p3-l2-loop-ack
@@ -610,8 +612,9 @@ active_tracks:
           organism-rewire host evidence merged at exact heads. Completion:
           every path is classified, two clean exact-head falsifier passes find
           no unresolved P0/P1 or unexplained P2, and any unproved loop remains
-          below CLOSED_LIVE. Target closure: owner-specific only. Non-goal: no
-          aggregate CLOSED_LIVE count or grep-only causality claim.
+          below CLOSED_LIVE. Target closure: CLOSED_NOT_PROD for this
+          owner-scoped evidence item. Non-goal: no aggregate CLOSED_LIVE count
+          or grep-only causality claim.
         kind: governance
         blocker: true
 
@@ -792,6 +795,7 @@ active_tracks:
           fixtures cannot establish production parity, and arena evidence
           cannot authorize the graph promotion it evaluates. Cross-track
           execution and file owner: dharmagraph-engine-2026-07. Target closure:
+          VERIFIED_SLICE for the custody acknowledgement. Enforcement target:
           CHECKED before any scoped RUNTIME_BLOCKING promotion.
         kind: governance
         blocker: true
@@ -1626,7 +1630,8 @@ active_tracks:
           migration coverage, rollback, and one scoped lane only after parity;
           the legacy bridge receives a dated retirement gate. Cross-track
           acknowledgement: orchestration-arena-v1-2026-06. Target closure:
-          CHECKED before any scoped RUNTIME_BLOCKING promotion.
+          VERIFIED_SLICE for the scoped lane. Enforcement target: CHECKED
+          before any scoped RUNTIME_BLOCKING promotion.
         kind: code
         blocker: true
       - id: humming-v2-p2-agent-node-fencing
@@ -1644,6 +1649,13 @@ active_tracks:
         what: |
           Re-run the frozen DharmaGraph gauntlet only after the macrograph,
           neutral compiler, default-REJECT HITL, and agent-node fencing merge.
+          Existing owner item dharmagraph-engine-2026-07/54 (ASCENT L-D),
+          after its L-C and L-A/L-B prerequisites, must also merge and record
+          the frozen-before-results SHA for
+          docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json
+          before this item becomes executable. This promotion item consumes
+          that V3 rubric and the judge ratifications read-only; it may not mint
+          or edit either owner output.
           Completion: exact candidate SHA, independent judge custody,
           invariant-specific mutations, total score above 58 and LG24 above
           zero, row-level semantic delta, full migration coverage, and
@@ -2096,9 +2108,10 @@ active_tracks:
           P0/P1 or unexplained P2, fresh-clone agreement, executed rollback for
           each consequential slice, exact host evidence for every live claim,
           and no temporary workflow, script, parallel owner, dead caller, or
-          undated compatibility alias. Target closure:
-          OPERATIONALLY_COMPLETE_100_OF_100 only when all controller buckets
-          are full; otherwise record the single exact irreducible gate.
+          undated compatibility alias. Target closure: CLOSED_NOT_PROD.
+          Receipt outcome: OPERATIONALLY_COMPLETE_100_OF_100 only when all
+          controller buckets are full; otherwise record the single exact
+          irreducible gate.
         kind: governance
         blocker: true
     non_goals:
