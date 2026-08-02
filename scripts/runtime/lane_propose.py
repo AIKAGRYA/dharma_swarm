@@ -222,6 +222,13 @@ def agent_env(selector: str = "") -> dict[str, str]:
     }
 
 
+# The delivery side writes exactly one of these per lane PR. Anchored to the
+# line so the free-form task description in the `- Target:` blob below it can
+# never be mistaken for a consumption record (lane_deliver.py builds the
+# matching line; the two must move together).
+CLAIM_RE = re.compile(r"^- Consumption claim: `(\{[^`]*\})`\s*$", re.MULTILINE)
+
+
 def attempted_task_ids(repo: str) -> set[str] | None:
     """Task ids this lane has already delivered a PR for, in ANY state.
 
@@ -265,17 +272,31 @@ def attempted_task_ids(repo: str) -> set[str] | None:
     for row in rows:
         if not str(row.get("headRefName", "")).startswith(LANE_BRANCH_PREFIX):
             continue
-        # `(?:[^"\\]|\\.)*` rather than `[^"]+`: the id is written by
-        # json.dumps on the delivery side, so a value containing a quote
-        # arrives escaped and a naive class would capture a truncated,
-        # non-matching prefix — recording an id that matches no task while
-        # the real one stays "unattempted".
-        for match in re.finditer(r'"task_id"\s*:\s*"((?:[^"\\]|\\.)*)"',
-                                 str(row.get("body", ""))):
+        # Read ONLY the dedicated claim line, not the whole body.
+        #
+        # The body also carries a `- Target:` blob holding the operator's
+        # free-form task description. Scanning everything meant any text that
+        # contained `"task_id": "X"` would record X as attempted, and
+        # select_target() has no way to un-attempt it — permanent starvation
+        # of an unrelated task.
+        #
+        # Measured: that does NOT currently reproduce, because the blob is
+        # written through json.dumps and the embedded quotes arrive escaped
+        # (`\"task_id\"`), which this pattern does not match. But the safety
+        # is incidental — it holds only while every task-derived field
+        # reaches the body via json.dumps, which nothing enforces. Anchoring
+        # to the claim line makes it explicit instead. (Devin on #1200.)
+        #
+        # Strict anchoring costs no compatibility: the lane has never run, so
+        # no lane PR predates this format.
+        for match in CLAIM_RE.finditer(str(row.get("body", ""))):
             try:
-                seen.add(json.loads(f'"{match.group(1)}"'))
+                claimed = json.loads(match.group(1))
             except json.JSONDecodeError:
                 continue
+            task_id = claimed.get("task_id") if isinstance(claimed, dict) else None
+            if isinstance(task_id, str) and task_id:
+                seen.add(task_id)
     return seen
 
 

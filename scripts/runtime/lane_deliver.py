@@ -505,12 +505,25 @@ def main(argv: list[str] | None = None) -> int:
 
     push = _git(["push", "origin", f"{head_sha}:refs/heads/{branch}"])
     if push.returncode != 0:
-        # A timed-out push is AMBIGUOUS: the ref may have landed before the
-        # client gave up. Reporting PUSH_FAILED and walking away would strand
-        # exactly the orphan the rollback below exists to remove. Ask origin
-        # what actually happened rather than trusting the exit code.
+        # A failed push is AMBIGUOUS: the ref may have landed before the
+        # client lost the response. Reporting PUSH_FAILED and walking away
+        # strands exactly the orphan the rollback exists to remove — and an
+        # orphan `lane/hardening-*` is invisible to the open-draft ceiling,
+        # which counts PRs, so every retry accumulates another.
+        #
+        # This probe was gated on EXIT_TIMEOUT while the comment above it
+        # said "ask origin rather than trusting the exit code" — the same
+        # too-narrow gating already fixed for `gh pr create` in this file,
+        # left in place two blocks away. A timeout is not the only failure
+        # that can follow a server-side ref update; a connection reset after
+        # the remote accepts does it too. So: probe on every non-zero.
+        # (Greptile on #1200, matching Devin's finding on the create side.)
+        #
+        # The one exit needing no probe is a missing `git` binary: no process
+        # ran, so nothing can have landed, and the probe would need the same
+        # missing binary to answer.
         landed = ""
-        if push.returncode == EXIT_TIMEOUT:
+        if push.returncode != EXIT_NOT_FOUND:
             listed = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
             if listed.returncode == 0 and listed.stdout.split():
                 landed = listed.stdout.split()[0]

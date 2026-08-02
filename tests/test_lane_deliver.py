@@ -837,6 +837,60 @@ def test_a_long_task_body_still_yields_a_recoverable_consumption_claim(
     assert "T-2026-08-02-alpha" in recovered, captured["body"][:400]
 
 
+def test_a_plain_push_failure_that_actually_landed_is_rolled_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for the push-side twin of the create-side bug (Greptile on
+    #1200).
+
+    A connection reset after the remote accepts the ref exits non-zero and is
+    not 124, so the probe gated on EXIT_TIMEOUT never ran and the receipt
+    said "nothing to roll back" over a branch that exists. An orphan
+    `lane/hardening-*` is invisible to the open-draft ceiling, which counts
+    PRs, so every retry adds another.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    real_run = subprocess.run
+
+    def handler(cmd, kw):
+        # Let the real push land, then report a plain (non-timeout) failure.
+        if "push" in cmd and not any("--force-with-lease" in a for a in cmd):
+            real_run(cmd, **kw)
+            return subprocess.CompletedProcess(
+                cmd, 1, "", "fatal: the remote end hung up unexpectedly")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PUSH_FAILED"
+    assert stored["branch_rollback"] == "deleted under lease"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
+def test_a_push_that_never_landed_has_nothing_to_roll_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """The other side: a push that genuinely failed leaves no ref, so the
+    probe answers honestly rather than inventing a rollback."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if "push" in cmd and not any("--force-with-lease" in a for a in cmd):
+            return subprocess.CompletedProcess(
+                cmd, 1, "", "fatal: protected branch hook declined")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PUSH_FAILED"
+    assert stored["branch_rollback"] == "nothing to roll back"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
     """Source pin for the two operations that reintroduce the PR #1162 class:
     `git add` runs clean filters the agent can define, and a checkout writes

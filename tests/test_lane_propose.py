@@ -215,6 +215,42 @@ def test_a_staged_rename_is_counted_not_collapsed_to_zero(
     assert lane_propose.diff_line_count() >= 1600
 
 
+def test_only_the_dedicated_claim_line_records_consumption(monkeypatch) -> None:
+    """Regression for a fragility Devin raised on #1200.
+
+    The reader used to scan the WHOLE PR body, which also carries a
+    `- Target:` blob holding the operator's free-form task description. Any
+    text containing `"task_id": "X"` would have recorded X as attempted, and
+    `select_target()` cannot un-attempt anything — permanent starvation of an
+    unrelated task.
+
+    Measured: that did NOT reproduce, because the blob goes through
+    json.dumps and the embedded quotes arrive escaped (`\\"task_id\\"`). But
+    the safety was incidental — it held only while every task-derived field
+    reached the body via json.dumps. Anchoring makes it explicit, so an
+    unescaped field appearing later cannot poison the ledger.
+    """
+    claim = json.dumps({"task_id": "T-SELF"}, sort_keys=True)
+    target = {"kind": "mailbox", "task_id": "T-SELF", "summary": "s",
+              "body": 'continue {"task_id": "T-ESCAPED"} please'}
+    body = (
+        "Hardening-lane output\n\n"
+        f"- Consumption claim: `{claim}`\n"
+        f"- Target: `{json.dumps(target)[:400]}`\n"
+        # An UNESCAPED marker, which the old whole-body scan would have taken.
+        '- Note: "task_id": "T-UNESCAPED"\n'
+    )
+    rows = [{"headRefName": "lane/hardening-20260802T120000Z", "body": body}]
+    monkeypatch.setattr(lane_propose, "_run", lambda *a, **k:
+                        subprocess.CompletedProcess(
+                            [], 0, json.dumps(rows), ""))
+
+    seen = lane_propose.attempted_task_ids("o/r")
+    assert seen == {"T-SELF"}, seen
+    assert "T-UNESCAPED" not in seen
+    assert "T-ESCAPED" not in seen
+
+
 def test_a_hung_blob_read_is_a_verdict_not_a_crashed_lane(
         tmp_path: Path, monkeypatch) -> None:
     """Regression for an escape reintroduced by the fix for a different one
@@ -342,7 +378,8 @@ def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:
     Without it the oldest ready task was re-selected forever and newer tasks
     starved behind it."""
     rows = [{"headRefName": "lane/hardening-20260101T000000Z",
-             "body": 'Target: `{"kind": "mailbox", "task_id": "T-1"}`'}]
+             "body": '- Consumption claim: `{"task_id": "T-1"}`\n'
+                     '- Target: `{"kind": "mailbox", "task_id": "T-1"}`'}]
     monkeypatch.setattr(
         lane_propose, "_run",
         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(rows), ""))
@@ -359,7 +396,8 @@ def test_attempt_history_at_the_cap_fails_closed(monkeypatch) -> None:
     """
     monkeypatch.setattr(lane_propose, "ATTEMPT_HISTORY_LIMIT", 3)
     rows = [{"headRefName": f"lane/hardening-2026010{i}T000000Z",
-             "body": f'{{"task_id": "T-{i}"}}'} for i in range(3)]
+             "body": f'- Consumption claim: `{{"task_id": "T-{i}"}}`\n'}
+            for i in range(3)]
     monkeypatch.setattr(
         lane_propose, "_run",
         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(rows), ""))
