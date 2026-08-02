@@ -253,6 +253,22 @@ def test_a_failed_stage_blocks_rather_than_reporting_no_diff(
     assert lane_propose.stage_agent_changes() is None
 
 
+def test_an_unmeasurable_staged_diff_blocks_rather_than_claiming_no_diff(
+        monkeypatch) -> None:
+    """The propose-side twin, found by sweeping rather than reported.
+
+    Here the fail-open is worse than admitting an oversized diff: 0 lines
+    reads as NO_DIFF, so an unreadable measurement writes a whole agent run
+    off as "the agent changed nothing".
+    """
+    monkeypatch.setattr(lane_propose, "_git", lambda args, **kw:
+                        subprocess.CompletedProcess(
+                            args, lane_propose.EXIT_TIMEOUT, "", "timed out")
+                        if args and args[0] == "diff"
+                        else subprocess.CompletedProcess(args, 0, "", ""))
+    assert lane_propose.diff_line_count() is None
+
+
 def test_an_unreadable_status_listing_blocks_rather_than_claiming_no_change(
         monkeypatch) -> None:
     """Regression for the fail-open twin of the `git add` one (Devin, #1200).

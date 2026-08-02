@@ -520,7 +520,7 @@ def stage_agent_changes() -> list[str] | None:
     return paths
 
 
-def diff_line_count() -> int:
+def diff_line_count() -> int | None:
     """Changed lines in the STAGED set, so cap and commit measure the same
     thing (`git diff HEAD` omits untracked files, which let a new-file-only
     change escape the cap entirely).
@@ -537,6 +537,16 @@ def diff_line_count() -> int:
     and had the identical hole, so both move together (#1200).
     """
     result = _git(["diff", "--cached", "--no-renames", "--numstat"])
+    if result.returncode != 0:
+        # None, not 0 — the delivery-side twin of this function had the same
+        # fail-open and Devin reported that one; this one was found by
+        # sweeping every gate input for the pattern rather than fixing only
+        # the instance named. Here it is worse than admitting an oversized
+        # diff: 0 lines reads as NO_DIFF, so an unreadable measurement writes
+        # a whole agent run off as "the agent changed nothing". (#1200.)
+        print(f"could not measure the staged diff: {result.stderr[-400:]}",
+              file=sys.stderr)
+        return None
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")
@@ -727,6 +737,11 @@ def main(argv: list[str] | None = None) -> int:
                       "report NO_DIFF over work that exists but did not reach "
                       "the index"}, 1)
     lines = diff_line_count()
+    if lines is None:
+        return done("BLOCKED", {
+            "target": target,
+            "reason": "could not measure the staged diff; refusing to report "
+                      "NO_DIFF over a measurement that failed"}, 1)
     if lines == 0:
         return done("NO_DIFF", {"target": target,
                                 "agent_exit": agent.returncode})

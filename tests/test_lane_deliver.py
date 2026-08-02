@@ -12,6 +12,7 @@ than what it claimed".
 
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 import os
@@ -1035,6 +1036,70 @@ def test_an_unreadable_blob_listing_refuses_rather_than_admitting(
     assert code == 1
     assert stored["status"] == "REFUSED"
     assert "changed blob bytes" in stored["reason"], stored["reason"]
+
+
+def test_an_unmeasurable_diff_refuses_rather_than_admitting(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for the last fail-open measurement gate (Devin on #1200).
+
+    `_run` synthesizes empty stdout for a missing binary (127) and a timeout
+    (124), so an unreadable `--numstat` summed to zero and
+    `lines > MAX_DIFF_LINES` could never fire — a change of any size admitted
+    because the ruler broke.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if "--numstat" in cmd:
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: bad rev")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "changed lines" in stored["reason"], stored["reason"]
+
+
+def test_every_gate_input_checks_its_return_code() -> None:
+    """The recurring defect of this PR, converted into a mechanical check.
+
+    Six separate review findings reduced to one shape: a function that feeds a
+    gate reads `result.stdout` without inspecting `result.returncode`. Because
+    `_run` synthesizes an empty-stdout CompletedProcess for a missing binary
+    (127) and a timeout (124), an unreadable measurement becomes a permissive
+    zero — the ceiling cannot fire, or the run reports "nothing changed" over
+    work it simply could not see.
+
+    Reviewers caught these one at a time, each in a different function. This
+    asserts the property over ALL of them at once, so a seventh instance fails
+    here instead of costing another round. (CLAUDE.md: prefer uncharmable
+    mechanical checks over reviewer vigilance.)
+    """
+    # Safe by construction, and each is verified by its own test above:
+    #   changed_paths   — empty output is refused at the call site
+    #                     ("candidate commit changes nothing")
+    #   commit_subject  — cosmetic PR title with a literal fallback
+    #   _run/_git/_run_bytes — the runners themselves; they PRODUCE the code
+    exempt = {"changed_paths", "commit_subject",
+              "_run", "_git", "_run_bytes"}
+
+    offenders: list[str] = []
+    for module in ("lane_deliver.py", "lane_propose.py"):
+        source = (REPO_ROOT / "scripts" / "runtime" / module).read_text()
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef) or node.name in exempt:
+                continue
+            body = ast.get_source_segment(source, node) or ""
+            runs = any(call in body for call in
+                       ("_git(", "_run(", "_run_bytes("))
+            if runs and "returncode" not in body:
+                offenders.append(f"{module}::{node.name}")
+
+    assert not offenders, (
+        "these feed a gate but never inspect returncode, so an unreadable "
+        f"input reads as a permissive zero: {offenders}")
 
 
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:

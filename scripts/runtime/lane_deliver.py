@@ -227,7 +227,7 @@ def denied_paths(paths: list[str]) -> list[str]:
     return sorted(bad)
 
 
-def numstat_lines(base: str, head: str) -> int:
+def numstat_lines(base: str, head: str) -> int | None:
     """Changed lines, counting a rename as the delete plus the add it is.
 
     `--no-renames` is load-bearing and must match `changed_paths()`. With
@@ -246,6 +246,15 @@ def numstat_lines(base: str, head: str) -> int:
     intent of the cap. (Devin on #1200.)
     """
     result = _git(["diff", "--no-renames", "--numstat", f"{base}..{head}"])
+    if result.returncode != 0:
+        # None, not 0. `_run` synthesizes empty stdout for a missing binary
+        # (127) and a timeout (124), so an unreadable measurement summed to
+        # zero and `lines > MAX_DIFF_LINES` could never fire — a change of any
+        # size admitted because the ruler broke. The same fail-open closed for
+        # `entries()` and for the propose-side status listing; this was the
+        # remaining measurement gate that admitted on unreadable input.
+        # (Devin on #1200.)
+        return None
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")
@@ -490,6 +499,8 @@ def main(argv: list[str] | None = None) -> int:
                       paths=forbidden)
 
     lines = numstat_lines(parent, head_sha)
+    if lines is None:
+        return refuse("could not measure the candidate's changed lines")
     if lines > MAX_DIFF_LINES:
         return refuse("candidate exceeds the diff cap as measured here",
                       observed=lines, limit=MAX_DIFF_LINES)
