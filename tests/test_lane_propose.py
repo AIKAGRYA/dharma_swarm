@@ -242,14 +242,87 @@ def test_a_failed_stage_blocks_rather_than_reporting_no_diff(
         tmp_path: Path, monkeypatch) -> None:
     """A discarded `git add` return code made an aborted stage look exactly
     like an agent that produced nothing."""
-    monkeypatch.setattr(lane_propose, "agent_changed_paths",
-                        lambda: ["a.py"])
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+
+    real_git = lane_propose._git
     monkeypatch.setattr(lane_propose, "_git", lambda args, **kw:
                         subprocess.CompletedProcess(
                             args, 128, "", "fatal: pathspec did not match")
-                        if args and args[0] == "add"
-                        else subprocess.CompletedProcess(args, 0, "", ""))
+                        if args and args[0] == "add" else real_git(args, **kw))
     assert lane_propose.stage_agent_changes() is None
+
+
+def test_an_unreadable_status_listing_blocks_rather_than_claiming_no_change(
+        monkeypatch) -> None:
+    """Regression for the fail-open twin of the `git add` one (Devin, #1200).
+
+    `_run_bytes` synthesizes EXIT_TIMEOUT / EXIT_NOT_FOUND with empty stdout,
+    so mapping any non-zero result to [] wrote a whole agent run off as
+    NO_DIFF when the lane simply could not read what changed.
+    """
+    monkeypatch.setattr(lane_propose, "_run_bytes", lambda *a, **k:
+                        subprocess.CompletedProcess(
+                            [], lane_propose.EXIT_TIMEOUT, b"", b"timed out"))
+    assert lane_propose.agent_changed_paths() is None
+    assert lane_propose.stage_agent_changes() is None
+
+
+def test_a_git_mv_does_not_discard_the_rest_of_the_run(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for a defect the rename fix introduced (Devin on #1200).
+
+    A porcelain R/C record only appears once the rename is ALREADY staged, so
+    the SOURCE exists in neither the worktree nor the index and matches no
+    pathspec. `git add` validates every pathspec before touching the index, so
+    passing it killed the whole call. Measured on this branch before the fix:
+
+        agent_changed_paths() -> ['a.py', 'b.py', 'c.py']
+        stage_agent_changes() -> None        # BLOCKED, c.py never staged
+
+    The earlier rename test missed it by running `git reset -q HEAD --` first,
+    which restores the source into the index and makes the pathspec match —
+    the real first staging call never sees that state.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+    subprocess.run(["git", "mv", "a.py", "b.py"], cwd=repo, check=True)
+    (repo / "c.py").write_text("z = 3\n", encoding="utf-8")
+
+    # Both sides are still RECORDED — the post-test re-stage needs the source.
+    assert lane_propose.agent_changed_paths() == ["a.py", "b.py", "c.py"]
+
+    staged = lane_propose.stage_agent_changes()
+    assert staged == ["a.py", "b.py", "c.py"], staged
+
+    # `--no-renames`, for the same reason the caps use it: with rename
+    # detection on, `--name-only` collapses a.py -> b.py and hides the
+    # deletion half that proves the source was staged.
+    listed = subprocess.run(
+        ["git", "diff", "--cached", "--no-renames", "--name-only"],
+        cwd=repo, capture_output=True, text=True, check=True).stdout.split()
+    assert sorted(listed) == ["a.py", "b.py", "c.py"], listed
+
+
+def test_a_staged_deletion_does_not_discard_the_run(
+        tmp_path: Path, monkeypatch) -> None:
+    """`git rm` has the identical shape: the path is in neither the worktree
+    nor the index, so it must not reach `git add`."""
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "gone.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+    subprocess.run(["git", "rm", "-q", "gone.py"], cwd=repo, check=True)
+    (repo / "kept.py").write_text("y = 2\n", encoding="utf-8")
+
+    staged = lane_propose.stage_agent_changes()
+    assert staged is not None, "a staged deletion must not block the run"
+    listed = subprocess.run(["git", "diff", "--cached", "--name-only"],
+                            cwd=repo, capture_output=True, text=True,
+                            check=True).stdout.split()
+    assert sorted(listed) == ["gone.py", "kept.py"], listed
 
 
 def test_a_rename_survives_the_post_test_restage(tmp_path: Path,

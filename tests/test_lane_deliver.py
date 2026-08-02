@@ -875,6 +875,82 @@ def test_a_plain_push_failure_that_actually_landed_is_rolled_back(
     assert LANE_BRANCH not in refs
 
 
+def test_an_unanswerable_probe_still_attempts_the_leased_rollback(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a stranded orphan (Greptile on #1200, executed harness).
+
+    When the push failed AND the `ls-remote` probe also failed, `landed`
+    stayed empty and the receipt said "nothing to roll back" over a branch
+    that exists — invisible to the open-draft ceiling, accumulating on every
+    retry.
+
+    The lease, not the probe, is what makes the delete safe. Measured against
+    git 2.43 in all three remote states: ref absent -> rejected (stale info),
+    ref at our SHA -> deleted, ref at another SHA -> rejected. So attempting
+    is never worse than declining.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    real_run = subprocess.run
+
+    def handler(cmd, kw):
+        # The push lands, then reports failure.
+        if "push" in cmd and not any("--force-with-lease" in a for a in cmd):
+            real_run(cmd, **kw)
+            return subprocess.CompletedProcess(cmd, 1, "", "connection reset")
+        # ...and the reconciliation probe cannot answer.
+        if "ls-remote" in cmd:
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: unreachable")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PUSH_FAILED"
+    assert "probe unanswerable" in stored["branch_rollback"]
+    assert "deleted under lease" in stored["branch_rollback"]
+    # The orphan is actually gone.
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
+def test_an_unanswerable_probe_cannot_delete_another_writers_branch(
+        lane, tmp_path, monkeypatch) -> None:
+    """The lease still protects a concurrent writer even when we attempt the
+    rollback blind — which is what makes attempting safe."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    # Build the concurrent writer's commit BEFORE patching, so its setup does
+    # not re-enter the handler below (the patch is on subprocess.run itself,
+    # which this file's own _git helper also uses).
+    _git(lane["seed"], "checkout", "-q", "-B", "intruder", lane["base"])
+    (lane["seed"] / "other.txt").write_text("x\n", encoding="utf-8")
+    _git(lane["seed"], "add", "-A")
+    _git(lane["seed"], "commit", "-q", "-m", "intruder")
+    _git(lane["seed"], "checkout", "-q", "main")
+    real_run = subprocess.run
+
+    def handler(cmd, kw):
+        if "push" in cmd and not any("--force-with-lease" in a for a in cmd):
+            real_run(cmd, **kw)
+            # The writer moves the branch after our push lands, via the
+            # UNPATCHED runner so this does not recurse.
+            real_run(["git", "-C", str(lane["seed"]), "push", "-q", "--force",
+                      "origin", f"intruder:refs/heads/{LANE_BRANCH}"],
+                     capture_output=True, check=True)
+            return subprocess.CompletedProcess(cmd, 1, "", "connection reset")
+        if "ls-remote" in cmd:
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: unreachable")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert "lease refused the delete" in stored["branch_rollback"]
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH in refs, "the concurrent writer's branch must survive"
+
+
 def test_a_push_that_never_landed_has_nothing_to_roll_back(
         lane, tmp_path, monkeypatch) -> None:
     """The other side: a push that genuinely failed leaves no ref, so the
@@ -892,7 +968,7 @@ def test_a_push_that_never_landed_has_nothing_to_roll_back(
 
     assert code == 1
     assert stored["status"] == "PUSH_FAILED"
-    assert stored["branch_rollback"] == "nothing to roll back"
+    assert stored["branch_rollback"].startswith("nothing to roll back")
     refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
     assert LANE_BRANCH not in refs
 

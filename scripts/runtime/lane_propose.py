@@ -387,7 +387,7 @@ def open_lane_drafts(repo: str) -> list[int] | None:
     ]
 
 
-def agent_changed_paths() -> list[str]:
+def agent_changed_paths() -> list[str] | None:
     """Every path the agent touched or created, minus the excluded set.
 
     `-z` is load-bearing, and for the same reason it is load-bearing in
@@ -422,7 +422,13 @@ def agent_changed_paths() -> list[str]:
     result = _run_bytes([GIT_BIN, "status", "--porcelain", "-z",
                          "--untracked-files=all"])
     if result.returncode != 0:
-        return []
+        # None, not [] — an unreadable listing is not "the agent changed
+        # nothing". Returning [] let a failed or timed-out `git status` flow
+        # into NO_DIFF, writing off a full agent run as no-op work: the same
+        # fail-open closed one function below for `git add`. (Devin on #1200.)
+        print(f"could not list the agent's changes: {result.stderr[-400:]!r}",
+              file=sys.stderr)
+        return None
     fields = result.stdout.split(b"\0")
     paths: list[str] = []
     index = 0
@@ -451,6 +457,31 @@ def agent_changed_paths() -> list[str]:
     return sorted(set(paths))
 
 
+def _stageable(paths: list[str]) -> list[str]:
+    """The subset `git add` will accept: present in the worktree or the index.
+
+    A porcelain R/C record only appears once the rename is ALREADY staged, so
+    the source path exists in neither place and matches no pathspec. `git add`
+    validates every pathspec before touching the index, so passing it made the
+    call fail atomically and discard the whole change set — after `git mv a.py
+    b.py` plus a new c.py, staging died on `a.py` and c.py never landed
+    either. Agent-staged deletions (`D  path`) have the identical shape.
+    (Devin on #1200.)
+
+    The source still has to be RETURNED by agent_changed_paths(), because the
+    post-test re-stage runs `git reset -q HEAD --` first, which restores it to
+    the index — where it does resolve, and where re-adding it reproduces the
+    deletion half of the rename. So the filter belongs here, at the call, not
+    in the recorded set.
+    """
+    tracked: set[str] = set()
+    listed = _run_bytes([GIT_BIN, "ls-files", "-z", "--", *paths])
+    if listed.returncode == 0:
+        tracked = {os.fsdecode(part) for part in listed.stdout.split(b"\0")
+                   if part}
+    return [path for path in paths if Path(path).exists() or path in tracked]
+
+
 def stage_agent_changes() -> list[str] | None:
     """Stage the agent's change set by explicit path; return what was staged.
 
@@ -461,12 +492,18 @@ def stage_agent_changes() -> list[str] | None:
     blocks with a truthful receipt instead. (Devin on #1200.)
     """
     paths = agent_changed_paths()
+    if paths is None:
+        return None
     if not paths:
         return []
-    added = _git(["add", "--", *paths])
-    if added.returncode != 0:
-        print(f"staging failed: {added.stderr[-400:]}", file=sys.stderr)
-        return None
+    stageable = _stageable(paths)
+    if stageable:
+        added = _git(["add", "--", *stageable])
+        if added.returncode != 0:
+            print(f"staging failed: {added.stderr[-400:]}", file=sys.stderr)
+            return None
+    # Both sides are returned: the post-test re-stage needs the rename source
+    # to reproduce the deletion after `git reset`.
     return paths
 
 

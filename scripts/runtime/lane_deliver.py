@@ -183,7 +183,11 @@ def rollback_branch(branch: str, head_sha: str) -> str:
     if deleted.returncode == 0:
         return "deleted under lease"
     if "stale info" in (deleted.stderr + deleted.stdout):
-        return "kept: branch moved after our push; lease refused the delete"
+        # Covers both "the branch moved" and "the branch was never there":
+        # git reports a lease mismatch identically for a ref at another SHA
+        # and a ref that does not exist. Either way we did not touch it.
+        return ("kept: origin is not at our SHA (moved, or the push never "
+                "landed); the lease refused the delete")
     return f"delete failed: {deleted.stderr[-200:]}"
 
 
@@ -542,16 +546,43 @@ def main(argv: list[str] | None = None) -> int:
         # The one exit needing no probe is a missing `git` binary: no process
         # ran, so nothing can have landed, and the probe would need the same
         # missing binary to answer.
-        landed = ""
-        if push.returncode != EXIT_NOT_FOUND:
-            listed = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
-            if listed.returncode == 0 and listed.stdout.split():
-                landed = listed.stdout.split()[0]
+        #
+        # An UNANSWERABLE probe means attempt the rollback anyway, because the
+        # lease — not the probe — is what makes the delete safe. Measured
+        # against git 2.43, `--force-with-lease=<ref>:<sha>` on a delete
+        # refspec in all three remote states:
+        #
+        #   ref absent          -> "! [rejected] (stale info)"  harmless no-op
+        #   ref at OUR sha      -> "- [deleted]"                orphan cleaned
+        #   ref at another sha  -> "! [rejected] (stale info)"  writer safe
+        #
+        # So a failed probe leaving `landed` empty and recording "nothing to
+        # roll back" was strictly worse than trying: it stranded an orphan the
+        # open-draft ceiling cannot see, and every retry adds another.
+        # (Greptile on #1200, with an executed harness.)
+        #
+        # This does NOT contradict the `gh pr create` path above, which
+        # refuses to delete when it cannot tell. The asymmetry is real: there,
+        # a delete can CLOSE AN EXISTING PR, which is unrecoverable. Here no
+        # PR exists yet, and the lease guarantees the delete can only ever
+        # remove our own orphan.
+        if push.returncode == EXIT_NOT_FOUND:
+            rollback = "nothing to roll back: git never ran"
+        else:
+            probe = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
+            if probe.returncode != 0:
+                rollback = ("probe unanswerable; attempted under lease: "
+                            + rollback_branch(branch, head_sha))
+            elif not probe.stdout.split():
+                rollback = "nothing to roll back: origin has no such ref"
+            elif probe.stdout.split()[0] == head_sha:
+                rollback = rollback_branch(branch, head_sha)
+            else:
+                rollback = "kept: origin holds a different SHA on this branch"
+
         receipt({"status": "PUSH_FAILED", **verified_facts,
                  "stderr": push.stderr[-1000:],
-                 "branch_rollback": (rollback_branch(branch, head_sha)
-                                     if landed == head_sha
-                                     else "nothing to roll back")}, out)
+                 "branch_rollback": rollback}, out)
         return 1
 
     proposed = load_propose_receipt(
