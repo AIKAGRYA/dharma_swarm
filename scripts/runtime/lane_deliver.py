@@ -160,6 +160,33 @@ def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
     return _run([GIT_BIN, *flags, *args], **kwargs)
 
 
+def rollback_branch(branch: str, head_sha: str) -> str:
+    """Delete our own pushed branch, and only ever our own.
+
+    The open-draft ceiling counts PRs, not branches, so a pushed branch with
+    no PR is an orphan every scheduled retry adds to and nothing cleans up.
+
+    The lease is part of the delete, not a check before it. Reading the SHA
+    with `ls-remote` and then deleting unconditionally is a TOCTOU: a writer
+    that updates the branch between the two operations gets their commit
+    deleted instead of our orphan. Greptile proved exactly that against the
+    first version of this block (#1200).
+
+    `--force-with-lease=<ref>:<sha>` with a delete refspec binds the two
+    together atomically. Verified against git 2.43: a stale expectation is
+    rejected with "(delete) ... stale info" and the branch survives; a
+    matching expectation deletes.
+    """
+    deleted = _git(["push",
+                    f"--force-with-lease=refs/heads/{branch}:{head_sha}",
+                    "origin", f":refs/heads/{branch}"])
+    if deleted.returncode == 0:
+        return "deleted under lease"
+    if "stale info" in (deleted.stderr + deleted.stdout):
+        return "kept: branch moved after our push; lease refused the delete"
+    return f"delete failed: {deleted.stderr[-200:]}"
+
+
 def receipt(payload: dict, out: Path) -> None:
     payload.setdefault("schema", "dharma.lane_deliver_receipt.v1")
     payload.setdefault("generated_at", _utc_stamp())
@@ -423,8 +450,20 @@ def main(argv: list[str] | None = None) -> int:
 
     push = _git(["push", "origin", f"{head_sha}:refs/heads/{branch}"])
     if push.returncode != 0:
+        # A timed-out push is AMBIGUOUS: the ref may have landed before the
+        # client gave up. Reporting PUSH_FAILED and walking away would strand
+        # exactly the orphan the rollback below exists to remove. Ask origin
+        # what actually happened rather than trusting the exit code.
+        landed = ""
+        if push.returncode == EXIT_TIMEOUT:
+            listed = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
+            if listed.returncode == 0 and listed.stdout.split():
+                landed = listed.stdout.split()[0]
         receipt({"status": "PUSH_FAILED", **verified_facts,
-                 "stderr": push.stderr[-1000:]}, out)
+                 "stderr": push.stderr[-1000:],
+                 "branch_rollback": (rollback_branch(branch, head_sha)
+                                     if landed == head_sha
+                                     else "nothing to roll back")}, out)
         return 1
 
     proposed = load_propose_receipt(
@@ -457,34 +496,39 @@ def main(argv: list[str] | None = None) -> int:
                  "pr_output": (pr.stdout + pr.stderr)[-500:]}, out)
         return 0
 
-    # The branch is pushed but has no PR. The open-draft ceiling counts PRs,
-    # not branches, so leaving this behind lets every scheduled retry strand
-    # another `lane/hardening-*` orphan that nothing will ever clean up or
-    # count. Roll the push back — but only if the remote ref still points at
-    # exactly the SHA we pushed, so a concurrent writer is never clobbered.
-    # The lease is part of the delete, not a check before it. Reading the SHA
-    # with `ls-remote` and then deleting unconditionally is a TOCTOU: a writer
-    # that updates the branch between the two operations gets their commit
-    # deleted instead of our orphan. Greptile proved exactly that against the
-    # first version of this block (#1200).
+    # A TIMED-OUT `gh pr create` is not a failed one. `gh` runs the GraphQL
+    # mutation and then prints the URL; a timeout between those two leaves the
+    # PR open on GitHub while the client reports non-zero. Rolling back there
+    # deletes the head branch of a PR that exists — and GitHub closes a PR
+    # whose head branch is deleted, so the lane would destroy the work it just
+    # published and report "creation failed" for it.
     #
-    # `--force-with-lease=<ref>:<sha>` with a delete refspec binds the two
-    # together atomically. Verified against git 2.43: a stale expectation is
-    # rejected with "(delete) ... stale info" and the branch survives; a
-    # matching expectation deletes.
-    deleted = _git(["push",
-                    f"--force-with-lease=refs/heads/{branch}:{head_sha}",
-                    "origin", f":refs/heads/{branch}"])
-    if deleted.returncode == 0:
-        rollback = "deleted under lease"
-    elif "stale info" in (deleted.stderr + deleted.stdout):
-        rollback = "kept: branch moved after our push; lease refused the delete"
-    else:
-        rollback = f"delete failed: {deleted.stderr[-200:]}"
+    # This is a defect this PR introduced: before the TimeoutExpired arm in
+    # _run(), a hung `gh pr create` crashed main() and nothing was deleted.
+    # Converting it to a non-zero exit made the rollback reachable. Ask GitHub
+    # what exists rather than inferring it from an exit code, and treat "I
+    # cannot tell" as "do not delete" — an orphan branch is recoverable, a
+    # deleted PR is not. (Devin on #1200.)
+    if pr.returncode == EXIT_TIMEOUT:
+        existing = _run([GH_BIN, "pr", "list", "--repo", args.repo,
+                         "--head", branch, "--state", "all",
+                         "--json", "number", "--limit", "5"])
+        unknown = existing.returncode != 0
+        found = (not unknown
+                 and existing.stdout.strip() not in ("", "[]"))
+        if unknown or found:
+            receipt({"status": "PR_CREATE_AMBIGUOUS", **verified_facts,
+                     "pr_output": (pr.stdout + pr.stderr)[-500:],
+                     "branch_rollback": "kept: " + (
+                         "a PR already exists for this branch; deleting it "
+                         "would close that PR" if found else
+                         "could not enumerate PRs for this branch, so the "
+                         "delete could not be proven safe")}, out)
+            return 1
 
     receipt({"status": "PR_CREATE_FAILED", **verified_facts,
              "pr_output": (pr.stdout + pr.stderr)[-500:],
-             "branch_rollback": rollback}, out)
+             "branch_rollback": rollback_branch(branch, head_sha)}, out)
     return 1
 
 

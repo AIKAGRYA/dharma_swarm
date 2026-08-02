@@ -373,59 +373,59 @@ def diff_line_count() -> int:
     return total
 
 
-# Every git attribute that can transform worktree bytes into different index
-# bytes. `filter` alone was not enough: `text eol=lf` on a CRLF worktree file
-# stores LF in the index while the tests read CRLF, and because the transform
-# is deterministic the re-add reproduces the same tree hash — so the equality
-# check passes over content that was never tested. `working-tree-encoding` and
-# `ident` have the same shape (Codex on #1200).
-#
-# This repo's own .gitattributes sets only `merge=union` on a handful of docs,
-# so rejecting this set costs nothing legitimate today.
-INDEX_TRANSFORMING_ATTRS = ("filter", "text", "eol", "working-tree-encoding",
-                            "ident")
-_ATTR_INACTIVE = {"unspecified", "unset", ""}
+def index_transformed_paths(paths: list[str]) -> list[str]:
+    """Staged paths whose INDEX bytes differ from their WORKTREE bytes.
 
+    Why this is fail-closed: the measured-tree / tested-tree equality check
+    below compares two `write-tree` results. Anything that transforms content
+    on `git add` stores transformed bytes in `measured_tree` while
+    `make test-fast` reads the untransformed worktree — and because the
+    transform is deterministic, the re-add reproduces the same tree hash, so
+    the equality check passes over content that was never tested.
 
-def active_clean_filters(paths: list[str]) -> list[str]:
-    """Index-transforming filters or attributes on the staged set, if any.
+    This measures the EFFECT, not the causes. Enumerating causes was a losing
+    game, and it lost twice in one PR:
 
-    Why this is fail-closed rather than tolerated: the measured-tree /
-    tested-tree equality check below compares two `write-tree` results. A
-    clean filter runs on `git add`, so if the agent configures one (plus a
-    matching `.gitattributes`), the FIRST add stores transformed bytes in
-    `measured_tree` while `make test-fast` reads the untransformed worktree.
-    Re-adding applies the same deterministic filter, so the hashes still
-    match and the equality check passes — while the bytes that were tested
-    are not the bytes that ship.
+      * scanning `git config` for `filter.*.clean` at every scope caught the
+        `filter.lfs.clean` that Git LFS registers GLOBALLY on GitHub runners,
+        so the lane reported BLOCKED on every machine with git-lfs installed;
+      * scoping that scan to `--local` to fix it then missed the agent's real
+        reach. The agent runs as the same UID on the same runner, so it can
+        write `$HOME/.gitconfig`, or set `extensions.worktreeConfig` and hide
+        the filter in `$GIT_DIR/config.worktree`, neither of which `--local`
+        reads (Devin on #1200).
 
-    Both inputs are agent-writable (`.git/config` and in-tree
-    `.gitattributes`), so the honest response is to refuse rather than to
-    claim a guarantee that does not hold.
+    And no attribute list closes it either: `core.autocrlf=true` in the global
+    config transforms CRLF to LF on add with NO `.gitattributes` at all, so
+    every `check-attr` reads `unspecified` while the bytes still change.
+    Measured, not assumed.
+
+    Comparing the raw bytes is scope-independent, attribute-independent and
+    mechanism-independent. It is also why `git diff-files` cannot be used
+    here: git re-applies the clean filter when it compares, so a transformed
+    file reads as unmodified — the same determinism that defeats the tree-hash
+    check. `cat-file` returns the stored object without filtering.
     """
     found: list[str] = []
-    # --local is load-bearing, not tidiness. The agent can write `.git/config`
-    # and in-tree `.gitattributes`; it cannot write the runner's global or
-    # system config. Querying every scope caught `filter.lfs.clean`, which
-    # Git LFS registers globally on GitHub runners, so the lane reported
-    # BLOCKED on every run on every machine with git-lfs installed — a lane
-    # that looks configured and can never deliver. Scope the check to what
-    # the adversary can actually reach.
-    configured = _git(["config", "--local", "--get-regexp",
-                       r"^filter\..*\.clean"])
-    if configured.returncode == 0 and configured.stdout.strip():
-        found.extend(line.split()[0] for line in
-                     configured.stdout.strip().splitlines() if line.split())
-    if paths:
-        attrs = _git(["check-attr", *INDEX_TRANSFORMING_ATTRS, "-z",
-                      "--", *paths])
-        if attrs.returncode == 0:
-            fields = attrs.stdout.split("\0")
-            # check-attr -z emits path, attr, value triples
-            for index in range(0, max(0, len(fields) - 2), 3):
-                path, attr, value = fields[index:index + 3]
-                if value not in _ATTR_INACTIVE:
-                    found.append(f"{path}:{attr}={value}")
+    for path in paths:
+        target = Path(path)
+        try:
+            # Deletions have no delivered bytes to diverge; symlink blobs
+            # store the target string, not file content.
+            if target.is_symlink() or not target.is_file():
+                continue
+            worktree = target.read_bytes()
+        except OSError:
+            continue
+        blob = subprocess.run([GIT_BIN, "cat-file", "-p", f":{path}"],
+                              capture_output=True, timeout=120, check=False)
+        if blob.returncode != 0:
+            # Staged but unreadable from the index: cannot prove the bytes
+            # match, so do not claim they do.
+            found.append(path)
+            continue
+        if blob.stdout != worktree:
+            found.append(path)
     return sorted(set(found))
 
 
@@ -556,17 +556,17 @@ def main(argv: list[str] | None = None) -> int:
                                 "limit": MAX_DIFF_LINES, "target": target,
                                 "paths": staged[:20]})
 
-    # A clean filter would silently decouple "what was tested" from "what
-    # ships" while still passing the equality check below, so it is refused
-    # outright rather than accommodated.
-    filters = active_clean_filters(staged)
-    if filters:
+    # Anything that transforms content on `git add` silently decouples "what
+    # was tested" from "what ships" while still passing the equality check
+    # below, so it is refused outright rather than accommodated.
+    transformed = index_transformed_paths(staged)
+    if transformed:
         return done("BLOCKED", {
             "target": target,
-            "reason": "a clean filter could apply to the staged set, which "
-                      "would let the tested bytes differ from the delivered "
-                      "bytes while the tree hashes still match",
-            "filters": filters[:20]})
+            "reason": "the staged index bytes differ from the worktree bytes "
+                      "for these paths, so the tested bytes are not the "
+                      "delivered bytes even though the tree hashes match",
+            "transformed_paths": transformed[:20]})
 
     # Freeze the MEASURED content as a tree object. A tree SHA is
     # content-addressed, so whatever the test run does to the working tree

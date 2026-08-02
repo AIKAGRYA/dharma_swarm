@@ -12,6 +12,7 @@ than what it claimed".
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import subprocess
@@ -425,12 +426,28 @@ def test_orphan_rollback_deletes_under_an_atomic_lease() -> None:
     stale expectation is rejected with "(delete) ... stale info" and the
     branch survives; a matching one deletes.
     """
+    body = inspect.getsource(lane_deliver.rollback_branch)
+    assert "--force-with-lease=refs/heads/{branch}:{head_sha}" in body
+    assert "stale info" in body
+
+    # Scan CODE only. The docstring below describes the TOCTOU it forbids, so
+    # a naive source scan matches the very prose documenting the prohibition.
+    code_only = "\n".join(
+        line for line in
+        body.replace(lane_deliver.rollback_branch.__doc__ or "", "").splitlines()
+        if not line.strip().startswith("#"))
+    # The non-atomic shape must not come back HERE. `ls-remote` is legitimate
+    # elsewhere in the module (probing whether a timed-out push landed); what
+    # must never return is a read-then-delete inside the rollback itself.
+    assert "ls-remote" not in code_only
+    assert '"--delete"' not in code_only
+
+    # And the rollback is the module's ONLY ref deletion, so no second path
+    # can grow one without a lease.
     source = (REPO_ROOT / "scripts" / "runtime" / "lane_deliver.py").read_text()
-    assert "--force-with-lease=refs/heads/{branch}:{head_sha}" in source
-    assert "stale info" in source
-    # The non-atomic shape must not come back.
-    assert '"ls-remote"' not in source
-    assert '"--delete"' not in source
+    deletions = [line for line in source.splitlines()
+                 if 'f":refs/heads/' in line]
+    assert len(deletions) == 1, deletions
 
 
 def test_run_converts_a_timeout_into_a_verdict_not_an_exception() -> None:
@@ -441,32 +458,143 @@ def test_run_converts_a_timeout_into_a_verdict_not_an_exception() -> None:
     assert "timed out" in result.stderr
 
 
-def test_a_hung_gh_pr_create_still_rolls_back_and_reports(
-        lane, tmp_path, monkeypatch) -> None:
-    """Regression for a verified escape (Devin on #1200).
+def _intercept(monkeypatch, handler):
+    """Route lane_deliver's subprocess calls through `handler` first.
 
-    `_run` caught only FileNotFoundError while its sibling `lane_propose._run`
-    grew a TimeoutExpired arm in this same PR. `gh pr create` runs *after* the
-    push, so a timeout there escaped `main()` before the rollback and before
-    the receipt: branch pushed, no PR, no verdict, and the orphan this PR
-    exists to clean up left behind on origin.
+    Patched at the subprocess layer, not at `_run`/`_git`: those call each
+    other, so patching them recurses.
     """
+    real_run = subprocess.run
+
+    def dispatch(cmd, *args, **kwargs):
+        verdict = handler(cmd, kwargs)
+        if verdict is not None:
+            return verdict
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(lane_deliver.subprocess, "run", dispatch)
+
+
+def _is(cmd, *tokens) -> bool:
+    return all(token in cmd for token in tokens)
+
+
+def test_a_clean_pr_create_failure_still_rolls_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """The unambiguous case: `gh` said no, so no PR exists and the pushed
+    branch is a genuine orphan the draft ceiling cannot see."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    _intercept(monkeypatch, lambda cmd, kw: (
+        subprocess.CompletedProcess(cmd, 1, "", "validation failed")
+        if _is(cmd, "pr", "create") else None))
+
+    code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_FAILED"
+    assert stored["branch_rollback"] == "deleted under lease"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
+def test_a_timed_out_pr_create_never_deletes_a_branch_whose_pr_may_exist(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a defect THIS PR introduced (Devin on #1200).
+
+    Before the TimeoutExpired arm, a hung `gh pr create` crashed main() and
+    nothing was deleted. Converting it to a non-zero exit made the rollback
+    reachable — but `gh` runs the GraphQL mutation and *then* prints the URL,
+    so a timeout in between leaves the PR open on GitHub. Opening a PR does
+    not move the branch ref, so the lease still matches and the delete
+    succeeds; GitHub closes a PR whose head branch is deleted. The lane would
+    have destroyed the work it had just published and called it a failure.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout", 300))
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, '[{"number":7}]', "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_AMBIGUOUS"
+    assert "deleting it would close that PR" in stored["branch_rollback"]
+    # The branch that possibly-created PR points at is still there.
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH in refs
+
+
+def test_a_timed_out_pr_create_with_no_pr_does_roll_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """Ambiguity resolved in the other direction: GitHub says no PR exists,
+    so the branch really is an orphan and the rollback proceeds."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout", 300))
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_FAILED"
+    assert stored["branch_rollback"] == "deleted under lease"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
+def test_an_unenumerable_pr_list_keeps_the_branch(
+        lane, tmp_path, monkeypatch) -> None:
+    """An orphan branch is recoverable; a closed PR is not. When the lane
+    cannot prove no PR exists, it must not delete."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout", 300))
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 1, "", "gh unavailable")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_AMBIGUOUS"
+    assert "could not be proven safe" in stored["branch_rollback"]
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH in refs
+
+
+def test_a_timed_out_push_that_landed_is_rolled_back(
+        lane, tmp_path, monkeypatch) -> None:
+    """A timed-out push is ambiguous too: the ref may have landed before the
+    client gave up. Reporting PUSH_FAILED and walking away strands exactly the
+    orphan the rollback exists to remove."""
     bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
     real_run = subprocess.run
 
-    def hang_on_pr_create(cmd, *args, **kwargs):
-        if "pr" in cmd and "create" in cmd:
-            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 300))
-        return real_run(cmd, *args, **kwargs)
+    def handler(cmd, kw):
+        # Let the real push land, then report a timeout to the caller.
+        if "push" in cmd and not any("--force-with-lease" in a for a in cmd):
+            real_run(cmd, **kw)
+            return subprocess.CompletedProcess(cmd, lane_deliver.EXIT_TIMEOUT,
+                                               "", "timed out")
+        return None
 
-    monkeypatch.setattr(lane_deliver.subprocess, "run", hang_on_pr_create)
+    _intercept(monkeypatch, handler)
     code, stored = _deliver(lane, bundle, tmp_path)
 
-    # A verdict was reached rather than an exception escaping.
     assert code == 1
-    assert stored["status"] == "PR_CREATE_FAILED"
-    assert "timed out" in stored["pr_output"]
-    # And the orphan branch the push created was actually rolled back.
+    assert stored["status"] == "PUSH_FAILED"
     assert stored["branch_rollback"] == "deleted under lease"
     refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
     assert LANE_BRANCH not in refs
@@ -600,6 +728,32 @@ def test_delivery_requires_a_ci_triggering_credential() -> None:
     verify = [s for s in deliver["steps"] if s.get("name", "").startswith("Verify")][0]
     assert 'HAS_TRUSTED_TOKEN}" != "true"' in verify["run"]
     assert "--dry-run" in verify["run"]
+
+
+def test_model_credentials_are_scoped_to_the_driver_step_only() -> None:
+    """Regression for a verified widening (Devin on #1200).
+
+    At job level the provider secrets were in scope for every step of the job
+    that runs untrusted agent code — including `pip install -e ".[dev]"` and
+    `npm install -g`, both of which execute third-party install hooks with
+    whatever the environment holds. Only the driver step needs them.
+    """
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    propose = workflow["jobs"]["propose"]
+    keys = {"ANTHROPIC_API_KEY", "OPENAI_API_KEY"}
+
+    assert not (keys & set(propose.get("env") or {})), (
+        "model credentials must not be job-level env")
+
+    carriers = [step.get("name") for step in propose["steps"]
+                if keys & set(step.get("env") or {})]
+    assert carriers == ["Run the proposing phase"], carriers
+
+    # And no step that installs third-party code carries them.
+    for step in propose["steps"]:
+        run = step.get("run") or ""
+        if "pip install" in run or "npm install" in run:
+            assert not (keys & set(step.get("env") or {})), step.get("name")
 
 
 def test_caps_live_in_the_workflow_not_in_a_prompt() -> None:

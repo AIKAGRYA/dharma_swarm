@@ -139,19 +139,20 @@ def test_eol_attribute_is_rejected_like_a_clean_filter(tmp_path: Path,
     read CRLF, and because the transform is deterministic the re-add
     reproduces the same tree hash — so the equality check passes over content
     that was never tested."""
-    repo = tmp_path / "r"
-    repo.mkdir()
-    for cmd in (["git", "init", "-q", "-b", "main"],
-                ["git", "config", "user.email", "t@e.com"],
-                ["git", "config", "user.name", "t"]):
-        subprocess.run(cmd, cwd=repo, check=True)
-    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
-    monkeypatch.chdir(repo)
-    assert lane_propose.active_clean_filters(["a.py"]) == []
-
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
     (repo / ".gitattributes").write_text("*.py text eol=lf\n", encoding="utf-8")
-    found = lane_propose.active_clean_filters(["a.py"])
-    assert any("eol=lf" in item or "text=" in item for item in found), found
+
+    # An LF file under `eol=lf` transforms nothing, so nothing is flagged —
+    # the guard measures divergence, not the mere presence of an attribute.
+    (repo / "clean.py").write_bytes(b"x = 1\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    assert lane_propose.index_transformed_paths(["clean.py"]) == []
+
+    # A CRLF file under the same attribute is Codex's case: LF lands in the
+    # index while the tests read CRLF.
+    (repo / "crlf.py").write_bytes(b"x = 1\r\ny = 2\r\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    assert lane_propose.index_transformed_paths(["crlf.py"]) == ["crlf.py"]
 
 
 def test_test_suite_timeout_becomes_a_cap_receipt_not_an_exception(
@@ -169,34 +170,13 @@ def test_test_suite_timeout_becomes_a_cap_receipt_not_an_exception(
     assert "partial output" in result.stdout
 
 
-def test_active_clean_filters_detects_configured_and_attributed(
-        tmp_path: Path, monkeypatch) -> None:
-    """A clean filter runs on `git add`, so it can put transformed bytes in
-    the measured tree while the tests read the untransformed worktree — and
-    because the filter is deterministic, re-adding reproduces the same hash
-    and the equality check still passes. Detect and refuse."""
-    repo = tmp_path / "r"
-    repo.mkdir()
-    for cmd in (["git", "init", "-q", "-b", "main"],
-                ["git", "config", "user.email", "t@e.com"],
-                ["git", "config", "user.name", "t"]):
-        subprocess.run(cmd, cwd=repo, check=True)
-    monkeypatch.chdir(repo)
-    assert lane_propose.active_clean_filters([]) == []
+def _repo_with_global_config(tmp_path: Path, monkeypatch, config: str) -> Path:
+    """A repo whose GLOBAL git config the 'agent' controls.
 
-    subprocess.run(["git", "config", "--local", "filter.evil.clean",
-                    "sed s/a/b/"], cwd=repo, check=True)
-    found = lane_propose.active_clean_filters([])
-    assert any("filter.evil.clean" in item for item in found), found
-
-
-def test_a_global_filter_does_not_block_the_lane(tmp_path: Path,
-                                                 monkeypatch) -> None:
-    """Git LFS registers `filter.lfs.clean` in the GLOBAL config on GitHub
-    runners. The agent cannot write global or system config, so a filter
-    defined there is the runner's own setup, not an attack — and treating it
-    as one made the lane report BLOCKED on every run everywhere git-lfs is
-    installed. Caught by CI on #1200 before it could ship.
+    The agent runs as the same UID on the same runner as the lane, so
+    $HOME/.gitconfig is squarely within its reach — the earlier claim in this
+    module that it "cannot write the runner's global or system config" was
+    simply false (Devin on #1200).
     """
     repo = tmp_path / "r"
     repo.mkdir()
@@ -205,16 +185,93 @@ def test_a_global_filter_does_not_block_the_lane(tmp_path: Path,
                 ["git", "config", "user.name", "t"]):
         subprocess.run(cmd, cwd=repo, check=True)
     global_cfg = tmp_path / "gitconfig"
-    global_cfg.write_text("[filter \"lfs\"]\n\tclean = git-lfs clean -- %f\n",
-                          encoding="utf-8")
+    global_cfg.write_text(config, encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_cfg))
     monkeypatch.chdir(repo)
+    return repo
+
+
+def test_untransformed_content_is_not_flagged(tmp_path: Path, monkeypatch) -> None:
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True)
+    assert lane_propose.index_transformed_paths(["a.py"]) == []
+
+
+def test_a_global_clean_filter_transforming_a_staged_path_is_caught(
+        tmp_path: Path, monkeypatch) -> None:
+    """The bypass `--local` opened (Devin on #1200).
+
+    Scoping the config scan to --local was meant to stop git-lfs from blocking
+    every run. It also blinded the guard to $HOME/.gitconfig, which the agent
+    can write. Measuring the delivered bytes closes it regardless of scope.
+    """
+    repo = _repo_with_global_config(
+        tmp_path, monkeypatch,
+        '[filter "evil"]\n\tclean = sed s/SECRET/REDACTED/\n\tsmudge = cat\n')
+    (repo / ".gitattributes").write_text("*.py filter=evil\n", encoding="utf-8")
+    (repo / "a.py").write_text('x = "SECRET"\n', encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    # Sanity: the transform really happened.
+    staged = subprocess.run(["git", "cat-file", "-p", ":a.py"], cwd=repo,
+                            capture_output=True, text=True, check=True).stdout
+    assert "REDACTED" in staged
+    assert lane_propose.index_transformed_paths(["a.py"]) == ["a.py"]
+
+
+def test_core_autocrlf_is_caught_with_no_gitattributes_at_all(
+        tmp_path: Path, monkeypatch) -> None:
+    """No attribute list can close this one, which is why the guard stopped
+    enumerating attributes.
+
+    `core.autocrlf=true` in the global config rewrites CRLF to LF on `git add`
+    with NO .gitattributes present, so every `check-attr` the old guard asked
+    about read `unspecified` while the delivered bytes still differed from the
+    tested bytes. Verified against real git before this test was written.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch,
+                                    "[core]\n\tautocrlf = true\n")
+    (repo / "a.py").write_bytes(b'x = 1\r\ny = 2\r\n')
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True)
+    assert not (repo / ".gitattributes").exists()
+    # The old guard's inputs both read clean...
+    attrs = subprocess.run(
+        ["git", "check-attr", "filter", "text", "eol", "--", "a.py"],
+        cwd=repo, capture_output=True, text=True, check=True).stdout
+    assert "unspecified" in attrs and "filter: evil" not in attrs
+    # ...while the bytes differ.
+    assert lane_propose.index_transformed_paths(["a.py"]) == ["a.py"]
+
+
+def test_a_global_lfs_filter_does_not_block_the_lane(tmp_path: Path,
+                                                     monkeypatch) -> None:
+    """Git LFS registers `filter.lfs.clean` GLOBALLY on GitHub runners.
+
+    Treating that as an attack made the lane report BLOCKED on every run on
+    every machine with git-lfs installed — caught by CI on #1200 before it
+    shipped. It transforms nothing unless a path is actually attributed to it,
+    so measuring bytes gets this right without a scope carve-out.
+    """
+    repo = _repo_with_global_config(
+        tmp_path, monkeypatch,
+        '[filter "lfs"]\n\tclean = git-lfs clean -- %f\n')
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True)
     # Sanity: git really does see it in the global scope.
     seen = subprocess.run(["git", "config", "--get-regexp", r"^filter\..*\.clean"],
                           cwd=repo, capture_output=True, text=True)
     assert "filter.lfs.clean" in seen.stdout
-    # ...and the lane ignores it, because the agent cannot write there.
-    assert lane_propose.active_clean_filters([]) == []
+    assert lane_propose.index_transformed_paths(["a.py"]) == []
+
+
+def test_a_deleted_path_has_no_delivered_bytes_to_diverge(
+        tmp_path: Path, monkeypatch) -> None:
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "t"], cwd=repo, check=True)
+    subprocess.run(["git", "rm", "-q", "a.py"], cwd=repo, check=True)
+    assert lane_propose.index_transformed_paths(["a.py"]) == []
 
 
 def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:

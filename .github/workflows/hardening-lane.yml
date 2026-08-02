@@ -68,12 +68,11 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       DHARMA_LANE_AGENT_CMD: ${{ secrets.DHARMA_LANE_AGENT_CMD }}
-      # The agent's own model credential — the one thing it legitimately
-      # needs. agent_env() passes these through while stripping every
-      # GitHub/Git credential channel. Absent, the lane reports BLOCKED
-      # rather than pretending.
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # NOTE: the model credentials are deliberately NOT job-level env. They
+      # are set on the single step that runs the driver, below. At job level
+      # they were also in scope for `pip install -e ".[dev]"` and
+      # `npm install -g`, both of which execute third-party install hooks
+      # (Devin on #1200).
     steps:
       - name: Halt on loop kill-switch
         run: |
@@ -174,19 +173,30 @@ jobs:
             *)
               echo "::warning::unknown selector; lane_propose will refuse against its allowlist" ;;
           esac
-          # The agent also needs its own model credential. It is passed
-          # through by agent_env() if present and withheld otherwise; the
-          # lane never invents one.
-          if [ -z "${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}" ]; then
-            echo "::notice::No model credential in scope; an installed agent will still fail to authenticate."
-          fi
+          # The model-credential check lives on the driver step below, which
+          # is the only step those secrets are in scope for. Checking here
+          # would report "no credential" on every run regardless.
 
       - name: Run the proposing phase
         id: lane
+        # The agent's model credential enters here and NOWHERE else in this
+        # job. At job level it was also in scope for `pip install -e ".[dev]"`
+        # and `npm install -g`, which execute third-party install hooks with
+        # whatever is in the environment (Devin on #1200). agent_env() then
+        # narrows further: the agent subprocess receives only the provider key
+        # its own selector needs, and no GitHub/Git credential channel at all.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -uo pipefail
           git config user.name "hardening-lane"
           git config user.email "hardening-lane@users.noreply.github.com"
+          # The lane never invents a credential; absent one it reports rather
+          # than pretending.
+          if [ -z "${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}" ]; then
+            echo "::notice::No model credential in scope; an installed agent will still fail to authenticate."
+          fi
           # Capture the exit status: failure paths write a useful receipt and
           # then return nonzero, and `set -e` would abort before that receipt
           # reached the summary — exactly the runs where it matters most.
