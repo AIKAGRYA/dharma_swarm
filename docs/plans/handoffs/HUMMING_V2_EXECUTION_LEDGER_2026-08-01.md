@@ -42,9 +42,9 @@ they do not rewrite history. It is a projection and cannot overrule an owner.
 
 ## A0 controller events
 
-- 2026-08-01: requested the structural-hardening controller after its workflow
-  definition was updated. This append exists only to create a clean branch
-  synchronization event; it grants no authority and makes no completion claim.
+- 2026-08-02: one exact-main check observed 1/22 durable-invoker failures.
+  A fail-closed rerun passed; a stress falsifier then passed 30 full suites and
+  50 concurrency rounds. The non-reproduced failure remains recorded.
 
 ## A0 pre-merge correction log
 
