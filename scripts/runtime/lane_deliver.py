@@ -282,9 +282,18 @@ def changed_blob_bytes(base: str, head: str) -> int:
 
     `git diff --numstat` reports `-` for both cells on binary files, so a
     binary contributes ZERO toward the line cap. The bundle size ceiling does
-    not close that either: it measures compressed bytes, and highly
-    compressible data slips under it while unpacking to something far larger
-    on the delivery runner. This measures the real thing.
+    not close that either: it measures COMPRESSED bytes, so highly
+    compressible data slips under it while unpacking to something far larger.
+    This measures the real thing.
+
+    What "larger" means here is OBJECT-STORE bytes, not worktree bytes. The
+    delivery job never checks the candidate out (see
+    test_delivery_never_stages_or_checks_out_the_candidate); `git fetch` of
+    the bundle unpacks objects and stops there. An earlier draft of this
+    docstring said "unpacking to something far larger on the delivery runner",
+    which reads as materialized files and would argue for charging each path
+    — a materialization that never happens. Stated correctly so the rationale
+    matches what the code measures.
 
     Only blobs the base does not already have are charged. `changed_paths()`
     runs `--no-renames`, so a relocation arrives as delete(old) + add(new) —
