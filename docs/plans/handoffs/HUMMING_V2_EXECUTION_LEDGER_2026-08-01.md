@@ -4,7 +4,7 @@
 the A0 governance PR is independently reviewed and merged.
 **Authority:** none. Git, `docs/governance/ACTIVE_TRACK.yaml`, CI, current owner
 files, and runtime receipts remain authoritative.
-**Base:** `e1c5dffda158b9f2590567880b8278ee44437e87`
+**Base:** `a8da9bb5bffa2031f3e0b699261a94dd8ecb2ef1`
 **Bootstrap head before generated A0 commit:** `6cc6bab7751c714f7d596a989aaa503117e036fc`
 **Branch:** `codex/humming-v2-a0-portfolio-admission`
 **Pull request:** `#1189`
@@ -16,7 +16,7 @@ they do not rewrite history. It is a projection and cannot overrule an owner.
 
 | Work item | Owning track | Dependencies | Enforcement now | Positive proof | Negative control | Rollback | Live host | State | Remaining blocker |
 |---|---|---|---|---|---|---|---|---|---|
-| A0 portfolio admission | cross-track governance | #1187 and #1186 merged | CHECKED after CI only | ACTIVE_TRACK diff + owner map | no new track; no implementation diff | revert A0 | no | ADMISSION_PENDING_MERGE | independent review and human merge |
+| A0 portfolio admission | cross-track governance | #1187, #1186, and #1177 merged | CHECKED after CI only | ACTIVE_TRACK diff + owner map | no new track; no implementation diff | revert A0 | no | ADMISSION_PENDING_MERGE | independent review and human merge |
 | P0-K ActionEnvelope + dispatcher | sovereign-safety-tcb | A0 merged | OBSERVED design only | none yet | none yet | additive feature flag required | no | NOT_STARTED | A0 merge |
 | P0-H1a hook hardening | sovereign-safety-tcb | A0 merged | OBSERVED design only | none yet | malformed/empty/logger sabotage required | hook remains uninstalled | no | NOT_STARTED | A0 merge |
 | P0-H1b hook installation | sovereign-safety-tcb | H1a merged | OBSERVED design only | none yet | real denied tool call required | remove tracked hook registration | seat | BLOCKED_DEPENDENCY | H1a |
@@ -36,9 +36,9 @@ they do not rewrite history. It is a projection and cannot overrule an owner.
   authority changed.
 - No `CLOSED_LIVE`, production, universal enforcement, aggregate-budget, or
   neutral-graph parity claim is made.
-- PR #1177 remains a serialized governance collision; its Titanium amendment
-  must merge first or this branch must be refreshed while preserving both
-  changes before A0 can become Ready.
+- PR #1177 is merged; A0 was rebuilt from that exact main head while preserving
+  both WP-0D test surfaces and the complete three-repair task boundary. This
+  synchronization grants no implementation authority before A0 merges.
 
 ## A0 controller events
 
