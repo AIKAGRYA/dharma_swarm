@@ -224,7 +224,24 @@ def denied_paths(paths: list[str]) -> list[str]:
 
 
 def numstat_lines(base: str, head: str) -> int:
-    result = _git(["diff", "--numstat", f"{base}..{head}"])
+    """Changed lines, counting a rename as the delete plus the add it is.
+
+    `--no-renames` is load-bearing and must match `changed_paths()`. With
+    git's default rename detection a pure relocation is ONE record reading
+    `0\t0\told => new`, which sums to zero and sails under MAX_DIFF_LINES.
+    Measured on git 2.43 against an 800-line file:
+
+        git diff --numstat              ->  0  0  big.py => moved.py     (0)
+        git diff --no-renames --numstat ->  0  800 big.py
+                                            800 0   moved.py            (1600)
+
+    Without it the two gates disagreed about the same commit — `changed_paths`
+    counted two files while this counted zero lines — so a candidate could
+    relocate thousands of lines and be delivered as if it changed nothing.
+    The blob ceiling only bounds that at 4 MiB, far above the ~600-line
+    intent of the cap. (Devin on #1200.)
+    """
+    result = _git(["diff", "--no-renames", "--numstat", f"{base}..{head}"])
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")

@@ -361,8 +361,20 @@ def stage_agent_changes() -> list[str]:
 def diff_line_count() -> int:
     """Changed lines in the STAGED set, so cap and commit measure the same
     thing (`git diff HEAD` omits untracked files, which let a new-file-only
-    change escape the cap entirely)."""
-    result = _git(["diff", "--cached", "--numstat"])
+    change escape the cap entirely).
+
+    `--no-renames` for the same reason it is on the delivery side: git's
+    default rename detection collapses a pure relocation into one
+    `0\t0\told => new` record that sums to zero, so an agent could `git mv`
+    an 800-line file and measure as a no-op. Measured on git 2.43:
+
+        git diff --cached --numstat              ->  0 0 big.py => moved.py
+        git diff --cached --no-renames --numstat ->  0 800 / 800 0
+
+    Devin found this on lane_deliver; the propose-side cap is the FIRST gate
+    and had the identical hole, so both move together (#1200).
+    """
+    result = _git(["diff", "--cached", "--no-renames", "--numstat"])
     total = 0
     for line in result.stdout.splitlines():
         parts = line.split("\t")

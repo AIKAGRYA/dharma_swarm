@@ -191,6 +191,30 @@ def _repo_with_global_config(tmp_path: Path, monkeypatch, config: str) -> Path:
     return repo
 
 
+def test_a_staged_rename_is_counted_not_collapsed_to_zero(
+        tmp_path: Path, monkeypatch) -> None:
+    """The propose-side cap is the FIRST gate and had the same hole Devin
+    found on the delivery side (#1200).
+
+    `git diff --cached --numstat` collapses a staged rename into one
+    `0\\t0\\told => new` record, so an agent could `git mv` an 800-line file
+    and measure as a no-op against MAX_DIFF_LINES.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    body = "\n".join(f"line_{i} = {i}" for i in range(800)) + "\n"
+    (repo / "big.py").write_text(body, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+
+    subprocess.run(["git", "mv", "big.py", "moved.py"], cwd=repo, check=True)
+    # Sanity: git's default view really does report this as nothing.
+    default = subprocess.run(["git", "diff", "--cached", "--numstat"], cwd=repo,
+                             capture_output=True, text=True, check=True).stdout
+    assert "=>" in default and default.split("\t")[0] == "0", default
+
+    assert lane_propose.diff_line_count() >= 1600
+
+
 def test_untransformed_content_is_not_flagged(tmp_path: Path, monkeypatch) -> None:
     repo = _repo_with_global_config(tmp_path, monkeypatch, "")
     (repo / "a.py").write_text("x = 1\n", encoding="utf-8")

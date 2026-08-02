@@ -657,6 +657,46 @@ def test_a_timed_out_push_that_landed_is_rolled_back(
     assert LANE_BRANCH not in refs
 
 
+def test_relocating_a_large_file_is_measured_not_waved_through(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a verified accounting hole (Devin on #1200).
+
+    `changed_paths()` gained `--no-renames` so a rename shows both sides to
+    the denylist. `numstat_lines()` was left on git's default rename
+    detection, which reports a pure relocation as ONE `0\\t0\\told => new`
+    record. Measured on git 2.43 against an 800-line file: 0 lines with
+    detection on, 1600 with it off. So the two gates disagreed about the same
+    commit — two files, zero lines — and thousands of relocated lines sailed
+    under MAX_DIFF_LINES with only the 4 MiB blob ceiling above them.
+    """
+    seed = lane["seed"]
+    body = "\n".join(f"line_{i} = {i}" for i in range(800)) + "\n"
+    _git(seed, "checkout", "-q", "-B", "seed-big", lane["base"])
+    (seed / "dharma_swarm").mkdir(parents=True, exist_ok=True)
+    (seed / "dharma_swarm" / "big.py").write_text(body, encoding="utf-8")
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-q", "-m", "seed the file")
+    seeded = _git(seed, "rev-parse", "HEAD")
+    _git(seed, "push", "-q", "origin", "seed-big:refs/heads/main")
+
+    # One commit that does nothing but relocate it.
+    _git(seed, "checkout", "-q", "-B", LANE_BRANCH, seeded)
+    _git(seed, "mv", "dharma_swarm/big.py", "dharma_swarm/moved.py")
+    _git(seed, "commit", "-q", "-m", "harden: relocate [hardening-lane]")
+    bundle = lane["tmp"] / "rename.bundle"
+    _git(seed, "bundle", "create", str(bundle),
+         f"{seeded}..refs/heads/{LANE_BRANCH}")
+    _git(seed, "checkout", "-q", "main")
+    _git(lane["work"], "fetch", "-q", "origin")
+
+    code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "diff cap" in stored["reason"], stored["reason"]
+    # And the count is the real one, not the zero rename detection reports.
+    assert stored["observed"] >= 1600, stored["observed"]
+
+
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
     """Source pin for the two operations that reintroduce the PR #1162 class:
     `git add` runs clean filters the agent can define, and a checkout writes
@@ -811,6 +851,38 @@ def test_model_credentials_are_scoped_to_the_driver_step_only() -> None:
         run = step.get("run") or ""
         if "pip install" in run or "npm install" in run:
             assert not (keys & set(step.get("env") or {})), step.get("name")
+
+
+def test_no_agent_budget_is_spent_on_a_run_that_cannot_deliver() -> None:
+    """Regression for two safety behaviours cancelling out (Devin on #1200).
+
+    Delivery degrades to --dry-run without a push credential, so no lane PR is
+    opened; `attempted_task_ids()` infers consumption from delivered PR
+    bodies, so it returns the empty set forever; `select_target()` then picks
+    fresh[0] — the oldest ready mailbox task — on every scheduled run while
+    newer tasks starve. That is precisely the starvation the attempt history
+    was added to prevent, and each pass burns a 45-minute agent budget to
+    build a bundle nothing can deliver.
+    """
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    steps = workflow["jobs"]["propose"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    guard = "Refuse a scheduled run that could never deliver"
+    assert guard in names
+    # The guard runs before anything expensive, and after the kill-switch.
+    assert names.index(guard) == 1, names
+
+    gate = "steps.deliverable.outputs.proceed == 'true'"
+    for step in steps[2:]:
+        assert gate in (step.get("if") or ""), step.get("name")
+
+    # An explicit operator dry-run must still exercise the lane; the refusal
+    # is for scheduled runs that can never open a PR.
+    body = [s for s in steps if s.get("name") == guard][0]["run"]
+    assert "OPERATOR_DRY_RUN" in body
+    assert "LANE_DELIVERY_PUSH_TOKEN" in str(
+        [s for s in steps if s.get("name") == guard][0].get("env"))
 
 
 def test_caps_live_in_the_workflow_not_in_a_prompt() -> None:
