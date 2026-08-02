@@ -524,9 +524,28 @@ def main(argv: list[str] | None = None) -> int:
     proposed = load_propose_receipt(
         Path(args.propose_receipt) if args.propose_receipt else None)
     target = proposed.get("target", {})
+    # The consumption claim gets its OWN untruncated line, and is emitted
+    # before the human-readable summary that may be cut.
+    #
+    # It used to be recoverable only from the truncated `Target:` blob below,
+    # which made the anti-starvation mechanism depend on JSON key ordering:
+    # `receipt()` writes with sort_keys=True, so the target round-trips as
+    # body, kind, summary, task_id — free-form body FIRST — and `[:400]` cut
+    # `task_id` off the end. Measured: a task body over ~300 characters
+    # dropped the id, `attempted_task_ids()` returned nothing for it, and
+    # `select_target()` re-picked that same oldest task on every scheduled
+    # run forever. The starvation this whole mechanism exists to prevent,
+    # reachable by writing a slightly longer task description. (Devin on
+    # #1200.)
+    claim = ""
+    task_id = target.get("task_id")
+    if isinstance(task_id, str) and task_id:
+        claim = ("- Consumption claim: "
+                 f"`{json.dumps({'task_id': task_id}, sort_keys=True)}`\n")
     body = (
         "Hardening-lane output — **draft only**, produced by an agent that "
         "held no repository credential.\n\n"
+        f"{claim}"
         f"- Target: `{json.dumps(target)[:400]}`\n"
         f"- Verified at delivery: {lines} changed lines across "
         f"{len(paths)} file(s), one commit on `{base_sha[:12]}`, no referee "

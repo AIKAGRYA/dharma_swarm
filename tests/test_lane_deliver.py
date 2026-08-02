@@ -15,6 +15,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -779,6 +780,61 @@ def test_new_content_still_counts_against_the_blob_budget(
     assert code == 1
     assert stored["status"] == "REFUSED"
     assert "blob" in stored["reason"].lower(), stored["reason"]
+
+
+def test_a_long_task_body_still_yields_a_recoverable_consumption_claim(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a verified starvation loop (Devin on #1200).
+
+    The id used to be recoverable only from the truncated `Target:` blob.
+    `receipt()` writes with sort_keys=True, so the target round-trips as
+    body, kind, summary, task_id — free-form body FIRST — and `[:400]` cut
+    the id off. Measured: a body over ~300 characters dropped it entirely, so
+    `attempted_task_ids()` never saw the task and `select_target()` re-picked
+    the same oldest one on every scheduled run.
+
+    This round-trips the real chain: propose receipt -> delivery PR body ->
+    the reader's regex. The pre-existing test used a short hand-written body
+    and never reached the truncation.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "scripts" / "runtime"))
+    import lane_propose
+
+    target = {"kind": "mailbox", "task_id": "T-2026-08-02-alpha",
+              "summary": "harden the thing",
+              "body": "Please harden the following surface. " + ("x" * 600)}
+
+    # Exactly how propose writes it, and how delivery reads it back.
+    receipt_path = tmp_path / "propose.json"
+    lane_propose.receipt({"status": "READY_TO_DELIVER", "target": target},
+                         receipt_path)
+    read_back = lane_deliver.load_propose_receipt(receipt_path)["target"]
+    assert list(read_back) == ["body", "kind", "summary", "task_id"], \
+        "key order assumption changed; the truncation risk may have moved"
+
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    captured: dict[str, str] = {}
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            captured["body"] = cmd[cmd.index("--body") + 1]
+            return subprocess.CompletedProcess(cmd, 0, "https://pr/1", "")
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path,
+                            "--propose-receipt", str(receipt_path))
+    assert code == 0, stored
+    assert stored["status"] == "DRAFT_PR_OPENED"
+
+    # The truncated summary really does lose it...
+    assert '"task_id"' not in json.dumps(read_back)[:400]
+    # ...and the dedicated claim line carries it anyway.
+    recovered = re.findall(r'"task_id"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                           captured["body"])
+    assert "T-2026-08-02-alpha" in recovered, captured["body"][:400]
 
 
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:

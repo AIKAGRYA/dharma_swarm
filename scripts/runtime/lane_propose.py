@@ -265,9 +265,17 @@ def attempted_task_ids(repo: str) -> set[str] | None:
     for row in rows:
         if not str(row.get("headRefName", "")).startswith(LANE_BRANCH_PREFIX):
             continue
-        for match in re.finditer(r'"task_id"\s*:\s*"([^"]+)"',
+        # `(?:[^"\\]|\\.)*` rather than `[^"]+`: the id is written by
+        # json.dumps on the delivery side, so a value containing a quote
+        # arrives escaped and a naive class would capture a truncated,
+        # non-matching prefix — recording an id that matches no task while
+        # the real one stays "unattempted".
+        for match in re.finditer(r'"task_id"\s*:\s*"((?:[^"\\]|\\.)*)"',
                                  str(row.get("body", ""))):
-            seen.add(match.group(1))
+            try:
+                seen.add(json.loads(f'"{match.group(1)}"'))
+            except json.JSONDecodeError:
+                continue
     return seen
 
 
