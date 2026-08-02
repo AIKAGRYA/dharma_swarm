@@ -263,3 +263,73 @@ def test_make_gitleaks_absent_is_named_nonzero_failure():
     )
     assert proc.returncode == 2, proc.stdout + proc.stderr
     assert "GITLEAKS_MISSING" in proc.stdout + proc.stderr
+
+
+# ── WP-0C1R ratified-disposition contract (operator decisions A1 + B1,
+# 2026-08-02) ─────────────────────────────────────────────────────────
+# The 21 strict-scan findings were adjudicated by the operator: 18 Rule 1
+# files became declared research participants in ACTIVE_SURFACE_MANIFEST.yaml
+# and 3 Rule 2 files carry closure-layer-role headers. These tests pin the
+# rule's own documented procedure so an allowlist entry can never outlive
+# its manifest declaration or role header, and the allowlists can never
+# silently widen into the broad ignores the WP-0C1R spec forbids.
+
+_ANTI_SLOP = REPO_ROOT / ".semgrep" / "dharma-anti-slop.yml"
+_SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
+
+
+def _anti_slop_rule_excludes(rule_id: str) -> list[str]:
+    import yaml
+
+    config = yaml.safe_load(_ANTI_SLOP.read_text(encoding="utf-8"))
+    rule = next(r for r in config["rules"] if r["id"] == rule_id)
+    return list(rule.get("paths", {}).get("exclude", []))
+
+
+def test_rule1_research_excludes_are_declared_manifest_participants():
+    import yaml
+
+    manifest = yaml.safe_load(_SURFACE_MANIFEST.read_text(encoding="utf-8"))
+    participants = manifest.get("research_state_participants", {})
+    declared = {
+        path
+        for group in participants.values()
+        for path in group
+    }
+    assert len(declared) == 18, (
+        "the WP-0C1R ratification declared exactly 18 research participants; "
+        f"manifest now declares {len(declared)} — update the adjudication "
+        "record and this contract together, never one alone"
+    )
+    excludes = set(_anti_slop_rule_excludes("dharma.no-unauthorized-dharma-write"))
+    missing = declared - excludes
+    assert not missing, (
+        f"declared research participants missing from Rule 1 allowlist: {sorted(missing)}"
+    )
+    for path in sorted(declared):
+        assert (REPO_ROOT / path).is_file(), f"declared participant vanished: {path}"
+
+
+def test_rule2_excludes_carry_closure_layer_role_headers():
+    excludes = _anti_slop_rule_excludes("dharma.no-new-substrate")
+    role_files = [p for p in excludes if p != "dharma_swarm/runtime_state.py"]
+    assert sorted(role_files) == [
+        "dharma_swarm/bridge_registry.py",
+        "dharma_swarm/graph_store.py",
+        "dharma_swarm/knowledge_units.py",
+    ], "Rule 2 allowlist widened beyond the ratified WP-0C1R set"
+    for path in role_files:
+        head = (REPO_ROOT / path).read_text(encoding="utf-8")[:2000]
+        assert "closure-layer-role:" in head, (
+            f"{path} lost its closure-layer-role header — the Rule 2 "
+            "allowlist entry is only valid while the header states the role"
+        )
+
+
+def test_anti_slop_allowlists_contain_no_globs():
+    for rule_id in ("dharma.no-unauthorized-dharma-write", "dharma.no-new-substrate"):
+        for entry in _anti_slop_rule_excludes(rule_id):
+            assert "*" not in entry and not entry.endswith("/"), (
+                f"{rule_id} exclude {entry!r} is a glob/directory — the "
+                "WP-0C1R spec forbids broad ignores; allowlist exact files only"
+            )

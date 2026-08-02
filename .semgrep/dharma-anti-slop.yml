@@ -43,6 +43,29 @@ rules:
         - "scripts/memory_retrieval_broad_sweep.py"
         - "scripts/memory_retrieval_live_gate.py"
         - "scripts/memory_retrieval_system_gate.py"
+        # WP-0C1R ratified research participants (operator decision A1,
+        # 2026-08-02): declared in ACTIVE_SURFACE_MANIFEST.yaml
+        # research_state_participants; adjudication record
+        # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+        # Exact files only — no globs (plan forbids broad ignores).
+        - "dharma_swarm/palantir_pilot_manifest.py"
+        - "scripts/governance/palantir_pilot_audit.py"
+        - "scripts/governance/register_palantir_pilot.py"
+        - "scripts/research/palantir_contribution_packets.py"
+        - "scripts/research/palantir_deep_ingest.py"
+        - "scripts/research/palantir_learning_backlog.py"
+        - "scripts/research/palantir_pilot_curriculum.py"
+        - "scripts/research/palantir_pilot_orientation.py"
+        - "scripts/research/palantir_pilot_query.py"
+        - "scripts/research/palantir_playbook_evals.py"
+        - "scripts/research/palantir_public_source_cards.py"
+        - "scripts/research/palantir_public_source_index.py"
+        - "scripts/research/palantir_query_cookbook.py"
+        - "scripts/research/palantir_source_card_balanced_expand.py"
+        - "scripts/research/palantir_source_card_cleanup.py"
+        - "scripts/research/palantir_source_card_playbooks.py"
+        - "scripts/research/palantir_source_card_quality.py"
+        - "dharma_swarm/verifier_ranker_v0/inventory.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
@@ -72,6 +95,14 @@ rules:
     paths:
       exclude:
         - "dharma_swarm/runtime_state.py"
+        # WP-0C1R ratified roles (operator decision B1, 2026-08-02): each file
+        # carries a closure-layer-role header (Rule 2 vocabulary: exempt —
+        # subordinate adapter/projection under the MemoryKernel doctrine,
+        # CLAUDE.md); adjudication record
+        # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+        - "dharma_swarm/bridge_registry.py"
+        - "dharma_swarm/graph_store.py"
+        - "dharma_swarm/knowledge_units.py"
     patterns:
       - pattern-either:
           # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
