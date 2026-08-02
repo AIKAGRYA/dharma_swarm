@@ -479,7 +479,20 @@ def _stageable(paths: list[str]) -> list[str]:
     if listed.returncode == 0:
         tracked = {os.fsdecode(part) for part in listed.stdout.split(b"\0")
                    if part}
-    return [path for path in paths if Path(path).exists() or path in tracked]
+    # `lexists`, not `exists`: the predicate has to match what `git add`
+    # ACCEPTS, and `Path.exists()` follows symlinks. A freshly created
+    # dangling symlink therefore read as absent and was filtered out of the
+    # first staging pass — while `git add -- link` accepts it happily. It is
+    # still returned in `staged`, so the post-test pass re-added it, the two
+    # trees diverged, and the run died reporting "the test run altered the
+    # measured content" about a mutation that never happened. Measured:
+    #
+    #   Path('dangling').exists()   -> False      git add -- dangling -> 0
+    #   os.path.lexists('dangling') -> True       (staged)
+    #
+    # (Devin on #1200.)
+    return [path for path in paths
+            if os.path.lexists(path) or path in tracked]
 
 
 def stage_agent_changes() -> list[str] | None:

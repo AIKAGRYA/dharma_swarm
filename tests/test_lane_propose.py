@@ -306,6 +306,43 @@ def test_a_git_mv_does_not_discard_the_rest_of_the_run(
     assert sorted(listed) == ["a.py", "b.py", "c.py"], listed
 
 
+def test_a_dangling_symlink_is_staged_in_the_first_pass(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for a false BLOCKED (Devin on #1200).
+
+    `_stageable` must match what `git add` ACCEPTS. `Path.exists()` follows
+    symlinks, so a freshly created dangling symlink read as absent and was
+    filtered out of the first staging pass — but it stays in the returned
+    `staged` list, so the post-test pass re-added it, the trees diverged, and
+    the run died claiming "the test run altered the measured content" about a
+    mutation that never occurred. Measured against real git:
+
+        Path('dangling').exists()   -> False    git add -- dangling -> exit 0
+        os.path.lexists('dangling') -> True     (staged)
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+
+    (repo / "dangling").symlink_to("/nonexistent/target")
+    (repo / "ok.py").write_text("x = 1\n", encoding="utf-8")
+
+    staged = lane_propose.stage_agent_changes()
+    assert staged == ["dangling", "ok.py"], staged
+
+    # Both trees must agree: what pass 1 staged is what pass 2 reproduces.
+    measured = subprocess.run(["git", "write-tree"], cwd=repo,
+                              capture_output=True, text=True,
+                              check=True).stdout.strip()
+    subprocess.run(["git", "reset", "-q", "HEAD", "--"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "--", *staged], cwd=repo, check=True)
+    post = subprocess.run(["git", "write-tree"], cwd=repo,
+                          capture_output=True, text=True,
+                          check=True).stdout.strip()
+    assert post == measured, "the two staging passes must agree"
+
+
 def test_a_staged_deletion_does_not_discard_the_run(
         tmp_path: Path, monkeypatch) -> None:
     """`git rm` has the identical shape: the path is in neither the worktree
