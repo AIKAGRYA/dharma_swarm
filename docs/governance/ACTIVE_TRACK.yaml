@@ -159,6 +159,22 @@ active_tracks:
       - tests/test_agent_loop_budget.py
       - tests/test_cron_unify.py
       - tests/test_cron_authority.py
+      - dharma_swarm/strategy_reinforcer.py
+      - dharma_swarm/agent_runner.py
+      - dharma_swarm/loop_supervisor.py
+      - dharma_swarm/orchestrate_live.py
+      - dharma_swarm/overnight_director.py
+      - dharma_swarm/signal_bus.py
+      - tests/test_strategy_reinforcer.py
+      - tests/test_agent_runner_semantic_acceptance.py
+      - tests/test_loop_supervisor.py
+      - tests/test_orchestrate_live.py
+      - tests/test_overnight_director.py
+      - tests/test_signal_bus.py
+      - docs/governance/humming_v2_named_milestones.schema.json
+      - scripts/governance/humming_v2_named_milestones_check.py
+      - tests/test_humming_v2_named_milestones_check.py
+      - reports/loop_closure/humming_v2_named_milestones.json
 
     moves_vital_signs:
       - quality_gates
@@ -464,22 +480,114 @@ active_tracks:
         what: "WP-A4A5 (aliveness campaign wave 0, admitted 2026-07-17): durable liveness evidence — orchestrate_live.py append_liveness_ledger_row writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, closing the overwrite-in-place gap in _write_loop_liveness that left run claims unfalsifiable; single-mint process boot_id in dharma_swarm/spine/identity.py (P4 restart-survival prerequisite); read-only replay verifier scripts/governance/liveness_ledger_check.py (typed needs_host exit 0 when the ledger is absent, exit 1 on broken chain or failed coverage); live_ops_census.py dharma_daemon pattern extended to match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD). REMAINING (host, WP-LC2 window): >=24 chained hourly rows under one boot_id after 24h, cross-restart different-boot_id proof, hourly census scheduling after the BR-004 cron reconciliation."
         kind: code
         blocker: false
-      - id: humming-v2-p0-b-root-loop
-        what: >-
+      - id: humming-v2-p1-l5-root-loop
+        what: |
           Bound root agent_loop.sh with cycle, wall-clock, and stall limits and
           consume the merged hierarchical budget contract. Token/cost limits
           may be advertised only where authoritative child accounting exists.
-          Dependencies: humming-v2-p0-b-contract and the applicable Titanium
-          accounting adapters. Completion: cycle/wall/stall stops, child budget
+          Dependencies: the applicable constitutional P0 slices,
+          humming-v2-p0-b-contract, and the Titanium accounting adapters merged
+          at exact heads. Completion: cycle/wall/stall stops, child budget
           exhaustion, crash/restart, and no-output negative controls with
-          receipts. Cross-track acknowledgement:
+          receipts while preserving .STOP and kill-switch behavior. Cross-track acknowledgement:
           repository-titanium-hardening-2026-07. Target closure:
           VERIFIED_SLICE. Non-goal: no false aggregate-spend claim from a
           direct-spend-only ledger.
         kind: code
         blocker: true
+      - id: humming-v2-p1-l1-strategy-canary
+        what: |
+          Run StrategyReinforcer only as a receipt-grounded shadow canary.
+          Dependencies: the applicable constitutional P0 slices,
+          humming-v2-p0-h2a, and authoritative budget accounting merged at
+          exact heads. The candidate remains disabled until the later
+          Titanium-owned humming-v2-p1-l1-consumer merges, so that promotion
+          ordering is one-way rather than a mutual implementation dependency.
+          Treat strategy fragments as untrusted data; bind source class,
+          strategy ids, prompt digest, top-k and character limits, and prevent
+          strategy text from changing capability or authority fields.
+          Completion: invalid-strategy rejection, rollback switch, paired
+          counterfactual without the strategy, decision delta, ablation, and
+          Loop 7 owner-surface evidence. Cross-track acknowledgement:
+          repository-titanium-hardening-2026-07 owns the consumer seam. Target
+          closure: VERIFIED_SLICE before any owner-specific CLOSED_LIVE claim.
+        kind: code
+        blocker: true
+      - id: humming-v2-p1-l3-pause-actuator
+        what: |
+          Implement one typed, expiring PAUSE_LOOP actuator that consumes an
+          independently authorized supervisor recommendation; add typed cancel
+          and escalate outcomes without letting the observer self-authorize.
+          Dependencies: constitutional P0 merged. Completion: pause honored
+          within one tick, durable receipt, expiry and resume, crash/restart
+          continuation, malformed or stale recommendation denial, and rollback.
+          Target closure: VERIFIED_SLICE. Non-goal: REDUCE_SCOPE or
+          ALERT_DHYANA remains observation-only until it has its own actuator.
+        kind: code
+        blocker: true
+      - id: humming-v2-p1-l4-earned-acceptance
+        what: |
+          Require the dharma_swarm/agent_runner.py semantic acceptance path to
+          bind declared artifacts, exact worktree delta, and test receipts;
+          empty output and false success remain failures. Dependencies:
+          constitutional P0 merged. Completion:
+          tests/test_agent_runner_semantic_acceptance.py covers seeded empty-
+          success, stale artifact, orphaned verifier, retry bound, and crash or
+          restart negative controls plus rollback. Target closure:
+          VERIFIED_SLICE. Non-goal: a model assertion or file-existence grep is
+          not earned acceptance.
+        kind: code
+        blocker: true
+      - id: humming-v2-p1-l6-named-milestones
+        what: |
+          Queue named dependency-critical causal milestones instead of an
+          aggregate loop count: Loop 1 host-bound closure; Loop 4 H5 context
+          consumed by later real work; Loop 2 or 6 L2 verdict changing later
+          routing or admission; one E4 event with durable delivery, consumer
+          acknowledgement, and backpressure; and any further loop only after
+          its owner criterion is named here. Dependencies: constitutional P0
+          merged; no P2/P3 implementation or live receipt is required to freeze
+          the criteria. Completion: the exact schema and checker at
+          docs/governance/humming_v2_named_milestones.schema.json and
+          scripts/governance/humming_v2_named_milestones_check.py, with
+          tests/test_humming_v2_named_milestones_check.py, reject an unnamed
+          owner criterion, missing causal field, aggregate-count substitution,
+          or unreviewed promotion. P4 later populates
+          reports/loop_closure/humming_v2_named_milestones.json only after the
+          applicable P3/host evidence exists. Target closure: CHECKED criteria
+          contract only. Non-goal: no five-of-thirteen target, early receipt,
+          or aggregate production-readiness claim.
+        kind: governance
+        blocker: true
+      - id: humming-v2-p3-l2-loop-ack
+        what: |
+          Own the loop-side producer epoch, promotion boundary, and later
+          decision-delta evidence for the separated L2 evaluator canary.
+          Dependencies: humming-v2-p3-l2-evaluator and constitutional P0/P1/P2
+          exact merged heads. Completion: evaluator candidates cannot write
+          their holdout evidence, deterministic checks remain authoritative,
+          abstention is preserved, and old/new/adversarial verdicts change a
+          later bounded routing decision only through existing authority.
+          Cross-track acknowledgement: orchestration-arena-v1-2026-06 owns the
+          evaluator and calibration surfaces. Target closure: VERIFIED_SLICE.
+        kind: governance
+        blocker: true
+      - id: humming-v2-p3-e2-event-producer
+        what: |
+          Repair the real GAUNTLET_REGRESSION producer call in
+          dharma_swarm/orchestrate_live.py and route the typed event through
+          dharma_swarm/signal_bus.py to a deduplicated incident and
+          diagnosis/proposal, never directly to mutation. Dependencies:
+          constitutional P0, bounded P1, and P2 graph contracts merged.
+          Completion: real-producer-path tests cover event identity, cooldown,
+          dedupe, causal component attribution, immutable reproduction,
+          duplicate/drop/reorder/restart, failed consumer, and propose-only
+          default. Cross-track acknowledgement: sovereign-safety-tcb-2026-07
+          owns the promotion boundary. Target closure: VERIFIED_SLICE.
+        kind: code
+        blocker: true
       - id: humming-v2-e1-cron-authority
-        what: >-
+        what: |
           OWNERSHIP RESOLUTION ONLY AT A0: loop-closure owns cron_jobs.json,
           scripts/cron_unify.py, and dharma_swarm/cron_job_runtime.py for the future E1
           authority-unification slice. Implementation is dependency-blocked
@@ -493,6 +601,19 @@ active_tracks:
           access, or BR-004 closure claim.
         kind: governance
         blocker: false
+      - id: humming-v2-p4-loop-causal-closure
+        what: |
+          Prove each named Humming loop promotion with producer and consumer
+          receipts, a later-cycle and post-restart read, decision delta,
+          ablation, and the loop-specific live owner criterion in
+          CYBERNETIC_LOOP_MAP.md. Dependencies: the applicable P1/P3 slices and
+          organism-rewire host evidence merged at exact heads. Completion:
+          every path is classified, two clean exact-head falsifier passes find
+          no unresolved P0/P1 or unexplained P2, and any unproved loop remains
+          below CLOSED_LIVE. Target closure: owner-specific only. Non-goal: no
+          aggregate CLOSED_LIVE count or grep-only causality claim.
+        kind: governance
+        blocker: true
 
   - id: orchestration-arena-v1-2026-06
     name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
@@ -521,6 +642,12 @@ active_tracks:
       - tests/test_council_profiles.py
       - tests/test_coordination_closure_checks.py
       - tests/test_arena_truth_report.py
+      - dharma_swarm/agent_runner_quality.py
+      - dharma_swarm/quality_gates.py
+      - dharma_swarm/ginko_brier.py
+      - tests/test_agent_runner_quality.py
+      - tests/test_quality_gates.py
+      - tests/test_ginko_brier.py
     moves_vital_signs:
       - eval_coverage
       - quality_gates
@@ -652,6 +779,37 @@ active_tracks:
           the report receipt. Labels only; zero training (v1 doctrine).
         kind: code
         blocker: false
+      - id: humming-v2-p2-differential-ack
+        what: |
+          Independently review the frozen DharmaGraph-owned corpus and semantic
+          outcome referee at tests/oracle_support/scenarios.py,
+          tests/oracle_support/outcomes.py, and
+          tests/test_langgraph_differential_oracle.py as read-only inputs, then
+          provide an Arena custody acknowledgement without editing those files.
+          Dependencies: P1 bounded-loop contracts and the DharmaGraph P2
+          macrograph candidate at an exact head. Completion: representative
+          genomes exercise both engines, semantic divergence is explicit,
+          fixtures cannot establish production parity, and arena evidence
+          cannot authorize the graph promotion it evaluates. Cross-track
+          execution and file owner: dharmagraph-engine-2026-07. Target closure:
+          CHECKED before any scoped RUNTIME_BLOCKING promotion.
+        kind: governance
+        blocker: true
+      - id: humming-v2-p3-l2-evaluator
+        what: |
+          Build the evaluator side of L2/H2b with immutable versioned holdout
+          tasks and outcomes, separated producer and evaluator epochs, and
+          old/new/adversarial comparison before promotion. Dependencies:
+          constitutional P0/P1/P2 exact merged heads. Completion: evaluator
+          candidates have no write access to heldout evidence; Brier and ECE
+          apply only to explicit probability forecasts with independently
+          resolved outcomes; abstention and deterministic-check precedence are
+          measured; sabotage of label custody fails. Cross-track
+          acknowledgement: loop-closure-2026-06 owns producer and later-decision
+          evidence; sovereign-safety-tcb-2026-07 owns the no-grant authority
+          boundary. Target closure: VERIFIED_SLICE canary only.
+        kind: code
+        blocker: true
 
   - id: merge-master-mike-d4-2026-06
     name: Merge Master Mike — D4 persistent always-on merge agent
@@ -825,19 +983,35 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-enforcement-ack
-        what: >-
+        what: |
           Cross-track enforcement acknowledgement for Humming V2: preserve the
           existing required-check, stale-head, conflict, unresolved-thread,
           CHANGES_REQUESTED, reviewer-quorum, and human-risk gates. New Humming
           checks remain OBSERVED or CHECKED until the existing policy
           independently promotes them; advisory jobs are never described as
           enforced. Dependencies: each owning implementation PR supplies its
-          exact deterministic checker and negative control. Target closure:
+          exact deterministic checker and negative control. Completion: an
+          attempted weakening of any preserved gate is rejected, and the
+          authoritative policy names the exact check before promotion. Target closure:
           VERIFIED_SLICE for merge-policy consumption only. Non-goals: no new
           merge authority, waiver, self-approval, silent merge, or reduced
           required-context set.
         kind: governance
         blocker: false
+      - id: humming-v2-p3-e3-reviewer-service
+        what: |
+          Bind the automatic Humming reviewer lane to the existing authenticated
+          native GitHub App review source and Merge Master policy. Dependencies:
+          constitutional P0/P1/P2 merged and the exact candidate head frozen.
+          Completion: trusted-login authentication, commit pin, timeout,
+          concurrency, dedupe, kill switch, receipt transport, stale-head and
+          unavailable-reviewer negative controls, plus an automatic trigger;
+          unresolved threads and CHANGES_REQUESTED still block. A future
+          credentialed provider is separately operator-gated. Target closure:
+          VERIFIED_SLICE. Non-goals: no secret in git, self-approval, new merge
+          authority, or judge-issued authorization.
+        kind: code
+        blocker: true
 
   - id: organism-rewire-2026-07
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
@@ -856,6 +1030,12 @@ active_tracks:
       - tools/world_signal_ingestor_go/**
       - tools/github_ingestor_go/**
       - tools/evidence_ingestor_go/**
+      - tools/world_signal_ingestor_go/adapter.go
+      - tools/world_signal_ingestor_go/adapter_test.go
+      - tools/github_ingestor_go/adapter.go
+      - tools/github_ingestor_go/adapter_test.go
+      - tools/evidence_ingestor_go/main.go
+      - tools/evidence_ingestor_go/main_test.go
       - dharma_swarm/world_radar/**
       - scripts/runtime/github_ingestor_runner.py
       - tests/test_github_ingestor_runner.py
@@ -961,15 +1141,33 @@ active_tracks:
         kind: code
         blocker: false
 
-      - id: humming-v2-host-ack
-        what: >-
+      - id: humming-v2-p3-e4-afferents
+        what: |
+          Own authenticated source identity and correlation continuity for the
+          existing Go afferent adapters before they enter the durable event
+          transport. Dependencies: constitutional P0/P1/P2 merged; this source-
+          identity slice merges before the Titanium NATS contract consumes it.
+          Completion: authenticated
+          source, stable event and consumer identity, duplicate/drop/reorder,
+          poison-input, restart, and adapter-receipt negative controls; host
+          delivery remains unclaimed until the transport owner supplies durable
+          acknowledgement and backpressure evidence. Cross-track
+          acknowledgement: repository-titanium-hardening-2026-07 owns the NATS
+          verification and host matrix. Target closure: VERIFIED_SLICE.
+        kind: code
+        blocker: true
+      - id: humming-v2-p4-host-evidence
+        what: |
           Cross-track host acknowledgement for Humming V2: preserve
           deployment authority with organism-rewire and provide later
           host-bound evidence for actual sandbox/network tier, scheduler
-          authority, loop causality, and rollback. Dependencies: no host action
-          before the owning implementation PRs merge. Completion: exact
-          deployed SHA, host identity, live owner-surface observation, negative
-          control, and rollback receipt. Target closure: host evidence only.
+          authority, durable events, loop causality, restart, and rollback.
+          Dependencies: no host action before each owning implementation PR
+          merges and explicit host authority exists. Completion: exact deployed
+          SHA, host identity, mounts, ports, configuration and scheduler,
+          actual isolation tier, live owner-surface observation, negative
+          control, post-restart read, and executed rollback receipt. Target
+          closure: host evidence only.
           Non-goals: A0 authorizes no deployment, restart, secret use, paid
           infrastructure, or CLOSED_LIVE promotion.
         kind: ops
@@ -1030,6 +1228,16 @@ active_tracks:
       - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)
       - tests/test_action_effect_graph_adapter.py
       - tests/test_graph_budget_lineage.py
+      - dharma_swarm/graph/schema.py
+      - dharma_swarm/graph/compiler.py
+      - dharma_swarm/graph/checkpoint.py
+      - dharma_swarm/graph/durable_invoker.py
+      - dharma_swarm/graph/interrupts.py
+      - dharma_swarm/graph/scheduler.py
+      - dharma_swarm/graph/executor.py
+      - tests/test_graph_neutral_core.py
+      - tests/test_graph_neutral_cycles_resume.py
+      - tests/test_langgraph_parity_readiness.py
 
     moves_vital_signs:
       - quality_gates
@@ -1350,7 +1558,7 @@ active_tracks:
         blocker: false
 
       - id: humming-v2-p0-graph-adapter
-        what: >-
+        what: |
           Add the DharmaGraph adapter for ActionEnvelope graph/checkpoint
           identity, parent/child budget propagation, and side-effect identity
           derived from (run_id, superstep, node_id, attempt), reusing
@@ -1364,6 +1572,84 @@ active_tracks:
           VERIFIED_SLICE. Non-goal: this does not authorize P2 graph promotion
           or claim neutral-engine production parity.
         kind: code
+        blocker: true
+      - id: humming-v2-p2-macrograph-contract
+        what: |
+          Implement the neutral checkpointed campaign macrograph only after
+          P0 and every P1 contract are stable: ADMIT, PLAN, ACT, VERIFY,
+          COMMIT, OBSERVE, ADAPT, and COMPLETE or RETRY or ESCALATE. Reject
+          cycles at compile time unless a bounded cycle is explicitly typed;
+          enforce termination, recursion and retry bounds, checkpoint lineage,
+          default-REJECT human interrupt, and no approval bypass on resume.
+          Completion: crash/restart, cycle, recursion, interrupt/resume,
+          sibling-cancellation, and checkpoint-fork negative controls with no
+          new graph truth store. Target closure: VERIFIED_SLICE.
+        kind: code
+        blocker: true
+      - id: humming-v2-p2-g1-legacy-honesty
+        what: |
+          Repair the admitted legacy seams before migration: cycle detection
+          in dharma_swarm/workflow.py raises rather than truncates, and
+          dharma_swarm/checkpoint.py writes through a same-directory temporary
+          file, flush, file fsync, atomic replace, and parent-directory fsync.
+          Dependencies: constitutional P0 and bounded P1 merged. Completion:
+          tests/test_workflow.py and tests/test_checkpoint.py prove cycle
+          rejection, failure-injected atomicity, preservation of the last good
+          checkpoint, no partial file, and rollback. Target closure:
+          VERIFIED_SLICE. Non-goal: legacy honesty is not neutral-engine parity
+          or a reason to retain the legacy executor after migration.
+        kind: code
+        blocker: true
+      - id: humming-v2-p2-g5-hitl-protocol
+        what: |
+          Use one default-REJECT human-interrupt protocol across
+          dharma_swarm/checkpoint.py and dharma_swarm/graph/interrupts.py with
+          durable request and response identity bound to the exact run, node,
+          attempt, policy, and checkpoint lineage. Dependencies:
+          humming-v2-p2-macrograph-contract and the P0 ActionEnvelope merged.
+          Completion: tests/test_checkpoint.py and
+          tests/test_graph_neutral_langgraph_oracle.py prove missing handler,
+          timeout, stale or mismatched response, duplicate/replay, crash/resume,
+          and approval-bypass attempts reject; only an exact pending request may
+          resume. Target closure: VERIFIED_SLICE. Non-goals: no implicit
+          approval, auto-approve for consequential Humming paths, or new human-
+          authority store.
+        kind: code
+        blocker: true
+      - id: humming-v2-p2-neutral-compiler
+        what: |
+          Compile TopologyGenome into the neutral DharmaGraph engine and
+          shadow-run the legacy and neutral engines on identical representative
+          genomes. Dependencies: humming-v2-p2-macrograph-contract and the
+          arena differential acknowledgement. Completion: semantic outcome
+          differential, durable receipts, retry/checkpoint controls, exact
+          migration coverage, rollback, and one scoped lane only after parity;
+          the legacy bridge receives a dated retirement gate. Cross-track
+          acknowledgement: orchestration-arena-v1-2026-06. Target closure:
+          CHECKED before any scoped RUNTIME_BLOCKING promotion.
+        kind: code
+        blocker: true
+      - id: humming-v2-p2-agent-node-fencing
+        what: |
+          Fence each consequential agent node through the merged ActionEnvelope
+          and derive side-effect identity from stable run, superstep, node, and
+          attempt coordinates. Dependencies: P0 graph adapter and
+          humming-v2-p2-macrograph-contract. Completion: one provider invocation
+          across a same-attempt mid-superstep crash, distinct identity for a
+          new attempt, concurrent-claim and ambiguous-commit controls, budget
+          failure before commit, and rollback. Target closure: VERIFIED_SLICE.
+        kind: code
+        blocker: true
+      - id: humming-v2-p2-gauntlet-promotion
+        what: |
+          Re-run the frozen DharmaGraph gauntlet only after the macrograph,
+          neutral compiler, default-REJECT HITL, and agent-node fencing merge.
+          Completion: exact candidate SHA, independent judge custody,
+          invariant-specific mutations, total score above 58 and LG24 above
+          zero, row-level semantic delta, full migration coverage, and
+          rollback. Fixture-only tests cannot prove neutral-engine parity.
+          Target closure: scoped VERIFIED_SLICE; no production-wide promotion.
+        kind: governance
         blocker: true
     non_goals:
       - Do not adopt langgraph as the runtime engine; it is reference semantics and a differential-test oracle only.
@@ -1502,6 +1788,17 @@ active_tracks:
       - tests/test_telos_hook.py
       - tests/test_action_budget.py
       - docs/plans/handoffs/HUMMING_V2_EXECUTION_LEDGER_2026-08-01.md
+      - dharma_swarm/policy_compiler.py
+      - tests/test_policy_compiler.py
+      - tests/test_policy_compiler_v2.py
+      - tests/test_policy_compiler_fourfold_warrant.py
+      - reports/governance/safety/humming_v2_policy_compiler_coverage.json
+      - dharma_swarm/reflexion.py
+      - dharma_swarm/self_improve.py
+      - dharma_swarm/forge_v1/coding_swarm.py
+      - tests/test_reflexion.py
+      - tests/test_self_improve.py
+      - tests/test_forge_v1.py
 
     moves_vital_signs:
       - quality_gates
@@ -1628,7 +1925,7 @@ active_tracks:
         blocker: false
 
       - id: humming-v2-p0-k
-        what: >-
+        what: |
           ADMITTED ONLY AFTER THE A0 GOVERNANCE PR MERGES. Build the typed
           constitutional ActionEnvelope in dharma_swarm/action_effects/envelope.py and one
           action-effect dispatcher in dharma_swarm/action_effects/dispatcher.py, reusing
@@ -1655,7 +1952,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-h1a
-        what: >-
+        what: |
           H1a, before installation: harden hooks/telos_gate.py with strict input
           schema validation, inspection of every GATED_TOOLS member, and
           fail-closed consequential behavior for empty, malformed, unknown, and
@@ -1669,7 +1966,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-h1b
-        what: >-
+        what: |
           H1b, installation only after humming-v2-p0-h1a is independently
           reviewed and merged: register the hardened PreToolUse hook in
           .claude/settings.json and prove one real end-to-end consequential
@@ -1680,7 +1977,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-h2a
-        what: >-
+        what: |
           Implement deterministic capability and argument provenance through
           ActionEnvelope. External text may populate data fields but may never
           choose capability, destination, authority class, graph edge,
@@ -1696,7 +1993,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-h3-contract
-        what: >-
+        what: |
           Define one deterministic shell-command policy in
           dharma_swarm/shell_command_policy.py. Freeze its policy digest,
           normalize paths and arguments, classify read-only versus
@@ -1711,7 +2008,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-b-contract
-        what: >-
+        what: |
           Establish one hierarchical parent/child budget reservation contract
           in dharma_swarm/action_effects/budget.py, with contract tests in
           tests/test_action_budget.py, for loops, graph nodes, retries, provider
@@ -1728,6 +2025,81 @@ active_tracks:
           aggregate token or cost-cap claims are prohibited. Non-goal: no new
           economic ledger or durable truth store.
         kind: code
+        blocker: true
+      - id: humming-v2-p0-h4-policy-bridge
+        what: |
+          Extend dharma_swarm/policy_compiler.py to consume the signed
+          dharma_kernel.py axioms and registered telos gates as read-only
+          inputs, with an explicit compiled or uncompilable(reason) result for
+          each structured principle. Gate changes use GateRegistry.propose();
+          H4 never edits dharma_kernel.py or telos_gates.py directly.
+          Dependencies: humming-v2-p0-k and humming-v2-p0-h2a merged at exact
+          heads. Completion: tests/test_policy_compiler.py,
+          tests/test_policy_compiler_v2.py, and
+          tests/test_policy_compiler_fourfold_warrant.py prove digest-bound
+          coverage reporting at
+          reports/governance/safety/humming_v2_policy_compiler_coverage.json,
+          deterministic denial, unsupported-principle refusal, mutation of
+          each protected predicate, rollback, and a named fail-closed promotion
+          step. The bridge remains OBSERVED or CHECKED
+          until a human-approved [kernel-amendment] names the principle set
+          promoted to RUNTIME_BLOCKING. Non-goal: degrading to current behavior
+          is shadow evidence, never enforcement or kernel mutability.
+        kind: code
+        blocker: true
+      - id: humming-v2-p1-l7-verifier-reflexion
+        what: |
+          Run the orphaned-verifier and bounded reflexion slice only in a
+          disposable worktree or sandbox, compare output to the exact proposal
+          digest, and keep self-improvement behind DHARMA_SELF_IMPROVE and the
+          existing promotion authority. Dependencies: constitutional P0 and
+          earned-acceptance P1 merged. Completion: orphan detection,
+          provenance and bounded-retention tests, stale or mismatched proposal
+          denial, crash/restart, no-output and rollback controls; mutation of
+          task.workdir or task.edit_file never reaches the implementation
+          checkout. Target closure: VERIFIED_SLICE. Non-goal: no standing
+          autonomous apply or untrusted/market fitness.
+        kind: code
+        blocker: true
+      - id: humming-v2-p3-h2b-judge-boundary
+        what: |
+          Admit an optional judge canary only after deterministic H2a and the
+          separated L2 evaluator merge. The judge may deny, abstain, or
+          escalate; it may never create capability or upgrade denied,
+          expired, or unproved authority. Completion: timeout, unavailability,
+          malformed verdict, prompt injection, approval spoof, and
+          judge-self-authorization controls through the ActionEnvelope with
+          deterministic denial receipts. Cross-track acknowledgement:
+          orchestration-arena-v1-2026-06 owns calibration evidence. Target
+          closure: VERIFIED_SLICE canary only.
+        kind: code
+        blocker: true
+      - id: humming-v2-p3-e2-promotion-boundary
+        what: |
+          Consume GAUNTLET_REGRESSION incidents only as immutable
+          diagnosis/proposal inputs behind the existing deterministic
+          reproduction and promotion authority; self_improve.py may not treat
+          the event or One Wire as authorization. Dependencies:
+          humming-v2-p3-e2-event-producer and the P0 ActionEnvelope merged.
+          Completion: dedupe, stale proposal, wrong causation, missing budget,
+          capability-laundering, judge-unavailable, and replay controls plus
+          rollback. Cross-track execution owner: loop-closure-2026-06 owns the
+          producer. Target closure: VERIFIED_SLICE propose-only.
+        kind: code
+        blocker: true
+      - id: humming-v2-p4-evidence-custody
+        what: |
+          Maintain the append-only Humming execution ledger and issue the final
+          digest-bound confidence receipt only after every owner-specific P0
+          through P4 item is merged and re-proved on exact main. Completion:
+          two cache-isolated full runs, two decorrelated reviews with no open
+          P0/P1 or unexplained P2, fresh-clone agreement, executed rollback for
+          each consequential slice, exact host evidence for every live claim,
+          and no temporary workflow, script, parallel owner, dead caller, or
+          undated compatibility alias. Target closure:
+          OPERATIONALLY_COMPLETE_100_OF_100 only when all controller buckets
+          are full; otherwise record the single exact irreducible gate.
+        kind: governance
         blocker: true
     non_goals:
       - Do not weaken, bypass, or hard-code any telos gate, ratchet, or the one-door verify_promotion arbiter to make a gate green.
@@ -1802,6 +2174,11 @@ active_tracks:
       - tests/test_transcendence_ledger.py
       - reports/governance/inward_ascent/**
       - reports/governance/chamber/**
+      - reports/governance/chamber/humming_v2_frontier_decisions.json
+      - dharma_swarm/chetana/claude_code_plugin/chetana/scripts/pre_compact.sh
+      - dharma_swarm/memory_kernel/context_eval.py
+      - dharma_swarm/memory_kernel/context_eval_cases.py
+      - tests/test_memory_context_eval.py
     moves_vital_signs:
       - eval_coverage
       - quality_gates
@@ -1928,6 +2305,36 @@ active_tracks:
         what: "E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta."
         kind: governance
         blocker: false
+      - id: humming-v2-p1-h5-context-integrity
+        what: |
+          Evaluate the existing Chetana pre-compact and MemoryKernel context
+          path with frozen cases in dharma_swarm/memory_kernel/context_eval.py
+          and context_eval_cases.py; do not reward memory growth. Dependencies:
+          constitutional P0 merged. Completion: tests/test_memory_context_eval.py
+          proves retrieval and answer utility, source attribution,
+          contradiction and stale-claim rejection, protected-fact coverage,
+          token and latency bounds, a deletion or supersession receipt, and an
+          ablation against raw recall. Cross-track acknowledgement:
+          loop-closure-2026-06 owns later-cycle causal consumption. Target
+          closure: VERIFIED_SLICE before a Loop 4 owner claim. Non-goals: no
+          never-shrink metric, new memory store, or context-derived authority.
+        kind: code
+        blocker: true
+      - id: humming-v2-frontier-decision-matrix
+        what: |
+          Maintain the read-only Humming frontier decision matrix from current
+          primary sources: exact release or commit and date, license, threat
+          model, local overlap, locally reproduced behavioral gap, measured
+          integration and operational cost, added state and attack surface,
+          rollback, owner, and acceptance test. Run candidates as differential
+          oracles before any adoption decision. Dependencies: each consuming
+          work packet requests only its relevant row. Completion: every final
+          dependency decision is ADOPT, BORROW_SEMANTICS, DIFFERENTIAL_ORACLE,
+          REJECT, or DEFER with evidence. Non-goal: no framework, service,
+          dependency, state owner, or optional research candidate is admitted
+          for implementation by this A0 item.
+        kind: research
+        blocker: true
 
     non_goals:
       - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
@@ -2027,6 +2434,7 @@ active_tracks:
       - tests/test_action_provenance.py
       - tests/test_sandbox_limits.py
       - tests/test_budget_accounting_adapters.py
+      - scripts/docops/check_docops_integrity.py
 
     moves_vital_signs:
       - quality_gates
@@ -2123,7 +2531,7 @@ active_tracks:
         evidence_criterion: titanium_independent_clean_room_receipt_valid
 
       - id: humming-v2-p0-harness-consumers
-        what: >-
+        what: |
           Migrate the Titanium-owned consequential consumers
           (autonomous_agent.py, sandbox.py, and api/chat_tool_execution.py) to
           the merged ActionEnvelope/provenance contract and the single frozen
@@ -2138,13 +2546,16 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-h6
-        what: >-
+        what: |
           Add honest LocalSandbox CPU, memory, process, file-size, wall-clock,
           and output limits where the host supports them, with explicit
           isolation tiers. A requested network-isolated mode must fail rather
           than silently fall back when default-deny networking is unavailable.
-          Dependencies: humming-v2-p0-h3-contract and the scoped
-          ActionEnvelope adapter. Completion: resource-exhaustion negatives,
+          Dependencies: humming-v2-p0-h3-contract, the scoped ActionEnvelope
+          adapter, and the H6-specific gVisor, Firecracker, nsjail, and AISI row
+          of humming-v2-frontier-decision-matrix completed as a differential-
+          oracle decision before deployment design. Completion: resource-
+          exhaustion negatives,
           process-tree cleanup, output truncation receipt, unsupported-network
           refusal, and declared-tier checks. Target closure: VERIFIED_SLICE.
           Non-claim: LocalSandbox is not network-isolated merely because a
@@ -2152,9 +2563,12 @@ active_tracks:
         kind: code
         blocker: true
       - id: humming-v2-p0-b-adapters
-        what: >-
-          Wire authoritative child accounting adapters for Titanium-owned
-          agent/tool/provider paths into humming-v2-p0-b-contract. Dependencies:
+        what: |
+          Wire authoritative child accounting at the agent, tool, and provider
+          call sites already contained in the Titanium-owned exact surface
+          dharma_swarm/autonomous_agent.py into humming-v2-p0-b-contract.
+          Contract coverage lives in
+          tests/test_budget_accounting_adapters.py. Dependencies:
           the merged budget contract and ActionEnvelope. Completion: child
           reservations reconcile to parent limits across retries and provider
           fallback, unpriced or missing downstream usage blocks aggregate-cap
@@ -2164,6 +2578,49 @@ active_tracks:
           Non-goal: do not reinterpret daemon-direct spend or EconomicLedger
           P&L as aggregate authorization.
         kind: code
+        blocker: true
+      - id: humming-v2-p1-l1-consumer
+        what: |
+          Wire the Titanium-owned autonomous_agent.py consumer to the merged
+          H2a provenance boundary before the loop owner enables the
+          StrategyReinforcer shadow canary. Dependencies: P0 harness consumers
+          and humming-v2-p1-l1-strategy-canary candidate at an exact head.
+          Completion: strategy text remains data, cannot select capability or
+          authorization, prompt and strategy digests enter the dispatch
+          receipt, invalid or oversized input is rejected, and the consumer
+          rollback flag restores the prior path. Cross-track execution owner:
+          loop-closure-2026-06 owns strategy selection and causal ablation.
+          Target closure: VERIFIED_SLICE.
+        kind: code
+        blocker: true
+      - id: humming-v2-p3-e4-nats-contract
+        what: |
+          Prove the durable NATS or JetStream contract for adopted Humming
+          afferents with the existing substrate and live-evidence checkers.
+          Dependencies: P0/P1/P2 and humming-v2-p3-e4-afferents merged at
+          exact heads. Completion: authenticated source, durable delivery,
+          consumer identity and acknowledgement after commit, dedupe,
+          backpressure, replay, poison handling, duplicate/drop/reorder,
+          consumer restart, and typed NEEDS_HOST when live evidence is absent;
+          execute host rollback before any live swap. Cross-track execution
+          owner: organism-rewire-2026-07 owns afferent adapters and host action.
+          Target closure: VERIFIED_SLICE before host-bound promotion.
+        kind: code
+        blocker: true
+      - id: humming-v2-p4-projection-metabolism
+        what: |
+          After every owner-specific Humming slice merges, regenerate and
+          verify the canonical DocOps inventory and operator-coherence
+          projections from current owners; classify every caller, consumer,
+          feature flag, retry and host path. Dependencies: all applicable P0
+          through P4 implementations and rollback evidence merged. Completion:
+          temporary workflows and scripts are absent; dead callers, duplicate
+          policies and abandoned modules are removed only after reachability
+          proof; compatibility flags and aliases have dated retirement gates;
+          dashboards and runbooks underclaim; broken-register changes cite
+          current evidence. Target closure: VERIFIED_SLICE. Non-goal: generated
+          projections never become authority.
+        kind: governance
         blocker: true
     non_goals:
       - No Phase 1-7 implementation before the Phase 0 exit gate passes independently on merged main.
