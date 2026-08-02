@@ -1879,10 +1879,6 @@ active_tracks:
           - verdict
 
     next_items:
-      - id: WP-0D
-        what: "First land the 2026-08-01 bounded specification amendment and ownership admission for tests/test_agent_work_packet.py and tests/test_make_onboarding_contract.py (approval is that PR's human merge). Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios in tests/test_agent_work_packet.py, replace its environment-dependent hollow-module fixture with a deterministically absent module, add the measured pytest.mark.timeout repo-scale override for tests/test_make_onboarding_contract.py::test_make_report_root_rejects_hypothesis_cache_symlink registered in REPO_SCALE_OVERRIDES, and prove two consecutive clean make test-fast runs plus make test."
-        kind: code
-        blocker: true
       - id: WP-0F1
         what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
