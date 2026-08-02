@@ -255,6 +255,72 @@ def test_referee_paths_are_refused(lane, tmp_path, path) -> None:
     assert path in stored["paths"]
 
 
+def test_non_ascii_referee_path_cannot_evade_the_denylist(lane, tmp_path) -> None:
+    """Regression for a verified bypass (Greptile, post-merge on #1197).
+
+    `git diff --name-only` C-quotes paths with non-ASCII bytes, so
+    `.github/workflows/é.yml` arrived as `".github/workflows/\\303\\251.yml"`.
+    The leading quote meant it no longer matched the `.github/workflows/`
+    deny prefix and `denied_paths()` returned []. Reproduced against real git
+    before the fix; `-z` makes the output verbatim.
+    """
+    bundle = _make_bundle(lane, files={".github/workflows/é.yml": "evil\n"})
+    code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert "referee or excluded paths" in stored["reason"]
+    assert any("é.yml" in p for p in stored["paths"]), stored["paths"]
+    assert not any(p.startswith('"') for p in stored["paths"])
+
+
+def test_renaming_a_referee_file_away_cannot_evade_the_denylist(
+        lane, tmp_path) -> None:
+    """Regression for a second verified bypass (Codex, post-merge on #1197).
+
+    With rename detection on, `--name-only` reports ONLY the destination, so
+    renaming `scripts/runtime/pr_merge_control.py` to a benign path showed
+    just the benign name while effectively deleting the referee gate.
+    Reproduced against real git; `--no-renames` surfaces both sides.
+    """
+    seed = lane["seed"]
+    referee = "scripts/runtime/pr_merge_control.py"
+    body = "\n".join(f"line {i}" for i in range(200)) + "\n"
+    base_with_referee = _commit(seed, referee, body, "seed referee")
+    _git(seed, "push", "-q", "origin", "main")
+    _git(lane["work"], "fetch", "-q", "origin")
+    _git(lane["work"], "reset", "-q", "--hard", "origin/main")
+
+    _git(seed, "checkout", "-q", "-B", LANE_BRANCH, base_with_referee)
+    (seed / "dharma_swarm").mkdir(parents=True, exist_ok=True)
+    _git(seed, "mv", referee, "dharma_swarm/harmless.py")
+    _git(seed, "commit", "-q", "-m", "harden: tidy [hardening-lane]")
+    bundle = lane["tmp"] / "rename.bundle"
+    _git(seed, "bundle", "create", str(bundle),
+         f"{base_with_referee}..refs/heads/{LANE_BRANCH}")
+    _git(seed, "checkout", "-q", "main")
+
+    out = tmp_path / "deliver.json"
+    code = lane_deliver.main(["--repo", "o/r", "--bundle", str(bundle),
+                              "--receipt", str(out), "--base", "main"])
+    stored = json.loads(out.read_text())
+    assert code == 1
+    assert "referee or excluded paths" in stored["reason"]
+    assert referee in stored["paths"]
+
+
+def test_large_binary_blob_is_refused_despite_a_zero_line_count(
+        lane, tmp_path, monkeypatch) -> None:
+    """`git diff --numstat` prints `-` for binaries, so they score zero
+    against the line cap; the compressed bundle ceiling does not bound them
+    either. The byte ceiling is what actually stops this."""
+    monkeypatch.setattr(lane_deliver, "MAX_CHANGED_BLOB_BYTES", 1024)
+    payload = ("\x00" * 40_000)
+    bundle = _make_bundle(lane, files={"dharma_swarm/blob.bin": payload})
+    code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert "byte ceiling" in stored["reason"]
+    assert stored["bytes"] > 1024
+
+
 def test_over_cap_diff_is_refused_on_the_delivery_side(lane, tmp_path,
                                                        monkeypatch) -> None:
     """The cap is re-measured here. A proposing phase that lied about its
@@ -418,13 +484,31 @@ def test_deliver_job_never_installs_or_runs_the_test_suite() -> None:
     assert "lane_propose.py" not in blob
 
 
-def test_kill_switch_guard_is_the_first_step_and_reads_loop_control() -> None:
-    propose = _workflow()["jobs"]["propose"]
-    first = propose["steps"][0]
-    assert "kill-switch" in first["name"].lower()
-    # The ref matters: a KILLSWITCH on main halts nothing.
-    assert "ref=loop-control" in first["run"]
-    assert "exit 1" in first["run"]
+def test_kill_switch_guard_is_the_first_step_of_BOTH_jobs() -> None:
+    """Propose can run 45 minutes after its own check. If the operator
+    engages the switch during that window, delivery must not still push —
+    so the guard is per-job, matching docs/ops/loop_control/README.md."""
+    for job_name in ("propose", "deliver"):
+        first = _workflow()["jobs"][job_name]["steps"][0]
+        assert "kill-switch" in first["name"].lower(), job_name
+        # The ref matters: a KILLSWITCH on main halts nothing.
+        assert "ref=loop-control" in first["run"], job_name
+        assert "exit 1" in first["run"], job_name
+
+
+def test_delivery_requires_a_ci_triggering_credential() -> None:
+    """A push made with the default github.token does not trigger workflows,
+    so a lane draft pushed with it strands with zero check runs — the
+    `ci_never_ran` pathology pr-ci-health.yml already fights. Delivery
+    prefers a PAT and degrades to verify-only without one."""
+    deliver = _workflow()["jobs"]["deliver"]
+    blob = yaml.safe_dump(deliver)
+    assert "LANE_DELIVERY_PUSH_TOKEN" in blob
+    assert "HAS_TRUSTED_TOKEN" in blob
+    # Fail-closed: no trusted credential => --dry-run, never a silent push.
+    verify = [s for s in deliver["steps"] if s.get("name", "").startswith("Verify")][0]
+    assert 'HAS_TRUSTED_TOKEN}" != "true"' in verify["run"]
+    assert "--dry-run" in verify["run"]
 
 
 def test_caps_live_in_the_workflow_not_in_a_prompt() -> None:

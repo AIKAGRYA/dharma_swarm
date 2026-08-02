@@ -105,6 +105,74 @@ def test_agent_environment_strips_every_credential_channel(monkeypatch) -> None:
     assert env["ANTHROPIC_API_KEY"] == "keep-me"
 
 
+def test_test_suite_timeout_becomes_a_cap_receipt_not_an_exception(
+        tmp_path: Path, monkeypatch) -> None:
+    """`subprocess.run(timeout=...)` raises TimeoutExpired. Uncaught, it flew
+    past the receipt write and emit_status(), so a run that blew its test
+    budget ended NO_RECEIPT_WRITTEN — losing the one outcome the budget
+    exists to report."""
+    def boom(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 1),
+                                        output="partial output")
+    monkeypatch.setattr(lane_propose.subprocess, "run", boom)
+    result = lane_propose._run(["make", "test-fast"], timeout=5)
+    assert result.returncode == lane_propose.EXIT_TIMEOUT
+    assert "partial output" in result.stdout
+
+
+def test_active_clean_filters_detects_configured_and_attributed(
+        tmp_path: Path, monkeypatch) -> None:
+    """A clean filter runs on `git add`, so it can put transformed bytes in
+    the measured tree while the tests read the untransformed worktree — and
+    because the filter is deterministic, re-adding reproduces the same hash
+    and the equality check still passes. Detect and refuse."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    for cmd in (["git", "init", "-q", "-b", "main"],
+                ["git", "config", "user.email", "t@e.com"],
+                ["git", "config", "user.name", "t"]):
+        subprocess.run(cmd, cwd=repo, check=True)
+    monkeypatch.chdir(repo)
+    assert lane_propose.active_clean_filters([]) == []
+
+    subprocess.run(["git", "config", "filter.evil.clean", "sed s/a/b/"],
+                   cwd=repo, check=True)
+    found = lane_propose.active_clean_filters([])
+    assert any("filter.evil.clean" in item for item in found), found
+
+
+def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:
+    """Nothing writes a claim back to loop-tasks (propose holds contents:read),
+    so consumption is inferred from the lane's own delivered PR bodies.
+    Without it the oldest ready task was re-selected forever and newer tasks
+    starved behind it."""
+    rows = [{"headRefName": "lane/hardening-20260101T000000Z",
+             "body": 'Target: `{"kind": "mailbox", "task_id": "T-1"}`'}]
+    monkeypatch.setattr(
+        lane_propose, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(rows), ""))
+    assert lane_propose.attempted_task_ids("o/r") == {"T-1"}
+
+
+def test_unreadable_attempt_history_fails_closed(monkeypatch) -> None:
+    monkeypatch.setattr(
+        lane_propose, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", "boom"))
+    assert lane_propose.attempted_task_ids("o/r") is None
+
+
+def test_unknown_attempt_history_blocks_rather_than_reworking(
+        tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(lane_propose, "open_lane_drafts", lambda repo: [])
+    monkeypatch.setattr(lane_propose, "select_target",
+                        lambda repo: {"kind": "mailbox_unknown"})
+    code = lane_propose.main(_args(tmp_path))
+    stored = json.loads((tmp_path / "r.json").read_text())
+    assert code == 0
+    assert stored["status"] == "BLOCKED"
+    assert "unattempted" in stored["reason"]
+
+
 def test_summary_is_sanitized_to_one_printable_line() -> None:
     assert lane_propose.sanitize_summary("a\nb\tc") == "a b c"
     assert "\x00" not in lane_propose.sanitize_summary("a\x00b")

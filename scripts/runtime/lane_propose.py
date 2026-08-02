@@ -109,6 +109,12 @@ def _utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+# Distinct exit codes so callers can tell "never ran" from "ran too long"
+# without either escaping as an exception and killing the receipt.
+EXIT_NOT_FOUND = 127
+EXIT_TIMEOUT = 124
+
+
 def _run(cmd: list[str], *, timeout: int = 300,
          env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     try:
@@ -116,7 +122,18 @@ def _run(cmd: list[str], *, timeout: int = 300,
                               timeout=timeout, check=False, env=env)
     except FileNotFoundError as exc:
         # A missing binary is a failed command, not a crashed lane.
-        return subprocess.CompletedProcess(cmd, 127, "", str(exc))
+        return subprocess.CompletedProcess(cmd, EXIT_NOT_FOUND, "", str(exc))
+    except subprocess.TimeoutExpired as exc:
+        # A command that outruns its budget is a CAP HIT with a receipt, not
+        # an uncaught exception. `make test-fast` exceeding MAX_TEST_SECONDS
+        # used to raise straight past the receipt write and emit_status(), so
+        # the run ended NO_RECEIPT_WRITTEN — losing exactly the outcome the
+        # budget exists to report.
+        captured = exc.stdout or b"" if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        if isinstance(captured, bytes):
+            captured = captured.decode("utf-8", "replace")
+        return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, captured,
+                                           f"timed out after {timeout}s")
 
 
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -152,8 +169,47 @@ def agent_env() -> dict[str, str]:
     }
 
 
+def attempted_task_ids(repo: str) -> set[str] | None:
+    """Task ids this lane has already delivered a PR for, in ANY state.
+
+    The lane has no way to write a claim back to `loop-tasks` — the proposing
+    job holds `contents: read` by design. So consumption is inferred from the
+    lane's own output instead: every delivered PR body carries its target,
+    including the task id.
+
+    Without this, `ready_tasks()` kept returning the same oldest task after
+    its draft closed and the open-draft ceiling cleared, so every scheduled
+    run spent its whole agent budget re-doing one task while newer mailbox
+    tasks starved behind it.
+
+    Returns None if the query failed, so callers can fail closed rather than
+    treat "unknown" as "nothing attempted".
+    """
+    result = _run([
+        GH_BIN, "pr", "list", "--repo", repo, "--state", "all",
+        "--label", "lane-output", "--json", "body,headRefName",
+        "--limit", "100",
+    ])
+    if result.returncode != 0:
+        return None
+    try:
+        rows = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    seen: set[str] = set()
+    for row in rows:
+        if not str(row.get("headRefName", "")).startswith(LANE_BRANCH_PREFIX):
+            continue
+        for match in re.finditer(r'"task_id"\s*:\s*"([^"]+)"',
+                                 str(row.get("body", ""))):
+            seen.add(match.group(1))
+    return seen
+
+
 def select_target(repo: str) -> dict | None:
-    """First ready mailbox task, else newest nightly failure, else None."""
+    """First unattempted ready mailbox task, else newest nightly failure."""
     try:
         from dharma_swarm.roaming_mailbox import RoamingMailbox
 
@@ -165,9 +221,16 @@ def select_target(repo: str) -> dict | None:
         if callable(ready):
             tasks = list(ready(recipient=RECIPIENT))
             if tasks:
-                task = tasks[0]
-                return {"kind": "mailbox", "task_id": task.task_id,
-                        "summary": task.summary, "body": task.body}
+                attempted = attempted_task_ids(repo)
+                if attempted is None:
+                    return {"kind": "mailbox_unknown"}
+                fresh = [t for t in tasks if t.task_id not in attempted]
+                if fresh:
+                    task = fresh[0]
+                    return {"kind": "mailbox", "task_id": task.task_id,
+                            "summary": task.summary, "body": task.body}
+                print(f"all {len(tasks)} ready mailbox task(s) already have a "
+                      "lane PR; falling through", file=sys.stderr)
     except Exception as exc:  # noqa: BLE001 - selection must never crash the lane
         print(f"mailbox selection unavailable: {exc}", file=sys.stderr)
 
@@ -276,6 +339,39 @@ def diff_line_count() -> int:
     return total
 
 
+def active_clean_filters(paths: list[str]) -> list[str]:
+    """Clean filters that could apply to the staged set, if any.
+
+    Why this is fail-closed rather than tolerated: the measured-tree /
+    tested-tree equality check below compares two `write-tree` results. A
+    clean filter runs on `git add`, so if the agent configures one (plus a
+    matching `.gitattributes`), the FIRST add stores transformed bytes in
+    `measured_tree` while `make test-fast` reads the untransformed worktree.
+    Re-adding applies the same deterministic filter, so the hashes still
+    match and the equality check passes — while the bytes that were tested
+    are not the bytes that ship.
+
+    Both inputs are agent-writable (`.git/config` and in-tree
+    `.gitattributes`), so the honest response is to refuse rather than to
+    claim a guarantee that does not hold.
+    """
+    found: list[str] = []
+    configured = _git(["config", "--get-regexp", r"^filter\..*\.clean"])
+    if configured.returncode == 0 and configured.stdout.strip():
+        found.extend(line.split()[0] for line in
+                     configured.stdout.strip().splitlines() if line.split())
+    if paths:
+        attrs = _git(["check-attr", "filter", "-z", "--", *paths])
+        if attrs.returncode == 0:
+            fields = attrs.stdout.split("\0")
+            # check-attr -z emits path, attr, value triples
+            for index in range(0, max(0, len(fields) - 2), 3):
+                value = fields[index + 2]
+                if value not in ("unspecified", "unset", ""):
+                    found.append(f"{fields[index]}:filter={value}")
+    return sorted(set(found))
+
+
 def sanitize_summary(text: str, limit: int = 60) -> str:
     """A one-line, control-character-free subject.
 
@@ -317,6 +413,12 @@ def main(argv: list[str] | None = None) -> int:
     if target is None:
         return done("NO_WORK", {
             "reason": "no ready mailbox task; nightly positively green"})
+    if target.get("kind") == "mailbox_unknown":
+        return done("BLOCKED", {
+            "reason": "could not enumerate previously-delivered lane PRs, so "
+                      "there is no way to tell an unattempted mailbox task "
+                      "from one already worked — refusing to re-spend the "
+                      "agent budget on a guess"})
     if target.get("kind") == "nightly_unknown":
         return done("BLOCKED", {
             "reason": "nightly state is not a verdict "
@@ -397,6 +499,18 @@ def main(argv: list[str] | None = None) -> int:
                                 "limit": MAX_DIFF_LINES, "target": target,
                                 "paths": staged[:20]})
 
+    # A clean filter would silently decouple "what was tested" from "what
+    # ships" while still passing the equality check below, so it is refused
+    # outright rather than accommodated.
+    filters = active_clean_filters(staged)
+    if filters:
+        return done("BLOCKED", {
+            "target": target,
+            "reason": "a clean filter could apply to the staged set, which "
+                      "would let the tested bytes differ from the delivered "
+                      "bytes while the tree hashes still match",
+            "filters": filters[:20]})
+
     # Freeze the MEASURED content as a tree object. A tree SHA is
     # content-addressed, so whatever the test run does to the working tree
     # afterwards, this identifier still resolves to the bytes the cap was
@@ -410,6 +524,10 @@ def main(argv: list[str] | None = None) -> int:
 
     tests = _run([MAKE_BIN, "test-fast"], timeout=MAX_TEST_SECONDS,
                  env=agent_env())
+    if tests.returncode == EXIT_TIMEOUT:
+        return done("CAP_HIT", {"cap": "test_seconds", "target": target,
+                                "limit": MAX_TEST_SECONDS,
+                                "tail": tests.stdout[-2000:]})
     if tests.returncode != 0:
         return done("TESTS_RED", {"target": target,
                                   "tail": tests.stdout[-2000:]})

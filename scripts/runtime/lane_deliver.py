@@ -62,6 +62,11 @@ from pathlib import Path
 MAX_DIFF_LINES = int(os.environ.get("LANE_MAX_DIFF_LINES", "600"))
 MAX_CHANGED_FILES = int(os.environ.get("LANE_MAX_CHANGED_FILES", "40"))
 MAX_BUNDLE_BYTES = int(os.environ.get("LANE_MAX_BUNDLE_BYTES", str(8 * 1024 * 1024)))
+# Uncompressed ceiling for the blobs the candidate touches. MAX_BUNDLE_BYTES
+# measures COMPRESSED bytes and so does not bound this: compressible padding
+# passes the bundle cap and unpacks large on the delivery runner.
+MAX_CHANGED_BLOB_BYTES = int(
+    os.environ.get("LANE_MAX_CHANGED_BLOB_BYTES", str(4 * 1024 * 1024)))
 MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
 LANE_BRANCH_PREFIX = "lane/hardening-"
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
@@ -172,8 +177,49 @@ def numstat_lines(base: str, head: str) -> int:
 
 
 def changed_paths(base: str, head: str) -> list[str]:
-    result = _git(["diff", "--name-only", f"{base}..{head}"])
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    """Every path the candidate touches, in machine-readable form.
+
+    Two flags here are load-bearing, and both were proven necessary by
+    executable review proofs against the first version of this file:
+
+    ``-z``  — without it `git diff --name-only` emits git's HUMAN format,
+              which C-quotes any path with non-ASCII or special bytes:
+              `.github/workflows/é.yml` came back as
+              `".github/workflows/\\303\\251.yml"`, whose leading quote meant
+              it no longer matched the `.github/workflows/` deny prefix and
+              `denied_paths()` returned []. NUL-delimited output is verbatim.
+
+    ``--no-renames`` — with rename detection on, a rename reports ONLY the
+              destination. Renaming `scripts/runtime/pr_merge_control.py` to
+              `dharma_swarm/harmless.py` showed just the harmless destination
+              while effectively deleting the referee gate. Disabling rename
+              detection makes git report the delete and the add separately,
+              so both sides face the denylist.
+    """
+    result = _git(["diff", "--no-renames", "--name-only", "-z",
+                   f"{base}..{head}"])
+    return [part for part in result.stdout.split("\0") if part]
+
+
+def changed_blob_bytes(base: str, head: str) -> int:
+    """Total uncompressed size of the blobs this candidate adds or modifies.
+
+    `git diff --numstat` reports `-` for both cells on binary files, so a
+    binary contributes ZERO toward the line cap. The bundle size ceiling does
+    not close that either: it measures compressed bytes, and highly
+    compressible data slips under it while unpacking to something far larger
+    on the delivery runner. This measures the real thing.
+    """
+    listing = _git(["ls-tree", "-r", "-z", "--long", head])
+    sizes: dict[str, int] = {}
+    for entry in listing.stdout.split("\0"):
+        if not entry:
+            continue
+        meta, _, path = entry.partition("\t")
+        fields = meta.split()
+        if len(fields) >= 4 and fields[3].isdigit():
+            sizes[path] = int(fields[3])
+    return sum(sizes.get(path, 0) for path in changed_paths(base, head))
 
 
 def open_lane_drafts(repo: str) -> list[int] | None:
@@ -314,6 +360,14 @@ def main(argv: list[str] | None = None) -> int:
         return refuse("candidate exceeds the diff cap as measured here",
                       observed=lines, limit=MAX_DIFF_LINES)
 
+    # Binary content is invisible to the line cap (numstat prints `-`), so it
+    # gets its own ceiling measured in uncompressed bytes.
+    blob_bytes = changed_blob_bytes(parent, head_sha)
+    if blob_bytes > MAX_CHANGED_BLOB_BYTES:
+        return refuse("candidate's changed blobs exceed the byte ceiling — "
+                      "binary content does not register against the line cap",
+                      bytes=blob_bytes, limit=MAX_CHANGED_BLOB_BYTES)
+
     # Authoritative ceiling: propose checked this early to avoid wasting an
     # agent run, but only the value read at delivery time governs.
     open_drafts = open_lane_drafts(args.repo)
@@ -366,11 +420,32 @@ def main(argv: list[str] | None = None) -> int:
         "--body", body,
         "--label", ",".join(LANE_LABELS),
     ])
-    receipt({"status": "DRAFT_PR_OPENED" if pr.returncode == 0
-             else "PR_CREATE_FAILED",
-             **verified_facts,
-             "pr_output": (pr.stdout + pr.stderr)[-500:]}, out)
-    return 0 if pr.returncode == 0 else 1
+    if pr.returncode == 0:
+        receipt({"status": "DRAFT_PR_OPENED", **verified_facts,
+                 "pr_output": (pr.stdout + pr.stderr)[-500:]}, out)
+        return 0
+
+    # The branch is pushed but has no PR. The open-draft ceiling counts PRs,
+    # not branches, so leaving this behind lets every scheduled retry strand
+    # another `lane/hardening-*` orphan that nothing will ever clean up or
+    # count. Roll the push back — but only if the remote ref still points at
+    # exactly the SHA we pushed, so a concurrent writer is never clobbered.
+    rollback = "not_attempted"
+    remote = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
+    remote_sha = remote.stdout.split("\t")[0].strip() if remote.stdout else ""
+    if remote.returncode != 0:
+        rollback = "skipped: could not read the remote ref"
+    elif remote_sha != head_sha:
+        rollback = f"skipped: remote moved to {remote_sha[:12] or 'absent'}"
+    else:
+        deleted = _git(["push", "origin", "--delete", f"refs/heads/{branch}"])
+        rollback = "deleted" if deleted.returncode == 0 else (
+            f"delete failed: {deleted.stderr[-200:]}")
+
+    receipt({"status": "PR_CREATE_FAILED", **verified_facts,
+             "pr_output": (pr.stdout + pr.stderr)[-500:],
+             "branch_rollback": rollback}, out)
+    return 1
 
 
 if __name__ == "__main__":

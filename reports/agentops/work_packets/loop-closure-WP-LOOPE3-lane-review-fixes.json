@@ -1,0 +1,99 @@
+{
+  "allowed_files": [
+    ".github/workflows/hardening-lane.yml",
+    "reports/agentops/work_packets/loop-closure-WP-LOOPE3-lane-review-fixes.json",
+    "scripts/runtime/lane_deliver.py",
+    "scripts/runtime/lane_propose.py",
+    "tests/test_lane_deliver.py",
+    "tests/test_lane_propose.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "9d792ceacef32a1698838dc01586ed90ecb93666",
+  "branch": "claude/graph-of-loops-audit-design-eh3lz5",
+  "commit": {
+    "allowed": false,
+    "message": "fix(loop-closure): close 10 post-merge review findings on the hardening lane"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/loop-watcher.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "packages/telos-kernel/**",
+    "scripts/docops/**",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/governance/hygiene/**",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_lane_propose.py tests/test_lane_deliver.py -q",
+      "expected_exit": 0,
+      "name": "lane-review-fixes",
+      "timeout_seconds": 600
+    }
+  ],
+  "id": "loop-closure-WP-LOOPE3-lane-review-fixes",
+  "intent": "Close 10 findings raised by Greptile and Codex on #1197 AFTER it merged (it landed on mechanical green before the reviewers finished). Two are verified bypasses of the very denylist the PR exists to enforce: git diff --name-only C-quotes non-ASCII paths, so '.github/workflows/e-acute.yml' arrived quoted and denied_paths() returned empty; and with rename detection on, only a rename's destination is reported, so renaming pr_merge_control.py to a benign path deleted the referee gate invisibly. Both reproduced against real git before fixing; both fixed by '--no-renames --name-only -z'. Also: binary blobs score zero against the line cap (byte ceiling added), the delivery job had no kill-switch guard of its own (added), a github.token push does not trigger CI so lane drafts would strand (PAT preferred, verify-only without one), a clean filter could decouple tested bytes from delivered bytes while the tree hashes still matched (refused), make test-fast timeouts escaped as an exception and lost the receipt (now CAP_HIT), mailbox tasks were never consumed so the oldest starved every newer one (attempt history inferred from delivered PR bodies), the agent binary was never provisioned so every real target reported BLOCKED (provisioning step plus honest warnings), and a failed gh pr create left an orphan branch the ceiling could not see (rolled back under a SHA lease).",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/lane_deliver.py'); orig=p.read_text(); mut=orig.replace('\\\"--no-renames\\\", \\\"--name-only\\\", \\\"-z\\\"','\\\"--name-only\\\"',1); assert mut!=orig, 'diff flags not found'; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_lane_deliver.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "restoring-human-readable-diff-flags-reopens-both-bypasses",
+      "timeout_seconds": 600
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/lane_deliver.py",
+      "scripts/runtime/lane_propose.py",
+      ".github/workflows/pr-ci-health.yml",
+      "docs/ops/loop_control/README.md"
+    ],
+    "collision": {
+      "checked_at_sha": "9d792ceacef32a1698838dc01586ed90ecb93666",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The two denylist bypasses were live on main from 9d792cea until this lands. Exposure is nil in practice because the lane is inert without DHARMA_LANE_AGENT_CMD, but the code was wrong and shipped.",
+      "Delivery now degrades to verify-only unless LANE_DELIVERY_PUSH_TOKEN or MERGEMASTERMIKE_PAT proves push authority, because a github.token push does not trigger CI. Configuring that secret is an operator action.",
+      "claude and codex selectors still cannot be provisioned on a stock ubuntu-latest runner; only claude-npx installs. The workflow now warns explicitly instead of failing opaquely.",
+      "Mailbox consumption is inferred from delivered PR bodies rather than claimed in loop-tasks, because the proposing job holds contents:read by design. A task whose PR body is edited to drop its task_id would be re-selected.",
+      "Clean filters are refused rather than accommodated: the lane cannot currently test a materialization of the frozen tree with filters disabled, so it declines the case instead of claiming a guarantee it does not have."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "c9c8798adc4bccfb25181c17a2f674fa7a4a9fc854f1bc4ad6dcef1fd0767c80",
+    "rollback": "Revert the single commit; the lane returns to its 9d792cea behaviour, including both denylist bypasses.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPE3"
+  },
+  "worktree": "."
+}
