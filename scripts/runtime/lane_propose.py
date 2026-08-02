@@ -356,7 +356,15 @@ def active_clean_filters(paths: list[str]) -> list[str]:
     claim a guarantee that does not hold.
     """
     found: list[str] = []
-    configured = _git(["config", "--get-regexp", r"^filter\..*\.clean"])
+    # --local is load-bearing, not tidiness. The agent can write `.git/config`
+    # and in-tree `.gitattributes`; it cannot write the runner's global or
+    # system config. Querying every scope caught `filter.lfs.clean`, which
+    # Git LFS registers globally on GitHub runners, so the lane reported
+    # BLOCKED on every run on every machine with git-lfs installed — a lane
+    # that looks configured and can never deliver. Scope the check to what
+    # the adversary can actually reach.
+    configured = _git(["config", "--local", "--get-regexp",
+                       r"^filter\..*\.clean"])
     if configured.returncode == 0 and configured.stdout.strip():
         found.extend(line.split()[0] for line in
                      configured.stdout.strip().splitlines() if line.split())

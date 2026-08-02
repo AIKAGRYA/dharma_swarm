@@ -135,10 +135,37 @@ def test_active_clean_filters_detects_configured_and_attributed(
     monkeypatch.chdir(repo)
     assert lane_propose.active_clean_filters([]) == []
 
-    subprocess.run(["git", "config", "filter.evil.clean", "sed s/a/b/"],
-                   cwd=repo, check=True)
+    subprocess.run(["git", "config", "--local", "filter.evil.clean",
+                    "sed s/a/b/"], cwd=repo, check=True)
     found = lane_propose.active_clean_filters([])
     assert any("filter.evil.clean" in item for item in found), found
+
+
+def test_a_global_filter_does_not_block_the_lane(tmp_path: Path,
+                                                 monkeypatch) -> None:
+    """Git LFS registers `filter.lfs.clean` in the GLOBAL config on GitHub
+    runners. The agent cannot write global or system config, so a filter
+    defined there is the runner's own setup, not an attack — and treating it
+    as one made the lane report BLOCKED on every run everywhere git-lfs is
+    installed. Caught by CI on #1200 before it could ship.
+    """
+    repo = tmp_path / "r"
+    repo.mkdir()
+    for cmd in (["git", "init", "-q", "-b", "main"],
+                ["git", "config", "user.email", "t@e.com"],
+                ["git", "config", "user.name", "t"]):
+        subprocess.run(cmd, cwd=repo, check=True)
+    global_cfg = tmp_path / "gitconfig"
+    global_cfg.write_text("[filter \"lfs\"]\n\tclean = git-lfs clean -- %f\n",
+                          encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_cfg))
+    monkeypatch.chdir(repo)
+    # Sanity: git really does see it in the global scope.
+    seen = subprocess.run(["git", "config", "--get-regexp", r"^filter\..*\.clean"],
+                          cwd=repo, capture_output=True, text=True)
+    assert "filter.lfs.clean" in seen.stdout
+    # ...and the lane ignores it, because the agent cannot write there.
+    assert lane_propose.active_clean_filters([]) == []
 
 
 def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:
