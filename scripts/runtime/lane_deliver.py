@@ -68,6 +68,11 @@ MAX_BUNDLE_BYTES = int(os.environ.get("LANE_MAX_BUNDLE_BYTES", str(8 * 1024 * 10
 MAX_CHANGED_BLOB_BYTES = int(
     os.environ.get("LANE_MAX_CHANGED_BLOB_BYTES", str(4 * 1024 * 1024)))
 MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
+
+# Shell convention, and the same values lane_propose uses: a missing binary and
+# a command that outran its budget must be distinguishable in the receipt.
+EXIT_NOT_FOUND = 127
+EXIT_TIMEOUT = 124
 LANE_BRANCH_PREFIX = "lane/hardening-"
 LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
 
@@ -122,7 +127,26 @@ def _run(cmd: list[str], *, timeout: int = 300) -> subprocess.CompletedProcess:
                               errors="surrogateescape",
                               timeout=timeout, check=False)
     except FileNotFoundError as exc:
-        return subprocess.CompletedProcess(cmd, 127, "", str(exc))
+        return subprocess.CompletedProcess(cmd, EXIT_NOT_FOUND, "", str(exc))
+    except subprocess.TimeoutExpired as exc:
+        # A hung command is a failed command with a receipt, not a crashed
+        # delivery. This helper carried only the FileNotFoundError arm while
+        # its sibling lane_propose._run grew a TimeoutExpired arm in this same
+        # PR — the identical defect, left in the job that can do damage.
+        # Every gate in main() runs through here: bundle fetch, origin fetch,
+        # push, `gh pr list`, `gh pr create`. An escape past this point skips
+        # refuse()/receipt() and the step reports NO_RECEIPT_WRITTEN.
+        #
+        # The `gh pr create` call is the one that matters. It runs AFTER the
+        # push, so an escape there skips the orphan-branch rollback below and
+        # strands exactly the `lane/hardening-*` branch that block exists to
+        # remove — the failure mode this PR set out to close, reintroduced
+        # through the timeout path. (Devin on #1200.)
+        captured = exc.stdout or b"" if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        if isinstance(captured, bytes):
+            captured = captured.decode("utf-8", "surrogateescape")
+        return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, captured,
+                                           f"timed out after {timeout}s")
 
 
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:

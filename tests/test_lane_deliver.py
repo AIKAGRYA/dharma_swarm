@@ -433,6 +433,45 @@ def test_orphan_rollback_deletes_under_an_atomic_lease() -> None:
     assert '"--delete"' not in source
 
 
+def test_run_converts_a_timeout_into_a_verdict_not_an_exception() -> None:
+    """A hung command must be a failed command, not a crashed delivery."""
+    result = lane_deliver._run(
+        [sys.executable, "-c", "import time; time.sleep(30)"], timeout=1)
+    assert result.returncode == lane_deliver.EXIT_TIMEOUT
+    assert "timed out" in result.stderr
+
+
+def test_a_hung_gh_pr_create_still_rolls_back_and_reports(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a verified escape (Devin on #1200).
+
+    `_run` caught only FileNotFoundError while its sibling `lane_propose._run`
+    grew a TimeoutExpired arm in this same PR. `gh pr create` runs *after* the
+    push, so a timeout there escaped `main()` before the rollback and before
+    the receipt: branch pushed, no PR, no verdict, and the orphan this PR
+    exists to clean up left behind on origin.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+    real_run = subprocess.run
+
+    def hang_on_pr_create(cmd, *args, **kwargs):
+        if "pr" in cmd and "create" in cmd:
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 300))
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(lane_deliver.subprocess, "run", hang_on_pr_create)
+    code, stored = _deliver(lane, bundle, tmp_path)
+
+    # A verdict was reached rather than an exception escaping.
+    assert code == 1
+    assert stored["status"] == "PR_CREATE_FAILED"
+    assert "timed out" in stored["pr_output"]
+    # And the orphan branch the push created was actually rolled back.
+    assert stored["branch_rollback"] == "deleted under lease"
+    refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
+    assert LANE_BRANCH not in refs
+
+
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
     """Source pin for the two operations that reintroduce the PR #1162 class:
     `git add` runs clean filters the agent can define, and a checkout writes
