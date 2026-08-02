@@ -388,34 +388,59 @@ def open_lane_drafts(repo: str) -> list[int] | None:
 
 
 def agent_changed_paths() -> list[str]:
-    """Every path the agent touched or created, minus the excluded set."""
-    result = _git(["status", "--porcelain", "--untracked-files=all"])
+    """Every path the agent touched or created, minus the excluded set.
+
+    `-z` is load-bearing, and for the same reason it is load-bearing in
+    lane_deliver.changed_paths(): git's human format C-quotes any path with
+    non-ASCII bytes, a backslash or a quote (`core.quotePath` defaults on).
+    Stripping the surrounding quotes leaves the ESCAPE TEXT, and the result is
+    a bogus pathspec. Measured against real git:
+
+        $ git status --porcelain --untracked-files=all
+        ?? a.py
+        ?? "caf\\303\\251.py"
+        parsed -> ['a.py', 'caf\\303\\251.py']
+        $ git add -- a.py 'caf\\303\\251.py'   -> exit 128
+        $ git diff --cached --name-only        -> (empty)
+
+    `git add` dies on the unmatched pathspec BEFORE touching the index, so it
+    is atomic: one oddly-named file discards the ENTIRE run's work, and
+    `diff_line_count()` then reports 0 and the lane emits NO_DIFF after
+    spending its whole agent budget. Under `-z` the bytes arrive verbatim.
+
+    I fixed this on the delivery side earlier in this PR and left the propose
+    side — the same defect, the same file family, the sibling parser.
+    (Devin on #1200.)
+
+    The `-z` record shape differs for renames: `XY <new>\0<old>\0`, with the
+    source as its own NUL-terminated field carrying no status prefix, rather
+    than a ` -> ` infix. Verified against git 2.43. The parser consumes that
+    extra field, because BOTH sides must be recorded — keeping only the
+    destination made every rename undeliverable through the post-test
+    re-stage.
+    """
+    result = _run_bytes([GIT_BIN, "status", "--porcelain", "-z",
+                         "--untracked-files=all"])
+    if result.returncode != 0:
+        return []
+    fields = result.stdout.split(b"\0")
     paths: list[str] = []
-    for line in result.stdout.splitlines():
-        if len(line) < 4:
+    index = 0
+    while index < len(fields):
+        field = fields[index]
+        index += 1
+        if len(field) < 4:
             continue
-        entry = line[3:].strip()
-        # BOTH sides of a rename, not just the destination.
-        #
-        # `git status --porcelain` reports a staged rename as one record,
-        # `R  old -> new`. Keeping only `new` made every rename undeliverable:
-        # `measured_tree` is written while the index holds the delete of `old`
-        # AND the add of `new`, but the post-test re-stage does
-        # `git reset -q HEAD --` then re-adds the recorded paths — and the
-        # reset restores `old` from HEAD with nothing to remove it again. So
-        # post_test_tree never matched and the run ended BLOCKED claiming
-        # "the test run altered the measured content" on a run where the tests
-        # changed nothing. Verified against git 2.43; recording both sides
-        # round-trips to the identical tree, and a genuine mutation is still
-        # caught. (Devin on #1200.)
-        #
-        # This matters more now that renames are counted against the diff cap
-        # rather than scoring zero — the accounting says they are deliverable,
-        # so the staging has to actually deliver them.
-        candidates = ([part.strip() for part in entry.split(" -> ", 1)]
-                      if " -> " in entry else [entry])
-        for path in candidates:
-            path = path.strip('"')
+        status, raw = field[:2], field[3:]
+        candidates = [raw]
+        if b"R" in status or b"C" in status:
+            if index < len(fields) and fields[index]:
+                candidates.append(fields[index])
+                index += 1
+        for candidate in candidates:
+            # fsdecode, not decode(): surrogateescape round-trips arbitrary
+            # filename bytes back through subprocess argv unchanged.
+            path = os.fsdecode(candidate)
             if not path or path.startswith(STAGE_EXCLUDE_PREFIXES):
                 continue
             if path.endswith(STAGE_EXCLUDE_SUFFIXES):
@@ -426,11 +451,22 @@ def agent_changed_paths() -> list[str]:
     return sorted(set(paths))
 
 
-def stage_agent_changes() -> list[str]:
-    """Stage the agent's change set by explicit path; return what was staged."""
+def stage_agent_changes() -> list[str] | None:
+    """Stage the agent's change set by explicit path; return what was staged.
+
+    None means staging FAILED. The return code used to be discarded, so an
+    aborted `git add` left an empty index, `diff_line_count()` reported 0, and
+    the run emitted NO_DIFF — indistinguishable from an agent that did
+    nothing, after spending the whole agent budget. A staging failure now
+    blocks with a truthful receipt instead. (Devin on #1200.)
+    """
     paths = agent_changed_paths()
-    if paths:
-        _git(["add", "--", *paths])
+    if not paths:
+        return []
+    added = _git(["add", "--", *paths])
+    if added.returncode != 0:
+        print(f"staging failed: {added.stderr[-400:]}", file=sys.stderr)
+        return None
     return paths
 
 
@@ -634,6 +670,12 @@ def main(argv: list[str] | None = None) -> int:
     # Stage the intended set FIRST, then measure it, so the cap and the
     # delivered content see the same change set.
     staged = stage_agent_changes()
+    if staged is None:
+        return done("BLOCKED", {
+            "target": target,
+            "reason": "could not stage the agent's change set; refusing to "
+                      "report NO_DIFF over work that exists but did not reach "
+                      "the index"}, 1)
     lines = diff_line_count()
     if lines == 0:
         return done("NO_DIFF", {"target": target,

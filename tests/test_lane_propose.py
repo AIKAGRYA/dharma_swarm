@@ -191,6 +191,67 @@ def _repo_with_global_config(tmp_path: Path, monkeypatch, config: str) -> Path:
     return repo
 
 
+def test_an_oddly_named_file_does_not_discard_the_whole_change_set(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for the propose-side twin of the C-quoting bypass this PR
+    fixed on the delivery side (Devin on #1200).
+
+    `git status --porcelain` C-quotes non-ASCII paths, and stripping the outer
+    quotes leaves the ESCAPE TEXT. `git add` dies on the resulting bogus
+    pathspec BEFORE touching the index — atomically — so one oddly-named file
+    discarded every other file the agent produced, and the run reported
+    NO_DIFF after burning its whole budget. Measured against real git:
+
+        parsed -> ['a.py', 'caf\\\\303\\\\251.py']
+        git add -> exit 128, STAGED: []      # a.py lost too
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "café.py").write_text("y = 2\n", encoding="utf-8")
+
+    found = lane_propose.agent_changed_paths()
+    assert found == ["a.py", "café.py"], found
+
+    staged = lane_propose.stage_agent_changes()
+    assert staged == ["a.py", "café.py"], staged
+    listed = subprocess.run(["git", "diff", "--cached", "--name-only", "-z"],
+                            cwd=repo, capture_output=True, check=True).stdout
+    assert b"a.py" in listed and "café.py".encode() in listed
+
+
+def test_a_rename_is_recorded_from_the_z_record_shape(
+        tmp_path: Path, monkeypatch) -> None:
+    """`-z` emits a rename as `XY <new>\\0<old>\\0` — the source is its own
+    NUL field with no status prefix, not a ` -> ` infix. The parser must
+    consume that extra field or it loses the side that makes renames
+    deliverable."""
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+    subprocess.run(["git", "mv", "a.py", "moved.py"], cwd=repo, check=True)
+
+    assert lane_propose.agent_changed_paths() == ["a.py", "moved.py"]
+
+
+def test_a_failed_stage_blocks_rather_than_reporting_no_diff(
+        tmp_path: Path, monkeypatch) -> None:
+    """A discarded `git add` return code made an aborted stage look exactly
+    like an agent that produced nothing."""
+    monkeypatch.setattr(lane_propose, "agent_changed_paths",
+                        lambda: ["a.py"])
+    monkeypatch.setattr(lane_propose, "_git", lambda args, **kw:
+                        subprocess.CompletedProcess(
+                            args, 128, "", "fatal: pathspec did not match")
+                        if args and args[0] == "add"
+                        else subprocess.CompletedProcess(args, 0, "", ""))
+    assert lane_propose.stage_agent_changes() is None
+
+
 def test_a_rename_survives_the_post_test_restage(tmp_path: Path,
                                                  monkeypatch) -> None:
     """Regression for a rename that could never be delivered (Devin on #1200).
