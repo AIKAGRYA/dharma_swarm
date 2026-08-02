@@ -205,3 +205,62 @@ def test_workflow_rebases_on_merge_to_main_not_only_hourly():
         if step.get("name", "").startswith("Rebase conflict-free")
     )
     assert "rebase" in rebase_step["if"]
+
+
+def test_behind_main_is_detected_when_state_says_blocked():
+    """GitHub's mergeable_state is single-valued and `blocked` outranks
+    `behind`, so a PR that is behind main AND waiting on a required check
+    reports `blocked`. Keying behind-main detection on the state therefore
+    missed nearly every real case — which is exactly the PR the operator
+    ends up rebasing by hand."""
+    triage = classify_pr(_pr(2001, state="blocked"), [], behind_by=7)
+    assert "behind_main" in triage.categories
+    assert "merge_blocked" in triage.categories
+
+
+def test_behind_by_zero_is_not_behind_main():
+    triage = classify_pr(_pr(2002, state="blocked"), [], behind_by=0)
+    assert "behind_main" not in triage.categories
+
+
+def test_measured_zero_beats_a_stale_behind_state():
+    """mergeable_state is computed asynchronously and goes stale. A measured
+    behind_by == 0 must not be overridden by a leftover `behind`, or an
+    up-to-date PR gets a no-op rebase attempt — and, with no trusted push
+    token, a false ci-stranded-rebase-skipped label and comment (Greptile
+    and Codex both, on PR #1178)."""
+    triage = classify_pr(_pr(2005, state="behind"), [], behind_by=0)
+    assert "behind_main" not in triage.categories
+
+
+def test_unmeasured_behind_by_falls_back_to_the_state():
+    """-1 means "not measured" and must never read as up to date; the
+    mergeable_state fallback still catches the plain `behind` case."""
+    assert "behind_main" in classify_pr(_pr(2003, state="behind"), []).categories
+    assert "behind_main" not in classify_pr(_pr(2004, state="blocked"), []).categories
+
+
+def test_compare_behind_by_fails_closed_on_a_read_error(monkeypatch):
+    def boom(_args):
+        raise OSError("network down")
+
+    monkeypatch.setattr(pr_ci_health, "_gh_json", boom)
+    assert pr_ci_health.compare_behind_by("o/r", "main", "deadbeef") == -1
+
+
+def test_compare_behind_by_reads_the_count(monkeypatch):
+    monkeypatch.setattr(pr_ci_health, "_gh_json", lambda args: {"behind_by": 12})
+    assert pr_ci_health.compare_behind_by("o/r", "main", "deadbeef") == 12
+
+
+def test_rebase_selection_uses_behind_by_not_mergeable_state():
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+    assert 'select(.mergeable_state == "behind")' not in workflow, (
+        "state-keyed selection hides every behind-main PR that is also blocked"
+    )
+    assert 'select(.categories | index("behind_main"))' in workflow
+    assert 'select(.categories | index("merge_conflict") | not)' in workflow, (
+        "a rebase cannot resolve a conflicted branch"
+    )
