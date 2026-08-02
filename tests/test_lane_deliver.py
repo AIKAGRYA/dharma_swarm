@@ -697,6 +697,60 @@ def test_relocating_a_large_file_is_measured_not_waved_through(
     assert stored["observed"] >= 1600, stored["observed"]
 
 
+def test_a_pure_rename_does_not_consume_the_blob_budget(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a false refusal (Greptile on #1200).
+
+    `changed_paths()` runs `--no-renames`, so a relocation arrives as
+    delete(old) + add(new). The new blob is byte-identical to one already in
+    the base tree, so charging it billed the candidate for content it never
+    shipped: measured at 4096 bytes for a pure rename of a 4096-byte file.
+
+    Comparing base and candidate blobs per path — the fix as prescribed —
+    does not close it, because the destination is a new path with no base
+    blob and still charges 4096. Membership in the base tree's blob-OID set
+    answers 0.
+    """
+    seed = lane["seed"]
+    _git(seed, "checkout", "-q", "-B", "seed-blob", lane["base"])
+    (seed / "dharma_swarm").mkdir(parents=True, exist_ok=True)
+    (seed / "dharma_swarm" / "asset.bin").write_bytes(b"A" * 4096)
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-q", "-m", "seed the asset")
+    seeded = _git(seed, "rev-parse", "HEAD")
+    _git(seed, "push", "-q", "origin", "seed-blob:refs/heads/main")
+
+    _git(seed, "checkout", "-q", "-B", LANE_BRANCH, seeded)
+    _git(seed, "mv", "dharma_swarm/asset.bin", "dharma_swarm/moved.bin")
+    _git(seed, "commit", "-q", "-m", "harden: relocate [hardening-lane]")
+    bundle = lane["tmp"] / "blob.bundle"
+    _git(seed, "bundle", "create", str(bundle),
+         f"{seeded}..refs/heads/{LANE_BRANCH}")
+    _git(seed, "checkout", "-q", "main")
+    _git(lane["work"], "fetch", "-q", "origin")
+
+    # The blob budget must see zero NEW content...
+    assert lane_deliver.changed_blob_bytes(seeded, LANE_BRANCH) == 0
+
+    # ...so a ceiling far below the file's size does not refuse it.
+    monkeypatch.setattr(lane_deliver, "MAX_CHANGED_BLOB_BYTES", 100)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 0, stored
+    assert stored["status"] == "VERIFIED_DRY_RUN"
+
+
+def test_new_content_still_counts_against_the_blob_budget(
+        lane, tmp_path, monkeypatch) -> None:
+    """The other side of the same measurement: content the base does NOT
+    have is charged in full, which is what the ceiling exists for."""
+    bundle = _make_bundle(lane, files={"dharma_swarm/fat.py": "A" * 4096})
+    monkeypatch.setattr(lane_deliver, "MAX_CHANGED_BLOB_BYTES", 100)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "blob" in stored["reason"].lower(), stored["reason"]
+
+
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
     """Source pin for the two operations that reintroduce the PR #1162 class:
     `git add` runs clean filters the agent can define, and a checkout writes

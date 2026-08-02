@@ -285,17 +285,46 @@ def changed_blob_bytes(base: str, head: str) -> int:
     not close that either: it measures compressed bytes, and highly
     compressible data slips under it while unpacking to something far larger
     on the delivery runner. This measures the real thing.
+
+    Only blobs the base does not already have are charged. `changed_paths()`
+    runs `--no-renames`, so a relocation arrives as delete(old) + add(new) —
+    and the "new" blob is byte-identical to one already in the base tree, so
+    charging it billed a candidate for content it did not ship. Measured on a
+    4096-byte file: a pure rename charged 4096. (Greptile on #1200.)
+
+    Comparing base and candidate blobs PER PATH — the fix as prescribed —
+    does not close it: the destination is a new path with no base blob, so it
+    still charges 4096. Membership in the base tree's blob-OID SET is the
+    question, and it answers 0. Verified against git 2.43.
+
+    Unique OIDs, because the object store gains a blob once no matter how
+    many paths point at it; MAX_CHANGED_FILES bounds the path count
+    separately.
+
+    This one is a FALSE REFUSAL rather than a hole — it made the cap stricter
+    than its own docstring claimed, never looser.
     """
-    listing = _git(["ls-tree", "-r", "-z", "--long", head])
-    sizes: dict[str, int] = {}
-    for entry in listing.stdout.split("\0"):
-        if not entry:
-            continue
-        meta, _, path = entry.partition("\t")
-        fields = meta.split()
-        if len(fields) >= 4 and fields[3].isdigit():
-            sizes[path] = int(fields[3])
-    return sum(sizes.get(path, 0) for path in changed_paths(base, head))
+    def entries(ref: str) -> dict[str, tuple[str, int]]:
+        listing = _git(["ls-tree", "-r", "-z", "--long", ref])
+        out: dict[str, tuple[str, int]] = {}
+        for entry in listing.stdout.split("\0"):
+            if not entry:
+                continue
+            meta, _, path = entry.partition("\t")
+            fields = meta.split()
+            if len(fields) >= 4 and fields[3].isdigit():
+                out[path] = (fields[2], int(fields[3]))
+        return out
+
+    head_entries = entries(head)
+    base_oids = {oid for oid, _ in entries(base).values()}
+
+    charged: dict[str, int] = {}
+    for path in changed_paths(base, head):
+        found = head_entries.get(path)
+        if found and found[0] not in base_oids:
+            charged[found[0]] = found[1]
+    return sum(charged.values())
 
 
 def open_lane_drafts(repo: str) -> list[int] | None:
