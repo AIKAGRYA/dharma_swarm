@@ -1,0 +1,65 @@
+name: humming-durable-invoker-diagnostic
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: humming-durable-invoker-diagnostic-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  stress-current-main:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/humming-a0-rebase-sync'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTEST_ADDOPTS: '-p no:cacheprovider'
+      EXPECTED_MAIN: a8da9bb5bffa2031f3e0b699261a94dd8ecb2ef1
+    steps:
+      - name: Checkout exact merged main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: a8da9bb5bffa2031f3e0b699261a94dd8ecb2ef1
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install declared dependencies
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_MAIN}"
+          python -m pip install --upgrade pip
+          python -m pip install '.[dev]'
+
+      - name: Reproduce criterion repeatedly and identify first failing test
+        run: |
+          set -euo pipefail
+          for iteration in $(seq 1 30); do
+            seed=$((1000 + iteration))
+            echo "===== iteration=${iteration} PYTHONHASHSEED=${seed} ====="
+            PYTHONHASHSEED="${seed}" \
+              python -m pytest -vv -x --tb=long tests/test_graph_durable_invoker.py
+          done
+
+      - name: Run concurrency-heavy cases under repeated scheduler pressure
+        run: |
+          set -euo pipefail
+          for iteration in $(seq 1 50); do
+            seed=$((5000 + iteration))
+            echo "===== concurrency iteration=${iteration} seed=${seed} ====="
+            PYTHONHASHSEED="${seed}" python -m pytest -vv -x --tb=long \
+              tests/test_graph_durable_invoker.py::test_concurrent_double_begin_loses_one_cleanly \
+              tests/test_graph_durable_invoker.py::test_concurrent_stale_takeover_reclaims_atomically \
+              tests/test_graph_durable_invoker.py::test_concurrent_cross_identity_double_begin_loses_one
+          done
