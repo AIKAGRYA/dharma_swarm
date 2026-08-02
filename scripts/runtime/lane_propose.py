@@ -790,8 +790,27 @@ def main(argv: list[str] | None = None) -> int:
     # identical hash: any drift means the green result does not cover the
     # delivery, so nothing ships.
     _git(["reset", "-q", "HEAD", "--"])
+    # RECOMPUTE the stageable subset: the reset changed the index, so which
+    # paths resolve changed with it. Passing the raw recorded list re-created
+    # the exact failure _stageable() exists to prevent — a path in neither
+    # HEAD, the index, nor the worktree aborts `git add` atomically, so
+    # NOTHING is re-staged. A file the agent created, staged and then deleted
+    # arrives as `AD path` and does precisely that. Measured:
+    #
+    #   re-add exit    : 128  pathspec 'dharma_swarm/tmp.py' did not match
+    #   post_test_tree : differs -> BLOCKED "the test run altered the
+    #                    measured content" on a run where tests changed nothing
+    #
+    # And the return code has to be READ, or the abort is invisible and the
+    # tree comparison blames the test suite for it. (Devin on #1200.)
     if staged:
-        _git(["add", "--", *staged])
+        restage = _git(["add", "--", *_stageable(staged)])
+        if restage.returncode != 0:
+            return done("BLOCKED", {
+                "target": target,
+                "reason": "could not re-stage the measured set after the test "
+                          "run; this is a staging failure, not test-run drift",
+                "stderr": restage.stderr[-400:]}, 1)
     post_test_tree = _git(["write-tree"]).stdout.strip()
     if post_test_tree != measured_tree:
         return done("BLOCKED", {
@@ -810,7 +829,16 @@ def main(argv: list[str] | None = None) -> int:
             "target": target,
             "reason": "commit-tree failed on the measured tree",
             "stderr": commit.stderr[-1000:]}, 1)
-    _git(["update-ref", f"refs/heads/{branch}", new_commit])
+    # Checked for the same reason: the bundle below is built from this ref,
+    # so a silent failure here hands delivery a bundle of the wrong thing —
+    # or of nothing at all.
+    ref_write = _git(["update-ref", f"refs/heads/{branch}", new_commit])
+    if ref_write.returncode != 0:
+        return done("BLOCKED", {
+            "target": target,
+            "reason": "could not write the lane branch ref; the bundle would "
+                      "not describe the measured commit",
+            "stderr": ref_write.stderr[-400:]}, 1)
 
     # The hand-off. A bundle is a self-contained, content-addressed pack: the
     # delivery job fetches the commit out of it WITHOUT ever checking the

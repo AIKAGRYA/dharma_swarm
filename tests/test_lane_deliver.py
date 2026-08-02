@@ -1064,42 +1064,86 @@ def test_an_unmeasurable_diff_refuses_rather_than_admitting(
 def test_every_gate_input_checks_its_return_code() -> None:
     """The recurring defect of this PR, converted into a mechanical check.
 
-    Six separate review findings reduced to one shape: a function that feeds a
-    gate reads `result.stdout` without inspecting `result.returncode`. Because
-    `_run` synthesizes an empty-stdout CompletedProcess for a missing binary
-    (127) and a timeout (124), an unreadable measurement becomes a permissive
-    zero — the ceiling cannot fire, or the run reports "nothing changed" over
-    work it simply could not see.
+    Seven review findings reduced to one shape: a call whose `stdout` is used
+    without its `returncode` being inspected. `_run` synthesizes an
+    empty-stdout CompletedProcess for a missing binary (127) and a timeout
+    (124), so an unreadable input becomes a permissive zero — a ceiling that
+    cannot fire, or a run reporting "nothing changed" over work it could not
+    see.
 
-    Reviewers caught these one at a time, each in a different function. This
-    asserts the property over ALL of them at once, so a seventh instance fails
-    here instead of costing another round. (CLAUDE.md: prefer uncharmable
-    mechanical checks over reviewer vigilance.)
+    PER CALL SITE, not per function. The first version of this test asked only
+    whether the word `returncode` appeared somewhere in the enclosing
+    function, which `main()` satisfies trivially via `agent.returncode` in an
+    unrelated receipt — so it could not have caught the post-test re-stage
+    that discarded its own exit code. Devin pointed that out on #1200, and the
+    weakness was real: a gate that large functions pass for free.
     """
-    # Safe by construction, and each is verified by its own test above:
-    #   changed_paths   — empty output is refused at the call site
+    # Justified exemptions, each verified by its own test above:
+    #   changed_paths   — empty output refused at the call site
     #                     ("candidate commit changes nothing")
     #   commit_subject  — cosmetic PR title with a literal fallback
-    #   _run/_git/_run_bytes — the runners themselves; they PRODUCE the code
-    exempt = {"changed_paths", "commit_subject",
-              "_run", "_git", "_run_bytes"}
+    #   _run/_git/_run_bytes — the runners; they PRODUCE the code
+    exempt_functions = {"changed_paths", "commit_subject",
+                        "_run", "_git", "_run_bytes"}
+    # Fire-and-forget calls whose outcome is genuinely irrelevant, named
+    # individually so a new one cannot be added silently.
+    exempt_calls = {
+        ("lane_propose.py", "reset"),      # index scrub before the re-stage
+        ("lane_propose.py", "checkout"),   # returns to a known ref
+        ("lane_propose.py", "config"),     # identity for the lane commit
+        ("lane_deliver.py", "config"),
+    }
+    runners = {"_git", "_run", "_run_bytes"}
+
+    def first_arg_token(call: ast.Call) -> str:
+        """The git/gh subcommand, for the exemption list."""
+        if not call.args:
+            return ""
+        arg = call.args[0]
+        if isinstance(arg, ast.List) and arg.elts:
+            head = arg.elts[0]
+            if isinstance(head, ast.Constant) and isinstance(head.value, str):
+                token = head.value
+                return token if not token.startswith("/") else ""
+        return ""
 
     offenders: list[str] = []
     for module in ("lane_deliver.py", "lane_propose.py"):
         source = (REPO_ROOT / "scripts" / "runtime" / module).read_text()
         tree = ast.parse(source)
         for node in ast.walk(tree):
-            if not isinstance(node, ast.FunctionDef) or node.name in exempt:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if node.name in exempt_functions:
                 continue
             body = ast.get_source_segment(source, node) or ""
-            runs = any(call in body for call in
-                       ("_git(", "_run(", "_run_bytes("))
-            if runs and "returncode" not in body:
-                offenders.append(f"{module}::{node.name}")
+            for inner in ast.walk(node):
+                call = None
+                bound: str | None = None
+                if isinstance(inner, ast.Assign) and isinstance(inner.value, ast.Call):
+                    call, targets = inner.value, inner.targets
+                    if len(targets) == 1 and isinstance(targets[0], ast.Name):
+                        bound = targets[0].id
+                elif isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call):
+                    call = inner.value          # result discarded entirely
+                if call is None:
+                    continue
+                name = getattr(call.func, "id", "")
+                if name not in runners:
+                    continue
+                if (module, first_arg_token(call)) in exempt_calls:
+                    continue
+                # Either the bound name's returncode is inspected, or the
+                # call is inline inside a check (e.g. `_git([...]).stdout`
+                # guarded elsewhere) — the former is what we require.
+                if bound is None or f"{bound}.returncode" not in body:
+                    where = f"{module}::{node.name}"
+                    detail = first_arg_token(call) or "?"
+                    offenders.append(f"{where} -> {detail}")
 
     assert not offenders, (
-        "these feed a gate but never inspect returncode, so an unreadable "
-        f"input reads as a permissive zero: {offenders}")
+        "these run a command and use its output without inspecting "
+        f"returncode, so an unreadable input reads as permissive: {offenders}")
 
 
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:

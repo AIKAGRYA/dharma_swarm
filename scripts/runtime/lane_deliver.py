@@ -461,7 +461,18 @@ def main(argv: list[str] | None = None) -> int:
 
     # Base is fetched by THIS job. The propose phase's claim about its base
     # is not consulted.
-    _git(["fetch", "origin", args.base])
+    # The return code is load-bearing, not decoration: the bundle fetch above
+    # ALSO wrote FETCH_HEAD, so a silently failed origin fetch would leave
+    # `base_sha` pointing at the CANDIDATE commit rather than origin/<base> —
+    # the base every later gate measures against. It happens to fail closed
+    # downstream (`rev-list --count` would be 0, not 1), but by accident
+    # rather than design. Found by tightening the gate-input sweep to
+    # per-call-site after Devin showed the per-function version was
+    # satisfiable by an unrelated mention (#1200).
+    base_fetch = _git(["fetch", "origin", args.base])
+    if base_fetch.returncode != 0:
+        return refuse(f"could not fetch origin/{args.base} to verify against",
+                      stderr=base_fetch.stderr[-1000:])
     base_sha = _git(["rev-parse", "FETCH_HEAD"]).stdout.strip()
     if not base_sha:
         return refuse(f"could not resolve origin/{args.base}")

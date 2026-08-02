@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import subprocess
 import sys
@@ -357,6 +358,62 @@ def test_a_dangling_symlink_is_staged_in_the_first_pass(
                           capture_output=True, text=True,
                           check=True).stdout.strip()
     assert post == measured, "the two staging passes must agree"
+
+
+def test_a_created_then_deleted_file_does_not_fail_the_restage(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for a false BLOCKED that blamed the test suite (Devin, #1200).
+
+    The post-test re-stage passed the RAW recorded list and discarded its exit
+    code. A file the agent created, staged and then deleted arrives as
+    `AD path`; after `git reset -q HEAD --` it is in neither HEAD, the index,
+    nor the worktree, so `git add` aborts atomically and NOTHING is re-staged.
+    The tree comparison then blamed the test run. Measured:
+
+        re-add exit    : 128  pathspec '...' did not match any files
+        post_test_tree : differs -> BLOCKED "the test run altered the
+                         measured content" with make replaced by /bin/true
+
+    `_stageable` must be RECOMPUTED after the reset, because the reset is what
+    changes which paths resolve.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+
+    (repo / "keep.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tmp.py").write_text("y = 2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tmp.py"], cwd=repo, check=True)
+    (repo / "tmp.py").unlink()
+
+    staged = lane_propose.stage_agent_changes()
+    assert staged is not None
+    measured = subprocess.run(["git", "write-tree"], cwd=repo,
+                              capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    # Bind to the PRODUCTION path, not to a re-implementation of it. Calling
+    # _stageable() directly here would pass even with main() restored to the
+    # raw list — which is exactly how two earlier tests in this PR passed for
+    # the wrong reason. Assert main() actually routes the re-stage through the
+    # filter and reads the result.
+    restage_block = inspect.getsource(lane_propose.main)
+    restage_block = restage_block[restage_block.index('"reset", "-q", "HEAD"'):]
+    assert "_stageable(staged)" in restage_block, (
+        "main() must recompute the stageable subset after the reset")
+    assert "restage.returncode" in restage_block, (
+        "main() must read the re-stage exit code")
+
+    subprocess.run(["git", "reset", "-q", "HEAD", "--"], cwd=repo, check=True)
+    restage = subprocess.run(
+        ["git", "add", "--", *lane_propose._stageable(staged)],
+        cwd=repo, capture_output=True, text=True)
+    assert restage.returncode == 0, restage.stderr
+    post = subprocess.run(["git", "write-tree"], cwd=repo,
+                          capture_output=True, text=True,
+                          check=True).stdout.strip()
+    assert post == measured, "the re-stage must reproduce the measured tree"
 
 
 def test_a_staged_deletion_does_not_discard_the_run(
