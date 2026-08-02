@@ -265,7 +265,7 @@ def numstat_lines(base: str, head: str) -> int | None:
     return total
 
 
-def changed_paths(base: str, head: str) -> list[str]:
+def changed_paths(base: str, head: str) -> list[str] | None:
     """Every path the candidate touches, in machine-readable form.
 
     Two flags here are load-bearing, and both were proven necessary by
@@ -287,6 +287,14 @@ def changed_paths(base: str, head: str) -> list[str]:
     """
     result = _git(["diff", "--no-renames", "--name-only", "-z",
                    f"{base}..{head}"])
+    if result.returncode != 0:
+        # None, not []. This has TWO call sites and they disagreed about what
+        # an empty list means: main() refuses ("candidate commit changes
+        # nothing"), but changed_blob_bytes() just charged nothing and
+        # returned 0, so the byte ceiling could never fire. Binary content
+        # scores zero against the line cap, so that ceiling is the ONLY bound
+        # on it. (Devin on #1200.)
+        return None
     return [part for part in result.stdout.split("\0") if part]
 
 
@@ -357,8 +365,11 @@ def changed_blob_bytes(base: str, head: str) -> int | None:
         return None
     base_oids = {oid for oid, _ in base_entries.values()}
 
+    touched = changed_paths(base, head)
+    if touched is None:
+        return None
     charged: dict[str, int] = {}
-    for path in changed_paths(base, head):
+    for path in touched:
         found = head_entries.get(path)
         if found and found[0] not in base_oids:
             charged[found[0]] = found[1]
@@ -498,6 +509,8 @@ def main(argv: list[str] | None = None) -> int:
                       parent=parent, base=base_sha)
 
     paths = changed_paths(parent, head_sha)
+    if paths is None:
+        return refuse("could not list the candidate's changed paths")
     if not paths:
         return refuse("candidate commit changes nothing")
     if len(paths) > MAX_CHANGED_FILES:

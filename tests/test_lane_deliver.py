@@ -1078,13 +1078,18 @@ def test_every_gate_input_checks_its_return_code() -> None:
     that discarded its own exit code. Devin pointed that out on #1200, and the
     weakness was real: a gate that large functions pass for free.
     """
-    # Justified exemptions, each verified by its own test above:
-    #   changed_paths   — empty output refused at the call site
-    #                     ("candidate commit changes nothing")
+    # Justified exemptions. `changed_paths` USED to be here, on the grounds
+    # that "empty output is refused at the call site" — which was true of
+    # main() and false of the second call site inside changed_blob_bytes(),
+    # where an empty list simply charged nothing and the byte ceiling could
+    # never fire. An exemption justified per FUNCTION when the property only
+    # holds per CALL SITE is the same defect this test exists to catch,
+    # committed in the test itself. It now checks its own return code and is
+    # no longer exempt. (Devin on #1200.)
+    #
     #   commit_subject  — cosmetic PR title with a literal fallback
     #   _run/_git/_run_bytes — the runners; they PRODUCE the code
-    exempt_functions = {"changed_paths", "commit_subject",
-                        "_run", "_git", "_run_bytes"}
+    exempt_functions = {"commit_subject", "_run", "_git", "_run_bytes"}
     # Fire-and-forget calls whose outcome is genuinely irrelevant, named
     # individually so a new one cannot be added silently.
     exempt_calls = {
@@ -1144,6 +1149,39 @@ def test_every_gate_input_checks_its_return_code() -> None:
     assert not offenders, (
         "these run a command and use its output without inspecting "
         f"returncode, so an unreadable input reads as permissive: {offenders}")
+
+
+def test_an_unlistable_path_set_cannot_zero_the_blob_ceiling(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a fail-open my own EXEMPTION created (Devin on #1200).
+
+    `changed_paths()` has two call sites that disagreed about what an empty
+    list means: main() refuses ("candidate commit changes nothing"), but
+    `changed_blob_bytes()` charged nothing and returned 0 — so the byte
+    ceiling could never fire. Binary content scores zero against the line cap
+    (`numstat` prints `-`), so that ceiling is its ONLY bound.
+
+    The AST gate exempted `changed_paths` on the stated grounds that empty
+    output is refused at the call site. True of one call site, false of the
+    other — an exemption justified per function when the property only held
+    per call site.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if "--name-only" in cmd:
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: bad rev")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "changed paths" in stored["reason"], stored["reason"]
+
+    # And measured directly: an unlistable set is None, never a permissive 0.
+    _intercept(monkeypatch, handler)
+    assert lane_deliver.changed_blob_bytes("HEAD~1", "HEAD") is None
 
 
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
