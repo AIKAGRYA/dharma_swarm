@@ -139,27 +139,37 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Provision the selected coding agent
-        # Without this the runner has no `claude`/`codex` binary at all, so
-        # every real target hit lane_propose's FileNotFoundError path and the
-        # lane could never produce a candidate — it would report BLOCKED
-        # forever while looking configured. Only `claude-npx` is installable
-        # on a stock runner; the other selectors need a pre-provisioned or
-        # self-hosted image, and this step says so out loud instead of
-        # failing opaquely 45 minutes later.
+        # Without this the runner has no agent binary at all, so every real
+        # target hit lane_propose's FileNotFoundError path and the lane
+        # reported BLOCKED forever while looking configured.
+        #
+        # The routing matters and the first version had it backwards (Devin
+        # Review on #1200). `claude-npx` runs `npx -y @anthropic-ai/claude-code`
+        # (lane_propose.py AGENT_COMMANDS), and `npx -y` resolves the package
+        # from the registry itself — a global install is not what makes that
+        # selector work. `claude` runs the bare `claude` binary, and
+        # `npm install -g @anthropic-ai/claude-code` is precisely what puts
+        # that binary on PATH. So the install belonged on the arm that was
+        # refusing it, and the refusal message ("not installable on a stock
+        # ubuntu-latest runner") was false for `claude`.
+        #
+        # `codex` is left genuinely unprovisioned rather than guessed at: I
+        # have not verified a package that installs it, and inventing one
+        # would put an unverified claim in the failure path.
         run: |
           set -uo pipefail
           case "${DHARMA_LANE_AGENT_CMD:-}" in
             "")
               echo "::notice::No agent selector configured; the lane will emit BLOCKED." ;;
-            claude-npx)
+            claude|claude-npx)
               npm install -g @anthropic-ai/claude-code \
-                && echo "provisioned claude-npx" \
-                || echo "::warning::claude-npx install failed; lane will report BLOCKED" ;;
-            claude|codex)
-              if command -v "${DHARMA_LANE_AGENT_CMD%%-*}" >/dev/null 2>&1; then
-                echo "agent '${DHARMA_LANE_AGENT_CMD}' already present"
+                && echo "provisioned @anthropic-ai/claude-code (provides the 'claude' binary)" \
+                || echo "::warning::claude install failed; lane will report BLOCKED" ;;
+            codex)
+              if command -v codex >/dev/null 2>&1; then
+                echo "agent 'codex' already present"
               else
-                echo "::warning::selector '${DHARMA_LANE_AGENT_CMD}' is not installable on a stock ubuntu-latest runner — use claude-npx or a pre-provisioned runner; the lane will report BLOCKED"
+                echo "::warning::selector 'codex' is not provisioned by this step — use claude/claude-npx or a pre-provisioned runner; the lane will report BLOCKED"
               fi ;;
             *)
               echo "::warning::unknown selector; lane_propose will refuse against its allowlist" ;;

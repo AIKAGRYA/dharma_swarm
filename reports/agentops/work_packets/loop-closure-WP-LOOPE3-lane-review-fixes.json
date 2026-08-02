@@ -79,13 +79,13 @@
     "honest_blockers": [
       "The two denylist bypasses were live on main from 9d792cea until this lands. Exposure is nil in practice because the lane is inert without DHARMA_LANE_AGENT_CMD, but the code was wrong and shipped.",
       "Delivery now degrades to verify-only unless LANE_DELIVERY_PUSH_TOKEN or MERGEMASTERMIKE_PAT proves push authority, because a github.token push does not trigger CI. Configuring that secret is an operator action.",
-      "claude and codex selectors still cannot be provisioned on a stock ubuntu-latest runner; only claude-npx installs. The workflow now warns explicitly instead of failing opaquely.",
+      "Only the codex selector is unprovisioned on a stock ubuntu-latest runner. An earlier revision of this packet claimed claude was too — that was false, and Devin Review caught it: npm install -g @anthropic-ai/claude-code is exactly what puts the claude binary on PATH, while claude-npx uses npx -y and needs no install at all. The workflow had the install on the arm that did not need it and refused the arm that did. codex is left unprovisioned deliberately rather than guessed at, since no verified install command for it is recorded here.",
       "Mailbox consumption is inferred from delivered PR bodies rather than claimed in loop-tasks, because the proposing job holds contents:read by design. A task whose PR body is edited to drop its task_id would be re-selected.",
       "Clean filters are refused rather than accommodated: the lane cannot currently test a materialization of the frozen tree with filters disabled, so it declines the case instead of claiming a guarantee it does not have."
     ],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "c9c8798adc4bccfb25181c17a2f674fa7a4a9fc854f1bc4ad6dcef1fd0767c80",
+    "packet_digest": "7ca736896214d6f3baf5868a6ef659a2c2fe8d841f5b6c83dc30784ce29fa4e2",
     "rollback": "Revert the single commit; the lane returns to its 9d792cea behaviour, including both denylist bypasses.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {

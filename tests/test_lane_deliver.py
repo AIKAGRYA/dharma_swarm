@@ -381,6 +381,26 @@ def test_a_lying_propose_receipt_changes_no_verdict(lane, tmp_path) -> None:
     assert "referee or excluded paths" in stored["reason"]
 
 
+def test_orphan_rollback_deletes_under_an_atomic_lease() -> None:
+    """Regression for a verified race (Greptile, #1200).
+
+    The first version read the branch SHA with `ls-remote` and then deleted
+    unconditionally — a TOCTOU. Greptile pushed a concurrent writer's commit
+    between the two operations and watched the rollback delete it.
+
+    `--force-with-lease=<ref>:<sha>` with a delete refspec binds expectation
+    and deletion into one atomic operation. Verified against git 2.43: a
+    stale expectation is rejected with "(delete) ... stale info" and the
+    branch survives; a matching one deletes.
+    """
+    source = (REPO_ROOT / "scripts" / "runtime" / "lane_deliver.py").read_text()
+    assert "--force-with-lease=refs/heads/{branch}:{head_sha}" in source
+    assert "stale info" in source
+    # The non-atomic shape must not come back.
+    assert '"ls-remote"' not in source
+    assert '"--delete"' not in source
+
+
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:
     """Source pin for the two operations that reintroduce the PR #1162 class:
     `git add` runs clean filters the agent can define, and a checkout writes

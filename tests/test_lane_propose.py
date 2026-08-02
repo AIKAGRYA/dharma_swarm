@@ -181,6 +181,30 @@ def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:
     assert lane_propose.attempted_task_ids("o/r") == {"T-1"}
 
 
+def test_attempt_history_at_the_cap_fails_closed(monkeypatch) -> None:
+    """Regression for a verified defect (Greptile, #1200). A truncated
+    history is indistinguishable from a complete one in this response, and a
+    truncated history reads as "never attempted" — which re-selects an old
+    task and starves the newer ones, the exact failure the function exists to
+    prevent. Greptile demonstrated it at the 100-PR boundary: 100 results
+    skipped T-OLD correctly, 101 results (truncated to 100) re-selected it.
+    """
+    monkeypatch.setattr(lane_propose, "ATTEMPT_HISTORY_LIMIT", 3)
+    rows = [{"headRefName": f"lane/hardening-2026010{i}T000000Z",
+             "body": f'{{"task_id": "T-{i}"}}'} for i in range(3)]
+    monkeypatch.setattr(
+        lane_propose, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(rows), ""))
+    assert lane_propose.attempted_task_ids("o/r") is None
+
+    # One under the cap is a complete view and answers normally.
+    monkeypatch.setattr(
+        lane_propose, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(
+            cmd, 0, json.dumps(rows[:2]), ""))
+    assert lane_propose.attempted_task_ids("o/r") == {"T-0", "T-1"}
+
+
 def test_unreadable_attempt_history_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr(
         lane_propose, "_run",

@@ -430,17 +430,25 @@ def main(argv: list[str] | None = None) -> int:
     # another `lane/hardening-*` orphan that nothing will ever clean up or
     # count. Roll the push back — but only if the remote ref still points at
     # exactly the SHA we pushed, so a concurrent writer is never clobbered.
-    rollback = "not_attempted"
-    remote = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
-    remote_sha = remote.stdout.split("\t")[0].strip() if remote.stdout else ""
-    if remote.returncode != 0:
-        rollback = "skipped: could not read the remote ref"
-    elif remote_sha != head_sha:
-        rollback = f"skipped: remote moved to {remote_sha[:12] or 'absent'}"
+    # The lease is part of the delete, not a check before it. Reading the SHA
+    # with `ls-remote` and then deleting unconditionally is a TOCTOU: a writer
+    # that updates the branch between the two operations gets their commit
+    # deleted instead of our orphan. Greptile proved exactly that against the
+    # first version of this block (#1200).
+    #
+    # `--force-with-lease=<ref>:<sha>` with a delete refspec binds the two
+    # together atomically. Verified against git 2.43: a stale expectation is
+    # rejected with "(delete) ... stale info" and the branch survives; a
+    # matching expectation deletes.
+    deleted = _git(["push",
+                    f"--force-with-lease=refs/heads/{branch}:{head_sha}",
+                    "origin", f":refs/heads/{branch}"])
+    if deleted.returncode == 0:
+        rollback = "deleted under lease"
+    elif "stale info" in (deleted.stderr + deleted.stdout):
+        rollback = "kept: branch moved after our push; lease refused the delete"
     else:
-        deleted = _git(["push", "origin", "--delete", f"refs/heads/{branch}"])
-        rollback = "deleted" if deleted.returncode == 0 else (
-            f"delete failed: {deleted.stderr[-200:]}")
+        rollback = f"delete failed: {deleted.stderr[-200:]}"
 
     receipt({"status": "PR_CREATE_FAILED", **verified_facts,
              "pr_output": (pr.stdout + pr.stderr)[-500:],

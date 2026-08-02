@@ -65,6 +65,11 @@ MAX_TEST_SECONDS = int(os.environ.get("LANE_MAX_TEST_SECONDS", "1500"))
 MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
 LANE_BRANCH_PREFIX = "lane/hardening-"
 RECIPIENT = "hardening-lane"
+# How far back the lane looks for its own delivered PRs when deciding whether
+# a mailbox task was already attempted. Generous, because reaching it fails
+# closed (see attempted_task_ids) — at one delivery per run, three times a
+# week, this is roughly six years of lane output.
+ATTEMPT_HISTORY_LIMIT = int(os.environ.get("LANE_ATTEMPT_HISTORY_LIMIT", "1000"))
 
 # The DHARMA_LANE_AGENT_CMD secret selects one of these literal argv
 # templates by KEY — it is a name, not a shell string. No environment-derived
@@ -188,7 +193,7 @@ def attempted_task_ids(repo: str) -> set[str] | None:
     result = _run([
         GH_BIN, "pr", "list", "--repo", repo, "--state", "all",
         "--label", "lane-output", "--json", "body,headRefName",
-        "--limit", "100",
+        "--limit", str(ATTEMPT_HISTORY_LIMIT),
     ])
     if result.returncode != 0:
         return None
@@ -197,6 +202,16 @@ def attempted_task_ids(repo: str) -> set[str] | None:
     except json.JSONDecodeError:
         return None
     if not isinstance(rows, list):
+        return None
+    # Truncation is indistinguishable from completeness in this response, and
+    # a truncated history reads as "never attempted" — which re-selects an old
+    # task and starves the newer ones, the exact failure this function exists
+    # to prevent. Greptile demonstrated it at the 100-PR boundary (#1200).
+    # Hitting the cap therefore fails closed rather than answering from a
+    # partial view.
+    if len(rows) >= ATTEMPT_HISTORY_LIMIT:
+        print(f"attempt history hit the {ATTEMPT_HISTORY_LIMIT}-PR cap; "
+              "cannot prove a task is unattempted", file=sys.stderr)
         return None
     seen: set[str] = set()
     for row in rows:
