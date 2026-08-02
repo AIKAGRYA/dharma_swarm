@@ -131,8 +131,30 @@ EXIT_TIMEOUT = 124
 
 def _run(cmd: list[str], *, timeout: int = 300,
          env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    # `errors="surrogateescape"` is load-bearing, and its absence here was
+    # the exact TWIN of the defect it fixes on the delivery side: that helper
+    # got the tolerant decode in this PR (Codex, non-UTF-8 filename crashing
+    # the trusted job) and this one was left strict. Measured on this branch:
+    #
+    #   subprocess.run(cmd, capture_output=True, text=True)
+    #     -> UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff ...
+    #   ... with errors="surrogateescape"
+    #     -> 'ok \udcff\udcfe bad\n'
+    #
+    # The exception is raised INSIDE subprocess.run, so it escapes `_run`,
+    # escapes main(), and skips done()/receipt()/emit_status() — the workflow
+    # step then reports NO_RECEIPT_WRITTEN, which is the pathology the
+    # TimeoutExpired arm below already exists to close. Reachable without an
+    # attack: `make test-fast` runs a suite the agent has just edited, so one
+    # test writing raw bytes to stdout ends the run with no report and the
+    # whole agent budget spent. (Devin on #1200.)
+    #
+    # Safe through the receipt path, checked rather than assumed: json.dumps
+    # defaults to ensure_ascii=True, so a lone surrogate leaves as `\udcff`
+    # and both the write_text(utf-8) and the print() see pure ASCII.
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
+                              errors="surrogateescape",
                               timeout=timeout, check=False, env=env)
     except FileNotFoundError as exc:
         # A missing binary is a failed command, not a crashed lane.
@@ -145,7 +167,11 @@ def _run(cmd: list[str], *, timeout: int = 300,
         # budget exists to report.
         captured = exc.stdout or b"" if isinstance(exc.stdout, bytes) else (exc.stdout or "")
         if isinstance(captured, bytes):
-            captured = captured.decode("utf-8", "replace")
+            # surrogateescape, not "replace", to match the decode above and
+            # the delivery twin: a lossy handler cannot be re-encoded to the
+            # bytes the command actually emitted, and the tail this produces
+            # is the only evidence a timed-out run leaves behind.
+            captured = captured.decode("utf-8", "surrogateescape")
         return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, captured,
                                            f"timed out after {timeout}s")
 
@@ -172,11 +198,17 @@ def _run_bytes(cmd: list[str], *, timeout: int = 120
         return subprocess.run(cmd, capture_output=True, timeout=timeout,
                               check=False)
     except FileNotFoundError as exc:
-        return subprocess.CompletedProcess(cmd, EXIT_NOT_FOUND, b"",
-                                           str(exc).encode())
+        # surrogateescape on the way OUT too, by the same rule as the way in:
+        # an error arm that can itself raise is not an error arm. `str(exc)`
+        # names the executable, so a strict encode would only trip on a
+        # non-ASCII interpreter path — thin, but the whole point of this
+        # round is that a helper must not have a door out past the receipt.
+        return subprocess.CompletedProcess(
+            cmd, EXIT_NOT_FOUND, b"", str(exc).encode("utf-8", "surrogateescape"))
     except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, b"",
-                                           f"timed out after {timeout}s".encode())
+        return subprocess.CompletedProcess(
+            cmd, EXIT_TIMEOUT, b"",
+            f"timed out after {timeout}s".encode("utf-8", "surrogateescape"))
 
 
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -759,10 +791,16 @@ def main(argv: list[str] | None = None) -> int:
         # argv is purely the literal template; the prompt travels on stdin
         # (claude -p and codex exec both read piped input), so task text
         # never enters the command-argument position.
+        # Same tolerant decode as `_run`, and for a stronger reason: this
+        # command IS the untrusted agent. Its stdout is whatever it chooses to
+        # write, so strict decoding hands it a one-byte way to end the run
+        # with no receipt at all. There is no UnicodeDecodeError arm below
+        # because with surrogateescape the decode cannot fail — an except
+        # clause here would be untestable dead code. (Devin on #1200.)
         agent = subprocess.run(
             agent_argv, input=prompt, env=agent_env(agent_choice),
-            capture_output=True, text=True, timeout=MAX_AGENT_SECONDS,
-            check=False,
+            capture_output=True, text=True, errors="surrogateescape",
+            timeout=MAX_AGENT_SECONDS, check=False,
         )
     except subprocess.TimeoutExpired:
         return done("CAP_HIT", {"cap": "agent_seconds", "target": target,

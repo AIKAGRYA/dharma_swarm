@@ -332,6 +332,65 @@ def test_an_unmeasurable_staged_diff_blocks_rather_than_claiming_no_diff(
     assert lane_propose.diff_line_count() is None
 
 
+def test_non_utf8_command_output_is_a_receipt_not_a_crashed_lane(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for the propose-side twin of a fix this PR made on delivery.
+
+    `lane_deliver._run` got `errors="surrogateescape"` earlier in this PR
+    because a non-UTF-8 filename crashed the trusted job (Codex). The sibling
+    helper here was left on strict `text=True`, and the exception is raised
+    INSIDE `subprocess.run` — so it escapes `_run`, escapes `main()`, and
+    skips `done()`/`receipt()`/`emit_status()`. The workflow step then reports
+    NO_RECEIPT_WRITTEN: the exact pathology the TimeoutExpired arm exists to
+    close, reachable through a different door. Measured on this branch:
+
+        text=True, strict          -> UnicodeDecodeError: byte 0xff ...
+        text=True, surrogateescape -> 'ok \\udcff\\udcfe bad\\n'
+
+    No attack needed. `make test-fast` runs a suite the agent has just edited,
+    so one test writing raw bytes to stdout ends the run with no report and
+    the whole agent budget spent. (Devin on #1200.)
+    """
+    # The agent writes a real change AND emits undecodable bytes, exercising
+    # both the direct `subprocess.run(agent_argv, ...)` call and the receipt.
+    outputs = _lane_repo_with_stub_agent(
+        tmp_path, monkeypatch,
+        "printf 'x = 1\\n' > dharma_swarm/fix.py\n"
+        "printf 'raw \\377\\376 bytes\\n'\n")
+
+    code = lane_propose.main(_args(tmp_path))
+    stored = json.loads((tmp_path / "r.json").read_text())
+    assert code == 0, stored
+    assert stored["status"] == "READY_TO_DELIVER", stored
+    assert "status=READY_TO_DELIVER" in outputs.read_text()
+
+    # And `_run` itself, on a command whose output cannot be decoded.
+    result = lane_propose._run(
+        [sys.executable, "-c",
+         r"import sys; sys.stdout.buffer.write(b'ok \xff\xfe bad\n')"])
+    assert result.returncode == 0
+    # Round-trips: surrogateescape is reversible, `replace` would not be.
+    assert result.stdout.encode("utf-8", "surrogateescape") == b"ok \xff\xfe bad\n"
+
+
+def test_a_timed_out_command_keeps_its_undecodable_tail(monkeypatch) -> None:
+    """The same handler, on the arm that reports a blown budget.
+
+    The timeout arm decoded its captured tail with `"replace"` while the
+    delivery twin used `"surrogateescape"`. That tail is the ONLY evidence a
+    timed-out run leaves, and `replace` cannot be re-encoded to the bytes the
+    command actually emitted — so the divergence moved with the rest of it.
+    """
+    def boom(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 1),
+                                        output=b"partial \xff\xfe output")
+    monkeypatch.setattr(lane_propose.subprocess, "run", boom)
+    result = lane_propose._run(["make", "test-fast"], timeout=5)
+    assert result.returncode == lane_propose.EXIT_TIMEOUT
+    assert result.stdout.encode("utf-8", "surrogateescape") == \
+        b"partial \xff\xfe output"
+
+
 def test_a_binary_file_and_a_submodule_are_measured_not_refused(
         tmp_path: Path, monkeypatch) -> None:
     """The negative control for the malformed-numstat refusal below.

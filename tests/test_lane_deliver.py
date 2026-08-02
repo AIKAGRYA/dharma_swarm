@@ -1282,6 +1282,64 @@ def test_an_inline_runner_call_is_named_rather_than_invisible() -> None:
         f"expected {allowed}, found {found}")
 
 
+def test_every_text_mode_command_decodes_tolerantly() -> None:
+    """The TWIN pattern of this PR, mechanized instead of re-reported.
+
+    Eight findings across these two files reduce to "a guard applied to one of
+    a known pair of call sites". This one cost a round on its own: the
+    delivery `_run` got `errors="surrogateescape"` when a non-UTF-8 filename
+    crashed the trusted job (Codex), and the propose `_run` — plus the direct
+    `subprocess.run(agent_argv, ...)`, whose output IS the untrusted agent's —
+    stayed strict. A `UnicodeDecodeError` is raised inside `subprocess.run`,
+    so it escapes the helper, escapes `main()`, and skips the receipt write
+    entirely (Devin on #1200).
+
+    Command output here is filenames and test logs: bytes, not text. Any
+    call that converts between the two must do it reversibly, in BOTH
+    directions — an `.encode()` in an error arm can raise just as an
+    `.decode()` can, and an error arm that raises is not an error arm.
+    Bytes-mode `subprocess.run` calls are exempt because they never decode;
+    `_run_bytes` is the intended way to read output that must stay bytes.
+
+    What this cannot see: `from subprocess import run`, or a decode reached
+    through an alias. It pins the forms these two files actually use.
+    """
+    tolerant = "surrogateescape"
+    offenders: list[str] = []
+    for module in ("lane_deliver.py", "lane_propose.py"):
+        source = (REPO_ROOT / "scripts" / "runtime" / module).read_text()
+        for node in ast.walk(ast.parse(source)):
+            if not isinstance(node, ast.Call):
+                continue
+            kw = {k.arg: k.value for k in node.keywords if k.arg}
+            func = node.func
+            is_run = (isinstance(func, ast.Attribute) and func.attr == "run"
+                      and getattr(func.value, "id", "") == "subprocess")
+            if is_run:
+                text_mode = any(
+                    isinstance(kw.get(name), ast.Constant)
+                    and kw[name].value is True
+                    for name in ("text", "universal_newlines")
+                ) or "encoding" in kw
+                if not text_mode:
+                    continue          # bytes in, bytes out: nothing decodes
+                errors = kw.get("errors")
+                if not (isinstance(errors, ast.Constant)
+                        and errors.value == tolerant):
+                    offenders.append(f"{module}:{node.lineno} subprocess.run")
+            elif (isinstance(func, ast.Attribute)
+                    and func.attr in ("decode", "encode")):
+                handler = node.args[1] if len(node.args) > 1 else kw.get("errors")
+                if not (isinstance(handler, ast.Constant)
+                        and handler.value == tolerant):
+                    offenders.append(f"{module}:{node.lineno} .{func.attr}")
+
+    assert not offenders, (
+        "these decode command output strictly or lossily; a filename or test "
+        "log is bytes, so strict raises past the receipt write and lossy "
+        f"cannot be re-encoded to what the command emitted: {offenders}")
+
+
 def test_an_unparseable_numstat_record_refuses_on_the_governing_side(
         lane, tmp_path, monkeypatch) -> None:
     """Greptile reported this against the propose-side parser; this is the
