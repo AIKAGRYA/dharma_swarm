@@ -481,7 +481,7 @@ active_tracks:
       - id: humming-v2-e1-cron-authority
         what: >-
           OWNERSHIP RESOLUTION ONLY AT A0: loop-closure owns cron_jobs.json,
-          scripts/cron_unify.py, and cron_job_runtime.py for the future E1
+          scripts/cron_unify.py, and dharma_swarm/cron_job_runtime.py for the future E1
           authority-unification slice. Implementation is dependency-blocked
           until the constitutional harness, bounded-loop P1, and scoped graph
           P2 prerequisites are merged. Completion when executable: one durable
@@ -1630,8 +1630,8 @@ active_tracks:
       - id: humming-v2-p0-k
         what: >-
           ADMITTED ONLY AFTER THE A0 GOVERNANCE PR MERGES. Build the typed
-          constitutional ActionEnvelope in action_effects/envelope.py and one
-          action-effect dispatcher in action_effects/dispatcher.py, reusing
+          constitutional ActionEnvelope in dharma_swarm/action_effects/envelope.py and one
+          action-effect dispatcher in dharma_swarm/action_effects/dispatcher.py, reusing
           ExecutionIdentity, RuntimeStateStore idempotency, Shakti warrants,
           EvidenceReceipt, reversibility gates, and existing runtime storage.
           Because semantic_governance.py already owns a semantic-only
