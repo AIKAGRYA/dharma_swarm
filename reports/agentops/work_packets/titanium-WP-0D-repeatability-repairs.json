@@ -1,0 +1,129 @@
+{
+  "id": "titanium-WP-0D-repeatability-repairs",
+  "base_ref": "a8da9bb5bffa2031f3e0b699261a94dd8ecb2ef1",
+  "branch": "claude/titanium-hardening-status-bm7th5",
+  "worktree": ".",
+  "intent": "Perform exactly the three WP-0D repeatability repairs ratified by the human-merged 2026-08-01 bounded amendment (PR #1177, merged as a8da9bb): split the six-scenario AgentOps closeout test in tests/test_agent_work_packet.py into individually budgeted items, replace its environment-dependent hollow-module negative-control fixture with a deterministically absent module, and add the measured pytest.mark.timeout repo-scale override for tests/test_make_onboarding_contract.py::test_make_report_root_rejects_hypothesis_cache_symlink registered in REPO_SCALE_OVERRIDES. Behavioral coverage is preserved or strengthened; the 10-second fast item budget is not weakened; regenerated count projections are reconverged. This packet edits no runtime, workflow, or governance-spec file and retires no residual \u2014 only merged-main reverification does that.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-0D-repeatability-repairs.json",
+    "tests/test_agent_work_packet.py",
+    "tests/test_make_onboarding_contract.py",
+    "tests/test_fast_suite_isolation.py",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "terminal/**",
+    "tools/**",
+    "scripts/**",
+    "docs/plans/**",
+    "docs/prompts/**",
+    "docs/state/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "reports/loop_closure/**",
+    "reports/governance/titanium/phase0_clean_room_receipt.json",
+    "reports/governance/titanium/wp00_baseline.json",
+    "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
+    "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
+    "reports/agentops/work_packets/titanium-WP-M1-post-1164-reconciliation.json",
+    "reports/agentops/work_packets/titanium-WP-PHASE0-INTEGRATION.json",
+    "reports/agentops/work_packets/titanium-WP-0D-scope-amendment.json",
+    "Dockerfile",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock",
+    "INTERFACE_MISMATCH_MAP.md",
+    "CYBERNETIC_LOOP_MAP.md",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "repaired-surfaces-contracts",
+      "command": "python3 -m pytest -q tests/test_agent_work_packet.py tests/test_make_onboarding_contract.py tests/test_fast_suite_isolation.py",
+      "expected_exit": 0,
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-rejects-unknown-flag",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(tests): WP-0D repeatability repairs \u2014 split closeout scenarios, deterministic hollow probe, measured timeout override"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0D",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a8da9bb5bffa2031f3e0b699261a94dd8ecb2ef1",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The single six-scenario closeout item exceeded the 10-second fast budget on the operator host even in isolation (reports/governance/titanium/phase0_reconciliation_2026-07-25.json isolated_timeout_replay); the split preserves every scenario as its own budgeted item.",
+      "The hollow-module negative control probed python3 -m pytest, whose jail importability varies by host site-packages; the deterministically absent module removes the environment dependence the reconciliation documented.",
+      "Merged-main count projections lag the #1180/#1186/#1187 merges; this PR reconverges them alongside its own +2 test-def delta."
+    ],
+    "closest_existing_implementation": [
+      "tests/test_agent_work_packet.py",
+      "tests/test_fast_suite_isolation.py",
+      "tests/test_make_onboarding_contract.py",
+      "scripts/governance/run_agent_work_packet.py",
+      "reports/agentops/work_packets/titanium-WP-0D-scope-amendment.json"
+    ],
+    "honest_blockers": [
+      "The WP-0D residual closes only on merged-main reverification of two consecutive clean make test-fast runs plus make test; this PR carries the head-proof runs, not the merged-main replay.",
+      "Full-suite proof runs on this container require a non-root runner and a 4096 soft file-descriptor limit; the 1024 default exhausts descriptors near test 13,046 from suite-wide leaked resources that are outside this packet's authorized scope (CI passes at its own defaults; the leak inventory is post-Phase-0 work).",
+      "Phase 0 remains BLOCKED targeting CLOSED_NOT_PROD; WP-0F1, WP-0G, WP-0C1R, WP-0S, and WP-0I are untouched by this packet."
+    ],
+    "rollback": "Revert the single repair commit; the test split, fixture replacement, override, registry entry, and reconverged projections disappear as one unit. No runtime state migrates.",
+    "packet_digest": "21f4cf967a47506625a56b23ced6d49a009232f2942ad2b98263c8b435284df3"
+  }
+}
