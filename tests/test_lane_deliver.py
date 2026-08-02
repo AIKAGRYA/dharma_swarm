@@ -729,9 +729,15 @@ def test_a_pure_rename_does_not_consume_the_blob_budget(
          f"{seeded}..refs/heads/{LANE_BRANCH}")
     _git(seed, "checkout", "-q", "main")
     _git(lane["work"], "fetch", "-q", "origin")
+    # Fetch the candidate into THIS repo before measuring it. Without this,
+    # `ls-tree` failed and the old fail-open `entries()` returned {}, so the
+    # assertion below passed at 0 for the wrong reason entirely — the
+    # fail-open Devin found (#1200) was also hiding a vacuous test.
+    _git(lane["work"], "fetch", "-q", str(bundle), f"refs/heads/{LANE_BRANCH}")
+    head = _git(lane["work"], "rev-parse", "FETCH_HEAD")
 
     # The blob budget must see zero NEW content...
-    assert lane_deliver.changed_blob_bytes(seeded, LANE_BRANCH) == 0
+    assert lane_deliver.changed_blob_bytes(seeded, head) == 0
 
     # ...so a ceiling far below the file's size does not refuse it.
     monkeypatch.setattr(lane_deliver, "MAX_CHANGED_BLOB_BYTES", 100)
@@ -889,6 +895,70 @@ def test_a_push_that_never_landed_has_nothing_to_roll_back(
     assert stored["branch_rollback"] == "nothing to roll back"
     refs = _git(lane["origin"], "for-each-ref", "--format=%(refname)")
     assert LANE_BRANCH not in refs
+
+
+def test_a_malformed_target_does_not_crash_after_the_push(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a crash this PR introduced (Devin on #1200).
+
+    `target` comes from the untrusted receipt and is never type-validated —
+    `proposed.get("target", {})` does not protect, because the default applies
+    only when the key is ABSENT, not when it is present and null. `.get()` on
+    None raised AttributeError after the push and before `gh pr create`, so it
+    escaped main(): no receipt, no PR, no rollback, stranded branch.
+    """
+    receipt_path = tmp_path / "propose.json"
+    receipt_path.write_text('{"status": "READY_TO_DELIVER", "target": null}',
+                            encoding="utf-8")
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if _is(cmd, "pr", "create"):
+            return subprocess.CompletedProcess(cmd, 0, "https://pr/1", "")
+        if _is(cmd, "pr", "list"):
+            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+        return None
+
+    _intercept(monkeypatch, handler)
+    # A verdict, not an exception.
+    code, stored = _deliver(lane, bundle, tmp_path,
+                            "--propose-receipt", str(receipt_path))
+    assert code == 0, stored
+    assert stored["status"] == "DRAFT_PR_OPENED"
+
+    for hostile in ('"not-a-dict"', '[1, 2, 3]', '123'):
+        receipt_path.write_text(
+            '{"status": "READY_TO_DELIVER", "target": %s}' % hostile,
+            encoding="utf-8")
+        code, stored = _deliver(lane, bundle, tmp_path, "--dry-run",
+                                "--propose-receipt", str(receipt_path))
+        assert code == 0, (hostile, stored)
+
+
+def test_an_unreadable_blob_listing_refuses_rather_than_admitting(
+        lane, tmp_path, monkeypatch) -> None:
+    """Regression for a fail-OPEN on the only ceiling bounding binary content
+    (Devin on #1200).
+
+    `entries()` ignored the return code, and `_run` yields empty stdout for
+    both a missing binary (127) and a timeout (124). An unreadable head
+    listing therefore read as "the candidate contains nothing": charged 0,
+    returned 0, and `blob_bytes > MAX_CHANGED_BLOB_BYTES` could never fire.
+    Binary content already scores zero against the line cap, so nothing else
+    would have caught it.
+    """
+    bundle = _make_bundle(lane, files={"dharma_swarm/ok.py": "x = 1\n"})
+
+    def handler(cmd, kw):
+        if "ls-tree" in cmd:
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: not a tree")
+        return None
+
+    _intercept(monkeypatch, handler)
+    code, stored = _deliver(lane, bundle, tmp_path, "--dry-run")
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    assert "changed blob bytes" in stored["reason"], stored["reason"]
 
 
 def test_delivery_never_stages_or_checks_out_the_candidate() -> None:

@@ -191,6 +191,54 @@ def _repo_with_global_config(tmp_path: Path, monkeypatch, config: str) -> Path:
     return repo
 
 
+def test_a_rename_survives_the_post_test_restage(tmp_path: Path,
+                                                 monkeypatch) -> None:
+    """Regression for a rename that could never be delivered (Devin on #1200).
+
+    `git status --porcelain` reports a staged rename as one record,
+    `R  old -> new`. Keeping only `new` meant `measured_tree` held the delete
+    of `old` AND the add of `new`, while the post-test re-stage
+    (`git reset -q HEAD --` then re-add the recorded paths) restored `old`
+    from HEAD with nothing to remove it. So `post_test_tree` never matched and
+    every rename ended BLOCKED claiming "the test run altered the measured
+    content" — on a run where the tests changed nothing.
+
+    That directly contradicted the rename accounting added in this same PR:
+    the diff cap counts renames at full cost, which only makes sense if a
+    rename can actually ship.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "big.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, check=True)
+    subprocess.run(["git", "mv", "big.py", "moved.py"], cwd=repo, check=True)
+
+    # Both sides are recorded, not just the destination.
+    assert lane_propose.agent_changed_paths() == ["big.py", "moved.py"]
+
+    measured = subprocess.run(["git", "write-tree"], cwd=repo,
+                              capture_output=True, text=True,
+                              check=True).stdout.strip()
+    # The exact re-stage main() performs after the test run.
+    subprocess.run(["git", "reset", "-q", "HEAD", "--"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "--", "big.py", "moved.py"], cwd=repo,
+                   check=True)
+    post = subprocess.run(["git", "write-tree"], cwd=repo,
+                          capture_output=True, text=True,
+                          check=True).stdout.strip()
+    assert post == measured, "a rename must round-trip through the re-stage"
+
+    # And the check still catches a genuine test-run mutation.
+    (repo / "moved.py").write_text("x = 999\n", encoding="utf-8")
+    subprocess.run(["git", "reset", "-q", "HEAD", "--"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "--", "big.py", "moved.py"], cwd=repo,
+                   check=True)
+    mutated = subprocess.run(["git", "write-tree"], cwd=repo,
+                             capture_output=True, text=True,
+                             check=True).stdout.strip()
+    assert mutated != measured
+
+
 def test_a_staged_rename_is_counted_not_collapsed_to_zero(
         tmp_path: Path, monkeypatch) -> None:
     """The propose-side cap is the FIRST gate and had the same hole Devin

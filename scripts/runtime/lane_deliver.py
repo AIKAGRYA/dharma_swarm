@@ -277,7 +277,7 @@ def changed_paths(base: str, head: str) -> list[str]:
     return [part for part in result.stdout.split("\0") if part]
 
 
-def changed_blob_bytes(base: str, head: str) -> int:
+def changed_blob_bytes(base: str, head: str) -> int | None:
     """Total uncompressed size of the blobs this candidate adds or modifies.
 
     `git diff --numstat` reports `-` for both cells on binary files, so a
@@ -313,8 +313,21 @@ def changed_blob_bytes(base: str, head: str) -> int:
     This one is a FALSE REFUSAL rather than a hole — it made the cap stricter
     than its own docstring claimed, never looser.
     """
-    def entries(ref: str) -> dict[str, tuple[str, int]]:
+    def entries(ref: str) -> dict[str, tuple[str, int]] | None:
+        # None, not {}, when the listing could not be read. An unreadable
+        # head listing used to be indistinguishable from "the candidate
+        # contains nothing": the loop charged nothing, the function returned
+        # 0, and `blob_bytes > MAX_CHANGED_BLOB_BYTES` could never fire —
+        # fail-OPEN on the only ceiling that bounds binary content, which
+        # already scores zero against the line cap. `_run` returns empty
+        # stdout for both a missing binary (127) and a timeout (124), so this
+        # was reachable without any attack. The asymmetry made it worse: a
+        # failed `base` listing fails closed (empty OID set charges
+        # everything) while a failed `head` listing failed open.
+        # (Devin on #1200.)
         listing = _git(["ls-tree", "-r", "-z", "--long", ref])
+        if listing.returncode != 0:
+            return None
         out: dict[str, tuple[str, int]] = {}
         for entry in listing.stdout.split("\0"):
             if not entry:
@@ -326,7 +339,10 @@ def changed_blob_bytes(base: str, head: str) -> int:
         return out
 
     head_entries = entries(head)
-    base_oids = {oid for oid, _ in entries(base).values()}
+    base_entries = entries(base)
+    if head_entries is None or base_entries is None:
+        return None
+    base_oids = {oid for oid, _ in base_entries.values()}
 
     charged: dict[str, int] = {}
     for path in changed_paths(base, head):
@@ -477,6 +493,10 @@ def main(argv: list[str] | None = None) -> int:
     # Binary content is invisible to the line cap (numstat prints `-`), so it
     # gets its own ceiling measured in uncompressed bytes.
     blob_bytes = changed_blob_bytes(parent, head_sha)
+    if blob_bytes is None:
+        # Matches how an unreadable draft ceiling is handled below: a gate
+        # that cannot read its input refuses rather than admitting.
+        return refuse("could not measure the candidate's changed blob bytes")
     if blob_bytes > MAX_CHANGED_BLOB_BYTES:
         return refuse("candidate's changed blobs exceed the byte ceiling — "
                       "binary content does not register against the line cap",
@@ -551,7 +571,16 @@ def main(argv: list[str] | None = None) -> int:
     # reachable by writing a slightly longer task description. (Devin on
     # #1200.)
     claim = ""
-    task_id = target.get("task_id")
+    # `isinstance` because `target` comes from the untrusted receipt and this
+    # module's rule is that nothing the propose phase says is evidence. The
+    # top-level receipt is validated as a dict; `target` is not, so `null`, a
+    # string or a list all reach here. `.get()` on any of those raises
+    # AttributeError — AFTER the push and BEFORE `gh pr create`, so it escapes
+    # main(), skips receipt(), skips the rollback, and strands exactly the
+    # orphan branch this PR exists to eliminate. Note `proposed.get("target",
+    # {})` does NOT protect: the default applies only when the key is absent,
+    # not when it is present and null. (Devin on #1200.)
+    task_id = target.get("task_id") if isinstance(target, dict) else None
     if isinstance(task_id, str) and task_id:
         claim = ("- Consumption claim: "
                  f"`{json.dumps({'task_id': task_id}, sort_keys=True)}`\n")

@@ -394,17 +394,35 @@ def agent_changed_paths() -> list[str]:
     for line in result.stdout.splitlines():
         if len(line) < 4:
             continue
-        path = line[3:].strip()
-        if " -> " in path:  # rename: take the destination
-            path = path.split(" -> ", 1)[1]
-        path = path.strip('"')
-        if not path or path.startswith(STAGE_EXCLUDE_PREFIXES):
-            continue
-        if path.endswith(STAGE_EXCLUDE_SUFFIXES):
-            continue
-        if Path(path).name in STAGE_EXCLUDE_NAMES:
-            continue
-        paths.append(path)
+        entry = line[3:].strip()
+        # BOTH sides of a rename, not just the destination.
+        #
+        # `git status --porcelain` reports a staged rename as one record,
+        # `R  old -> new`. Keeping only `new` made every rename undeliverable:
+        # `measured_tree` is written while the index holds the delete of `old`
+        # AND the add of `new`, but the post-test re-stage does
+        # `git reset -q HEAD --` then re-adds the recorded paths — and the
+        # reset restores `old` from HEAD with nothing to remove it again. So
+        # post_test_tree never matched and the run ended BLOCKED claiming
+        # "the test run altered the measured content" on a run where the tests
+        # changed nothing. Verified against git 2.43; recording both sides
+        # round-trips to the identical tree, and a genuine mutation is still
+        # caught. (Devin on #1200.)
+        #
+        # This matters more now that renames are counted against the diff cap
+        # rather than scoring zero — the accounting says they are deliverable,
+        # so the staging has to actually deliver them.
+        candidates = ([part.strip() for part in entry.split(" -> ", 1)]
+                      if " -> " in entry else [entry])
+        for path in candidates:
+            path = path.strip('"')
+            if not path or path.startswith(STAGE_EXCLUDE_PREFIXES):
+                continue
+            if path.endswith(STAGE_EXCLUDE_SUFFIXES):
+                continue
+            if Path(path).name in STAGE_EXCLUDE_NAMES:
+                continue
+            paths.append(path)
     return sorted(set(paths))
 
 
