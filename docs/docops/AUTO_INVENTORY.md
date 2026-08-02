@@ -12,11 +12,11 @@ Do not hand-edit the generated block.
 | Test files | 949 |
 | Test function occurrences | 14,332 |
 | Test function occurrences | 14,330 |
-| Markdown files | 1,462 |
-| Markdown total lines | 307,377 |
+| Markdown files | 1,463 |
+| Markdown total lines | 307,450 |
 | Bridge files | 32 |
 | Adapter files | 29 |
 | Orchestrator files | 7 |
 | Router files | 19 |
-| Authority candidate docs | 661 |
+| Authority candidate docs | 662 |
 <!-- DOCOPS:END -->
