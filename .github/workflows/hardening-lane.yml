@@ -306,6 +306,14 @@ jobs:
         env:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          # The PR must be OPENED with the trusted token too, not just pushed
+          # with it. `tests.yml` reaches lane branches only via `pull_request`,
+          # and GitHub suppresses workflow runs caused by GITHUB_TOKEN — so a
+          # PAT push followed by a github.token `gh pr create` still produces
+          # zero checks and lands in the exact ci_never_ran state this change
+          # exists to prevent (Codex on #1200). The job-level GH_TOKEN is
+          # overridden here for that reason.
+          GH_TOKEN: ${{ secrets.LANE_DELIVERY_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT || github.token }}
         run: |
           set -uo pipefail
           git config user.name "hardening-lane"

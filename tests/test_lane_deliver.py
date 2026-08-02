@@ -13,6 +13,7 @@ than what it claimed".
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -378,6 +379,37 @@ def test_a_lying_propose_receipt_changes_no_verdict(lane, tmp_path) -> None:
     ])
     stored = json.loads(out.read_text())
     assert code == 1
+    assert "referee or excluded paths" in stored["reason"]
+
+
+def test_non_utf8_filename_is_refused_not_crashed(lane, tmp_path) -> None:
+    """Regression for a verified crash (Codex on #1200).
+
+    Git filenames are bytes, not UTF-8. A legal name like `bad-\\xff.txt` made
+    `text=True` raise UnicodeDecodeError inside `_run()`, which escaped before
+    `refuse()` could write a receipt — an untrusted candidate crashing the
+    trusted delivery job instead of being deterministically rejected.
+    `errors="surrogateescape"` round-trips the bytes so the denylist sees the
+    real path and the job returns a verdict.
+    """
+    seed = lane["seed"]
+    _git(seed, "checkout", "-q", "-B", LANE_BRANCH, lane["base"])
+    hostile = os.fsdecode(b".github/workflows/bad-\xff.yml")
+    target = Path(os.fsencode(str(seed)).decode("utf-8", "surrogateescape")) / hostile
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("evil\n", encoding="utf-8")
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-q", "-m", "harden: odd bytes [hardening-lane]")
+    bundle = lane["tmp"] / "utf8.bundle"
+    _git(seed, "bundle", "create", str(bundle),
+         f"{lane['base']}..refs/heads/{LANE_BRANCH}")
+    _git(seed, "checkout", "-q", "main")
+
+    # The point is that this returns a verdict rather than raising.
+    code, stored = _deliver(lane, bundle, tmp_path)
+    assert code == 1
+    assert stored["status"] == "REFUSED"
+    # And the referee denylist still recognises it despite the odd bytes.
     assert "referee or excluded paths" in stored["reason"]
 
 

@@ -96,13 +96,62 @@ def test_agent_environment_strips_every_credential_channel(monkeypatch) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "secret")
     monkeypatch.setenv("GH_TOKEN", "secret")
     monkeypatch.setenv("MERGEMASTERMIKE_PAT", "secret")
+    monkeypatch.setenv("LANE_DELIVERY_PUSH_TOKEN", "secret")
     monkeypatch.setenv("ACTIONS_RUNTIME_TOKEN", "secret")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "keep-me")
-    env = lane_propose.agent_env()
+    env = lane_propose.agent_env("claude")
     for leaked in ("GITHUB_TOKEN", "GH_TOKEN", "MERGEMASTERMIKE_PAT",
-                   "ACTIONS_RUNTIME_TOKEN"):
+                   "LANE_DELIVERY_PUSH_TOKEN", "ACTIONS_RUNTIME_TOKEN"):
         assert leaked not in env
     assert env["ANTHROPIC_API_KEY"] == "keep-me"
+
+
+def test_agent_gets_only_its_own_providers_credential(monkeypatch) -> None:
+    """Handing every agent both provider keys let a compromised `claude`
+    exfiltrate or spend the OpenAI credential it has no use for, and vice
+    versa (Codex on #1200). Each selector sees only its own."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai")
+
+    claude = lane_propose.agent_env("claude")
+    assert claude["ANTHROPIC_API_KEY"] == "anthropic"
+    assert "OPENAI_API_KEY" not in claude
+
+    npx = lane_propose.agent_env("claude-npx")
+    assert npx["ANTHROPIC_API_KEY"] == "anthropic"
+    assert "OPENAI_API_KEY" not in npx
+
+    codex = lane_propose.agent_env("codex")
+    assert codex["OPENAI_API_KEY"] == "openai"
+    assert "ANTHROPIC_API_KEY" not in codex
+
+    # The test run needs no model credential and therefore gets neither.
+    tests = lane_propose.agent_env()
+    assert "ANTHROPIC_API_KEY" not in tests
+    assert "OPENAI_API_KEY" not in tests
+
+
+def test_eol_attribute_is_rejected_like_a_clean_filter(tmp_path: Path,
+                                                       monkeypatch) -> None:
+    """Regression for a verified gap (Codex on #1200). Checking only the
+    `filter` attribute did not close the tested-vs-delivered gap: `text
+    eol=lf` on a CRLF worktree file stores LF in the index while the tests
+    read CRLF, and because the transform is deterministic the re-add
+    reproduces the same tree hash — so the equality check passes over content
+    that was never tested."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    for cmd in (["git", "init", "-q", "-b", "main"],
+                ["git", "config", "user.email", "t@e.com"],
+                ["git", "config", "user.name", "t"]):
+        subprocess.run(cmd, cwd=repo, check=True)
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.chdir(repo)
+    assert lane_propose.active_clean_filters(["a.py"]) == []
+
+    (repo / ".gitattributes").write_text("*.py text eol=lf\n", encoding="utf-8")
+    found = lane_propose.active_clean_filters(["a.py"])
+    assert any("eol=lf" in item or "text=" in item for item in found), found
 
 
 def test_test_suite_timeout_becomes_a_cap_receipt_not_an_exception(

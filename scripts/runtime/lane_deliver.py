@@ -110,8 +110,16 @@ def _utc_stamp() -> str:
 
 
 def _run(cmd: list[str], *, timeout: int = 300) -> subprocess.CompletedProcess:
+    # `errors="surrogateescape"` is load-bearing, not style. Git filenames are
+    # bytes, not UTF-8: a candidate containing a legal name like `bad-\xff.txt`
+    # made plain text=True raise UnicodeDecodeError INSIDE this helper, which
+    # escaped before refuse() could write a receipt — an untrusted candidate
+    # crashing the trusted delivery job instead of being deterministically
+    # rejected (Codex on #1200; reproduced against real git). surrogateescape
+    # round-trips those bytes so the denylist sees the real path.
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
+                              errors="surrogateescape",
                               timeout=timeout, check=False)
     except FileNotFoundError as exc:
         return subprocess.CompletedProcess(cmd, 127, "", str(exc))

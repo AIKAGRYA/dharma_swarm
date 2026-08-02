@@ -97,7 +97,16 @@ MAKE_BIN = shutil.which("make") or "make"
 # leak — but a stripped environment stays correct and costs nothing.
 AGENT_STRIPPED_ENV_PREFIXES = ("GH_", "GITHUB_", "GIT_ASKPASS", "GIT_CONFIG",
                                "MERGEMASTERMIKE_", "ACTIONS_", "RUNNER_")
-AGENT_STRIPPED_ENV_KEYS = {"GITHUB_TOKEN", "GH_TOKEN", "PR_CI_HEALTH_PUSH_TOKEN"}
+AGENT_STRIPPED_ENV_KEYS = {"GITHUB_TOKEN", "GH_TOKEN", "PR_CI_HEALTH_PUSH_TOKEN",
+                           "LANE_DELIVERY_PUSH_TOKEN"}
+
+# The model credential each selector legitimately needs — and only that one.
+PROVIDER_KEY_FOR_SELECTOR = {
+    "claude": "ANTHROPIC_API_KEY",
+    "claude-npx": "ANTHROPIC_API_KEY",
+    "codex": "OPENAI_API_KEY",
+}
+ALL_PROVIDER_KEYS = frozenset(PROVIDER_KEY_FOR_SELECTOR.values())
 
 # Paths the agent's change set may never include. Staging is BY EXPLICIT
 # PATH — never `git add -A`, which would sweep in secrets, generated
@@ -162,14 +171,24 @@ def emit_status(status: str) -> None:
             handle.write(f"status={status}\n")
 
 
-def agent_env() -> dict[str, str]:
-    """The child environment for the coding agent: this phase's environment
-    minus every GitHub/Git credential channel. Model API keys pass through —
-    they are what the agent legitimately needs."""
+def agent_env(selector: str = "") -> dict[str, str]:
+    """The child environment for a subprocess this phase does not trust.
+
+    Strips every GitHub/Git credential channel, and passes through ONLY the
+    model credential the named selector actually needs. Handing every agent
+    both provider keys let a compromised `claude` exfiltrate or spend the
+    OpenAI credential it has no use for, and vice versa (Codex on #1200).
+
+    Called with no selector for the test run, which needs no model credential
+    at all and therefore gets neither.
+    """
+    keep = PROVIDER_KEY_FOR_SELECTOR.get(selector)
+    drop_provider = {k for k in ALL_PROVIDER_KEYS if k != keep}
     return {
         key: value
         for key, value in os.environ.items()
         if key not in AGENT_STRIPPED_ENV_KEYS
+        and key not in drop_provider
         and not key.startswith(AGENT_STRIPPED_ENV_PREFIXES)
     }
 
@@ -354,8 +373,22 @@ def diff_line_count() -> int:
     return total
 
 
+# Every git attribute that can transform worktree bytes into different index
+# bytes. `filter` alone was not enough: `text eol=lf` on a CRLF worktree file
+# stores LF in the index while the tests read CRLF, and because the transform
+# is deterministic the re-add reproduces the same tree hash — so the equality
+# check passes over content that was never tested. `working-tree-encoding` and
+# `ident` have the same shape (Codex on #1200).
+#
+# This repo's own .gitattributes sets only `merge=union` on a handful of docs,
+# so rejecting this set costs nothing legitimate today.
+INDEX_TRANSFORMING_ATTRS = ("filter", "text", "eol", "working-tree-encoding",
+                            "ident")
+_ATTR_INACTIVE = {"unspecified", "unset", ""}
+
+
 def active_clean_filters(paths: list[str]) -> list[str]:
-    """Clean filters that could apply to the staged set, if any.
+    """Index-transforming filters or attributes on the staged set, if any.
 
     Why this is fail-closed rather than tolerated: the measured-tree /
     tested-tree equality check below compares two `write-tree` results. A
@@ -384,14 +417,15 @@ def active_clean_filters(paths: list[str]) -> list[str]:
         found.extend(line.split()[0] for line in
                      configured.stdout.strip().splitlines() if line.split())
     if paths:
-        attrs = _git(["check-attr", "filter", "-z", "--", *paths])
+        attrs = _git(["check-attr", *INDEX_TRANSFORMING_ATTRS, "-z",
+                      "--", *paths])
         if attrs.returncode == 0:
             fields = attrs.stdout.split("\0")
             # check-attr -z emits path, attr, value triples
             for index in range(0, max(0, len(fields) - 2), 3):
-                value = fields[index + 2]
-                if value not in ("unspecified", "unset", ""):
-                    found.append(f"{fields[index]}:filter={value}")
+                path, attr, value = fields[index:index + 3]
+                if value not in _ATTR_INACTIVE:
+                    found.append(f"{path}:{attr}={value}")
     return sorted(set(found))
 
 
@@ -490,7 +524,7 @@ def main(argv: list[str] | None = None) -> int:
         # (claude -p and codex exec both read piped input), so task text
         # never enters the command-argument position.
         agent = subprocess.run(
-            agent_argv, input=prompt, env=agent_env(),
+            agent_argv, input=prompt, env=agent_env(agent_choice),
             capture_output=True, text=True, timeout=MAX_AGENT_SECONDS,
             check=False,
         )
