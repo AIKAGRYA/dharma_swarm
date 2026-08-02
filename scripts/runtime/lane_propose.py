@@ -150,6 +150,35 @@ def _run(cmd: list[str], *, timeout: int = 300,
                                            f"timed out after {timeout}s")
 
 
+def _run_bytes(cmd: list[str], *, timeout: int = 120
+               ) -> subprocess.CompletedProcess:
+    """`_run` for commands whose OUTPUT IS BYTES, with the same fail-closed arms.
+
+    `_run` is `text=True`, which is right for every other command here and
+    wrong for reading a blob: comparing a decoded `str` against the worktree's
+    `bytes` is never equal, so routing the byte comparison through `_run`
+    would flag every path and leave the lane permanently BLOCKED. Verified:
+
+        text=True  -> 'x = 1\\n'  (str)
+        bytes      -> b'x = 1\\n' (bytes)   worktree: b'x = 1\\n'
+
+    What it MUST share with `_run` is the exception handling. A raw
+    `subprocess.run` here let TimeoutExpired and FileNotFoundError escape past
+    done()/receipt()/emit_status(), ending the run NO_RECEIPT_WRITTEN — the
+    exact pathology finding #7 of this PR set out to close, reintroduced by
+    the function that closed a different one. (Devin on #1200.)
+    """
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=timeout,
+                              check=False)
+    except FileNotFoundError as exc:
+        return subprocess.CompletedProcess(cmd, EXIT_NOT_FOUND, b"",
+                                           str(exc).encode())
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, b"",
+                                           f"timed out after {timeout}s".encode())
+
+
 def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
     return _run([GIT_BIN, *args], **kwargs)
 
@@ -429,8 +458,7 @@ def index_transformed_paths(paths: list[str]) -> list[str]:
             worktree = target.read_bytes()
         except OSError:
             continue
-        blob = subprocess.run([GIT_BIN, "cat-file", "-p", f":{path}"],
-                              capture_output=True, timeout=120, check=False)
+        blob = _run_bytes([GIT_BIN, "cat-file", "-p", f":{path}"])
         if blob.returncode != 0:
             # Staged but unreadable from the index: cannot prove the bytes
             # match, so do not claim they do.

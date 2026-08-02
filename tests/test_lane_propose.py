@@ -215,6 +215,44 @@ def test_a_staged_rename_is_counted_not_collapsed_to_zero(
     assert lane_propose.diff_line_count() >= 1600
 
 
+def test_a_hung_blob_read_is_a_verdict_not_a_crashed_lane(
+        tmp_path: Path, monkeypatch) -> None:
+    """Regression for an escape reintroduced by the fix for a different one
+    (Devin on #1200).
+
+    `index_transformed_paths()` called `subprocess.run` directly, so a hung
+    `git cat-file` raised straight past done()/receipt()/emit_status() and the
+    run ended NO_RECEIPT_WRITTEN — the exact pathology finding #7 of this PR
+    set out to close.
+
+    It could not simply route through `_run()`: that is `text=True`, so the
+    comparison would be `str != bytes`, always True, flagging every path and
+    leaving the lane permanently BLOCKED. `_run_bytes()` keeps the bytes and
+    the fail-closed arms.
+    """
+    repo = _repo_with_global_config(tmp_path, monkeypatch, "")
+    (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True)
+
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 120))
+
+    monkeypatch.setattr(lane_propose.subprocess, "run", hang)
+    # A verdict, not an exception — and fail-closed, because a blob that
+    # cannot be read cannot be proven to match.
+    assert lane_propose.index_transformed_paths(["a.py"]) == ["a.py"]
+
+
+def test_run_bytes_returns_bytes_and_survives_a_missing_binary() -> None:
+    """The whole reason this helper exists rather than reusing `_run`."""
+    ok = lane_propose._run_bytes(["git", "--version"])
+    assert ok.returncode == 0
+    assert isinstance(ok.stdout, bytes)
+
+    missing = lane_propose._run_bytes(["definitely-not-a-real-binary-xyz"])
+    assert missing.returncode == lane_propose.EXIT_NOT_FOUND
+
+
 def test_untransformed_content_is_not_flagged(tmp_path: Path, monkeypatch) -> None:
     repo = _repo_with_global_config(tmp_path, monkeypatch, "")
     (repo / "a.py").write_text("x = 1\n", encoding="utf-8")

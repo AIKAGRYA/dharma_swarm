@@ -739,7 +739,11 @@ def _workflow() -> dict:
 def test_workflow_has_two_jobs_with_separated_trust() -> None:
     data = _workflow()
     jobs = data["jobs"]
-    assert set(jobs) == {"propose", "deliver"}
+    assert set(jobs) == {"preflight", "propose", "deliver"}
+
+    # preflight holds the delivery PAT and runs no agent code; that is why it
+    # is a job of its own rather than a step of propose (Devin on #1200).
+    assert jobs["preflight"]["permissions"] == {"contents": "read"}
 
     propose = jobs["propose"]["permissions"]
     # The single most important assertion in this file: the job that runs
@@ -800,11 +804,11 @@ def test_deliver_job_never_installs_or_runs_the_test_suite() -> None:
     assert "lane_propose.py" not in blob
 
 
-def test_kill_switch_guard_is_the_first_step_of_BOTH_jobs() -> None:
+def test_kill_switch_guard_is_the_first_step_of_EVERY_job() -> None:
     """Propose can run 45 minutes after its own check. If the operator
     engages the switch during that window, delivery must not still push —
     so the guard is per-job, matching docs/ops/loop_control/README.md."""
-    for job_name in ("propose", "deliver"):
+    for job_name in ("preflight", "propose", "deliver"):
         first = _workflow()["jobs"][job_name]["steps"][0]
         assert "kill-switch" in first["name"].lower(), job_name
         # The ref matters: a KILLSWITCH on main halts nothing.
@@ -860,29 +864,51 @@ def test_no_agent_budget_is_spent_on_a_run_that_cannot_deliver() -> None:
     opened; `attempted_task_ids()` infers consumption from delivered PR
     bodies, so it returns the empty set forever; `select_target()` then picks
     fresh[0] — the oldest ready mailbox task — on every scheduled run while
-    newer tasks starve. That is precisely the starvation the attempt history
-    was added to prevent, and each pass burns a 45-minute agent budget to
-    build a bundle nothing can deliver.
+    newer tasks starve, burning a 45-minute agent budget each pass.
     """
-    workflow = yaml.safe_load(WORKFLOW.read_text())
-    steps = workflow["jobs"]["propose"]["steps"]
-    names = [step.get("name") for step in steps]
+    data = _workflow()
+    propose = data["jobs"]["propose"]
+    assert propose.get("needs") == "preflight"
+    assert propose.get("if") == "needs.preflight.outputs.deliverable == 'true'"
+    assert (data["jobs"]["preflight"]["outputs"]["deliverable"]
+            == "${{ steps.probe.outputs.deliverable }}")
 
-    guard = "Refuse a scheduled run that could never deliver"
-    assert guard in names
-    # The guard runs before anything expensive, and after the kill-switch.
-    assert names.index(guard) == 1, names
 
-    gate = "steps.deliverable.outputs.proceed == 'true'"
-    for step in steps[2:]:
-        assert gate in (step.get("if") or ""), step.get("name")
+def test_the_untrusted_job_never_holds_a_delivery_credential() -> None:
+    """Regression for a guard that broke the premise it protected (Devin,
+    #1200).
 
-    # An explicit operator dry-run must still exercise the lane; the refusal
-    # is for scheduled runs that can never open a PR.
-    body = [s for s in steps if s.get("name") == guard][0]["run"]
-    assert "OPERATOR_DRY_RUN" in body
-    assert "LANE_DELIVERY_PUSH_TOKEN" in str(
-        [s for s in steps if s.get("name") == guard][0].get("env"))
+    The first version of the budget guard checked the credential inside
+    `propose`, which materialized a push-capable PAT in the job that runs
+    agent code — the one thing this whole workflow is built to prevent. The
+    probe belongs in a job that holds no agent.
+    """
+    data = _workflow()
+    rendered = json.dumps(data["jobs"]["propose"])
+    for secret in ("LANE_DELIVERY_PUSH_TOKEN", "MERGEMASTERMIKE_PAT"):
+        assert secret not in rendered, secret
+    # And it lives where an agent never runs.
+    preflight = json.dumps(data["jobs"]["preflight"])
+    assert "LANE_DELIVERY_PUSH_TOKEN" in preflight
+    assert "checkout" not in preflight.lower()
+    assert "DHARMA_LANE_AGENT_CMD" not in preflight
+
+
+def test_preflight_probes_push_authority_not_mere_presence() -> None:
+    """A configured-but-expired or under-scoped credential passes a presence
+    test, spends the budget, and then delivery verify-onlys anyway — the same
+    starvation loop with extra steps. Both checkpoints run the identical
+    `.permissions.push` probe (Devin on #1200)."""
+    steps = _workflow()["jobs"]["preflight"]["steps"]
+    probe = [s for s in steps if s.get("id") == "probe"][0]["run"]
+    assert ".permissions.push" in probe
+    # An explicit operator dry-run must still exercise the lane.
+    assert "OPERATOR_DRY_RUN" in probe
+
+    deliver_steps = _workflow()["jobs"]["deliver"]["steps"]
+    validate = [s for s in deliver_steps
+                if "credential" in (s.get("name") or "").lower()][0]["run"]
+    assert ".permissions.push" in validate
 
 
 def test_caps_live_in_the_workflow_not_in_a_prompt() -> None:

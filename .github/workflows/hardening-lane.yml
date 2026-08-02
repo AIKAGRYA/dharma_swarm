@@ -53,8 +53,97 @@ env:
   LANE_MAX_OPEN_DRAFTS: "1"
 
 jobs:
+  # The credential probe lives in its OWN job, and that is the point.
+  #
+  # Two safety behaviours in this PR cancelled each other out (Devin on
+  # #1200): delivery degrades to --dry-run without a push credential, so no
+  # lane PR is opened; attempted_task_ids() infers consumption from delivered
+  # PR bodies, so it returns the empty set forever; select_target() then picks
+  # fresh[0] — the OLDEST ready mailbox task — on every scheduled run while
+  # newer tasks starve. Each pass burned a 45-minute agent budget building a
+  # bundle nothing could deliver.
+  #
+  # My first fix put that check inside `propose`, which meant materializing a
+  # push-capable PAT in the job that runs agent code — breaking the invariant
+  # this entire workflow exists to hold (see the header, and lane_propose.py's
+  # module docstring). Devin caught it. A guard that violates the premise it
+  # protects is worse than the waste it prevents.
+  #
+  # So the probe runs here: a job that holds the PAT, runs no agent code,
+  # checks out nothing, and hands `propose` a boolean. Same trust split as
+  # propose/deliver, applied to the pre-flight question.
+  #
+  # It probes PUSH AUTHORITY, not mere presence. A configured-but-expired or
+  # under-scoped credential passes a presence test, spends the budget, and
+  # then delivery verify-onlys anyway — the same starvation loop with extra
+  # steps. This is the identical `.permissions.push` probe the delivery job
+  # runs, so both checkpoints agree (also Devin on #1200).
+  preflight:
+    name: Preflight (can this run deliver at all?)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      deliverable: ${{ steps.probe.outputs.deliverable }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Halt on loop kill-switch
+        run: |
+          set -euo pipefail
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — no lane run" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
+      - name: Probe delivery push authority
+        id: probe
+        env:
+          PUSH_TOKEN: ${{ secrets.LANE_DELIVERY_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT }}
+          OPERATOR_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          set -uo pipefail
+          deliverable=false
+          if [ "${OPERATOR_DRY_RUN}" = "true" ]; then
+            deliverable=true
+            echo "operator dry-run: exercising the lane without delivering."
+          elif [ -n "${PUSH_TOKEN:-}" ]; then
+            allowed="$(GH_TOKEN="$PUSH_TOKEN" gh api "repos/${GH_REPO}" \
+              --jq '.permissions.push // false' 2>/dev/null || true)"
+            if [ "$allowed" = "true" ]; then
+              deliverable=true
+              echo "delivery credential proves push authority."
+            else
+              echo "::warning::Delivery credential does not prove push authority."
+            fi
+          fi
+          echo "deliverable=${deliverable}" >> "$GITHUB_OUTPUT"
+          if [ "$deliverable" != "true" ]; then
+            {
+              echo "## Hardening lane — not run"
+              echo
+              echo 'No delivery credential with proven push authority, so delivery'
+              echo 'could only dry-run and no PR could be opened. Because mailbox'
+              echo 'consumption is inferred from delivered PRs, running anyway would'
+              echo 'reselect the same oldest task every scheduled run and starve the'
+              echo 'rest of the queue. Configure `LANE_DELIVERY_PUSH_TOKEN`, or'
+              echo 'dispatch manually with `dry_run: true` to exercise the lane.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   propose:
     name: Propose (untrusted — no write credential)
+    needs: preflight
+    if: needs.preflight.outputs.deliverable == 'true'
     runs-on: ubuntu-latest
     # Budget: agent 1200s + tests 1500s = 45 min of capped work inside a
     # 65-minute envelope, leaving margin for checkout, install and bundling.
@@ -92,45 +181,7 @@ jobs:
             exit 1
           fi
 
-      # Two safety behaviours in this PR cancelled each other out (Devin on
-      # #1200). Delivery degrades to --dry-run without a push credential, so
-      # no lane PR is ever opened; attempted_task_ids() infers consumption
-      # from delivered PR bodies, so it always returns the empty set; and
-      # select_target() then picks fresh[0] — the OLDEST ready mailbox task —
-      # on every scheduled run, forever, while newer tasks starve. That is the
-      # exact starvation the attempt history was added to prevent.
-      #
-      # Spending a 45-minute agent budget to build a bundle that structurally
-      # cannot be delivered is waste on top of that. A scheduled run without a
-      # delivery credential is refused here, BEFORE the installs and the
-      # agent. An explicit operator dry-run still proceeds, because verifying
-      # the lane on demand is the one case where producing no PR is the point.
-      - name: Refuse a scheduled run that could never deliver
-        id: deliverable
-        env:
-          PUSH_TOKEN: ${{ secrets.LANE_DELIVERY_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT }}
-          OPERATOR_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
-        run: |
-          set -euo pipefail
-          if [ -n "${PUSH_TOKEN:-}" ] || [ "${OPERATOR_DRY_RUN}" = "true" ]; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No delivery credential; refusing to spend the agent budget on a run that cannot open a PR."
-            {
-              echo "## Hardening lane — not run"
-              echo
-              echo 'No `LANE_DELIVERY_PUSH_TOKEN` / `MERGEMASTERMIKE_PAT`, so delivery'
-              echo 'could only dry-run and no PR could be opened. Because mailbox'
-              echo 'consumption is inferred from delivered PRs, running anyway would'
-              echo 'reselect the same oldest task every scheduled run and starve the'
-              echo 'rest of the queue. Configure the credential, or dispatch manually'
-              echo 'with `dry_run: true` to exercise the lane.'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
       - name: Checkout default branch (no persisted credentials)
-        if: steps.deliverable.outputs.proceed == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -141,7 +192,6 @@ jobs:
           persist-credentials: false
 
       - name: Overlay operator-ingested tasks (read-only, outside the worktree)
-        if: steps.deliverable.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           # PR-F ingestion writes mailbox tasks to the loop-tasks branch. The
@@ -163,13 +213,11 @@ jobs:
           fi
 
       - name: Set up Python
-        if: steps.deliverable.outputs.proceed == 'true'
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        if: steps.deliverable.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           # Without this the lane reaches `make test-fast` on a bare runner,
@@ -179,7 +227,6 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Provision the selected coding agent
-        if: steps.deliverable.outputs.proceed == 'true'
         # Without this the runner has no agent binary at all, so every real
         # target hit lane_propose's FileNotFoundError path and the lane
         # reported BLOCKED forever while looking configured.
@@ -220,7 +267,6 @@ jobs:
           # would report "no credential" on every run regardless.
 
       - name: Run the proposing phase
-        if: steps.deliverable.outputs.proceed == 'true'
         id: lane
         # The agent's model credential enters here and NOWHERE else in this
         # job. At job level it was also in scope for `pip install -e ".[dev]"`
@@ -260,7 +306,7 @@ jobs:
           exit "${lane_exit}"
 
       - name: Upload delivery candidate
-        if: always() && steps.deliverable.outputs.proceed == 'true'
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: lane-delivery-candidate
