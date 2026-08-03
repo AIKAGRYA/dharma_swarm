@@ -1953,6 +1953,7 @@ active_tracks:
       - docs/plans/DARSHAN_CHARTER_2026-07-12.md
       - reports/darshan/**
       - reports/tam/**
+      - scripts/darshan/**
     moves_vital_signs:
       - eval_coverage
     target_closure_kind: CLOSED_NOT_PROD

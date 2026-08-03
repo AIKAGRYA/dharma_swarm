@@ -86,7 +86,7 @@ track-owned surface `reports/darshan/**`.
   pending). It deliberately does NOT live at the canonical path, so
   `darshan_issue_one_receipt_valid` stays **RED** until publication is real
   (deliberate-RED precedent: #864/#866).
-- `scripts/seal_issue_one_receipt.py` — refuses to write the canonical
+- `scripts/darshan/seal_issue_one_receipt.py` — refuses to write the canonical
   receipt unless every article re-hashes to what was assembled, every URL is
   HTTP-200 with the title on the page, and the operator's read is confirmed
   in their own words. Verified 2026-07-21: it correctly REFUSES today
@@ -100,7 +100,7 @@ track-owned surface `reports/darshan/**`.
    live ones are a click away).
 2. Approve publication — merge darshan PR #1 (Pages deploys from `main`).
 3. Convene the merge gate on this dharma_swarm PR.
-4. Seal: `python3 reports/darshan/scripts/seal_issue_one_receipt.py
+4. Seal: `python3 scripts/darshan/seal_issue_one_receipt.py
    --operator-read-confirmed "<your words>"` — then commit the sealed
    `issue_one_receipt.json`, and the track's second criterion goes green on
    its own machinery.

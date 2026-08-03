@@ -9,7 +9,7 @@ completeness and path-containment gates the seal script enforces. Run it after
 ANY edit to reports/darshan/issue_one/articles/*.md so the DRAFT receipt and
 the files stay consistent; the seal script refuses on any mismatch.
 
-    python3 reports/darshan/scripts/refresh_draft_hashes.py
+    python3 scripts/darshan/refresh_draft_hashes.py
 """
 
 import importlib.util

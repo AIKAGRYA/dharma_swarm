@@ -10,7 +10,7 @@ asserts an unpublished issue must not validate; that is the point.
 Run from the repo root, after the operator has read Issue One and merged the
 darshan site PR (Pages deploys from main):
 
-    python3 reports/darshan/scripts/seal_issue_one_receipt.py \
+    python3 scripts/darshan/seal_issue_one_receipt.py \
         --operator-read-confirmed "<the operator's own words>"
 
 Checks (all mandatory, in order):
@@ -33,7 +33,12 @@ Checks (all mandatory, in order):
           visible text (tags stripped, HTML-unescaped, whitespace collapsed),
           and the entire normalized body must appear as one consecutive run of
           the normalized page text (title-only or truncated pages fail);
-  5. --operator-read-confirmed was provided (recorded verbatim).
+  5. every editorial-law gate already established outside this script is
+     explicitly true (`both_fires` and `independent_discernment`);
+  6. every article carries a digest-bound, article-hash-bound source-review
+     receipt with verdict PASS; and
+  7. --operator-read-confirmed was provided (recorded verbatim), with no
+     remaining item in `pending_operator_actions`.
 
 Then: published=true and per-article status/publication_evidence updated to the
 seal-time observation (the sealed receipt is internally consistent — no stale
@@ -51,9 +56,10 @@ sealed into the digest like every other key. The tracker criterion's
 requires_keys are unaffected: extra keys are permitted. This script validates
 the field's shape but never fabricates entries.
 
-The editorial_law_passes.independent_discernment flag is sealed AS-IS from the
-draft: this script asserts publication facts it can verify live, and does not
-overwrite discernment state it cannot verify.
+The script never promotes editorial or source-review state. Those facts are
+produced by independent review and must already be digest-bound PASS evidence
+in the draft. A pending action is never silently deleted: the draft must be
+updated after each prerequisite is actually discharged, before sealing.
 """
 
 import argparse
@@ -66,7 +72,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[2]
 DRAFT = REPO / "reports/darshan/issue_one_receipt.DRAFT.json"
 CANONICAL = REPO / "reports/darshan/issue_one_receipt.json"
 MANIFEST = REPO / "reports/darshan/ISSUE_ONE_MANIFEST.md"
@@ -207,6 +213,131 @@ def _validated_external_evidence(receipt: dict) -> list:
             fail(f"external_evidence[{i}] must be an object with keys "
                  f"{sorted(required)}")
     return evidence
+
+
+def _require_editorial_gates(receipt: dict) -> None:
+    """Refuse to promote publication unless every non-live editorial gate passed."""
+    laws = receipt.get("editorial_law_passes")
+    if not isinstance(laws, dict):
+        fail("editorial_law_passes must be an object")
+    for gate in ("both_fires", "independent_discernment"):
+        if laws.get(gate) is not True:
+            fail(
+                f"editorial_law_passes.{gate} is {laws.get(gate)!r}; the "
+                "editorial law must pass before the receipt can seal"
+            )
+
+
+def _require_no_pending_actions(receipt: dict) -> None:
+    """A sealer may prove facts, but it may not erase unresolved obligations."""
+    actions = receipt.get("pending_operator_actions")
+    if not isinstance(actions, list):
+        fail("pending_operator_actions must be a list")
+    if actions:
+        fail(
+            "pending_operator_actions is not empty; discharge and record every "
+            "listed prerequisite before sealing (nothing is cleared implicitly)"
+        )
+
+
+def _expected_content_digest(receipt: dict) -> str:
+    """Derive the aggregate article fingerprint from the checked article rows."""
+    return stable_digest(
+        {str(article["slug"]): str(article["sha256_md"])
+         for article in receipt["articles"]}
+    )
+
+
+def _validated_source_verification(
+    receipt: dict, manifest_slugs: list[str]
+) -> None:
+    """Validate one independent, digest-bound source-review receipt per article.
+
+    Promotion is deliberately typed: a prose assertion or boolean is not
+    enough. Each PASS must bind reviewer, article bytes, source checks, and its
+    own canonical digest in a contained repository artifact.
+    """
+    records = receipt.get("source_verification")
+    if not isinstance(records, dict):
+        fail("source_verification must be an object keyed by article slug")
+    if set(records) != set(manifest_slugs):
+        fail("source_verification keys must exactly match the manifest slugs")
+
+    required_check_keys = {"source", "access", "disposition", "note"}
+    allowed_access = {"FULL_TEXT_READ", "PRIMARY_SOURCE_READ"}
+    allowed_dispositions = {
+        "SUPPORTED",
+        "ATTRIBUTED",
+        "NOT_LOAD_BEARING",
+        "CORRECTED",
+        "REMOVED",
+    }
+    articles = {str(a["slug"]): a for a in receipt["articles"]}
+    for slug in manifest_slugs:
+        record = records[slug]
+        if not isinstance(record, dict) or record.get("status") != "VERIFIED":
+            status = record.get("status") if isinstance(record, dict) else None
+            fail(f"source_verification[{slug!r}] is {status!r}, not VERIFIED")
+        reviewer = record.get("reviewer")
+        observed_at = record.get("observed_at")
+        evidence_file = record.get("evidence_file")
+        evidence_sha256 = record.get("evidence_sha256")
+        if not all(isinstance(v, str) and v.strip() for v in (
+            reviewer, observed_at, evidence_file, evidence_sha256
+        )):
+            fail(f"source_verification[{slug!r}] has incomplete evidence metadata")
+
+        evidence_path = _validated_repo_file(evidence_file)
+        expected_parent = (REPO / "reports/darshan/source_verification").resolve()
+        if not evidence_path.is_relative_to(expected_parent):
+            fail(
+                f"source_verification[{slug!r}] evidence_file must be under "
+                "reports/darshan/source_verification/"
+            )
+        if not evidence_path.is_file():
+            fail(f"source-verification evidence missing: {evidence_file}")
+        if sha256_file(evidence_path) != evidence_sha256:
+            fail(f"source-verification evidence hash mismatch for {slug!r}")
+
+        try:
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            fail(f"source-verification evidence unreadable for {slug!r}: {exc}")
+        if evidence.get("schema") != "darshan.source_verification.v1":
+            fail(f"source-verification evidence schema invalid for {slug!r}")
+        if evidence.get("article_slug") != slug:
+            fail(f"source-verification evidence slug mismatch for {slug!r}")
+        if evidence.get("article_sha256_md") != articles[slug]["sha256_md"]:
+            fail(f"source-verification evidence article hash mismatch for {slug!r}")
+        if evidence.get("reviewer") != reviewer or evidence.get("observed_at") != observed_at:
+            fail(f"source-verification evidence metadata mismatch for {slug!r}")
+        if evidence.get("verdict") != "PASS":
+            fail(f"source-verification evidence verdict is not PASS for {slug!r}")
+        checks = evidence.get("source_checks")
+        if not isinstance(checks, list) or not checks:
+            fail(f"source-verification evidence has no source_checks for {slug!r}")
+        for index, check in enumerate(checks):
+            if not isinstance(check, dict) or not required_check_keys <= set(check):
+                fail(
+                    f"source-verification {slug!r} check {index} must contain "
+                    f"{sorted(required_check_keys)}"
+                )
+            if check["access"] not in allowed_access:
+                fail(f"source-verification {slug!r} check {index} has invalid access")
+            if check["disposition"] not in allowed_dispositions:
+                fail(
+                    f"source-verification {slug!r} check {index} has unresolved "
+                    "or invalid disposition"
+                )
+            if not all(isinstance(check[key], str) and check[key].strip()
+                       for key in required_check_keys):
+                fail(f"source-verification {slug!r} check {index} has empty fields")
+        digest = evidence.get("digest")
+        expected_digest = stable_digest(
+            {k: v for k, v in evidence.items() if k != "digest"}
+        )
+        if not isinstance(digest, str) or digest != expected_digest:
+            fail(f"source-verification evidence digest invalid for {slug!r}")
 
 
 # ------------------------------------------------------- site renderer copy
@@ -450,12 +581,18 @@ def main(argv=None) -> None:
     receipt = json.loads(DRAFT.read_text(encoding="utf-8"))
 
     # 1. Completeness: articles exactly match the manifest canonical set.
-    _check_completeness(
-        receipt, _manifest_slugs(MANIFEST.read_text(encoding="utf-8"))
-    )
+    manifest_slugs = _manifest_slugs(MANIFEST.read_text(encoding="utf-8"))
+    _check_completeness(receipt, manifest_slugs)
 
     # external_evidence: additive, [] by default, sealed into the digest.
     receipt["external_evidence"] = _validated_external_evidence(receipt)
+
+    # Non-live publication authority is never inferred from reachable pages.
+    # These checks run before network contact so a known editorial blocker
+    # cannot accidentally be obscured by a successful deployment probe.
+    _require_editorial_gates(receipt)
+    _validated_source_verification(receipt, manifest_slugs)
+    _require_no_pending_actions(receipt)
 
     # 2 + 3. Repo article paths contained; content unchanged since assembly.
     article_paths: dict[str, Path] = {}
@@ -469,6 +606,13 @@ def main(argv=None) -> None:
                  f"({actual[:12]}… != {art['sha256_md'][:12]}…); re-run assembly "
                  "or regenerate the draft receipt so the operator reads what ships")
         article_paths[art["slug"]] = p
+
+    expected_content_digest = _expected_content_digest(receipt)
+    if receipt.get("content_digest") != expected_content_digest:
+        fail(
+            "content_digest does not match stable_digest({slug: sha256_md}) "
+            "for the verified article set"
+        )
 
     # 4. Every article live: HTTP 200, no draft banner, title AND full
     #    rendered body on the page.
@@ -515,11 +659,13 @@ def main(argv=None) -> None:
         "live_pages_sealed — stable_digest over {published_url: page_stable_digest} "
         "of every Issue One page fetched HTTP-200 at seal time"
     )
-    receipt["pending_operator_actions"] = []
+    # pending_operator_actions was required to be empty above. Preserve it
+    # verbatim so the permanent record never acquires a false assertion by
+    # seal-time deletion.
     receipt["digest_policy"] = (
         "digest = stable_digest(receipt minus digest); canonicalisation identical "
         "to scripts/governance/check_track_status.py. Sealed by "
-        "reports/darshan/scripts/seal_issue_one_receipt.py after live verification."
+        "scripts/darshan/seal_issue_one_receipt.py after live verification."
     )
     receipt["digest"] = None
     receipt["digest"] = stable_digest(

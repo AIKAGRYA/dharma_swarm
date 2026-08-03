@@ -45,7 +45,7 @@
 - **`repository-titanium-hardening-2026-07`** — Titanium-grade repository hardening — truthful verification and clean-room closure (ACTIVE, serves `substrate-nativeness`, verified 2026-07-31, open blocker items: 5)
   - owns: Makefile, Dockerfile, .github/workflows/hermetic.yml, .github/workflows/tests.yml, .github/workflows/ci-parity.yml, .github/workflows/docops.yml, .github/workflows/docops-reconcile-main.yml, .github/workflows/pr-dedupe.yml, .github/workflows/bot-pr-limit.yml, .github/workflows/a2a-agni-live-contact.yml, docs/governance/CI_TRUTH_CONTRACT.json, scripts/governance/ci_parity_manifest.json, scripts/governance/check_ci_parity.py, scripts/runtime/ci_truth.py, scripts/governance/run_semgrep_with_ca.sh, scripts/uplift_guards/shakti_warrant_guard.py, scripts/uplift_guards/run_pre_commit.py, scripts/governance/check_shakti_warrant.py, scripts/governance/check_nats_substrate_contract.py, scripts/governance/check_nats_live_production_evidence.py, scripts/governance/run_nats_live_production_matrix.py, scripts/docops/**, dharma_swarm/build_engine.py, dharma_swarm/autonomous_agent.py, dharma_swarm/diff_applier.py, dharma_swarm/sandbox.py, docs/docops/AUTO_INVENTORY.md, api/main.py, tests/test_api_auth.py, tests/test_verify_api.py, tests/test_bootstrap_contract.py, tests/test_verifier_selfcheck_contract.py, tests/test_semgrep_wrapper.py, tests/test_uplift_guard_subprocess.py, tests/test_fast_suite_isolation.py, tests/test_agent_work_packet.py, tests/test_make_onboarding_contract.py, tests/test_diff_applier.py, tests/test_sandbox.py, tests/test_nats_verification_split.py, tests/test_nats_substrate_contract.py, tests/test_nats_live_production_evidence.py, tests/test_nats_live_contact.py, tests/governance/test_ci_parity_guard.py, tests/test_ci_truth.py, tests/test_docops_integrity.py, tests/test_docops_reconcile_workflow.py, tests/test_pr_dedupe_workflow.py, tests/test_polyglot_ci_contract.py, tests/test_hermetic_supply_chain.py, docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md, docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md, reports/governance/titanium/**, dashboard/src/lib/operatorCoherence.ts, dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts, dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx, dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts
 - **`darshan-publication-2026-07`** — Darshan — publication venture cell (multi-disciplinary voice of clear seeing) (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-12, open blocker items: 2)
-  - owns: docs/plans/DARSHAN_CHARTER_2026-07-12.md, reports/darshan/**, reports/tam/**
+  - owns: docs/plans/DARSHAN_CHARTER_2026-07-12.md, reports/darshan/**, reports/tam/**, scripts/darshan/**
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
@@ -168,13 +168,13 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 |--------|-------|-------------|
 | Total Python modules | **1,046** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **455 (43.5%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **374,661** | wc -l across dharma_swarm Python modules |
-| Test files | **952** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **14,426 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **374,694** | wc -l across dharma_swarm Python modules |
+| Test files | **953** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **14,460 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,465** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **308,134** | wc -l across all tracked .md |
+| Markdown files | **1,477** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **310,629** | wc -l across all tracked .md |
 | Bridge files | **32** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **29** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |

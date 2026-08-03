@@ -8,7 +8,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = REPO_ROOT / "reports/darshan/scripts/seal_issue_one_receipt.py"
+SCRIPT = REPO_ROOT / "scripts/darshan/seal_issue_one_receipt.py"
 DRAFT = REPO_ROOT / "reports/darshan/issue_one_receipt.DRAFT.json"
 MANIFEST = REPO_ROOT / "reports/darshan/ISSUE_ONE_MANIFEST.md"
 
@@ -298,6 +298,45 @@ def fixture_repo(tmp_path, monkeypatch):
         + "\n",
         encoding="utf-8",
     )
+    verification_dir = tmp_path / "reports/darshan/source_verification"
+    verification_dir.mkdir(parents=True)
+    source_verification = {}
+    for article in articles:
+        slug = article["slug"]
+        reviewer = "independent-fixture-reviewer"
+        observed_at = "2026-08-03T00:00:00Z"
+        evidence = {
+            "schema": "darshan.source_verification.v1",
+            "article_slug": slug,
+            "article_sha256_md": article["sha256_md"],
+            "reviewer": reviewer,
+            "observed_at": observed_at,
+            "verdict": "PASS",
+            "source_checks": [
+                {
+                    "source": "https://example.test/primary",
+                    "access": "PRIMARY_SOURCE_READ",
+                    "disposition": "SUPPORTED",
+                    "note": "Fixture primary source read in full.",
+                }
+            ],
+        }
+        evidence["digest"] = seal.stable_digest(evidence)
+        evidence_path = verification_dir / f"{slug}.json"
+        evidence_path.write_text(
+            json.dumps(evidence, indent=2) + "\n", encoding="utf-8"
+        )
+        source_verification[slug] = {
+            "status": "VERIFIED",
+            "reviewer": reviewer,
+            "observed_at": observed_at,
+            "evidence_file": (
+                f"reports/darshan/source_verification/{slug}.json"
+            ),
+            "evidence_sha256": hashlib.sha256(
+                evidence_path.read_bytes()
+            ).hexdigest(),
+        }
     receipt = {
         "schema": "darshan.issue_one_receipt.v1",
         "receipt_state": "DRAFT_PENDING_OPERATOR_PUBLICATION",
@@ -313,6 +352,8 @@ def fixture_repo(tmp_path, monkeypatch):
             "operator_read": False,
             "operator_read_evidence": "PENDING",
         },
+        "source_verification": source_verification,
+        "pending_operator_actions": [],
         "external_evidence": [],
         "digest": None,
     }
@@ -356,6 +397,7 @@ def test_seal_happy_path_seals_and_is_internally_consistent(fixture_repo) -> Non
     assert sealed["receipt_state"] == "SEALED"
     assert sealed["editorial_law_passes"]["operator_read"] is True
     assert sealed["external_evidence"] == []
+    assert sealed["pending_operator_actions"] == []
     for art in sealed["articles"]:
         assert art["published"] is True
         assert art["status"].startswith("SEALED — live page verified")
@@ -364,6 +406,79 @@ def test_seal_happy_path_seals_and_is_internally_consistent(fixture_repo) -> Non
     assert sealed["digest"] == seal.stable_digest(
         {k: v for k, v in sealed.items() if k != "digest"}
     )
+
+
+@pytest.mark.parametrize("gate", ["both_fires", "independent_discernment"])
+def test_seal_refuses_unpassed_editorial_gate(fixture_repo, gate) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    receipt["editorial_law_passes"][gate] = False
+    draft.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
+
+
+def test_seal_refuses_stale_top_level_content_digest(fixture_repo) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    receipt["content_digest"] = "0" * 64
+    draft.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
+
+
+def test_seal_refuses_pending_operator_action(fixture_repo) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    receipt["pending_operator_actions"] = ["unratified source vintage"]
+    draft.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
+
+
+def test_seal_refuses_pending_source_verification(fixture_repo) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    slug = receipt["articles"][0]["slug"]
+    receipt["source_verification"][slug]["status"] = "PENDING"
+    draft.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
+
+
+def test_seal_refuses_tampered_source_verification_evidence(fixture_repo) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    slug = receipt["articles"][0]["slug"]
+    evidence = (
+        fixture_repo["tmp_path"]
+        / receipt["source_verification"][slug]["evidence_file"]
+    )
+    evidence.write_text(
+        evidence.read_text(encoding="utf-8") + " ", encoding="utf-8"
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
 
 
 def test_seal_refuses_draft_bannered_page(fixture_repo) -> None:

@@ -121,6 +121,65 @@
     "operator_read": false,
     "operator_read_evidence": "PENDING \u2014 one of the two remaining editorial-law gates (with iran re-discernment)"
   },
+  "source_verification": {
+    "2026-07-12-the-chamber": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-12-the-silenced-no": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-12-one-idea-away": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-13-whose-temples": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-13-shape-of-a-silence": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-13-gates-around-the-minds": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-13-nobody-knows-why": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    },
+    "2026-07-13-age-of-iron": {
+      "status": "PENDING",
+      "reviewer": null,
+      "observed_at": null,
+      "evidence_file": null,
+      "evidence_sha256": null
+    }
+  },
+  "source_verification_policy": "Each VERIFIED entry must point to a contained reports/darshan/source_verification/*.json receipt whose sha256, canonical digest, reviewer, observed_at, article slug, article sha256, PASS verdict, and fully-read source dispositions are validated by the sealer. PENDING cannot seal.",
   "assembly": {
     "assembled_at_jst": "2026-07-21 late evening",
     "assembled_by": "fable (editor/assembler pass; zero body authorship)",
@@ -158,7 +217,7 @@
     "Approve publication: merge darshan repo PR #1 (issue-one-20260721 -> main; Pages deploys from main), including the 2026-08-03 R_V corrections per the corrections law",
     "Ratify (or override) the canonical R_V paper vintage: arxiv_candidate v011 (2026-07-15) is presumed, not ratified",
     "Convene the merge gate on the dharma_swarm PR",
-    "Run reports/darshan/scripts/seal_issue_one_receipt.py --operator-read-confirmed '<own words>' to seal the canonical receipt"
+    "Run scripts/darshan/seal_issue_one_receipt.py --operator-read-confirmed '<own words>' to seal the canonical receipt"
   ],
   "digest": null,
   "digest_policy": "digest stays null in this DRAFT. It is computed as stable_digest(receipt minus digest) by the seal script ONLY after live-URL verification of all 8 pieces and explicit operator-read confirmation \u2014 identical canonicalisation to scripts/governance/check_track_status.py. A receipt that asserts an unpublished issue must not validate; that is the point."
