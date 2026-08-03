@@ -64,6 +64,52 @@ def test_default_registry_has_no_phantom_targets():
     assert pp.validate_gates(pp.default_gates()) == []
 
 
+def test_default_corral_gate_uses_exact_strict_argv():
+    gate = next(g for g in pp.default_gates() if g.name == "verify-corral")
+
+    assert list(gate.argv) == [
+        "python3",
+        "scripts/governance/verify_corral_findings.py",
+        "--strict",
+    ]
+
+
+def test_strict_corral_gate_rejects_stale_line_receipt(tmp_path):
+    corral = tmp_path / "DE_BUG_CORRAL"
+    corral.mkdir()
+    (corral / "01.md").write_text(
+        """# Stale line fixture
+
+### MAJOR · TC-01 · stale Pramana line reference
+
+- Detail: `scripts/governance/pramana_probe.py:9999999` is past EOF.
+- Status: OPEN
+""",
+        encoding="utf-8",
+    )
+    gate = next(g for g in pp.default_gates() if g.name == "verify-corral")
+    expected_argv = [
+        "python3",
+        "scripts/governance/verify_corral_findings.py",
+        "--strict",
+    ]
+
+    def run_strict_fixture(argv, cwd):
+        assert list(argv) == expected_argv
+        return pp.subprocess_runner(
+            [sys.executable, *argv[1:], "--dir", str(corral)], cwd
+        )
+
+    report = pp.run_probe([gate], tier="medium", runner=run_strict_fixture)
+    receipt = report.to_receipt()
+
+    assert report.all_gates_passed is False
+    assert report.outcomes[0].exit_code == 1
+    assert "STALE-LINES-PAST-EOF" in report.outcomes[0].detail
+    assert receipt["gates"][0]["ok"] is False
+    assert receipt["gates"][0]["exit_code"] == 1
+
+
 def test_default_registry_covers_pratyaksha():
     # The highest-weighted pramana (0.30, direct perception) previously had NO
     # gate at all; the registry must keep one.
