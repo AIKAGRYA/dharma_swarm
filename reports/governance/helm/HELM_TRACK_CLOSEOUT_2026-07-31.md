@@ -10,15 +10,18 @@ two ever disagree, the YAML wins and this file is history.
 **Branch:** `governance/close-helm-track-v2-20260803` (repair lane F6)  
 **Closed by:** governance closeout (this receipt)
 
-## Re-proof on current main — 2026-08-03
+## Re-proof on then-current main — 2026-08-03
 
-Every claim in this receipt is proved against `origin/main` @ `f3eb5b397` and
-nothing else. The closure was drafted 2026-07-31 on an operator-local branch
-that never reached origin; that draft is **not fetchable from this repository
-and carries zero evidentiary weight** — no claim here rests on it, and it is
+The behavioral and closure evidence in this receipt was proved against
+`origin/main` @ `f3eb5b397`. The complete pre-closure track contract is
+preserved from the PR's repository-reachable merge base
+`f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd`, of which `f3eb5b397` is an
+ancestor. The closure was drafted 2026-07-31 on an operator-local branch that
+never reached origin; that draft is **not fetchable from this repository and
+carries zero evidentiary weight** — no claim here rests on it, and it is
 deliberately left uncited rather than presented as a checkable reference. The
 work was re-applied semantically on `f3eb5b397` and every check below was
-re-executed 2026-08-03:
+re-executed 2026-08-03; current-head CI binds the resulting closure to the PR:
 
 | Check | Result (2026-08-03, main @ f3eb5b397) |
 |-------|----------------------------------------|
@@ -75,6 +78,7 @@ Regression tests: `test_command_passes_does_not_export_dharma_python_for_non_pyt
 
 - Removed `helm-worldclass-terminal-2026-06` from `active_tracks`.
 - Appended closed entry under `closed_tracks` with `status: SHIPPED`, `closure_kind: CLOSED_NOT_PROD`.
+- Preserved all 15 pre-closure fields from reachable merge base `f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd`; only `status` transitions, while closure state and evidence are additive.
 - Sibling edge `repository-titanium-hardening-2026-07.complements` still names helm; active→closed edges resolve.
 - Managed digest blocks in `CLAUDE.md` and `docs/governance/SOVEREIGN_MANIFEST.md` regenerated via `scripts/governance/render_active_track_includes.py` (never hand-edited); `--check` exits 0.
 
