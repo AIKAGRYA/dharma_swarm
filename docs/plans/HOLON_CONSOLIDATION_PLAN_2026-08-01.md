@@ -113,9 +113,22 @@ $ python3 -c "import dharma_swarm.holon_system.authority.permissions"
 ModuleNotFoundError: No module named 'textual'
 ```
 
-`dharma_swarm/operator_core/permissions.py` pulls in `textual`, an OPTIONAL TUI
-dependency, without a guard. The fix is to guard that import (or declare the
-dependency), **not** to delete the facade. Repair, do not remove.
+The unguarded import is **three levels down**, not in `permissions.py`. The exact
+chain, each hop cited:
+
+| Hop | Location | Statement |
+|---|---|---|
+| 1 | `dharma_swarm/operator_core/permissions.py:14` | `from dharma_swarm.tui.engine.events import CanonicalEvent, ThinkingComplete, ToolCallComplete` |
+| 2 | `dharma_swarm/tui/engine/__init__.py:25` | `from .provider_runner import ProviderRunner` |
+| 3 | `dharma_swarm/tui/engine/provider_runner.py:10` | `from textual import work` ← **unguarded** |
+
+`textual` is an OPTIONAL TUI dependency. Note that `dharma_swarm/tui/__init__.py:15-17`
+already wraps its own import in `try/except ImportError` — so the missing guard is
+specifically in the **engine** package, and the fix belongs at hop 3 (or the
+dependency gets declared). It is **not** in `operator_core/permissions.py`, which
+contains no `textual` import at all.
+
+Repair at hop 3. Do not delete the facade.
 
 ## 3. Ownership collisions (checked against ACTIVE_TRACK.yaml)
 
@@ -188,9 +201,12 @@ at `living_agent_kernel.py:51` and mkdirs at `:788`).
 
 1. MOVE 0 — lazy `runtime/__init__.py`, prove the suite returns to baseline.
 2. Phase A moves 1–7, one commit each, suite green between every one.
-3. Repair `authority/permissions.py` by guarding the transitive `textual` import in
-   `operator_core/permissions.py` (fixes the live `test_holon_system_imports.py`
-   failure). Do NOT delete it, and do NOT touch the other two shims — they work.
+3. Repair `authority/permissions.py` by guarding `from textual import work` at
+   `dharma_swarm/tui/engine/provider_runner.py:10` — reached via
+   `operator_core/permissions.py:14` → `tui/engine/__init__.py:25` (see §2.1 for the
+   full chain). This fixes the live `test_holon_system_imports.py` failure. Do NOT
+   edit `operator_core/permissions.py`; it has no `textual` import. Do NOT delete any
+   of the three shims, and do not touch the other two at all — they work.
 4. Apply the §4 estate-map corrections.
 5. Re-run the index sweep for the surfaces §the errata lists as missed (cron subsystem,
    `browser_agent`, `synthesis_agent`, `sleep_time_agent`, `garden_daemon`, the sixth registry).
