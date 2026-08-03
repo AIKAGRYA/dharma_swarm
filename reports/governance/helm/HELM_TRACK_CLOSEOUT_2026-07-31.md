@@ -1,17 +1,24 @@
 # Helm track closeout — 2026-07-31
 
+**Doc role:** `report` (dated descriptive output)  
+**Subordinates to:** `docs/governance/ACTIVE_TRACK.yaml` — the canonical track
+owner. This receipt replaces no existing doc; it is the evidence attachment for
+the `helm-worldclass-terminal-2026-06` entry under `closed_tracks` there. If the
+two ever disagree, the YAML wins and this file is history.  
 **Track:** `helm-worldclass-terminal-2026-06`  
 **Closure kind:** `CLOSED_NOT_PROD`  
-**Branch:** `governance/close-helm-track-v2-20260803` (recreated from stranded local
-branch `governance/close-helm-track-20260731`, commit 559908042, which never
-reached origin — repair lane F6)  
+**Branch:** `governance/close-helm-track-v2-20260803` (repair lane F6)  
 **Closed by:** governance closeout (this receipt)
 
 ## Re-proof on current main — 2026-08-03
 
-This closeout was originally authored 2026-07-31 on a branch that fell ~23
-commits behind main before it could land. All evidence below was re-executed
-2026-08-03 against `origin/main` @ `f3eb5b397`:
+Every claim in this receipt is proved against `origin/main` @ `f3eb5b397` and
+nothing else. The closure was drafted 2026-07-31 on an operator-local branch
+that never reached origin; that draft is **not fetchable from this repository
+and carries zero evidentiary weight** — no claim here rests on it, and it is
+deliberately left uncited rather than presented as a checkable reference. The
+work was re-applied semantically on `f3eb5b397` and every check below was
+re-executed 2026-08-03:
 
 | Check | Result (2026-08-03, main @ f3eb5b397) |
 |-------|----------------------------------------|
@@ -60,13 +67,25 @@ Lifecycle rule `verified-slice-erases-blockers` forbids reusing an id that had o
 
 The terminal suite treats `DHARMA_PYTHON` as the **bridge** executable (see `terminal/src/bridge.ts`). When the checker is invoked under macOS system Python 3.9, bun tests spawn a 3.9 bridge, hit `requires-python >=3.11` / union-type failures, and exit 1 — even though the same suite is green without that pin.
 
-Fix: export `DHARMA_PYTHON` only for Python/wrapper-shaped commands (`_command_should_export_dharma_python`). Regression test: `test_command_passes_does_not_export_dharma_python_for_non_python`.
+Fix: export `DHARMA_PYTHON` only for Python/wrapper-shaped commands (`_command_should_export_dharma_python`). The wrapper allowlist `_DHARMA_PYTHON_WRAPPERS` names **both** repo wrappers that read `DHARMA_PYTHON` as the interpreter (`scripts/governance/run_python_with_repo_env.sh:18-26`, `scripts/governance/run_pytest_with_repo_env.sh:6-7`); their underscore-delimited names cannot match the `python3?|pytest` token regex, so omitting either would reintroduce the checkout-local-`.venv` split-brain for criteria routed through it.
+
+Regression tests: `test_command_passes_does_not_export_dharma_python_for_non_python`, `test_every_dharma_python_wrapper_is_pinned` (derives the wrapper set from the scripts themselves, so a new `DHARMA_PYTHON`-honoring wrapper fails until allowlisted), and negative control `test_bun_command_is_not_pinned_negative_control` (broadening the allowlist must not start poisoning bun criteria).
 
 ## Portfolio change
 
 - Removed `helm-worldclass-terminal-2026-06` from `active_tracks`.
 - Appended closed entry under `closed_tracks` with `status: SHIPPED`, `closure_kind: CLOSED_NOT_PROD`.
 - Sibling edge `repository-titanium-hardening-2026-07.complements` still names helm; active→closed edges resolve.
+- Managed digest blocks in `CLAUDE.md` and `docs/governance/SOVEREIGN_MANIFEST.md` regenerated via `scripts/governance/render_active_track_includes.py` (never hand-edited); `--check` exits 0.
+
+### Generated DocOps counts deliberately NOT touched
+
+`docs/docops/AUTO_INVENTORY.md` and the asserted count tokens in `SOVEREIGN_MANIFEST.md` are left at main's values on purpose, for two independent reasons:
+
+1. **Ownership.** `docs/docops/AUTO_INVENTORY.md` is inside `repository-titanium-hardening-2026-07`'s `owns:` globs. This PR serves the helm closure, not Titanium, and `CLAUDE.md` puts owned surfaces off-limits except through the owning track's next-items.
+2. **The DocOps contract already forbids it.** `.github/workflows/docops.yml:44-47` — "Generated counts … are advisory on PRs: PRs no longer hand-commit them, and docops-reconcile-main.yml reconciles them after each merge." Hand-committing counts in a feature PR is the O(n²) counter cascade that design removed.
+
+Verified with the CI invocation: `python3 scripts/docops/check_docops_integrity.py --report-json reports/docops/check.json --counts-advisory --changed-from f3eb5b397` → **exit 0** ("DocOps integrity checks passed"; count drift reported as WARN, as designed). Pre-existing count drift on main is `docops-reconcile-main.yml`'s job, not this closure's.
 
 ## Explicit non-claims
 

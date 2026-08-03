@@ -578,6 +578,12 @@ def _missing_environment_module(output: str) -> str | None:
     return top
 
 
+_DHARMA_PYTHON_WRAPPERS = (
+    "run_python_with_repo_env",
+    "run_pytest_with_repo_env",
+)
+
+
 def _command_should_export_dharma_python(command: list[str]) -> bool:
     """Only Python/wrapper criteria should inherit the checker's interpreter.
 
@@ -597,12 +603,15 @@ def _command_should_export_dharma_python(command: list[str]) -> bool:
     if exe in {"./.venv/bin/python", ".venv/bin/python"}:
         return True
     joined = " ".join(command)
-    if "run_python_with_repo_env" in joined:
+    # Every repo wrapper that honors DHARMA_PYTHON must be listed here. Both
+    # read it as the interpreter (run_python_with_repo_env.sh:18-26,
+    # run_pytest_with_repo_env.sh:6-7) and otherwise fall back to a
+    # checkout-local .venv or bare python3 — the split-brain this pin exists to
+    # remove. Underscore-delimited names cannot match the token regex below.
+    if any(wrapper in joined for wrapper in _DHARMA_PYTHON_WRAPPERS):
         return True
     # bash -c wrappers that invoke python/pytest still need the pin.
     if exe in {"bash", "sh", "/bin/bash", "/bin/sh"}:
-        if "run_python_with_repo_env" in joined:
-            return True
         if re.search(r"(^|[\s/])(python3?|pytest)(\s|$)", joined):
             return True
     return False
