@@ -83,9 +83,22 @@ def memory_pack_summary(pack: MemoryContextPack | None) -> dict[str, Any]:
 
     ``consulted`` is the flag that distinguishes a deployment with no memory
     from one whose policy admitted nothing.
+
+    Both branches return the SAME keys. An earlier revision omitted
+    ``truncated`` and ``warnings`` on the no-kernel path, so a caller reading
+    ``summary["warnings"]`` raised ``KeyError`` only when memory was absent --
+    breaking exactly the degraded case this organ exists to survive, and only
+    on the path a dev environment is least likely to exercise.
     """
     if pack is None:
-        return {"consulted": False, "candidates": 0, "admitted": 0, "omitted": 0}
+        return {
+            "consulted": False,
+            "candidates": 0,
+            "admitted": 0,
+            "omitted": 0,
+            "truncated": False,
+            "warnings": [],
+        }
     return {
         "consulted": True,
         "candidates": pack.candidate_count,

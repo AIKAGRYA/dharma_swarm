@@ -258,7 +258,14 @@ async def run_daemon(
 
         memory_kernel = MemoryKernel()
     except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
-        print(f"[sarathi] memory kernel unavailable, planning without recall: {exc}")
+        # stderr, not stdout: `--json` prints the report as the SOLE stdout
+        # payload (:489), so a diagnostic on stdout breaks every consumer doing
+        # json.loads(subprocess output) -- and it breaks them precisely in the
+        # degraded case this fail-open path exists to survive.
+        print(
+            f"[sarathi] memory kernel unavailable, planning without recall: {exc}",
+            file=sys.stderr,
+        )
         memory_kernel = None
 
     def load_boot_pack() -> BootPack:
@@ -283,7 +290,10 @@ async def run_daemon(
         try:
             memory_excerpt = render_memory_excerpt(build_memory_pack(memory_kernel))
         except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
-            print(f"[sarathi] memory read failed, planning without recall: {exc}")
+            print(
+                f"[sarathi] memory read failed, planning without recall: {exc}",
+                file=sys.stderr,
+            )
             memory_excerpt = ""
 
         return BootPack(

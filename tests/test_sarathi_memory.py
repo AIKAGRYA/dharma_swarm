@@ -133,6 +133,47 @@ def test_wake_passes_the_boot_pack_memory_into_the_brief():
     )
 
 
+def test_memory_summary_shape_is_identical_on_both_paths():
+    """Devin review, PR #1208. The no-kernel branch once returned four keys
+    while the populated branch returned six, so `summary["warnings"]` raised
+    KeyError only when memory was absent -- the degraded case this organ exists
+    to survive, and the path least exercised in development."""
+    from dharma_swarm.memory_kernel import MemoryKernel
+
+    absent = memory_pack_summary(None)
+    consulted = memory_pack_summary(build_memory_pack(MemoryKernel()))
+    assert set(absent) == set(consulted), (
+        f"summary shape diverges: only-when-absent={set(absent) - set(consulted)}, "
+        f"only-when-consulted={set(consulted) - set(absent)}"
+    )
+    # Neutral defaults, not absence.
+    assert absent["truncated"] is False and absent["warnings"] == []
+
+
+def test_daemon_memory_diagnostics_go_to_stderr_not_stdout():
+    """Devin review, PR #1208. `--json` prints the report as the SOLE stdout
+    payload (sarathi_wake_daemon.py:489), so a diagnostic on stdout breaks every
+    consumer doing json.loads(subprocess output) -- and breaks them exactly when
+    memory is unavailable, which is when the fail-open path fires."""
+    daemon = REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py"
+    tree = ast.parse(daemon.read_text(encoding="utf-8"))
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "print"):
+            continue
+        rendered = ast.dump(node)
+        if "[sarathi]" not in rendered:
+            continue  # the report prints are the legitimate stdout payload
+        if not any(kw.arg == "file" for kw in node.keywords):
+            offenders.append(getattr(node, "lineno", "?"))
+
+    assert not offenders, (
+        f"daemon diagnostics print to stdout at line(s) {offenders}; route them to "
+        f"sys.stderr so --json output stays machine-readable"
+    )
+
+
 def test_organ_reaches_memory_only_through_the_kernel_front_door():
     """CLAUDE.md makes MemoryKernel the canonical front door. The organ must not
     reach around it into a legacy store or a raw path -- that is how a second,
