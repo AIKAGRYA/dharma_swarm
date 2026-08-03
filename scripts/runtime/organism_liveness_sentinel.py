@@ -10,9 +10,12 @@ Three independent checks, all of which must pass:
 
 1. launchd service presence — ``launchctl print gui/<uid>/com.dharma.swarm``
    must succeed. An absent service is a FAIL, never a WARN.
-2. orchestrate-live process — a live process matching
-   ``dharma_swarm.dgc_cli orchestrate-live`` must exist AND answer
-   ``kill -0``. A PID read from any file is never trusted on its own.
+2. orchestrate-live process — a live process matching ANY of the organism's
+   real launch spellings (``ORCHESTRATE_COMMAND_FORMS``: the plist's console
+   script ``dgc orchestrate-live``, the release runner's module form
+   ``dharma_swarm.dgc_cli orchestrate-live``, the container entrypoint
+   ``dharma_swarm.orchestrate_live``) must exist AND answer ``kill -0``.
+   A PID read from any file is never trusted on its own.
 3. admission-denial growth — the count of ``admission denied`` lines in
    ``~/.dharma/logs/swarm.err`` must not have grown since the previous run.
    Growth means launchd is thrashing in a fail-closed denial loop: the
@@ -21,7 +24,16 @@ Three independent checks, all of which must pass:
 
 On any failure the sentinel writes a loud receipt
 (``~/.dharma/witness/liveness_sentinel/ORGANISM_DOWN_<utc>.json``) and exits
-nonzero. On success it updates the denial-count baseline and exits 0.
+nonzero.
+
+The denial baseline records the LAST OBSERVED count on every non-dry run,
+pass or fail, so check 3 compares consecutive observations. Gating the
+baseline write on the overall verdict froze it at the pre-incident value and
+turned one denial burst into an alarm that could never clear — a permanently
+screaming sentinel is an ignored sentinel. Recovery is automatic: once the
+denial count stops growing, check 3 goes green. It never launders a real
+outage, because checks 1 and 2 (service loaded, process alive) are
+independent and unaffected by the baseline.
 
 ``--dry-run`` runs every check and prints the verdict but writes nothing
 (no receipt, no baseline update). The exit code still reflects the verdict
@@ -32,10 +44,17 @@ authority; a human adds this object to the ``jobs`` array by hand):
 
   {"id": "organism_liveness_sentinel", "name": "Organism Liveness Sentinel",
    "handler": "shell", "enabled": true, "deliver": "local",
-   "shell_command": "/Users/dhyana/dharma_swarm/.venv/bin/python /Users/dhyana/dharma_swarm/scripts/runtime/organism_liveness_sentinel.py",
+   "shell_command": "python3 scripts/runtime/organism_liveness_sentinel.py",
    "schedule": {"kind": "interval", "minutes": 30, "display": "every 30m"},
    "timeout_sec": 60, "urgent": true,
    "prompt": "Fail loudly if the organism launchd service, orchestrate-live process, or admission lane is dead."}
+
+The ``shell_command`` above is the exact string the cron shell handler
+allowlists (``cron_runner._ALLOWED_SHELL_COMMAND_PREFIXES``); it is run with
+cwd=repo root, hence the relative path. An absolute-interpreter spelling is
+rejected before launch, so do not "improve" it into one.
+``tests/test_cron_runner.py`` parses this docstring and runs the command
+through the real handler, so the documented wiring cannot rot.
 
 Known blind spot, accepted: the sentinel rides the existing cron lane
 (``com.dharma.cron-daemon``); if the cron daemon itself dies, nothing fires.
@@ -55,7 +74,33 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SERVICE_LABEL = "com.dharma.swarm"
-ORCHESTRATE_PATTERN = "dharma_swarm.dgc_cli orchestrate-live"
+
+# Every spelling the organism is actually launched under. Sources:
+#   com.dharma.swarm.plist            -> exec env ... dgc orchestrate-live
+#   dharma_swarm_release_runner.sh    -> python -B -I -m dharma_swarm.dgc_cli orchestrate-live
+#   Dockerfile.swarm / container CMD  -> python -m dharma_swarm.orchestrate_live
+# Matching only the module form made a plist-started (i.e. the normal) host
+# scan as dead, which would have made this sentinel a liar on the very
+# machine it was written for. tests/test_runtime_command_forms.py pins these
+# against the real launch definitions.
+#
+# This script stays stdlib-only and imports nothing from dharma_swarm on
+# purpose: a watchdog that cannot start when the package it watches is broken
+# is not a watchdog. The mirrored constant in
+# dharma_swarm/runtime_process_identity.py is kept honest by that test.
+ORCHESTRATE_COMMAND_FORMS: tuple[str, ...] = (
+    "dgc orchestrate-live",
+    "dharma_swarm.dgc_cli orchestrate-live",
+    "dharma_swarm.orchestrate_live",
+)
+_SKIP_MARKERS: tuple[str, ...] = (
+    "organism_liveness_sentinel",
+    "ps -axo",
+    "pgrep",
+    "grep ",
+    "pytest",
+    "dgc doctor",
+)
 DENIAL_PATTERN = re.compile(r"admission denied", re.IGNORECASE)
 
 
@@ -131,30 +176,70 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
-def check_orchestrate_process(launchd_pid: int | None) -> CheckResult:
+def scan_orchestrate_processes() -> tuple[list[tuple[int, str]], str | None]:
+    """Return ([(pid, command)], error) for every orchestrate-live spelling.
+
+    ``ps -axo pid=,command=`` with substring matching rather than
+    ``pgrep -f <regex>``: the alternation needed to cover all launch forms is
+    not portable across pgrep's regex flavours, and the full command line is
+    itself the evidence a receipt should carry.
+    """
     try:
         proc = subprocess.run(
-            ["pgrep", "-f", ORCHESTRATE_PATTERN],
+            ["ps", "-axo", "pid=,command="],
             capture_output=True,
             text=True,
             timeout=15,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
+        return [], f"ps probe failed to execute: {exc}"
+    if proc.returncode != 0:
+        return [], f"ps probe returned rc={proc.returncode}"
+
+    current_pid = os.getpid()
+    matches: list[tuple[int, str]] = []
+    for raw in proc.stdout.splitlines():
+        parts = raw.strip().split(maxsplit=1)
+        if len(parts) != 2:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        command = parts[1]
+        if pid == current_pid:
+            continue
+        if not any(form in command for form in ORCHESTRATE_COMMAND_FORMS):
+            continue
+        if any(marker in command for marker in _SKIP_MARKERS):
+            continue
+        matches.append((pid, command))
+    return matches, None
+
+
+def check_orchestrate_process(launchd_pid: int | None) -> CheckResult:
+    found, error = scan_orchestrate_processes()
+    if error is not None:
         return CheckResult(
             name="orchestrate_process",
             ok=False,
-            detail=f"pgrep probe failed to execute: {exc}",
+            detail=error,
         )
-    pids = [int(p) for p in proc.stdout.split() if p.strip().isdigit()]
-    live = [p for p in pids if _pid_alive(p)]
+    live = [pid for pid, _ in found if _pid_alive(pid)]
     if not live:
         return CheckResult(
             name="orchestrate_process",
             ok=False,
-            detail=f"no live process matches '{ORCHESTRATE_PATTERN}'",
-            evidence={"pgrep_pids": pids},
+            detail=(
+                "no live process matches any orchestrate-live command form "
+                f"{list(ORCHESTRATE_COMMAND_FORMS)}"
+            ),
+            evidence={"scanned_pids": [pid for pid, _ in found]},
         )
-    evidence: dict[str, object] = {"live_pids": live}
+    evidence: dict[str, object] = {
+        "live_pids": live,
+        "commands": [cmd for pid, cmd in found if pid in live][:4],
+    }
     if launchd_pid is not None and launchd_pid not in live:
         evidence["launchd_pid_mismatch"] = launchd_pid
         return CheckResult(
@@ -216,6 +301,26 @@ def check_admission_denials(err_log: Path, baseline_path: Path) -> CheckResult:
     return CheckResult(name="admission_denials", ok=True, detail=detail, evidence=evidence)
 
 
+def _record_denial_baseline(
+    baseline_path: Path,
+    *,
+    denial_count: object,
+    observed_at: str,
+    verdict: str,
+) -> None:
+    """Persist the last observed denial count (pass or fail)."""
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "denial_count": denial_count,
+                "updated_at": observed_at,
+                "observed_under_verdict": verdict,
+            }
+        )
+        + "\n"
+    )
+
+
 def run_sentinel(
     *,
     state_root: Path,
@@ -248,16 +353,18 @@ def run_sentinel(
         return 0 if ok else 1
 
     sentinel_dir.mkdir(parents=True, exist_ok=True)
+    # Record the last OBSERVED denial count on every non-dry run, pass or
+    # fail. Gating this on `ok` froze the baseline at the pre-incident value,
+    # so one burst re-fired forever and the sentinel could never return to
+    # green on its own. The comparison is between consecutive observations:
+    # a still-growing denial loop fails again next run, a stopped one clears.
+    _record_denial_baseline(
+        baseline_path,
+        denial_count=denials.evidence.get("denial_count", 0),
+        observed_at=str(verdict["timestamp_utc"]),
+        verdict=str(verdict["verdict"]),
+    )
     if ok:
-        baseline_path.write_text(
-            json.dumps(
-                {
-                    "denial_count": denials.evidence.get("denial_count", 0),
-                    "updated_at": verdict["timestamp_utc"],
-                }
-            )
-            + "\n"
-        )
         return 0
 
     stamp = verdict["timestamp_utc"].replace(":", "").replace("-", "")

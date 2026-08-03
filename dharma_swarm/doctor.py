@@ -25,6 +25,11 @@ from urllib.parse import urlparse
 from dharma_swarm.api_keys import RUNTIME_PROVIDER_API_KEY_ENV_KEYS
 from dharma_swarm.claude_cli import unattended_claude_auth_error
 from dharma_swarm.runtime_artifacts import dgc_health_snapshot_summary
+from dharma_swarm.runtime_process_identity import (
+    ORCHESTRATE_COMMAND_NEEDLES,
+    looks_like_runtime_command,
+    pid_command as _pid_command,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +137,22 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _daemon_pid_alive(pid: int) -> bool:
+    """``kill -0`` plus a recycled-PID disconfirmation.
+
+    Existence of the number is not ownership: after a PID wrap an unrelated
+    process answers ``kill -0`` and a corpse's snapshot reads as live. If the
+    pid's command line is readable and provably belongs to something else, the
+    writer is gone. Unreadable command lines never downgrade a live pid.
+    """
+    if not _pid_alive(pid):
+        return False
+    command = _pid_command(pid)
+    if command is None:
+        return True
+    return looks_like_runtime_command(command)
+
+
 def _read_pid_file(path: Path) -> tuple[int | None, str]:
     if not path.exists():
         return None, "missing"
@@ -194,8 +215,19 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    needles = ("dharma_swarm.orchestrate_live", "orchestrate_live.py", "run_daemon.sh")
-    skip_markers = ("dgc doctor", "ps -axo", "rg ", "pytest")
+    # Canonical launch spellings live in runtime_process_identity so the
+    # doctor, the sentinel, and the census cannot drift apart. The old local
+    # tuple knew only the module/legacy forms, so a host started through the
+    # plist's console script (`dgc orchestrate-live`) scanned as having no
+    # daemon at all.
+    needles = ORCHESTRATE_COMMAND_NEEDLES
+    skip_markers = (
+        "dgc doctor",
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "organism_liveness_sentinel",
+    )
 
     for raw in proc.stdout.splitlines():
         line = raw.strip()
@@ -279,6 +311,33 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
             detail_parts.append(f"live process: {pid}:{command}")
         if legacy_details:
             detail_parts.append("legacy pid files: " + ", ".join(legacy_details))
+        if not live_processes:
+            # A stale pid file with nothing running is the exact 2026-07-25→08-01
+            # shape: the doctor cited the corpse's pid number and filed WARN for
+            # seven days. Consult launchd BEFORE settling on WARN — if the host
+            # is supposed to be running an organism, absence is a FAIL.
+            service_state, service_detail = _launchd_service_state(timeout_seconds)
+            if service_state == "loaded" or (
+                service_state == "absent" and _launchd_plist_installed()
+            ):
+                detail_parts.append(service_detail)
+                _add(
+                    checks,
+                    name="daemon_integrity",
+                    status="FAIL",
+                    summary=(
+                        "stale pid file cited while no daemon process is running "
+                        f"({LAUNCHD_SERVICE_LABEL} is {service_state}) — the organism is dead"
+                    ),
+                    detail=" | ".join(detail_parts),
+                    fix=(
+                        "Do not trust the pid file. Inspect logs/swarm.err for "
+                        "admission denials, restart via the release runner, and "
+                        "delete the stale pid file."
+                    ),
+                )
+                return
+            detail_parts.append(service_detail)
         _add(
             checks,
             name="daemon_integrity",
@@ -492,7 +551,7 @@ def _check_message_bus_integrity(checks: list[DoctorCheck], timeout_seconds: flo
 
 
 def _check_dgc_health_snapshot(checks: list[DoctorCheck]) -> None:
-    snapshot = dgc_health_snapshot_summary(HOME / ".dharma", pid_alive=_pid_alive)
+    snapshot = dgc_health_snapshot_summary(HOME / ".dharma", pid_alive=_daemon_pid_alive)
     if not snapshot["exists"]:
         _add(
             checks,

@@ -57,10 +57,19 @@ def cmd_status(*, as_json: bool = False) -> None:
 
     if "loop_liveness" in data:
         ll = data["loop_liveness"]
-        if ll.get("pid_alive") is False:
+        # Only an explicit True is proof of an owner. False means the owner is
+        # gone; None means the record carries no usable pid and the claim can
+        # never be checked — neither may print "N running".
+        if ll.get("pid_alive") is not True:
+            verdict = "DEAD" if ll.get("pid_alive") is False else "UNVERIFIED"
+            owner = (
+                f"owning pid {ll['pid']} is gone"
+                if ll.get("pid_alive") is False
+                else f"owning pid {ll['pid']!r} cannot be verified"
+            )
             print(
-                f"Daemon loops: DEAD — liveness file claims {ll['running']} running "
-                f"but owning pid {ll['pid']} is gone "
+                f"Daemon loops: {verdict} — liveness file claims {ll['running']} running "
+                f"but {owner} "
                 f"(file is {ll['age_min']}m old; do not trust it)"
             )
         else:

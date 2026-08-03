@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 from typing import Any
+
+from dharma_swarm.runtime_process_identity import daemon_pid_alive
 
 
 def parse_iso_datetime(raw: Any) -> datetime | None:
@@ -63,13 +64,12 @@ def append_pulse_log(state_dir: Path, entry: str) -> None:
 
 
 def _pid_alive(pid: int) -> bool:
-    try:
-        if pid <= 1:
-            return False
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
+    """Default probe: existence AND not a provably foreign (recycled) pid.
+
+    ``kill -0`` alone proves only that *a* process holds the number. See
+    ``dharma_swarm.runtime_process_identity.daemon_pid_alive``.
+    """
+    return daemon_pid_alive(pid)
 
 
 def dgc_health_snapshot_summary(

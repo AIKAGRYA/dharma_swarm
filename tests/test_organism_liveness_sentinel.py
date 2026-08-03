@@ -88,6 +88,133 @@ def test_dead_service_fails_and_writes_receipt(monkeypatch, tmp_path: Path) -> N
     assert len(receipts) == 1
 
 
+def test_denial_alarm_clears_once_the_count_stops_growing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The runaway-alarm regression: a failed run must still advance the
+    baseline, so a handled burst does not re-fire forever."""
+    _patch_healthy(monkeypatch)
+    ticks = iter(f"2026-08-03T00:0{n}:00Z" for n in range(9))
+    monkeypatch.setattr(sentinel, "_utc_now", lambda: next(ticks))
+    err_log = tmp_path / "logs" / "swarm.err"
+    err_log.parent.mkdir(parents=True)
+    sentinel_dir = tmp_path / "witness" / "liveness_sentinel"
+    baseline = sentinel_dir / "denial_baseline.json"
+
+    # Run 1: healthy, records baseline 1.
+    err_log.write_text("admission denied: x\n", encoding="utf-8")
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 0
+    assert json.loads(baseline.read_text())["denial_count"] == 1
+
+    # Run 2: the burst. Fails loudly AND records what it saw.
+    err_log.write_text("admission denied: x\n" * 588, encoding="utf-8")
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 1
+    assert len(list(sentinel_dir.glob("ORGANISM_DOWN_*.json"))) == 1
+    recorded = json.loads(baseline.read_text())
+    assert recorded["denial_count"] == 588
+    assert recorded["observed_under_verdict"] == "ORGANISM_DOWN"
+
+    # Run 3: nothing new appended. The sentinel must return to green rather
+    # than scream at the same 588 forever.
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 0
+    assert len(list(sentinel_dir.glob("ORGANISM_DOWN_*.json"))) == 1
+
+    # Run 4: growth resumes -> it fires again. Recovery must not deafen it.
+    err_log.write_text("admission denied: x\n" * 600, encoding="utf-8")
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 1
+    assert len(list(sentinel_dir.glob("ORGANISM_DOWN_*.json"))) == 2
+
+
+def test_baseline_advance_never_launders_a_dead_service(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Negative control: the denial baseline is independent of checks 1-2, so
+    a stable denial count cannot turn a dead organism green."""
+    monkeypatch.setattr(
+        sentinel,
+        "check_launchd_service",
+        lambda label=None: CheckResult(
+            name="launchd_service", ok=False, detail="service NOT loaded"
+        ),
+    )
+    monkeypatch.setattr(
+        sentinel, "check_orchestrate_process", lambda pid: _ok("orchestrate_process")
+    )
+    err_log = tmp_path / "logs" / "swarm.err"
+    err_log.parent.mkdir(parents=True)
+    err_log.write_text("admission denied: x\n" * 5, encoding="utf-8")
+
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 1
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 1
+    receipts = list(
+        (tmp_path / "witness" / "liveness_sentinel").glob("ORGANISM_DOWN_*.json")
+    )
+    assert len(receipts) >= 1
+
+
+def test_scan_matches_console_script_launch_form(monkeypatch) -> None:
+    """The plist spelling (`dgc orchestrate-live`) must be seen as alive."""
+    ps_output = "\n".join(
+        [
+            "  501 /sbin/launchd",
+            "  777 /Users/dhyana/dharma_swarm/.venv/bin/python "
+            "/Users/dhyana/dharma_swarm/.venv/bin/dgc orchestrate-live",
+            "  888 /usr/bin/vim notes.txt",
+        ]
+    )
+
+    class FakeProc:
+        returncode = 0
+        stdout = ps_output
+        stderr = ""
+
+    monkeypatch.setattr(
+        sentinel.subprocess, "run", lambda *a, **kw: FakeProc()
+    )
+    monkeypatch.setattr(sentinel, "_pid_alive", lambda pid: True)
+
+    found, error = sentinel.scan_orchestrate_processes()
+    assert error is None
+    assert [pid for pid, _ in found] == [777]
+
+    result = sentinel.check_orchestrate_process(777)
+    assert result.ok is True
+    assert result.evidence["live_pids"] == [777]
+
+
+def test_scan_matches_module_launch_form(monkeypatch) -> None:
+    """The release-runner spelling must keep working too."""
+    ps_output = (
+        "  901 /Users/dhyana/dharma_releases/x/.venv/bin/python -B -I "
+        "-m dharma_swarm.dgc_cli orchestrate-live"
+    )
+
+    class FakeProc:
+        returncode = 0
+        stdout = ps_output
+        stderr = ""
+
+    monkeypatch.setattr(sentinel.subprocess, "run", lambda *a, **kw: FakeProc())
+    monkeypatch.setattr(sentinel, "_pid_alive", lambda pid: True)
+
+    found, error = sentinel.scan_orchestrate_processes()
+    assert error is None
+    assert [pid for pid, _ in found] == [901]
+
+
+def test_scan_reports_down_when_nothing_matches(monkeypatch) -> None:
+    class FakeProc:
+        returncode = 0
+        stdout = "  888 /usr/bin/vim notes.txt"
+        stderr = ""
+
+    monkeypatch.setattr(sentinel.subprocess, "run", lambda *a, **kw: FakeProc())
+
+    result = sentinel.check_orchestrate_process(None)
+    assert result.ok is False
+    assert "no live process matches" in result.detail
+
+
 def test_dry_run_writes_nothing_but_reports_failure(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         sentinel,

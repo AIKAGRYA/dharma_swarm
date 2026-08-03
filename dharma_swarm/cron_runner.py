@@ -48,6 +48,7 @@ _ALLOWED_SHELL_COMMAND_PREFIXES = (
     ("python3", "scripts/check_provider_credits.py"),
     ("bash", "scripts/refresh_provider_status.sh"),
     ("python3", "scripts/runtime/github_ingestor_runner.py"),
+    ("python3", "scripts/runtime/organism_liveness_sentinel.py"),
 )
 
 

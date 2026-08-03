@@ -170,6 +170,7 @@ def test_write_doctor_artifacts_normalizes_legacy_timestamp_utc(tmp_path: Path) 
 
 
 def test_daemon_integrity_warns_on_stale_pid_file(monkeypatch, tmp_path: Path) -> None:
+    """No launchd expectation on this host: a stale pid file is only untidy."""
     state_dir = tmp_path / ".dharma"
     state_dir.mkdir(parents=True)
     (state_dir / "daemon.pid").write_text("4242", encoding="utf-8")
@@ -180,6 +181,11 @@ def test_daemon_integrity_warns_on_stale_pid_file(monkeypatch, tmp_path: Path) -
         "dharma_swarm.doctor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
     )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: False)
 
     checks = []
     _check_daemon_integrity(checks, timeout_seconds=0.1)
@@ -187,6 +193,164 @@ def test_daemon_integrity_warns_on_stale_pid_file(monkeypatch, tmp_path: Path) -
     assert checks[0].name == "daemon_integrity"
     assert checks[0].status == "WARN"
     assert "stale pid files" in checks[0].detail
+
+
+def test_daemon_integrity_fails_on_stale_pid_when_service_is_loaded(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """The actual 2026-07-25..08-01 shape: a stale pid file cited while the
+    service is loaded and nothing is running. The stale-pid branch used to
+    return WARN before launchd was ever consulted."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("67078", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl print: loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "FAIL"
+    assert "the organism is dead" in checks[0].summary
+    assert "67078" in checks[0].detail
+
+
+def test_daemon_integrity_fails_on_stale_pid_when_plist_installed_but_unloaded(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Installed-but-booted-out with a stale pid from the unclean exit."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("67078", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "FAIL"
+    assert "the organism is dead" in checks[0].summary
+
+
+def test_daemon_integrity_keeps_warn_when_a_live_process_explains_the_stale_pid(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """A running organism must never be escalated to FAIL by a stale file."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("4242", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "777 /Users/dhyana/dharma_swarm/.venv/bin/python "
+            "/Users/dhyana/dharma_swarm/.venv/bin/dgc orchestrate-live",
+            "",
+        ),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl print: loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "WARN"
+    assert "777" in checks[0].detail
+
+
+def test_daemon_integrity_sees_console_script_launch_form(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """`dgc orchestrate-live` (the plist spelling) must count as a live daemon.
+
+    Before this, the needles knew only the module/legacy forms, so a healthy
+    launchd host with no pid file scanned as "no daemon process" and the new
+    launchd branch turned that blind spot into a loud false FAIL.
+    """
+    (tmp_path / ".dharma").mkdir(parents=True)
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "777 /Users/dhyana/dharma_swarm/.venv/bin/python "
+            "/Users/dhyana/dharma_swarm/.venv/bin/dgc orchestrate-live",
+            "",
+        ),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl print: loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "PASS"
+    assert "777" in (checks[0].summary or "")
+
+
+def test_daemon_integrity_sees_release_runner_launch_form(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".dharma").mkdir(parents=True)
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "901 /Users/dhyana/dharma_releases/x/.venv/bin/python -B -I "
+            "-m dharma_swarm.dgc_cli orchestrate-live",
+            "",
+        ),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "PASS"
+    assert "901" in (checks[0].summary or "")
 
 
 def test_daemon_integrity_warns_on_legacy_orchestrator_pid_with_live_daemon(
@@ -559,6 +723,10 @@ def test_dgc_health_snapshot_passes_when_fresh_and_cited_pid_alive(
 
     monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
     monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: pid == 111)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._pid_command",
+        lambda pid: "python -m dharma_swarm.dgc_cli orchestrate-live",
+    )
 
     checks = []
     _check_dgc_health_snapshot(checks)
@@ -566,6 +734,45 @@ def test_dgc_health_snapshot_passes_when_fresh_and_cited_pid_alive(
     assert checks[0].name == "dgc_health_snapshot"
     assert checks[0].status == "PASS"
     assert "daemon_pid_alive=True" in checks[0].detail
+
+
+def test_dgc_health_snapshot_fails_when_cited_pid_was_recycled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """kill -0 succeeds on a reused pid; identity must still call it dead."""
+    state_dir = tmp_path / ".dharma"
+    stigmergy_dir = state_dir / "stigmergy"
+    stigmergy_dir.mkdir(parents=True)
+    (stigmergy_dir / "dgc_health.json").write_text(
+        json.dumps(
+            {
+                "daemon_pid": 67078,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "agent_count": 20,
+                "source": "orchestrate_live",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: True)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._pid_command",
+        lambda pid: "/Applications/Safari.app/Contents/MacOS/Safari",
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+
+    checks = []
+    _check_dgc_health_snapshot(checks)
+
+    assert checks[0].name == "dgc_health_snapshot"
+    assert checks[0].status == "FAIL"
+    assert "dead daemon PID" in checks[0].summary
 
 
 def test_doctor_schedule_passes_when_job_is_armed(monkeypatch, tmp_path: Path) -> None:
