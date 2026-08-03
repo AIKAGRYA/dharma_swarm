@@ -1,0 +1,103 @@
+{
+  "allowed_files": [
+    "reports/agentops/work_packets/repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2.json",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "scripts/governance/check_track_status.py",
+    "tests/test_track_portfolio.py",
+    "reports/governance/titanium/CANON_EFFECT_ADMISSION_2026-08-03.md"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "agent/canon-effect-convergence-current-20260803",
+  "commit": {
+    "allowed": false,
+    "message": "governance: converge tracks and admit effect boundary"
+  },
+  "forbidden_files": [
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "reports/governance/arena/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_check_track_status_lifecycle.py tests/test_track_portfolio.py tests/test_arena_v1.py tests/test_arena_truth_report.py tests/test_arena_parity_controls.py",
+      "expected_exit": 0,
+      "name": "portfolio-and-closure-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 scripts/docops/check_docops_integrity.py",
+      "expected_exit": 0,
+      "name": "docops-integrity",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2",
+  "intent": "Rebind the already independently verified Arena and Helm CLOSED_NOT_PROD convergence plus the bounded Titanium/Sovereign-Safety effect-boundary admission to exact current main after unrelated test-only drift. No effect implementation, runtime restart, deployment, or worktree cleanup is claimed by this packet.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"raise SystemExit(7)\"",
+      "expected_exit": 7,
+      "name": "nonzero-negative-control",
+      "timeout_seconds": 30
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "docs/plans/HARNESS_LOOP_GRAPH_HUMMING_SPEC_V2_2026-08-01.md",
+      "dharma_swarm/spine/warrant.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/tool_registry.py",
+      "dharma_swarm/mcp_server.py",
+      "dharma_swarm/diff_applier.py",
+      "bundle:a90886d75dd5b34babfff3fc5788408696c38a240560802f0417ef7dd7b51fd7"
+    ],
+    "collision": {
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This governance packet grants no runtime implementation authority until merged and a new exact implementation packet is rebound to the merged main SHA.",
+      "Worktree removal remains operator-gated after preservation proofs and is not performed here.",
+      "Runtime restart and deployed-SHA activation remain operator-only if they could terminate the active agent session."
+    ],
+    "interface_mismatches": [
+      "Current main still declares Arena and Helm ACTIVE although their bounded control machinery and named implementation anchors are on main; they must close as CLOSED_NOT_PROD because the base entries retain blocker history.",
+      "check_track_status exports DHARMA_PYTHON into all command_passes environments, while the terminal suite uses that variable as a bridge executable and can be falsely red under the checker.",
+      "Humming V2 names a constitutional effect boundary as unowned while semantic_governance.ActionEnvelope already names a separate semantic-evaluation input; runtime types must remain distinctly named and explicitly bridged.",
+      "Only two default paths carry RuntimeWarrant; the admitted implementation must raise the count to at least five without creating a second store, ledger, registry, or receipt substrate."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "f43145e8824e75fa7b7580932a629753d419511bc8e65ca2cedad4a8340244f7",
+    "rollback": "Revert the packet-scoped governance commit as one unit: restore Arena and Helm active entries, remove their closed entries and effect-boundary ownership/acknowledgement rows, restore the checker behavior, and regenerate managed projections from ACTIVE_TRACK.yaml.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-CANON-ADMIT-R2"
+  },
+  "worktree": "."
+}

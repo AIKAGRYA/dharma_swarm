@@ -455,165 +455,6 @@ active_tracks:
         kind: code
         blocker: false
 
-  - id: orchestration-arena-v1-2026-06
-    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
-    status: ACTIVE
-    opened_at: "2026-06-23"
-    # Re-verified 2026-07-16: check_track_status full run, 12/12 completion
-    # criteria pass including live pytest greens (arena_v1_controls_tests_pass
-    # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
-    # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
-    verified_at: "2026-07-17"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - provider-routing-consolidation-2026-06
-      - loop-closure-2026-06
-    owned_surfaces:
-      - dharma_swarm/coordination/**
-      - dharma_swarm/council/**
-      - scripts/governance/arena_truth_report.py
-      - reports/governance/arena/**
-      - tests/test_arena_v1.py
-      - tests/test_dpi.py
-      - tests/test_orchestration_genome.py
-      - tests/test_orchestrator_v1.py
-      - tests/test_council_profiles.py
-      - tests/test_coordination_closure_checks.py
-      - tests/test_arena_truth_report.py
-    moves_vital_signs:
-      - eval_coverage
-      - quality_gates
-
-    description: |
-      Governance admission for the Arena/Orchestration substrate that LANDED on
-      main (PRs #670 and adjacent) but was not yet represented in the active-track
-      portfolio. The DGM substrate must be governance-visible: the system needs to
-      know its own fitness function exists, is frozen/hermetic/replayable, and is
-      not yet making production capability claims.
-
-      This is the keystone fitness layer for any future Dharma Forge: a frozen
-      verifiable taskpack + deterministic scorer + zero-weight heuristic
-      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
-      that gates a decorrelated-correctness bonus on actual correctness, plus a
-      minimal Council that verifies orchestration traces.
-
-      Doctrine that must hold: capability leads, trust multiplies (not the
-      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
-      trained weights — training is earned only after the arena produces labels.
-
-    prerequisites:
-      - id: arena_runner_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/runner.py
-      - id: arena_scorer_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/scorer.py
-      - id: orchestration_genome_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/genome.py
-
-    completion_criteria:
-      - id: frozen_taskpack_present
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/taskpack.py
-        pattern: "TASK_PACK_ID"
-      - id: deterministic_scorer_hash
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/scorer.py
-        pattern: "def scorer_hash"
-      - id: orchestration_genome_class
-        kind: file_contains
-        file: dharma_swarm/coordination/genome.py
-        pattern: "class OrchestrationGenome"
-      - id: zero_weight_orchestrator_map_elites
-        kind: file_contains
-        file: dharma_swarm/coordination/orchestrator_v1.py
-        pattern: "class MapElitesArchive"
-      - id: dpi_decorrelation_gated_on_correctness
-        kind: file_contains
-        file: dharma_swarm/coordination/dpi.py
-        pattern: "def decorrelation_bonus"
-      - id: council_trace_verification
-        kind: file_contains
-        file: dharma_swarm/council/council.py
-        pattern: "class Council"
-      - id: arena_v1_test_exists
-        kind: file_contains
-        file: tests/test_arena_v1.py
-        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
-      - id: dpi_test_exists
-        kind: file_exists
-        file: tests/test_dpi.py
-      - id: closure_checks_test_exists
-        kind: file_exists
-        file: tests/test_coordination_closure_checks.py
-      # Rigorous criteria (2026-07-03): the onboarding TRUST CHECK capped this
-      # track at existence-only evidence. These make readiness a number a real
-      # check produced — the controls/parity/significance battery must PASS and
-      # the governance surface must replay + verify as a digest-intact receipt.
-      - id: arena_v1_controls_tests_pass
-        kind: test_passes
-        test: tests/test_arena_v1.py
-      - id: arena_truth_surface_tests_pass
-        kind: test_passes
-        test: tests/test_arena_truth_report.py
-      - id: arena_truth_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/arena/arena_truth_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 21
-        requires_keys:
-          - schema
-          - generated_at
-          - hermetic
-          - capability_claim
-          - task_manifest_hash
-          - scorer_hash
-          - sealed_oracle_hash
-          - best
-          - corpus
-
-    non_goals:
-      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
-      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
-      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
-      - Do not couple admission to the full world-ingestion (#662) seam.
-
-    next_items:
-      - id: 1
-        what: >-
-          DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only
-          governance surface — scripts/governance/arena_truth_report.py renders
-          reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md +
-          corpus), seeded/deterministic; --check fails if the committed surface
-          does not replay byte-for-byte. Criterion arena_truth_receipt_valid
-          verifies it.
-        kind: code
-        blocker: false
-      - id: 2
-        what: >-
-          HERMETIC CONTROLS SHIPPED (runner.run always executes
-          best_single_full_budget gate + budget-parity ledger for every arm +
-          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
-          REMAINING (the blocker's live edge): any future live-lane arena run
-          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
-          arms before any capability claim — the hermetic lift on the fixture
-          taskpack is a control-machinery existence proof, never a capability
-          claim (non-goal 1). C2 stays owned by real benchmark evidence.
-        kind: code
-        blocker: true
-      - id: 3
-        what: >-
-          DONE 2026-07-03: arena winners connected to the cold-start trace
-          corpus — coordination/arena/corpus.py emits labeled winner traces
-          (positive_lift_candidate only, scorer-labeled, deterministic) to
-          reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in
-          the report receipt. Labels only; zero training (v1 doctrine).
-        kind: code
-        blocker: false
-
   - id: merge-master-mike-d4-2026-06
     name: Merge Master Mike — D4 persistent always-on merge agent
     status: ACTIVE
@@ -1288,81 +1129,10 @@ active_tracks:
       - Do not touch surfaces owned by sibling tracks except through their own next-items.
 
   # ==========================================================================
-  # ADMITTED 2026-07-07 (ACTIVE_TRACK reconcile) — two tracks whose shipped work
-  # owned no active track. Each is admitted with a VERIFIED-GREEN behavioral gate
-  # (never an existence-only rubber-stamp).
+  # ADMITTED 2026-07-07 (ACTIVE_TRACK reconcile) — safety substrate whose
+  # shipped work owned no active track. It remains admitted with a
+  # VERIFIED-GREEN behavioral gate (never an existence-only rubber-stamp).
   # ==========================================================================
-
-  - id: helm-worldclass-terminal-2026-06
-    name: Helm — world-class operator terminal (Bun+Ink TUI)
-    status: ACTIVE
-    opened_at: "2026-06-15"
-    verified_at: "2026-07-07"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - merge-master-mike-d4-2026-06
-    owned_surfaces:
-      - terminal/**
-    moves_vital_signs:
-      - tool_coverage
-      - context_efficiency
-
-    description: |
-      Stranded-track admission (2026-07-07 reconcile). The operator TUI
-      (terminal/, a Bun+Ink TypeScript project) shipped a real behavioral suite
-      on origin/main but owned no active track; its prior gate on
-      agent/magpie-seed was 7x file_exists (rubber-stamp) and 6 of those 7 files
-      exist ONLY on magpie-seed (a false positive on main). This admits the
-      LANDED core with an honest, re-runnable behavioral gate.
-
-      Claim boundary: the command_passes gate proves the operator TUI's GENERAL
-      shipped behavior (527 green), NOT the golden-frame / compact-viewport /
-      tmux-receipt verification LANE — that lane is genuinely unmerged
-      (branch-only) and remains open work below; it must NOT be gated by
-      file_exists.
-
-    completion_criteria:
-      # REAL behavioral gate (replaces the 7x file_exists rubber-stamp).
-      # Verified GREEN 2026-07-07, bun 1.3.11:
-      #   cd terminal && bun install --frozen-lockfile && bun test
-      #   -> 527 pass / 0 fail across 12 files, exit 0.
-      - id: terminal_tui_test_suite_passes
-        kind: command_passes
-        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test"]
-        timeout_s: 300
-      # Tighter/faster gate on the app render + command-routing surface named by
-      # the old app_test_exists criterion. Verified GREEN: 208 pass / 0 fail, exit 0.
-      - id: terminal_app_test_passes
-        kind: command_passes
-        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test tests/app.test.ts"]
-        timeout_s: 300
-      # Provenance-only evidence (NOT a sole gate): app test file ships on main.
-      - id: app_test_exists
-        kind: file_exists
-        file: terminal/tests/app.test.ts
-      # Rigorous landed anchor (2026-07-07): the commit that introduced the Bun TUI
-      # behavioral suite (terminal/tests/app.test.ts) is an ancestor of origin/main.
-      # Verified: git merge-base --is-ancestor 1d8dae294 origin/main -> true.
-      - id: terminal_behavioral_suite_landed
-        kind: commit_on_main
-        commit: "1d8dae2943f48e5ef343e67ee7c4ed084e065ea0"
-      # NOTE: the 6 golden-frame/compact-viewport/tmux-receipt file_exists criteria
-      # from the prior gate (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt,
-      # compactShell.test.tsx, HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md, HELM_WORLDCLASS_CLOSEOUT.md)
-      # do NOT exist on origin/main -- they live only on agent/magpie-seed. That lane
-      # is genuinely unmerged and stays tracked by next_items; it must NOT be file_exists-gated.
-
-    next_items:
-      - id: 1
-        what: "(blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists."
-        kind: code
-        blocker: true
-
-    non_goals:
-      - Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
-      - Do not touch surfaces owned by sibling tracks except through their own next-items.
 
   - id: sovereign-safety-tcb-2026-07
     name: Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
@@ -1378,6 +1148,7 @@ active_tracks:
       - organism-rewire-2026-07
     owned_surfaces:
       - dharma_swarm/evolution_safety.py
+      - tests/test_effect_authority_invariants.py
       - scripts/governance/check_claim_evidence_binding.py
       - scripts/governance/pramana_probe.py
       - scripts/governance/branch_janitor.py
@@ -1508,6 +1279,18 @@ active_tracks:
       #    already satisfy the grade floor with no existence-only sole gate.
 
     next_items:
+      - id: H2A-EFFECT-AUTHORITY-ACK
+        what: >-
+          ACKNOWLEDGED 2026-08-03: independently verify the Titanium-owned
+          PreparedEffect -> AuthorizedEffect runtime boundary. Safety TCB owns
+          the authority-invariant negative controls only: a stochastic judge,
+          semantic ActionEnvelope, model consensus, or forged AuthorizedEffect
+          can deny/escalate but can never grant missing identity, idempotency,
+          RuntimeWarrant, expiry, scope, destination, rollback, or deterministic
+          verification authority. One Wire, live-trading, merge, deployment,
+          and operator-approval boundaries remain unchanged.
+        kind: governance
+        blocker: false
       - id: 1
         what: "(operator) Ratify this track; then decide the AI-M1 flip: promote docs/governance/hygiene/patterns/AI-M1.yaml stage advisory->enforced via scripts/governance/hygiene/promote.py (turns the graded-binding gate's teeth on with no code change) and/or mark pudgala-rigor a required status check in branch protection."
         kind: governance
@@ -1782,6 +1565,12 @@ active_tracks:
       - dharma_swarm/build_engine.py
       - dharma_swarm/autonomous_agent.py
       - dharma_swarm/diff_applier.py
+      - dharma_swarm/effects/**
+      - dharma_swarm/tool_registry.py
+      - dharma_swarm/mcp_server.py
+      - dharma_swarm/semantic_governance.py
+      - dharma_swarm/runtime_state.py
+      - dharma_swarm/spine/warrant.py
       - dharma_swarm/sandbox.py
       - docs/docops/AUTO_INVENTORY.md
       - api/main.py
@@ -1795,6 +1584,13 @@ active_tracks:
       - tests/test_agent_work_packet.py
       - tests/test_make_onboarding_contract.py
       - tests/test_diff_applier.py
+      - tests/test_effect_dispatcher.py
+      - tests/test_tool_registry.py
+      - tests/test_mcp_server.py
+      - tests/test_semantic_governance.py
+      - tests/test_runtime_warrant.py
+      - tests/test_runtime_state.py
+      - tests/test_effect_bypass_checker.py
       - tests/test_sandbox.py
       - tests/test_nats_verification_split.py
       - tests/test_nats_substrate_contract.py
@@ -1809,6 +1605,9 @@ active_tracks:
       - tests/test_hermetic_supply_chain.py
       - docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md
       - docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md
+      - scripts/governance/check_effect_bypasses.py
+      - scripts/governance/effect_scope_manifest.json
+      - tests/fixtures/effect_bypass/**
       - reports/governance/titanium/**
       - dashboard/src/lib/operatorCoherence.ts
       - dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts
@@ -1883,6 +1682,27 @@ active_tracks:
           - verdict
 
     next_items:
+      - id: WP-EFFECT-BOUNDARY
+        what: >-
+          ADMITTED 2026-08-03 (Humming V2 constitutional kernel): implement
+          immutable PreparedEffect, AuthorizedEffect, DeniedEffect,
+          CommittedEffect, and FailedEffect under dharma_swarm/effects/; bridge
+          rather than duplicate semantic_governance.ActionEnvelope; reuse
+          ExecutionIdentity, RuntimeStateStore runtime_receipts and
+          idempotency_records, RuntimeWarrant, and existing self-mod receipts.
+          Route ToolRegistry, mutating core MCP tools (spawn_agent, create_task,
+          store_memory), and the lowest shared DiffApplier write boundary
+          through one dispatcher with live/record/replay/shadow/deny modes.
+          Unknown or unclassified consequential actions deny, store/audit
+          failure fails closed, PreparedEffect cannot execute, replay never
+          re-executes, partial diff application rolls back, and an advisory
+          AST bypass checker must report zero for the exact admitted scope.
+          No new store, SQLite table, command ledger, receipt substrate, or
+          widening of One Wire/live-trading/merge/deployment/human approval.
+          Sovereign Safety acknowledgement is
+          H2A-EFFECT-AUTHORITY-ACK.
+        kind: code
+        blocker: true
       - id: WP-0F1
         what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
@@ -2018,6 +1838,62 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: orchestration-arena-v1-2026-06
+    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+    status: SHIPPED
+    closure_kind: CLOSED_NOT_PROD
+    opened_at: "2026-06-23"
+    closed_at: "2026-08-03"
+    closed_by: "repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2"
+    serves: substrate-nativeness
+    complements:
+      - provider-routing-consolidation-2026-06
+      - loop-closure-2026-06
+    evidence:
+      - "dharma_swarm/coordination/arena/ — frozen taskpack, deterministic scorer, runner controls, corpus"
+      - "dharma_swarm/coordination/arena/measure.py — opt-in live measurement fails closed on best-single, budget-parity, and seeded-bootstrap significance controls"
+      - "commit a24dbd68b6256e5a0b1bd13388df4c7029d2f2f9 — live parity controls, verified ancestor of the exact closeout base"
+      - "tests/test_arena_v1.py tests/test_arena_truth_report.py tests/test_arena_parity_controls.py — 69 passed on exact base f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd"
+      - "scripts/governance/arena_truth_report.py --check — exact replay OK"
+      - "reports/governance/titanium/CANON_EFFECT_ADMISSION_2026-08-03.md — current-main closure and admission receipt"
+    unresolved_at_closure:
+      - "No production capability, trained-weight, or real-benchmark superiority claim."
+      - "Any future live-lane claim must preserve best-single, budget-parity, and significance controls."
+    notes: |
+      Closed as CLOSED_NOT_PROD rather than VERIFIED_SLICE because the exact
+      base entry retained a blocker history. The bounded claim is that the
+      hermetic control machinery and opt-in controlled live measurement path
+      are landed and replayable; fixture lift remains only an existence proof
+      of controls.
+
+  - id: helm-worldclass-terminal-2026-06
+    name: Helm — world-class operator terminal (Bun+Ink TUI)
+    status: SHIPPED
+    closure_kind: CLOSED_NOT_PROD
+    opened_at: "2026-06-15"
+    closed_at: "2026-08-03"
+    closed_by: "repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2"
+    serves: substrate-nativeness
+    complements:
+      - merge-master-mike-d4-2026-06
+    evidence:
+      - "commit 1d8dae2943f48e5ef343e67ee7c4ed084e065ea0 — behavioral suite anchor, verified ancestor of the exact closeout base"
+      - "commit 8965ffa93 — golden-frame lane, verified ancestor of the exact closeout base"
+      - "commit 88458e06f — terminal integration, verified ancestor of the exact closeout base"
+      - "bun install --frozen-lockfile && bun test — 650 passed, 0 failed on an isolated exact-base archive with DHARMA_PYTHON and PYTHONPATH bound to the exact-base repository bridge"
+      - "bun test tests/app.test.ts tests/compactShell.test.tsx — 222 passed, 0 failed"
+      - "scripts/governance/check_track_status.py — non-Python command criteria no longer inherit the checker interpreter"
+      - "tests/test_track_portfolio.py::test_command_passes_does_not_export_dharma_python_for_non_python — regression guard"
+      - "reports/governance/titanium/CANON_EFFECT_ADMISSION_2026-08-03.md — current-main closure and admission receipt"
+    unresolved_at_closure:
+      - "No production-daemon readiness, external-operator SLO, or live tmux deployment claim."
+      - "The hermetic suite exercised no production daemon, live tmux session, or external operator SLO."
+    notes: |
+      Closed as CLOSED_NOT_PROD because the exact base entry retained an open
+      golden-frame blocker even though its named implementation commits are on
+      main. The bounded claim is the landed TUI, golden corpus, focused
+      behavioral suite, and corrected governance evaluator environment.
+
   - id: company-builder-parity-2026-07
     name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
     status: RETIRED

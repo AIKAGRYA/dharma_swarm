@@ -578,6 +578,31 @@ def _missing_environment_module(output: str) -> str | None:
     return top
 
 
+def _command_should_export_dharma_python(command: list[str]) -> bool:
+    """Pin the checker interpreter only for Python-shaped criteria.
+
+    Some non-Python consumers reuse ``DHARMA_PYTHON`` as the executable for
+    their own bridge process.  Exporting the track checker's interpreter into
+    every command therefore changes the behavior being measured and can turn a
+    hermetic Bun test red only under governance evaluation.
+    """
+    if not command:
+        return False
+    executable = command[0]
+    if executable in {"python", "python3", "pytest"}:
+        return True
+    if executable == sys.executable or executable.endswith(("/python", "/python3")):
+        return True
+    if executable in {"./.venv/bin/python", ".venv/bin/python"}:
+        return True
+    joined = " ".join(command)
+    if "run_python_with_repo_env" in joined:
+        return True
+    if executable in {"bash", "sh", "/bin/bash", "/bin/sh"}:
+        return re.search(r"(^|[\s/])(python3?|pytest)(\s|$)", joined) is not None
+    return False
+
+
 def check_command_passes(
     command: list[str],
     *,
@@ -602,11 +627,15 @@ def check_command_passes(
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     resolved_python = _resolve_python_executable()
-    if "DHARMA_PYTHON" not in os.environ:
+    if (
+        "DHARMA_PYTHON" not in os.environ
+        and _command_should_export_dharma_python(resolved_command)
+    ):
         # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
         # DHARMA_PYTHON; point them at this dependency-complete interpreter so
-        # track truth does not depend on one checkout's `.venv` — the same
-        # portability doctrine as _resolve_command_for_current_runtime.
+        # track truth does not depend on one checkout's `.venv`.  Do not leak
+        # this variable into non-Python commands: terminal/Bun uses it as the
+        # bridge executable and must retain its own hermetic default.
         env = {**os.environ, "DHARMA_PYTHON": resolved_python}
     try:
         result = subprocess.run(
