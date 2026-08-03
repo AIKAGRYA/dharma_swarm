@@ -33,13 +33,13 @@
   ],
   "gates": [
     {
-      "name": "docops-integrity",
-      "command": "python3 scripts/docops/check_docops_integrity.py",
+      "name": "hygiene-integrity",
+      "command": "make hygiene-check",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
-      "name": "no-new-root-files",
+      "name": "docops-contract-tests",
       "command": "python3 -m pytest -q tests/test_docops_integrity.py",
       "expected_exit": 0,
       "timeout_seconds": 300
@@ -98,9 +98,10 @@
       "No move has been executed and none should be until MOVE 0 (lazy runtime/__init__.py) lands and the suite is proven back at baseline.",
       "Phase C (the four a2a scripts) is deferred: its packaging-inversion justification is false because all four bodies import from scripts/ themselves.",
       "This lands on the PR-S6 branch because the session is scoped to a single branch. It is unrelated to the wake lane and would be cleaner as its own PR.",
-      "DocOps count assertions and the AUTO_INVENTORY auto-section go stale when markdown is added; on PRs these are advisory (--counts-advisory) and docops-reconcile-main.yml reconciles them post-merge. Verified: main already carried this drift before this branch."
+      "DocOps count assertions and the AUTO_INVENTORY auto-section go stale when markdown is added; on PRs these are advisory (--counts-advisory) and docops-reconcile-main.yml reconciles them post-merge. Verified: main already carried this drift before this branch.",
+      "The bare `python3 scripts/docops/check_docops_integrity.py` CANNOT be a packet gate and was removed (Devin review on PR #1198, correctly). It exits 1 on this branch because adding markdown drifts the SOVEREIGN_MANIFEST count assertions and staleness the AUTO_INVENTORY auto-section. CI only passes because .github/workflows/docops.yml:51-56 appends --counts-advisory --changed-from, and the packet runner's allowlist admits that script with NO arguments only (_ALLOWED_REPO_SCRIPT_ARGV, scripts/governance/run_agent_work_packet.py:104), so the advisory flags cannot be supplied. `make docops-integrity` fails the same way (exit 2). The gates are now `make hygiene-check` and the docops contract tests, both verified exit 0 on this branch. Count reconciliation is docops-reconcile-main.yml's job post-merge, not this packet's."
     ],
     "rollback": "Revert the three docs and this packet together. Nothing imports them; no code changed.",
-    "packet_digest": "8ccd717e73f82001f25f5316629b48c46b614afe8f28d6714cafb300dcb2dfbb"
+    "packet_digest": "d9365e7e21c01073d29f5243a527687b7062e66da3a85d2886aa2fd9b627cdb2"
   }
 }
