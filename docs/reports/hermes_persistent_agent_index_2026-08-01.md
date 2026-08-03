@@ -18,7 +18,8 @@ partially_fulfils: docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-2
 > |---|---|
 > | §3 Provider Matrix: browser agent "none grounded in repo files" | `dharma_swarm/browser_agent.py` is 719 lines, `class BrowserAgent` at :148 (Playwright, SSRF blocklist at :57). Dormant ≠ absent. |
 > | §4: synthesis agent "none grounded / UNSOURCED" | `dharma_swarm/synthesis_agent.py` (323 lines), imported in **production** by `cron_runner.py` and `kaizen_ops_local.py`. |
-> | §2.12 / §5 Gap 10: "8 workflows carry the kill-switch guard" | Exactly 4: `automerge.yml:91`, `codex-mention-router.yml:49`, `merge-master-mike-backlog.yml:77`, `sarathi-wake-lane.yml:86`. |
+> | §2.12 / §5 Gap 10: "8 workflows carry the kill-switch guard" | **4 workflow files, 5 job-level guards** — `automerge.yml:91`, `codex-mention-router.yml:49`, `loop-watcher.yml:45` and `:131` (two jobs), `merge-master-mike-backlog.yml:77`. Reproduce: `grep -rn "Halt on loop kill-switch" .github/workflows/`. (`walking-brief.yml:12` matches only as a comment stating it does **not** carry the guard.) |
+> | *(this errata's own first revision)*: "Exactly 4: … `sarathi-wake-lane.yml:86`" | Wrong membership. `.github/workflows/sarathi-wake-lane.yml` **does not exist** at HEAD, at `origin/main`, or at this packet's `base_ref` — it existed only on the closed, force-replaced PR-S6 branch (#1188, never merged). `loop-watcher.yml` is the file that was missed. |
 > | §2.9 / §4: "`GET /agents` (api/routers/agents.py:46) serves nothing" | The route is `api/routers/agents.py:303-312`, returns `await swarm.list_agents()`, and never touches the ginko registry. `:46` is a lazy accessor. |
 > | §2.12: "`claude` and `devin` are in `DEFAULT_REQUIRED_REVIEWERS`" | `pr_merge_control.py:71` is `("codex", "claude")`. `devin` appears only in `DEFAULT_A2A_NATS_SUBJECTS`. |
 > | §5 Gap 2 / §7 PR 2: "`qwen_code` declares an empty subject" | The key is **absent**, not empty — PR 2's edit targets a field that does not exist. |
@@ -207,9 +208,25 @@ on the direct path" by the stronger method of grepping the whole tree rather tha
 one script: **no file imports both `telos_gates` and `reversibility_gate`**, and
 **no file imports both `reversibility_gate` and `execution_lease`**.
 
-It **agrees** with §4.6 that `dharma_swarm/holon_system/` is a facade with no
-production consumers, and that top-level `holon_system/` does not exist (only
+It **agrees** with §4.6 that top-level `holon_system/` does not exist (only
 `dharma_swarm/holon_system/`).
+
+It **disagrees** with §4.6's "no production consumers" — that claim is false,
+and this report repeated it in an earlier revision. Two runtime scripts import
+the package directly:
+`scripts/runtime/sarathi_wake_daemon.py:81-86` (`sarathi.plan`, `sarathi.roster`,
+`sarathi.wake`) and `scripts/runtime/sarathi_proof_window.py:43-55`
+(`sarathi.delegate`, `sarathi.plan`, `sarathi.proof`, `sarathi.roster`,
+`sarathi.wake`). Reproduce:
+
+```bash
+grep -rln "from dharma_swarm\.holon_system\|import dharma_swarm\.holon_system" \
+  --include=*.py . | grep -v "^./tests/" | grep -v "^./dharma_swarm/holon_system/"
+```
+
+Both files are the only non-test, non-package importers. Consolidation work
+must therefore treat `holon_system/sarathi/` as load-bearing and check those
+two scripts for compatibility, not as an unused facade.
 
 Three places where **the code has moved since 2026-07-13**:
 
