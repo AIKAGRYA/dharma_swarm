@@ -578,6 +578,36 @@ def _missing_environment_module(output: str) -> str | None:
     return top
 
 
+def _command_should_export_dharma_python(command: list[str]) -> bool:
+    """Only Python/wrapper criteria should inherit the checker's interpreter.
+
+    Terminal (bun) criteria use ``DHARMA_PYTHON`` as the *bridge* executable
+    path (or stub). Unconditionally exporting the checker's interpreter into
+    every ``command_passes`` environment poisons those hermetic suites —
+    system Python 3.9 cannot import the repo (requires-python >=3.11) and flips
+    green bun tests red under the track checker only.
+    """
+    if not command:
+        return False
+    exe = command[0]
+    if exe in {"python", "python3", "pytest"}:
+        return True
+    if exe == sys.executable or exe.endswith(("/python", "/python3")):
+        return True
+    if exe in {"./.venv/bin/python", ".venv/bin/python"}:
+        return True
+    joined = " ".join(command)
+    if "run_python_with_repo_env" in joined:
+        return True
+    # bash -c wrappers that invoke python/pytest still need the pin.
+    if exe in {"bash", "sh", "/bin/bash", "/bin/sh"}:
+        if "run_python_with_repo_env" in joined:
+            return True
+        if re.search(r"(^|[\s/])(python3?|pytest)(\s|$)", joined):
+            return True
+    return False
+
+
 def check_command_passes(
     command: list[str],
     *,
@@ -602,11 +632,13 @@ def check_command_passes(
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     resolved_python = _resolve_python_executable()
-    if "DHARMA_PYTHON" not in os.environ:
-        # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
-        # DHARMA_PYTHON; point them at this dependency-complete interpreter so
-        # track truth does not depend on one checkout's `.venv` — the same
-        # portability doctrine as _resolve_command_for_current_runtime.
+    if "DHARMA_PYTHON" not in os.environ and _command_should_export_dharma_python(
+        resolved_command
+    ):
+        # Wrapper-routed / Python criteria honor DHARMA_PYTHON; point them at
+        # this dependency-complete interpreter so track truth does not depend
+        # on one checkout's `.venv`. Non-Python commands (bun, etc.) must not
+        # inherit this pin — they repurpose DHARMA_PYTHON as the bridge path.
         env = {**os.environ, "DHARMA_PYTHON": resolved_python}
     try:
         result = subprocess.run(

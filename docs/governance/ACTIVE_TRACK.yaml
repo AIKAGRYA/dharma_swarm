@@ -1293,77 +1293,6 @@ active_tracks:
   # (never an existence-only rubber-stamp).
   # ==========================================================================
 
-  - id: helm-worldclass-terminal-2026-06
-    name: Helm — world-class operator terminal (Bun+Ink TUI)
-    status: ACTIVE
-    opened_at: "2026-06-15"
-    verified_at: "2026-07-07"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - merge-master-mike-d4-2026-06
-    owned_surfaces:
-      - terminal/**
-    moves_vital_signs:
-      - tool_coverage
-      - context_efficiency
-
-    description: |
-      Stranded-track admission (2026-07-07 reconcile). The operator TUI
-      (terminal/, a Bun+Ink TypeScript project) shipped a real behavioral suite
-      on origin/main but owned no active track; its prior gate on
-      agent/magpie-seed was 7x file_exists (rubber-stamp) and 6 of those 7 files
-      exist ONLY on magpie-seed (a false positive on main). This admits the
-      LANDED core with an honest, re-runnable behavioral gate.
-
-      Claim boundary: the command_passes gate proves the operator TUI's GENERAL
-      shipped behavior (527 green), NOT the golden-frame / compact-viewport /
-      tmux-receipt verification LANE — that lane is genuinely unmerged
-      (branch-only) and remains open work below; it must NOT be gated by
-      file_exists.
-
-    completion_criteria:
-      # REAL behavioral gate (replaces the 7x file_exists rubber-stamp).
-      # Verified GREEN 2026-07-07, bun 1.3.11:
-      #   cd terminal && bun install --frozen-lockfile && bun test
-      #   -> 527 pass / 0 fail across 12 files, exit 0.
-      - id: terminal_tui_test_suite_passes
-        kind: command_passes
-        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test"]
-        timeout_s: 300
-      # Tighter/faster gate on the app render + command-routing surface named by
-      # the old app_test_exists criterion. Verified GREEN: 208 pass / 0 fail, exit 0.
-      - id: terminal_app_test_passes
-        kind: command_passes
-        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test tests/app.test.ts"]
-        timeout_s: 300
-      # Provenance-only evidence (NOT a sole gate): app test file ships on main.
-      - id: app_test_exists
-        kind: file_exists
-        file: terminal/tests/app.test.ts
-      # Rigorous landed anchor (2026-07-07): the commit that introduced the Bun TUI
-      # behavioral suite (terminal/tests/app.test.ts) is an ancestor of origin/main.
-      # Verified: git merge-base --is-ancestor 1d8dae294 origin/main -> true.
-      - id: terminal_behavioral_suite_landed
-        kind: commit_on_main
-        commit: "1d8dae2943f48e5ef343e67ee7c4ed084e065ea0"
-      # NOTE: the 6 golden-frame/compact-viewport/tmux-receipt file_exists criteria
-      # from the prior gate (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt,
-      # compactShell.test.tsx, HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md, HELM_WORLDCLASS_CLOSEOUT.md)
-      # do NOT exist on origin/main -- they live only on agent/magpie-seed. That lane
-      # is genuinely unmerged and stays tracked by next_items; it must NOT be file_exists-gated.
-
-    next_items:
-      - id: 1
-        what: "(blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists."
-        kind: code
-        blocker: true
-
-    non_goals:
-      - Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
-      - Do not touch surfaces owned by sibling tracks except through their own next-items.
-
   - id: sovereign-safety-tcb-2026-07
     name: Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
     status: ACTIVE
@@ -2018,6 +1947,35 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: helm-worldclass-terminal-2026-06
+    name: Helm — world-class operator terminal (Bun+Ink TUI)
+    status: SHIPPED
+    closure_kind: CLOSED_NOT_PROD
+    opened_at: "2026-06-15"
+    closed_at: "2026-08-03"
+    closed_by: "governance/close-helm-track-v2-20260803"
+    serves: substrate-nativeness
+    complements:
+      - merge-master-mike-d4-2026-06
+    evidence:
+      - "terminal/ — Bun+Ink operator TUI on origin/main with hermetic behavioral suite"
+      - "commit 1d8dae2943f48e5ef343e67ee7c4ed084e065ea0 — behavioral suite anchor (ancestor of origin/main)"
+      - "PR #1073 (8965ffa93) — golden-frame lane closed (golden_capture.sh, ratchet.sh, compactShell, 120x40 corpus)"
+      - "PR #1078 (88458e06f) — live world-class terminal integration on main"
+      - "bun test — 650 pass / 0 fail across 25 files (full suite); app.test.ts 218 pass / 0 fail"
+      - "bun test tests/compactShell.test.tsx — 4 pass / 0 fail"
+      - "scripts/governance/check_track_status.py — stop exporting DHARMA_PYTHON into non-Python command_passes (fixes checker-only red bun gates)"
+      - "tests/test_track_portfolio.py::test_command_passes_does_not_export_dharma_python_for_non_python — pin regression guard"
+      - "reports/governance/helm/HELM_TRACK_CLOSEOUT_2026-07-31.md — closeout receipt"
+    notes: |
+      Closed as CLOSED_NOT_PROD (not VERIFIED_SLICE): the original active entry
+      still carried an open golden-frame blocker on origin/main, so lifecycle
+      forbids reusing the same id for VERIFIED_SLICE. The golden-frame work
+      itself already landed via #1073/#1078; the remaining red was a track-
+      checker environment bug (DHARMA_PYTHON forced onto bun criteria), not
+      missing product code. Claim boundary: hermetic suite + golden corpus
+      on main — not a production daemon or external-operator SLO claim.
+
   - id: company-builder-parity-2026-07
     name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
     status: RETIRED

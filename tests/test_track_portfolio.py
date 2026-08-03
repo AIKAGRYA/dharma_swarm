@@ -317,6 +317,21 @@ def test_command_passes_exports_dharma_python(monkeypatch) -> None:
     assert result.executed
 
 
+def test_command_passes_does_not_export_dharma_python_for_non_python(
+    monkeypatch,
+) -> None:
+    """Bun/terminal criteria treat DHARMA_PYTHON as the bridge binary path.
+    The checker must not force its own interpreter into those environments."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+    # bun-shaped command: no python/pytest token, so no DHARMA_PYTHON pin.
+    result = check_command_passes(
+        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
 def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:
     monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
     probe = (

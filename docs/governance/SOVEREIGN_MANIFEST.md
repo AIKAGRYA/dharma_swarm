@@ -22,7 +22,7 @@
                  tests/test_active_track_governance.py
      newest track verified_at in source: 2026-07-31 -->
 
-**Active portfolio — declared intent only:** 10 co-equal track(s) (WIP warn 8, max 10; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy.
+**Active portfolio — declared intent only:** 9 co-equal track(s) (WIP warn 8, max 10; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy.
 
 **Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
 
@@ -36,8 +36,6 @@
   - owns: tools/world_scout_go/**, tools/world_signal_ingestor_go/**, tools/github_ingestor_go/**, tools/evidence_ingestor_go/**, dharma_swarm/world_radar/**, scripts/runtime/github_ingestor_runner.py, tests/test_github_ingestor_runner.py, tests/test_go_evidence_ingestor_bridge.py, tests/test_go_github_ingestor_bridge.py, tests/test_go_world_signal_bridge.py, tests/test_go_receipt_identity_verify.py, tests/test_go_adapter_contracts.py, tests/test_world_radar_go_bridge.py, dharma_swarm/organism.py, dharma_swarm/strange_loop.py, dharma_swarm/diversity_archive.py, dharma_swarm/archive.py, docker-compose.yml, Dockerfile.swarm
 - **`dharmagraph-engine-2026-07`** — DharmaGraph — sovereign durable graph runtime consolidation (ACTIVE, serves `substrate-nativeness`, verified 2026-07-05, open blocker items: 1)
   - owns: dharma_swarm/graph/**, dharma_swarm/workflow.py, dharma_swarm/topology_genome.py, dharma_swarm/checkpoint.py, dharma_swarm/swarm.py, dharma_swarm/orchestrator.py, pyproject.toml, .github/workflows/langgraph-oracle.yml, tests/test_workflow.py, tests/test_topology_execution.py, tests/test_checkpoint.py, tests/test_graph_checkpoint.py, tests/test_graph_reconciler.py, tests/test_graph_durable_invoker.py, tests/test_langgraph_differential_oracle.py, tests/test_graph_neutral_langgraph_oracle.py, tests/test_graph_pregel_properties.py, docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md, scripts/governance/dharmagraph_parity_gauntlet.py, tests/oracle_support/dharmagraph_gauntlet.py, tests/test_dharmagraph_parity_gauntlet.py, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json, docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json, docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json, reports/governance/dharmagraph_parity/**, docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md, docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md, docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md, docs/governance/CAMPAIGN_KERNEL.md, tests/oracle_support/scenarios.py, tests/oracle_support/outcomes.py
-- **`helm-worldclass-terminal-2026-06`** — Helm — world-class operator terminal (Bun+Ink TUI) (ACTIVE, serves `substrate-nativeness`, verified 2026-07-07, open blocker items: 1)
-  - owns: terminal/**
 - **`sovereign-safety-tcb-2026-07`** — Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio (ACTIVE, serves `substrate-nativeness`, verified 2026-07-07, open blocker items: 1)
   - owns: dharma_swarm/evolution_safety.py, scripts/governance/check_claim_evidence_binding.py, scripts/governance/pramana_probe.py, scripts/governance/branch_janitor.py, scripts/governance/verify_corral_findings.py, scripts/governance/hygiene/**, docs/governance/hygiene/patterns/AI-M1.yaml, packages/telos-kernel/**, packages/titanium-verify/**, .github/workflows/pudgala-rigor.yml, .github/workflows/pramana-probe.yml, .github/workflows/kernel-titanium-verify.yml, .github/workflows/kernel-tests.yml, .github/workflows/branch-janitor.yml, tests/test_evolution_safety.py, tests/test_claim_evidence_binding.py, tests/test_pramana_probe.py, tests/test_pramana.py, tests/test_branch_janitor.py, tests/test_verify_corral_findings.py
 - **`hyperbolic-time-chamber-2026-07`** — Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger (ACTIVE, serves `research-depth`, verified 2026-07-07, open blocker items: 1)
@@ -49,7 +47,7 @@
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
-**Recently closed tracks:** `company-builder-parity-2026-07` (RETIRED, closed 2026-07-17) · `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17) · `onboard-session-status-2026-07` (SHIPPED, closed 2026-07-17)
+**Recently closed tracks:** `helm-worldclass-terminal-2026-06` (SHIPPED, closed 2026-08-03) · `company-builder-parity-2026-07` (RETIRED, closed 2026-07-17) · `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17)
 
 For machine-readable status, run `python3 scripts/governance/check_track_status.py` — it writes `reports/governance/active_track_evidence.md` (untracked; derived status is not committed). CI publishes the latest copy on the `generated/status` branch: `git show origin/generated/status:reports/governance/active_track_evidence.md`.
 
@@ -168,13 +166,13 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 |--------|-------|-------------|
 | Total Python modules | **1,046** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **455 (43.5%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **374,661** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **374,694** | wc -l across dharma_swarm Python modules |
 | Test files | **952** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **14,426 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **14,436 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,465** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **308,134** | wc -l across all tracked .md |
+| Markdown files | **1,469** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **309,612** | wc -l across all tracked .md |
 | Bridge files | **32** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **29** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |
