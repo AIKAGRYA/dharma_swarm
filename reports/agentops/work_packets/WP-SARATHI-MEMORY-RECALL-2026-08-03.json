@@ -1,0 +1,100 @@
+{
+  "id": "WP-SARATHI-MEMORY-RECALL-2026-08-03",
+  "intent": "Give the Sarathi apex seat governed memory recall. Before this change `grep -c memory_kernel` over dharma_swarm/holon_system/sarathi/*.py returned 0 on every file, while CLAUDE.md names MemoryKernel the canonical front door for agent memory: she planned every wake cycle from the backlog alone, with no recall. New organ sarathi/memory.py reads through MemoryKernel.preview_memory_pack and only that front door, under a tight apex budget (no projections, no high canon/PII risk, references not payloads, reject_stale). Wired end to end -- daemon -> BootPack.memory_excerpt -> wake -> operator brief -- because a declared but unpopulated field is decoration: BootPack.lodestone_excerpt was declared and then appeared exactly once in the whole repo, its own declaration. Two negative controls in tests/test_sarathi_memory.py guard the producer and the consumer, both verified to FAIL when the wiring is removed.",
+  "branch": "claude/sarathi-autonomy-build-vyr998",
+  "base_ref": "b65030b7d31a3c84b052e57a29873e42aa114d8f",
+  "worktree": ".",
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "commit": {
+    "allowed": false,
+    "message": "feat(sarathi): give the apex seat governed memory recall"
+  },
+  "allowed_files": [
+    "dharma_swarm/holon_system/sarathi/brief.py",
+    "dharma_swarm/holon_system/sarathi/memory.py",
+    "dharma_swarm/holon_system/sarathi/plan.py",
+    "dharma_swarm/holon_system/sarathi/wake.py",
+    "reports/agentops/work_packets/WP-SARATHI-MEMORY-RECALL-2026-08-03.json",
+    "scripts/runtime/sarathi_wake_daemon.py",
+    "tests/test_sarathi_memory.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/ci-parity.yml",
+    ".github/workflows/docops.yml",
+    ".github/workflows/hermetic.yml",
+    ".github/workflows/tests.yml",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/telos_gates.py",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "sarathi-memory-organ",
+      "command": "python3 -m pytest tests/test_sarathi_memory.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "sarathi-organs-regression",
+      "command": "python3 -m pytest tests/test_sarathi_plan.py tests/test_sarathi_wake.py tests/test_sarathi_delegate.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "hygiene-check",
+      "command": "make hygiene-check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "no-tests-matching-nothing",
+      "command": "python3 -m pytest tests/test_sarathi_memory.py -q -k nonexistent_test_ever",
+      "expected_exit": 5,
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "work_packet": "WP-SARATHI-MEMORY-RECALL",
+    "owner": "@AmitabhainArunachala",
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/memory_kernel/__init__.py",
+      "dharma_swarm/holon_system/sarathi/plan.py",
+      "dharma_swarm/holon_system/sarathi/brief.py"
+    ],
+    "collision": {
+      "checked_at_sha": "b65030b7d31a3c84b052e57a29873e42aa114d8f",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "active_track is a SERVING claim, not an ownership claim. No declared track owns any path this packet touches -- all seven were checked against every owns: glob in docs/governance/ACTIVE_TRACK.yaml and came back unowned. organism-rewire-2026-07 is named because its charter is 'dormant organs to production' and giving the apex seat memory is exactly that; it serves substrate-nativeness. This packet claims NONE of that track's owned surfaces -- notably not docker-compose.yml or Dockerfile.swarm, which remain its property and are untouched here.",
+      "build_plan does NOT condition on memory. Recall reaches the plan input and the operator brief; the planner stays the pure deterministic function its docstring documents. Planning FROM recall has its own gate implications and is deliberately not in this packet.",
+      "No container. docker-compose.yml still has no sarathi service, and that file is owned by organism-rewire-2026-07, so it needs that track or a host defined outside it. Not attempted here.",
+      "tests/test_holon_system_imports.py fails in the authoring container only: textual>=0.40 is a CORE dependency (pyproject.toml:23) that CI installs via '.[dev]' and the container lacks. Verified to fail identically on clean main with this branch stashed. Unrelated to this change; no repair attempted."
+    ],
+    "interface_mismatches": [],
+    "rollback": "git revert the commit on branch claude/sarathi-autonomy-build-vyr998",
+    "tool_versions": {
+      "git": "2.43.0",
+      "python": "3.11.15"
+    },
+    "packet_digest": "f260710b6b78468e95ddb42bc4e7ca889019ee0889c88b5df6dba453e8c18370"
+  }
+}
