@@ -18,10 +18,12 @@ Spec: docs/prompts/DHARMAGRAPH_ANTITHESIS_V0_GOAL_2026-07-18.md §Phase A.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from tests.antithesis_support.seam_ledger import (
     LEDGER_PATH,
     REPO_ROOT,
+    _module_to_path,
     build_ledger,
     render_ledger,
 )
@@ -126,6 +128,27 @@ def test_bypass_count_ratchets_down_only():
 
 
 # --- Codex review round (2026-07-18) — one regression test per finding ---
+
+
+def test_module_resolution_is_case_exact(monkeypatch):
+    """Imported symbols must not become modules on case-insensitive hosts."""
+    expected = (
+        REPO_ROOT / "packages" / "telos-kernel" / "telos_kernel" / "manifest.py"
+    )
+    assert _module_to_path("telos_kernel.manifest") == expected
+
+    # Make the old ``Path.is_file`` implementation behave as it does on a
+    # case-insensitive filesystem even when this test runs on Linux.  The
+    # resolver must use exact directory-entry names instead of trusting that
+    # aliased lookup.
+    aliased = expected.with_name("Manifest.py")
+    real_is_file = Path.is_file
+
+    def case_insensitive_is_file(path):
+        return path == aliased or real_is_file(path)
+
+    monkeypatch.setattr(Path, "is_file", case_insensitive_is_file)
+    assert _module_to_path("telos_kernel.Manifest") is None
 
 
 def test_package_init_relative_imports_resolve_to_package():
