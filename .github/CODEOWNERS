@@ -35,64 +35,99 @@
 # to it can affect that many other modules. Regenerate this block with
 #   python3 scripts/governance/codeowners_blast_radius.py --emit
 # and verify coverage with --check (wired in .github/workflows/hermetic.yml).
-/dharma_swarm/models.py                 @AmitabhainArunachala
-/dharma_swarm/stigmergy.py              @AmitabhainArunachala
-/dharma_swarm/_stigmergy_lock.py        @AmitabhainArunachala
-/dharma_swarm/traces.py                 @AmitabhainArunachala
-/dharma_swarm/correlation_context.py    @AmitabhainArunachala
-/dharma_swarm/daemon_config.py          @AmitabhainArunachala
-/dharma_swarm/runtime_contract.py       @AmitabhainArunachala
-/dharma_swarm/engine/knowledge_store.py @AmitabhainArunachala
-/dharma_swarm/engine/event_memory.py    @AmitabhainArunachala
-/dharma_swarm/spine/identity.py         @AmitabhainArunachala
-/dharma_swarm/runtime_state.py          @AmitabhainArunachala
-/dharma_swarm/execution_profile.py      @AmitabhainArunachala
-/dharma_swarm/merkle_log.py             @AmitabhainArunachala
-/dharma_swarm/archive.py                @AmitabhainArunachala
-/dharma_swarm/api_keys.py               @AmitabhainArunachala
-/dharma_swarm/runtime_env_loader.py     @AmitabhainArunachala
-/dharma_swarm/tiny_router_shadow.py     @AmitabhainArunachala
-/dharma_swarm/model_defaults.py         @AmitabhainArunachala
-/dharma_swarm/model_hierarchy.py       @AmitabhainArunachala
-/dharma_swarm/resilience.py             @AmitabhainArunachala
-/dharma_swarm/routing_memory.py         @AmitabhainArunachala
-/dharma_swarm/evolution_roster.py       @AmitabhainArunachala
-/dharma_swarm/model_pool.py             @AmitabhainArunachala
-/dharma_swarm/ollama_config.py          @AmitabhainArunachala
-/dharma_swarm/telemetry_plane.py        @AmitabhainArunachala
-/dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala
-/dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala
-/dharma_swarm/router_retrospective.py   @AmitabhainArunachala
-/dharma_swarm/codex_cli.py              @AmitabhainArunachala
-/dharma_swarm/cost_tracker.py           @AmitabhainArunachala
-/dharma_swarm/decision_router.py        @AmitabhainArunachala
-/dharma_swarm/key_oracle.py             @AmitabhainArunachala
-/dharma_swarm/spine/tollbooth.py        @AmitabhainArunachala
-/dharma_swarm/__init__.py               @AmitabhainArunachala
-/dharma_swarm/base_provider.py          @AmitabhainArunachala
-/dharma_swarm/metrics.py                @AmitabhainArunachala
-/dharma_swarm/moonshot_provider.py      @AmitabhainArunachala
-/dharma_swarm/provider_policy.py        @AmitabhainArunachala
-/dharma_swarm/provider_transport.py     @AmitabhainArunachala
-/dharma_swarm/router_v1.py              @AmitabhainArunachala
-/dharma_swarm/runtime_provider.py       @AmitabhainArunachala
-/dharma_swarm/semantic_gravity.py       @AmitabhainArunachala
-/dharma_swarm/signal_bus.py             @AmitabhainArunachala
-/dharma_swarm/smart_router.py           @AmitabhainArunachala
-/dharma_swarm/swarm_router.py           @AmitabhainArunachala
-/dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala
-/dharma_swarm/embedders.py              @AmitabhainArunachala
-/dharma_swarm/vector_fallback_guard.py  @AmitabhainArunachala
-/dharma_swarm/vector_store.py           @AmitabhainArunachala
-
-# Governance config — touch carefully
-/.github/                               @AmitabhainArunachala
-/.semgrep/                              @AmitabhainArunachala
-/.gitleaks.toml                         @AmitabhainArunachala
-/.pre-commit-config.yaml                @AmitabhainArunachala
-/scripts/uplift_guards/                 @AmitabhainArunachala
-/scripts/governance/                    @AmitabhainArunachala
-/scripts/docops/                        @AmitabhainArunachala
-/docs/docops/                           @AmitabhainArunachala
-/INTERFACE_MISMATCH_MAP.md              @AmitabhainArunachala
-/SWARM_HOT_ITEMS.md                     @AmitabhainArunachala
+/dharma_swarm/models.py                 @AmitabhainArunachala  # blast=436
+/dharma_swarm/daemon_config.py          @AmitabhainArunachala  # blast=411
+/dharma_swarm/correlation_context.py    @AmitabhainArunachala  # blast=386
+/dharma_swarm/merkle_log.py             @AmitabhainArunachala  # blast=299
+/dharma_swarm/execution_profile.py      @AmitabhainArunachala  # blast=298
+/dharma_swarm/archive.py                @AmitabhainArunachala  # blast=296
+/dharma_swarm/runtime_contract.py       @AmitabhainArunachala  # blast=281
+/dharma_swarm/engine/knowledge_store.py @AmitabhainArunachala  # blast=267
+/dharma_swarm/engine/event_memory.py    @AmitabhainArunachala  # blast=266
+/dharma_swarm/spine/identity.py         @AmitabhainArunachala  # blast=263
+/dharma_swarm/runtime_state.py          @AmitabhainArunachala  # blast=258
+/dharma_swarm/_stigmergy_lock.py        @AmitabhainArunachala  # blast=201
+/dharma_swarm/stigmergy.py              @AmitabhainArunachala  # blast=200
+/dharma_swarm/spine/tollbooth.py        @AmitabhainArunachala  # blast=198
+/dharma_swarm/metrics.py                @AmitabhainArunachala  # blast=197
+/dharma_swarm/semantic_gravity.py       @AmitabhainArunachala  # blast=197
+/dharma_swarm/signal_bus.py             @AmitabhainArunachala  # blast=196
+/dharma_swarm/traces.py                 @AmitabhainArunachala  # blast=195
+/dharma_swarm/api_keys.py               @AmitabhainArunachala  # blast=192
+/dharma_swarm/runtime_env_loader.py     @AmitabhainArunachala  # blast=192
+/dharma_swarm/tiny_router_shadow.py     @AmitabhainArunachala  # blast=191
+/dharma_swarm/economic_engine.py        @AmitabhainArunachala  # blast=189
+/dharma_swarm/embedders.py              @AmitabhainArunachala  # blast=189
+/dharma_swarm/vector_fallback_guard.py  @AmitabhainArunachala  # blast=189
+/dharma_swarm/vector_store.py           @AmitabhainArunachala  # blast=188
+/dharma_swarm/knowledge_units.py        @AmitabhainArunachala  # blast=187
+/dharma_swarm/revenue/spine_models.py   @AmitabhainArunachala  # blast=187
+/dharma_swarm/bridge_registry.py        @AmitabhainArunachala  # blast=186
+/dharma_swarm/anekanta_gate.py          @AmitabhainArunachala  # blast=185
+/dharma_swarm/revenue/spine.py          @AmitabhainArunachala  # blast=185
+/dharma_swarm/runtime_artifacts.py      @AmitabhainArunachala  # blast=185
+/dharma_swarm/temporal_graph.py         @AmitabhainArunachala  # blast=185
+/dharma_swarm/telos_formal_math.py      @AmitabhainArunachala  # blast=184
+/dharma_swarm/zeitgeist.py              @AmitabhainArunachala  # blast=184
+/dharma_swarm/knowledge_extractor.py    @AmitabhainArunachala  # blast=183
+/dharma_swarm/memory_palace.py          @AmitabhainArunachala  # blast=183
+/dharma_swarm/revenue/telic_bridge.py   @AmitabhainArunachala  # blast=183
+/dharma_swarm/steelman_gate.py          @AmitabhainArunachala  # blast=183
+/dharma_swarm/telos_formal_models.py    @AmitabhainArunachala  # blast=183
+/dharma_swarm/algedonic_activation.py   @AmitabhainArunachala  # blast=182
+/dharma_swarm/amiros.py                 @AmitabhainArunachala  # blast=182
+/dharma_swarm/concept_blast_radius.py   @AmitabhainArunachala  # blast=182
+/dharma_swarm/concept_parser.py         @AmitabhainArunachala  # blast=182
+/dharma_swarm/dharma_attractor.py       @AmitabhainArunachala  # blast=182
+/dharma_swarm/dogma_gate.py             @AmitabhainArunachala  # blast=182
+/dharma_swarm/dynamic_correction.py     @AmitabhainArunachala  # blast=182
+/dharma_swarm/economic_spine.py         @AmitabhainArunachala  # blast=182
+/dharma_swarm/graph_store.py            @AmitabhainArunachala  # blast=182
+/dharma_swarm/identity.py               @AmitabhainArunachala  # blast=182
+/dharma_swarm/lineage.py                @AmitabhainArunachala  # blast=182
+/dharma_swarm/model_routing.py          @AmitabhainArunachala  # blast=182
+/dharma_swarm/ontology.py               @AmitabhainArunachala  # blast=182
+/dharma_swarm/ontology_hub.py           @AmitabhainArunachala  # blast=182
+/dharma_swarm/ontology_runtime.py       @AmitabhainArunachala  # blast=182
+/dharma_swarm/organism.py               @AmitabhainArunachala  # blast=182
+/dharma_swarm/organism_memory.py        @AmitabhainArunachala  # blast=182
+/dharma_swarm/samvara.py                @AmitabhainArunachala  # blast=182
+/dharma_swarm/shakti_executive/feedback_writer.py @AmitabhainArunachala  # blast=182
+/dharma_swarm/sleep_time_agent.py       @AmitabhainArunachala  # blast=182
+/dharma_swarm/strange_loop.py           @AmitabhainArunachala  # blast=182
+/dharma_swarm/telic_seam.py             @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_formal.py           @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_formal_graph.py     @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_gates.py            @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_gates_witness_enhancement.py @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_payload_classifier.py @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_receipts.py         @AmitabhainArunachala  # blast=182
+/dharma_swarm/telos_reroute.py          @AmitabhainArunachala  # blast=182
+/dharma_swarm/vsm_channels.py           @AmitabhainArunachala  # blast=182
+/dharma_swarm/model_defaults.py         @AmitabhainArunachala  # blast=181
+/dharma_swarm/resilience.py             @AmitabhainArunachala  # blast=175
+/dharma_swarm/routing_memory.py         @AmitabhainArunachala  # blast=175
+/dharma_swarm/evolution_roster.py       @AmitabhainArunachala  # blast=174
+/dharma_swarm/model_hierarchy.py        @AmitabhainArunachala  # blast=174
+/dharma_swarm/model_pool.py             @AmitabhainArunachala  # blast=174
+/dharma_swarm/ollama_config.py          @AmitabhainArunachala  # blast=174
+/dharma_swarm/telemetry_plane.py        @AmitabhainArunachala  # blast=170
+/dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala  # blast=168
+/dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala  # blast=167
+/dharma_swarm/router_retrospective.py   @AmitabhainArunachala  # blast=167
+/dharma_swarm/cost_tracker.py           @AmitabhainArunachala  # blast=160
+/dharma_swarm/codex_cli.py              @AmitabhainArunachala  # blast=159
+/dharma_swarm/decision_router.py        @AmitabhainArunachala  # blast=157
+/dharma_swarm/key_oracle.py             @AmitabhainArunachala  # blast=157
+/dharma_swarm/__init__.py               @AmitabhainArunachala  # blast=156
+/dharma_swarm/base_provider.py          @AmitabhainArunachala  # blast=156
+/dharma_swarm/moonshot_provider.py      @AmitabhainArunachala  # blast=156
+/dharma_swarm/provider_policy.py        @AmitabhainArunachala  # blast=156
+/dharma_swarm/provider_transport.py     @AmitabhainArunachala  # blast=156
+/dharma_swarm/providers.py              @AmitabhainArunachala  # blast=156
+/dharma_swarm/router_v1.py              @AmitabhainArunachala  # blast=156
+/dharma_swarm/runtime_provider.py       @AmitabhainArunachala  # blast=156
+/dharma_swarm/smart_router.py           @AmitabhainArunachala  # blast=156
+/dharma_swarm/swarm_router.py           @AmitabhainArunachala  # blast=156
+/dharma_swarm/receipt_consumption.py     @AmitabhainArunachala  # blast=156
+/dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala  # blast=156

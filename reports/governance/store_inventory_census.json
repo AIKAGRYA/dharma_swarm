@@ -44,6 +44,7 @@
   "jsonl_targets": [
     "JIKOKU_LOG.20260322_pre_rotation.jsonl",
     "JIKOKU_LOG.jsonl",
+    "MANIFEST.jsonl",
     "THINKODYNAMIC_DIRECTOR_LOG.jsonl",
     "action_log.jsonl",
     "actions.jsonl",
@@ -297,7 +298,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 217,
+    "distinct_jsonl_names": 218,
     "ledger_classes": 11,
     "ledger_modules": 12
   }

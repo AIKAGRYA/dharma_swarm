@@ -393,6 +393,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('dharma_swarm/guardian_crew.py', '_create_issue_if_needed', 'path_write', 'e08815565330', 'operational_state', occurrences=3),
         ReviewedWriteBaselineEntry('dharma_swarm/identity.py', 'IdentityMonitor._issue_correction', 'path_write', '53e7798f503c', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/loop_supervisor.py', 'LoopSupervisor.save_state', 'path_write', 'c006db8e7f1d', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/memory_common.py', 'run_memory_metabolism', 'path_write', '65b2a23ed30c', 'generated_artifact', occurrences=1, review_note='Metabolism receipt JSON under the state-dir report sink (~/.dharma/reports/memory_kernel), never canonical memory rows (PR #1132).'),
         ReviewedWriteBaselineEntry('dharma_swarm/ontology.py', 'OntologyRegistry.save', 'path_write', 'bab070f87b44', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/orchestrate.py', 'save_state', 'path_write', 'c6056417f922', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/orchestrate_live.py', 'orchestrate', 'path_write', '03f223acc3e6', 'operational_state', occurrences=1),

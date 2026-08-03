@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.util
 import json
 import os
 import re
@@ -26,7 +27,9 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 try:
-    from scripts.runtime.ci_truth import DEFAULT_CONTRACT_PATH as DEFAULT_CI_TRUTH_CONTRACT
+    from scripts.runtime.ci_truth import (
+        DEFAULT_CONTRACT_PATH as DEFAULT_CI_TRUTH_CONTRACT,
+    )
     from scripts.runtime.ci_truth import evaluate_rollup as evaluate_ci_rollup
     from scripts.runtime.ci_truth import load_contract as load_ci_truth_contract
 except ModuleNotFoundError:
@@ -36,7 +39,9 @@ except ModuleNotFoundError:
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_NATS_CA_PEM_PATH = REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
+DEFAULT_NATS_CA_PEM_PATH = (
+    REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
+)
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
 REQUIRED_COHERENCE_FIELDS = (
     "Organ touched",
@@ -47,7 +52,9 @@ REQUIRED_COHERENCE_FIELDS = (
 BAD_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}
 PASS_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 REVIEW_VERDICTS = ("APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN")
-REVIEW_VERDICT_RE = re.compile(r"\b(APPROVE|REQUEST_CHANGES|BLOCKED|NEEDS_HUMAN)\b", re.IGNORECASE)
+REVIEW_VERDICT_RE = re.compile(
+    r"\b(APPROVE|REQUEST_CHANGES|BLOCKED|NEEDS_HUMAN)\b", re.IGNORECASE
+)
 DEFAULT_AGENT_TIMEOUT_S = 600.0
 DEFAULT_AGENT_KILL_GRACE_S = 5.0
 DEFAULT_FANOUT_STATUSES = ("GITHUB_GREEN_NEEDS_PACKET", "NEEDS_AGENT_REVIEW")
@@ -127,7 +134,12 @@ class NATSConfig:
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def stamp() -> str:
@@ -138,7 +150,9 @@ def expand(path: str | Path) -> Path:
     return Path(os.path.expanduser(str(path))).resolve()
 
 
-def run(cmd: list[str], *, cwd: Path = REPO_ROOT, timeout: int = 120, check: bool = True) -> CommandResult:
+def run(
+    cmd: list[str], *, cwd: Path = REPO_ROOT, timeout: int = 120, check: bool = True
+) -> CommandResult:
     proc = subprocess.run(
         cmd,
         cwd=str(cwd),
@@ -159,11 +173,16 @@ def gh_json(args: list[str], *, timeout: int = 120) -> Any:
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise PRControlError(f"gh returned non-JSON output for {' '.join(args)}") from exc
+        raise PRControlError(
+            f"gh returned non-JSON output for {' '.join(args)}"
+        ) from exc
 
 
 def repo_name() -> str:
-    result = run(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], timeout=30)
+    result = run(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+        timeout=30,
+    )
     name = result.stdout.strip()
     if not name or "/" not in name:
         raise PRControlError("could not determine GitHub repository name")
@@ -172,7 +191,9 @@ def repo_name() -> str:
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def write_text(path: Path, text: str) -> None:
@@ -192,7 +213,9 @@ def ci_truth_contract_path(args: argparse.Namespace | None = None) -> Path:
     return expand(configured) if configured else DEFAULT_CI_TRUTH_CONTRACT
 
 
-def ci_truth_for_pr(pr: dict[str, Any], args: argparse.Namespace | None = None) -> dict[str, Any]:
+def ci_truth_for_pr(
+    pr: dict[str, Any], args: argparse.Namespace | None = None
+) -> dict[str, Any]:
     contract = load_ci_truth_contract(ci_truth_contract_path(args))
     return evaluate_ci_rollup(pr.get("statusCheckRollup") or [], contract)
 
@@ -242,14 +265,22 @@ def backup_reviewer_agents(args: argparse.Namespace) -> list[str]:
         "DHARMA_PR_BACKUP_REVIEWERS",
         "backup_opus,backup_gemini,backup_hermes,backup_perplexity",
     )
-    return parse_csv_tokens(raw, default=("backup_opus", "backup_gemini", "backup_hermes", "backup_perplexity"))
+    return parse_csv_tokens(
+        raw,
+        default=("backup_opus", "backup_gemini", "backup_hermes", "backup_perplexity"),
+    )
 
 
 def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     rollup = pr.get("statusCheckRollup") or []
     latest_by_name: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
     for index, item in enumerate(rollup):
-        name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+        name = str(
+            item.get("name")
+            or item.get("context")
+            or item.get("workflowName")
+            or "unnamed"
+        )
         # startedAt identifies the newest run; an older run that finishes
         # after a newer failing run must not win on completion time.
         timestamp = str(item.get("startedAt") or item.get("completedAt") or "")
@@ -264,7 +295,12 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     unknown: list[str] = []
 
     for name, (_, item) in latest_by_name.items():
-        name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+        name = str(
+            item.get("name")
+            or item.get("context")
+            or item.get("workflowName")
+            or "unnamed"
+        )
         conclusion = str(item.get("conclusion") or "").upper()
         status = str(item.get("status") or "").upper()
         if conclusion in BAD_CONCLUSIONS:
@@ -316,7 +352,9 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
         reasons.append(f"reviewDecision={review_decision}")
         status = "NEEDS_AGENT_REVIEW"
     else:
-        reasons.append("GitHub green; packet, dual review, and merge gate still required")
+        reasons.append(
+            "GitHub green; packet, dual review, and merge gate still required"
+        )
         status = "GITHUB_GREEN_NEEDS_PACKET"
 
     if checks["unknown"]:
@@ -326,7 +364,9 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
         "number": pr.get("number"),
         "title": pr.get("title"),
         "url": pr.get("url"),
-        "author": (pr.get("author") or {}).get("login") if isinstance(pr.get("author"), dict) else pr.get("author"),
+        "author": (pr.get("author") or {}).get("login")
+        if isinstance(pr.get("author"), dict)
+        else pr.get("author"),
         "headRefName": pr.get("headRefName"),
         "head_sha": pr.get("headRefOid") or "",
         "baseRefName": pr.get("baseRefName"),
@@ -341,16 +381,18 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
 
 
 def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
-    return gh_json([
-        "pr",
-        "list",
-        "--state",
-        "open",
-        "--limit",
-        str(limit),
-        "--json",
-        "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
-    ])
+    return gh_json(
+        [
+            "pr",
+            "list",
+            "--state",
+            "open",
+            "--limit",
+            str(limit),
+            "--json",
+            "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
+        ]
+    )
 
 
 def render_queue_markdown(summary: dict[str, Any]) -> str:
@@ -368,7 +410,9 @@ def render_queue_markdown(summary: dict[str, Any]) -> str:
         lines.append(f"- `{status}`: {count}")
     lines.extend(["", "## Queue", ""])
     for item in summary["items"]:
-        reason = "; ".join(item["reasons"]) if item["reasons"] else "no blocker detected"
+        reason = (
+            "; ".join(item["reasons"]) if item["reasons"] else "no blocker detected"
+        )
         lines.append(
             f"- **#{item['number']}** `{item['status']}` "
             f"{item['title']} — {reason} ({item['url']})"
@@ -405,17 +449,21 @@ def build_queue_summary(prs: list[dict[str, Any]], repo: str) -> dict[str, Any]:
 
 
 def fetch_pr_view(pr_number: int) -> dict[str, Any]:
-    return gh_json([
-        "pr",
-        "view",
-        str(pr_number),
-        "--json",
-        "number,title,body,author,baseRefName,baseRefOid,headRefName,headRefOid,isDraft,labels,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
-    ])
+    return gh_json(
+        [
+            "pr",
+            "view",
+            str(pr_number),
+            "--json",
+            "number,title,body,author,baseRefName,baseRefOid,headRefName,headRefOid,isDraft,labels,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+        ]
+    )
 
 
 def fetch_pr_files(pr_number: int, repo: str) -> list[dict[str, Any]]:
-    return gh_json(["api", f"repos/{repo}/pulls/{pr_number}/files", "--paginate"], timeout=180)
+    return gh_json(
+        ["api", f"repos/{repo}/pulls/{pr_number}/files", "--paginate"], timeout=180
+    )
 
 
 def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
@@ -461,7 +509,11 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
         check=False,
     )
     if result.code != 0:
-        return {"ok": False, "error": (result.stderr or result.stdout).strip(), "unresolved": None}
+        return {
+            "ok": False,
+            "error": (result.stderr or result.stdout).strip(),
+            "unresolved": None,
+        }
     payload = json.loads(result.stdout)
     nodes = (
         payload.get("data", {})
@@ -471,10 +523,16 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
         .get("nodes", [])
     )
     unresolved = [
-        node for node in nodes
+        node
+        for node in nodes
         if not node.get("isResolved") and not node.get("isOutdated")
     ]
-    return {"ok": True, "threads": nodes, "unresolved": unresolved, "unresolved_count": len(unresolved)}
+    return {
+        "ok": True,
+        "threads": nodes,
+        "unresolved": unresolved,
+        "unresolved_count": len(unresolved),
+    }
 
 
 def thread_is_advisory_only(thread: dict[str, Any]) -> bool:
@@ -498,61 +556,99 @@ def thread_is_advisory_only(thread: dict[str, Any]) -> bool:
 
 
 def fetch_pr_diff(pr_number: int) -> str:
-    result = run(["gh", "pr", "diff", str(pr_number), "--patch"], timeout=180, check=False)
+    result = run(
+        ["gh", "pr", "diff", str(pr_number), "--patch"], timeout=180, check=False
+    )
     if result.code != 0:
         detail = (result.stderr or result.stdout).strip()
         return f"# Diff unavailable\n\n`gh pr diff {pr_number} --patch` failed:\n\n```text\n{detail}\n```\n"
     return result.stdout
 
 
-def coherence_results(body: str) -> dict[str, Any]:
-    lines = body.splitlines()
-    results: dict[str, dict[str, Any]] = {}
-    for field in REQUIRED_COHERENCE_FIELDS:
-        prefix_variants = (
-            f"- {field}:",
-            f"* {field}:",
-            f"{field}:",
-            f"- **{field}**:",
-            f"* **{field}**:",
-            f"**{field}**:",
+_COHERENCE_CHECKER_PATH = (
+    REPO_ROOT / "scripts" / "governance" / "check_pr_coherence_delta.py"
+)
+_coherence_checker_module: Any = None
+
+
+def _coherence_checker() -> Any:
+    """The CI Coherence Delta checker, loaded as the gate's parser.
+
+    scripts/governance/check_pr_coherence_delta.py is the single source of
+    truth for Coherence Delta parsing (operator-ratified 2026-07-31): the gate
+    accepts exactly what CI accepts. Fail closed — a missing or broken checker
+    is a repo integrity error, never a silent fallback to a divergent parser.
+    """
+    global _coherence_checker_module
+    if _coherence_checker_module is not None:
+        return _coherence_checker_module
+    module_name = "_dharma_check_pr_coherence_delta"
+    spec = importlib.util.spec_from_file_location(
+        module_name, _COHERENCE_CHECKER_PATH
+    )
+    if spec is None or spec.loader is None:
+        raise PRControlError(
+            f"cannot load Coherence Delta checker at {_COHERENCE_CHECKER_PATH}"
         )
-        value = None
-        for index, line in enumerate(lines):
-            stripped = line.strip()
-            match = next((prefix for prefix in prefix_variants if stripped.startswith(prefix)), None)
-            if not match:
-                continue
-            first = stripped[len(match):].strip()
-            tail: list[str] = []
-            for next_line in lines[index + 1:]:
-                next_stripped = next_line.strip()
-                if not next_stripped:
-                    continue
-                if any(next_stripped.startswith(prefix) for prefix in prefix_variants):
-                    break
-                if any(next_stripped.startswith(f"- {other}:") or next_stripped.startswith(f"- **{other}**:") for other in REQUIRED_COHERENCE_FIELDS):
-                    break
-                if next_stripped.startswith("#"):
-                    break
-                tail.append(next_stripped)
-            value = "\n".join(part for part in [first, *tail] if part).strip()
-            break
-        normalized = (value or "").strip().lower().strip("`*_-. ")
-        ok = bool(value) and normalized not in {"", "n/a", "na", "none", "none yet", "tbd", "todo", "unknown", "placeholder"}
-        results[field] = {"ok": ok, "value": value or "", "reason": "" if ok else "missing or placeholder"}
-    return {"ok": all(item["ok"] for item in results.values()), "fields": results}
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+    _coherence_checker_module = module
+    return module
+
+
+def coherence_results(
+    body: str, comments: list[str] | None = None
+) -> dict[str, Any]:
+    """Validate Coherence Delta fields by delegating to the CI checker.
+
+    Accepts everything scripts/governance/check_pr_coherence_delta.py accepts —
+    label aliases, bold/bullet variants (colon inside or outside the bold),
+    HTML-comment stripping, and the PR-comment fallback — so the gate can never
+    reject a body that CI passed."""
+    checker = _coherence_checker()
+    results, source = checker.validate_sources(body or "", list(comments or []))
+    fields = {
+        result.name: {
+            "ok": result.ok,
+            "value": result.value,
+            "reason": "" if result.ok else (result.reason or "missing or placeholder"),
+        }
+        for result in results
+    }
+    return {
+        "ok": all(result.ok for result in results),
+        "fields": fields,
+        "source": source,
+    }
 
 
 def risk_from_files(files: list[dict[str, Any]]) -> dict[str, Any]:
     names = [str(item.get("filename") or "") for item in files]
-    hot = [name for name in names if any(name == pattern or name.startswith(pattern) for pattern in HOT_PATH_PATTERNS)]
-    deletions = [name for name, item in zip(names, files) if item.get("status") == "removed"]
+    hot = [
+        name
+        for name in names
+        if any(
+            name == pattern or name.startswith(pattern) for pattern in HOT_PATH_PATTERNS
+        )
+    ]
+    deletions = [
+        name for name, item in zip(names, files) if item.get("status") == "removed"
+    ]
     additions = sum(int(item.get("additions") or 0) for item in files)
     deletions_count = sum(int(item.get("deletions") or 0) for item in files)
-    docs_only = bool(names) and all(name.startswith("docs/") or name.endswith(".md") for name in names)
+    docs_only = bool(names) and all(
+        name.startswith("docs/") or name.endswith(".md") for name in names
+    )
 
-    if any(name in {"dharma_swarm/dharma_kernel.py", "dharma_swarm/telos_gates.py"} for name in hot):
+    if any(
+        name in {"dharma_swarm/dharma_kernel.py", "dharma_swarm/telos_gates.py"}
+        for name in hot
+    ):
         level = "CRITICAL"
     elif len(names) > 25 or additions + deletions_count > 2000 or hot:
         level = "HIGH"
@@ -641,7 +737,12 @@ def review_command_and_env(
                 env.get("DHARMA_CLAUDE_REVIEW_MAX_TURNS", "8"),
             ]
         else:
-            command = ["claude", "-p", "--max-turns", env.get("DHARMA_CLAUDE_REVIEW_MAX_TURNS", "8")]
+            command = [
+                "claude",
+                "-p",
+                "--max-turns",
+                env.get("DHARMA_CLAUDE_REVIEW_MAX_TURNS", "8"),
+            ]
         if env.get("DHARMA_CLAUDE_REVIEW_USE_API_KEY") != "1":
             env.pop("ANTHROPIC_API_KEY", None)
         return command, env
@@ -651,7 +752,13 @@ def review_command_and_env(
         command = shlex.split(override)
     else:
         effort = env.get("DHARMA_CODEX_REVIEW_REASONING_EFFORT", "medium")
-        command = ["codex", "exec", "--ephemeral", "-c", f'model_reasoning_effort="{effort}"']
+        command = [
+            "codex",
+            "exec",
+            "--ephemeral",
+            "-c",
+            f'model_reasoning_effort="{effort}"',
+        ]
         model = env.get("DHARMA_CODEX_REVIEW_MODEL", "").strip()
         if model:
             command.extend(["--model", model])
@@ -692,11 +799,13 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
             f"- `{item.get('filename')}` {item.get('status')} "
             f"+{item.get('additions', 0)}/-{item.get('deletions', 0)}"
         )
-    lines.extend([
-        "",
-        "## Queue Reasons",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Queue Reasons",
+            "",
+        ]
+    )
     if packet["classification"]["reasons"]:
         lines.extend(f"- {reason}" for reason in packet["classification"]["reasons"])
     else:
@@ -704,27 +813,33 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
     lines.extend(["", "## CI Truth", ""])
     if ci_truth:
         lines.append(f"- Verdict: `{ci_truth.get('verdict')}`")
-        lines.append(f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw")
+        lines.append(
+            f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw"
+        )
         if ci_truth.get("merge_blockers"):
-            lines.extend(f"- BLOCKER: {blocker}" for blocker in ci_truth["merge_blockers"])
+            lines.extend(
+                f"- BLOCKER: {blocker}" for blocker in ci_truth["merge_blockers"]
+            )
         else:
             lines.append("- Merge blockers: none")
         if ci_truth.get("warnings"):
             lines.extend(f"- Warning: {warning}" for warning in ci_truth["warnings"])
     else:
         lines.append("- not evaluated")
-    lines.extend([
-        "",
-        "## Required Local Outputs",
-        "",
-        "- `codex_review.md`",
-        "- `claude_review.md`",
-        "- `MERGE_GATE.md`",
-        "- `DIFF.patch` contains the PR diff for bounded review.",
-        "",
-        "Generate reviews from `PROMPT_CODEX.md` and `PROMPT_CLAUDE.md` in this directory.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Required Local Outputs",
+            "",
+            "- `codex_review.md`",
+            "- `claude_review.md`",
+            "- `MERGE_GATE.md`",
+            "- `DIFF.patch` contains the PR diff for bounded review.",
+            "",
+            "Generate reviews from `PROMPT_CODEX.md` and `PROMPT_CLAUDE.md` in this directory.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -734,7 +849,9 @@ def packet_dir(state_root: Path, pr_number: int, packet_id: str | None = None) -
         return base / packet_id
     existing = sorted([path for path in base.glob("*") if path.is_dir()])
     if not existing:
-        raise PRControlError(f"no packet directory exists for PR #{pr_number}; run packet first")
+        raise PRControlError(
+            f"no packet directory exists for PR #{pr_number}; run packet first"
+        )
     return existing[-1]
 
 
@@ -764,13 +881,24 @@ def cmd_packet(args: argparse.Namespace) -> int:
     }
     write_json(out_dir / "FACTS.json", packet)
     write_text(out_dir / "PR_BODY.md", pr.get("body") or "")
-    write_text(out_dir / "changed_files.txt", "\n".join(str(item.get("filename") or "") for item in files) + "\n")
+    write_text(
+        out_dir / "changed_files.txt",
+        "\n".join(str(item.get("filename") or "") for item in files) + "\n",
+    )
     write_text(out_dir / "DIFF.patch", diff)
     write_text(out_dir / "REVIEW_PACKET.md", render_packet_markdown(packet))
-    write_text(out_dir / "PROMPT_CODEX.md", render_agent_prompt("Codex", out_dir / "REVIEW_PACKET.md", args.pr))
-    write_text(out_dir / "PROMPT_CLAUDE.md", render_agent_prompt("Claude Code Opus", out_dir / "REVIEW_PACKET.md", args.pr))
+    write_text(
+        out_dir / "PROMPT_CODEX.md",
+        render_agent_prompt("Codex", out_dir / "REVIEW_PACKET.md", args.pr),
+    )
+    write_text(
+        out_dir / "PROMPT_CLAUDE.md",
+        render_agent_prompt("Claude Code Opus", out_dir / "REVIEW_PACKET.md", args.pr),
+    )
     print(f"packet={out_dir}")
-    print(f"status={classification['status']} risk={risk['level']} coherence={'pass' if coherence['ok'] else 'fail'}")
+    print(
+        f"status={classification['status']} risk={risk['level']} coherence={'pass' if coherence['ok'] else 'fail'}"
+    )
     return 0
 
 
@@ -860,7 +988,9 @@ def agent_review_blockers(status: dict[str, Any], *, human_approved: bool) -> li
     if not status["receipt_present"]:
         blockers.append(f"missing {agent}_review_receipt.json")
     elif not status["receipt_valid"]:
-        blockers.append(f"invalid {agent}_review_receipt.json: {status['receipt_error']}")
+        blockers.append(
+            f"invalid {agent}_review_receipt.json: {status['receipt_error']}"
+        )
     elif status["timed_out"] or status["receipt_status"] == "timeout":
         blockers.append(f"{title} review timed out after {status.get('timeout_s')}s")
     elif status["exit_code"] not in (0, "0"):
@@ -911,9 +1041,38 @@ def fetch_pr_reviews(pr_number: int) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def fetch_pr_comments(pr_number: int) -> list[str]:
+    """Issue-comment bodies for a PR, oldest first.
+
+    The CI Coherence Delta check accepts a PR comment carrying all four fields
+    (for agents that cannot edit the PR description); the gate fetches the same
+    surface so its verdict can never be stricter than CI's. The surface is
+    strictly additive — a failed fetch degrades to body-only validation (the
+    pre-existing behavior), it never blocks."""
+    repo = repo_name()
+    try:
+        data = gh_json(
+            ["api", f"repos/{repo}/issues/{pr_number}/comments", "--paginate"]
+        )
+    except Exception:
+        # Additive surface only: a blocked or failed fetch (offline jail,
+        # missing gh, API error) must degrade to body-only validation, which
+        # is exactly the pre-change gate. It must never block or crash.
+        return []
+    if not isinstance(data, list):
+        return []
+    return [
+        str(item.get("body") or "")
+        for item in data
+        if isinstance(item, dict) and str(item.get("body") or "").strip()
+    ]
+
+
 def _review_login(review: dict[str, Any]) -> str:
     user = review.get("user") or review.get("author") or {}
-    return _normalize_login(str(user.get("login") or "")) if isinstance(user, dict) else ""
+    return (
+        _normalize_login(str(user.get("login") or "")) if isinstance(user, dict) else ""
+    )
 
 
 def _review_commit(review: dict[str, Any]) -> str:
@@ -1101,34 +1260,36 @@ def render_agent_failure_review(
     stdout: str,
     stderr: str,
 ) -> str:
-    return "\n".join([
-        "## Verdict",
-        "BLOCKED",
-        "",
-        "## Findings",
-        f"1. **BLOCKER**: {agent} review did not complete cleanly. Reason: `{reason}`.",
-        f"   Command: `{' '.join(shlex.quote(part) for part in command)}`.",
-        f"   Timeout: `{timeout_s}s`; duration: `{duration_s}s`.",
-        "",
-        "## Missing Tests Or Proof",
-        "- A complete reviewer artifact with an explicit `APPROVE`, `REQUEST_CHANGES`, `BLOCKED`, or `NEEDS_HUMAN` verdict.",
-        "",
-        "## Merge Conditions",
-        "- Re-run the reviewer successfully and regenerate `MERGE_GATE.md`.",
-        "",
-        "## Captured Stdout",
-        "",
-        "```text",
-        trim_log(stdout).strip(),
-        "```",
-        "",
-        "## Captured Stderr",
-        "",
-        "```text",
-        trim_log(stderr).strip(),
-        "```",
-        "",
-    ])
+    return "\n".join(
+        [
+            "## Verdict",
+            "BLOCKED",
+            "",
+            "## Findings",
+            f"1. **BLOCKER**: {agent} review did not complete cleanly. Reason: `{reason}`.",
+            f"   Command: `{' '.join(shlex.quote(part) for part in command)}`.",
+            f"   Timeout: `{timeout_s}s`; duration: `{duration_s}s`.",
+            "",
+            "## Missing Tests Or Proof",
+            "- A complete reviewer artifact with an explicit `APPROVE`, `REQUEST_CHANGES`, `BLOCKED`, or `NEEDS_HUMAN` verdict.",
+            "",
+            "## Merge Conditions",
+            "- Re-run the reviewer successfully and regenerate `MERGE_GATE.md`.",
+            "",
+            "## Captured Stdout",
+            "",
+            "```text",
+            trim_log(stdout).strip(),
+            "```",
+            "",
+            "## Captured Stderr",
+            "",
+            "```text",
+            trim_log(stderr).strip(),
+            "```",
+            "",
+        ]
+    )
 
 
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:
@@ -1138,7 +1299,9 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     repo = repo_name()
     current_threads = fetch_review_threads(args.pr, repo)
     current_classification = classify_pr(current_pr)
-    current_coherence = coherence_results(current_pr.get("body") or "")
+    current_coherence = coherence_results(
+        current_pr.get("body") or "", comments=fetch_pr_comments(args.pr)
+    )
     current_ci_truth = ci_truth_for_pr(current_pr, args)
 
     blockers: list[str] = []
@@ -1177,7 +1340,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     unresolved_count = current_threads.get("unresolved_count")
     if is_bot_pr:
         blocking_threads = [
-            thread for thread in unresolved_threads
+            thread
+            for thread in unresolved_threads
             if not thread_is_advisory_only(thread)
         ]
         ignored_advisory = len(unresolved_threads) - len(blocking_threads)
@@ -1201,7 +1365,11 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         required_reviewers = []
     accept_github_reviews = getattr(args, "accept_github_reviews", False)
     head_sha = current_pr.get("headRefOid") or ""
-    pr_reviews = fetch_pr_reviews(args.pr) if accept_github_reviews and required_reviewers else []
+    pr_reviews = (
+        fetch_pr_reviews(args.pr)
+        if accept_github_reviews and required_reviewers
+        else []
+    )
     review_statuses = {
         agent: resolve_agent_review_status(
             out_dir,
@@ -1226,7 +1394,9 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     }
     claude_blockers: list[str] = []
     for agent, status in review_statuses.items():
-        agent_blockers = agent_review_blockers(status, human_approved=args.human_approved)
+        agent_blockers = agent_review_blockers(
+            status, human_approved=args.human_approved
+        )
         if agent == "claude":
             claude_blockers = agent_blockers
         else:
@@ -1271,7 +1441,9 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
         blockers.append(f"{original_risk} risk requires --human-approved")
     if current_classification["checks"]["unknown"]:
-        warnings.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
+        warnings.append(
+            f"unknown checks: {', '.join(current_classification['checks']['unknown'])}"
+        )
     if bot_pr_waivers:
         warnings.extend(bot_pr_waivers)
 
@@ -1339,9 +1511,14 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
     lines.extend(["", "## CI Truth", ""])
     if ci_truth:
         lines.append(f"- Verdict: `{ci_truth.get('verdict')}`")
-        lines.append(f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw")
+        lines.append(
+            f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw"
+        )
         if ci_truth.get("merge_blockers"):
-            lines.extend(f"- Required blocker: {blocker}" for blocker in ci_truth["merge_blockers"])
+            lines.extend(
+                f"- Required blocker: {blocker}"
+                for blocker in ci_truth["merge_blockers"]
+            )
         else:
             lines.append("- Required blockers: none")
         if ci_truth.get("warnings"):
@@ -1421,41 +1598,49 @@ def render_github_comment(
     else:
         lines.append("- none")
     if merge_receipt:
-        lines.extend([
-            "",
-            "### Merge Request",
-            "",
-            f"- Status: `{merge_receipt.get('status')}`",
-            f"- Reason: {merge_receipt.get('reason')}",
-            f"- Method: `{merge_receipt.get('method')}`",
-            f"- Auto-merge: `{merge_receipt.get('auto')}`",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Merge Request",
+                "",
+                f"- Status: `{merge_receipt.get('status')}`",
+                f"- Reason: {merge_receipt.get('reason')}",
+                f"- Method: `{merge_receipt.get('method')}`",
+                f"- Auto-merge: `{merge_receipt.get('auto')}`",
+            ]
+        )
         if merge_receipt.get("exit_code") is not None:
             lines.append(f"- Exit code: `{merge_receipt.get('exit_code')}`")
-    required_reviewers = gate.get("required_reviewers", []) if gate else list(DEFAULT_REQUIRED_REVIEWERS)
-    lines.extend([
-        "",
-        "### Authority Boundary",
-        "",
-        "- GitHub Action Mike may create packets, run deterministic gates, post this status comment, and run `gh pr merge --auto` only when explicitly asked to `merge when clean`.",
-        "- Mike may not approve PRs, push code, mark human approval, resolve review threads, or bypass branch protection.",
-        "- Branch protection and GitHub auto-merge remain enforcement layers after Mike's gate.",
-        "",
-        "### Required Review Receipts",
-        "",
-    ])
+    required_reviewers = (
+        gate.get("required_reviewers", []) if gate else list(DEFAULT_REQUIRED_REVIEWERS)
+    )
+    lines.extend(
+        [
+            "",
+            "### Authority Boundary",
+            "",
+            "- GitHub Action Mike may create packets, run deterministic gates, post this status comment, and run `gh pr merge --auto` only when explicitly asked to `merge when clean`.",
+            "- Mike may not approve PRs, push code, mark human approval, resolve review threads, or bypass branch protection.",
+            "- Branch protection and GitHub auto-merge remain enforcement layers after Mike's gate.",
+            "",
+            "### Required Review Receipts",
+            "",
+        ]
+    )
     for reviewer in required_reviewers:
         lines.append(f"- `{reviewer}_review.md` plus `{reviewer}_review_receipt.json`")
-    lines.extend([
-        "",
-        "### Local Commands",
-        "",
-        "```bash",
-        f"make pr-packet PR={pr['number']}",
-        f"make pr-gate PR={pr['number']}",
-        f"make pr-merge PR={pr['number']} ARGS=\"--confirm merge-pr-{pr['number']}\"",
-        "```",
-    ])
+    lines.extend(
+        [
+            "",
+            "### Local Commands",
+            "",
+            "```bash",
+            f"make pr-packet PR={pr['number']}",
+            f"make pr-gate PR={pr['number']}",
+            f'make pr-merge PR={pr["number"]} ARGS="--confirm automerge-policy-pass-{pr["number"]}"',
+            "```",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -1573,7 +1758,9 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         claude_payload = json.loads(claude_proc.stdout)
     except json.JSONDecodeError:
         claude_payload = None
-    claude_auth_ready = bool(isinstance(claude_payload, dict) and claude_payload.get("loggedIn"))
+    claude_auth_ready = bool(
+        isinstance(claude_payload, dict) and claude_payload.get("loggedIn")
+    )
     claude_probe: dict[str, Any] | None = None
     if args.live_probe:
         probe = run_agent_process(
@@ -1602,7 +1789,8 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
             "auth_status": claude_payload,
             "auth_ready": claude_auth_ready,
             "live_probe": claude_probe,
-            "ready": claude_auth_ready and (claude_probe is None or claude_probe["exit_code"] == 0),
+            "ready": claude_auth_ready
+            and (claude_probe is None or claude_probe["exit_code"] == 0),
         },
         "codex": {
             "command": codex_command,
@@ -1614,16 +1802,22 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         return 0 if result["claude"]["ready"] else 2
 
     print(f"Claude command: {' '.join(claude_command)}")
-    print(f"Claude credential env scrubbed: {result['claude']['anthropic_credential_env_scrubbed']}")
+    print(
+        f"Claude credential env scrubbed: {result['claude']['anthropic_credential_env_scrubbed']}"
+    )
     print(f"Claude auth ready: {result['claude']['auth_ready']}")
     if claude_probe is None:
-        print("Claude live probe: not run (use ARGS='--live-probe' to check quota/runtime)")
+        print(
+            "Claude live probe: not run (use ARGS='--live-probe' to check quota/runtime)"
+        )
     else:
         print(
             f"Claude live probe: status={claude_probe['status']} "
             f"exit={claude_probe['exit_code']} timed_out={claude_probe['timed_out']}"
         )
-        probe_output = (claude_probe["stdout_excerpt"] or claude_probe["stderr_excerpt"]).strip()
+        probe_output = (
+            claude_probe["stdout_excerpt"] or claude_probe["stderr_excerpt"]
+        ).strip()
         if probe_output:
             print(f"Claude live probe output: {probe_output}")
     if isinstance(claude_payload, dict):
@@ -1636,7 +1830,13 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
 
 
 def cmd_merge(args: argparse.Namespace) -> int:
-    expected = f"merge-pr-{args.pr}"
+    # Operator ruling 2026-07-29 (docs/ops/OPERATOR_RULING_2026-07-29_
+    # AUTO_WITH_DECORRELATED_REVIEW.md): the old merge-pr-{N} token claimed
+    # operator consent it never received (CI synthesized it from the PR
+    # number). automerge-policy-pass-{N} is honest: it asserts machine policy
+    # plus decorrelated review verdicts, and claims nothing about the
+    # operator.
+    expected = f"automerge-policy-pass-{args.pr}"
     if args.confirm != expected:
         raise PRControlError(f"merge requires --confirm {expected!r}")
     gate = build_gate(args)
@@ -1682,7 +1882,9 @@ def cmd_merge(args: argparse.Namespace) -> int:
         auto=args.auto,
     )
     write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
-    print(f"merge_status={merge_receipt['status']} pr={args.pr} method={args.method} auto={args.auto}")
+    print(
+        f"merge_status={merge_receipt['status']} pr={args.pr} method={args.method} auto={args.auto}"
+    )
     return 0 if merge_receipt["status"] == "MERGE_COMMAND_ACCEPTED" else 2
 
 
@@ -1691,8 +1893,16 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
     prompt_name = "PROMPT_CLAUDE.md" if args.agent == "claude" else "PROMPT_CODEX.md"
     prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
     command, env = review_command_and_env(args.agent)
-    timeout_s = args.timeout_s if args.timeout_s is not None else env_float("DHARMA_PR_REVIEW_TIMEOUT_S", DEFAULT_AGENT_TIMEOUT_S)
-    kill_grace_s = args.kill_grace_s if args.kill_grace_s is not None else DEFAULT_AGENT_KILL_GRACE_S
+    timeout_s = (
+        args.timeout_s
+        if args.timeout_s is not None
+        else env_float("DHARMA_PR_REVIEW_TIMEOUT_S", DEFAULT_AGENT_TIMEOUT_S)
+    )
+    kill_grace_s = (
+        args.kill_grace_s
+        if args.kill_grace_s is not None
+        else DEFAULT_AGENT_KILL_GRACE_S
+    )
     result = run_agent_process(
         command,
         prompt,
@@ -1768,7 +1978,9 @@ def parse_csv_tokens(value: str | None, *, default: tuple[str, ...]) -> list[str
 
 
 def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
-    raw = getattr(args, "required_reviewers", "") or os.environ.get("DHARMA_PR_REQUIRED_REVIEWERS", "")
+    raw = getattr(args, "required_reviewers", "") or os.environ.get(
+        "DHARMA_PR_REQUIRED_REVIEWERS", ""
+    )
     return parse_csv_tokens(raw, default=DEFAULT_REQUIRED_REVIEWERS)
 
 
@@ -1827,10 +2039,20 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         or ""
     )
     if require_devin_secrets:
-        required_names = MERGE_MASTER_MIKE_NATS_SECRET_NAMES if mike_present else DEVIN_NATS_SECRET_NAMES
+        required_names = (
+            MERGE_MASTER_MIKE_NATS_SECRET_NAMES
+            if mike_present
+            else DEVIN_NATS_SECRET_NAMES
+        )
         missing = [name for name in required_names if not env.get(name)]
     else:
-        missing = [] if endpoint else ["MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"]
+        missing = (
+            []
+            if endpoint
+            else [
+                "MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"
+            ]
+        )
     return NATSConfig(
         endpoint=endpoint,
         user=user,
@@ -1846,7 +2068,11 @@ def _normalize_ca_pem(value: str) -> str:
     normalized = value.strip()
     if "\\n" in normalized and "\n" not in normalized:
         normalized = normalized.replace("\\n", "\n")
-    return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
+    return (
+        normalized + "\n"
+        if normalized and not normalized.endswith("\n")
+        else normalized
+    )
 
 
 def _nats_url_is_tls(endpoint: str) -> bool:
@@ -1979,7 +2205,9 @@ def build_a2a_fanout_messages(
         "schema_version": "dharma.pr_review.a2a_nats_session.v1",
         "timestamp": utc_now(),
         "from": "github_actions_merge_master_mike",
-        "authority": "conditional_merge" if merge_mode == "auto-when-clean" else "external_worker_evidence_only",
+        "authority": "conditional_merge"
+        if merge_mode == "auto-when-clean"
+        else "external_worker_evidence_only",
         "repo": repo,
         "goal": (
             "collaborative PR queue synthesis; conditional merge authority when gate-clean"
@@ -2004,7 +2232,9 @@ def build_a2a_fanout_messages(
             "run_merge_gate",
             "write_receipts",
             "recommend_next_actions",
-            "conditional_merge_after_clean_gate" if merge_mode == "auto-when-clean" else "no_merge",
+            "conditional_merge_after_clean_gate"
+            if merge_mode == "auto-when-clean"
+            else "no_merge",
         ],
         "forbidden_actions": [
             "unconditional_merge",
@@ -2050,15 +2280,17 @@ async def _publish_a2a_messages_async(
         for message in messages:
             data = json.dumps(message["payload"], sort_keys=True).encode("utf-8")
             ack = await js.publish(str(message["subject"]), data, timeout=timeout_s)
-            rows.append({
-                "subject": message["subject"],
-                "kind": message["payload"].get("kind"),
-                "to": message["payload"].get("to"),
-                "ack_verified": True,
-                "ack_tier": "JETSTREAM_PUB_ACK",
-                "stream": ack.stream,
-                "seq": ack.seq,
-            })
+            rows.append(
+                {
+                    "subject": message["subject"],
+                    "kind": message["payload"].get("kind"),
+                    "to": message["payload"].get("to"),
+                    "ack_verified": True,
+                    "ack_tier": "JETSTREAM_PUB_ACK",
+                    "stream": ack.stream,
+                    "seq": ack.seq,
+                }
+            )
         return rows
     finally:
         await nc.close()
@@ -2084,7 +2316,9 @@ def default_a2a_nats_publisher(
     return asyncio.run(_publish_a2a_messages_with_deadline(config, messages, timeout_s))
 
 
-A2ANatsPublisher = Callable[[NATSConfig, list[dict[str, Any]], float], list[dict[str, Any]]]
+A2ANatsPublisher = Callable[
+    [NATSConfig, list[dict[str, Any]], float], list[dict[str, Any]]
+]
 
 
 def publish_a2a_fanout_session(
@@ -2105,7 +2339,10 @@ def publish_a2a_fanout_session(
     env: dict[str, str] | None = None,
     publisher: A2ANatsPublisher = default_a2a_nats_publisher,
 ) -> dict[str, Any]:
-    config = _nats_config(dict(env or os.environ), require_devin_secrets=required)
+    config = _nats_config(
+        dict(env if env is not None else os.environ),
+        require_devin_secrets=required,
+    )
     messages = build_a2a_fanout_messages(
         repo=repo,
         run_id=run_id,
@@ -2134,7 +2371,9 @@ def publish_a2a_fanout_session(
         "acks": [],
     }
     if config.missing:
-        receipt["code"] = "NATS_SECRETS_MISSING" if required else "NATS_ENDPOINT_MISSING"
+        receipt["code"] = (
+            "NATS_SECRETS_MISSING" if required else "NATS_ENDPOINT_MISSING"
+        )
         receipt["reason"] = f"missing NATS configuration: {', '.join(config.missing)}"
         return receipt
 
@@ -2150,10 +2389,14 @@ def publish_a2a_fanout_session(
         receipt["status"] = "OK"
         receipt["code"] = "NATS_ACK_VERIFIED"
         receipt["ack_tier"] = "JETSTREAM_PUB_ACK"
-        receipt["reason"] = "all A2A PR janitor messages received JetStream publish acks"
+        receipt["reason"] = (
+            "all A2A PR janitor messages received JetStream publish acks"
+        )
     else:
         receipt["code"] = "NATS_ACK_FAILED"
-        receipt["reason"] = "one or more A2A PR janitor messages did not receive a verified ack"
+        receipt["reason"] = (
+            "one or more A2A PR janitor messages did not receive a verified ack"
+        )
     return receipt
 
 
@@ -2167,9 +2410,7 @@ def select_fanout_items(
 
     status_rank = {status: index for index, status in enumerate(statuses)}
     candidates = [
-        item
-        for item in summary.get("items", [])
-        if item.get("status") in status_rank
+        item for item in summary.get("items", []) if item.get("status") in status_rank
     ]
     candidates.sort(
         key=lambda item: (
@@ -2178,7 +2419,7 @@ def select_fanout_items(
             int(item.get("number") or 0),
         )
     )
-    return candidates[:max(0, max_prs)]
+    return candidates[: max(0, max_prs)]
 
 
 def latest_packet_dir_or_none(state_root: Path, pr_number: int) -> Path | None:
@@ -2231,7 +2472,9 @@ def _packet_gate_summary(packet_dir_path: Path) -> dict[str, Any] | None:
     }
 
 
-def current_fanout_receipt_for_item(state_root: Path, item: dict[str, Any]) -> dict[str, Any]:
+def current_fanout_receipt_for_item(
+    state_root: Path, item: dict[str, Any]
+) -> dict[str, Any]:
     pr_number = int(item.get("number") or 0)
     packet_path = latest_packet_dir_or_none(state_root, pr_number)
     expected = _queue_item_fingerprint(item)
@@ -2271,9 +2514,13 @@ def current_fanout_receipt_for_item(state_root: Path, item: dict[str, Any]) -> d
     stable_keys = ("head_sha", "base_sha", "updated_at", "status", "review_decision")
     if all(observed.get(key) == expected.get(key) for key in stable_keys):
         result["current"] = True
-        result["reason"] = "latest clean packet/gate already matches PR head, base, update time, queue status, and review decision"
+        result["reason"] = (
+            "latest clean packet/gate already matches PR head, base, update time, queue status, and review decision"
+        )
         return result
-    result["reason"] = "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
+    result["reason"] = (
+        "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
+    )
     return result
 
 
@@ -2290,9 +2537,7 @@ def select_fanout_plan(
 
     status_rank = {status: index for index, status in enumerate(statuses)}
     candidates = [
-        item
-        for item in summary.get("items", [])
-        if item.get("status") in status_rank
+        item for item in summary.get("items", []) if item.get("status") in status_rank
     ]
     candidates.sort(
         key=lambda item: (
@@ -2308,15 +2553,17 @@ def select_fanout_plan(
         if skip_current:
             current = current_fanout_receipt_for_item(state_root, item)
             if current["current"]:
-                skipped_current.append({
-                    "number": item.get("number"),
-                    "title": item.get("title"),
-                    "status": item.get("status"),
-                    "packet_dir": current.get("packet_dir", ""),
-                    "head_sha": current.get("head_sha", ""),
-                    "updatedAt": current.get("updatedAt", ""),
-                    "reason": current.get("reason", ""),
-                })
+                skipped_current.append(
+                    {
+                        "number": item.get("number"),
+                        "title": item.get("title"),
+                        "status": item.get("status"),
+                        "packet_dir": current.get("packet_dir", ""),
+                        "head_sha": current.get("head_sha", ""),
+                        "updatedAt": current.get("updatedAt", ""),
+                        "reason": current.get("reason", ""),
+                    }
+                )
                 continue
         selected.append(item)
         if len(selected) >= max(0, max_prs):
@@ -2326,9 +2573,7 @@ def select_fanout_plan(
 
 def should_skip_current_fanout(args: argparse.Namespace) -> bool:
     return bool(
-        not args.reprocess_current
-        and args.packet_only
-        and args.merge_mode == "off"
+        not args.reprocess_current and args.packet_only and args.merge_mode == "off"
     )
 
 
@@ -2385,29 +2630,36 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
                 )
     else:
         lines.append("- none")
-    lines.extend([
-        "",
-        "## Authority",
-        "",
-        "- GitHub comment text is rendered locally only; posting remains a separate explicit action.",
-        "- Merge is allowed only when `merge_mode=auto-when-clean` and the deterministic gate is clean.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Authority",
+            "",
+            "- GitHub comment text is rendered locally only; posting remains a separate explicit action.",
+            "- Merge is allowed only when `merge_mode=auto-when-clean` and the deterministic gate is clean.",
+            "",
+        ]
+    )
     if receipt.get("merge_mode") == "auto-when-clean":
-        lines.insert(-1, "- This fanout may run Mike's conditional merge command after a clean gate.")
+        lines.insert(
+            -1,
+            "- This fanout may run Mike's conditional merge command after a clean gate.",
+        )
     else:
         lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
     if receipt.get("a2a_nats"):
         nats = receipt["a2a_nats"]
-        lines.extend([
-            "## A2A NATS",
-            "",
-            f"- Status: `{nats.get('status')}`",
-            f"- Code: `{nats.get('code')}`",
-            f"- Ack tier: `{nats.get('ack_tier')}`",
-            f"- Receipt: `{nats.get('receipt_path')}`",
-            "",
-        ])
+        lines.extend(
+            [
+                "## A2A NATS",
+                "",
+                f"- Status: `{nats.get('status')}`",
+                f"- Code: `{nats.get('code')}`",
+                f"- Ack tier: `{nats.get('ack_tier')}`",
+                f"- Receipt: `{nats.get('receipt_path')}`",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -2424,7 +2676,9 @@ def cmd_fanout(args: argparse.Namespace) -> int:
     required_reviewers = required_reviewer_agents(args)
     invalid_agents = sorted(set(agents) - {"codex", "claude"})
     if invalid_agents:
-        raise PRControlError(f"unsupported fanout agent(s): {', '.join(invalid_agents)}")
+        raise PRControlError(
+            f"unsupported fanout agent(s): {', '.join(invalid_agents)}"
+        )
 
     plan = select_fanout_plan(
         queue_summary,
@@ -2451,16 +2705,18 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         )
         packet_code = cmd_packet(packet_args)
         if packet_code != 0:
-            processed.append({
-                "number": pr_number,
-                "title": item.get("title"),
-                "status": item.get("status"),
-                "packet_status": "failed",
-                "packet_exit": packet_code,
-                "reviewers": [],
-                "gate_decision": "BLOCKED",
-                "blockers": [f"packet command exited {packet_code}"],
-            })
+            processed.append(
+                {
+                    "number": pr_number,
+                    "title": item.get("title"),
+                    "status": item.get("status"),
+                    "packet_status": "failed",
+                    "packet_exit": packet_code,
+                    "reviewers": [],
+                    "gate_decision": "BLOCKED",
+                    "blockers": [f"packet command exited {packet_code}"],
+                }
+            )
             continue
 
         out_dir = packet_dir(root, pr_number)
@@ -2477,16 +2733,18 @@ def cmd_fanout(args: argparse.Namespace) -> int:
                 )
                 exit_code = cmd_run_agent(run_args)
                 status = load_agent_review_status(out_dir, agent)
-                reviewer_rows.append({
-                    "agent": agent,
-                    "exit_code": exit_code,
-                    "status": status.get("receipt_status"),
-                    "timed_out": status.get("timed_out"),
-                    "duration_s": status.get("duration_s"),
-                    "verdict": status.get("verdict"),
-                    "output": status.get("output"),
-                    "receipt": status.get("receipt"),
-                })
+                reviewer_rows.append(
+                    {
+                        "agent": agent,
+                        "exit_code": exit_code,
+                        "status": status.get("receipt_status"),
+                        "timed_out": status.get("timed_out"),
+                        "duration_s": status.get("duration_s"),
+                        "verdict": status.get("verdict"),
+                        "output": status.get("output"),
+                        "receipt": status.get("receipt"),
+                    }
+                )
 
         gate_args = argparse.Namespace(
             state_root=str(root),
@@ -2525,18 +2783,20 @@ def cmd_fanout(args: argparse.Namespace) -> int:
                 "exit_code": merge_receipt.get("exit_code"),
             }
         write_text(comment_path, render_github_comment(packet, gate, merge_receipt))
-        processed.append({
-            "number": pr_number,
-            "title": item.get("title"),
-            "status": item.get("status"),
-            "packet_dir": str(out_dir),
-            "reviewers": reviewer_rows,
-            "gate_decision": gate["decision"],
-            "blockers": gate["blockers"],
-            "warnings": gate["warnings"],
-            "comment_path": str(comment_path),
-            "merge": merge_summary,
-        })
+        processed.append(
+            {
+                "number": pr_number,
+                "title": item.get("title"),
+                "status": item.get("status"),
+                "packet_dir": str(out_dir),
+                "reviewers": reviewer_rows,
+                "gate_decision": gate["decision"],
+                "blockers": gate["blockers"],
+                "warnings": gate["warnings"],
+                "comment_path": str(comment_path),
+                "merge": merge_summary,
+            }
+        )
 
     receipt = {
         "schema": "dharma.pr_review.mike_fanout.v1",
@@ -2569,7 +2829,9 @@ def cmd_fanout(args: argparse.Namespace) -> int:
     }
 
     if args.nats_session:
-        nats_subjects = parse_csv_tokens(args.nats_subjects, default=DEFAULT_A2A_NATS_SUBJECTS)
+        nats_subjects = parse_csv_tokens(
+            args.nats_subjects, default=DEFAULT_A2A_NATS_SUBJECTS
+        )
         nats_receipt = publish_a2a_fanout_session(
             repo=repo,
             run_id=run_id,
@@ -2611,15 +2873,25 @@ def cmd_fanout(args: argparse.Namespace) -> int:
     for item in skipped_current:
         print(f"SKIPPED_CURRENT #{item['number']} {item['status']} {item['title']}")
     for item in processed:
-        print(f"PROCESSED #{item['number']} gate={item.get('gate_decision')} packet={item.get('packet_dir')}")
-    if args.nats_session and args.nats_required and receipt.get("a2a_nats", {}).get("status") != "OK":
+        print(
+            f"PROCESSED #{item['number']} gate={item.get('gate_decision')} packet={item.get('packet_dir')}"
+        )
+    if (
+        args.nats_session
+        and args.nats_required
+        and receipt.get("a2a_nats", {}).get("status") != "OK"
+    ):
         return 3
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-root", default=str(DEFAULT_STATE_ROOT), help="Receipt root (default: ~/.dharma/pr_review)")
+    parser.add_argument(
+        "--state-root",
+        default=str(DEFAULT_STATE_ROOT),
+        help="Receipt root (default: ~/.dharma/pr_review)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_backup_reviewer_flags(command: argparse.ArgumentParser) -> None:
@@ -2645,13 +2917,17 @@ def build_parser() -> argparse.ArgumentParser:
     def add_reviewer_policy_flags(command: argparse.ArgumentParser) -> None:
         command.add_argument(
             "--required-reviewers",
-            default=os.environ.get("DHARMA_PR_REQUIRED_REVIEWERS", ",".join(DEFAULT_REQUIRED_REVIEWERS)),
+            default=os.environ.get(
+                "DHARMA_PR_REQUIRED_REVIEWERS", ",".join(DEFAULT_REQUIRED_REVIEWERS)
+            ),
             help="Comma-separated required reviewer receipt names before merge.",
         )
         command.add_argument(
             "--accept-github-reviews",
             action="store_true",
-            default=os.environ.get("DHARMA_PR_ACCEPT_GITHUB_REVIEWS", "").strip().lower()
+            default=os.environ.get("DHARMA_PR_ACCEPT_GITHUB_REVIEWS", "")
+            .strip()
+            .lower()
             in {"1", "true", "yes", "on"},
             help=(
                 "Count a trusted installed reviewer-App's native GitHub review "
@@ -2665,7 +2941,9 @@ def build_parser() -> argparse.ArgumentParser:
     def add_ci_truth_flags(command: argparse.ArgumentParser) -> None:
         command.add_argument(
             "--ci-truth-contract",
-            default=os.environ.get("DHARMA_CI_TRUTH_CONTRACT", str(DEFAULT_CI_TRUTH_CONTRACT)),
+            default=os.environ.get(
+                "DHARMA_CI_TRUTH_CONTRACT", str(DEFAULT_CI_TRUTH_CONTRACT)
+            ),
             help="Path to the CI truth contract consumed by packet and merge-gate evaluation.",
         )
 
@@ -2683,35 +2961,76 @@ def build_parser() -> argparse.ArgumentParser:
     queue.add_argument("--limit", type=int, default=100)
     queue.set_defaults(func=cmd_queue)
 
-    fanout = sub.add_parser("fanout", help="Merge Master Mike PR packet -> reviewer -> gate fanout")
-    fanout.add_argument("--limit", type=int, default=100, help="Open PRs to scan before selection")
-    fanout.add_argument("--max-prs", type=int, default=3, help="Maximum PRs to process this run")
+    fanout = sub.add_parser(
+        "fanout", help="Merge Master Mike PR packet -> reviewer -> gate fanout"
+    )
+    fanout.add_argument(
+        "--limit", type=int, default=100, help="Open PRs to scan before selection"
+    )
+    fanout.add_argument(
+        "--max-prs", type=int, default=3, help="Maximum PRs to process this run"
+    )
     fanout.add_argument(
         "--statuses",
         default=",".join(DEFAULT_FANOUT_STATUSES),
         help="Comma-separated queue statuses Mike may process",
     )
-    fanout.add_argument("--agents", default="codex,claude", help="Comma-separated reviewer agents: codex,claude")
-    fanout.add_argument("--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout")
-    fanout.add_argument("--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S)
+    fanout.add_argument(
+        "--agents",
+        default="codex,claude",
+        help="Comma-separated reviewer agents: codex,claude",
+    )
+    fanout.add_argument(
+        "--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout"
+    )
+    fanout.add_argument(
+        "--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S
+    )
     add_legacy_pending_flag(fanout)
     fanout.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(fanout)
     add_backup_reviewer_flags(fanout)
     add_ci_truth_flags(fanout)
-    fanout.add_argument("--packet-only", action="store_true", help="Create packets and gates without reviewer fanout")
-    fanout.add_argument("--dry-run", action="store_true", help="Select PRs and write Mike receipt without processing them")
+    fanout.add_argument(
+        "--packet-only",
+        action="store_true",
+        help="Create packets and gates without reviewer fanout",
+    )
+    fanout.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Select PRs and write Mike receipt without processing them",
+    )
     fanout.add_argument(
         "--reprocess-current",
         action="store_true",
         help="Process PRs even when the latest packet/gate already matches the current PR head and status",
     )
-    fanout.add_argument("--merge-mode", choices=MERGE_MODES, default="off", help="Mike merge authority mode")
-    fanout.add_argument("--merge-method", choices=("squash", "merge", "rebase"), default="squash")
-    fanout.add_argument("--no-merge-auto", dest="merge_auto", action="store_false", default=True)
-    fanout.add_argument("--nats-session", action="store_true", help="Publish a PR janitor session announcement to A2A NATS")
-    fanout.add_argument("--nats-required", action="store_true", help="Return non-zero if A2A NATS publish is not ack-verified")
-    fanout.add_argument("--nats-timeout-s", type=float, default=5.0, help="NATS connect/publish timeout")
+    fanout.add_argument(
+        "--merge-mode",
+        choices=MERGE_MODES,
+        default="off",
+        help="Mike merge authority mode",
+    )
+    fanout.add_argument(
+        "--merge-method", choices=("squash", "merge", "rebase"), default="squash"
+    )
+    fanout.add_argument(
+        "--no-merge-auto", dest="merge_auto", action="store_false", default=True
+    )
+    fanout.add_argument(
+        "--nats-session",
+        action="store_true",
+        help="Publish a PR janitor session announcement to A2A NATS",
+    )
+    fanout.add_argument(
+        "--nats-required",
+        action="store_true",
+        help="Return non-zero if A2A NATS publish is not ack-verified",
+    )
+    fanout.add_argument(
+        "--nats-timeout-s", type=float, default=5.0, help="NATS connect/publish timeout"
+    )
     fanout.add_argument(
         "--nats-subjects",
         default=",".join(DEFAULT_A2A_NATS_SUBJECTS),
@@ -2719,7 +3038,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fanout.set_defaults(func=cmd_fanout)
 
-    packet = sub.add_parser("packet", help="Create a dual-agent review packet for one PR")
+    packet = sub.add_parser(
+        "packet", help="Create a dual-agent review packet for one PR"
+    )
     packet.add_argument("--pr", type=int, required=True)
     add_ci_truth_flags(packet)
     packet.set_defaults(func=cmd_packet)
@@ -2742,30 +3063,54 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(merge)
     add_backup_reviewer_flags(merge)
     add_ci_truth_flags(merge)
-    merge.add_argument("--method", choices=("squash", "merge", "rebase"), default="squash")
-    merge.add_argument("--auto", action="store_true", help="Use gh pr merge --auto when executing")
+    merge.add_argument(
+        "--method", choices=("squash", "merge", "rebase"), default="squash"
+    )
+    merge.add_argument(
+        "--auto", action="store_true", help="Use gh pr merge --auto when executing"
+    )
     merge.add_argument("--confirm", required=True)
     merge.add_argument("--execute", action="store_true")
     merge.set_defaults(func=cmd_merge)
 
-    comment = sub.add_parser("comment", help="Render a GitHub comment for the latest packet/gate")
+    comment = sub.add_parser(
+        "comment", help="Render a GitHub comment for the latest packet/gate"
+    )
     comment.add_argument("--pr", type=int, required=True)
     comment.add_argument("--packet-dir")
     comment.add_argument("--output")
     comment.set_defaults(func=cmd_comment)
 
-    reviewers = sub.add_parser("reviewers", help="Check local reviewer command/auth readiness")
+    reviewers = sub.add_parser(
+        "reviewers", help="Check local reviewer command/auth readiness"
+    )
     reviewers.add_argument("--json", action="store_true")
-    reviewers.add_argument("--live-probe", action="store_true", help="Run a tiny Claude command to catch quota/runtime failures")
+    reviewers.add_argument(
+        "--live-probe",
+        action="store_true",
+        help="Run a tiny Claude command to catch quota/runtime failures",
+    )
     reviewers.add_argument("--probe-timeout-s", type=float, default=45.0)
     reviewers.set_defaults(func=cmd_reviewers)
 
-    run_agent = sub.add_parser("run-agent", help="Run Codex or Claude against an existing packet")
+    run_agent = sub.add_parser(
+        "run-agent", help="Run Codex or Claude against an existing packet"
+    )
     run_agent.add_argument("--pr", type=int, required=True)
     run_agent.add_argument("--packet-dir")
     run_agent.add_argument("--agent", choices=("codex", "claude"), required=True)
-    run_agent.add_argument("--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout (default: DHARMA_PR_REVIEW_TIMEOUT_S or 600)")
-    run_agent.add_argument("--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S, help="Seconds to wait after SIGTERM before SIGKILL")
+    run_agent.add_argument(
+        "--timeout-s",
+        type=float,
+        default=None,
+        help="Reviewer wall-clock timeout (default: DHARMA_PR_REVIEW_TIMEOUT_S or 600)",
+    )
+    run_agent.add_argument(
+        "--kill-grace-s",
+        type=float,
+        default=DEFAULT_AGENT_KILL_GRACE_S,
+        help="Seconds to wait after SIGTERM before SIGKILL",
+    )
     run_agent.set_defaults(func=cmd_run_agent)
 
     return parser

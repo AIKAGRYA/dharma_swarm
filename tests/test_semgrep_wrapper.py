@@ -9,6 +9,7 @@ scan carries a portable wall-clock bound converted into a named nonzero failure.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -263,3 +264,176 @@ def test_make_gitleaks_absent_is_named_nonzero_failure():
     )
     assert proc.returncode == 2, proc.stdout + proc.stderr
     assert "GITLEAKS_MISSING" in proc.stdout + proc.stderr
+
+
+# ── WP-0C1R ratified-disposition contract (operator decisions A1 + B1,
+# 2026-08-02) ─────────────────────────────────────────────────────────
+# The 21 strict-scan findings were adjudicated by the operator: 18 Rule 1
+# files became declared research participants in ACTIVE_SURFACE_MANIFEST.yaml
+# and 3 Rule 2 files carry closure-layer-role headers. These tests pin the
+# rule's own documented procedure so an allowlist entry can never outlive
+# its manifest declaration or role header, and the allowlists can never
+# silently widen into the broad ignores the WP-0C1R spec forbids.
+
+_ANTI_SLOP = REPO_ROOT / ".semgrep" / "dharma-anti-slop.yml"
+_SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
+
+# Rule 1 exclude entries that are NOT research participants: canonical owners
+# (2026-04-26 audit), operational cron scripts, and the Memory Common door
+# (PR #1132). Pinned here so a new exclude entry cannot ride into the
+# allowlist without changing this contract in the same diff.
+_RULE1_PERMITTED_NON_RESEARCH_EXCLUDES = {
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/system_rv.py",
+    "dharma_swarm/daemon_config.py",
+    "dharma_swarm/experiment_log.py",
+    "dharma_swarm/pulse.py",
+    "dharma_swarm/custodians.py",
+    "dharma_swarm/kaizen_ops_local.py",
+    "dharma_swarm/scout_report.py",
+    "dharma_swarm/review_cycle.py",
+    "dharma_swarm/ginko_backtest.py",
+    "dharma_swarm/ginko_evolution.py",
+    "dharma_swarm/engine/store_sync.py",
+    "scripts/consume_review_marks.py",
+    "scripts/hermes_heartbeat_poll.py",
+    "scripts/check_provider_credits.py",
+    "dharma_swarm/memory_common.py",
+    "scripts/memory_retrieval_broad_sweep.py",
+    "scripts/memory_retrieval_live_gate.py",
+    "scripts/memory_retrieval_system_gate.py",
+}
+
+# WP-0C1R decision B1: the ratified substrate classes and the one file each
+# is allowed to live in. Class-scoped (not file-scoped) so a new substrate
+# class in the same file still triggers Rule 2.
+_RULE2_RATIFIED_ROLE_CLASSES = {
+    "BridgeRegistry": "dharma_swarm/bridge_registry.py",
+    "SQLiteGraphStore": "dharma_swarm/graph_store.py",
+    "KnowledgeStore": "dharma_swarm/knowledge_units.py",
+}
+
+# Closed role vocabulary from docs/governance/ANTI_SLOP_RULES.md Rule 2.
+_RULE2_ROLE_VOCABULARY = {
+    "canonical-store",
+    "derived-view",
+    "plugin-sink",
+    "cache",
+    "legacy-mirror",
+    "migration-mirror",
+    "exempt",
+}
+
+# Structural header: a comment line `# closure-layer-role: <role>`, not a
+# bare substring (an empty value or the token inside a string must fail).
+_ROLE_HEADER_RE = re.compile(r"^#\s*closure-layer-role:\s*([a-z][a-z-]*)", re.MULTILINE)
+
+
+def _anti_slop_rule(rule_id: str) -> dict:
+    import yaml
+
+    config = yaml.safe_load(_ANTI_SLOP.read_text(encoding="utf-8"))
+    return next(r for r in config["rules"] if r["id"] == rule_id)
+
+
+def _anti_slop_rule_excludes(rule_id: str) -> list[str]:
+    return list(_anti_slop_rule(rule_id).get("paths", {}).get("exclude", []))
+
+
+def test_rule1_lockstep_is_bidirectional():
+    import yaml
+
+    manifest = yaml.safe_load(_SURFACE_MANIFEST.read_text(encoding="utf-8"))
+    participants = manifest.get("research_state_participants", {})
+    declared: set[str] = set()
+    for group_name, group in participants.items():
+        files = group.get("files") or []
+        slices = group.get("state_slices") or []
+        assert files, f"{group_name}: participant group declares no files"
+        assert slices, (
+            f"{group_name}: research participants must declare the state_dir "
+            "slices they read/write — file names alone are not a declaration"
+        )
+        for state_slice in slices:
+            assert state_slice.startswith("~/.dharma"), (
+                f"{group_name}: state slice outside the canonical state root: "
+                f"{state_slice!r}"
+            )
+        declared.update(files)
+    assert len(declared) == 18, (
+        "the WP-0C1R ratification declared exactly 18 research participants; "
+        f"manifest now declares {len(declared)} — update the adjudication "
+        "record and this contract together, never one alone"
+    )
+    excludes = set(_anti_slop_rule_excludes("dharma.no-unauthorized-dharma-write"))
+    missing = declared - excludes
+    assert not missing, (
+        f"declared research participants missing from Rule 1 allowlist: {sorted(missing)}"
+    )
+    undeclared = excludes - declared - _RULE1_PERMITTED_NON_RESEARCH_EXCLUDES
+    assert not undeclared, (
+        "Rule 1 exclude entries with neither a manifest declaration nor a "
+        f"pinned canonical/operational justification: {sorted(undeclared)} — "
+        "an allowlist entry may never precede its declaration (WP-0C1R)"
+    )
+    for path in sorted(declared):
+        assert (REPO_ROOT / path).is_file(), f"declared participant vanished: {path}"
+
+
+def test_rule2_exemptions_are_class_scoped_and_role_headed():
+    rule = _anti_slop_rule("dharma.no-new-substrate")
+    excludes = _anti_slop_rule_excludes("dharma.no-new-substrate")
+    assert excludes == ["dharma_swarm/runtime_state.py"], (
+        "Rule 2 must not exempt whole files beyond the canonical store — "
+        "ratified WP-0C1R exemptions are class-scoped pattern-nots so a NEW "
+        f"substrate in the same file is still caught; got {excludes}"
+    )
+    exempted_classes: set[str] = set()
+    for clause in rule["patterns"]:
+        if "pattern-not" not in clause:
+            continue
+        match = re.search(r"class\s+(\w+)\s*:", clause["pattern-not"])
+        assert match, f"unparseable Rule 2 pattern-not clause: {clause['pattern-not']!r}"
+        exempted_classes.add(match.group(1))
+    assert exempted_classes == set(_RULE2_RATIFIED_ROLE_CLASSES), (
+        "Rule 2 class exemptions diverged from the ratified WP-0C1R set: "
+        f"{sorted(exempted_classes)} != {sorted(_RULE2_RATIFIED_ROLE_CLASSES)}"
+    )
+    for cls, path in sorted(_RULE2_RATIFIED_ROLE_CLASSES.items()):
+        head = (REPO_ROOT / path).read_text(encoding="utf-8")[:2000]
+        header = _ROLE_HEADER_RE.search(head)
+        assert header, (
+            f"{path} lost its structural '# closure-layer-role: <role>' header "
+            "comment — the Rule 2 exemption is only valid while the header "
+            "states the role"
+        )
+        assert header.group(1) in _RULE2_ROLE_VOCABULARY, (
+            f"{path} declares role {header.group(1)!r} outside the Rule 2 "
+            f"closed vocabulary {sorted(_RULE2_ROLE_VOCABULARY)}"
+        )
+        definitions = subprocess.run(
+            ["git", "grep", "-lE", rf"^class {cls}[(:]"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        defined_in = definitions.stdout.split()
+        assert path in defined_in, f"ratified class {cls} vanished from {path}"
+        for other in defined_in:
+            if other == path:
+                continue
+            body = (REPO_ROOT / other).read_text(encoding="utf-8")
+            assert "sqlite3.connect" not in body and "aiosqlite.connect" not in body, (
+                f"{other} defines a class named {cls} AND opens SQLite — it "
+                f"would silently inherit {path}'s class-scoped Rule 2 "
+                "exemption; rename the class or adjudicate it explicitly"
+            )
+
+
+def test_anti_slop_allowlists_contain_no_globs():
+    for rule_id in ("dharma.no-unauthorized-dharma-write", "dharma.no-new-substrate"):
+        for entry in _anti_slop_rule_excludes(rule_id):
+            assert "*" not in entry and not entry.endswith("/"), (
+                f"{rule_id} exclude {entry!r} is a glob/directory — the "
+                "WP-0C1R spec forbids broad ignores; allowlist exact files only"
+            )

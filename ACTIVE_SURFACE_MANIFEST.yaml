@@ -10,7 +10,61 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-07-11"
+last_updated: "2026-08-02"
+
+# WP-0C1R ratified research participants (operator decision A1, 2026-08-02,
+# Titanium campaign — reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md).
+# The Palantir research-pilot family and verifier_ranker_v0 inventory are
+# declared participants in the canonical state_dir slices they read/write.
+# Each group declares its accessed slices machine-readably in state_slices
+# (decorrelated review 2026-08-02: a prose-only slice list is not a
+# declaration). They mint no new slice; Semgrep Rule 1 allowlists exactly
+# these files per this declaration, and the contract test enforces the
+# lockstep in BOTH directions (an allowlist entry with no declaration fails).
+research_state_participants:
+  palantir_pilot:
+    files:
+      - dharma_swarm/palantir_pilot_manifest.py
+      - scripts/governance/palantir_pilot_audit.py
+      - scripts/governance/register_palantir_pilot.py
+      - scripts/research/palantir_contribution_packets.py
+      - scripts/research/palantir_deep_ingest.py
+      - scripts/research/palantir_learning_backlog.py
+      - scripts/research/palantir_pilot_curriculum.py
+      - scripts/research/palantir_pilot_orientation.py
+      - scripts/research/palantir_pilot_query.py
+      - scripts/research/palantir_playbook_evals.py
+      - scripts/research/palantir_public_source_cards.py
+      - scripts/research/palantir_public_source_index.py
+      - scripts/research/palantir_query_cookbook.py
+      - scripts/research/palantir_source_card_balanced_expand.py
+      - scripts/research/palantir_source_card_cleanup.py
+      - scripts/research/palantir_source_card_playbooks.py
+      - scripts/research/palantir_source_card_quality.py
+    state_slices:
+      # Research wiki notes + local-only deep-cards (never committed to git)
+      - "~/.dharma/knowledge/wiki/research/palantir-pilot.md"
+      - "~/.dharma/knowledge/wiki/research/palantir-pilot"
+      - "~/.dharma/knowledge/wiki/raw/palantir-pilot"
+      # Agent registration surfaces scoped to the pilot's own identity
+      - "~/.dharma/agents/palantir_pilot"
+      - "~/.dharma/external_agents/palantir_pilot"
+      - "~/.dharma/a2a/cards/palantir-pilot.json"
+  verifier_ranker_v0:
+    files:
+      - dharma_swarm/verifier_ranker_v0/inventory.py
+    state_slices:
+      # Read-only inventory surfaces (sqlite metadata / redacted rows only,
+      # per the SurfaceSpec table in verifier_ranker_v0/inventory.py)
+      - "~/.dharma/state/runtime.db"
+      - "~/.dharma/db/messages.db"
+      - "~/.dharma/datasets"
+      - "~/.dharma/forge_v1"
+      - "~/.dharma/traces"
+      - "~/.dharma/agent_memory"
+      - "~/.dharma/agents"
+      - "~/.dharma/external_agents"
+      - "~/.dharma/a2a/cards"
 
 state_dir:
   canonical: "~/.dharma"
@@ -32,6 +86,11 @@ state_dir:
   a2a_bus_queue: "~/.dharma/a2a_bus/queue.jsonl"
   promote_log: "~/.dharma/logs/consume_review_marks.jsonl"
   provider_credits_log: "~/.dharma/logs/provider_credits_latest.json"
+  # Memory Common door (dharma_swarm/memory_common.py) + retrieval gate
+  # scripts (scripts/memory_retrieval_*.py): read vectors_db, write
+  # metabolism/gate receipts into memory_kernel_reports only.
+  vectors_db: "~/.dharma/vectors.db"
+  memory_kernel_reports: "~/.dharma/reports/memory_kernel"
 
 api_routers:
   - id: holon

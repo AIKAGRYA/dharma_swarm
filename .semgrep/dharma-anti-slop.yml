@@ -36,6 +36,36 @@ rules:
         - "scripts/consume_review_marks.py"
         - "scripts/hermes_heartbeat_poll.py"
         - "scripts/check_provider_credits.py"
+        # Memory Common door + retrieval gates (own memory_kernel_reports receipt
+        # sink and read the vector store; surface declared in
+        # ACTIVE_SURFACE_MANIFEST.yaml state_dir, PR #1132)
+        - "dharma_swarm/memory_common.py"
+        - "scripts/memory_retrieval_broad_sweep.py"
+        - "scripts/memory_retrieval_live_gate.py"
+        - "scripts/memory_retrieval_system_gate.py"
+        # WP-0C1R ratified research participants (operator decision A1,
+        # 2026-08-02): declared in ACTIVE_SURFACE_MANIFEST.yaml
+        # research_state_participants; adjudication record
+        # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+        # Exact files only — no globs (plan forbids broad ignores).
+        - "dharma_swarm/palantir_pilot_manifest.py"
+        - "scripts/governance/palantir_pilot_audit.py"
+        - "scripts/governance/register_palantir_pilot.py"
+        - "scripts/research/palantir_contribution_packets.py"
+        - "scripts/research/palantir_deep_ingest.py"
+        - "scripts/research/palantir_learning_backlog.py"
+        - "scripts/research/palantir_pilot_curriculum.py"
+        - "scripts/research/palantir_pilot_orientation.py"
+        - "scripts/research/palantir_pilot_query.py"
+        - "scripts/research/palantir_playbook_evals.py"
+        - "scripts/research/palantir_public_source_cards.py"
+        - "scripts/research/palantir_public_source_index.py"
+        - "scripts/research/palantir_query_cookbook.py"
+        - "scripts/research/palantir_source_card_balanced_expand.py"
+        - "scripts/research/palantir_source_card_cleanup.py"
+        - "scripts/research/palantir_source_card_playbooks.py"
+        - "scripts/research/palantir_source_card_quality.py"
+        - "dharma_swarm/verifier_ranker_v0/inventory.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
@@ -66,6 +96,25 @@ rules:
       exclude:
         - "dharma_swarm/runtime_state.py"
     patterns:
+      # WP-0C1R ratified roles (operator decision B1, 2026-08-02): exemptions
+      # are CLASS-scoped, not file-scoped, so any NEW Store/Ledger/Registry
+      # added to the same files is still caught (paths.exclude runs before the
+      # class pattern and would skip the whole file — decorrelated review
+      # 2026-08-02). Each class's file carries a structural
+      # `# closure-layer-role: <role>` header (vocabulary: exempt — subordinate
+      # adapter/projection under the MemoryKernel doctrine, CLAUDE.md); the
+      # contract test proves no same-named class elsewhere opens SQLite (a
+      # collision would silently inherit the exemption). Adjudication record
+      # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+      - pattern-not: |
+          class BridgeRegistry:
+              ...
+      - pattern-not: |
+          class SQLiteGraphStore:
+              ...
+      - pattern-not: |
+          class KnowledgeStore:
+              ...
       - pattern-either:
           # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
           - pattern: |

@@ -1,0 +1,102 @@
+{
+  "id": "dharmagraph-WP-RUNTIMECONVERGENCE-runtime-admission-20260725",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/runtime-convergence-20260725",
+  "worktree": ".",
+  "intent": "Converge the warranted runtime-control fixes from the deployed recovery snapshot onto current main, add a versioned release runner, and make every current orchestrate-live command boundary fail closed on explicit provenance. A tracked checkout must be clean and either exactly current origin/main or an explicitly pinned current-main descendant; a separately governed source-only image can instead present and re-verify an image-baked source manifest, which is typed as container-image provenance rather than canonical Git authority. Harden the release boundary against blank pins, ignored import bytecode, interpreter traversal, and symlinked virtual environments. Preserve the already-landed stronger quarantine-status implementation from PR 1110 rather than replaying its older release commit.",
+  "allowed_files": [
+    "dharma_swarm/context_agent.py",
+    "dharma_swarm/orchestrate_live.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/runtime_admission.py",
+    "dharma_swarm/terminal_commands/lifecycle.py",
+    "reports/agentops/work_packets/dharmagraph-WP-RUNTIMECONVERGENCE-runtime-admission-20260725.json",
+    "scripts/runtime/dharma_swarm_release_runner.sh",
+    "tests/test_context_agent.py",
+    "tests/test_dgc_cli.py",
+    "tests/test_orchestrate_live.py",
+    "tests/test_orchestrator.py",
+    "tests/test_runtime_admission.py",
+    "tests/test_runtime_release_runner.py"
+  ],
+  "forbidden_files": [
+    "packages/telos-kernel/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "name": "runtime-convergence-tests",
+      "command": "python3 -m pytest -q tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "runtime-convergence-ruff",
+      "command": "python3 -m ruff check dharma_swarm/runtime_admission.py dharma_swarm/terminal_commands/lifecycle.py dharma_swarm/context_agent.py dharma_swarm/orchestrator.py tests/test_runtime_admission.py tests/test_runtime_release_runner.py tests/test_context_agent.py tests/test_orchestrator.py tests/test_dgc_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "tracked-dirty-admission-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/runtime_admission.py'); t=p.read_text(); old='if tracked_changes:'; assert old in t; p.write_text(t.replace(old,'if False:',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','-p','no:cacheprovider','tests/test_runtime_admission.py::test_tracked_dirty_checkout_is_rejected'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): converge release controls and fail closed on stale launch"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RUNTIMECONVERGENCE",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The deployed release carries two runtime-control commits that are absent from current main, while current main already carries a stronger version of the release's quarantine-status commit.",
+      "The machine launchd runner is unversioned and selects release code while borrowing the stale checkout's interpreter and secret file, so its provenance and dependency boundary are split.",
+      "The current CLI starts orchestrate-live from any checkout that imports it, including clean branches that are hundreds of commits behind origin/main.",
+      "The separately owned source-only image has no Git metadata, so it needs a distinct manifest-bound provenance value rather than being mislabeled as canonical Git authority."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/terminal_commands/lifecycle.py:cmd_orchestrate_live",
+      "dharma_swarm/orchestrate_live.py:orchestrate",
+      "dharma_swarm/runtime_admission.py:assess_runtime_admission",
+      "scripts/load_runtime_env.sh",
+      "release commits f248b838f3502363a8bf9917b1c3c8abdab96056 and b5ec7a82e7bee6c51a63d472a5d2fd3979e63468",
+      "main commit fdf9670f0 implementing PR 1110 quarantine-status compatibility"
+    ],
+    "honest_blockers": [
+      "A source-level guard cannot retroactively alter old checkouts; the versioned release runner must be installed at the stable machine path and launchd must be repointed during the separately controlled live cutover.",
+      "The admission comparison uses the shared local origin/main ref; deployment must fetch immediately before cutting and pinning the release.",
+      "Container-image admission proves equality to an image-baked source manifest, not equality to canonical Git; the Docker build and runner changes remain in the separately owned organism-rewire lane and must land before this PR.",
+      "This lane does not stop, restart, mutate, or claim health for the live daemon.",
+      "Exact-head hosted CI, independent review policy, and operator merge and deployment authority remain required."
+    ],
+    "rollback": "Restore the prior stable machine runner and release root, then revert the runtime admission module, command-boundary calls, release-runner script, runtime-control gates, tests, and this packet together. Do not roll back PR 1110 or rewrite quarantined task rows.",
+    "packet_digest": "48f811df2bfc7a795c0d1ed43d5b05f92db04849e8f63f6453a0a1d940ff8eea"
+  }
+}

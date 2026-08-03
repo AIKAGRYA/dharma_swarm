@@ -1,9 +1,9 @@
 """Deterministic renderers for compact, deep, and JSON session status.
 
 Rendering only — no collection, no policy, no I/O.  The compact human view is
-hard-bounded to 40–70 lines; ``--json`` is a deterministic machine
-projection of the verdict and stable core that excludes every volatile field
-by construction, not by key-name guessing.
+hard-bounded to 40–70 lines; ``--json`` is a deterministic projection of the
+verdict and stable core plus one explicitly bounded local NATS observation.
+No other volatile receipt field is projected.
 """
 
 from __future__ import annotations
@@ -14,10 +14,17 @@ from typing import Any, Mapping
 HUMAN_MIN_LINES = 40
 HUMAN_MAX_LINES = 70
 
-# Fields the machine projection deliberately carries — nothing volatile:
-# no observed_at, ages, durations, host paths, cache bookkeeping, or delta
-# The full receipt retains volatile fields as typed data.
-_JSON_PROJECTION_KEYS = ("schema", "verdict", "exit_code", "stable_core", "conditions")
+# Fields the machine projection deliberately carries: no observed_at, ages,
+# durations, absolute host paths, cache bookkeeping, or delta. NATS status is
+# the one explicit live observation and carries no admission authority.
+_JSON_PROJECTION_KEYS = (
+    "schema",
+    "verdict",
+    "exit_code",
+    "stable_core",
+    "conditions",
+    "nats_substrate",
+)
 
 
 def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
@@ -38,12 +45,16 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
         for row in receipt.get("live_delta", {}).get("conditions", [])
         if isinstance(row, dict)
     ]
+    nats_substrate = receipt.get("extensions", {}).get("nats_substrate", {})
+    if not isinstance(nats_substrate, Mapping):
+        nats_substrate = {}
     projection = {
         "schema": "dharma_swarm.onboard_json.v1",
         "verdict": str(receipt.get("primary_verdict", "")),
         "exit_code": receipt.get("exit_code", 1),
         "stable_core": stable_core,
         "conditions": sorted(conditions, key=lambda row: row["id"]),
+        "nats_substrate": dict(nats_substrate),
     }
     assert tuple(projection) == _JSON_PROJECTION_KEYS
     return projection
@@ -113,6 +124,37 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
         lines.append(f"  [{row.get('state', '?'):>12}] {row.get('id')}{suffix}")
     if len(ordered) > condition_budget:
         lines.append(f"  … {len(ordered) - condition_budget} more in the receipt")
+
+    nats_substrate = receipt.get("extensions", {}).get("nats_substrate", {})
+    if isinstance(nats_substrate, Mapping) and nats_substrate:
+        mirrors = [
+            row
+            for row in nats_substrate.get("filesystem_mirrors", [])
+            if isinstance(row, Mapping)
+        ]
+        mirror_count = sum(row.get("exists") is True for row in mirrors)
+        mirror_state = "present" if nats_substrate.get(
+            "filesystem_mirrors_exist"
+        ) else "absent"
+        tcp_state = "listening" if nats_substrate.get(
+            "tcp_listening"
+        ) else "not listening"
+        lines.append("")
+        lines.append("NATS SUBSTRATE — LOCAL OBSERVATION ONLY")
+        lines.append(f"  Spec: {nats_substrate.get('spec_path', '?')}")
+        lines.append(
+            "  Local TCP "
+            f"{nats_substrate.get('tcp_host', '?')}:{nats_substrate.get('tcp_port', '?')}: "
+            f"{tcp_state}"
+        )
+        lines.append(
+            "  Compatibility filesystem A2A mirrors: "
+            f"{mirror_state} ({mirror_count}/{len(mirrors)} declared paths)"
+        )
+        lines.append(
+            "  WARNING: compatibility filesystem mirrors are not live-transport proof."
+        )
+        lines.append("  No JetStream ack or live contact is claimed.")
 
     lines.append("")
     tracks = core.get("portfolio", {}).get("tracks", [])

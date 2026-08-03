@@ -54,7 +54,7 @@ make pr-reviewers
 make pr-run-codex PR=397
 make pr-run-claude PR=397
 make pr-gate PR=397
-make pr-merge PR=397 ARGS="--confirm merge-pr-397"
+make pr-merge PR=397 ARGS="--confirm automerge-policy-pass-397"
 ```
 
 ## GitHub Comment Adapter
@@ -327,7 +327,7 @@ after the gate passes. To execute, add `--execute` and the exact confirmation
 token:
 
 ```bash
-make pr-merge PR=397 ARGS="--confirm merge-pr-397 --execute"
+make pr-merge PR=397 ARGS="--confirm automerge-policy-pass-397 --execute"
 ```
 
 High-risk and critical PRs require `--human-approved` even when Codex and Claude

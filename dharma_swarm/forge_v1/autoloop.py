@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -40,10 +39,6 @@ from pathlib import Path
 WT = Path(__file__).resolve().parents[2]
 if str(WT) not in sys.path:
     sys.path.insert(0, str(WT))
-
-# The instance Docker images live on the forge-swebench colima profile, not the
-# default context. Make every docker call (context pull + grade) target it.
-os.environ.setdefault("DOCKER_CONTEXT", os.environ.get("FORGE_DOCKER_CONTEXT", "colima-forge-swebench"))
 
 from dharma_swarm.api_keys import bootstrap_runtime_env  # noqa: E402
 

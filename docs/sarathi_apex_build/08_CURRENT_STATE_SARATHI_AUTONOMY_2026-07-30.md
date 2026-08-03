@@ -1,0 +1,21 @@
+# 08 — CURRENT_STATE: Sarathi autonomy build (2026-07-30)
+
+Fifteen lines reconciling the mission prompt
+(`docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md`) against disk; each line
+carries its evidence.
+
+1. Sarathi source package is read-only projections only — pulse/brief/gateway/roster/scoreboard; every surface pins `wake_loop_active: False`, `alive_claim: False` (`dharma_swarm/holon_system/sarathi/pulse.py:24`, `gateway.py:19`).
+2. `holon_wake_cycle(name, agent_runner, *, spent_usd, cap_usd, agents_root=None, persist=True, memory_kernel=None, planned_action=None, operator_reachable=False)` runs kill → budget → reversibility gate (step 2.5, only when `planned_action` is supplied) → work → compass → persist (`dharma_swarm/holon_runtime.py:53-118`).
+3. Gate REAL shapes: `classify_action(action, *, operator_reachable=False) -> GateDecision(action, risk, action_class, may_execute_unattended, requires_execution_lease, operator_reachable, never_auto_hit, reasons)`; `ActionClass` is 4-way; `_never_auto_match` returns the matched pattern string (`dharma_swarm/operator_core/reversibility_gate.py:118-152`).
+4. NEVER_AUTO includes "git push" and "merge pr" (`reversibility_gate.py:63-92`) — Sarathi structurally cannot merge or push directly; merge intents must ride Merge Master Mike's lane as PR/label intents.
+5. DRIFT: the mission's "docs 08/09 seat audit" and starter drafts `sarathi_plan.py` / `sarathi_delegate.py` do not exist anywhere on disk (`docs/sarathi_apex_build/` holds 00–07 + 90/91; repo-wide glob for the drafts returns nothing) — PR-S1 organs are written fresh against the real signatures, not ported.
+6. The `sarathi` WakeProfile exists (`scripts/runtime/codex_composer_wake_loop.py:125-133`); `_sarathi_model_identity()` honors `DGC_DIRECTOR_SARATHI_MODEL`, else `default_model(GOOGLE_AI)`, else "gemini-2.5-flash" (`codex_composer_wake_loop.py:90-97`) — PR-S3 target confirmed.
+7. Mailbox schema (PR-D #1159): `MailboxTask` with `depends_on` ready-set; dependent tasks are written `status="blocked"`; claims go through an `O_CREAT|O_EXCL` fence receipt under `roaming_mailbox/receipts/`; only a `responded` record satisfies a dependency, unknown ids fail closed (`dharma_swarm/roaming_mailbox.py:54-325`).
+8. `invoke_agent(task: dict, agent_id, context_id, routing: RoutingDecision, *, invoker) -> EvidenceReceipt` — the invoker is injected; the spine owns no execution (`dharma_swarm/spine/invoke.py:36-55`).
+9. Door state before this PR: tier0 = 1 review ≤ 300 lines (docs), tier1 = 2 decorrelated reviews ≤ 600, tier2 = `operator_hand_merge_forever` (`scripts/governance/automerge_tier_policy.json`, pre-v2); approvals count only on the head SHA from exact `<app>[bot]` logins with family ≠ author family (`scripts/governance/check_automerge_tier_policy.py:114-141`).
+10. The tier-policy workflow loads policy + checker from the DEFAULT branch (`.github/workflows/automerge-tier-policy.yml:51-55`) — the repeal binds only after the operator lands PR-S0; landing it is the ratifying act.
+11. CONSTRAINT found and fixed in PR-S0: the checker runs on bare `python3` (no pip install) while `reversibility_gate` imported `adaptive_autonomy` which imports pydantic — the shared vocabulary moved to stdlib-only `dharma_swarm/risk_patterns.py` so the gate is importable in the referee workflow.
+12. LivingAgentKernel lease/closeback surface for PR-S1/S2: `lease_next_wake(lease_owner, lease_seconds, allowed_sources)`, `complete_wake(record, KernelRunResult)`, `record_wake_closeback(record, KernelSourceCloseback)` — hash-chained wake records (`dharma_swarm/operator_core/living_agent_kernel.py:1030-1133`).
+13. Gate-9 stays binding: repo source under `dharma_swarm/holon_system/`, runtime wrapper thin; Gate-10: no `wake_loop_active=true` claim without unattended proof (`docs/sarathi_apex_build/06_PROOF_GATES.md:20-21`) — matches mission PR-S4.
+14. Runtime truth for briefs is `reports/loop_closure/cybernetics_codex/latest_audit.json` (11 harness-proven loops, 2 blocked, closed-live 0 at read time); a brief that disagrees with the JSON is a bug — JSON wins.
+15. Roster default: `hermes-m5, codex_composer, fugu_ultra, fable_composer` (`dharma_swarm/holon_system/sarathi/roster.py:7`); Mike's own surfaces (`pr_merge_control.py`, daemon) are another track's owned surfaces — Sarathi integrates via labels/PRs, not edits.

@@ -20,6 +20,7 @@ from urllib.parse import quote
 
 from dharma_swarm.memory_kernel.adapters.base import SurfaceProbe
 from dharma_swarm.memory_kernel.atoms import (
+    AGENT_OWNER_METADATA_KEYS,
     MemoryAtom,
     MemoryAtomType,
     MemoryOrder,
@@ -417,7 +418,10 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
         ):
             return
         atoms: list[MemoryAtom] = []
-        files = _ordered_paths(_markdown_files(self.path, self.config.max_files), resolved_query.order_by)
+        files = _ordered_paths(
+            _manifest_trusted_markdown_files(self.path, self.config.max_files),
+            resolved_query.order_by,
+        )
         for file_path in files:
             stat = file_path.stat()
             content: str | None = None
@@ -664,19 +668,36 @@ def _jsonl_files(path: Path, max_files: int) -> tuple[Path, ...]:
     return tuple(files)
 
 
-def _markdown_files(path: Path, max_files: int) -> tuple[Path, ...]:
+def _iter_markdown_files(path: Path) -> Iterator[Path]:
     if path.is_file() and path.suffix.lower() in {".md", ".markdown"}:
-        return (path,)
+        yield path
+        return
     if not path.is_dir():
-        return ()
-    files: list[Path] = []
+        return
     for current, dirs, filenames in os.walk(path):
         dirs[:] = sorted(name for name in dirs if name not in {".git", "__pycache__"})
         for filename in sorted(filenames):
             if Path(filename).suffix.lower() in {".md", ".markdown"}:
-                files.append(Path(current) / filename)
-                if len(files) >= max_files:
-                    return tuple(files)
+                yield Path(current) / filename
+
+
+def _manifest_trusted_markdown_files(path: Path, max_files: int) -> tuple[Path, ...]:
+    """Wiki-tree listing gated by the signed trust manifest.
+
+    The manifest filter runs BEFORE the max_files truncation so untrusted
+    alphabetically-early scratch files can never crowd out trusted pages.
+    Fail-closed: no valid signed manifest → no files.
+    """
+    from dharma_swarm.chetana.manifest import load_manifest
+
+    manifest = load_manifest(path)
+    files: list[Path] = []
+    for candidate in _iter_markdown_files(path):
+        if not manifest.is_trusted(candidate):
+            continue
+        files.append(candidate)
+        if len(files) >= max_files:
+            break
     return tuple(files)
 
 
@@ -753,6 +774,15 @@ def _safe_metadata(
     for key, value in metadata.items():
         if key in {"row", "payload"} and not include_payloads:
             redacted_keys.append(key)
+            # Ownership must survive payload redaction: scoped context
+            # admission enforces owner identity from atom metadata, and
+            # silently dropping the row would skip that check for
+            # shared-scope records whose owner lives only in the row.
+            if isinstance(value, dict):
+                owner_ids = _payload_owner_ids(value)
+                if owner_ids:
+                    merged = (*safe.get("owner_agent_ids", ()), *owner_ids)
+                    safe["owner_agent_ids"] = tuple(dict.fromkeys(merged))
             continue
         safe_value, child_redactions = _redacted_value(key, value)
         safe[key] = safe_value
@@ -770,12 +800,25 @@ def _safe_metadata(
     compact = {
         key: value
         for key, value in safe.items()
-        if key in STRUCTURAL_METADATA_KEYS or key.startswith("redaction_")
+        if key in STRUCTURAL_METADATA_KEYS
+        or key.startswith("redaction_")
+        or key == "owner_agent_ids"
     }
     compact["metadata_truncated"] = True
     compact["redaction_status"] = safe["redaction_status"]
     compact["redacted_keys"] = safe["redacted_keys"]
     return compact
+
+
+def _payload_owner_ids(payload: dict[str, Any]) -> tuple[str, ...]:
+    ids: list[str] = []
+    for key in AGENT_OWNER_METADATA_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            ids.append(value.strip())
+        elif isinstance(value, (list, tuple, set)):
+            ids.extend(str(item).strip() for item in value if str(item).strip())
+    return tuple(dict.fromkeys(ids))
 
 
 def _redacted_value(key: str, value: Any) -> tuple[Any, list[str]]:

@@ -1,0 +1,92 @@
+{
+  "allowed_files": [
+    "dharma_swarm/cybernetics_codex.py",
+    "reports/agentops/work_packets/loop-closure-WP-CCAR1-cybernetics-audit-refresh-2026-07-24.json",
+    "reports/loop_closure/cybernetics_codex/latest_audit.json",
+    "tests/test_cybernetics_codex.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+  "branch": "agent/cybernetics-codex-audit-refresh-20260724",
+  "commit": {
+    "allowed": true,
+    "message": "governance(loop-closure): refresh cybernetics codex audit"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_cybernetics_codex.py tests/test_one_wire_archive_fitness_guard.py -q",
+      "expected_exit": 0,
+      "name": "cybernetics-audit-contract-tests",
+      "timeout_seconds": 600
+    },
+    {
+      "command": "python3 scripts/governance/cybernetics_codex_audit.py --json",
+      "expected_exit": 0,
+      "max_output_chars": 100000,
+      "name": "render-current-cybernetics-audit",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check e1bb3d7b1cdf7bcc42a008cec6708acb2e471214..HEAD",
+      "expected_exit": 0,
+      "name": "committed-event-whitespace",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "loop-closure-WP-CCAR1-cybernetics-audit-refresh-2026-07-24",
+  "intent": "Repair the clean-clone Cybernetics Codex verdict projection so a structurally verified Loop 1 bounded replay remains HARNESS_PROVEN when no live runtime database is mounted, while CLOSED_LIVE still requires live owner-surface evidence. Re-run the canonical read-only generator and refresh its latest audit receipt without editing TTLs, criteria, historical receipts, or live state.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/cybernetics_codex.py'); t=p.read_text(); old='            if total_runs == 0 and not loop1_harness_proven:'; new='            if total_runs == 0:'; (old in t) or sys.exit(3); m=t.replace(old,new,1); (m != t) or sys.exit(4); p.write_text(m); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_cybernetics_codex.py::test_loop1_bounded_replay_stays_harness_proven_without_runtime_db'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "clean-clone-loop1-replay-must-not-be-unknown",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/cybernetics_codex.py",
+      "tests/test_cybernetics_codex.py",
+      "scripts/governance/cybernetics_codex_audit.py",
+      "reports/loop_closure/cybernetics_codex/latest_audit.json"
+    ],
+    "collision": {
+      "checked_at_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+      "details": [
+        "PR #1102 is an independent Titanium four-file correction and must not be edited by this packet."
+      ],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The refreshed clean-clone receipt proves CLOSED_LIVE=0, HARNESS_PROVEN=11, BLOCKED=2. It does not provide or substitute live runtime.db evidence.",
+      "Loops 12 and 13 remain BLOCKED behind the One Wire external-receipt quorum and archive-fitness authority.",
+      "Exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "interface_mismatches": [
+      "The canonical clean-clone audit loaded the verified Loop 1 bounded replay but classified it UNKNOWN whenever runtime.db was absent because the no-runtime branch ran before the HARNESS_PROVEN branch."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "e423529c975404fb89311ca2f8b6364e94c0fa92700f7e6b4c456226745ab3f7",
+    "rollback": "Revert the verdict ordering fix, its regression test, the generated latest audit, and this packet together. Rollback restores a stale receipt and a clean-clone false UNKNOWN for Loop 1.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.14.4"
+    },
+    "work_packet": "WP-CCAR1"
+  },
+  "worktree": "."
+}

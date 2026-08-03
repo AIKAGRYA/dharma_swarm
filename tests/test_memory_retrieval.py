@@ -4,7 +4,11 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
-from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
+from dharma_swarm.memory_retrieval import (
+    GovernedRetrievalEngine,
+    RetrievalAbstentionConfig,
+    RetrievalQuery,
+)
 from dharma_swarm.vector_store import VectorStore
 
 
@@ -377,3 +381,357 @@ def test_governed_retrieval_prefers_source_identity_for_source_files(tmp_path):
     assert result
     assert result[0].metadata["expected"] == "target"
     assert result[0].metadata["retrieval_source_match"] > 0
+
+
+def test_atoms_for_candidates_maps_ranked_candidates_to_projection_atoms(tmp_path):
+    from dharma_swarm.memory_kernel import (
+        CensusConfig,
+        MemoryAtomType,
+        MemoryKernel,
+        MemoryKernelConfig,
+    )
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    ranked = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.91,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="semantic inbox drains require a verified reply receipt",
+    )
+    unidentified = RetrievalCandidate(
+        doc_id="",
+        rank=2,
+        score=0.4,
+        source="receipt:no-doc-id",
+        layer="working",
+        channels=("vector",),
+        content="candidate without a doc id is skipped",
+    )
+
+    atoms = kernel.atoms_for_candidates((ranked, unidentified))
+
+    assert len(atoms) == 1
+    atom = atoms[0]
+    assert atom.surface_id == "home.vectors"
+    assert atom.atom_type == MemoryAtomType.SOURCE_CHUNK
+    assert atom.content_ref == "retrieval:doc-a2a"
+    assert atom.source_row_key == "doc-a2a"
+    assert atom.source_refs == ("receipt:a2a-consumer-liveness",)
+    assert atom.content == "semantic inbox drains require a verified reply receipt"
+    assert atom.metadata["retrieval_rank"] == 1
+    assert atom.metadata["retrieval_score"] == 0.91
+    assert atom.metadata["retrieval_layer"] == "working"
+    assert atom.metadata["retrieval_channels"] == ["fts"]
+    assert atom.source_digest
+    assert atom.promotion_allowed is False
+    assert atom.context_admissible is False
+
+
+def test_atoms_for_candidates_fails_loud_when_projection_surface_missing(tmp_path):
+    import pytest
+
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+    from dharma_swarm.memory_retrieval import RetrievalCandidate
+
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+    kernel.surfaces_by_id = {
+        surface_id: surface
+        for surface_id, surface in kernel.surfaces_by_id.items()
+        if surface_id != "home.vectors"
+    }
+    candidate = RetrievalCandidate(
+        doc_id="doc-a2a",
+        rank=1,
+        score=0.9,
+        source="receipt:a2a-consumer-liveness",
+        layer="working",
+        channels=("fts",),
+        content="chunk",
+    )
+
+    # A silent () would make shadow receipts read admitted=0 with no WHY;
+    # the missing-surface anomaly must surface as a stamped shadow_error.
+    with pytest.raises(LookupError, match="home.vectors"):
+        kernel.atoms_for_candidates((candidate,))
+
+
+def test_memory_kernel_query_forwards_shadow_flags(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import dharma_swarm.memory_retrieval as memory_retrieval_module
+    from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+
+    captured: dict[str, object] = {}
+
+    class _CaptureEngine:
+        def __init__(self, *, state_dir, memory_kernel):
+            captured["state_dir"] = state_dir
+
+        def retrieve(self, query):
+            captured["query"] = query
+            return SimpleNamespace(candidates=())
+
+    monkeypatch.setattr(
+        memory_retrieval_module, "GovernedRetrievalEngine", _CaptureEngine
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path / "home",
+                include_discovered=False,
+            )
+        )
+    )
+
+    kernel.query(
+        "governed memory",
+        top_k=6,
+        enable_memory_kernel=False,
+        record_telemetry=False,
+    )
+
+    query = captured["query"]
+    assert query.text == "governed memory"
+    assert query.top_k == 6
+    assert query.enable_memory_kernel is False
+    assert query.record_telemetry is False
+def test_nonsense_query_abstains_when_calibrated_config_enabled(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("nonexistent zxqwbblplk fnord")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason in {
+        "no_candidates_above_min_score",
+        "no_matching_documents",
+    }
+
+
+def test_legacy_default_never_marks_abstained(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(state_dir=tmp_path, vector_store=store)
+
+    assert engine.abstention == RetrievalAbstentionConfig()
+    nonsense = engine.retrieve("nonexistent zxqwbblplk fnord")
+    served = engine.retrieve("consumer liveness reply receipt")
+
+    assert nonsense.abstained is False
+    assert nonsense.abstained_reason == ""
+    assert served.abstained is False
+    assert served.candidates
+    assert served.candidates[0].metadata["expected"] == "a2a"
+
+
+def test_calibrated_min_score_overrides_query_min_score(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.99),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason == "no_candidates_above_min_score"
+
+
+def test_calibrated_empty_query_abstains_with_reason(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(),
+    )
+
+    result = engine.retrieve("   ")
+
+    assert result.candidates == ()
+    assert result.abstained is True
+    assert result.abstained_reason == "empty_query"
+
+
+def test_telemetry_records_shadow_abstention_columns(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(state_dir=tmp_path, vector_store=store)
+
+    engine.retrieve("consumer liveness reply receipt")
+    engine.retrieve("nonexistent zxqwbblplk fnord")
+
+    conn = sqlite3.connect(tmp_path / "vectors.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT query_preview, abstained, abstained_reason,
+                   shadow_abstained, shadow_min_score
+            FROM memory_retrieval_query_log
+            ORDER BY id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert len(rows) == 2
+    served, nonsense = rows
+    assert served["abstained"] == 0
+    assert served["abstained_reason"] == ""
+    assert served["shadow_min_score"] == 0.37
+    assert nonsense["abstained"] == 0
+    assert nonsense["shadow_abstained"] == 1
+
+
+def test_telemetry_schema_upgrade_is_additive(tmp_path):
+    from dharma_swarm.memory_kernel_retrieval.scoring_terms import (
+        _ensure_retrieval_telemetry_table,
+    )
+
+    db = tmp_path / "vectors.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE memory_retrieval_query_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query_time TEXT NOT NULL,
+            query_hash TEXT NOT NULL,
+            query_preview TEXT NOT NULL,
+            top_doc_id TEXT DEFAULT '',
+            top_source TEXT DEFAULT '',
+            top_layer TEXT DEFAULT '',
+            top_score REAL,
+            result_count INTEGER NOT NULL,
+            total_ms REAL,
+            vector_search_ms REAL,
+            fts_search_ms REAL,
+            fusion_ms REAL,
+            memory_kernel_available INTEGER NOT NULL DEFAULT 0,
+            memory_kernel_text_query_supported INTEGER NOT NULL DEFAULT 0,
+            memory_kernel_admitted_count INTEGER NOT NULL DEFAULT 0,
+            degraded_reasons_json TEXT NOT NULL DEFAULT '[]',
+            top_channels_json TEXT NOT NULL DEFAULT '[]'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO memory_retrieval_query_log (query_time, query_hash, query_preview, result_count)
+        VALUES ('2026-07-01T00:00:00+00:00', 'h', 'legacy row', 3)
+        """
+    )
+    conn.commit()
+
+    _ensure_retrieval_telemetry_table(conn)
+    _ensure_retrieval_telemetry_table(conn)
+
+    row = conn.execute(
+        "SELECT abstained, abstained_reason, shadow_abstained, shadow_min_score "
+        "FROM memory_retrieval_query_log"
+    ).fetchone()
+    conn.close()
+    assert row == (0, "", None, None)
+
+
+def test_abstention_config_from_env(monkeypatch):
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", raising=False)
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", raising=False)
+    assert RetrievalAbstentionConfig.from_env() == RetrievalAbstentionConfig()
+
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "1")
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0.42")
+    config = RetrievalAbstentionConfig.from_env()
+    assert config.enabled is True
+    assert config.include_below_threshold is False
+    assert config.apply_score_floors is False
+    assert config.min_score == 0.42
+
+
+def test_abstention_config_from_env_fails_closed_to_calibrated_default(monkeypatch):
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", "1")
+
+    # Enabled without an explicit threshold must serve at the measured
+    # calibrated default, never fall through to the permissive query floor.
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", raising=False)
+    assert RetrievalAbstentionConfig.from_env().min_score == 0.37
+
+    # A typo'd threshold must not silently deploy an unmeasured config.
+    monkeypatch.setenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_MIN_SCORE", "0,37")
+    assert RetrievalAbstentionConfig.from_env().min_score == 0.37
+
+    # Directly-constructed enabled configs without a threshold resolve the
+    # same way at the serving/shadow seam.
+    bare = RetrievalAbstentionConfig(enabled=True, min_score=None)
+    assert bare.effective_min_score() == 0.37
+
+    # Disabled + malformed stays legacy; shadow scoring uses the default.
+    monkeypatch.delenv("DHARMA_MEMORY_RETRIEVAL_CALIBRATED_ABSTENTION", raising=False)
+    disabled = RetrievalAbstentionConfig.from_env()
+    assert disabled.min_score is None
+    assert disabled.effective_min_score() == 0.37
+
+
+def test_calibrated_config_serves_results_on_normal_path(tmp_path):
+    store = _seed_vector_store(tmp_path)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert result.abstained is False
+    assert result.abstained_reason == ""
+    assert result.candidates
+    assert result.candidates[0].metadata["expected"] == "a2a"
+    assert result.candidates[0].score >= 0.37
+
+
+def test_calibrated_config_serves_results_when_fts_guard_blocked(tmp_path, monkeypatch):
+    # The floors-off arms (_bounded_row_distance real-score branch and the
+    # 0.0 default-score branch) must still SERVE on the guard-blocked path —
+    # the live serving path — not just abstain on nonsense.
+    store = _seed_vector_store(tmp_path)
+    monkeypatch.setenv("DHARMA_VECTOR_FTS_MAX_ROWS", "1")
+    monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+    monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+    engine = GovernedRetrievalEngine(
+        state_dir=tmp_path,
+        vector_store=store,
+        abstention=RetrievalAbstentionConfig.calibrated(min_score=0.37),
+    )
+
+    result = engine.retrieve("consumer liveness reply receipt")
+
+    assert "fts_guard_blocked" in result.diagnostics.degraded_reasons
+    assert result.abstained is False
+    assert result.candidates
+    assert result.candidates[0].metadata["expected"] == "a2a"
+    assert result.candidates[0].score >= 0.37

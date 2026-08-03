@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from dharma_swarm.context_agent import (
     ContextAgent,
+    HEALTH_ALERT,
     Intelligence,
     NervousSystem,
-    assemble_package,
 )
 
 
@@ -219,6 +219,36 @@ class TestIntelligence:
 
 class TestContextAgent:
     @pytest.mark.asyncio
+    async def test_context_agent_intelligence_gate_skips_constructor(
+        self,
+        tmp_dharma: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A false runtime control preserves sensing without constructing LLMs."""
+        import dharma_swarm.context_agent as context_agent_module
+        from dharma_swarm.signal_bus import SignalBus
+
+        intelligence_constructor = MagicMock(
+            side_effect=AssertionError("disabled intelligence constructor called")
+        )
+        monkeypatch.setenv("DGC_CONTEXT_AGENT_INTELLIGENCE", "0")
+        monkeypatch.setattr(
+            context_agent_module,
+            "Intelligence",
+            intelligence_constructor,
+        )
+
+        agent = ContextAgent(signal_bus=SignalBus(), base_path=tmp_dharma)
+        report = await agent.run_cycle()
+
+        intelligence_constructor.assert_not_called()
+        assert agent.intelligence is None
+        assert report["cycle"] == 1
+        assert report["actions"] == []
+        assert (tmp_dharma / "context" / "freshness.json").exists()
+        assert (tmp_dharma / "context" / "packages" / "session_start.md").exists()
+
+    @pytest.mark.asyncio
     async def test_run_cycle_produces_report(self, tmp_dharma: Path) -> None:
         """A full cycle should produce a health report and write files."""
         from dharma_swarm.signal_bus import SignalBus
@@ -285,7 +315,3 @@ class TestContextAgent:
         # Should have stale signals
         stale_signals = bus.drain(["CONTEXT_STALE"])
         assert len(stale_signals) >= 1
-
-
-# Import threshold for the last test
-from dharma_swarm.context_agent import HEALTH_ALERT

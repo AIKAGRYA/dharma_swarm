@@ -1,0 +1,121 @@
+{
+  "id": "titanium-WP-VTC1-criterion-budget",
+  "base_ref": "d664c0146659ef003d4f154e44448e0870ac6b84",
+  "branch": "agent/titanium-verifier-timeout-contract",
+  "worktree": ".",
+  "intent": "Make titanium_verifier_truth_contracts_pass honest about its declared pytest timeout budget, separate its slow verifier selfcheck from the three fast support files, add a mechanical invariant plus a real-YAML negative control, and reduce the recipe's measured collection-only bottleneck with plain assertion collection while keeping behavioral sentinel execution under normal assertion semantics. Leave timeout-result semantics to its owning track.",
+  "allowed_files": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "Makefile",
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_verifier_selfcheck_contract.py",
+    "reports/agentops/work_packets/titanium-WP-VTC1-criterion-budget.json"
+  ],
+  "forbidden_files": [
+    ".github/workflows/hardening-lane.yml",
+    "scripts/runtime/lane_*.py",
+    "tests/test_lane_*.py",
+    "dharma_swarm/chamber/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/check_track_status.py",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "criterion-budget-and-track-contracts",
+      "command": "python3 -m pytest -q tests/test_fast_suite_isolation.py tests/test_active_track_governance.py tests/test_track_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "verifier-criterion-battery",
+      "command": "python3 -m pytest -q tests/test_verifier_selfcheck_contract.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py",
+      "expected_exit": 0,
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "touched-test-ruff",
+      "command": "python3 -m ruff check tests/test_fast_suite_isolation.py tests/test_verifier_selfcheck_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "managed-projections-stay-synchronized",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "working-tree-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "real-criterion-default-budget-violation-detected",
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGFzdAppbXBvcnQgcnVucHkKaW1wb3J0IHN5cwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKClNFVFVQX0ZBSUwgPSAzCnRyeToKICAgIGFjdGl2ZV90cmFjayA9IFBhdGgoImRvY3MvZ292ZXJuYW5jZS9BQ1RJVkVfVFJBQ0sueWFtbCIpCiAgICB0ZXh0ID0gYWN0aXZlX3RyYWNrLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQogICAgY29tbWFuZCA9ICcgICAgICAgIGNvbW1hbmQ6IFsicHl0aG9uMyIsICItbSIsICJweXRlc3QiLCAidGVzdHMvdGVzdF92ZXJpZmllcl9zZWxmY2hlY2tfY29udHJhY3QucHkiLCAiLXEiXScKICAgIGFuY2hvciA9ICIgICAgICAgIHRpbWVvdXRfczogOTAwXG4iICsgY29tbWFuZAogICAgaWYgdGV4dC5jb3VudChhbmNob3IpICE9IDE6CiAgICAgICAgc3lzLmV4aXQoU0VUVVBfRkFJTCkKICAgIGFjdGl2ZV90cmFjay53cml0ZV90ZXh0KHRleHQucmVwbGFjZShhbmNob3IsIGNvbW1hbmQsIDEpLCBlbmNvZGluZz0idXRmLTgiKQogICAgcG9ydGZvbGlvID0gcnVucHkucnVuX3BhdGgoInNjcmlwdHMvZ292ZXJuYW5jZS9jaGVja190cmFja19zdGF0dXMucHkiKVsibG9hZF9hY3RpdmVfdHJhY2siXShhY3RpdmVfdHJhY2spCiAgICBzb3VyY2VfcGF0aCA9IFBhdGgoInRlc3RzL3Rlc3RfZmFzdF9zdWl0ZV9pc29sYXRpb24ucHkiKQogICAgdHJlZSA9IGFzdC5wYXJzZShzb3VyY2VfcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IiksIGZpbGVuYW1lPXN0cihzb3VyY2VfcGF0aCkpCiAgICBuYW1lcyA9IHsKICAgICAgICAiX21hcmtfY2hhaW4iLAogICAgICAgICJfdGltZW91dF9vdmVycmlkZSIsCiAgICAgICAgIl9maWxlX3RpbWVvdXRfY29udHJhY3QiLAogICAgICAgICJfY3JpdGVyaW9uX3Rlc3RfZmlsZXMiLAogICAgICAgICJfY3JpdGVyaW9uX3RpbWVvdXRfdmlvbGF0aW9ucyIsCiAgICB9CiAgICBzZWxlY3RlZCA9IFsKICAgICAgICBub2RlCiAgICAgICAgZm9yIG5vZGUgaW4gdHJlZS5ib2R5CiAgICAgICAgaWYgaXNpbnN0YW5jZShub2RlLCAoYXN0LkZ1bmN0aW9uRGVmLCBhc3QuQXN5bmNGdW5jdGlvbkRlZikpCiAgICAgICAgYW5kIG5vZGUubmFtZSBpbiBuYW1lcwogICAgXQogICAgaWYge25vZGUubmFtZSBmb3Igbm9kZSBpbiBzZWxlY3RlZH0gIT0gbmFtZXM6CiAgICAgICAgc3lzLmV4aXQoU0VUVVBfRkFJTCkKICAgIG5hbWVzcGFjZSA9IHsiYXN0IjogYXN0LCAiUGF0aCI6IFBhdGgsICJSRVBPX1JPT1QiOiBQYXRoLmN3ZCgpfQogICAgZXhlYyhjb21waWxlKGFzdC5Nb2R1bGUoYm9keT1zZWxlY3RlZCwgdHlwZV9pZ25vcmVzPVtdKSwgc3RyKHNvdXJjZV9wYXRoKSwgImV4ZWMiKSwgbmFtZXNwYWNlKQogICAgdmlvbGF0aW9ucyA9IG5hbWVzcGFjZVsiX2NyaXRlcmlvbl90aW1lb3V0X3Zpb2xhdGlvbnMiXShwb3J0Zm9saW8pCiAgICBleHBlY3RlZCA9ICgKICAgICAgICAicmVwb3NpdG9yeS10aXRhbml1bS1oYXJkZW5pbmctMjAyNi0wNzo6IgogICAgICAgICJ0aXRhbml1bV92ZXJpZmllcl90cnV0aF9jb250cmFjdHNfcGFzcyB0aW1lb3V0X3M9MTIwIDwgIgogICAgICAgICJ0ZXN0cy90ZXN0X3ZlcmlmaWVyX3NlbGZjaGVja19jb250cmFjdC5weSBtYXggcHl0ZXN0Lm1hcmsudGltZW91dD05MDAiCiAgICApCmV4Y2VwdCBTeXN0ZW1FeGl0OgogICAgcmFpc2UKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHN5cy5leGl0KFNFVFVQX0ZBSUwpCnN5cy5leGl0KDEgaWYgdmlvbGF0aW9ucyA9PSBbZXhwZWN0ZWRdIGVsc2UgMCkK'))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "collection-plain-assertion-scope-removal-detected",
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGFzdAppbXBvcnQgcmUKaW1wb3J0IHN5cwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKClNFVFVQX0ZBSUwgPSAzCnRyeToKICAgIG1ha2VmaWxlID0gUGF0aCgiTWFrZWZpbGUiKQogICAgdGV4dCA9IG1ha2VmaWxlLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQogICAgYW5jaG9yID0gIiAtLWNvbGxlY3Qtb25seSAtLWFzc2VydD1wbGFpbiAtcSIKICAgIGlmIHRleHQuY291bnQoYW5jaG9yKSAhPSAxOgogICAgICAgIHN5cy5leGl0KFNFVFVQX0ZBSUwpCiAgICBtdXRhdGVkID0gdGV4dC5yZXBsYWNlKGFuY2hvciwgIiAtLWNvbGxlY3Qtb25seSAtcSIsIDEpCiAgICBtYWtlZmlsZS53cml0ZV90ZXh0KG11dGF0ZWQsIGVuY29kaW5nPSJ1dGYtOCIpCiAgICBzb3VyY2VfcGF0aCA9IFBhdGgoInRlc3RzL3Rlc3RfdmVyaWZpZXJfc2VsZmNoZWNrX2NvbnRyYWN0LnB5IikKICAgIHRyZWUgPSBhc3QucGFyc2Uoc291cmNlX3BhdGgucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpLCBmaWxlbmFtZT1zdHIoc291cmNlX3BhdGgpKQogICAgaGVscGVyID0gbmV4dCgKICAgICAgICAobm9kZSBmb3Igbm9kZSBpbiB0cmVlLmJvZHkgaWYgaXNpbnN0YW5jZShub2RlLCBhc3QuRnVuY3Rpb25EZWYpIGFuZCBub2RlLm5hbWUgPT0gIl9yZWNpcGUiKSwKICAgICAgICBOb25lLAogICAgKQogICAgY29udHJhY3QgPSBuZXh0KAogICAgICAgIChub2RlIGZvciBub2RlIGluIHRyZWUuYm9keSBpZiBpc2luc3RhbmNlKG5vZGUsIGFzdC5DbGFzc0RlZikgYW5kIG5vZGUubmFtZSA9PSAiVGVzdFJlY2lwZVN0cnVjdHVyZSIpLAogICAgICAgIE5vbmUsCiAgICApCiAgICBpZiBoZWxwZXIgaXMgTm9uZSBvciBjb250cmFjdCBpcyBOb25lOgogICAgICAgIHN5cy5leGl0KFNFVFVQX0ZBSUwpCiAgICBuYW1lc3BhY2UgPSB7CiAgICAgICAgInJlIjogcmUsCiAgICAgICAgIk1BS0VGSUxFIjogbXV0YXRlZCwKICAgICAgICAiTkFSUk9XRURfQkFOTkVSIjogInZlcmlmaWVyLXNlbGZjaGVjazogT0sgKHN5bnRheCwgRjgyMSwgY29sbGVjdGlvbiwgb25ib2FyZGluZywgYmVoYXZpb3JhbCBzZW50aW5lbCkiLAogICAgfQogICAgZXhlYyhjb21waWxlKGFzdC5Nb2R1bGUoYm9keT1baGVscGVyLCBjb250cmFjdF0sIHR5cGVfaWdub3Jlcz1bXSksIHN0cihzb3VyY2VfcGF0aCksICJleGVjIiksIG5hbWVzcGFjZSkKICAgIHRyeToKICAgICAgICBuYW1lc3BhY2VbIlRlc3RSZWNpcGVTdHJ1Y3R1cmUiXSgpLnRlc3RfcGxhaW5fYXNzZXJ0aW9uc19hcmVfY29uZmluZWRfdG9fY29sbGVjdGlvbigpCiAgICBleGNlcHQgQXNzZXJ0aW9uRXJyb3I6CiAgICAgICAgc3lzLmV4aXQoMSkKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgc3lzLmV4aXQoU0VUVVBfRkFJTCkKZXhjZXB0IFN5c3RlbUV4aXQ6CiAgICByYWlzZQpleGNlcHQgRXhjZXB0aW9uOgogICAgc3lzLmV4aXQoU0VUVVBfRkFJTCkKc3lzLmV4aXQoMCkK'))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): make verifier criterion budget honest"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-VTC1",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d664c0146659ef003d4f154e44448e0870ac6b84",
+      "details": []
+    },
+    "interface_mismatches": [
+      "titanium_verifier_truth_contracts_pass inherits the 120-second default while running tests that explicitly declare pytest.mark.timeout(900).",
+      "A TimeoutExpired result remains executed=True and is therefore rendered as REGRESSION when prior evidence passed; scripts/governance/check_track_status.py is not Titanium-owned, so that tri-state semantic repair is raised but excluded from this packet.",
+      "Splitting one completion criterion changes the live Titanium criterion count from eight to nine; sealed 7/8 reconciliation evidence remains historical while the live description must stop calling eight the current total."
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "Makefile",
+      "tests/test_fast_suite_isolation.py",
+      "tests/test_verifier_selfcheck_contract.py",
+      "scripts/governance/check_track_status.py"
+    ],
+    "honest_blockers": [
+      "The full repository suite is long-running and must complete without a 900-second outer cap; known root-only Docker/evolution-safety failures will be reported separately if reproduced.",
+      "Open PR #1200 changes only hardening-lane workflow/runtime/tests plus its own loop-closure packet; all six filenames are outside this packet and its lane runtime surfaces are explicitly forbidden here.",
+      "GitHub PR and remote-branch searches found no separate open verifier-timeout implementation branch at packet admission.",
+      "Hosted CI timing and flap frequency remain external evidence owned by the Actions-log audit.",
+      "The collection optimization preserves measured node IDs and failure exits, but collection-time assertion messages become plain; the behavioral sentinel remains under normal rewritten assertion semantics."
+    ],
+    "rollback": "Revert the YAML split, Makefile collection flag, both test contracts, and this packet together. Rollback restores the 120-second contradiction and removes the mechanical recurrence guard; it must not be described as a verifier regression.",
+    "packet_digest": "c2292ce1be56d6ed2bbdebcd6601a5f7d3b6957365379a060838ff5247a20e47"
+  }
+}

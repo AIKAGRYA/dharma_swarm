@@ -1,0 +1,121 @@
+{
+  "id": "titanium-WP-M0-phase0-truth-reconciliation",
+  "base_ref": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+  "branch": "agent/titanium-m0-phase0-truth-20260725",
+  "worktree": ".",
+  "intent": "Reconcile Titanium Phase 0 packet modalities and the canonical residual DAG against exact main after PR 1144, regenerate current DocOps counts while subsuming PR 1118's earlier delta, and publish a point-in-time receipt while preserving BLOCKED_OPERATOR, UNIMPLEMENTED, FINAL_REVIEW, and CLOSED_NOT_PROD boundaries. This packet changes no runtime implementation and grants no production or merge authority.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
+    "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "terminal/**",
+    "tools/**",
+    "tests/**",
+    "scripts/**",
+    "docs/plans/**",
+    "docs/prompts/**",
+    "docs/state/**",
+    "reports/loop_closure/**",
+    "reports/governance/titanium/wp00_baseline.json",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md",
+    "Dockerfile",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock",
+    "INTERFACE_MISMATCH_MAP.md",
+    "CYBERNETIC_LOOP_MAP.md"
+  ],
+  "gates": [
+    {
+      "name": "docops-integrity-and-active-track-render",
+      "command": "make docops-integrity",
+      "timeout_seconds": 300
+    },
+    {
+      "name": "m0-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_docops_integrity.py",
+      "timeout_seconds": 900
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-rejects-unknown-flag",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(titanium): reconcile Phase 0 truth"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-M0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The canonical track listed thirteen execution and residual nodes although exact merged-main proof reduces them to eight non-duplicated blocking residuals.",
+      "PR 1118's rolling branch was regenerated for current main but still has no checks because it lacks a check-triggering credential path; M0 therefore carries the current generated counts.",
+      "PR 1135 landed a same-track repair packet and regenerated CODEOWNERS; neither path intersects M0's six-file envelope, and the removed explicit broad governance routes remain WP-0F1 authority-policy debt rather than Phase 0 completion evidence.",
+      "PR 1112 merged with two distinct unresolved correctness defects; those require an independent corrective code packet and are not hidden or repaired by this governance-only packet."
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "scripts/governance/check_track_status.py",
+      "scripts/governance/render_active_track_includes.py",
+      "scripts/docops/check_docops_integrity.py",
+      "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md"
+    ],
+    "honest_blockers": [
+      "M0 keeps Phase 0 at 4/8 and BLOCKED; it closes no completion criterion.",
+      "Operator-owned exposure, scanner disposition, CI-policy, Administration-read, and DocOps credential decisions remain BLOCKED_OPERATOR.",
+      "WP-0E and WP-0H remain unimplemented; WP-0D lacks final repeatability evidence; WP-0I remains independent final review.",
+      "PR 1118 may be closed as superseded only after M0's freshly regenerated current-main DocOps counts merge.",
+      "The PR 1112 sequence-allocation and durable-delivery defects require a separate owner-safe corrective PR."
+    ],
+    "rollback": "Revert this packet, receipt, canonical next-item reconciliation, and generated projections as one unit, then allow the rolling DocOps lane to regenerate counts; do not alter historical packet receipts.",
+    "packet_digest": "a86256af2f6e57006e1ed26352d4ecf5a71a9fc45f77c104a0fa66d67613309c"
+  }
+}

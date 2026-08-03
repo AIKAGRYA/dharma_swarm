@@ -8,6 +8,7 @@ observations stay visible; missing evidence fails closed.
 from __future__ import annotations
 
 import json
+import multiprocessing
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,25 @@ def _event(event_type: str = "episode_opened", sequence: int = 0, **payload):
     )
 
 
+def _append_delivery_batch(
+    path: str,
+    episode_id: str,
+    worker_id: str,
+    count: int,
+    barrier,
+) -> None:
+    writer = EpisodeLedgerWriter(path)
+    barrier.wait(timeout=10)
+    for index in range(count):
+        writer.append_delivery(
+            delivery_key=f"worker:{worker_id}:{index}",
+            event_type="attempt_started",
+            episode_id=episode_id,
+            attempt_id=f"at_{worker_id}_{index}",
+            payload={"worker_id": worker_id, "index": index},
+        )
+
+
 # ---------------------------------------------------------------------------
 # Schema: versioned, validated, round-trips
 # ---------------------------------------------------------------------------
@@ -58,6 +78,17 @@ def test_event_round_trips_through_json():
     rebuilt = EpisodeEvent.from_dict(json.loads(json.dumps(event.to_dict())))
     assert rebuilt == event
     assert rebuilt.schema_version == EPISODE_EVENT_SCHEMA_VERSION
+
+
+@pytest.mark.parametrize(
+    "non_finite",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+@pytest.mark.parametrize("payload_key", ["value", "api_key"])
+def test_event_rejects_non_finite_json_numbers(non_finite, payload_key):
+    with pytest.raises(ValueError, match="JSON"):
+        _event("observation_recorded", 1, **{payload_key: non_finite})
 
 
 def test_unknown_schema_version_fails_closed():
@@ -312,6 +343,44 @@ def test_writer_recovers_from_corrupt_lines(tmp_path: Path):
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
 
 
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity", "1e999"])
+def test_writer_rehydration_skips_non_finite_records(
+    tmp_path: Path,
+    constant: str,
+):
+    path = tmp_path / "episodes.jsonl"
+    observation = _event("observation_recorded", 1, value=0)
+    EpisodeLedgerWriter(path).append(observation)
+    invalid = json.dumps(_event("review_recorded", 2, value=0).to_dict())
+    invalid = invalid.replace('"value": 0', f'"value": {constant}')
+    with open(path, "a") as stream:
+        stream.write(invalid + "\n")
+
+    recovered = EpisodeLedgerWriter(path)
+    assert recovered.append(observation) is False
+    assert recovered.append(_event("review_recorded", 2, value=1)) is True
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity", "1e999"])
+def test_non_finite_secret_record_cannot_squat_valid_identity(
+    tmp_path: Path,
+    constant: str,
+):
+    path = tmp_path / "episodes.jsonl"
+    original = _event("observation_recorded", 1, api_key="secret")
+    invalid = json.dumps(original.to_dict()).replace(
+        '"api_key": "[REDACTED]"',
+        f'"api_key": {constant}',
+    )
+    path.write_text(invalid + "\n")
+
+    recovered = EpisodeLedgerWriter(path)
+    assert recovered.append(original) is True
+    assert EpisodeEvent.from_dict(
+        json.loads(path.read_text().splitlines()[-1])
+    ) == original
+
+
 def test_writer_survives_torn_utf8_tail(tmp_path: Path):
     """A crash mid-write can leave a torn multi-byte UTF-8 tail. Rehydration
     must skip it like any corrupt line — a strict whole-file decode would
@@ -366,3 +435,267 @@ def test_writer_recovers_from_valid_json_non_object_lines(tmp_path: Path):
     writer = EpisodeLedgerWriter(path)
     assert writer.append(obs) is False
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+
+
+def test_writer_rejects_distinct_events_at_the_same_episode_sequence(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    first = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep_sequence",
+        attempt_id="at_first",
+        sequence=1,
+    )
+    second = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep_sequence",
+        attempt_id="at_second",
+        sequence=1,
+    )
+
+    assert writer.append(first) is True
+    assert writer.append(second) is False
+
+
+def test_logical_delivery_key_dedupes_replay_after_restart(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    first = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key="session-event:sevt-1:observation",
+        event_type="observation_recorded",
+        episode_id="ep_delivery",
+        attempt_id="at_delivery",
+        payload={"session_event_id": "sevt-1"},
+    )
+    replay = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key="session-event:sevt-1:observation",
+        event_type="observation_recorded",
+        episode_id="ep_delivery",
+        attempt_id="at_delivery",
+        payload={"session_event_id": "sevt-1"},
+    )
+
+    assert replay.event_id == first.event_id
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_rehydrate_collects_logical_keys_and_high_water_in_one_pass(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    seed = EpisodeLedgerWriter(path)
+    first = seed.append_delivery(
+        delivery_key="attempt:at_one:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_one",
+        payload={},
+    )
+    seed.append_delivery(
+        delivery_key="attempt:at_two:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_two",
+        payload={},
+    )
+
+    restarted = EpisodeLedgerWriter(path)
+    replay = restarted.append_delivery(
+        delivery_key="attempt:at_one:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_one",
+        payload={},
+    )
+    third = restarted.append_delivery(
+        delivery_key="attempt:at_three:started",
+        event_type="attempt_started",
+        episode_id="ep_one_pass",
+        attempt_id="at_three",
+        payload={},
+    )
+
+    assert restarted.rehydration_passes == 1
+    assert replay.event_id == first.event_id
+    assert third.sequence == 3
+
+
+def test_interprocess_writers_allocate_unique_monotonic_sequences(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    episode_id = "ep_concurrent"
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(3)
+    processes = [
+        context.Process(
+            target=_append_delivery_batch,
+            args=(str(path), episode_id, worker_id, 12, barrier),
+        )
+        for worker_id in ("a", "b")
+    ]
+
+    for process in processes:
+        process.start()
+    barrier.wait(timeout=10)
+    for process in processes:
+        process.join(timeout=20)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+
+    assert [process.exitcode for process in processes] == [0, 0]
+    events = [
+        EpisodeEvent.from_dict(json.loads(line))
+        for line in path.read_text().splitlines()
+    ]
+    sequences = sorted(event.sequence for event in events)
+    assert sequences == list(range(1, 25))
+
+
+@pytest.mark.parametrize(
+    ("event_type", "attempt_id", "sequence", "payload", "delivery_key"),
+    [
+        (
+            "episode_opened",
+            "",
+            0,
+            {"session_id": "sess-legacy"},
+            "episode:ep_legacy:opened",
+        ),
+        (
+            "attempt_started",
+            "at_legacy",
+            1,
+            {"session_id": "sess-legacy"},
+            "attempt:at_legacy:started",
+        ),
+        (
+            "observation_recorded",
+            "at_legacy",
+            2,
+            {"session_event_id": "sevt-legacy", "value": 1},
+            "session-event:sevt-legacy:observation",
+        ),
+    ],
+)
+def test_legacy_implicit_delivery_key_replays_matching_normalized_content(
+    tmp_path: Path,
+    event_type: str,
+    attempt_id: str,
+    sequence: int,
+    payload: dict,
+    delivery_key: str,
+):
+    path = tmp_path / f"{event_type}.jsonl"
+    legacy = EpisodeEvent.new(
+        event_type=event_type,
+        episode_id="ep_legacy",
+        attempt_id=attempt_id,
+        sequence=sequence,
+        payload=payload,
+    )
+    assert EpisodeLedgerWriter(path).append(legacy) is True
+
+    replay = EpisodeLedgerWriter(path).append_delivery(
+        delivery_key=delivery_key,
+        event_type=event_type,
+        episode_id="ep_legacy",
+        attempt_id=attempt_id,
+        payload=payload,
+    )
+
+    assert replay.event_id == legacy.event_id
+    assert len(path.read_text().splitlines()) == 1
+
+
+def test_logical_delivery_key_reuse_with_different_content_fails_closed(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    first = writer.append_delivery(
+        delivery_key="k",
+        event_type="observation_recorded",
+        episode_id="ep_x",
+        attempt_id="at_x",
+        payload={"session_event_id": "sevt-x", "value": 1},
+    )
+
+    with pytest.raises(LedgerValidationError, match="different content"):
+        writer.append_delivery(
+            delivery_key="k",
+            event_type="review_recorded",
+            episode_id="ep_other",
+            attempt_id="at_other",
+            payload={"value": 2},
+        )
+
+    assert EpisodeEvent.from_dict(json.loads(path.read_text())).event_id == first.event_id
+
+
+@pytest.mark.parametrize("changed_value", [1.0, True])
+def test_logical_delivery_compares_json_distinct_scalars(
+    tmp_path: Path,
+    changed_value: object,
+):
+    path = tmp_path / "json-distinct.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    writer.append_delivery(
+        delivery_key="json-distinct",
+        event_type="observation_recorded",
+        episode_id="ep-json-distinct",
+        attempt_id="at-json-distinct",
+        payload={"value": 1},
+    )
+
+    with pytest.raises(LedgerValidationError, match="different content"):
+        EpisodeLedgerWriter(path).append_delivery(
+            delivery_key="json-distinct",
+            event_type="observation_recorded",
+            episode_id="ep-json-distinct",
+            attempt_id="at-json-distinct",
+            payload={"value": changed_value},
+        )
+
+
+def test_first_file_creation_fsyncs_parent_directory(tmp_path: Path, monkeypatch):
+    path = tmp_path / "durable-directory-entry.jsonl"
+    synced_directories: list[Path] = []
+
+    monkeypatch.setattr(
+        "dharma_swarm.episode_ledger._fsync_parent_directory",
+        lambda directory: synced_directories.append(directory),
+    )
+    writer = EpisodeLedgerWriter(path)
+    assert writer.append(_event("observation_recorded", 1, note="first")) is True
+    assert synced_directories == [tmp_path]
+
+    assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+    assert synced_directories == [tmp_path]
+
+
+def test_rehydrated_conflicting_logical_records_poison_replay(tmp_path: Path):
+    path = tmp_path / "episodes.jsonl"
+    first = EpisodeEvent.new(
+        event_type="observation_recorded",
+        episode_id="ep_conflict",
+        attempt_id="at_conflict",
+        sequence=1,
+        payload={"session_event_id": "sevt-conflict", "value": 1},
+    )
+    conflicting = EpisodeEvent.new(
+        event_type="observation_recorded",
+        episode_id="ep_other",
+        attempt_id="at_other",
+        sequence=1,
+        payload={"session_event_id": "sevt-conflict", "value": 2},
+    )
+    path.write_text(
+        "\n".join(json.dumps(event.to_dict()) for event in (first, conflicting)) + "\n"
+    )
+
+    writer = EpisodeLedgerWriter(path)
+    with pytest.raises(LedgerValidationError, match="conflicting records"):
+        writer.append_delivery(
+            delivery_key="session-event:sevt-conflict:observation",
+            event_type=first.event_type,
+            episode_id=first.episode_id,
+            attempt_id=first.attempt_id,
+            payload=first.payload,
+        )
+
+    assert len(path.read_text().splitlines()) == 2
