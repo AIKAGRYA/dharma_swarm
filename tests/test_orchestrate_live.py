@@ -92,6 +92,64 @@ def test_log_system_failure_empty_message_exception_still_identifiable(capsys):
     assert "RuntimeError" in out
 
 
+def test_log_system_failure_falsey_exception_keeps_traceback(caplog):
+    """A falsey exception instance must not disable logging's exc_info path."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class FalseyError(RuntimeError):
+        def __bool__(self):
+            return False
+
+    def _falsey_boom():
+        raise FalseyError("falsey failure")
+
+    try:
+        _falsey_boom()
+    except FalseyError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_falsey_boom" in rendered
+    assert "FalseyError: falsey failure" in rendered
+
+
+def test_log_system_failure_broken_repr_cannot_escape(caplog, capsys):
+    """Failure diagnostics stay non-fatal when an exception's repr is broken."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class BrokenReprError(RuntimeError):
+        def __repr__(self):
+            raise KeyboardInterrupt("repr broke")
+
+    def _broken_repr_boom():
+        raise BrokenReprError("original failure")
+
+    try:
+        _broken_repr_boom()
+    except BrokenReprError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    out = capsys.readouterr().out
+    assert "<BrokenReprError repr failed>" in out
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_broken_repr_boom" in rendered
+    assert "BrokenReprError: original failure" in rendered
+
+
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------

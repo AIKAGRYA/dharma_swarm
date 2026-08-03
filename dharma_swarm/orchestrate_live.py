@@ -135,10 +135,24 @@ def _log_system_failure(system: str, exc: BaseException) -> None:
     dispatch-dropoff outage ran 91h undiagnosed because the swarm loop's
     import-time IndexError surfaced only as
     ``System swarm failed: tuple index out of range`` with no frame info.
-    ``{exc!r}`` also keeps empty-message exceptions identifiable.
+    ``repr(exc)`` also keeps empty-message exceptions identifiable; a safe
+    fallback covers custom exceptions whose ``__repr__`` is itself broken.
     """
-    _log("orchestrator", f"System {system} failed: {exc!r}")
-    logger.error("System %s failed", system, exc_info=exc)
+    try:
+        detail = repr(exc)
+    except BaseException:
+        # Failure reporting must not take down the supervisor when a custom
+        # exception has a broken __repr__ implementation.
+        detail = f"<{type(exc).__name__} repr failed>"
+    _log("orchestrator", f"System {system} failed: {detail}")
+    # Logger._log truth-tests exception instances before normalizing them to
+    # exc_info tuples.  Pass the tuple directly so falsey custom exceptions
+    # cannot silently lose their originating traceback.
+    logger.error(
+        "System %s failed",
+        system,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
 
 
 def _tick_loop(supervisor: Any | None, name: str) -> None:
