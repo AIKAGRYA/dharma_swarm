@@ -17,6 +17,9 @@ modes. These tests pin those protections so a revert cannot land silently:
   would silently drop them from every automated gate (``make test``,
   ``make test-fast``, and .github/workflows/tests.yml all filter
   ``-m "not slow ..."``);
+- every active ``command_passes`` criterion that runs a test file budgets at
+  least that file's largest declared ``pytest.mark.timeout`` override, so an
+  outer governance timeout cannot contradict the test contract it evaluates;
 - AgentConfig-driven state resolution never falls back to this checkout's
   ambient repo-root ``.dharma/`` (its shared ontology.db grows across test
   runs until writes cross the fast budget — the autouse
@@ -33,12 +36,15 @@ Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0D).
 from __future__ import annotations
 
 import ast
+import copy
 import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+ACTIVE_TRACK = REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml"
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 TESTS_WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(
     encoding="utf-8"
@@ -139,6 +145,149 @@ def _is_marked_slow(decorators: list[ast.expr]) -> bool:
         if _mark_chain(target) == "pytest.mark.slow":
             return True
     return False
+
+
+def _file_timeout_contract(
+    relative_path: str,
+) -> tuple[int | float | None, list[int]]:
+    source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+    overrides: list[int | float] = []
+    unresolved_lines: list[int] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        if _mark_chain(node.func) != "pytest.mark.timeout":
+            continue
+        timeout = _timeout_override([node])
+        if isinstance(timeout, (int, float)) and not isinstance(timeout, bool):
+            overrides.append(timeout)
+        else:
+            unresolved_lines.append(node.lineno)
+    return max(overrides, default=None), sorted(unresolved_lines)
+
+
+def _criterion_test_files(command: object) -> list[str]:
+    if not isinstance(command, list):
+        return []
+    files: set[str] = set()
+    for part in command:
+        if not isinstance(part, str):
+            continue
+        relative = part.split("::", 1)[0]
+        if relative.startswith("tests/") and relative.endswith(".py"):
+            files.add(relative)
+    return sorted(files)
+
+
+def _criterion_timeout_violations(portfolio: dict[str, object]) -> list[str]:
+    violations: list[str] = []
+    for track in portfolio.get("active_tracks", []):
+        if not isinstance(track, dict):
+            continue
+        track_id = str(track.get("id", "<missing-track-id>"))
+        for group in ("prerequisites", "completion_criteria", "ship_vetoes"):
+            criteria = track.get(group, [])
+            if not isinstance(criteria, list):
+                continue
+            for criterion in criteria:
+                if not isinstance(criterion, dict):
+                    continue
+                if criterion.get("kind") != "command_passes":
+                    continue
+                criterion_id = str(criterion.get("id", "<missing-criterion-id>"))
+                budget = int(criterion.get("timeout_s", 120))
+                for relative_path in _criterion_test_files(criterion.get("command")):
+                    declared, unresolved_lines = _file_timeout_contract(relative_path)
+                    if unresolved_lines:
+                        lines = ",".join(str(line) for line in unresolved_lines)
+                        violations.append(
+                            f"{track_id}::{criterion_id} cannot compare "
+                            f"{relative_path} pytest.mark.timeout at line(s) {lines}; "
+                            "use a numeric literal"
+                        )
+                    if declared is not None and budget < declared:
+                        violations.append(
+                            f"{track_id}::{criterion_id} timeout_s={budget} < "
+                            f"{relative_path} max pytest.mark.timeout={declared}"
+                        )
+    return sorted(violations)
+
+
+# ── outer criterion budgets must cover inner pytest contracts ───────
+
+
+class TestTrackCriterionTimeoutBudgets:
+    def test_command_criteria_cover_declared_test_timeouts(self):
+        portfolio = yaml.safe_load(ACTIVE_TRACK.read_text(encoding="utf-8"))
+        violations = _criterion_timeout_violations(portfolio)
+        assert not violations, (
+            "an outer command_passes budget is below a pytest timeout declared "
+            "by one of its test files; the governance runner can time out valid "
+            "work and misreport it as a regression:\n" + "\n".join(violations)
+        )
+
+    def test_guard_names_real_underbudget_mutation(self):
+        portfolio = yaml.safe_load(ACTIVE_TRACK.read_text(encoding="utf-8"))
+        mutated = copy.deepcopy(portfolio)
+        titanium = next(
+            track
+            for track in mutated["active_tracks"]
+            if track["id"] == "repository-titanium-hardening-2026-07"
+        )
+        verifier = next(
+            criterion
+            for criterion in titanium["completion_criteria"]
+            if criterion["id"] == "titanium_verifier_truth_contracts_pass"
+        )
+        verifier.pop("timeout_s", None)
+
+        violations = _criterion_timeout_violations(mutated)
+        expected = (
+            "repository-titanium-hardening-2026-07::"
+            "titanium_verifier_truth_contracts_pass timeout_s=120 < "
+            "tests/test_verifier_selfcheck_contract.py max pytest.mark.timeout=900"
+        )
+        assert expected in violations, violations
+
+    def test_guard_fails_closed_on_dynamic_timeout(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        test_file = tmp_path / "tests" / "test_dynamic_timeout.py"
+        test_file.parent.mkdir()
+        test_file.write_text(
+            "import pytest\n\n"
+            "@pytest.mark.timeout(LONG_TIMEOUT)\n"
+            "def test_dynamic_timeout():\n"
+            "    pass\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setitem(globals(), "REPO_ROOT", tmp_path)
+        portfolio = {
+            "active_tracks": [
+                {
+                    "id": "synthetic-track",
+                    "completion_criteria": [
+                        {
+                            "id": "dynamic-timeout",
+                            "kind": "command_passes",
+                            "command": [
+                                "python3",
+                                "-m",
+                                "pytest",
+                                "tests/test_dynamic_timeout.py",
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        violations = _criterion_timeout_violations(portfolio)
+        assert violations == [
+            "synthetic-track::dynamic-timeout cannot compare "
+            "tests/test_dynamic_timeout.py pytest.mark.timeout at line(s) 3; "
+            "use a numeric literal"
+        ]
 
 
 # ── the fast-suite invocation contract (Makefile + CI parity) ───────
