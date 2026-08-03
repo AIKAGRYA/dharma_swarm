@@ -455,165 +455,6 @@ active_tracks:
         kind: code
         blocker: false
 
-  - id: orchestration-arena-v1-2026-06
-    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
-    status: ACTIVE
-    opened_at: "2026-06-23"
-    # Re-verified 2026-07-16: check_track_status full run, 12/12 completion
-    # criteria pass including live pytest greens (arena_v1_controls_tests_pass
-    # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
-    # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
-    verified_at: "2026-07-17"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - provider-routing-consolidation-2026-06
-      - loop-closure-2026-06
-    owned_surfaces:
-      - dharma_swarm/coordination/**
-      - dharma_swarm/council/**
-      - scripts/governance/arena_truth_report.py
-      - reports/governance/arena/**
-      - tests/test_arena_v1.py
-      - tests/test_dpi.py
-      - tests/test_orchestration_genome.py
-      - tests/test_orchestrator_v1.py
-      - tests/test_council_profiles.py
-      - tests/test_coordination_closure_checks.py
-      - tests/test_arena_truth_report.py
-    moves_vital_signs:
-      - eval_coverage
-      - quality_gates
-
-    description: |
-      Governance admission for the Arena/Orchestration substrate that LANDED on
-      main (PRs #670 and adjacent) but was not yet represented in the active-track
-      portfolio. The DGM substrate must be governance-visible: the system needs to
-      know its own fitness function exists, is frozen/hermetic/replayable, and is
-      not yet making production capability claims.
-
-      This is the keystone fitness layer for any future Dharma Forge: a frozen
-      verifiable taskpack + deterministic scorer + zero-weight heuristic
-      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
-      that gates a decorrelated-correctness bonus on actual correctness, plus a
-      minimal Council that verifies orchestration traces.
-
-      Doctrine that must hold: capability leads, trust multiplies (not the
-      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
-      trained weights — training is earned only after the arena produces labels.
-
-    prerequisites:
-      - id: arena_runner_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/runner.py
-      - id: arena_scorer_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/scorer.py
-      - id: orchestration_genome_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/genome.py
-
-    completion_criteria:
-      - id: frozen_taskpack_present
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/taskpack.py
-        pattern: "TASK_PACK_ID"
-      - id: deterministic_scorer_hash
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/scorer.py
-        pattern: "def scorer_hash"
-      - id: orchestration_genome_class
-        kind: file_contains
-        file: dharma_swarm/coordination/genome.py
-        pattern: "class OrchestrationGenome"
-      - id: zero_weight_orchestrator_map_elites
-        kind: file_contains
-        file: dharma_swarm/coordination/orchestrator_v1.py
-        pattern: "class MapElitesArchive"
-      - id: dpi_decorrelation_gated_on_correctness
-        kind: file_contains
-        file: dharma_swarm/coordination/dpi.py
-        pattern: "def decorrelation_bonus"
-      - id: council_trace_verification
-        kind: file_contains
-        file: dharma_swarm/council/council.py
-        pattern: "class Council"
-      - id: arena_v1_test_exists
-        kind: file_contains
-        file: tests/test_arena_v1.py
-        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
-      - id: dpi_test_exists
-        kind: file_exists
-        file: tests/test_dpi.py
-      - id: closure_checks_test_exists
-        kind: file_exists
-        file: tests/test_coordination_closure_checks.py
-      # Rigorous criteria (2026-07-03): the onboarding TRUST CHECK capped this
-      # track at existence-only evidence. These make readiness a number a real
-      # check produced — the controls/parity/significance battery must PASS and
-      # the governance surface must replay + verify as a digest-intact receipt.
-      - id: arena_v1_controls_tests_pass
-        kind: test_passes
-        test: tests/test_arena_v1.py
-      - id: arena_truth_surface_tests_pass
-        kind: test_passes
-        test: tests/test_arena_truth_report.py
-      - id: arena_truth_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/arena/arena_truth_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 21
-        requires_keys:
-          - schema
-          - generated_at
-          - hermetic
-          - capability_claim
-          - task_manifest_hash
-          - scorer_hash
-          - sealed_oracle_hash
-          - best
-          - corpus
-
-    non_goals:
-      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
-      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
-      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
-      - Do not couple admission to the full world-ingestion (#662) seam.
-
-    next_items:
-      - id: 1
-        what: >-
-          DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only
-          governance surface — scripts/governance/arena_truth_report.py renders
-          reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md +
-          corpus), seeded/deterministic; --check fails if the committed surface
-          does not replay byte-for-byte. Criterion arena_truth_receipt_valid
-          verifies it.
-        kind: code
-        blocker: false
-      - id: 2
-        what: >-
-          HERMETIC CONTROLS SHIPPED (runner.run always executes
-          best_single_full_budget gate + budget-parity ledger for every arm +
-          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
-          REMAINING (the blocker's live edge): any future live-lane arena run
-          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
-          arms before any capability claim — the hermetic lift on the fixture
-          taskpack is a control-machinery existence proof, never a capability
-          claim (non-goal 1). C2 stays owned by real benchmark evidence.
-        kind: code
-        blocker: true
-      - id: 3
-        what: >-
-          DONE 2026-07-03: arena winners connected to the cold-start trace
-          corpus — coordination/arena/corpus.py emits labeled winner traces
-          (positive_lift_candidate only, scorer-labeled, deterministic) to
-          reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in
-          the report receipt. Labels only; zero training (v1 doctrine).
-        kind: code
-        blocker: false
-
   - id: merge-master-mike-d4-2026-06
     name: Merge Master Mike — D4 persistent always-on merge agent
     status: ACTIVE
@@ -2041,6 +1882,38 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: orchestration-arena-v1-2026-06
+    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+    status: SHIPPED
+    closure_kind: CLOSED_NOT_PROD
+    opened_at: "2026-06-23"
+    closed_at: "2026-08-03"
+    closed_by: "governance/close-arena-track-20260803"
+    serves: substrate-nativeness
+    complements:
+      - provider-routing-consolidation-2026-06
+      - loop-closure-2026-06
+    evidence:
+      - "dharma_swarm/coordination/arena/ — frozen taskpack, deterministic scorer, runner controls, corpus"
+      - "dharma_swarm/coordination/arena/measure.py — opt-in live measurement (DHARMA_ARENA_LIVE=1) fail-closed on best_single + budget-parity + seeded bootstrap significance"
+      - "commit a24dbd68b6256e5a0b1bd13388df4c7029d2f2f9 — feat(arena): gate opt-in live measurement with parity controls (#983)"
+      - "tests/test_arena_v1.py + tests/test_arena_truth_report.py + tests/test_arena_parity_controls.py — 69 passed (re-proved 2026-08-03 on main @ f3eb5b397)"
+      - "scripts/governance/arena_truth_report.py --check — hermetic surface replay OK (re-run 2026-08-03)"
+      - "reports/governance/arena/arena_truth_receipt.json — digest-intact, generated 2026-07-27, within 21d TTL at closure"
+      - "check_track_status full run 2026-08-03 (main @ f3eb5b397) — 12/12 completion criteria pass"
+    notes: |
+      Closed as CLOSED_NOT_PROD (not VERIFIED_SLICE): origin/main still carried
+      open blocker next-item #2 (live-lane control inheritance), so lifecycle
+      forbids reusing the same id for VERIFIED_SLICE
+      (verified-slice-erases-blockers). The live edge itself already landed via
+      PR #983 / measure.py + tests/test_arena_parity_controls.py; the remaining
+      red at authoring time was YAML underclaim, not missing control machinery.
+      Claim boundary held: hermetic keystone + controlled live measurement only
+      — no production capability claim, no trained weights, fixture lift is an
+      existence proof of controls only. Closure authored 2026-07-31 on a local
+      branch that never reached origin; recreated from preserved WIP commit
+      298011a1d and fully re-proved on origin/main @ f3eb5b397 (repair lane F6).
+
   - id: company-builder-parity-2026-07
     name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
     status: RETIRED
