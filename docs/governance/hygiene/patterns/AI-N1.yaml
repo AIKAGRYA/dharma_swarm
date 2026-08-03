@@ -1,0 +1,29 @@
+{
+  "id": "AI-N1",
+  "title": "Unreadable input reported as a definite value",
+  "cluster": "N",
+  "cluster_title": "Measurement Integrity",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-08-03",
+  "last_verified": "2026-08-03",
+  "next_review": "2026-11-03",
+  "definition": "A gate runs a command or parses output to obtain a number, cannot read part of it -- non-zero exit, missing binary, timeout, a record the parser does not understand -- and returns a definite value anyway, computed from the part it could read. The two failure directions are equally wrong: a measurement that falls SHORT lets a ceiling admit what it was written to refuse, and a measurement that fails CLOSED while naming the wrong cause reports a defect that did not occur. Neither says 'unmeasurable'.",
+  "why_it_hurts": "A cap that cannot fire is worse than no cap, because it is believed. Runners that synthesize empty output for a missing binary (127) or a timeout (124) make this reachable with no adversary at all: the ruler breaks and the gate reads zero. The mirror-image case corrupts the record instead -- a timed-out criterion reported as REGRESSION asserts a regression that never happened, which is a false claim emitted by the layer whose job is verifying claims.",
+  "detector": {"type": "manual", "rationale": "Manual TODAY because the mechanical gates are not on main yet. Three AST gates over scripts/runtime/lane_*.py exist on the PR #1200 branch -- every runner call must inspect its returncode, an `if x.returncode == 0:` guard must terminate its arm or carry an else, and every text-mode decode must be reversible -- runnable as `python3 -m pytest tests/test_lane_deliver.py -k 'return_code or propagated or decodes_tolerantly' -q`. On main that selection matches nothing and pytest exits 5, so filing it as a command detector would ship a detector that errors rather than measures. Promote to `command` when #1200 lands; promote to `measured` only when a detector counts instances repo-wide rather than pass/failing two modules."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": [
+    "tests/test_lane_deliver.py",
+    "scripts/runtime/lane_propose.py",
+    "scripts/runtime/lane_deliver.py",
+    "scripts/governance/check_track_status.py",
+    "tests/test_loop_supervisor_tristate.py",
+    "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1200"
+  ],
+  "audit_questions": [
+    "For each command whose output feeds a threshold: what does this function return when the command exits non-zero, times out, or is missing? If that value is a number rather than a refusal, the ceiling it feeds cannot fire.",
+    "Does the parse loop skip records it does not recognise? A skipped record makes the total smaller, which is the one direction a cap must never be wrong in.",
+    "Is there a real distinction between 'measured and failed' and 'could not measure'? If both collapse to the same value, what does the resulting claim actually assert -- and is that assertion true?",
+    "Where a sentinel value is legitimate (git's `-` for binary in --numstat and for a gitlink's ls-tree size), is it distinguished from a genuine parse failure, or does refusing one refuse both?"
+  ]
+}

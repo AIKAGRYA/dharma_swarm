@@ -1,0 +1,28 @@
+{
+  "id": "AI-N2",
+  "title": "Guard applied to one of a paired call site",
+  "cluster": "N",
+  "cluster_title": "Measurement Integrity",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-08-03",
+  "last_verified": "2026-08-03",
+  "next_review": "2026-11-03",
+  "definition": "A fix lands at the call site a reviewer named and not at its twin -- the sibling module that re-derives the same fact, the second call site of the same helper, the matching flag on the paired command, the second of two staging passes. The reported instance closes and the class stays open, so the next review round rediscovers the same defect wearing a different file name.",
+  "why_it_hurts": "Fixing the instance rather than the class is the single largest source of repeat findings under agent review: nine of the forty-four findings on PR #1200 were twins of an already-fixed defect. Each costs a full review round, and the reviewer bill scales with rounds. Worse, a half-applied guard reads as present -- the code looks defended at the site everyone examines, and the undefended twin is the one that runs.",
+  "detector": {"type": "manual", "rationale": "No general mechanical detector: 'twin' is a semantic relation between call sites that a linter cannot infer. It is mechanizable ONE PAIR AT A TIME, and that is the recommended remedy -- tests/test_lane_deliver.py::test_every_text_mode_command_decodes_tolerantly pins both `_run` implementations across the two lane modules, so neither can regain a strict decode alone. The audit questions below are the review-time substitute until a pair is worth pinning."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": [
+    "tests/test_lane_deliver.py",
+    "scripts/runtime/lane_propose.py",
+    "scripts/runtime/lane_deliver.py",
+    "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1200"
+  ],
+  "audit_questions": [
+    "Does another module re-derive this same fact for itself? If so, does it carry this fix? Trust-split designs deliberately duplicate logic, so every duplicate is a twin by construction.",
+    "How many call sites does the helper being fixed have, and does the property hold at each one -- or only at the one that was reported?",
+    "If a flag was added to one command (--no-renames, -z, --long), does every other command that must agree with it carry the same flag?",
+    "Is this fix on the first of two passes over the same data (stage then re-stage, measure then re-measure)? The second pass sees different state and usually needs the guard more.",
+    "Would a test that pins BOTH sites be cheaper than the next review round that finds the twin?"
+  ]
+}

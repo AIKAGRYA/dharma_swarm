@@ -125,6 +125,46 @@ Audit questions:
 - What is the strongest evidence grade this claim rests on, and does it meet the required min_evidence_grade?
 - If the binding evidence is a passing test, is its oracle independent of the claim owner (signer is not the committer), or was it downgraded?
 
+## Cluster N - Measurement Integrity
+
+### AI-N1 - Unreadable input reported as a definite value
+A gate runs a command or parses output to obtain a number, cannot read part of it -- non-zero exit, missing binary, timeout, a record the parser does not understand -- and returns a definite value anyway, computed from the part it could read. The two failure directions are equally wrong: a measurement that falls SHORT lets a ceiling admit what it was written to refuse, and a measurement that fails CLOSED while naming the wrong cause reports a defect that did not occur. Neither says 'unmeasurable'.
+
+Audit questions:
+- For each command whose output feeds a threshold: what does this function return when the command exits non-zero, times out, or is missing? If that value is a number rather than a refusal, the ceiling it feeds cannot fire.
+- Does the parse loop skip records it does not recognise? A skipped record makes the total smaller, which is the one direction a cap must never be wrong in.
+- Is there a real distinction between 'measured and failed' and 'could not measure'? If both collapse to the same value, what does the resulting claim actually assert -- and is that assertion true?
+- Where a sentinel value is legitimate (git's `-` for binary in --numstat and for a gitlink's ls-tree size), is it distinguished from a genuine parse failure, or does refusing one refuse both?
+
+### AI-N2 - Guard applied to one of a paired call site
+A fix lands at the call site a reviewer named and not at its twin -- the sibling module that re-derives the same fact, the second call site of the same helper, the matching flag on the paired command, the second of two staging passes. The reported instance closes and the class stays open, so the next review round rediscovers the same defect wearing a different file name.
+
+Audit questions:
+- Does another module re-derive this same fact for itself? If so, does it carry this fix? Trust-split designs deliberately duplicate logic, so every duplicate is a twin by construction.
+- How many call sites does the helper being fixed have, and does the property hold at each one -- or only at the one that was reported?
+- If a flag was added to one command (--no-renames, -z, --long), does every other command that must agree with it carry the same flag?
+- Is this fix on the first of two passes over the same data (stage then re-stage, measure then re-measure)? The second pass sees different state and usually needs the guard more.
+- Would a test that pins BOTH sites be cheaper than the next review round that finds the twin?
+
+### AI-N3 - Language predicate standing in for the deciding authority
+Code answers a yes/no question with a language builtin that merely resembles the answer, when some external authority -- git, the filesystem, the API, the scheduler -- is the thing that actually decides. The stand-in agrees with the authority on the common case, which is why it survives review, and disagrees exactly on the edge case the guard exists to handle.
+
+Audit questions:
+- Who actually decides this question at runtime -- this process, or the tool that will act on the answer? If the latter, why is the answer computed here instead of asked there?
+- Name one input where the builtin and the authority disagree. If you cannot name one, you have not looked for the edge case; if you can, is it handled?
+- Was the predicate verified against the real tool, or inferred from its documentation? Cite the command and its measured output.
+- Does the external command fail atomically over its whole input? If so, one bad element discards everything, and filtering must happen before the call rather than being left to the tool.
+
+### AI-N4 - Check never exercised against an instance it should catch
+A gate, guard or regression test is added and observed to pass, but never run against a case it is supposed to fail. It may pass for a reason unrelated to the property it claims -- satisfied by an incidental token elsewhere in the function, measuring state the production path never reaches, or asserting on a ref it never fetched. The same defect applies to a check's EXEMPTIONS: an exemption argued per function when the property only holds at one of several call sites.
+
+Audit questions:
+- Has this check been run against an input it should reject? Paste the failure output, not the assertion that it would fail.
+- Did the negative control fail for the REASON claimed? A control that goes red for an unrelated reason -- a bad revert, a typo, a different error entirely -- proves nothing about the check.
+- Does the test exercise the same entry point the fix guards, or a helper the production path reaches differently? Bind to the production path (inspect.getsource of the caller, or drive main()) rather than re-implementing its logic in the test.
+- For each exemption the check carries: is the stated justification true at every call site it exempts, or only at the one that was examined when it was written?
+- Could this check pass for a reason other than the property it claims to enforce? Name that reason and rule it out.
+
 ## Cluster R - Quality Ratchet
 
 ### QL-R1 - Quality ratchet regression
