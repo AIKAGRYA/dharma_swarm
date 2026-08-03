@@ -33,3 +33,23 @@ def test_write_dgc_health_snapshot_persists_fresh_runtime_metadata(tmp_path: Pat
     summary = dgc_health_snapshot_summary(state_dir)
     assert summary["status"] == "fresh"
     assert summary["daemon_pid_mismatch"] is False
+
+
+def test_dgc_health_snapshot_summary_probes_daemon_pid(tmp_path: Path) -> None:
+    """daemon_pid is never trusted verbatim: kill -0 verdict is reported."""
+    state_dir = tmp_path / ".dharma"
+    write_dgc_health_snapshot(
+        state_dir,
+        daemon_pid=18104,
+        agent_count=20,
+        task_count=0,
+        anomaly_count=0,
+        source="orchestrate_live",
+    )
+
+    dead = dgc_health_snapshot_summary(state_dir, pid_alive=lambda pid: False)
+    assert dead["daemon_pid"] == 18104
+    assert dead["daemon_pid_alive"] is False
+
+    alive = dgc_health_snapshot_summary(state_dir, pid_alive=lambda pid: pid == 18104)
+    assert alive["daemon_pid_alive"] is True

@@ -57,14 +57,21 @@ def cmd_status(*, as_json: bool = False) -> None:
 
     if "loop_liveness" in data:
         ll = data["loop_liveness"]
-        line = f"Daemon loops: {ll['running']} running"
-        if ll["abandoned"]:
-            line += f" | ABANDONED: {', '.join(ll['abandoned'])}"
-        if ll["hot_restarts"]:
-            hot = ", ".join(f"{k}x{v}" for k, v in ll["hot_restarts"].items())
-            line += f" | hot restarts: {hot}"
-        line += f" (as of {ll['age_min']}m ago, pid {ll['pid']})"
-        print(line)
+        if ll.get("pid_alive") is False:
+            print(
+                f"Daemon loops: DEAD — liveness file claims {ll['running']} running "
+                f"but owning pid {ll['pid']} is gone "
+                f"(file is {ll['age_min']}m old; do not trust it)"
+            )
+        else:
+            line = f"Daemon loops: {ll['running']} running"
+            if ll["abandoned"]:
+                line += f" | ABANDONED: {', '.join(ll['abandoned'])}"
+            if ll["hot_restarts"]:
+                hot = ", ".join(f"{k}x{v}" for k, v in ll["hot_restarts"].items())
+                line += f" | hot restarts: {hot}"
+            line += f" (as of {ll['age_min']}m ago, pid {ll['pid']})"
+            print(line)
 
     agni = data.get("agni", {})
     if agni.get("synced"):

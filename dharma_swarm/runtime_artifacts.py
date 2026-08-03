@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -60,12 +62,30 @@ def append_pulse_log(state_dir: Path, entry: str) -> None:
             handle.write(entry)
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        if pid <= 1:
+            return False
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
 def dgc_health_snapshot_summary(
     state_dir: Path,
     *,
     stale_after_seconds: float = 3600.0,
+    pid_alive: Callable[[int], bool] | None = None,
 ) -> dict[str, Any]:
-    """Read ``dgc_health.json`` with freshness metadata."""
+    """Read ``dgc_health.json`` with freshness metadata.
+
+    A ``daemon_pid`` recorded in the snapshot is never trusted on its own:
+    it is probed with ``kill -0`` and reported via ``daemon_pid_alive``.
+    (The 2026-07/08 outage: a snapshot citing dead PID 18104 was echoed as
+    runtime truth for 7 days because nothing probed the integer.)
+    """
+    probe = pid_alive if pid_alive is not None else _pid_alive
     path = state_dir / "stigmergy" / "dgc_health.json"
     summary: dict[str, Any] = {
         "path": path,
@@ -75,6 +95,7 @@ def dgc_health_snapshot_summary(
         "timestamp": None,
         "age_seconds": None,
         "daemon_pid": None,
+        "daemon_pid_alive": None,
         "live_pid": None,
         "daemon_pid_mismatch": False,
     }
@@ -93,6 +114,11 @@ def dgc_health_snapshot_summary(
     age_seconds = None if timestamp is None else max(0.0, (now - timestamp).total_seconds())
 
     daemon_pid = payload.get("daemon_pid")
+    daemon_pid_alive = None
+    try:
+        daemon_pid_alive = probe(int(daemon_pid)) if daemon_pid is not None else None
+    except (TypeError, ValueError):
+        daemon_pid_alive = None
     live_pid = None
     pid_file = state_dir / "daemon.pid"
     if pid_file.exists():
@@ -107,6 +133,7 @@ def dgc_health_snapshot_summary(
             "timestamp": timestamp,
             "age_seconds": age_seconds,
             "daemon_pid": daemon_pid,
+            "daemon_pid_alive": daemon_pid_alive,
             "live_pid": live_pid,
             "daemon_pid_mismatch": (
                 daemon_pid is not None

@@ -16,6 +16,7 @@ from dharma_swarm.terminal_commands._helpers import (
     DGC_CORE,
     _format_age,
     _parse_iso_datetime,
+    _pid_alive,
     _runtime_pid_status,
 )
 from dharma_swarm.terminal_commands._status_readonly import read_memory_entry_count
@@ -420,6 +421,32 @@ def _resolve_mission_profile(
 # _build_status_data  (JSON-ready status payload)
 # ---------------------------------------------------------------------------
 
+def _loop_liveness_summary(liveness_path: Path) -> dict[str, Any] | None:
+    """Summarize ``loop_liveness.json`` with the owning pid probed.
+
+    The file outlives its writer: the recorded pid is checked with
+    ``kill -0`` (``pid_alive``) so no caller can print "N running" from a
+    corpse's snapshot. (A 7-day-old file claiming 20 live loops from dead
+    pid 67078 masked the 2026-07/08 outage.)
+    """
+    if not liveness_path.exists():
+        return None
+    liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
+    age_s = time.time() - liveness_path.stat().st_mtime
+    raw_pid = liveness.get("pid")
+    pid_alive = _pid_alive(raw_pid) if isinstance(raw_pid, int) else None
+    return {
+        "running": len(liveness.get("running", [])),
+        "abandoned": liveness.get("abandoned", []),
+        "hot_restarts": {
+            k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
+        },
+        "age_min": round(age_s / 60),
+        "pid": raw_pid,
+        "pid_alive": pid_alive,
+    }
+
+
 def _build_status_data() -> dict:
     """Collect system status data as a JSON-ready dict."""
 
@@ -449,21 +476,11 @@ def _build_status_data() -> dict:
     if snapshot:
         data["control_plane_snapshot"] = snapshot
 
-    # Loop liveness (projected by orchestrate_live's restart loop)
+    # Loop liveness (projected by orchestrate_live's restart loop).
     try:
-        liveness_path = DHARMA_STATE / "ops" / "loop_liveness.json"
-        if liveness_path.exists():
-            liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
-            age_s = time.time() - liveness_path.stat().st_mtime
-            data["loop_liveness"] = {
-                "running": len(liveness.get("running", [])),
-                "abandoned": liveness.get("abandoned", []),
-                "hot_restarts": {
-                    k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
-                },
-                "age_min": round(age_s / 60),
-                "pid": liveness.get("pid"),
-            }
+        summary = _loop_liveness_summary(DHARMA_STATE / "ops" / "loop_liveness.json")
+        if summary is not None:
+            data["loop_liveness"] = summary
     except Exception:
         pass
 
