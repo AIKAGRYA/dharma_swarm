@@ -1,0 +1,157 @@
+{
+ "allowed_files": [
+  "reports/agentops/work_packets/loop-closure-WP-LC4-consumption-check-2026-07-27.json",
+  "scripts/governance/loop1_consumption_check.py",
+  "tests/test_loop1_consumption_check.py"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+ "branch": "agent/loop1-wplc4-repair-20260804",
+ "commit": {
+  "allowed": true,
+  "message": "feat(loop1): WP-LC4 disjoint checker for receipt-grounded provider consumption [impact-checked]"
+ },
+ "forbidden_files": [
+  ".github/workflows/automerge.yml",
+  ".github/workflows/branch-janitor.yml",
+  ".github/workflows/kernel-tests.yml",
+  ".github/workflows/kernel-titanium-verify.yml",
+  ".github/workflows/langgraph-oracle.yml",
+  ".github/workflows/merge-master-mike-backlog.yml",
+  ".github/workflows/pramana-probe.yml",
+  ".github/workflows/pudgala-rigor.yml",
+  "Dockerfile",
+  "Dockerfile.swarm",
+  "Makefile",
+  "api/main.py",
+  "dharma_swarm/archive.py",
+  "dharma_swarm/chamber/**",
+  "dharma_swarm/checkpoint.py",
+  "dharma_swarm/coordination/**",
+  "dharma_swarm/council/**",
+  "dharma_swarm/dharma_kernel.py",
+  "dharma_swarm/diversity_archive.py",
+  "dharma_swarm/evolution_safety.py",
+  "dharma_swarm/graph/**",
+  "dharma_swarm/orchestrator.py",
+  "dharma_swarm/organism.py",
+  "dharma_swarm/providers.py",
+  "dharma_swarm/receipt_consumption.py",
+  "dharma_swarm/runtime_state.py",
+  "dharma_swarm/strange_loop.py",
+  "dharma_swarm/swarm.py",
+  "dharma_swarm/telic_seam.py",
+  "dharma_swarm/telos_gates.py",
+  "dharma_swarm/topology_genome.py",
+  "dharma_swarm/vsm_channels.py",
+  "dharma_swarm/workflow.py",
+  "dharma_swarm/world_radar/**",
+  "docker-compose.yml",
+  "docs/governance/hygiene/patterns/AI-M1.yaml",
+  "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+  "pyproject.toml",
+  "reports/darshan/**",
+  "scripts/governance/arena_truth_report.py",
+  "scripts/governance/branch_janitor.py",
+  "scripts/governance/check_claim_evidence_binding.py",
+  "scripts/governance/dharmagraph_parity_gauntlet.py",
+  "scripts/governance/frontier_ledger.py",
+  "scripts/governance/hygiene/**",
+  "scripts/governance/inward_ascent_baseline.py",
+  "scripts/governance/pramana_probe.py",
+  "scripts/governance/transcendence_ledger.py",
+  "scripts/governance/verify_corral_findings.py",
+  "scripts/runtime/merge_master_mike_daemon.py",
+  "scripts/runtime/pr_merge_control.py",
+  "terminal/**"
+ ],
+ "gates": [
+  {
+   "command": "python3 -m pytest tests/test_loop1_consumption_check.py -q",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 20000,
+   "name": "wp-lc4-consumption-check-unit-proof",
+   "timeout_seconds": 120
+  },
+  {
+   "command": "python3 -m ruff check scripts/governance/loop1_consumption_check.py tests/test_loop1_consumption_check.py",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 10000,
+   "name": "wp-lc4-consumption-check-ruff",
+   "timeout_seconds": 120
+  }
+ ],
+ "id": "loop-closure-WP-LC4-consumption-check-2026-07-27",
+  "intent": "WP-LC4 (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md section 6): disjoint read-only checker scripts/governance/loop1_consumption_check.py that independently validates the four Loop-1 closure properties P1..P4 from raw read-only runtime.db receipts and persisted router-audit JSONL, emitting a digest-bound producer/consumer chain witness, and supports --check replay with an honest needs_host typed gap when host evidence is absent.",
+ "negative_controls": [
+  {
+      "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','merge-base','--is-ancestor','f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd','HEAD'],capture_output=True); sys.exit(0 if r.returncode==0 else 9)\"",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 1000,
+   "name": "wp-lc4-base-is-ancestor",
+   "timeout_seconds": 60
+  },
+  {
+   "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','ls-tree','-r','--name-only','HEAD'],capture_output=True,text=True); out=r.stdout; sys.exit(0 if 'scripts/governance/loop1_consumption_check.py' in out and 'tests/test_loop1_consumption_check.py' in out and 'dharma_swarm/receipt_consumption.py' in out else 9)\"",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 1000,
+   "name": "wp-lc4-expected-files-present",
+   "timeout_seconds": 60
+  },
+  {
+      "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','ls-tree','-r','--name-only','f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd'],capture_output=True,text=True); out=r.stdout; sys.exit(0 if 'scripts/governance/loop1_consumption_check.py' not in out and 'tests/test_loop1_consumption_check.py' not in out else 9)\"",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 1000,
+   "name": "wp-lc4-files-absent-at-base",
+   "timeout_seconds": 60
+  }
+ ],
+ "session_entry": {
+  "active_track": "loop-closure-2026-06",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   "dharma_swarm/receipt_consumption.py:apply_receipt_consumption_ranking",
+   "dharma_swarm/providers.py:ModelRouter.complete_for_task",
+   "tests/test_loop1_consumption.py"
+  ],
+  "collision": {
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "WP-LC4 is a harness/witness only; it does not itself close Loop-1 live (D-LC5 claim still pending daemon host execution).",
+   "Loop-closure track items 1 (dispatch dropoff quarantine host execution), 8 (docker-compose loopback binding), and 10 (D-LC5 closure claim) remain open.",
+   "Current main does not persist the complete consumption trace, boot, and decision-delta fields in router audit rows; those hosts must report needs_host rather than closure."
+  ],
+    "interface_mismatches": [
+      "The stalled PR called the production ranking function from its verifier, so a shared parser or decision bug could self-certify.",
+      "The stalled receipt omitted a complete digest-bound producer/consumer trace, boot, routing-delta, row-count, host-SHA, and image-provenance witness."
+    ],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "11197dc12f328cc48e4ad0ecba8e02d4b365dfa0e2c54227e48747993832d7be",
+  "rollback": "remove scripts/governance/loop1_consumption_check.py, tests/test_loop1_consumption_check.py, and this packet",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+  },
+  "work_packet": "WP-LC4"
+ },
+ "worktree": "."
+}
