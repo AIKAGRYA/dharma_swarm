@@ -2,7 +2,7 @@
 title: Hermes Persistent Agent Index
 date: 2026-08-01
 status: report
-fulfils: docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md
+partially_fulfils: docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md
 ---
 
 # Hermes Persistent Agent Index
@@ -37,7 +37,21 @@ fulfils: docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md
 > `dharma_swarm/holon_system/` is **47 files / 1,345 lines**, not the 43/360 stated
 > at `docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md:332`.
 >
-> Do not treat this as the finished index. It is a verified-partial first pass.
+> Do not treat this as the finished index. It is a verified-partial first pass,
+> and the frontmatter says `partially_fulfils` for that reason — the 2026-05-28
+> P0 is NOT discharged.
+>
+> **§7's three-PR build plan additionally failed Codex review (PR #1198) and must
+> not be executed as written.** Verified defects in it: it invents a third
+> `ActionEnvelope` when `semantic_governance.ActionEnvelope` and
+> `living_agent_kernel.AgentRunEnvelope` already exist; it never calls the
+> `authorize()` it defines, leaving lease and budget checks dead; it asserts a
+> mailbox consumer that no listed edit creates; it extends `EvidenceReceipt`
+> without adding a producer, so the receipt_id criterion cannot be met; it
+> swaps `holon_wake_cycle` for `run_holon_loop` without adapting
+> `sarathi_wake_daemon.py:381-390`, which calls `.get()` on what would become a
+> list; and its acceptance command uses a positional `1` where the CLI requires
+> `--cycles 1`. Treat §7 as a sketch that needs a rewrite, not a plan.
 
 
 ## Header note — what this is and why it is dated today

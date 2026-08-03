@@ -2,7 +2,7 @@
 title: Holon Consolidation Plan — facade to real body
 date: 2026-08-01
 status: plan
-supersedes_claims_in: docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
+proposes_corrections_to: docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
 ---
 
 # Holon Consolidation Plan — facade to real body
@@ -48,8 +48,8 @@ passed — the pre-existing textual failure only).
   `HOLON_RUNTIME_FULL_ESTATE_MAP.md:332` ("43 files ... roughly 360 lines").
 - Destination state is as described: `persistence`/`bridge`/`health`/`wake_cycle`
   shims exist; `killswitch`/`budget_guard`/`compass` do not.
-- **MOVE 10 is a real live bug**: `pytest tests/test_holon_system_imports.py` FAILS
-  on current checkout at `holon_system/authority/permissions.py:3`.
+- `pytest tests/test_holon_system_imports.py` FAILS on current checkout at
+  `holon_system/authority/permissions.py:3` — but see §2.1 for the real cause.
 
 ### The reversibility gate stays put — verified empirically
 
@@ -80,13 +80,42 @@ self-documenting facade instead.
 | 5 | `holon_bridge.py` | `holon_system/runtime/bridge.py` | 419 | 11 | medium |
 | 6 | `holon_health.py` | `holon_system/runtime/health.py` | 79 | 4 | low |
 | 7 | `holon_runtime.py` | `holon_system/runtime/wake_cycle.py` | 283 | 9 | medium |
-| 8–10 | dead shims: `gateway/operator_brief.py`, `observability/scoreboard.py`, `authority/permissions.py` | delete | 13 | 4 | low |
+| 8 | `authority/permissions.py` | **REPAIR, do not delete** — see §2.1 | 3 | 1 | low |
 
 **Phase C (the four A2A scripts) is DEFERRED.** Its stated justification — that
 moving bodies into `dharma_swarm/` fixes the `pyproject.toml:62-63` packaging
 inversion — is **false**: all four bodies themselves import from `scripts/`
 (`pr_merge_control.py`, `a2a_topology.py`), so the inversion survives the move. Phase C
 needs its own design pass.
+
+### 2.1 Correction — the three "dead shims" are not dead (Codex review, PR #1198)
+
+The original plan said to delete `gateway/operator_brief.py`,
+`observability/scoreboard.py` and `authority/permissions.py` as dead. **That was
+wrong and following it would have caused damage.** Verified by import:
+
+```
+OK      dharma_swarm.holon_system.gateway.operator_brief
+OK      dharma_swarm.holon_system.observability.scoreboard
+FAILS   dharma_swarm.holon_system.authority.permissions
+```
+
+The first two import cleanly and are pinned as SUPPORTED facade imports by
+`tests/test_holon_system_imports.py:42,45`. Deleting them would remove two
+working public import paths and force the facade contract to be weakened.
+
+And the third is not a dead shim either. The shim is three lines and correct;
+the failure is transitive:
+
+```
+$ python3 -c "import dharma_swarm.holon_system.authority.permissions"
+    from textual import work
+ModuleNotFoundError: No module named 'textual'
+```
+
+`dharma_swarm/operator_core/permissions.py` pulls in `textual`, an OPTIONAL TUI
+dependency, without a guard. The fix is to guard that import (or declare the
+dependency), **not** to delete the facade. Repair, do not remove.
 
 ## 3. Ownership collisions (checked against ACTIVE_TRACK.yaml)
 
@@ -159,7 +188,9 @@ at `living_agent_kernel.py:51` and mkdirs at `:788`).
 
 1. MOVE 0 — lazy `runtime/__init__.py`, prove the suite returns to baseline.
 2. Phase A moves 1–7, one commit each, suite green between every one.
-3. Delete the three dead shims (fixes the live `test_holon_system_imports.py` failure).
+3. Repair `authority/permissions.py` by guarding the transitive `textual` import in
+   `operator_core/permissions.py` (fixes the live `test_holon_system_imports.py`
+   failure). Do NOT delete it, and do NOT touch the other two shims — they work.
 4. Apply the §4 estate-map corrections.
 5. Re-run the index sweep for the surfaces §the errata lists as missed (cron subsystem,
    `browser_agent`, `synthesis_agent`, `sleep_time_agent`, `garden_daemon`, the sixth registry).
