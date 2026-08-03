@@ -8,6 +8,7 @@
     "scripts/governance/validate_titanium_wp0s_observation_receipt.py",
     "tests/test_titanium_wp0s_observation_receipt.py",
     "reports/governance/titanium/wp0s_observation_receipt_20260801.json",
+    "reports/governance/titanium/wp0s_observation_refresh_20260803.md",
     "reports/agentops/work_packets/titanium-WP-0S-observation-receipt-20260801.json"
   ],
   "forbidden_files": [
@@ -130,6 +131,6 @@
       "The packet records observations only and performs no host mutation, service restart, firewall or proxy change, credential creation, deployment, repository setting change, or merge."
     ],
     "rollback": "Revert the validator, focused tests, observation receipt, and packet together. Preserve all external host state and observation facts; rollback grants no authority to mutate or reinterpret them.",
-    "packet_digest": "9e36dbe21bffbef1a9557d75106d0ca705166c84d82105e59d0f5bd241b613fc"
+    "packet_digest": "4f10b899f0dbc1f4683fd2551e6dc08219185850eccff3aa292852b705f4b6a8"
   }
 }
