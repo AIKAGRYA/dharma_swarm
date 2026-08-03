@@ -118,7 +118,7 @@ chain, each hop cited:
 
 | Hop | Location | Statement |
 |---|---|---|
-| 1 | `dharma_swarm/operator_core/permissions.py:14` | `from dharma_swarm.tui.engine.events import CanonicalEvent, ThinkingComplete, ToolCallComplete` |
+| 1 | `dharma_swarm/operator_core/permissions.py:13` | `from dharma_swarm.tui.engine.events import CanonicalEvent, ThinkingComplete, ToolCallComplete` |
 | 2 | `dharma_swarm/tui/engine/__init__.py:25` | `from .provider_runner import ProviderRunner` |
 | 3 | `dharma_swarm/tui/engine/provider_runner.py:10` | `from textual import work` ← **unguarded** |
 
@@ -156,10 +156,18 @@ Verified PRESENT but listed absent: `scripts/runtime/codex_composer_semantic_res
 (1,411 lines). Fix `:344` to name only Fugu.
 
 **Stale claim at `:333-334`** — "no production consumers outside the facade itself"
-is now FALSE: `sarathi_wake_daemon.py:81,85,86` and `sarathi_proof_window.py:43-55`
-import `holon_system.sarathi.{plan,roster,wake,delegate,proof}`, and
-`.github/workflows/sarathi-wake-lane.yml:152,160` runs both under bare `python3`.
-`holon_system/sarathi/` is already load-bearing.
+is now FALSE. Evidence present in THIS tree:
+`scripts/runtime/sarathi_wake_daemon.py:81,85,86` and
+`scripts/runtime/sarathi_proof_window.py:43-55` import
+`holon_system.sarathi.{plan,roster,wake,delegate,proof}`. `holon_system/sarathi/`
+is already load-bearing on two production runners.
+
+An earlier revision of this plan also cited `.github/workflows/sarathi-wake-lane.yml`
+as CI evidence. **That citation has been removed**: the file is ABSENT at this head,
+at `origin/main`, and at this packet's `base_ref`. It existed only on the PR-S6
+branch, which was closed without merging and has since been force-replaced, so the
+reference is unreachable and unverifiable. The claim above stands on the two scripts
+alone, both of which a reader can check.
 
 ## 5. Packet 1 — corrections before building it
 
@@ -203,7 +211,7 @@ at `living_agent_kernel.py:51` and mkdirs at `:788`).
 2. Phase A moves 1–7, one commit each, suite green between every one.
 3. Repair `authority/permissions.py` by guarding `from textual import work` at
    `dharma_swarm/tui/engine/provider_runner.py:10` — reached via
-   `operator_core/permissions.py:14` → `tui/engine/__init__.py:25` (see §2.1 for the
+   `operator_core/permissions.py:13` → `tui/engine/__init__.py:25` (see §2.1 for the
    full chain). This fixes the live `test_holon_system_imports.py` failure. Do NOT
    edit `operator_core/permissions.py`; it has no `textual` import. Do NOT delete any
    of the three shims, and do not touch the other two at all — they work.

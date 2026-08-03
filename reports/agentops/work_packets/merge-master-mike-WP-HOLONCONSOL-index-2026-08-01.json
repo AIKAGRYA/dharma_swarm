@@ -85,7 +85,7 @@
     },
     "interface_mismatches": [
       "HOLON_RUNTIME_FULL_ESTATE_MAP.md:332 states holon_system/ is 43 files / ~360 lines; it is 47 files / 1345 lines. The plan records the correction.",
-      "HOLON_RUNTIME_FULL_ESTATE_MAP.md:333-334 states there are no production consumers outside the facade; sarathi_wake_daemon.py:81,85,86 and sarathi_proof_window.py:43-55 import holon_system.sarathi.* and sarathi-wake-lane.yml:152,160 runs them under bare python3.",
+      "HOLON_RUNTIME_FULL_ESTATE_MAP.md:333-334 states there are no production consumers outside the facade; sarathi_wake_daemon.py:81,85,86 and sarathi_proof_window.py:43-55 import holon_system.sarathi.*, so the package is load-bearing on two production runners. An earlier revision also cited .github/workflows/sarathi-wake-lane.yml:152,160; that citation was REMOVED because the file is absent at this head, at origin/main and at this packet's base_ref \u2014 it existed only on the closed, force-replaced PR-S6 branch and a reader cannot verify it.",
       "HOLON_RUNTIME_FULL_ESTATE_MAP.md:344 lists Codex AND Fugu semantic responders as absent; codex_composer_semantic_responder.py is present (1411 lines). Only the Fugu half is still true."
     ],
     "closest_existing_implementation": [
@@ -103,6 +103,6 @@
       "The original negative control pinned expected_exit 1 on tests/test_holon_system_imports.py to show a docs-only change does not touch code. Devin review on PR #1198 correctly flagged it as stale by construction: HOLON_CONSOLIDATION_PLAN_2026-08-01.md:162 makes fixing that very failure step 3 of the order of work, so the control would report a FALSE RED the moment the repair lands. Replaced with a control that stays true either way \u2014 the Sarathi organ suites must pass (exit 0) before and after. The live test_holon_system_imports.py failure is still real and is still recorded in the plan at :51-52; removing the control does not hide it."
     ],
     "rollback": "Revert the three docs and this packet together. Nothing imports them; no code changed.",
-    "packet_digest": "ac3d01563041ca2507345b482595f2d3b6302ccf57e987c028a6adfb738bc6c2"
+    "packet_digest": "c3da693c3042f5519ee8d052ba34734e8657a95188b6eedaa90c1a8fd3bb6947"
   }
 }
