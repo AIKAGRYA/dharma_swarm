@@ -215,6 +215,93 @@ def test_daemon_backstop_reports_a_raised_read_as_read_failed():
             )
 
 
+ALL_STATUSES = (RECALL_NOT_CONFIGURED, RECALL_UNAVAILABLE, RECALL_READ_FAILED, RECALL_USED)
+
+# The claim each status makes to an operator. If a status renders text carrying
+# another status's claim, the two have collapsed.
+_CLAIMS = {
+    RECALL_NOT_CONFIGURED: "No read was attempted",
+    RECALL_UNAVAILABLE: "could not be loaded",
+    RECALL_READ_FAILED: "the read raised",
+    RECALL_USED: "Consulted through MemoryKernel",
+}
+
+
+def test_every_status_renders_distinctly_and_claims_only_its_own_fact():
+    """Exhaustive over ALL four statuses, not just the one most recently fixed.
+
+    Scope, measured rather than assumed: this covers the RENDERING axis only.
+    Run against the pre-fix revisions of this PR it does NOT reproduce the three
+    status collapses, because those were producer-side — the daemon selecting
+    the wrong status for a fault — and the brief rendered whatever status it was
+    handed correctly. `test_daemon_has_a_distinct_producer_for_each_fault_status`
+    is the one that catches those (verified: it fails against both
+    `cf237b74~1` and `3b80f156~1`).
+
+    This test guards the other direction: that no future edit makes two statuses
+    render the same text, or lets one carry another's claim.
+    """
+    rendered = {
+        status: build_operator_brief(
+            memory=MemoryRecall(status=status, detail="DETAIL-TOKEN", metadata={})
+        )
+        for status in ALL_STATUSES
+    }
+
+    # 1. Every status is rendered, and distinctly.
+    assert len(set(rendered.values())) == len(ALL_STATUSES), (
+        "two statuses render identically; an operator cannot tell them apart"
+    )
+
+    # 2. Each carries its OWN claim...
+    for status, text in rendered.items():
+        assert _CLAIMS[status] in text, f"{status} does not state its own outcome"
+
+    # 3. ...and none carries another's. This is the collapse check.
+    for status, text in rendered.items():
+        for other, claim in _CLAIMS.items():
+            if other == status:
+                continue
+            assert claim not in text, (
+                f"the {status!r} brief contains the {other!r} claim {claim!r} — "
+                f"these two outcomes have collapsed into each other"
+            )
+
+    # 4. A fault must carry its detail; an absence has none to carry.
+    for status in (RECALL_UNAVAILABLE, RECALL_READ_FAILED):
+        assert "DETAIL-TOKEN" in rendered[status], (
+            f"{status} drops the error detail, so the fault exists only in stderr"
+        )
+
+
+def test_daemon_has_a_distinct_producer_for_each_fault_status():
+    """The daemon must not reuse one helper for two different faults — that is
+    how `unavailable` came to stand in for `read_failed`."""
+    daemon_src = (REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py").read_text()
+    tree = ast.parse(daemon_src)
+    helpers = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name.endswith("_recall")
+    }
+    assert "_unavailable_recall" in helpers and "_read_failed_recall" in helpers
+
+    # Each helper hands back exactly one status, and not the other's.
+    for name, expected in (
+        ("_unavailable_recall", "unavailable"),
+        ("_read_failed_recall", "read_failed"),
+    ):
+        produced = {
+            kw.value.value
+            for n in ast.walk(helpers[name])
+            for kw in getattr(n, "keywords", [])
+            if kw.arg == "status" and isinstance(kw.value, ast.Constant)
+        }
+        assert produced == {expected}, (
+            f"{name} produces {produced or 'nothing'}, expected {{'{expected}'}}"
+        )
+
+
 def test_brief_states_admission_counts_when_consulted():
     """0 admitted must read as policy exclusion, not as memory being skipped."""
     rendered = build_operator_brief(
