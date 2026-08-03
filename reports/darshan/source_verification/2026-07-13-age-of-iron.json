@@ -1,0 +1,99 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-13-age-of-iron",
+  "article_sha256_md": "edad062dbeb292b34404553c68f7fcb0a037b3cb983746713549d097ce2182b0",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://www.wisdomlib.org/hinduism/book/vishnu-purana-wilson/d/doc115938.html",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Wilson's Vishnu Purana I.3 translation supports the traditional yuga arithmetic used by the essay. The source establishes the textual tradition, not a modern historical date for composition or an empirical chronology."
+    },
+    {
+      "source": "https://www.wisdomlib.org/hinduism/book/vishnu-purana-wilson/d/doc116021.html",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Vishnu Purana IV.24 supports the attributed Kali portrait, Krishna-epoch association, and return-of-Krita motif."
+    },
+    {
+      "source": "https://www.wisdomlib.org/hinduism/book/vishnu-purana-wilson/d/doc116062.html",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Vishnu Purana VI.1 supports the attributed social-decay portrait. The essay does not cite the deliberately unfetched VI.2 praise-of-Kali passage."
+    },
+    {
+      "source": "https://www.wisdomlib.org/hinduism/book/the-bhagavata-purana/d/doc1129006.html",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Bhagavata Purana 12.2 supports the attributed symptoms, 1,200-celestial-year figure, and onset-of-Kali material."
+    },
+    {
+      "source": "https://en.wikipedia.org/wiki/Kali_Yuga",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The cited page supports the 432,000-year arithmetic, conventional 3102 BCE epoch, Aryabhatiya quotation, and remaining-years calculation. As the article's own binding note admits, it does not support the further historical claim that 3102 BCE was an astronomers' back-calculation."
+    },
+    {
+      "source": "https://mayadecipherment.com/2008/12/20/what-will-not-happen-in-2012/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Stephen Houston's specialist account supports the article's central correction that Maya inscriptions do not predict a 2012 apocalypse and supplies the relevant Long Count framing."
+    },
+    {
+      "source": "https://news.utexas.edu/2012/06/29/maya-scholar-deciphers-meaning-of-newly-discovered-monument-that-refers-to-2012/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The UT Austin release supports the La Corona monument and David Stuart quotation. It identifies the visitor only as the era's most powerful Maya ruler, so the essay correctly sources the Calakmul identification elsewhere."
+    },
+    {
+      "source": "https://www.safe.ai/work/statement-on-ai-risk",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The original CAIS statement supports the short extinction-risk formulation and signatory context. The essay treats it as a public discourse artifact, not evidence that extinction is certain or dated."
+    },
+    {
+      "source": "https://intelligence.org/2023/04/07/pausing-ai-developments-isnt-enough-we-need-to-shut-it-all-down/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "MIRI's authorized repost supports Yudkowsky's stated position and rhetoric. The essay attributes the view and does not adopt it as forecast evidence."
+    },
+    {
+      "source": "https://firstmonday.org/ojs/index.php/fm/article/view/13636",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Gebru and Torres support the attributed TESCREAL critique. The article avoids importing the unfetched acronym-expansion material beyond what it can source."
+    },
+    {
+      "source": "https://arxiv.org/abs/2310.02207",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Gurnee and Tegmark support learned spatial and temporal representations in the tested Llama-2 family. The essay marks extension to other model families as inference."
+    },
+    {
+      "source": "https://platform.claude.com/docs/en/docs/about-claude/models/overview",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Anthropic's live model overview supports knowledge-cutoff definitions, context-window metadata, pinned snapshots, and the listed cutoff range. It does not verbatim establish the essay's broader engineering claims that inference is stateless between calls or that a model has no clock; the article's own verification obligation therefore remains open."
+    },
+    {
+      "source": "reports/darshan/issue_one/articles/2026-07-13-age-of-iron.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The article contains explicit binding-before-print notes requiring a dedicated critical history for the 3102 BCE back-calculation account, primary sourcing for dateless eschatology and Manhattan/Bulletin/Doomsday-Clock comparisons if load-bearing, and verbatim provider documentation for stateless inference and absence of a clock. Those obligations remain in the current bytes."
+    }
+  ],
+  "hold_reasons": [
+    "The article's own binding pre-publication source obligations are not discharged in its current source ledger.",
+    "The 3102 BCE back-calculation provenance is acknowledged as load-bearing but still rests on received characterization rather than the required dedicated critical history.",
+    "The provider page verifies cutoff and model metadata but not the generic stateless-inference and no-clock claims that the body explicitly says must be checked before print."
+  ],
+  "unresolved_obligations": [
+    "Fetch and digest-bind a dedicated critical history of the Aryabhatan 3102 BCE epoch, or narrow the claim to what the current source actually establishes.",
+    "Bind any load-bearing dateless-eschatology and Manhattan Project/Bulletin/Doomsday Clock comparisons to primary sources.",
+    "Verify the stateless-inference and no-clock descriptions verbatim against relevant provider/API documentation, with product-specific scope."
+  ],
+  "digest": "c8566c98efd6d2db9d3418314b53d1bc1ec55f60619767642ccff5507849e9fb"
+}

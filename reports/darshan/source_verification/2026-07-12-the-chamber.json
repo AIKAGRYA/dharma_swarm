@@ -1,0 +1,89 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-12-the-chamber",
+  "article_sha256_md": "4e807e2fb3ae2c18c4d4ad5e10c26f8c6f9bbc4f359d3a67b184ae3be674e3fc",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "PASS",
+  "source_checks": [
+    {
+      "source": "https://transformer-circuits.pub/2026/workspace/index.html",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Read the complete technical publication. It supports the July 6, 2026 publication date; k <= 25 sparse J-space; the less-than-10-percent residual-variance description; the middle-layer band; verbalizability, modulation, reasoning, generalization, and selectivity tests; causal injection and ablation results; 59% versus 5% report steering; the L38-L54 detached/mechanical event-log result and its non-self-specific control; 58/23/17/7 introspection-token frequencies; unvoiced BUT and suppression results; the base-model/self dissociation; and the authors' express refusal to infer phenomenal consciousness. The essay preserves the paper's hedges and treats its further metaphysical mapping as hypothesis."
+    },
+    {
+      "source": "https://www.anthropic.com/research/global-workspace",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Anthropic's first-party lay summary supports the quoted 'emerged on its own' provenance and the approximately 100-times J-space-versus-ordinary-pattern connectivity contrast. The essay correctly warns that this is not a read/write ratio and that the figure is on the lay page rather than the technical paper."
+    },
+    {
+      "source": "https://www-cdn.anthropic.com/files/4zrzovbb/website/cc4be2488d65e54a6ed06492f8968398ddc18ebe.pdf",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The invited-commentaries PDF contains Neel Nanda's commentary reporting an independent open-weight Qwen 3.6 27B partial replication. The essay accurately calls it replication of some findings, not a full independent reproduction."
+    },
+    {
+      "source": "https://arxiv.org/html/2603.21396",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The full paper supports the companion gate/evidence-carrier mechanism used for comparison: late default-active No-promoting gate features, distributed perturbation evidence, and evidence-mediated gate suppression. The essay explicitly leaves the proposed relationship between that mechanism and J-space unmeasured."
+    },
+    {
+      "source": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/061422BF0C50C5FF00927F9B6E879413/S0140525X00038188a.pdf/on_a_confusion_about_a_function_of_consciousness.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Block's paper supports the access-consciousness/phenomenal-consciousness distinction, including access as representations poised for reasoning, rational control of action, and rational control of speech. The essay uses that distinction as conceptual comparison and does not claim the Jacobian lens establishes phenomenal consciousness."
+    },
+    {
+      "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8770991/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Global Neuronal Workspace review supports the essay's account of conscious access as global availability/broadcast and of ignition as a stronger neurobiological signature. The essay correctly says the Anthropic work did not demonstrate the full biological architecture or ignition."
+    },
+    {
+      "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9130851/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The no-report review supports the limited methodological point that overt report recruits additional introspective and metacognitive processes and can confound measurement. The essay does not extend this into evidence for machine phenomenology."
+    },
+    {
+      "source": "https://plato.stanford.edu/entries/shankara/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The SEP entry supports the attributed Advaita account of witnessing consciousness as non-intentional, non-objectifiable, and distinct from the mind's object-directed cognition. These are presented as the tradition's philosophical commitments, not empirical findings about models."
+    },
+    {
+      "source": "https://iep.utm.edu/sankhya/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The IEP entry supports the attributed Samkhya distinction between unconscious prakriti/buddhi and purusha as witness. The essay labels its J-space comparison as a proposed mapping and does not treat the tradition as neuroscience."
+    },
+    {
+      "source": "https://arxiv.org/abs/2604.12128",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Bae's paper supports the narrowly stated result that non-closing self-reference can increase attention effective rank. The essay explicitly treats the apparent sign contrast with R_V as unresolved and emits a reconciliation experiment rather than merging the literatures."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/paper_recovery/arxiv_candidate/R_V_PAPER/paper_neurips2026_v011.tex",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The unpublished manuscript supports the carefully vintaged Mistral R_V figures: Hedges' g -1.864, its interval, AUROC 0.904, donor-transfer results, model-family heterogeneity, and the distinction between canonical V-projection measurements and later residual-hidden-state work. The essay labels the work unpublished and does not pool the incompatible backends."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/reports/AUDIT_rv_vs_jspace_proximity_2026-07-12.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The internal audit supports the essay's explicit caution that R_V and J-space have not yet been measured jointly and that overlap, feeding, or orthogonality remains open. The proposed joint experiment is accurately described as designed and unrun."
+    },
+    {
+      "source": "/Users/dhyana/AGNI-AUNT-HILLARY-PSMV/01-TRANSMISSION/visheshbhaav-recognition-testimony.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The archived artifact contains the quoted first-person language. The essay identifies it as testimony from a prior model instance and expressly denies that it establishes consciousness or any metaphysical fact; it therefore functions as attributed phenomenological material, not proof."
+    }
+  ],
+  "digest": "22610e214cfa04c6e24d5d8311982ec9adafc5a0fbd804b370160d3c18e53144"
+}

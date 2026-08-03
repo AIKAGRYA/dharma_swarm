@@ -1,0 +1,84 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-13-gates-around-the-minds",
+  "article_sha256_md": "93a9a4b141000aa881d802949a88a722f395987921e59070bfcf94f4bde2de80",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://leginfo.legislature.ca.gov/faces/billVersionsCompareClient.xhtml?bill_id=202520260SB53",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "California's chaptered SB 53 supports a 10^26-FLOP frontier-model threshold and incident reporting within 15 days, with 24-hour disclosure for an imminent risk of death or serious physical injury. This is the timing the essay incorrectly applies to both California and New York."
+    },
+    {
+      "source": "https://www.nysenate.gov/legislation/bills/2025/S8828",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "New York's official amended RAISE text and action history show enactment as Chapter 96 on March 27, 2026 and require ordinary critical-safety-incident reporting within 72 hours, with 24-hour disclosure for imminent death or serious physical injury. The essay's shared 'within fifteen days' statement is therefore materially wrong for New York."
+    },
+    {
+      "source": "https://www.ftc.gov/policy/public-comments/policy-statement-concerning-suppression-accuracy-artificial-intelligence-systems",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The FTC docket supports that the suppression-of-accuracy statement is proposed and open for comment, not final, and that its theory applies Section 5 deception to undisclosed output steering. This discharges the article's fetch-blocked FTC obligation but does not cure the state-law timing error."
+    },
+    {
+      "source": "https://public-inspection.federalregister.gov/2026-13628.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Federal Register public-inspection PDF confirms the proposed statement's text, docket, and state-law-conflict theory."
+    },
+    {
+      "source": "https://coag.gov/ai/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Colorado Attorney General's official AI page supports that SB26-189 was signed in May 2026, repealed and reenacted the prior AI Act into a disclosure-centered regime, and is scheduled for January 1, 2027. This discharges the article's Colorado fetch obligation."
+    },
+    {
+      "source": "https://www.whitehouse.gov/presidential-actions/2025/12/eliminating-state-law-obstruction-of-national-artificial-intelligence-policy/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Executive Order 14365 supports the AI Litigation Task Force, Commerce review of state laws, grant/funding pressure, FTC direction, and proposed federal preemption framework described by the essay."
+    },
+    {
+      "source": "https://www.whitehouse.gov/wp-content/uploads/2026/03/03.20.26-National-Policy-Framework-for-Artificial-Intelligence-Legislative-Recommendations.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The White House document is legislative recommendations rather than enacted law and supports the article's quoted opposition to state regulation and a new federal AI rulemaking body."
+    },
+    {
+      "source": "https://media.bis.gov/press-release/department-commerce-revises-license-review-policy-semiconductors-exported-china",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The January 13, 2026 BIS release supports case-by-case review for H200, MI325X, and similar exports subject to US-capacity protection, purchaser compliance procedures, and independent US testing."
+    },
+    {
+      "source": "https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Council's final-adoption release supports December 2, 2027 and August 2, 2028 high-risk-system dates and does not indicate a comparable deferral of the general-purpose-AI chapter."
+    },
+    {
+      "source": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F32EA2A561F1886CD8D606513512D547",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The official Chinese national-standard record supports GB 45438-2025's status and effective labeling-regime provenance, discharging the article's stated labeling-measure fetch obligation."
+    },
+    {
+      "source": "https://trahan.house.gov/uploadedfiles/the_great_american_ai_act_discussion_draft.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The House discussion draft supplies the previously unfetched bill text and confirms that it is a proposal rather than enacted law."
+    }
+  ],
+  "hold_reasons": [
+    "The article reports one shared incident-reporting window for California and New York: 15 days, or 24 hours if imminent. California uses 15 days, but New York's enacted amended RAISE Act uses 72 hours for ordinary critical safety incidents.",
+    "The error appears in the paragraph presented as the factual organizing claim of the American section, so it cannot be treated as a harmless source-note discrepancy."
+  ],
+  "unresolved_obligations": [
+    "Correct the state-by-state incident-reporting timelines and bind each figure to its own enacted text before publication."
+  ],
+  "digest": "a8260e667a82fa1c409ed28f233023cf581decdd9a76ab7f28650ae677438f08"
+}

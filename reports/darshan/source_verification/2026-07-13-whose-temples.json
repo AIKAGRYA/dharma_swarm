@@ -1,0 +1,108 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-13-whose-temples",
+  "article_sha256_md": "18267a9e0d55c5b33e7ca1ca8a0097a2aaadaa3f615ba7e39e50318c9bd0c396",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://www.fsa.usda.gov/sites/default/files/2026-01/AFIDAYR2024ReportWithPageNumbers.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Read the complete USDA/FSA 2024 report and manually inspected the relevant tables. It supports approximately 46 million foreign-held acres, 3.6% of privately held agricultural land and roughly 2% of all US land; China 247,659 acres, Iran 547, Russia 11, North Korea 0; the five-company 92% decomposition; no filings directly by China's government; lease/wind predominance; the minimum-count caveat; and the 2025 penalty figures. The Report 12 table visually aligns $120,216.38 with Brazos Highland, discharging the requested human glance."
+    },
+    {
+      "source": "https://www.gao.gov/products/gao-24-106337",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "GAO-24-106337 supports the article's AFIDA data-quality findings: manual and incomplete processes, inadequate verification and quality review, double-counting, and DOD/CFIUS access and timeliness gaps."
+    },
+    {
+      "source": "https://www.govinfo.gov/content/pkg/FR-2026-06-25/pdf/2026-12808.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The June 25, 2026 Federal Register document is a proposed, not final, AFIDA modernization rule and supports the quoted description of USDA's transaction-specific CFIUS participation. The essay preserves the proposal status."
+    },
+    {
+      "source": "https://www.fsa.usda.gov/sites/default/files/2024-12/AFIDAYR2023ReportwithPageNumbers.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The 2023 AFIDA report supports the article's vintage comparison: 277,336 China-associated acres, Texas 123,708, Utah 33,035, and no filings directly by China's government."
+    },
+    {
+      "source": "https://www.flsenate.gov/Laws/Statutes/2024/692.204",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Florida's official statute supports the covered-person definition and the one-residence, two-acre, five-mile, valid-visa exception, together with grandfathering and registration provisions."
+    },
+    {
+      "source": "https://capitol.texas.gov/tlodocs/89R/billtext/html/SB00017F.htm",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The enrolled Texas SB 17 text supports the article's description of the enacted Texas restriction and its September 1, 2025 effective date."
+    },
+    {
+      "source": "https://www.govinfo.gov/content/pkg/FR-2024-11-07/html/2024-25773.htm",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Treasury's final CFIUS rule supports the Grand Forks Air Force Base 100-mile-radius jurisdictional expansion and its December 9, 2024 effective date."
+    },
+    {
+      "source": "https://www.mayerbrown.com/en/insights/publications/2023/01/cfius-determines-it-has-no-jurisdiction-over-fufeng-groups-north-dakota-corn-mill-project",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Mayer Brown client alert supports the narrow point that CFIUS determined it lacked jurisdiction over the Fufeng transaction under the rules then in force."
+    },
+    {
+      "source": "https://foreignpolicy.com/2020/06/25/texas-chinese-wind-farm-national-security-espionage-electrical-grid/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Foreign Policy contains the article's exact quoted explanation that CFIUS review was limited because the Blue Hills project was a greenfield investment. The body attributes that exact quotation to Texas Public Radio instead; this source mismatch is publication-blocking even though the substantive explanation is supported."
+    },
+    {
+      "source": "https://www.wind-watch.org/news/2020/06/26/deep-in-the-heart-of-texas-a-chinese-wind-farm-raises-eyebrows/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "This syndication preserves the same Foreign Policy story and exact CFIUS quotation, further identifying the quotation's provenance. No corresponding full Texas Public Radio article was found from the ledger's title/date description."
+    },
+    {
+      "source": "https://www.forbes.com/sites/johnhyatt/2021/08/09/why-a-secretive-chinese-billionaire-bought-140000-acres-of-land-in-texas/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Forbes supports the attributed account of Sun Guangxin's Val Verde County holdings and business background. The essay treats the security assessment as attributed rather than independently proven."
+    },
+    {
+      "source": "https://www.cbsnews.com/amp/news/saudi-arabia-water-access-arizona/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "CBS supports the Fondomonte/Arizona groundwater and lease-termination example. It is used as a conduct-based regulatory comparison, not as evidence about Chinese ownership."
+    },
+    {
+      "source": "https://www.opb.org/article/2024/01/21/tianqiao-chen-oregon-land-acquisition/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "OPB supports the attributed Tianqiao Chen Oregon acquisition and the discrepancy between land-ranking coverage and AFIDA classification. The essay correctly labels its proposed reclassification explanation as hypothesis."
+    },
+    {
+      "source": "https://landreport.com/land-report-100/tianqiao-chen",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The Land Report profile supports the attributed acreage/ranking used in the Chen comparison; it does not establish AFIDA classification."
+    },
+    {
+      "source": "https://www.aljazeera.com/economy/2026/5/18/us-says-china-to-buy-billions-in-agricultural-goods-after-trump-xi-talks",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Al Jazeera supports the reported annual agricultural-purchase commitment. The article carries it as a reported agreement claim, not a completed-purchases fact."
+    }
+  ],
+  "hold_reasons": [
+    "A load-bearing quotation about CFIUS's Blue Hills jurisdiction is attributed in the body to Texas Public Radio, but the exact language is traceable to Foreign Policy and its syndication; the named Texas Public Radio source could not be located.",
+    "The source ledger itself requires full fetch before external publication, so an unresolved outlet/quotation mismatch cannot be promoted by merely preserving the underlying substantive point."
+  ],
+  "unresolved_obligations": [
+    "Correct the body and source ledger to the actual source of the CFIUS quotation, or supply and digest-bind the missing Texas Public Radio full text showing the exact language."
+  ],
+  "digest": "bff027f230cf51e0581e474a44717210b29091107ad1896e6130860dd0bccacc"
+}

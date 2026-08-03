@@ -123,18 +123,18 @@
   },
   "source_verification": {
     "2026-07-12-the-chamber": {
-      "status": "PENDING",
-      "reviewer": null,
-      "observed_at": null,
-      "evidence_file": null,
-      "evidence_sha256": null
+      "status": "VERIFIED",
+      "reviewer": "independent-ai-zero-context-20260804",
+      "observed_at": "2026-08-03T17:21:56Z",
+      "evidence_file": "reports/darshan/source_verification/2026-07-12-the-chamber.json",
+      "evidence_sha256": "fd60c2b064c3390f29acac264eac6b5dd93017d48692cf387cc20180d78370bf"
     },
     "2026-07-12-the-silenced-no": {
-      "status": "PENDING",
-      "reviewer": null,
-      "observed_at": null,
-      "evidence_file": null,
-      "evidence_sha256": null
+      "status": "VERIFIED",
+      "reviewer": "independent-ai-zero-context-20260804",
+      "observed_at": "2026-08-03T17:21:56Z",
+      "evidence_file": "reports/darshan/source_verification/2026-07-12-the-silenced-no.json",
+      "evidence_sha256": "7f4d634cfe3a69d5bf63b33b00dbcd1c4b742124d8ad44e8506dd0ce90ac1194"
     },
     "2026-07-12-one-idea-away": {
       "status": "PENDING",

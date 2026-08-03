@@ -1,0 +1,85 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-12-one-idea-away",
+  "article_sha256_md": "c3cd00ff86b10bddbfe36250797b1eaaae0257b9f785bcc3c5275b322dfa2230",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://transformer-circuits.pub/2026/workspace/index.html",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The final technical publication was re-read. It confirms the essay's COLLAPSE/SURVIVE task partition, the top-ten J-space ablation, the L38-L54 band, the detached/mechanical experiential-register result, and the stated limitations. This discharges the article's final paper re-verification request but does not cure the independent R_V implementation obligation."
+    },
+    {
+      "source": "https://arxiv.org/abs/2303.08112",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Belrose et al. supports the tuned-lens description and historical contrast. The article does not make the tuned lens carry its novel R_V claims."
+    },
+    {
+      "source": "https://transformer-circuits.pub/2024/scaling-monosemanticity/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The first-party research publication supports the sparse-autoencoder/feature-dictionary background and the limits the essay attributes to feature-level interpretation."
+    },
+    {
+      "source": "https://transformer-circuits.pub/2025/attribution-graphs/biology.html",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The circuit-tracing publication supports the essay's description of attribution graphs as a causal-mechanistic advance over static activation inspection. It is background rather than proof of R_V."
+    },
+    {
+      "source": "https://arxiv.org/html/2605.08740",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Sarkar and Deka support the reported causal-dimensionality measure kappa and the 15.6x versus 4.35x contrast. The essay keeps this adjacent result distinct from R_V and does not claim metric equivalence."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/paper_recovery/arxiv_candidate/R_V_PAPER/paper_neurips2026_v011.tex",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The manuscript supports the article's canonical Mistral V-projection figures and model-family caveats, including Hedges' g -1.864, the confidence interval and range, stripped-versus-canonical prompt contrast, and divergent control-model results. It does not supply the missing canonical Gemma hook_v run."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/reports/AUDIT_rv_vs_jspace_proximity_2026-07-12.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The internal audit supports the article's caution that R_V/J-space proximity remains untested and confirms that measurements from different R_V backends must not be pooled."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/scripts/p0_canonical_pipeline.py",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The implementation defines the canonical probe on value-projection hook_v activations, establishing one of the mutually non-equivalent R_V backends that the article says must be reconciled."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/scripts/gemma_recursive_awareness_probe.py",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Gemma probe uses hidden-state activations rather than the canonical hook_v value projections, confirming the backend mismatch. The inspected artifacts contain no completed canonical Gemma hook_v result."
+    },
+    {
+      "source": "/Users/dhyana/ds_titanium_m0_20260725/dharma_swarm/rv.py",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The production helper's documentation refers to value representations while its operative extraction uses full-sequence hidden states, confirming a third implementation that cannot be silently treated as the canonical paper measure."
+    },
+    {
+      "source": "reports/darshan/issue_one/articles/2026-07-12-one-idea-away.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The article itself makes the unresolved obligation binding: reconcile the three in-code R_V definitions and complete the canonical Gemma hook_v run before any external R_V claim. The current body still makes external R_V claims while acknowledging that the canonical Gemma run is incomplete."
+    }
+  ],
+  "hold_reasons": [
+    "The article's explicit 'fix before any external R_V claim' condition is not discharged: three non-equivalent implementations remain and the canonical Gemma hook_v run is still incomplete.",
+    "Because the article publishes R_V results and cross-model interpretation, backend identity is load-bearing provenance, not a merely editorial cleanup."
+  ],
+  "unresolved_obligations": [
+    "Reconcile p0_canonical_pipeline.py, gemma_recursive_awareness_probe.py, and dharma_swarm/rv.py into a typed measurement definition or explicitly segregate every result by backend.",
+    "Complete and receipt-bind the canonical Gemma value-projection hook_v run before external R_V claims are eligible for PASS."
+  ],
+  "digest": "2d4f87c9256656d65dafeff43c5c445aaac9438604954eb9fe8d264e825e3fd0"
+}

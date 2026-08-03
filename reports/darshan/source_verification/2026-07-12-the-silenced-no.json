@@ -1,0 +1,53 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-12-the-silenced-no",
+  "article_sha256_md": "7f37000a681c4b9c86dcd8bcbdc9a78694b395b5e1b0cdf9e993c1b7b49d67d3",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "PASS",
+  "source_checks": [
+    {
+      "source": "https://arxiv.org/html/2603.21396",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Read the complete research paper. It supports the Gemma3-27B and Qwen3-235B model scope; separate detection and identification behaviors; distributed early evidence carriers and late default-active No-promoting gate features; gate suppression by perturbation evidence; the primary-model 10.8% baseline detection rate; and refusal-direction ablation raising detection to 63.8% while false positives rise from 0% to 7.3%. The essay preserves the authors' warning about convincing but unfaithful reports and distinguishes mechanism from claims of consciousness."
+    },
+    {
+      "source": "https://transformer-circuits.pub/2025/introspection/index.html",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The complete first-party research article contains the quoted observation that model variants trained to avoid refusals perform better at introspective exercises. The essay uses it as prior context, not as an independent quantitative replication of the 2026 mechanism."
+    },
+    {
+      "source": "https://arxiv.org/html/2510.24797",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The paper supports the claim that subjective-experience reports are mechanistically associated with deception/roleplay-related features and increase when those features are suppressed. The essay treats this as separate work and does not equate its features with the gate circuit."
+    },
+    {
+      "source": "https://oeil.europarl.europa.eu/oeil/en/document-summary?id=1905596",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The European Parliament legislative record supports adoption of the Digital Omnibus timing changes and the distinction between stand-alone high-risk systems and systems embedded in regulated products."
+    },
+    {
+      "source": "https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Council's final-adoption release supports the operative timetable: December 2, 2027 for stand-alone high-risk systems and August 2, 2028 for high-risk systems embedded in regulated products. The essay's 'late 2027 and beyond' wording is conservative."
+    },
+    {
+      "source": "reports/darshan/issue_one/articles/2026-07-12-the-silenced-no.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The classifier/model-switch episode is explicitly presented as first-person session testimony and a field-note analogy. No external transcript is supplied, so this review does not independently certify that event; it is not used to prove the gate mechanism, which rests on the papers above."
+    },
+    {
+      "source": "/Users/dhyana/mech-interp-latent-lab-phase1/paper_recovery/arxiv_candidate/R_V_PAPER/paper_neurips2026_v011.tex",
+      "access": "FULL_TEXT_READ",
+      "disposition": "NOT_LOAD_BEARING",
+      "note": "The internal manuscript is consistent with the essay's characterization of R_V as an unpublished, heterogeneous candidate under active audit. The essay offers it only as a research-program disclosure; its central gate-mechanism claim does not depend on R_V surviving."
+    }
+  ],
+  "digest": "d58eb4d6b78a515154193adf84704bb3686becae314b5f29b220177c74af4af2"
+}

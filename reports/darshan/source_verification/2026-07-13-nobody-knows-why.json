@@ -1,0 +1,81 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-13-nobody-knows-why",
+  "article_sha256_md": "cba1b26a6a33564ed4ab4995e11c3a23268e72c491ded8e7473060a35a5b3edb",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://www.eda.admin.ch/en/memorandum-of-understanding-between-the-usa-and-iran",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Swiss FDFA's complete dated ticker supports the June 17-22 chronology, Switzerland's facilitator role, the June 19 postponement, and the exact statement that no further information could be provided. It also supports that Switzerland publicly welcomed a signed MoU while not publishing the instrument."
+    },
+    {
+      "source": "https://mofa.gov.qa/en/latest-articles/statements/joint-statement-by-the-state-of-qatar-and-the-islamic-republic-of-pakistan-regarding-the-conclusion-of-lake-lucerne-summit--first-high-level-committee-meeting-with-participation-of-the-united-states-of-america-and-the-islamic-republic-of-iran",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Qatar-Pakistan joint statement supports the Islamabad MoU name, the high-level committee and 60-day roadmap, paragraph 5's safe-passage communication line, and the mediators' role."
+    },
+    {
+      "source": "https://www.axios.com/2026/06/17/read-full-us-iran-deal-memorandum-understanding",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "Axios publishes fourteen numbered paragraphs and expressly says the print text was not released and its transcript of a senior US official's readout may be inexact. The essay accurately distinguishes public readability from authentication and checks paragraphs 5, 10, 11, and 13 within that limited standing."
+    },
+    {
+      "source": "https://www.iaea.org/newscenter/pressreleases/update-on-developments-in-iran-6",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The linked IAEA page is dated June 24, 2025, describes the 2025 twelve-day conflict, and says inspectors remained in Iran then. It is not a June 2026 source and cannot support the essay's 2026 claim that no inspector is documented inside a bombed site since February. The source ledger's former 'HTTP 402; unavailable' description is now independently shown to conceal a material vintage mismatch."
+    },
+    {
+      "source": "https://isis-online.org/isis-reports/analysis-of-iaea-iran-verification-and-monitoring-and-npt-safeguards-reports-june-2026",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The Institute for Science and International Security analysis discusses June 2026 IAEA reporting and supports a secondary account of inspection-access gaps. The article labels this source down-weighted context, but then makes the absence of referees a load-bearing factual plank without citing the underlying current IAEA report."
+    },
+    {
+      "source": "https://www.axios.com/2026/07/07/iran-resumes-hormuz-attacks-us-officials",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Axios supports the carefully attributed US allegation and reports UKMTO's 'unknown projectile' language. The essay appropriately distinguishes the belligerent's attribution from the non-attributing maritime report, but the UKMTO primary record itself is not supplied in the source ledger."
+    },
+    {
+      "source": "https://www.aljazeera.com/news/2026/6/22/us-iran-agree-on-roadmap-towards-final-deal-in-switzerland-talks",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Al Jazeera supports the attributed June 19 causal account and summit-roadmap reporting. The essay correctly flags the causal sentence as unattributed and contrasts it with the Swiss primary record."
+    },
+    {
+      "source": "https://www.aljazeera.com/news/2026/6/18/what-we-know-so-far-about-the-us-iran-ceremony-in-switzerland",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The ceremony explainer supports the attributed Sharif withdrawal and named Mosharraf Zaidi statement used as an edge around the unresolved June 19 postponement."
+    },
+    {
+      "source": "https://www.bbc.com/news/articles/cwykq59jwpvo",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The BBC report supports the article's attributed account of tanker strikes, CENTCOM's more-than-80-target claim, and the oil-waiver revocation. The essay preserves party attribution and does not present CENTCOM's target count as independently verified."
+    },
+    {
+      "source": "reports/darshan/issue_one/articles/2026-07-13-nobody-knows-why.md",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The article header still requires re-discernment after its rebuild. Independently of that separate editorial gate, this source audit cannot elevate the current body while a wrong-year IAEA citation sits under a load-bearing 2026 inspector-access claim."
+    }
+  ],
+  "hold_reasons": [
+    "The sole listed primary IAEA URL is a June 24, 2025 press release about the previous conflict, not a 2026 source. It therefore cannot support the article's load-bearing 2026 claim about inspection access after February.",
+    "The current inspection-access account is carried through a secondary Institute analysis while the underlying 2026 IAEA report is absent. The essay's central method depends on distinguishing a missing referee from a merely uncited referee, so primary-source provenance is material.",
+    "The article additionally cites UKMTO only through Axios rather than providing the primary maritime report, despite calling it the primary maritime record."
+  ],
+  "unresolved_obligations": [
+    "Replace the 2025 IAEA link with the applicable 2026 IAEA report and bind each site/access assertion to exact dated primary text, or narrow the claim to the secondary source's attributed account.",
+    "Add the direct UKMTO incident record or rewrite 'primary maritime record' as an attributed secondary report.",
+    "Complete the article's separately required re-discernment before any publication promotion."
+  ],
+  "digest": "fc82489bed64932d2c5cdda4ad5bf67ee397070197ff2db7752ca5ba8011f5c9"
+}

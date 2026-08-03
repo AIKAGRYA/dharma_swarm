@@ -1,0 +1,121 @@
+{
+  "schema": "darshan.source_verification.v1",
+  "article_slug": "2026-07-13-shape-of-a-silence",
+  "article_sha256_md": "9e24e3157c3fd57c6e2e046d0ee1f1dd1166664c67991484423eb7b8028ce988",
+  "reviewer": "independent-ai-zero-context-20260804",
+  "observed_at": "2026-08-03T17:21:56Z",
+  "verdict": "HOLD",
+  "source_checks": [
+    {
+      "source": "https://www.chinalawtranslate.com/en/generative-ai-interim/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The translated Interim Measures support the actual regulatory root: Article 4's core-socialist-values and prohibited-content duties and Article 14's requirements to stop generation/transmission, remove content, and take corrective model-training measures. The essay identifies its mapping from these duties to measured model mechanisms as inference."
+    },
+    {
+      "source": "https://cset.georgetown.edu/publication/china-safety-requirements-for-generative-ai-final/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "CSET's current source page identifies the February 29, 2024 instrument as TC260 'Technical Documentation,' says it was designed to inform a future Chinese national standard, and says it provides the oversight department a reference. This directly contradicts the essay's repeated characterization of the document as a binding final standard or binding law."
+    },
+    {
+      "source": "https://cset.georgetown.edu/wp-content/uploads/t0588_generative_AI_safety_EN.pdf",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The full translation supports the document's internal numerical provisions: over-5% corpus exclusion, suggested keyword-library floors of 10,000 total/200 per A.1/100 per A.2 category, refusal-rate thresholds of at least 95% and at most 5%, and positive-content testing during all conversations. Its use of 'shall' for particular clauses does not itself establish that the technical documentation is binding national law."
+    },
+    {
+      "source": "https://www.theguardian.com/technology/2025/jan/28/we-tried-out-deepseek-it-works-well-until-we-asked-it-about-tiananmen-square-and-taiwan",
+      "access": "FULL_TEXT_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "The Guardian's direct product test supports the disappearing-answer and leetspeak Tank Man examples and its Gemini comparison. The essay attributes these observations to the outlet rather than treating them as controlled research."
+    },
+    {
+      "source": "https://www.promptfoo.dev/blog/deepseek-censorship/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Promptfoo's published red-team method and results support the approximately 1,360-prompt test and roughly 85% sensitive-topic censorship result, within the evaluator's stated scope."
+    },
+    {
+      "source": "https://academic.oup.com/pnasnexus/article/5/2/pgag013/8487339",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The peer-reviewed Pan and Xu study supports the historical cross-model evidence for refusal, avoidance, refutation, and fabrication. The essay correctly limits the tested model vintages rather than presenting them as a fresh 2026 snapshot."
+    },
+    {
+      "source": "https://arxiv.org/html/2505.12625",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "R1dacted supports locally persistent R1 censorship, likely training/alignment origins, and experimental transfer of political alignment through distillation. It does not support the article's separate prevalence assertion that distilled variants ship worldwide 'mostly unlabeled.'"
+    },
+    {
+      "source": "https://arxiv.org/abs/2506.12349",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The USC audit supports the distinction between reasoning content and suppressed or rephrased final output on DeepSeek's hosted platform, with the article's 646-prompt scope preserved."
+    },
+    {
+      "source": "https://arxiv.org/abs/2504.17130",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "Steering the CensorShip supports the reported refusal-compliance and thought-suppression representation directions and causal steering experiments."
+    },
+    {
+      "source": "https://arxiv.org/abs/2604.03121",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The independent Kimi K2.5 evaluation supports only the claims the essay assigns to that model and does not fill the disclosed absence of MiniMax testing."
+    },
+    {
+      "source": "https://ceias.eu/chinese-llms-and-the-spillover-effects-of-political-alignment/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The CEIAS report supports its four-model, 40-topic, 37-country design; 24% English versus 59% Mandarin insertion of state framing on the most sensitive topics; 42%-86% Taiwan failure range; and the reported OpenRouter spillover beyond China-only questions."
+    },
+    {
+      "source": "https://speechmap.substack.com/p/chinese-open-source-model-roundup",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "SpeechMap's published evaluation supports the Qwen-Max API-error observation and the distinction between open weights and hosted endpoint behavior."
+    },
+    {
+      "source": "https://huggingface.co/blog/leonardlin/chinese-llm-censorship-analysis",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "ATTRIBUTED",
+      "note": "Lin's local Qwen2 experiments support the cited sensitive-topic refusals, Mandarin/English asymmetry, retained nationalist framing after abliteration, and the author's attributed interpretation of policy alignment."
+    },
+    {
+      "source": "https://airevolution.poltextlab.com/the-speechmap-free-speech-eval-reveals-ai-responses-to-controversial-topics/",
+      "access": "FULL_TEXT_READ",
+      "disposition": "SUPPORTED",
+      "note": "The analysis supports the cited 32.3% industry-wide contentious-request filtering/redirection/denial statistic and the reported time/model asymmetries, with those findings kept separate from Chinese legal requirements."
+    },
+    {
+      "source": "https://futurefreespeech.org/that-violates-my-policies-ai-laws-chatbots-and-the-future-of-expression/",
+      "access": "PRIMARY_SOURCE_READ",
+      "disposition": "SUPPORTED",
+      "note": "The Future of Free Speech study supports the comparison between rarer hard refusals, persistent soft moderation, and Qwen3's relative expressive-freedom result."
+    },
+    {
+      "source": "https://www.nist.gov/news-events/news/2025/09/caisi-evaluation-deepseek-ai-models-finds-shortcomings-and-risks",
+      "access": "FULL_TEXT_READ",
+      "disposition": "NOT_LOAD_BEARING",
+      "note": "The government release is explicitly treated as an attributed government claim and does not carry the essay's legal-status or mechanism conclusions."
+    },
+    {
+      "source": "https://thehackernews.com/2025/11/chinese-ai-model-deepseek-r1-generates.html",
+      "access": "FULL_TEXT_READ",
+      "disposition": "NOT_LOAD_BEARING",
+      "note": "This secondary report carries the CrowdStrike code-security figures. The essay clearly labels them unreplicated, attributes them to CrowdStrike, and states that no conclusion rests on the missing first-party page."
+    }
+  ],
+  "hold_reasons": [
+    "The essay turns TC260 technical documentation into a 'binding final,' 'binding law,' and a state punishment regime. CSET's source metadata instead says the document was designed to inform a future national standard and serves as an oversight reference; internal mandatory grammar does not establish binding legal status.",
+    "The claim that distilled R1 variants ship inside products worldwide 'mostly unlabeled' has no supporting deployment or labeling-prevalence source. R1dacted establishes transferability to studied distilled models, not global product prevalence."
+  ],
+  "unresolved_obligations": [
+    "Correct the TC260 legal-status language throughout, clearly separating binding Interim Measures from nonbinding technical documentation unless an authoritative source establishes a different status.",
+    "Source, narrow, or remove the worldwide mostly-unlabeled deployment assertion."
+  ],
+  "digest": "267454c092e446c934849b31d2f52060b480345bfff92c9e2584475e8ceb6101"
+}
