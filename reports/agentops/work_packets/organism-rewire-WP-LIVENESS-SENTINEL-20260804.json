@@ -5,6 +5,7 @@
   "worktree": ".",
   "intent": "Make the dormant-organism outage impossible to file as a quiet PASS: reconcile doctor, status, cron, live-census, and sentinel runtime identity against real current-process evidence; preserve uncertainty when probes are blind; distinguish a dead snapshot writer from a healthy replacement daemon; and keep all installation or restart actions operator-gated.",
   "allowed_files": [
+    ".github/CODEOWNERS",
     "dharma_swarm/cron_runner.py",
     "dharma_swarm/doctor.py",
     "dharma_swarm/runtime_artifacts.py",
@@ -249,7 +250,7 @@
       "GitHub Actions is materially backlogged, so current-head cloud checks may remain queued after the locally reproducible contracts pass.",
       "A fresh daemon-host observation is still required before Organism Rewire D1 may claim live closure; repository tests prove classification behavior, not host liveness."
     ],
-    "rollback": "Revert this pull request as one unit. Do not partially remove the shared runtime-command identity while leaving doctor or sentinel consumers, because that recreates divergent liveness answers. Runtime installation remains unchanged by repository rollback.",
-    "packet_digest": "c91a6860814b53114f957e05ab442cff736315e0997887e86603045767b6480b"
+    "rollback": "Revert this pull request as one unit, including the measured CODEOWNERS route. Do not partially remove the shared runtime-command identity while leaving doctor or sentinel consumers, because that recreates divergent liveness answers. Runtime installation remains unchanged by repository rollback.",
+    "packet_digest": "8ce4c40d4c83764de31a0d5b7f40a6e875581934d1effd3f432763b2e723e78f"
   }
 }
