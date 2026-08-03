@@ -23,6 +23,10 @@ Integration:
     - field_graph.py       -- Field intelligence bridges to semantic concepts
     - ontology.py          -- OntologyRegistry objects bridge everywhere
 """
+# closure-layer-role: exempt — subordinate adapter under the MemoryKernel/
+# DharmaGraph consolidation doctrine (CLAUDE.md: legacy stores are subordinate
+# adapters and projections). Ratified WP-0C1R decision B1 (2026-08-02);
+# adjudication: reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
 
 from __future__ import annotations
 

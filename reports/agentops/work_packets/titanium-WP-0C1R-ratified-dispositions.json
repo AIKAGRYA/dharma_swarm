@@ -1,0 +1,125 @@
+{
+  "id": "titanium-WP-0C1R-ratified-dispositions",
+  "base_ref": "d664c0146659ef003d4f154e44448e0870ac6b84",
+  "branch": "claude/titanium-hardening-status-bm7th5",
+  "worktree": ".",
+  "intent": "Execute the two operator-ratified WP-0C1R dispositions (session 2026-08-02: decision A1 for the 18 dharma.no-unauthorized-dharma-write findings, decision B1 for the 3 dharma.no-new-substrate findings) via each rule's own documented resolution procedure: declare the 18 research files as research_state_participants in ACTIVE_SURFACE_MANIFEST.yaml and allowlist exactly those files in Rule 1; add closure-layer-role headers to the three substrate modules and allowlist exactly those files in Rule 2; pin both with focused contract tests that forbid drift and glob widening; record the ratified adjudication. Strict semgrep goes from 21 findings to 0 with no runtime behavior change and no broad ignores. The scanner wrapper, required-scan target, and governance orchestration are untouched (WP-0C1 owns them); the WP-0C1R residual retires only on merged-main reverification.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-0C1R-ratified-dispositions.json",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    ".semgrep/dharma-anti-slop.yml",
+    "dharma_swarm/bridge_registry.py",
+    "dharma_swarm/graph_store.py",
+    "dharma_swarm/knowledge_units.py",
+    "tests/test_semgrep_wrapper.py",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "packages/**",
+    "terminal/**",
+    "tools/**",
+    "docs/plans/**",
+    "docs/prompts/**",
+    "docs/state/**",
+    "reports/loop_closure/**",
+    "reports/governance/titanium/phase0_clean_room_receipt.json",
+    "reports/governance/titanium/wp00_baseline.json",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-18.md",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md",
+    "reports/agentops/work_packets/titanium-WP-M0-phase0-truth-reconciliation.json",
+    "reports/agentops/work_packets/titanium-WP-PHASE0-INTEGRATION.json",
+    "Dockerfile",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock",
+    "INTERFACE_MISMATCH_MAP.md",
+    "CYBERNETIC_LOOP_MAP.md",
+    "reports/agentops/work_packets/titanium-WP-M2-wp0d-retirement.json",
+    "scripts/governance/run_semgrep_with_ca.sh",
+    "dharma_swarm/runtime_state.py",
+    ".semgrep/security.yml"
+  ],
+  "gates": [
+    {
+      "name": "c1r-contract-tests",
+      "command": "python3 -m pytest -q tests/test_semgrep_wrapper.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-rejects-unknown-flag",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(titanium): execute ratified WP-0C1R dispositions \u2014 strict semgrep 21 findings to 0"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0C1R",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d664c0146659ef003d4f154e44448e0870ac6b84",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The WP-0C1R spec admits rule/config edits for demonstrated false positives; these dispositions instead follow the rules' own declare-then-allowlist / role-then-allowlist procedures under explicit operator ratification \u2014 disclosed in the adjudication record rather than reinterpreted.",
+      "The three substrate modules carry role 'exempt' (truthful: not read-only views, caches, or scheduled-removal mirrors); MemoryKernel/DharmaGraph consolidation remains future work outside this campaign.",
+      "Merged-main count projections lag post-M2 merges; this PR reconverges the projections it must regenerate anyway."
+    ],
+    "closest_existing_implementation": [
+      ".semgrep/dharma-anti-slop.yml",
+      "ACTIVE_SURFACE_MANIFEST.yaml",
+      "docs/governance/ANTI_SLOP_RULES.md",
+      "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md",
+      "tests/test_semgrep_wrapper.py"
+    ],
+    "honest_blockers": [
+      "The WP-0C1R residual retires only after this PR merges and the strict scan is reverified green on merged main (M-pattern follow-up).",
+      "The operator ratification ('C1R approved', session 2026-08-02) is durably signed by the human merge of this PR per the campaign's approval mechanism.",
+      "Phase 0 remains BLOCKED targeting CLOSED_NOT_PROD; WP-0F1 recording/WP-0F2, WP-0G delivery, WP-0S verdict, and WP-0I are untouched by this packet."
+    ],
+    "rollback": "Revert the single commit; the surface declaration, allowlist entries, role headers, contract tests, adjudication record, and projections disappear as one unit, restoring the 21-finding strict result.",
+    "packet_digest": "7e7f01874f9c9bf50791b31246597a5bd59b9497abdd3e0b79b0bf927c347d3a"
+  }
+}
