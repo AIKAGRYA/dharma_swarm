@@ -37,8 +37,9 @@ Checks (all mandatory, in order):
      explicitly true (`both_fires` and `independent_discernment`);
   6. every article carries a digest-bound, article-hash-bound source-review
      receipt with verdict PASS; and
-  7. --operator-read-confirmed was provided (recorded verbatim), with no
-     remaining item in `pending_operator_actions`.
+  7. no prerequisite remains in `pending_operator_actions`; and
+  8. the draft declares exactly the two typed `seal_time_actions` this command
+     itself discharges: the operator-read confirmation and canonical write.
 
 Then: published=true and per-article status/publication_evidence updated to the
 seal-time observation (the sealed receipt is internally consistent — no stale
@@ -58,8 +59,10 @@ the field's shape but never fabricates entries.
 
 The script never promotes editorial or source-review state. Those facts are
 produced by independent review and must already be digest-bound PASS evidence
-in the draft. A pending action is never silently deleted: the draft must be
-updated after each prerequisite is actually discharged, before sealing.
+in the draft. A pending prerequisite is never silently deleted: the draft must
+be updated after it is actually discharged. Seal-time actions are a separate,
+closed vocabulary; they start PENDING and are changed to DISCHARGED only in the
+canonical receipt produced by the successful seal operation.
 """
 
 import argparse
@@ -81,6 +84,12 @@ ARTICLE_URL_PREFIX = (
     "https://amitabhainarunachala.github.io/darshan/articles/"
 )
 ARTICLE_REPO_DIR = "reports/darshan/issue_one/articles"
+SEAL_TIME_ACTION_SPECS = {
+    "operator_read_confirmation": "non-empty --operator-read-confirmed",
+    "canonical_receipt_write": (
+        "successful write of reports/darshan/issue_one_receipt.json"
+    ),
+}
 
 # Exact draft-banner marker emitted by the darshan site template
 # (darshan repo scripts/build.py, DRAFT_BANNER, commit c40ae16). A page that
@@ -229,15 +238,63 @@ def _require_editorial_gates(receipt: dict) -> None:
 
 
 def _require_no_pending_actions(receipt: dict) -> None:
-    """A sealer may prove facts, but it may not erase unresolved obligations."""
+    """A sealer may prove live facts, but it may not erase prerequisites."""
     actions = receipt.get("pending_operator_actions")
     if not isinstance(actions, list):
         fail("pending_operator_actions must be a list")
     if actions:
         fail(
             "pending_operator_actions is not empty; discharge and record every "
-            "listed prerequisite before sealing (nothing is cleared implicitly)"
+            "listed prerequisite before sealing (seal-time actions belong in "
+            "the separate typed seal_time_actions field)"
         )
+
+
+def _validated_seal_time_actions(receipt: dict) -> dict[str, dict]:
+    """Return the exact pending actions that a successful seal discharges.
+
+    The closed, typed vocabulary prevents arbitrary operator prerequisites from
+    being relabelled as self-discharging work. Pre-discharged, missing, extra,
+    or structurally ambiguous entries all refuse before any network contact.
+    """
+    actions = receipt.get("seal_time_actions")
+    if not isinstance(actions, list):
+        fail("seal_time_actions must be a list")
+
+    required_keys = {"id", "status", "discharged_by", "observed_at", "evidence"}
+    by_id: dict[str, dict] = {}
+    for index, action in enumerate(actions):
+        if not isinstance(action, dict) or set(action) != required_keys:
+            fail(
+                f"seal_time_actions[{index}] must contain exactly "
+                f"{sorted(required_keys)}"
+            )
+        action_id = action.get("id")
+        if not isinstance(action_id, str) or action_id in by_id:
+            fail(f"seal_time_actions[{index}].id must be a unique string")
+        by_id[action_id] = action
+
+    expected_ids = set(SEAL_TIME_ACTION_SPECS)
+    if set(by_id) != expected_ids:
+        fail(
+            "seal_time_actions must contain exactly the closed seal-time action "
+            f"set {sorted(expected_ids)}"
+        )
+    for action_id, discharged_by in SEAL_TIME_ACTION_SPECS.items():
+        action = by_id[action_id]
+        if action["status"] != "PENDING":
+            fail(f"seal_time_actions.{action_id}.status must be PENDING")
+        if action["discharged_by"] != discharged_by:
+            fail(
+                f"seal_time_actions.{action_id}.discharged_by does not match "
+                "the sealer's closed action contract"
+            )
+        if action["observed_at"] is not None or action["evidence"] is not None:
+            fail(
+                f"seal_time_actions.{action_id} carries evidence before the "
+                "sealer has discharged it"
+            )
+    return by_id
 
 
 def _expected_content_digest(receipt: dict) -> str:
@@ -593,6 +650,7 @@ def main(argv=None) -> None:
     _require_editorial_gates(receipt)
     _validated_source_verification(receipt, manifest_slugs)
     _require_no_pending_actions(receipt)
+    seal_time_actions = _validated_seal_time_actions(receipt)
 
     # 2 + 3. Repo article paths contained; content unchanged since assembly.
     article_paths: dict[str, Path] = {}
@@ -654,14 +712,25 @@ def main(argv=None) -> None:
     receipt["editorial_law_passes"]["operator_read_evidence"] = (
         args.operator_read_confirmed.strip()
     )
+    operator_read_action = seal_time_actions["operator_read_confirmation"]
+    operator_read_action["status"] = "DISCHARGED"
+    operator_read_action["observed_at"] = sealed_at
+    operator_read_action["evidence"] = args.operator_read_confirmed.strip()
+
+    canonical_write_action = seal_time_actions["canonical_receipt_write"]
+    canonical_write_action["status"] = "DISCHARGED"
+    canonical_write_action["observed_at"] = sealed_at
+    canonical_write_action["evidence"] = (
+        "This digest-bound canonical receipt exists only as the output of the "
+        "successful sealer write."
+    )
     receipt["site_build_sha256"] = stable_digest(live_pages)
     receipt["site_build_sha256_kind"] = (
         "live_pages_sealed — stable_digest over {published_url: page_stable_digest} "
         "of every Issue One page fetched HTTP-200 at seal time"
     )
     # pending_operator_actions was required to be empty above. Preserve it
-    # verbatim so the permanent record never acquires a false assertion by
-    # seal-time deletion.
+    # verbatim; only the separately typed seal_time_actions are discharged.
     receipt["digest_policy"] = (
         "digest = stable_digest(receipt minus digest); canonicalisation identical "
         "to scripts/governance/check_track_status.py. Sealed by "

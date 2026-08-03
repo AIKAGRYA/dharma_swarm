@@ -93,14 +93,23 @@ track-owned surface `reports/darshan/**`.
   (unpublished pieces 404); a simulated sealed receipt PASSES
   `scripts/governance/check_track_status.py::check_receipt_valid`
   (6 keys + digest intact) and a tampered one is REJECTED.
+- `pending_operator_actions` contains prerequisites only. Each must be removed
+  with its evidence before sealing. The operator-read confirmation and the
+  canonical write live instead in the closed, typed `seal_time_actions` list;
+  the sealer refuses missing, extra, malformed, or pre-discharged entries and
+  marks exactly those two DISCHARGED in its digest-bound canonical output.
 
 ## The one operator session
 
 1. Read Issue One — the five assembled pieces on darshan PR #1 (the three
-   live ones are a click away).
+   live ones are a click away). The seal command records this through its
+   mandatory `--operator-read-confirmed` value; it is not a prerequisite the
+   operator must manually delete from the draft.
 2. Approve publication — merge darshan PR #1 (Pages deploys from `main`).
 3. Convene the merge gate on this dharma_swarm PR.
-4. Seal: `python3 scripts/darshan/seal_issue_one_receipt.py
+4. Record evidence for and remove each now-discharged prerequisite from
+   `pending_operator_actions`; the sealer refuses while any remain.
+5. Seal: `python3 scripts/darshan/seal_issue_one_receipt.py
    --operator-read-confirmed "<your words>"` — then commit the sealed
    `issue_one_receipt.json`, and the track's second criterion goes green on
    its own machinery.

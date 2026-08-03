@@ -2,7 +2,7 @@
   "schema": "darshan.issue_one_receipt.v1",
   "receipt_state": "DRAFT_PENDING_OPERATOR_PUBLICATION",
   "track": "darshan-publication-2026-07",
-  "observed_at": "2026-08-03T14:22:19Z",
+  "observed_at": "2026-08-03T18:06:45Z",
   "issue": "Issue One",
   "site": "https://amitabhainarunachala.github.io/darshan/",
   "articles": [
@@ -212,12 +212,27 @@
     }
   ],
   "pending_operator_actions": [
-    "Read Issue One (the 5 assembled pieces; 3 are already live)",
     "Iran piece (2026-07-13-nobody-knows-why): re-discernment before external circulation \u2014 independent_discernment stays false until done",
     "Approve publication: merge darshan repo PR #1 (issue-one-20260721 -> main; Pages deploys from main), including the 2026-08-03 R_V corrections per the corrections law",
     "Ratify (or override) the canonical R_V paper vintage: arxiv_candidate v011 (2026-07-15) is presumed, not ratified",
-    "Convene the merge gate on the dharma_swarm PR",
-    "Run scripts/darshan/seal_issue_one_receipt.py --operator-read-confirmed '<own words>' to seal the canonical receipt"
+    "Convene the merge gate on the dharma_swarm PR"
+  ],
+  "pending_operator_actions_policy": "Prerequisites only: every entry must be discharged and removed with evidence before sealing. The operator-read assertion and canonical write are not prerequisites; they are the exact closed set in seal_time_actions and are discharged only by a successful sealer invocation.",
+  "seal_time_actions": [
+    {
+      "id": "operator_read_confirmation",
+      "status": "PENDING",
+      "discharged_by": "non-empty --operator-read-confirmed",
+      "observed_at": null,
+      "evidence": null
+    },
+    {
+      "id": "canonical_receipt_write",
+      "status": "PENDING",
+      "discharged_by": "successful write of reports/darshan/issue_one_receipt.json",
+      "observed_at": null,
+      "evidence": null
+    }
   ],
   "digest": null,
   "digest_policy": "digest stays null in this DRAFT. It is computed as stable_digest(receipt minus digest) by the seal script ONLY after live-URL verification of all 8 pieces and explicit operator-read confirmation \u2014 identical canonicalisation to scripts/governance/check_track_status.py. A receipt that asserts an unpublished issue must not validate; that is the point."

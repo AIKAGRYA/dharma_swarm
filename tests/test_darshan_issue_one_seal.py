@@ -354,6 +354,25 @@ def fixture_repo(tmp_path, monkeypatch):
         },
         "source_verification": source_verification,
         "pending_operator_actions": [],
+        "seal_time_actions": [
+            {
+                "id": "operator_read_confirmation",
+                "status": "PENDING",
+                "discharged_by": "non-empty --operator-read-confirmed",
+                "observed_at": None,
+                "evidence": None,
+            },
+            {
+                "id": "canonical_receipt_write",
+                "status": "PENDING",
+                "discharged_by": (
+                    "successful write of "
+                    "reports/darshan/issue_one_receipt.json"
+                ),
+                "observed_at": None,
+                "evidence": None,
+            },
+        ],
         "external_evidence": [],
         "digest": None,
     }
@@ -398,6 +417,16 @@ def test_seal_happy_path_seals_and_is_internally_consistent(fixture_repo) -> Non
     assert sealed["editorial_law_passes"]["operator_read"] is True
     assert sealed["external_evidence"] == []
     assert sealed["pending_operator_actions"] == []
+    seal_actions = {action["id"]: action for action in sealed["seal_time_actions"]}
+    assert set(seal_actions) == set(seal.SEAL_TIME_ACTION_SPECS)
+    assert all(action["status"] == "DISCHARGED" for action in seal_actions.values())
+    assert all(action["observed_at"] for action in seal_actions.values())
+    assert seal_actions["operator_read_confirmation"]["evidence"] == (
+        "read every word — fixture operator"
+    )
+    assert "canonical receipt exists" in (
+        seal_actions["canonical_receipt_write"]["evidence"]
+    )
     for art in sealed["articles"]:
         assert art["published"] is True
         assert art["status"].startswith("SEALED — live page verified")
@@ -446,6 +475,54 @@ def test_seal_refuses_pending_operator_action(fixture_repo) -> None:
 
     assert caught.value.code == 1
     assert not fixture_repo["canonical"].exists()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "extra", "predischarged", "wrong_mechanism", "premature_evidence"],
+)
+def test_seal_refuses_invalid_seal_time_action_contract(
+    fixture_repo, mutation
+) -> None:
+    draft = fixture_repo["draft"]
+    receipt = json.loads(draft.read_text(encoding="utf-8"))
+    actions = receipt["seal_time_actions"]
+    if mutation == "missing":
+        actions.pop()
+    elif mutation == "extra":
+        actions.append(
+            {
+                "id": "erase_unresolved_prerequisites",
+                "status": "PENDING",
+                "discharged_by": "the sealer",
+                "observed_at": None,
+                "evidence": None,
+            }
+        )
+    elif mutation == "predischarged":
+        actions[0]["status"] = "DISCHARGED"
+    elif mutation == "wrong_mechanism":
+        actions[0]["discharged_by"] = "prose assertion"
+    else:
+        actions[0]["evidence"] = "claimed before execution"
+    draft.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as caught:
+        seal.main(ARGS)
+
+    assert caught.value.code == 1
+    assert not fixture_repo["canonical"].exists()
+
+
+def test_checked_in_draft_separates_prerequisites_from_seal_actions() -> None:
+    receipt = json.loads(DRAFT.read_text(encoding="utf-8"))
+    pending_text = "\n".join(receipt["pending_operator_actions"]).lower()
+
+    assert "run scripts/darshan/seal_issue_one_receipt.py" not in pending_text
+    assert "read issue one" not in pending_text
+    actions = {action["id"]: action for action in receipt["seal_time_actions"]}
+    assert set(actions) == set(seal.SEAL_TIME_ACTION_SPECS)
+    assert all(action["status"] == "PENDING" for action in actions.values())
 
 
 def test_seal_refuses_pending_source_verification(fixture_repo) -> None:
