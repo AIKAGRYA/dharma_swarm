@@ -153,6 +153,21 @@ def create_mcp_server(state_dir: str = ".dharma"):
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+        # Swarm-free tools dispatch BEFORE the bootstrap. `SwarmManager.init()`
+        # mutates disk — it mkdirs the state dir, unlinks EMERGENCY_HOLD
+        # (`swarm.py:563-569`) and seeds the Telos/Concept graphs — so booting it
+        # to answer a read-only question would clear an operator's emergency hold
+        # as a side effect of merely looking. These two read the organ package
+        # directly and need no swarm.
+        if name == "sarathi_status":
+            from dharma_swarm.holon_system.sarathi import gateway_snapshot
+            snapshot = gateway_snapshot()
+            return [TextContent(type="text", text=json.dumps(snapshot, indent=2, default=str))]
+
+        if name == "sarathi_roster":
+            from dharma_swarm.holon_system.sarathi import load_roster
+            return [TextContent(type="text", text=json.dumps(list(load_roster()), indent=2))]
+
         swarm = await _get_swarm()
 
         if name == "swarm_status":
@@ -213,15 +228,6 @@ def create_mcp_server(state_dir: str = ".dharma"):
             await telos.load()
             summary = telos.strategy_map_summary()
             return [TextContent(type="text", text=json.dumps(summary, indent=2, default=str))]
-
-        elif name == "sarathi_status":
-            from dharma_swarm.holon_system.sarathi import gateway_snapshot
-            snapshot = gateway_snapshot()
-            return [TextContent(type="text", text=json.dumps(snapshot, indent=2, default=str))]
-
-        elif name == "sarathi_roster":
-            from dharma_swarm.holon_system.sarathi import load_roster
-            return [TextContent(type="text", text=json.dumps(list(load_roster()), indent=2))]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 

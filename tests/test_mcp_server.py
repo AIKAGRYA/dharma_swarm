@@ -260,3 +260,57 @@ def test_sarathi_mcp_tools_are_read_only():
         "an actuating Sarathi tool was added to the MCP surface; delegation must "
         "route through delegate_all so the reversibility gate runs first"
     )
+
+
+def test_sarathi_tools_dispatch_before_the_swarm_bootstrap():
+    """Reading Sarathi's status must not boot the swarm.
+
+    `SwarmManager.init()` mutates disk: it mkdirs the state dir, unlinks
+    `state_dir/EMERGENCY_HOLD` (`dharma_swarm/swarm.py:563-569`) and seeds the
+    Telos/Concept graphs. If `call_tool` awaits `_get_swarm()` before
+    dispatching, then merely *inspecting* Sarathi over MCP clears an operator's
+    emergency hold as a side effect — and the tools stop working at all when
+    swarm init raises. Both Sarathi tools read the organ package directly and
+    need no swarm, so they must return before the bootstrap.
+
+    Asserted structurally rather than behaviourally because `mcp` is an optional
+    dependency (`pyproject.toml:34`) and is absent from the `[dev]` extra CI
+    installs, so a test that constructs a live server would skip instead of
+    guarding.
+    """
+    import ast
+    import inspect
+    from dharma_swarm import mcp_server
+
+    tree = ast.parse(inspect.getsource(mcp_server))
+    call_tool = next(
+        (n for n in ast.walk(tree)
+         if isinstance(n, ast.AsyncFunctionDef) and n.name == "call_tool"),
+        None,
+    )
+    assert call_tool is not None, "call_tool not found in mcp_server"
+
+    def _stmt_index(predicate) -> int | None:
+        for i, stmt in enumerate(call_tool.body):
+            if any(predicate(sub) for sub in ast.walk(stmt)):
+                return i
+        return None
+
+    bootstrap_at = _stmt_index(
+        lambda n: isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "_get_swarm"
+    )
+    assert bootstrap_at is not None, "expected call_tool to bootstrap the swarm somewhere"
+
+    for tool in ("sarathi_status", "sarathi_roster"):
+        at = _stmt_index(
+            lambda n, _t=tool: isinstance(n, ast.Constant) and n.value == _t
+        )
+        assert at is not None, f"{tool} is not dispatched in call_tool"
+        assert at < bootstrap_at, (
+            f"{tool} is dispatched at statement {at}, after the swarm bootstrap at "
+            f"{bootstrap_at}. SwarmManager.init() unlinks EMERGENCY_HOLD and seeds "
+            f"graphs, so a read-only lookup would mutate operator state. Move the "
+            f"swarm-free branches above `await _get_swarm()`."
+        )
