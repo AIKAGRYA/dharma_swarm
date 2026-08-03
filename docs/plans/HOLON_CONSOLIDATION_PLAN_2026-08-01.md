@@ -80,7 +80,7 @@ self-documenting facade instead.
 | 5 | `holon_bridge.py` | `holon_system/runtime/bridge.py` | 419 | 11 | medium |
 | 6 | `holon_health.py` | `holon_system/runtime/health.py` | 79 | 4 | low |
 | 7 | `holon_runtime.py` | `holon_system/runtime/wake_cycle.py` | 283 | 9 | medium |
-| 8 | `authority/permissions.py` | **REPAIR, do not delete** — see §2.1 | 3 | 1 | low |
+| 8 | `authority/permissions.py` | **NO CODE CHANGE** — do not move, do not edit, do not delete; see §2.1 | 3 | 1 | none |
 
 **Phase C (the four A2A scripts) is DEFERRED.** Its stated justification — that
 moving bodies into `dharma_swarm/` fixes the `pyproject.toml:62-63` packaging

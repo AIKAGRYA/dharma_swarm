@@ -56,11 +56,17 @@ partially_fulfils: docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-2
 
 ## Header note — what this is and why it is dated today
 
-This report **fulfils the P0 task filed 2026-05-28** at
-`docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md`. That task
-required the deliverable at
+This report **partially fulfils the P0 task filed 2026-05-28** at
+`docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md`, and **the
+P0 remains open.** That task required the deliverable at
 `docs/reports/hermes_persistent_agent_index_2026-05-28.md`. That file does not
 exist and never did (`test -e` → absent). The debt is roughly nine weeks old.
+
+Do not mark the P0 complete on the strength of this file. The errata block
+above names the claims that were verified false and marks §7's three-PR build
+plan NOT EXECUTABLE AS WRITTEN; the frontmatter records `partially_fulfils`
+for the same reason. What is discharged is the *inventory* shape (§§1-7); what
+is outstanding is every surface the errata lists.
 
 It is dated **2026-08-01**, not backdated to the request date, because every
 claim in it was verified against the working tree *today*. Backdating would
