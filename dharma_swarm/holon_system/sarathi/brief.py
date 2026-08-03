@@ -32,6 +32,7 @@ def build_operator_brief(
     outcomes: Sequence[Any] | None = None,
     responses: Sequence[Mapping[str, Any]] | None = None,
     audit: Mapping[str, Any] | None = None,
+    memory_excerpt: str = "",
 ) -> str:
     pulse = pulse or sarathi_pulse()
     lines = [
@@ -64,6 +65,23 @@ def build_operator_brief(
                 f"- [completed] {response.get('summary')} by {response.get('responder')} "
                 f"(task={response.get('task_id')}, response_ref={response.get('response_ref') or '-'})"
             )
+
+    lines += ["", "## Memory"]
+    if not memory_excerpt:
+        # "Not consulted" and "consulted, admitted nothing" are different facts.
+        # A brief that renders both as silence lets an operator read an absent
+        # memory kernel as an empty memory.
+        lines.append(
+            "NOT CONSULTED — no memory kernel was available to this cycle. This "
+            "is not the same as recalling nothing; no read was attempted."
+        )
+    else:
+        lines.append(
+            "Consulted through MemoryKernel under the apex budget. The pack below "
+            "states its own admission counts; a pack admitting 0 atoms means "
+            "policy excluded them, not that memory was skipped."
+        )
+        lines += ["", memory_excerpt.rstrip()]
 
     lines += ["", "## Runtime audit"]
     if audit is None:

@@ -36,6 +36,12 @@ class BootPack:
     ready_keys: frozenset[str] = frozenset()
     audit: Mapping[str, Any] | None = None
     lodestone_excerpt: str = ""
+    # Governed memory recall, built upstream by ``memory.build_memory_pack`` and
+    # rendered by ``memory.render_memory_excerpt``. Injected like everything
+    # else here — the planner never reads a store. Empty string means memory was
+    # never consulted; a rendered pack that admitted 0 atoms is a DIFFERENT fact
+    # and renders as such, so a brief can distinguish them.
+    memory_excerpt: str = ""
 
 
 @dataclass(frozen=True)

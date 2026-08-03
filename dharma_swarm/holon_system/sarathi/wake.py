@@ -123,6 +123,7 @@ async def run_wake_unit(
         outcomes=outcomes,
         responses=responses,
         audit=effective_audit,
+        memory_excerpt=pack.memory_excerpt,
     )
 
     # Dispatch above already happened. A brief-persistence failure must NOT

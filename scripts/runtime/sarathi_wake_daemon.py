@@ -82,6 +82,10 @@ from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
     BootPack,
     stored_dedup_key,
 )
+from dharma_swarm.holon_system.sarathi.memory import (  # noqa: E402
+    build_memory_pack,
+    render_memory_excerpt,
+)
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
 from dharma_swarm.holon_system.sarathi.wake import make_wake_work_fn  # noqa: E402
 from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level  # noqa: E402
@@ -243,6 +247,20 @@ async def run_daemon(
     roster = load_roster() or DEFAULT_ROSTER
     level = current_autonomy_level()
 
+    # Governed memory recall. Constructed ONCE per run, not per cycle, and
+    # fail-open: a deployment with no memory configured, or a kernel that will
+    # not construct, must not halt the wake loop. Fail-open is safe here only
+    # because the failure is legible downstream -- `memory_excerpt` stays "",
+    # which the brief reports as "not consulted" rather than as "nothing
+    # recalled". The two are different facts and must not collapse.
+    try:
+        from dharma_swarm.memory_kernel import MemoryKernel
+
+        memory_kernel = MemoryKernel()
+    except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
+        print(f"[sarathi] memory kernel unavailable, planning without recall: {exc}")
+        memory_kernel = None
+
     def load_boot_pack() -> BootPack:
         # Dedup against EVERY task this sender has open OR completed, not just
         # currently-claimable ones: a claimed/responded task must still suppress
@@ -258,8 +276,22 @@ async def run_daemon(
             for key in (stored_dedup_key(task.metadata),)
             if key  # a keyless (pre-key) task does not dedup — see build_plan
         )
+        # Recall is read per cycle, not per run: memory that changed between
+        # cycles must reach the next plan. Fail-open for the same reason as
+        # construction, and legible for the same reason -- "" means the read
+        # did not happen, never "the read returned nothing".
+        try:
+            memory_excerpt = render_memory_excerpt(build_memory_pack(memory_kernel))
+        except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
+            print(f"[sarathi] memory read failed, planning without recall: {exc}")
+            memory_excerpt = ""
+
         return BootPack(
-            roster=roster, open_items=backlog, ready_keys=seen, audit=audit
+            roster=roster,
+            open_items=backlog,
+            ready_keys=seen,
+            audit=audit,
+            memory_excerpt=memory_excerpt,
         )
 
     brief_counter = {"n": 0}
