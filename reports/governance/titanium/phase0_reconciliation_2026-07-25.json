@@ -158,7 +158,7 @@
         "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 f3eb5b39759f4f6deae5f0562530d7ed38792458",
         "python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q: 65 passed",
         "GitHub API observation (2026-07-31): zero webhooks, zero Deployments, no Pages site, and no DHARMA_VERIFY_WEBHOOK_SECRET repository secret name. NOT SUFFICIENT for a non-exposure verdict, and as of 2026-08-01 no longer the whole picture: GitHub-side absence never bounded host-side exposure, and a direct host observation now exists (below).",
-        "2026-08-01 host observation, recorded on UNMERGED PR #1184: https://dashboard.167-172-95-184.nip.io/health answered HTTP 401 and http://178.128.87.170:8080/health answered public HTTP 200. Reachable from this repository with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803)."
+        "2026-08-01 host observation, recorded on UNMERGED PR #1184: the receipt classified one endpoint alias as HTTP 401 and another as unauthenticated public HTTP 200. Exact live network coordinates are intentionally omitted from this public reconciliation record. Reach the immutable source receipt from this repository with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803)."
       ],
       "evidence_observation_ids": [
         "m1-exact-main-contracts-92bec",
@@ -166,10 +166,10 @@
         "m3-wp0s-citation-20260803"
       ],
       "remaining": [
-        "Record the operator-backed actual deployment exposure and host-secret verdict. Live exposure is now OBSERVED rather than unknown (public HTTP 200 on meghadharma:8080), but the observation is implementation-observer authority on an unmerged PR, declares inventory_complete=false, and carries no operator attestation, so it cannot itself close the item.",
+        "Record the operator-backed actual deployment exposure and host-secret verdict. Live exposure is now OBSERVED rather than unknown (unauthenticated public HTTP 200 under the source receipt's exposed endpoint alias), but the observation is implementation-observer authority on an unmerged PR, declares inventory_complete=false, and carries no operator attestation, so it cannot itself close the item.",
         "Land or supersede PR #1184 so the receipt has merged custody; until then the citation depends on an unmerged ref.",
-        "OPERATOR ACTION on the exposure itself, not on the record: authenticate the endpoint observed answering unauthenticated HTTP 200 (host meghadharma, runtime dharmic-quant-web, public 8080 route), close it, or attest that it is intentionally public. The cited receipt already carries operator_action=required; recording it here so the obligation is on the ledger and not only inside an unmerged receipt.",
-        "DISCLOSURE POSTURE, recorded rather than redacted (raised in PR #1211 review): this repository is PUBLIC, so this entry names a live unauthenticated endpoint in a public default branch. Measured before deciding not to redact: both addresses are already on merged main f3eb5b397 (dharma_swarm/living_map.py, dharma_swarm/ontology.py, docs/architecture/NAVIGATION.md, scripts/sync_jikoku.sh carry 167.172.95.184; docs/plans/HANDOFF_HIGH_ROI_2026-07-03.md carries 178.128.87.170), and the exact endpoint-plus-status-code pairing is already public in the receipt on open non-draft PR #1184. Redacting the verdict-bearing evidence would remove this record's verifiability without removing any exposure, and the exposure is what WP-0S exists to adjudicate. If the operator prefers redaction, the address-bearing lines here, in the ACTIVE_TRACK.yaml WP-0S item, in PR #1184's receipt, and in the five merged-main files above must be handled together, as one operator-ratified decision."
+        "OPERATOR ACTION on the exposure itself, not on the record: authenticate the source receipt's endpoint alias observed answering unauthenticated HTTP 200, close it, or attest that it is intentionally public. The cited receipt already carries operator_action=required; recording it here keeps the obligation on the ledger without republishing the live network coordinate.",
+        "PUBLIC DISCLOSURE POSTURE (repaired after PR #1211 review): exact live network coordinates and the coordinate-to-status pairing are intentionally omitted from this tracked projection. The immutable receipt object, endpoint aliases, status classifications, implementation-observer authority, inventory_complete=false boundary, and operator_action=required obligation remain cited. This bounded repair does not claim repository-wide endpoint erasure and does not rewrite historical merged-main documents or PR #1184. Sanitizing the projection changes no packet classification, completion arithmetic, promotion authority, or operator obligation."
       ]
     },
     {
@@ -286,7 +286,7 @@
       ],
       "evidence": [
         "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 92bec3b2c8bf5fdb5003719f7ea540345accb89e",
-        "python3 -m pytest tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py -q: 36 passed on exact current main",
+        "python3 -m pytest tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py -q: 36 passed at measurement SHA 92bec3b2c8bf5fdb5003719f7ea540345accb89e on 2026-07-31T14:40:05Z",
         "non-live checker returns typed NEEDS_HOST and rejects tracked or ambient evidence"
       ],
       "evidence_observation_ids": [
@@ -346,7 +346,7 @@
         "e96674d27d90144f22bc55b64ac7ea2baff63b52"
       ],
       "evidence": [
-        "python3 -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q: 32 passed on exact current main",
+        "python3 -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q: 32 passed at measurement SHA 92bec3b2c8bf5fdb5003719f7ea540345accb89e on 2026-07-31T14:40:05Z",
         "DocOps run 30606619117 regenerated current counts and force-updated PR #1118 head a0d4c1ac, then observed zero checks and failed closed",
         "DOCOPS_RECONCILE_TOKEN is absent by secret name; no secret value was accessed"
       ],
@@ -367,7 +367,7 @@
       ],
       "evidence": [
         "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 92bec3b2c8bf5fdb5003719f7ea540345accb89e",
-        "python3 -m pytest tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py -q: 30 passed with pinned uv available on exact current main",
+        "python3 -m pytest tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py -q: 30 passed with pinned uv available at measurement SHA 92bec3b2c8bf5fdb5003719f7ea540345accb89e on 2026-07-31T14:40:05Z",
         "all six required PR #1164 head contexts succeeded; the complete head rollup was 45 success and 1 skipped, and postmerge push workflows had 41 success and 6 event-inapplicable skips with no failures"
       ],
       "evidence_observation_ids": [

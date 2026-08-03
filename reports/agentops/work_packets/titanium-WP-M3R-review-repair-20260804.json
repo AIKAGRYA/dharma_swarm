@@ -1,0 +1,100 @@
+{
+  "id": "titanium-WP-M3R-review-repair-20260804",
+  "base_ref": "822de24cda4d4b48b76bf22b9bfcb4d4cfb3adec",
+  "branch": "governance/titanium-prose-truth-20260803",
+  "worktree": ".",
+  "intent": "Repair two current-head review defects in the Titanium M3 reconciliation without changing its arithmetic or authority: remove exact live network coordinates from the public PR-diff governance surfaces while preserving a sanitized immutable receipt reference and exposure classification, and bind the carried WP-0E/WP-0G/WP-0H test results to their actual 2026-07-31 measurement SHA and time instead of calling them exact current main. This packet performs no live replay, deployment, production mutation, policy change, credential access, operator ratification, or independent WP-0I promotion.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-M3R-review-repair-20260804.json",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "reports/governance/titanium/phase0_reconciliation_2026-07-25.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "tools/**",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "reports/governance/titanium/phase0_clean_room_receipt.json"
+  ],
+  "gates": [
+    {
+      "name": "m3-review-repair-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_docops_integrity.py -k \"not count_writers_are_byte_idempotent\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-rejects-unknown-flag",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(titanium): repair M3 evidence disclosure and measurement scope"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-M3R",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "822de24cda4d4b48b76bf22b9bfcb4d4cfb3adec",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The public M3 projection paired exact live network coordinates with an unauthenticated HTTP 200 classification even though stable receipt aliases and an immutable object reference can carry the governance claim without republishing coordinates.",
+      "WP-0E, WP-0G, and WP-0H cited the historical m1-exact-main-contracts-92bec observation but described its 2026-07-31 results as exact current main after reviewed_main advanced to f3eb5b397."
+    ],
+    "closest_existing_implementation": [
+      "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "reports/agentops/work_packets/titanium-WP-M2-wp0d-retirement.json",
+      "scripts/governance/render_active_track_includes.py",
+      "scripts/docops/check_docops_integrity.py"
+    ],
+    "honest_blockers": [
+      "This repair does not contact either endpoint and cannot claim current exposure state; WP-0S remains BLOCKED_OPERATOR on the cited implementation-observer receipt.",
+      "This bounded repair removes coordinates only from tracked surfaces added by PR #1211; it does not claim repository-wide endpoint erasure and does not rewrite historical merged-main documents or PR #1184.",
+      "The historical WP-0E/WP-0G/WP-0H test results remain implementation-author replay at SHA 92bec3b2c8bf5fdb5003719f7ea540345accb89e; they are not re-executed or promoted here.",
+      "Strict local DocOps is already red at exact base 822de24c for five generated-count drifts owned by the separate #1118 reconciliation lane; this repair does not absorb those unrelated files. The advisory count projection and active-track renderer are checked separately, and test_count_writers_are_byte_idempotent is excluded because it intentionally rewrites those DocOps owner files in place.",
+      "Titanium Phase 0 remains BLOCKED at the M3 record's existing 8/9 arithmetic, with operator and independent-review boundaries unchanged."
+    ],
+    "rollback": "Revert the single WP-M3R review-repair commit to restore the pre-repair M3 prose and evidence strings; no runtime, live host, policy, credential, arithmetic, or authority state is affected.",
+    "packet_digest": "d3b99c25f35c666ddf6aa7dbe2624f2360f71ff4bd200297477dd7df61650e4e"
+  }
+}
