@@ -48,8 +48,8 @@ passed — the pre-existing textual failure only).
   `HOLON_RUNTIME_FULL_ESTATE_MAP.md:332` ("43 files ... roughly 360 lines").
 - Destination state is as described: `persistence`/`bridge`/`health`/`wake_cycle`
   shims exist; `killswitch`/`budget_guard`/`compass` do not.
-- `pytest tests/test_holon_system_imports.py` FAILS on current checkout at
-  `holon_system/authority/permissions.py:3` — but see §2.1 for the real cause.
+- `pytest tests/test_holon_system_imports.py` fails on a checkout WITHOUT core
+  dependencies installed. It is not a code defect — see §2.1.
 
 ### The reversibility gate stays put — verified empirically
 
@@ -88,47 +88,47 @@ inversion — is **false**: all four bodies themselves import from `scripts/`
 (`pr_merge_control.py`, `a2a_topology.py`), so the inversion survives the move. Phase C
 needs its own design pass.
 
-### 2.1 Correction — the three "dead shims" are not dead (Codex review, PR #1198)
+### 2.1 Correction — there is NO bug here (three prior revisions were wrong)
 
 The original plan said to delete `gateway/operator_brief.py`,
-`observability/scoreboard.py` and `authority/permissions.py` as dead. **That was
-wrong and following it would have caused damage.** Verified by import:
+`observability/scoreboard.py` and `authority/permissions.py` as dead shims.
+**That was wrong**, and the two follow-up "fixes" to it were also wrong. The
+full correction, with the evidence:
+
+**First error — the shims are not dead.** Verified by import:
 
 ```
 OK      dharma_swarm.holon_system.gateway.operator_brief
 OK      dharma_swarm.holon_system.observability.scoreboard
-FAILS   dharma_swarm.holon_system.authority.permissions
+FAILS   dharma_swarm.holon_system.authority.permissions   (in THIS container only)
 ```
 
 The first two import cleanly and are pinned as SUPPORTED facade imports by
-`tests/test_holon_system_imports.py:42,45`. Deleting them would remove two
-working public import paths and force the facade contract to be weakened.
+`tests/test_holon_system_imports.py:42,45`. Deleting them would remove working
+public API and force the facade contract to be weakened.
 
-And the third is not a dead shim either. The shim is three lines and correct;
-the failure is transitive:
+**Second and third errors — the remaining failure is not a code defect at all.**
+Earlier revisions of this section called `textual` an "OPTIONAL TUI dependency"
+and prescribed guarding its import. Both premises are false:
 
-```
-$ python3 -c "import dharma_swarm.holon_system.authority.permissions"
-    from textual import work
-ModuleNotFoundError: No module named 'textual'
-```
+| Fact | Evidence |
+|---|---|
+| `textual` is a **CORE** dependency | `pyproject.toml:23` — inside `dependencies = [...]`, not `[project.optional-dependencies]` |
+| CI installs it | `.github/workflows/tests.yml:36,69` — `pip install -e ".[dev]"` installs core deps |
+| It is absent here | `python3 -c "import textual"` → `ModuleNotFoundError` in this container |
+| The module cannot be guarded anyway | `provider_runner.py:10-13` imports four `textual` names, and `class ProviderRunner(Widget)` at `:24` needs `Widget` at **class-definition** time |
 
-The unguarded import is **three levels down**, not in `permissions.py`. The exact
-chain, each hop cited:
+So `tests/test_holon_system_imports.py` fails **only in environments where core
+dependencies are not installed**. It passes in CI. There is nothing to repair.
 
-| Hop | Location | Statement |
-|---|---|---|
-| 1 | `dharma_swarm/operator_core/permissions.py:13` | `from dharma_swarm.tui.engine.events import CanonicalEvent, ThinkingComplete, ToolCallComplete` |
-| 2 | `dharma_swarm/tui/engine/__init__.py:25` | `from .provider_runner import ProviderRunner` |
-| 3 | `dharma_swarm/tui/engine/provider_runner.py:10` | `from textual import work` ← **unguarded** |
+**The fix is `pip install -e ".[dev]"`, not a code change.** Do not guard the
+import, do not make the engine export lazy, do not delete the facade — all three
+would weaken a module that works, to accommodate a missing local install.
 
-`textual` is an OPTIONAL TUI dependency. Note that `dharma_swarm/tui/__init__.py:15-17`
-already wraps its own import in `try/except ImportError` — so the missing guard is
-specifically in the **engine** package, and the fix belongs at hop 3 (or the
-dependency gets declared). It is **not** in `operator_core/permissions.py`, which
-contains no `textual` import at all.
-
-Repair at hop 3. Do not delete the facade.
+> Recorded because this took four attempts to get right, and each intermediate
+> version read as more precise than the last while remaining wrong. The failure
+> mode throughout was diagnosing one level and prescribing a fix without testing
+> whether the fix would work — or, here, whether there was anything to fix.
 
 ## 3. Ownership collisions (checked against ACTIVE_TRACK.yaml)
 
@@ -209,12 +209,10 @@ at `living_agent_kernel.py:51` and mkdirs at `:788`).
 
 1. MOVE 0 — lazy `runtime/__init__.py`, prove the suite returns to baseline.
 2. Phase A moves 1–7, one commit each, suite green between every one.
-3. Repair `authority/permissions.py` by guarding `from textual import work` at
-   `dharma_swarm/tui/engine/provider_runner.py:10` — reached via
-   `operator_core/permissions.py:13` → `tui/engine/__init__.py:25` (see §2.1 for the
-   full chain). This fixes the live `test_holon_system_imports.py` failure. Do NOT
-   edit `operator_core/permissions.py`; it has no `textual` import. Do NOT delete any
-   of the three shims, and do not touch the other two at all — they work.
+3. **No code change.** `tests/test_holon_system_imports.py` fails only where core
+   dependencies are missing; run `pip install -e ".[dev]"`. All three shims work or
+   are reachable once deps are installed — do not delete or guard any of them.
+   See §2.1.
 4. Apply the §4 estate-map corrections.
 5. Re-run the index sweep for the surfaces §the errata lists as missed (cron subsystem,
    `browser_agent`, `synthesis_agent`, `sleep_time_agent`, `garden_daemon`, the sixth registry).
