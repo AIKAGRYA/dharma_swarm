@@ -98,7 +98,8 @@ rules:
             exempt) in a file-header comment AND, if it is a receipt,
             add an entry to ACTIVE_SURFACE_MANIFEST.yaml
             correlation_spine.layers, then adjudicate the class with the
-            operator (the ratified exemptions below are class-scoped).
+            operator. The three exemptions below are NAME-scoped grants to
+            three specific classes, not a general waiver.
 
       WHAT THIS DETECTOR CATCHES (each shape has a fixture line in
       .semgrep/tests/test_no_new_substrate.py):
