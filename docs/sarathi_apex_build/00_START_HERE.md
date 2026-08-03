@@ -4,7 +4,7 @@ Status: **collapse base landed; effect and durable-service closure remain**.
 Do not use this document to claim a living Sarathi.
 
 For current terminology, runtime-family boundaries, and evidence routes, read
-the canonical doorway: [`../SARATHI.md`](../SARATHI.md).
+the canonical doorway: [`../persistent_agents/README.md`](../persistent_agents/README.md).
 
 ## Locked sentence
 

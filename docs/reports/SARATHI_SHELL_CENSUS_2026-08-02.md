@@ -616,4 +616,4 @@ the statements above saying “no Sarathi MCP import/tool” and
 `Sarathi-specific MCP tools: 0` are historical for `9d792ceac`, not
 current-main facts. The new tools accept no message and perform no dispatch, so
 the end-to-end-shell verdict is unchanged. Use
-[`../SARATHI.md`](../SARATHI.md) as the current subject doorway.
+[`../persistent_agents/README.md`](../persistent_agents/README.md) as the current umbrella doorway.

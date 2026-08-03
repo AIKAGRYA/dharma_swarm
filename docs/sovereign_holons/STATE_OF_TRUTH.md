@@ -2,7 +2,7 @@
 
 > **Superseded for current operations (2026-08-03):** This file accurately
 > preserves a June audit, but its missing-body verdict predates later work. Start
-> at the canonical subject doorway, [`../SARATHI.md`](../SARATHI.md), for current
+> at the canonical umbrella doorway, [`../persistent_agents/README.md`](../persistent_agents/README.md), for current
 > terms, runtime-family boundaries, and evidence routes. Use code/tests for
 > implementation and onboarding/Live Ops for current operating state. The July
 > estate map is a dated deep reference. Do not use the score below as a

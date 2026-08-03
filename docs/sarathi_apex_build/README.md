@@ -4,7 +4,7 @@ Status: **collapse base landed on main; Sarathi is not yet a durable living
 service**. This folder preserves the Sarathi-specific design and build sequence.
 It no longer owns the ecosystem-wide source or readiness verdict.
 
-Start with [`../SARATHI.md`](../SARATHI.md). It is the current subject doorway
+Start with [`../persistent_agents/README.md`](../persistent_agents/README.md). It is the current umbrella doorway
 and distinguishes the Sarathi seat, shared Holon substrate, adjacent runtime
 families, and external Hermes/OpenClaw lanes. The July
 [`estate map`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) remains a dated
@@ -13,7 +13,7 @@ state.
 
 ## Read order
 
-1. [Canonical subject doorway](../SARATHI.md) — locked terms, family map,
+1. [Canonical umbrella doorway](../persistent_agents/README.md) — locked terms, family map,
    current high-level state, and evidence routes.
 2. [Dated estate map](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) — deep
    July snapshot; do not use its counts as current truth.

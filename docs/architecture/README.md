@@ -26,7 +26,7 @@ inspiration:
   - canonical_truth
 connected_relevant_files:
   - docs/README.md
-  - docs/SARATHI.md
+  - docs/persistent_agents/README.md
   - docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
   - docs/architecture/ORCHESTRATOR_LEDGERS.md
   - docs/architecture/PROVIDER_MATRIX_HARNESS.md
@@ -70,7 +70,7 @@ Use it for:
 
 Current examples:
 
-- [../SARATHI.md](../SARATHI.md) — first doorway for Sarathi/Holon terminology,
+- [../persistent_agents/README.md](../persistent_agents/README.md) — first doorway for persistent-agent/Sarathi/Holon terminology,
   runtime-family boundaries, current high-level composition, and the complete
   subject document map.
 - [HOLON_RUNTIME_FULL_ESTATE_MAP.md](HOLON_RUNTIME_FULL_ESTATE_MAP.md) — dated

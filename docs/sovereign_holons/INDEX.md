@@ -1,7 +1,7 @@
 # INDEX — Historical Design Read Order
 
 > **Authority notice (2026-08-03):** Start at the canonical subject doorway,
-> [`../SARATHI.md`](../SARATHI.md), for current terms, runtime-family boundaries,
+> [`../persistent_agents/README.md`](../persistent_agents/README.md), for current terms, runtime-family boundaries,
 > and evidence routes. This index preserves the June design sequence; its
 > present-tense implementation claims are historical. The July estate map is a
 > dated deep reference only.

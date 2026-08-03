@@ -7,7 +7,7 @@ status: reference
 # Holon Runtime Full Estate Map
 
 > **Deprecated as first/current orientation (2026-08-03).** Start at
-> [`../SARATHI.md`](../SARATHI.md); this remains a dated July deep reference.
+> [`../persistent_agents/README.md`](../persistent_agents/README.md); this remains a dated July deep reference.
 > The full deprecation record is in Section 12 below.
 
 For current operating state, run `make onboard` and `make organism-status`, then
@@ -28,7 +28,7 @@ Use it to answer:
   alive?
 
 [`AGENT_HOLON_CODE_MAP.md`](AGENT_HOLON_CODE_MAP.md) is a short call-chain index;
-both it and this dated map are subordinate to `docs/SARATHI.md` for subject
+both it and this dated map are subordinate to `docs/persistent_agents/README.md` for subject
 navigation. `docs/sarathi_apex_build/` owns dated build history and
 `docs/sovereign_holons/` preserves research; neither owns current body truth.
 
@@ -707,7 +707,7 @@ If you need to change:
 
 Do not create another registry, provider router, orchestrator, task store,
 receipt spine, runtime home, or another implementation map to close these gaps.
-Compose the owners above; current body/proof changes update `docs/SARATHI.md`.
+Compose the owners above; current body/proof changes update `docs/persistent_agents/README.md`.
 
 ## 12. Deprecation record — orientation role only
 
@@ -718,7 +718,7 @@ remeasured the surface and proved stale counts, omitted runtimes, and import
 hazards (`docs/plans/HOLON_CONSOLIDATION_PLAN_2026-08-01.md:18-52`;
 `docs/reports/SARATHI_SHELL_CENSUS_2026-08-02.md:24-55`).
 
-**Replacement:** [`../SARATHI.md`](../SARATHI.md) owns subsystem terminology,
+**Replacement:** [`../persistent_agents/README.md`](../persistent_agents/README.md) owns subsystem terminology,
 current family boundaries, and the complete document/code map. Use the census
 for exhaustive dated evidence and the consolidation decision; retain the older
 plan only for its reproduced import hazard and move probes.

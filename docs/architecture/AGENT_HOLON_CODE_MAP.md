@@ -6,7 +6,7 @@ status: reference
 
 # Agent Holon Call-Chain Index
 
-Start at [`../SARATHI.md`](../SARATHI.md) for locked terminology, runtime-family
+Start at [`../persistent_agents/README.md`](../persistent_agents/README.md) for locked terminology, runtime-family
 boundaries, and the document/code map. The deeper July snapshot remains
 [`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md), superseded
 for first orientation/current counts. Code/tests own implementation; onboarding

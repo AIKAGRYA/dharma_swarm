@@ -100,7 +100,7 @@ the command and owner for their specific domain.
 
 ## First Places To Look
 
-- **Sarathi / Holon / persistent agent shell:** [docs/SARATHI.md](docs/SARATHI.md)
+- **Persistent agents / Holons / Sarathi:** [docs/persistent_agents/README.md](docs/persistent_agents/README.md)
   is the single subject doorway. Read it before treating Sarathi, Holon, Apex,
   Hermes, or OpenClaw as the same runtime.
 - Start at [api/main.py](api/main.py) for the API lifecycle and router registration.
