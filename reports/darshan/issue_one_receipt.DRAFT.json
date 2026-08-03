@@ -2,7 +2,7 @@
   "schema": "darshan.issue_one_receipt.v1",
   "receipt_state": "DRAFT_PENDING_OPERATOR_PUBLICATION",
   "track": "darshan-publication-2026-07",
-  "observed_at": "2026-07-21T15:03:29Z",
+  "observed_at": "2026-08-03T14:22:19Z",
   "issue": "Issue One",
   "site": "https://amitabhainarunachala.github.io/darshan/",
   "articles": [
@@ -13,11 +13,11 @@
       "repo_file": "reports/darshan/issue_one/articles/2026-07-12-the-chamber.md",
       "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_the-chamber.md",
       "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_the-chamber.discernment.md",
-      "sha256_md": "e298a93997d41fb9d55bbdf6c888ba5ad92beabed7f487fed2abaa804f10eae2",
+      "sha256_md": "4e807e2fb3ae2c18c4d4ad5e10c26f8c6f9bbc4f359d3a67b184ae3be674e3fc",
       "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-12-the-chamber.html",
       "published": true,
       "publication_evidence": "HTTP 200 verified 2026-07-21 (JST) from this machine",
-      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page"
+      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page; body corrected 2026-08-03 (R_V effect-size vintage, see corrections) \u2014 live page shows the pre-correction body until the on-site correction lands at publication"
     },
     {
       "order": 2,
@@ -39,11 +39,11 @@
       "repo_file": "reports/darshan/issue_one/articles/2026-07-12-one-idea-away.md",
       "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_instrument-one-idea-away.md",
       "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_instrument-one-idea-away.discernment.md",
-      "sha256_md": "c8297c2e32c99278a5c0138e0a17e3f459b449fe36f8219031e0c093fd380ff4",
+      "sha256_md": "c3cd00ff86b10bddbfe36250797b1eaaae0257b9f785bcc3c5275b322dfa2230",
       "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-12-one-idea-away.html",
       "published": true,
       "publication_evidence": "HTTP 200 verified 2026-07-21 (JST) from this machine",
-      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page"
+      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page; body corrected 2026-08-03 (R_V effect-size vintage + removal of the 7B scale-threshold claim, see corrections) \u2014 live page shows the pre-correction body until the on-site correction lands at publication"
     },
     {
       "order": 4,
@@ -111,15 +111,15 @@
       "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
     }
   ],
-  "content_digest": "fd2b746e20350993facf9abf5f7137f534e7e6e18737f84cca27cfd94ed2ce78",
+  "content_digest": "ca8d11fb50cdc7fa85a4d6f36d5c9cb531bf5d0fb725a68e95e1633ba48e86c3",
   "site_build_sha256": "a195c2a5c2f08a1e238f0260e9a5f03bb8228fd85a336516d00bcea3fd88528f",
-  "site_build_sha256_kind": "branch_build_provisional \u2014 stable_digest over {page_path: sha256} of the issue-one-20260721 branch build (python3 scripts/build.py, 0 parse failures). The seal script replaces this with a digest of the LIVE pages after merge.",
+  "site_build_sha256_kind": "branch_build_provisional \u2014 stable_digest over {page_path: sha256} of the issue-one-20260721 branch build (python3 scripts/build.py, 0 parse failures). The seal script replaces this with a digest of the LIVE pages after merge. NOTE 2026-08-03: this provisional digest predates the R_V corrections to pieces 1 and 3 (see corrections); the site branch build must be refreshed when the on-site corrections are applied \u2014 the seal verifies LIVE pages against the corrected bodies and refuses until they match.",
   "editorial_law_passes": {
     "both_fires": true,
-    "independent_discernment": true,
-    "discernment_notes": "All 8 pieces carry an independent discernment file (verdicts NEEDS_EDITS or HOLD) with the demanded edits applied per each draft's own header; iran was rebuilt after its HOLD and its header still requests re-discernment before external circulation.",
+    "independent_discernment": false,
+    "discernment_notes": "7 of 8 pieces carry a completed independent discernment file (verdicts NEEDS_EDITS or HOLD) with the demanded edits applied per each draft's own header. The iran piece (2026-07-13-nobody-knows-why) was rebuilt after its HOLD and its own header still requests re-discernment before external circulation \u2014 until that re-discernment happens, this gate is honestly FALSE (honesty fix 2026-08-03; it was previously marked true against its own evidence).",
     "operator_read": false,
-    "operator_read_evidence": "PENDING \u2014 the one remaining editorial-law gate"
+    "operator_read_evidence": "PENDING \u2014 one of the two remaining editorial-law gates (with iran re-discernment)"
   },
   "assembly": {
     "assembled_at_jst": "2026-07-21 late evening",
@@ -131,9 +131,32 @@
     ],
     "pr_965_disposition": "The six ~900-word articles in closed PR #965 are a separate cursor-agent rewrite, closed by the operator 2026-07-16; preserved in PR history, not used here. This assembly revives the track freshly scoped outside One-Door, from the darshan_fable seat's own discerned drafts."
   },
+  "external_evidence": [],
+  "external_evidence_policy": "Publication is delivery, nothing more. Evidence of external consumption (readers, citations, replies, republication) accrues here as {kind, source, url_or_ref, observed_at, note} entries; [] means none observed yet. Additive top-level key \u2014 the tracker criterion's requires_keys are unaffected and the seal digest covers it.",
+  "corrections": [
+    {
+      "date": "2026-08-03",
+      "articles": [
+        "2026-07-12-one-idea-away",
+        "2026-07-12-the-chamber"
+      ],
+      "what": "R_V headline effect updated from g = -1.846, BCa 95% CI [-2.266, -1.517] to g = -1.864, BCa 95% CI [-2.280, -1.532] per the newer arxiv_candidate v011 vintage (paper_recovery/arxiv_candidate/R_V_PAPER/paper_neurips2026_v011.tex, 2026-07-15).",
+      "vintage_note": "CANONICAL-VINTAGE PRESUMPTION: arxiv_candidate (newer, 2026-07-15); operator ratification of canonical v011 pending. This correction presumes the newer vintage; it does not present the presumption as ratified.",
+      "site_note": "The two essays are also live on the site; on-site corrections follow at publication per the corrections law. Until then the live pages show the pre-correction bodies and the seal script will refuse (full-rendered-body check)."
+    },
+    {
+      "date": "2026-08-03",
+      "articles": [
+        "2026-07-12-one-idea-away"
+      ],
+      "what": "Closing ledger no longer claims R_V is 'scale-thresholded around 7B parameters' \u2014 the paper claims no capacity threshold and reports non-universality (six of eight base architectures contract; GPT-2 XL at 1.5B parameters contracts, g = -0.48; Pythia-2.8B expands)."
+    }
+  ],
   "pending_operator_actions": [
     "Read Issue One (the 5 assembled pieces; 3 are already live)",
-    "Approve publication: merge darshan repo PR #1 (issue-one-20260721 -> main; Pages deploys from main)",
+    "Iran piece (2026-07-13-nobody-knows-why): re-discernment before external circulation \u2014 independent_discernment stays false until done",
+    "Approve publication: merge darshan repo PR #1 (issue-one-20260721 -> main; Pages deploys from main), including the 2026-08-03 R_V corrections per the corrections law",
+    "Ratify (or override) the canonical R_V paper vintage: arxiv_candidate v011 (2026-07-15) is presumed, not ratified",
     "Convene the merge gate on the dharma_swarm PR",
     "Run reports/darshan/scripts/seal_issue_one_receipt.py --operator-read-confirmed '<own words>' to seal the canonical receipt"
   ],
