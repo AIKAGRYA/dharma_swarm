@@ -256,10 +256,20 @@ def scan_orchestrate_processes() -> tuple[list[tuple[int, str]], str | None]:
 def check_orchestrate_process(launchd_pid: int | None) -> CheckResult:
     found, error = scan_orchestrate_processes()
     if error is not None:
+        # DELIBERATE ASYMMETRY with check 1, do not "make this consistent".
+        # A missing launchctl is a structural property of a non-macOS host and
+        # says nothing about the organism, so it is `unknown`. An unreadable
+        # PROCESS TABLE is different: it is the single fact this sentinel
+        # exists to establish, and being blind to it is not health. If this
+        # branch were also `unknown`, a host with neither launchctl nor ps
+        # (verified: `python:3.12-slim` ships neither) would leave only the
+        # denial counter — which passes on an empty log — and the sentinel
+        # would report OK while knowing nothing at all. Fail closed.
+        # test_ps_probe_failure_is_fail_closed_not_unknown pins this.
         return CheckResult(
             name="orchestrate_process",
             ok=False,
-            detail=error,
+            detail=f"{error} — cannot see the process table, refusing to report health",
         )
     live = [pid for pid, _ in found if _pid_alive(pid)]
     if not live:

@@ -350,6 +350,56 @@ def test_healthy_container_host_does_not_false_alarm(monkeypatch, tmp_path: Path
     assert list((tmp_path / "witness" / "liveness_sentinel").glob("ORGANISM_DOWN_*")) == []
 
 
+def test_ps_probe_failure_is_fail_closed_not_unknown(monkeypatch) -> None:
+    """The asymmetry is deliberate: no launchctl is 'unknown', no ps is DOWN.
+
+    Verified with `docker run --rm python:3.12-slim`: that image ships
+    neither `launchctl` nor `ps`. If an unreadable process table were also
+    demoted to non-evidence, such a host would fall through to the denial
+    counter alone — which passes on an empty log — and the sentinel would
+    report OK while having established nothing. Blindness is not health.
+    """
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        _launchctl_raises(FileNotFoundError("No such file or directory: 'ps'")),
+    )
+
+    result = sentinel.check_orchestrate_process(None)
+
+    assert result.ok is False
+    assert "refusing to report health" in result.detail
+
+
+def test_host_with_neither_launchctl_nor_ps_reports_down_not_ok(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """End state of the asymmetry above, through the real verdict path."""
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        _launchctl_raises(FileNotFoundError("binary absent")),
+    )
+    err_log = tmp_path / "logs" / "swarm.err"
+    err_log.parent.mkdir(parents=True)
+    err_log.write_text("", encoding="utf-8")
+
+    rc = run_sentinel(state_root=tmp_path, dry_run=False, err_log=err_log)
+
+    assert rc == 1
+    receipts = list(
+        (tmp_path / "witness" / "liveness_sentinel").glob("ORGANISM_DOWN_*.json")
+    )
+    assert len(receipts) == 1
+    payload = json.loads(receipts[0].read_text())
+    # launchd is non-evidence; the unreadable process table is what convicts.
+    assert payload["non_evidence_checks"] == ["launchd_service"]
+    process_check = next(
+        c for c in payload["checks"] if c["name"] == "orchestrate_process"
+    )
+    assert process_check["ok"] is False
+
+
 def test_no_evidence_at_all_is_fail_closed() -> None:
     """Every probe unknown is silence, and silence is what this sentinel kills."""
     unknown = [
