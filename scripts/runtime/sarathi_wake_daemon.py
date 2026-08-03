@@ -118,6 +118,21 @@ SENDER = "sarathi"
 RECALL_QUERY = "open delegations, recent outcomes, and standing operator intent"
 
 
+def _read_failed_recall(detail: str = ""):
+    """For a read that RAN and raised — never `unavailable`.
+
+    `unavailable` renders as "the organ could not be loaded, so no read was
+    attempted", which is false here: the read happened and broke. An earlier
+    revision routed this backstop through `_unavailable_recall` and produced
+    exactly the collapse the four statuses exist to prevent (Devin, PR #1208).
+    """
+    if MemoryRecall is not None:
+        return MemoryRecall(status="read_failed", detail=detail)
+    return SimpleNamespace(
+        status="read_failed", detail=detail, excerpt="", admitted=0, candidates=0
+    )
+
+
 def _unavailable_recall(detail: str = ""):
     """Status-carrying stand-in for when the memory ORGAN itself is unusable.
 
@@ -352,7 +367,8 @@ async def run_daemon(
                     f"[sarathi] memory recall contract break: {exc}",
                     file=sys.stderr,
                 )
-                memory = _unavailable_recall(str(exc))
+                # The read ran and raised: read_failed, NOT unavailable.
+                memory = _read_failed_recall(str(exc))
 
         return BootPack(
             roster=roster,

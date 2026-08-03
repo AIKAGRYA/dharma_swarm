@@ -174,6 +174,47 @@ def test_kernel_construction_failure_is_a_fault_not_an_absence():
     )
 
 
+def test_daemon_backstop_reports_a_raised_read_as_read_failed():
+    """Devin P1, third instance of the same collapse. The backstop `except`
+    around `recall_memory` catches a read that RAN and raised, and an earlier
+    revision routed it through `_unavailable_recall` — which the brief renders
+    as "the organ could not be loaded, so no read was attempted". False for
+    this path, and exactly what
+    `test_brief_never_reports_a_failed_read_as_never_attempted` forbids; that
+    test simply did not reach the daemon's own backstop.
+
+    Both helpers must exist and be used for their own case: `unavailable` for
+    import/construction failures, `read_failed` for a read that broke.
+    """
+    daemon_src = (REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py").read_text()
+    assert "_read_failed_recall" in daemon_src, (
+        "no read_failed-shaped helper; a raised read is being reported as an "
+        "unloadable organ"
+    )
+
+    tree = ast.parse(daemon_src)
+    # The backstop handler around recall_memory must not yield `unavailable`.
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        calls_recall = any(
+            isinstance(n, ast.Call) and getattr(n.func, "id", None) == "recall_memory"
+            for n in ast.walk(node)
+        )
+        if not calls_recall:
+            continue
+        for handler in node.handlers:
+            used = {
+                getattr(n.func, "id", None)
+                for n in ast.walk(handler)
+                if isinstance(n, ast.Call)
+            }
+            assert "_unavailable_recall" not in used, (
+                "the recall backstop yields `unavailable`; a read that ran and "
+                "raised must be `read_failed` or the brief says no read was attempted"
+            )
+
+
 def test_brief_states_admission_counts_when_consulted():
     """0 admitted must read as policy exclusion, not as memory being skipped."""
     rendered = build_operator_brief(
