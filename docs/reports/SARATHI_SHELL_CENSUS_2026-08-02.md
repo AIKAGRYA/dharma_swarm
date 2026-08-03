@@ -5,7 +5,7 @@
 **Evidence revision:** `origin/main` at `9d792ceacef32a1698838dc01586ed90ecb93666`
 
 **Repository:** `AmitabhainArunachala/dharma_swarm`
-**Verdict:** `CLOSED_NOT_PROD` — Sarathi is not an end-to-end persistent agent shell on this revision.
+**Verdict:** `CLOSED_NOT_PROD` — Sarathi is not an end-to-end persistent agent shell on this revision. See the post-census update in §8 before applying MCP claims to current main.
 
 ## Executive answer
 
@@ -605,3 +605,15 @@ Until that path passes a real message-to-reply-and-memory integration test under
 SARATHI = GENESIS SOURCE + DETERMINISTIC ORGANS + BOUNDED WRAPPERS
 SARATHI != PERSISTENT AGENT SHELL
 ```
+
+## 8. Post-census update — 2026-08-03
+
+This report remains an immutable measurement of the evidence revision above.
+Later main commit `b65030b7d` added read-only MCP tools `sarathi_status` and
+`sarathi_roster` (`dharma_swarm/mcp_server.py:134-169`), guarded by
+read-only/bootstrap-order tests (`tests/test_mcp_server.py:226-316`). Therefore
+the statements above saying “no Sarathi MCP import/tool” and
+`Sarathi-specific MCP tools: 0` are historical for `9d792ceac`, not
+current-main facts. The new tools accept no message and perform no dispatch, so
+the end-to-end-shell verdict is unchanged. Use
+[`../SARATHI.md`](../SARATHI.md) as the current subject doorway.

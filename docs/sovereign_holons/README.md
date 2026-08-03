@@ -2,9 +2,9 @@
 
 > **Authority notice (2026-07-13):** This folder preserves the June research,
 > design, and first-brick lineage. It is not the current code/body or liveness
-> authority. Start with
-> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
-> for the holon-specific body synthesis, dated witness, recent work, and gaps.
+> authority. Start with [`../SARATHI.md`](../SARATHI.md) for locked vocabulary,
+> runtime-family boundaries, and the subject map; the
+> [`July estate map`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) is dated.
 
 **Created:** 2026-06-08 · **Status:** historical design/research corpus · **Owner:** Dhyana + opus_composer
 

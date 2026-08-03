@@ -3,8 +3,8 @@
 Status: **collapse base landed; effect and durable-service closure remain**.
 Do not use this document to claim a living Sarathi.
 
-For the current holon-specific body synthesis, read
-[`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+For current terminology, runtime-family boundaries, and evidence routes, read
+the canonical doorway: [`../SARATHI.md`](../SARATHI.md).
 
 ## Locked sentence
 

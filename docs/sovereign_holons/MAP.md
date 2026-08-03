@@ -1,18 +1,18 @@
 # MAP — Historical Sovereign-Holon Artifact Index
 
-> **Authority notice (2026-07-13):** This is a June artifact index, not a current
-> source-of-truth map. Use
-> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
-> for current implementation, runtime boundaries, recent work, and a dated
-> readiness witness.
+> **Authority notice (2026-08-03):** This is a June artifact index, not a current
+> source-of-truth map. Start at the canonical subject doorway,
+> [`../SARATHI.md`](../SARATHI.md), for current terminology, family boundaries,
+> and evidence routes. The July estate map remains a dated deep reference only.
+> Current implementation comes from code/tests; live state comes from onboarding.
 
 **Created:** 2026-06-08 · **Purpose:** Preserve the original initiative's artifact trail.
 
 This file records where the original design artifacts lived. Its paths and
-status claims may be stale; current code and the estate map win on conflict.
+status claims may be stale; current code, tests, and `../SARATHI.md` win.
 
 > **Historical maintenance contract:** The original lane required updates here.
-> New runtime work updates the current holon body reference instead.
+> New subject-level work updates the named canonical owner, not this corpus.
 
 ---
 
@@ -122,9 +122,9 @@ Branch: `worktree-holon-agent` · Path: `/Users/dhyana/.qwen/worktrees/holon-age
 
 ## How to use this map
 
-- **"Where do I add a new sovereign-holon doc?"** → `docs/sovereign_holons/`, with a numeric prefix continuing the sequence (`06_*`, `07_*`). Update this MAP in the same commit.
-- The 07 overbuild spec is the current driver for the highest-leverage missing harness (runnable shell integration, verification as organ, context-bridging content). All subsequent work in this lane should reference it.
+- **"Where do I add current Sarathi/Holon guidance?"** → update `docs/SARATHI.md` or the canonical owner it names; do not extend this historical corpus by default.
+- The 07 overbuild spec is historical design input, not the current work queue. Re-establish any proposal against code, tests, the census, and active-track ownership.
 - **"Where do I add a per-agent seed file?"** → `docs/agents/<agent-uid>/` (follow the perplexity-computer shape). Reference from this MAP, do not copy into the holons folder.
 - **"Where do I add a new hygiene pattern?"** → `dharma_swarm_pr_review_control/scripts/governance/hygiene/patterns/` and update [03_REGISTER_AS_HYGIENE.md](03_REGISTER_AS_HYGIENE.md).
-- **"Where do I check the live runtime state?"** → grep this file for `~/.dharma/` paths.
-- **"What is the order to read?"** → see [INDEX.md](INDEX.md).
+- **"Where do I check live runtime state?"** → run onboarding/`make organism-status`, then inspect `docs/state/LIVE_OPS_DASHBOARD.md`.
+- **"What is the order to read?"** → start at [`../SARATHI.md`](../SARATHI.md); use [INDEX.md](INDEX.md) only for June history.

@@ -24,6 +24,7 @@ inspiration:
 - repo_topology
 connected_relevant_files:
 - docs/README.md
+- docs/SARATHI.md
 - docs/plans/2026-04-02-reports-cartography-and-cleanup-plan.md
 - docs/archive/README.md
 - reports/historical/GODEL_CLAW_V1_REPORT.md
@@ -79,6 +80,9 @@ Keep these separate from:
 
 Current examples:
 
+- [SARATHI_SHELL_CENSUS_2026-08-02.md](SARATHI_SHELL_CENSUS_2026-08-02.md) —
+  behavior-first twelve-element census; use [../SARATHI.md](../SARATHI.md) as
+  the current subject doorway and read the census's post-snapshot update.
 - [DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md](DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md) — merged product closure, bounded replay evidence, and the explicit needs-revision boundary for both Codex skills.
 - [20-AGENT-DEEP-AUDIT-2026-03-29.md](/Users/dhyana/dharma_swarm/docs/reports/20-AGENT-DEEP-AUDIT-2026-03-29.md)
 - [AGENT_PROMPT_SYNTHESIS.md](/Users/dhyana/dharma_swarm/docs/reports/AGENT_PROMPT_SYNTHESIS.md)

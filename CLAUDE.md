@@ -159,6 +159,9 @@ prefer damping to mandates.
 
 ## Read when relevant (not before every change)
 
+- Sarathi, Holon, sovereign-agent, or Hermes/OpenClaw-class persistent-shell
+  work → `docs/SARATHI.md`; it owns subsystem terminology/navigation and
+  defers executable and live claims to their named owners.
 - Touching interfaces between modules → `INTERFACE_MISMATCH_MAP.md`; if the
   pair you're touching has a known mismatch, fix it as part of your change,
   then update the map.

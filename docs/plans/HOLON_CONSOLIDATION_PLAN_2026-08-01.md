@@ -13,7 +13,7 @@ records only what survived verification, plus the corrections. Companion artifac
 `docs/reports/hermes_persistent_agent_index_2026-08-01.md` and
 `docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md` — both carry their own errata.
 
-Nothing here has been executed. No file has been moved.
+Nothing here has been executed. No file has been moved. The August 2 census supersedes the Phase A destination decision; see §7.
 
 ## 0. The finding that changes the plan
 
@@ -217,3 +217,14 @@ at `living_agent_kernel.py:51` and mkdirs at `:788`).
 5. Re-run the index sweep for the surfaces §the errata lists as missed (cron subsystem,
    `browser_agent`, `synthesis_agent`, `sleep_time_agent`, `garden_daemon`, the sixth registry).
 6. Re-spec Packet 1 against §5, then build it.
+
+## 7. Post-plan disposition — partially superseded 2026-08-03
+
+The behavior-first census completed one day later supersedes this plan's Phase A
+destination recommendation. The shared top-level Holon runtime owners stay in
+place; a future Sarathi composition root should add adapters rather than absorb
+those bodies (`docs/reports/SARATHI_SHELL_CENSUS_2026-08-02.md:352-443,598-607`).
+
+Retain §§0–2 only as evidence of the reproduced eager-import hazard, importer
+checks, and simulated move ordering. They are not authorization to execute the
+move table. No move from this plan has occurred.

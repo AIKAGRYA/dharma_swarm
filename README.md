@@ -100,6 +100,9 @@ the command and owner for their specific domain.
 
 ## First Places To Look
 
+- **Sarathi / Holon / persistent agent shell:** [docs/SARATHI.md](docs/SARATHI.md)
+  is the single subject doorway. Read it before treating Sarathi, Holon, Apex,
+  Hermes, or OpenClaw as the same runtime.
 - Start at [api/main.py](api/main.py) for the API lifecycle and router registration.
 - Start at [run_operator.sh](run_operator.sh) for the canonical local backend boot path.
 - Start at [dashboard/package.json](dashboard/package.json) for frontend commands.

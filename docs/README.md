@@ -28,6 +28,7 @@ inspiration:
 - product_surface
 connected_relevant_files:
 - README.md
+- docs/SARATHI.md
 - docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
 - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
 - docs/REPO_RECLASSIFICATION_MATRIX_2026-04-01.md
@@ -77,6 +78,8 @@ Use the repo ontology from [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md]
 
 If you need the current repo and product truth:
 
+- [SARATHI.md](SARATHI.md): single subject doorway for Sarathi, Holon,
+  sovereign-agent, and Hermes/OpenClaw-class persistent-shell work
 - [README.md](/Users/dhyana/dharma_swarm/README.md): top-level operator entrypoint
 - [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md): agent operating contract
 - [PRODUCT_SURFACE.md](/Users/dhyana/dharma_swarm/PRODUCT_SURFACE.md): canonical product-surface statement
@@ -151,8 +154,8 @@ These are important, but they should not compete with repo-level canon:
 
 - [AUTOCATALYTIC_PORTFOLIO.md](architecture/AUTOCATALYTIC_PORTFOLIO.md): ten-node metabolic contract, semantic A2A promotion rule, and per-node pages
 - [HOLON_RUNTIME_FULL_ESTATE_MAP.md](architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md):
-  current holon-specific body synthesis across source, runtime state, parallel
-  Hermes boundaries, proof obligations, and a dated readiness witness
+  dated July holon-body reference; start with [SARATHI.md](SARATHI.md) for current
+  terminology, family boundaries, and the corrected document map
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)

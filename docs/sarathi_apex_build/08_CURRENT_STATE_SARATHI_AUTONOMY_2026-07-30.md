@@ -1,8 +1,8 @@
 # 08 — CURRENT_STATE: Sarathi autonomy build (2026-07-30)
 
-Fifteen lines reconciling the mission prompt
-(`docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md`) against disk; each line
-carries its evidence.
+> **Superseded snapshot (2026-08-03).** The numbered lines below preserve the July 30 audit; items 1, 5, and 6 are no longer current.
+> Current exports include plan/delegate/wake/proof (`dharma_swarm/holon_system/sarathi/__init__.py:7-40`), and the Composer profile now resolves an Anthropic frontier default (`scripts/runtime/codex_composer_wake_loop.py:90-101`).
+> Start at [`../SARATHI.md`](../SARATHI.md); do not use this file as present state.
 
 1. Sarathi source package is read-only projections only — pulse/brief/gateway/roster/scoreboard; every surface pins `wake_loop_active: False`, `alive_claim: False` (`dharma_swarm/holon_system/sarathi/pulse.py:24`, `gateway.py:19`).
 2. `holon_wake_cycle(name, agent_runner, *, spent_usd, cap_usd, agents_root=None, persist=True, memory_kernel=None, planned_action=None, operator_reachable=False)` runs kill → budget → reversibility gate (step 2.5, only when `planned_action` is supplied) → work → compass → persist (`dharma_swarm/holon_runtime.py:53-118`).

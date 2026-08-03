@@ -4,26 +4,30 @@ Status: **collapse base landed on main; Sarathi is not yet a durable living
 service**. This folder preserves the Sarathi-specific design and build sequence.
 It no longer owns the ecosystem-wide source or readiness verdict.
 
-Start with
-[`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
-That map is the current holon-specific body synthesis across the repo,
-`~/.dharma`, `~/.hermes`, recent PRs, a dated live witness, and the closure path.
-Onboarding and `docs/state/LIVE_OPS_DASHBOARD.md` still own live state.
+Start with [`../SARATHI.md`](../SARATHI.md). It is the current subject doorway
+and distinguishes the Sarathi seat, shared Holon substrate, adjacent runtime
+families, and external Hermes/OpenClaw lanes. The July
+[`estate map`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) remains a dated
+deep reference. Onboarding and `docs/state/LIVE_OPS_DASHBOARD.md` still own live
+state.
 
 ## Read order
 
-1. [Current estate map](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) — what
-   exists and works now.
-2. [`00_START_HERE.md`](00_START_HERE.md) — Sarathi thesis and current baseline.
-3. [`02_CODEBASE_RUNTIME_BOUNDARY.md`](02_CODEBASE_RUNTIME_BOUNDARY.md) — dated
-   repo/runtime boundary detail; defer to the estate map on conflicts.
-4. [`05_SARATHI_APEX_MAP.md`](05_SARATHI_APEX_MAP.md) — Sarathi-specific intent.
-5. [`06_PROOF_GATES.md`](06_PROOF_GATES.md) — original gate design.
-6. [`07_BACKLOG.md`](07_BACKLOG.md) — current closure packets.
-7. [`08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md`](08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md)
-   — drift reconciliation for the 2026-07-30 autonomy build
+1. [Canonical subject doorway](../SARATHI.md) — locked terms, family map,
+   current high-level state, and evidence routes.
+2. [Dated estate map](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md) — deep
+   July snapshot; do not use its counts as current truth.
+3. [`00_START_HERE.md`](00_START_HERE.md) — Sarathi thesis and original baseline.
+4. [`02_CODEBASE_RUNTIME_BOUNDARY.md`](02_CODEBASE_RUNTIME_BOUNDARY.md) — dated
+   repo/runtime boundary detail; defer to current code/tests, the census, and
+   the subject doorway on conflicts.
+5. [`05_SARATHI_APEX_MAP.md`](05_SARATHI_APEX_MAP.md) — Sarathi-specific intent.
+6. [`06_PROOF_GATES.md`](06_PROOF_GATES.md) — original gate design.
+7. [`07_BACKLOG.md`](07_BACKLOG.md) — dated closure packets; check PR/code state.
+8. [`08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md`](08_CURRENT_STATE_SARATHI_AUTONOMY_2026-07-30.md)
+   — superseded drift-reconciliation snapshot for the 2026-07-30 autonomy build
    (`docs/prompts/SARATHI_AUTONOMY_BUILD_2026-07-30.md`).
-8. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) and
+9. [`90_ANTI_SPRAWL_HARNESS.md`](90_ANTI_SPRAWL_HARNESS.md) and
    [`91_SPRAWL_HARNESS_RUNBOOK.md`](91_SPRAWL_HARNESS_RUNBOOK.md) — anti-fork
    policy and enforcement.
 
@@ -31,7 +35,7 @@ Onboarding and `docs/state/LIVE_OPS_DASHBOARD.md` still own live state.
 `04_PERSISTENT_AGENT_RELATION.md` are useful dated lane captures, not current
 estate authorities.
 
-## Current orientation
+## Dated orientation captured by this build history
 
 1. PR #821 landed the collapse base on 2026-07-09 at merge `0beef7584`
    (`git show -s --format='%H %cs %s' 0beef7584`).
@@ -46,8 +50,10 @@ estate authorities.
 6. Sarathi's source projections keep `wake_loop_active` and `alive_claim` false.
 7. Local commit `e7856fed9` contains additional Sarathi work but is not on main
    and is not product truth.
-8. The next exact work is the three closure packets in `07_BACKLOG.md`, starting
-   with a typed, lease-backed, budgeted real effect and receipt.
+8. At this snapshot, the proposed next work was the three closure packets in
+   `07_BACKLOG.md`, starting with a typed, lease-backed, budgeted real effect and
+   receipt. Current work must be re-established from code, PR state, and track
+   ownership rather than inferred from this history.
 
 This build-history file makes no current process claim; run onboarding and read
 Live Ops for that state. Reproduce the landed, packaging, and source-tree

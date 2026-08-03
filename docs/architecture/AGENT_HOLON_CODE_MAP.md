@@ -6,11 +6,11 @@ status: reference
 
 # Agent Holon Call-Chain Index
 
-The current holon-specific body synthesis is
-[`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md). It owns
-the holon-specific synthesis of source/runtime/Hermes boundaries, recent-work
-reconciliation, a dated witness, and the closure path. It defers current live
-state to onboarding and `docs/state/LIVE_OPS_DASHBOARD.md`.
+Start at [`../SARATHI.md`](../SARATHI.md) for locked terminology, runtime-family
+boundaries, and the document/code map. The deeper July snapshot remains
+[`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md), superseded
+for first orientation/current counts. Code/tests own implementation; onboarding
+and `docs/state/LIVE_OPS_DASHBOARD.md` own live state.
 
 This file is deliberately only a quick code index. It must not carry a second
 liveness verdict or estate census.
