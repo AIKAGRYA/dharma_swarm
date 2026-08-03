@@ -901,3 +901,137 @@ def test_create_doctor_job_marks_job_urgent(monkeypatch) -> None:
     assert captured["urgent"] is True
     assert captured["name"] == "doctor_assurance"
     assert job["urgent"] is True
+
+
+# --- an unreadable process table must not become a death certificate -------
+
+
+def _ps_raises(*_args, **_kwargs):
+    raise OSError("No such file or directory: 'ps'")
+
+
+def test_daemon_integrity_will_not_declare_death_from_a_blind_ps_probe(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """`ps` failing is "we did not look", not "nothing is running".
+
+    The PR taught this check to escalate an empty scan into a hard FAIL
+    saying the organism is dead. An empty list from a probe that never ran
+    must not reach that branch — it would be the mirror image of the bug
+    being fixed. WARN is the honest rung.
+    """
+    (tmp_path / ".dharma").mkdir(parents=True)
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor.subprocess.run", _ps_raises)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl: loaded"),
+    )
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].status == "WARN"
+    assert "unverified" in checks[0].summary
+    assert "dead" not in (checks[0].summary or "").lower()
+
+
+def test_daemon_integrity_still_fails_loudly_when_ps_really_reports_nothing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """NEGATIVE CONTROL for the test above: the incident shape stays a FAIL.
+
+    Same host state, but `ps` runs successfully and returns no organism.
+    That IS an observation of absence, and with launchd loaded it must
+    still be the loud FAIL this PR exists to produce.
+    """
+    (tmp_path / ".dharma").mkdir(parents=True)
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl: loaded"),
+    )
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].status == "FAIL"
+    assert "no daemon process is running" in checks[0].summary
+
+
+def test_stale_pid_plus_blind_ps_probe_warns_instead_of_asserting_death(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The stale-pid branch has the same escalation and the same gate."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("4242", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr("dharma_swarm.doctor.subprocess.run", _ps_raises)
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].status == "WARN"
+    assert "process table unreadable" in checks[0].detail
+
+
+def test_stale_pid_with_a_working_ps_probe_still_fails_loudly(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """NEGATIVE CONTROL: the exact 2026-07-25..08-01 shape stays a FAIL."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("67078", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].status == "FAIL"
+    assert "the organism is dead" in checks[0].summary
+
+
+def test_scan_reports_probe_failure_distinctly_from_an_empty_result() -> None:
+    """The seam itself: [] with scan_ok=False is not [] with scan_ok=True."""
+    from dharma_swarm.doctor import _scan_daemon_like_processes
+
+    import dharma_swarm.doctor as doctor_mod
+
+    original = doctor_mod.subprocess.run
+    try:
+        doctor_mod.subprocess.run = _ps_raises
+        assert _scan_daemon_like_processes(0.1) == ([], False)
+
+        doctor_mod.subprocess.run = (
+            lambda *a, **kw: subprocess.CompletedProcess(a[0], 0, "", "")
+        )
+        assert _scan_daemon_like_processes(0.1) == ([], True)
+    finally:
+        doctor_mod.subprocess.run = original

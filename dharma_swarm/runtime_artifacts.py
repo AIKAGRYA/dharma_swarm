@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 from dharma_swarm.runtime_process_identity import daemon_pid_alive
@@ -150,6 +151,43 @@ def dgc_health_snapshot_summary(
     else:
         summary["status"] = "fresh"
     return summary
+
+
+def loop_liveness_summary(
+    liveness_path: Path,
+    *,
+    pid_alive: Callable[[int], bool] | None = None,
+) -> dict[str, Any] | None:
+    """Summarize ``loop_liveness.json`` with the owning pid probed.
+
+    The file outlives its writer: the recorded pid is probed for existence
+    *and* identity (``runtime_process_identity.daemon_pid_alive``) so no
+    caller can print "N running" from a corpse's snapshot — nor from a pid
+    number that has since been recycled onto an unrelated process. (A 7-day-old
+    file claiming 20 live loops from dead pid 67078 masked the 2026-07/08
+    outage.)
+
+    ``pid_alive`` is ``None`` when the record carries no usable integer pid.
+    ``None`` means *unverifiable*, not *alive*: callers must not render a
+    running claim from it.
+    """
+    probe = pid_alive if pid_alive is not None else _pid_alive
+    if not liveness_path.exists():
+        return None
+    liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
+    age_s = time.time() - liveness_path.stat().st_mtime
+    raw_pid = liveness.get("pid")
+    usable_pid = isinstance(raw_pid, int) and not isinstance(raw_pid, bool)
+    return {
+        "running": len(liveness.get("running", [])),
+        "abandoned": liveness.get("abandoned", []),
+        "hot_restarts": {
+            k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
+        },
+        "age_min": round(age_s / 60),
+        "pid": raw_pid,
+        "pid_alive": probe(raw_pid) if usable_pid else None,
+    }
 
 
 def write_dgc_health_snapshot(

@@ -266,16 +266,18 @@ def test_launchctl_timeout_is_not_evidence_of_death(monkeypatch) -> None:
 
 
 def test_launchctl_answering_not_loaded_is_still_a_loud_fail(monkeypatch) -> None:
-    """Negative control for the fix above: the 2026-07-28 bootout shape.
+    """Negative control: the 2026-07-28 bootout shape must stay ok=False.
 
-    The probe RAN and said the service is gone. That must stay ok=False, not
-    get softened into 'unknown' along with the container case.
+    Verbatim from `launchctl print gui/501/com.dharma.swarm` on the hub Mac
+    with the service booted out.
     """
     monkeypatch.setattr(
         sentinel.subprocess,
         "run",
         lambda *a, **kw: _FakeProc(
-            113, stderr='Could not find service "com.dharma.swarm" in domain for login'
+            113,
+            stderr='Bad request.\nCould not find service "com.dharma.swarm" '
+            "in domain for user gui: 501",
         ),
     )
 
@@ -283,6 +285,52 @@ def test_launchctl_answering_not_loaded_is_still_a_loud_fail(monkeypatch) -> Non
 
     assert result.ok is False
     assert result.evidence["state"] == "absent"
+
+
+def test_missing_gui_domain_is_not_a_death_certificate(monkeypatch) -> None:
+    """rc=112 answers about the DOMAIN, not the service.
+
+    Verbatim from `launchctl print gui/99999/com.dharma.swarm`. A caller
+    outside the GUI session (ssh, system-context daemon) gets this shape;
+    reading it as "the service is gone" was a false ORGANISM_DOWN.
+    """
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        lambda *a, **kw: _FakeProc(
+            112, stderr="Bad request.\nCould not find domain for user gui: 99999"
+        ),
+    )
+
+    result = sentinel.check_launchd_service()
+
+    assert result.ok is None
+    assert result.evidence["state"] == "unknown"
+
+
+def test_domain_error_still_screams_when_the_process_is_dead(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Purpose guard for the rc=112 concession: check 2 remains the authority."""
+    monkeypatch.setattr(
+        sentinel,
+        "check_launchd_service",
+        lambda label=None: CheckResult(
+            name="launchd_service",
+            ok=None,
+            detail="domain error",
+            evidence={"state": "unknown"},
+        ),
+    )
+    monkeypatch.setattr(
+        sentinel,
+        "check_orchestrate_process",
+        lambda pid: CheckResult(
+            name="orchestrate_process", ok=False, detail="no live process"
+        ),
+    )
+
+    assert run_sentinel(state_root=tmp_path, dry_run=False) == 1
 
 
 def test_unknown_launchd_probe_never_launders_a_dead_organism(

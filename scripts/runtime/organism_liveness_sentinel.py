@@ -8,22 +8,39 @@ and nothing screamed. This sentinel is the scream.
 
 Three independent checks, all of which must pass:
 
-1. launchd service presence — ``launchctl print gui/<uid>/com.dharma.swarm``
-   must succeed. An absent service is a FAIL, never a WARN. If the probe
-   itself cannot RUN (no ``launchctl`` binary — every Linux/container host,
-   including the ``Dockerfile.swarm`` deployment this file already claims to
-   watch — or a timeout), the check is recorded as ``unknown`` and carries no
-   evidence either way; checks 2 and 3 decide. Conflating "probe could not
-   run" with "service is absent" made a healthy container scream
-   ORGANISM_DOWN every 30 minutes forever, and a watchdog nobody believes is
-   not a watchdog. ``dharma_swarm/doctor.py:_launchd_service_state`` uses the
-   same three-state rule.
+1. launchd service presence — ``launchctl print gui/<uid>/com.dharma.swarm``.
+   Three states, exactly as ``dharma_swarm/doctor.py:_launchd_service_state``:
+     ``loaded``  rc=0.
+     ``absent``  the probe answered "no such service" (measured: rc=113,
+                 ``Could not find service "..." in domain for user gui: 501``).
+                 A FAIL, never a WARN — this is the 2026-07-28 bootout shape.
+     ``unknown`` the probe could not run (no ``launchctl`` binary on any
+                 non-macOS host, or a timeout), OR it answered about the
+                 DOMAIN rather than the service (measured: rc=112, ``Could
+                 not find domain for user gui: 99999`` — what a caller
+                 outside the GUI session gets over ssh). Carries no evidence
+                 either way; checks 2 and 3 decide.
+   Reporting a dead service on the strength of a probe that never executed,
+   or that was answering a different question, is a lie — and a watchdog
+   nobody believes is not a watchdog.
 2. orchestrate-live process — a live process matching ANY of the organism's
    real launch spellings (``ORCHESTRATE_COMMAND_FORMS``: the plist's console
    script ``dgc orchestrate-live``, the release runner's module form
    ``dharma_swarm.dgc_cli orchestrate-live``, the container entrypoint
    ``dharma_swarm.orchestrate_live``) must exist AND answer ``kill -0``.
    A PID read from any file is never trusted on its own.
+   Deliberately NOT symmetric with check 1: if the ``ps`` probe fails, that
+   is a loud FAIL, not ``unknown``. Check 1 going blind is tolerable because
+   launchd is not the organism; check 2 going blind means the sentinel
+   cannot see the organism at all, and blindness is not health. The comment
+   in ``check_orchestrate_process`` carries the receipt.
+
+This script is a macOS-hub probe. It is wired only through the operator's
+``~/.dharma/cron/jobs.json``; the container command form appears in
+``ORCHESTRATE_COMMAND_FORMS`` for needle parity with the doctor and the
+census (pinned by ``tests/test_runtime_command_forms.py``), NOT because the
+sentinel is deployed there — ``python:3.12-slim`` ships neither
+``launchctl`` nor ``ps``.
 3. admission-denial growth — the count of ``admission denied`` lines in
    ``~/.dharma/logs/swarm.err`` must not have grown since the previous run.
    Growth means launchd is thrashing in a fail-closed denial loop: the
@@ -162,10 +179,12 @@ def check_launchd_service(label: str = SERVICE_LABEL) -> CheckResult:
             detail=f"launchctl probe could not run ({exc}) — no evidence either way",
             evidence={"target": target, "state": "unknown"},
         )
-    if proc.returncode != 0:
-        # The probe RAN and answered "not loaded". This is the 2026-07-28
-        # bootout shape and stays a loud FAIL — deliberately stricter than
-        # the doctor, which has WARN rungs the sentinel does not.
+    stderr = (proc.stderr or "").strip()
+    if proc.returncode != 0 and "could not find service" in stderr.lower():
+        # The probe RAN and answered "that service is not here". This is the
+        # 2026-07-28 bootout shape and stays a loud FAIL. Measured on macOS:
+        #   launchctl print gui/501/com.dharma.swarm
+        #     -> rc=113  Could not find service "..." in domain for user gui: 501
         return CheckResult(
             name="launchd_service",
             ok=False,
@@ -173,8 +192,26 @@ def check_launchd_service(label: str = SERVICE_LABEL) -> CheckResult:
             evidence={
                 "target": target,
                 "state": "absent",
-                "stderr": proc.stderr.strip()[:400],
+                "stderr": stderr[:400],
             },
+        )
+    if proc.returncode != 0:
+        # A nonzero rc that is NOT "no such service" is an answer about the
+        # DOMAIN, not about the organism. Measured on macOS:
+        #   launchctl print gui/99999/com.dharma.swarm
+        #     -> rc=112  Could not find domain for user gui: 99999
+        # A caller outside the GUI session (ssh, system-context daemon) gets
+        # exactly this, and reading it as "the service is gone" was a false
+        # death certificate. Non-evidence; check 2 is the authority on
+        # liveness and stays fail-closed.
+        return CheckResult(
+            name="launchd_service",
+            ok=None,
+            detail=(
+                f"launchctl rc={proc.returncode} for {target}: {stderr[:200]} "
+                "— probe answered about the domain, not the service; no evidence either way"
+            ),
+            evidence={"target": target, "state": "unknown", "stderr": stderr[:400]},
         )
     pid: int | None = None
     state: str | None = None

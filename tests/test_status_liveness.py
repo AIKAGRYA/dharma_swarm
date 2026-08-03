@@ -12,7 +12,18 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.terminal_commands._status_helpers import _loop_liveness_summary
+from dharma_swarm.runtime_artifacts import loop_liveness_summary as _loop_liveness_summary
+from dharma_swarm.terminal_commands import _status_helpers
+
+
+def test_status_helpers_resolves_the_canonical_summary() -> None:
+    """`dgc status` must keep reaching the same function after the move.
+
+    The helper lives in runtime_artifacts (next to dgc_health_snapshot_summary,
+    the other artifact-plus-pid-probe reader); _status_helpers imports it. If
+    that wiring breaks, the status lane silently loses the pid probe, so pin it.
+    """
+    assert _status_helpers._loop_liveness_summary is _loop_liveness_summary
 
 
 def _write_liveness(path: Path, *, pid: int, running: int) -> None:
@@ -30,16 +41,11 @@ def _write_liveness(path: Path, *, pid: int, running: int) -> None:
     )
 
 
-def test_loop_liveness_summary_marks_dead_owner(monkeypatch, tmp_path: Path) -> None:
+def test_loop_liveness_summary_marks_dead_owner(tmp_path: Path) -> None:
     liveness_path = tmp_path / "ops" / "loop_liveness.json"
     _write_liveness(liveness_path, pid=67078, running=20)
 
-    monkeypatch.setattr(
-        "dharma_swarm.terminal_commands._status_helpers._pid_alive",
-        lambda pid: False,
-    )
-
-    summary = _loop_liveness_summary(liveness_path)
+    summary = _loop_liveness_summary(liveness_path, pid_alive=lambda pid: False)
 
     assert summary is not None
     assert summary["pid"] == 67078
@@ -47,16 +53,11 @@ def test_loop_liveness_summary_marks_dead_owner(monkeypatch, tmp_path: Path) -> 
     assert summary["running"] == 20
 
 
-def test_loop_liveness_summary_confirms_live_owner(monkeypatch, tmp_path: Path) -> None:
+def test_loop_liveness_summary_confirms_live_owner(tmp_path: Path) -> None:
     liveness_path = tmp_path / "ops" / "loop_liveness.json"
     _write_liveness(liveness_path, pid=4242, running=19)
 
-    monkeypatch.setattr(
-        "dharma_swarm.terminal_commands._status_helpers._pid_alive",
-        lambda pid: pid == 4242,
-    )
-
-    summary = _loop_liveness_summary(liveness_path)
+    summary = _loop_liveness_summary(liveness_path, pid_alive=lambda pid: pid == 4242)
 
     assert summary is not None
     assert summary["pid_alive"] is True

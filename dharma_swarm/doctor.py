@@ -208,6 +208,24 @@ def _launchd_plist_installed() -> bool:
 
 
 def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]:
+    """Matches only. Callers that must not confuse "none" with "could not
+    look" want :func:`_scan_daemon_like_processes` instead."""
+    return _scan_daemon_like_processes(timeout_seconds)[0]
+
+
+def _scan_daemon_like_processes(
+    timeout_seconds: float,
+) -> tuple[list[tuple[int, str]], bool]:
+    """Return (matches, scan_ok).
+
+    ``scan_ok`` is False when the ``ps`` probe could not run (binary absent,
+    timeout, nonzero rc). An empty list then means "we did not look", not
+    "nothing is running" — a distinction that only started to matter when
+    this PR taught the caller to escalate an empty scan into a hard FAIL
+    saying the organism is dead. Absence of evidence is not evidence of
+    absence; the same rule already governs ``daemon_pid_alive``, where an
+    unreadable command line never downgrades a live pid.
+    """
     try:
         proc = subprocess.run(
             ["ps", "-axo", "pid=,command="],
@@ -216,10 +234,10 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
             timeout=max(0.5, timeout_seconds),
         )
     except Exception:
-        return []
+        return [], False
 
     if proc.returncode != 0:
-        return []
+        return [], False
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
@@ -259,7 +277,7 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
             continue
         matches.append((pid, command))
 
-    return matches
+    return matches, True
 
 
 def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -> None:
@@ -283,7 +301,7 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
         for label, (_, status) in pid_statuses.items()
         if status == "invalid"
     ]
-    live_processes = _list_daemon_like_processes(timeout_seconds)
+    live_processes, scan_ok = _scan_daemon_like_processes(timeout_seconds)
 
     if len(live_processes) > 1:
         detail = " | ".join(f"{pid}:{command}" for pid, command in live_processes[:4])
@@ -321,11 +339,17 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
             detail_parts.append(f"live process: {pid}:{command}")
         if legacy_details:
             detail_parts.append("legacy pid files: " + ", ".join(legacy_details))
-        if not live_processes:
+        if not scan_ok:
+            detail_parts.append(
+                "process table unreadable (ps probe failed) — liveness unverified"
+            )
+        if not live_processes and scan_ok:
             # A stale pid file with nothing running is the exact 2026-07-25→08-01
             # shape: the doctor cited the corpse's pid number and filed WARN for
             # seven days. Consult launchd BEFORE settling on WARN — if the host
             # is supposed to be running an organism, absence is a FAIL.
+            # Gated on scan_ok: an empty list from a probe that never ran is
+            # not an observation of absence, and this branch asserts death.
             service_state, service_detail = _launchd_service_state(timeout_seconds)
             if service_state == "loaded" or (
                 service_state == "absent" and _launchd_plist_installed()
@@ -396,6 +420,22 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
             status="PASS",
             summary=f"single daemon-like process detected (PID {pid})",
             detail=command,
+        )
+        return
+
+    if daemon_status != "alive" and not scan_ok:
+        # We did not observe "nothing running" — we failed to look. Saying
+        # "the organism is dead" here would manufacture a death certificate
+        # from a blind probe, which is the mirror image of the bug this PR
+        # fixes. WARN is the honest rung: loud enough not to be silence,
+        # honest enough not to be a lie.
+        _add(
+            checks,
+            name="daemon_integrity",
+            status="WARN",
+            summary="runtime liveness unverified: the process table could not be read",
+            detail="ps probe failed; no daemon.pid owner. Liveness is unknown, not absent.",
+            fix="Re-run the doctor with a longer --timeout, or check that `ps` is available on this host.",
         )
         return
 

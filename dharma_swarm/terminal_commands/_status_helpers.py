@@ -12,7 +12,7 @@ import subprocess
 import time
 
 from dharma_swarm.daemon_config import dharma_state_dir
-from dharma_swarm.runtime_process_identity import daemon_pid_alive as _pid_alive
+from dharma_swarm.runtime_artifacts import loop_liveness_summary as _loop_liveness_summary
 from dharma_swarm.terminal_commands._helpers import (
     DGC_CORE,
     _format_age,
@@ -420,39 +420,6 @@ def _resolve_mission_profile(
 # ---------------------------------------------------------------------------
 # _build_status_data  (JSON-ready status payload)
 # ---------------------------------------------------------------------------
-
-def _loop_liveness_summary(liveness_path: Path) -> dict[str, Any] | None:
-    """Summarize ``loop_liveness.json`` with the owning pid probed.
-
-    The file outlives its writer: the recorded pid is probed for existence
-    *and* identity (``runtime_process_identity.daemon_pid_alive``) so no
-    caller can print "N running" from a corpse's snapshot — nor from a pid
-    number that has since been recycled onto an unrelated process. (A 7-day-old
-    file claiming 20 live loops from dead pid 67078 masked the 2026-07/08
-    outage.)
-
-    ``pid_alive`` is ``None`` when the record carries no usable integer pid.
-    ``None`` means *unverifiable*, not *alive*: callers must not render a
-    running claim from it.
-    """
-    if not liveness_path.exists():
-        return None
-    liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
-    age_s = time.time() - liveness_path.stat().st_mtime
-    raw_pid = liveness.get("pid")
-    usable_pid = isinstance(raw_pid, int) and not isinstance(raw_pid, bool)
-    pid_alive = _pid_alive(raw_pid) if usable_pid else None
-    return {
-        "running": len(liveness.get("running", [])),
-        "abandoned": liveness.get("abandoned", []),
-        "hot_restarts": {
-            k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
-        },
-        "age_min": round(age_s / 60),
-        "pid": raw_pid,
-        "pid_alive": pid_alive,
-    }
-
 
 def _build_status_data() -> dict:
     """Collect system status data as a JSON-ready dict."""
