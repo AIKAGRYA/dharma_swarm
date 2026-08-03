@@ -691,98 +691,107 @@
     {
       "id": "titanium_bootstrap_contract_passes",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "9 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note."
     },
     {
       "id": "titanium_verifier_truth_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "9 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note.",
       "reattribution_note": "Before PR #1205 split the verifier criterion, this id carried the combined 46-test result and the semgrep-PATH projection_difference. Both belong to titanium_verifier_support_contracts_pass and have been moved there. tests/test_verifier_selfcheck_contract.py alone is 9 tests and has no semgrep dependency."
     },
     {
       "id": "titanium_verifier_support_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "46 passed with semgrep 1.168.0 on PATH",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note.",
       "projection_difference": "generated/status ran without the Semgrep executable on PATH and mechanically accepted 45 passed, 1 skipped. The skip is environment-dependent and belongs to this criterion (tests/test_semgrep_wrapper.py), not to titanium_verifier_truth_contracts_pass."
     },
     {
       "id": "titanium_ingress_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "65 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note."
     },
     {
       "id": "titanium_hermetic_live_split_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "36 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note."
     },
     {
       "id": "titanium_ci_authority_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "24 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note."
     },
     {
       "id": "titanium_docops_contracts_pass",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "32 passed",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note."
     },
     {
       "id": "titanium_polyglot_contract_passes",
       "passed": true,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "30 passed with uv 0.11.2 on PATH",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "replay_note": "Reader replay: check out merged main f3eb5b397 and run this criterion's completion_criteria command from docs/governance/ACTIVE_TRACK.yaml. The tree-equivalence basis for this row, the runnable equivalence check, and its 2026-08-04 scope correction are in completion_snapshot_note.",
       "projection_difference": "generated/status ran without the pinned uv executable on PATH and mechanically accepted 29 passed, 1 skipped."
     },
     {
       "id": "titanium_independent_clean_room_receipt_valid",
       "passed": false,
-      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "observed_on_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "observed_on_kind": "merged_main_equivalent_tree",
       "evidence_kind": "missing",
       "authority": "independent_reviewer_required",
       "admissible_under_no_skip": false,
@@ -1289,5 +1298,5 @@
     "command_passes evaluator semantics repair",
     "production-live or complete-security claims"
   ],
-  "completion_snapshot_note": "Re-derived 2026-08-03 against the nine-criterion set. The previous snapshot still carried the pre-PR-#1205 eight-criterion shape, had no row for titanium_verifier_support_contracts_pass, and attributed that suite's semgrep-PATH skip to titanium_verifier_truth_contracts_pass. Author-replay evidence; the no-skip obligation is discharged only for the environment recorded per row, and the CI projection still shows one skip each in the support and polyglot suites."
+  "completion_snapshot_note": "Re-derived 2026-08-03 against the nine-criterion set. The previous snapshot still carried the pre-PR-#1205 eight-criterion shape, had no row for titanium_verifier_support_contracts_pass, and attributed that suite's semgrep-PATH skip to titanium_verifier_truth_contracts_pass. Author-replay evidence; the no-skip obligation is discharged only for the environment recorded per row, and the CI projection still shows one skip each in the support and polyglot suites.  ADDENDUM 2026-08-04 (raised in PR #1211 review, confirmed): these rows previously carried observed_on_sha 05d9c9e13 -- a PR-branch commit that a later rebase force-push made unreachable, so the citation 'git diff f3eb5b397..05d9c9e13 --name-only' could not be run by any reader (verified: a fresh clone of this branch cannot resolve that object). Branch SHAs on this PR are not durable citations and are no longer used. observed_on_sha is now the merged-main SHA the measurement covers, with observed_on_kind=merged_main_equivalent_tree, meaning: the command ran on a PR-branch tree that differed from f3eb5b397 in no input to that criterion. Runnable equivalence check at any head: git diff f3eb5b397..HEAD --name-only. SCOPE CORRECTION: the earlier blanket claim 'No test input differs' is withdrawn -- it was true only while the branch was based directly on f3eb5b397. After the rebase onto main f2ffb439 (PR #1210) that command lists six paths, including tests/antithesis_support/seam_ledger.py and tests/test_graph_seam_ledger.py. Measured, not assumed: neither is an input to any of the nine titanium criteria commands -- seam_ledger is referenced only by tests/test_graph_seam_ledger.py, which appears in none of them -- and check_track_status.py was re-run at the rebased head and still derives 8/9 with titanium_independent_clean_room_receipt_valid the sole failure. The per-row counts therefore stand; the phrasing did not."
 }
