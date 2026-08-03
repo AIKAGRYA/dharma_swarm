@@ -216,3 +216,47 @@ def test_expected_tool_names():
     source = inspect.getsource(_mod_ref)
     for name in ["swarm_status", "spawn_agent", "create_task", "list_tasks", "store_memory", "recall_memory"]:
         assert name in source, f"Tool {name} not found in create_mcp_server source"
+
+
+# ---------------------------------------------------------------------------
+# Sarathi apex seat — callable-surface contract
+# ---------------------------------------------------------------------------
+
+
+def test_sarathi_tools_use_only_real_organ_entrypoints():
+    """The Sarathi MCP tools must call symbols the organ package actually
+    exports. A tool that names a function which does not exist would fail only
+    at call time, inside an MCP client, where the operator cannot see it."""
+    from dharma_swarm.holon_system.sarathi import gateway_snapshot, load_roster
+
+    snapshot = gateway_snapshot()
+    assert snapshot["schema_version"] == "dharma.sarathi.gateway_snapshot.v1"
+    # The honesty contract: the seat may not claim liveness from a projection.
+    assert snapshot["wake_loop_active"] is False
+    assert snapshot["alive_claim"] is False
+    assert isinstance(load_roster(), tuple) and load_roster()
+
+
+def test_sarathi_mcp_tools_are_read_only():
+    """Sarathi is reachable over MCP so any agent or model can SEE her state.
+
+    She must not be ACTUATABLE over MCP: delegation has to go through
+    sarathi.delegate_all so the reversibility gate classifies every action
+    first. A dispatch tool here would be a gate bypass reachable by any MCP
+    client, so this test fails if one is ever added without that plumbing.
+    """
+    import inspect
+    from dharma_swarm import mcp_server
+
+    source = inspect.getsource(mcp_server)
+    sarathi_tool_names = [
+        line.split('name="')[1].split('"')[0]
+        for line in source.splitlines()
+        if 'name="sarathi_' in line
+    ]
+    assert sarathi_tool_names, "expected Sarathi tools to be registered"
+    forbidden = {"sarathi_delegate", "sarathi_dispatch", "sarathi_merge", "sarathi_wake"}
+    assert not (set(sarathi_tool_names) & forbidden), (
+        "an actuating Sarathi tool was added to the MCP surface; delegation must "
+        "route through delegate_all so the reversibility gate runs first"
+    )

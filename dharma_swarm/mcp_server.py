@@ -131,6 +131,24 @@ def create_mcp_server(state_dir: str = ".dharma"):
                 description="Show strategic objectives, key results, and progress",
                 inputSchema={"type": "object", "properties": {}},
             ),
+            # Sarathi — the apex chief-of-staff seat. READ-ONLY by design: these
+            # make her legible to any MCP client (Claude, Codex, any model), but
+            # none of them dispatch work. Delegation must go through
+            # sarathi.delegate_all so the reversibility gate runs first; exposing
+            # a dispatch tool here would let an MCP caller bypass that gate.
+            Tool(
+                name="sarathi_status",
+                description=(
+                    "Sarathi apex seat status: honest wake_loop_active / alive_claim "
+                    "flags, pulse, brief and organ scoreboard. Read-only projection."
+                ),
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            Tool(
+                name="sarathi_roster",
+                description="List the sub-holons Sarathi can delegate to.",
+                inputSchema={"type": "object", "properties": {}},
+            ),
         ]
 
     @server.call_tool()
@@ -195,6 +213,15 @@ def create_mcp_server(state_dir: str = ".dharma"):
             await telos.load()
             summary = telos.strategy_map_summary()
             return [TextContent(type="text", text=json.dumps(summary, indent=2, default=str))]
+
+        elif name == "sarathi_status":
+            from dharma_swarm.holon_system.sarathi import gateway_snapshot
+            snapshot = gateway_snapshot()
+            return [TextContent(type="text", text=json.dumps(snapshot, indent=2, default=str))]
+
+        elif name == "sarathi_roster":
+            from dharma_swarm.holon_system.sarathi import load_roster
+            return [TextContent(type="text", text=json.dumps(list(load_roster()), indent=2))]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
