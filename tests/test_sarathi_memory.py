@@ -133,23 +133,53 @@ def test_brief_reports_isolation_from_the_read_never_asserts_it():
         )
     )
     assert "Isolation NOT ENFORCED" in unenforced
-    assert "may belong to" in unenforced
+    assert "MAY belong to other agents" in unenforced
     assert "agent_not_allowed" not in unenforced, (
         "brief claims agent filtering ran when isolation was not applied"
     )
 
 
-def test_brief_discloses_that_the_pack_may_carry_content():
-    """Devin (security). The supported entrypoint reads with
-    include_content=True, so the excerpt carries content snippets — not the
-    reference-only recall this work originally claimed — and the brief is
-    persisted under the state root. Whatever the policy, the durable artifact
-    must not understate what it contains."""
-    rendered = build_operator_brief(
-        memory=MemoryRecall(status=RECALL_USED, excerpt="# pack\nsome atom text")
+def test_durable_brief_withholds_memory_payloads_by_default():
+    """Devin (security), twice. The supported entrypoint reads with
+    include_content=True and the daemon persists every brief under the state
+    root, so embedding the pack verbatim writes memory payloads to disk each
+    wake cycle. Disclosing that did not reduce the footprint; the default now
+    withholds content and the operator opts in."""
+    payload = "SECRET-ATOM-TEXT"
+    default = build_operator_brief(
+        memory=MemoryRecall(status=RECALL_USED, excerpt=f"# pack\n{payload}")
     )
-    assert "may include content snippets" in rendered
-    assert "written to disk" in rendered
+    assert payload not in default, "memory payload written to a durable brief by default"
+    assert "withheld from this durable brief" in default
+
+    opted_in = build_operator_brief(
+        memory=MemoryRecall(status=RECALL_USED, excerpt=f"# pack\n{payload}"),
+        include_memory_content=True,
+    )
+    assert payload in opted_in and "written to disk" in opted_in
+
+
+def test_isolation_claim_is_keyed_on_scoped_semantics_not_applied():
+    """Devin, second false-isolation claim on the same line. Under the legacy
+    escape hatch the policy reports applied=True with semantics='legacy' while
+    the budget runs isolation_mode='unrestricted' and owner filtering is
+    skipped — so keying the ENFORCED claim on `applied` printed a guarantee
+    that did not hold. Only *_scoped semantics actually filter by owner."""
+    legacy = build_operator_brief(
+        memory=MemoryRecall(
+            status=RECALL_USED,
+            metadata={
+                "isolation_applied": True,
+                "isolation_semantics": "legacy",
+                "allowed_agent_ids": ["sarathi"],
+            },
+        )
+    )
+    assert "Isolation NOT ENFORCED" in legacy
+    assert "agent_not_allowed" not in legacy, (
+        "brief promises owner filtering under legacy semantics, where it does not run"
+    )
+    assert "MAY belong to other agents" in legacy
 
 
 def test_kernel_construction_failure_is_a_fault_not_an_absence():

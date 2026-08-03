@@ -33,6 +33,7 @@ def build_operator_brief(
     responses: Sequence[Mapping[str, Any]] | None = None,
     audit: Mapping[str, Any] | None = None,
     memory: Any = None,
+    include_memory_content: bool = False,
 ) -> str:
     pulse = pulse or sarathi_pulse()
     lines = [
@@ -108,9 +109,19 @@ def build_operator_brief(
         # promise an isolation guarantee that did not hold, in the one artifact
         # an operator trusts for provenance.
         applied = meta.get("isolation_applied")
-        semantics = meta.get("isolation_semantics") or "unknown"
+        semantics = str(meta.get("isolation_semantics") or "unknown")
         allowed = meta.get("allowed_agent_ids") or []
-        if applied:
+
+        # Keyed on SEMANTICS, not on `applied`. `applied` is true even under the
+        # legacy escape hatch (DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY), which
+        # returns semantics="legacy" while the budget is built with
+        # isolation_mode="unrestricted" — and `_omission_reasons` then skips
+        # owner filtering for non-AGENT-scope atoms. Keying on `applied` alone
+        # printed "Isolation ENFORCED: legacy ... omitted as agent_not_allowed"
+        # while another agent's swarm-scope memory could enter this artifact.
+        # Only `*_scoped` semantics actually filter by owner.
+        scoped = applied and semantics.endswith("_scoped")
+        if scoped:
             lines.append(
                 f"Isolation ENFORCED: {semantics}; readable agent ids "
                 f"{allowed or '(none declared)'}. Atoms owned by other agents "
@@ -118,26 +129,33 @@ def build_operator_brief(
             )
         else:
             lines.append(
-                f"Isolation NOT ENFORCED (semantics={semantics}). Agent-ownership "
-                f"filtering did not run, so atoms admitted here may belong to "
-                f"other agents. Do not read this section as Sarathi-only recall."
+                f"Isolation NOT ENFORCED (applied={bool(applied)}, "
+                f"semantics={semantics}). Owner filtering did not run, so atoms "
+                f"admitted here MAY belong to other agents. Do not read this "
+                f"section as Sarathi-only recall."
             )
         for warning in meta.get("isolation_warnings") or []:
             lines.append(f"Isolation warning: {warning}")
 
-        if excerpt:
-            # The pack below may carry content snippets, not only references:
-            # the supported entrypoint reads with include_content=True, and this
-            # brief is persisted under the state root. Stated because the
-            # alternative is a durable artifact whose contents are broader than
-            # the operator was told.
+        if excerpt and include_memory_content:
             lines += [
                 "",
-                "The pack below may include content snippets of admitted atoms, "
-                "not references alone, and is written to disk with this brief.",
+                "The pack below includes content snippets of admitted atoms, not "
+                "references alone, and is written to disk with this brief.",
                 "",
                 excerpt.rstrip(),
             ]
+        elif excerpt:
+            # Default: counts and provenance, NOT payloads. The supported
+            # entrypoint reads with include_content=True and the daemon persists
+            # this brief under the state root, so embedding the pack verbatim
+            # puts memory content on disk every wake cycle. Disclosure alone did
+            # not reduce that footprint. The operator can opt in per call.
+            lines.append(
+                "Pack content withheld from this durable brief (counts and "
+                "provenance above). Pass include_memory_content=True to embed "
+                "the admitted atoms' snippets."
+            )
 
     lines += ["", "## Runtime audit"]
     if audit is None:
