@@ -89,10 +89,17 @@ AUTHORITY_SOURCES: tuple[dict[str, str], ...] = (
 
 
 PROCESS_PATTERNS: dict[str, str] = {
-    # Both launch spellings: the operator CLI and the container entrypoint
-    # (`python -m dharma_swarm.orchestrate_live`, Dockerfile.swarm CMD) — the
-    # CLI-only pattern reported the daemon dead on every containerized host.
-    "dharma_daemon": r"dharma_swarm\.dgc_cli orchestrate-live|dharma_swarm\.orchestrate_live",
+    # ALL launch spellings: the console script installed by com.dharma.swarm.plist
+    # (`dgc orchestrate-live`), the module form used by the release runner
+    # (`-m dharma_swarm.dgc_cli orchestrate-live`), and the container entrypoint
+    # (`python -m dharma_swarm.orchestrate_live`, Dockerfile.swarm CMD).
+    # Each omission has cost a false "daemon absent" on a healthy host: the
+    # CLI-only pattern on containers, and this pattern on every launchd host
+    # until 2026-08-03. Mirrored from
+    # dharma_swarm/runtime_process_identity.ORCHESTRATE_COMMAND_NEEDLES — this
+    # census stays import-free by design, so tests/test_runtime_command_forms.py
+    # pins the mirror against the real launch definitions.
+    "dharma_daemon": r"dgc orchestrate-live|dharma_swarm\.dgc_cli orchestrate-live|dharma_swarm\.orchestrate_live",
     "dharma_cron": r"dharma_swarm\.dgc_cli cron daemon",
     "nats": r"nats-server .*local-nats\.conf",
     "nats_a2a_bridge": r"dharma_swarm\.operator_core\.nats_a2a_bridge",

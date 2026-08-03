@@ -12,8 +12,10 @@ definitions rather than against each other.
 from __future__ import annotations
 
 import plistlib
+import re
 from pathlib import Path
 
+import scripts.runtime.live_ops_census as census
 import scripts.runtime.organism_liveness_sentinel as sentinel
 from dharma_swarm.doctor import _list_daemon_like_processes  # noqa: F401  (import guard)
 from dharma_swarm.runtime_process_identity import (
@@ -21,6 +23,7 @@ from dharma_swarm.runtime_process_identity import (
     daemon_pid_alive,
     looks_like_runtime_command,
     matches_orchestrate_command,
+    orchestrate_pgrep_pattern,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -71,6 +74,34 @@ def test_sentinel_forms_match_every_real_launch_command() -> None:
             f"{source} launches a command the sentinel cannot see: {command!r} "
             f"(forms={sentinel.ORCHESTRATE_COMMAND_FORMS})"
         )
+
+
+def test_census_pattern_matches_every_real_launch_command() -> None:
+    """The census feeds its pattern to `pgrep -fl`; it must see all forms too.
+
+    It reported the daemon absent on every launchd host until 2026-08-03 —
+    the same false-oracle failure, on the cockpit's own observation surface.
+    """
+    pattern = census.PROCESS_PATTERNS["dharma_daemon"]
+    for source, command in _observed_launch_commands().items():
+        assert re.search(pattern, command), (
+            f"live_ops_census cannot see {source}: {command!r} (pattern={pattern!r})"
+        )
+
+
+def test_census_pattern_does_not_match_unrelated_processes() -> None:
+    pattern = census.PROCESS_PATTERNS["dharma_daemon"]
+    assert not re.search(pattern, "/usr/bin/vim notes.txt")
+    assert not re.search(pattern, "python -m dharma_swarm.dgc_cli cron daemon")
+
+
+def test_pgrep_pattern_is_a_valid_ere_over_every_needle() -> None:
+    """`orchestrate_pgrep_pattern` must compile and match each needle."""
+    pattern = orchestrate_pgrep_pattern()
+    compiled = re.compile(pattern)
+    for needle in ORCHESTRATE_COMMAND_NEEDLES:
+        assert compiled.search(f"/some/path/{needle} --flag"), needle
+    assert not compiled.search("/usr/bin/vim notes.txt")
 
 
 def test_console_script_form_is_covered_by_both_matchers() -> None:

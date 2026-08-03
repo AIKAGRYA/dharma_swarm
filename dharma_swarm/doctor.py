@@ -154,13 +154,21 @@ def _daemon_pid_alive(pid: int) -> bool:
 
 
 def _read_pid_file(path: Path) -> tuple[int | None, str]:
+    """Classify a pid file, refusing to call a recycled number "alive".
+
+    Bare existence here was a second route back to the quiet PASS: a
+    daemon.pid holding a foreign pid made ``daemon_status == "alive"``, which
+    skipped both the stale-pid branch and the launchd consultation guarded by
+    ``daemon_status != "alive"``. The identity-aware probe keeps the
+    asymmetric rule — an unreadable command line never downgrades a live pid.
+    """
     if not path.exists():
         return None, "missing"
     try:
         pid = int(path.read_text(encoding="utf-8").strip())
     except Exception:
         return None, "invalid"
-    if _pid_alive(pid):
+    if _daemon_pid_alive(pid):
         return pid, "alive"
     return pid, "stale"
 
@@ -215,11 +223,13 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    # Canonical launch spellings live in runtime_process_identity so the
-    # doctor, the sentinel, and the census cannot drift apart. The old local
-    # tuple knew only the module/legacy forms, so a host started through the
-    # plist's console script (`dgc orchestrate-live`) scanned as having no
-    # daemon at all.
+    # Canonical launch spellings live in runtime_process_identity. The doctor
+    # imports them; the sentinel and live_ops_census mirror them (both stay
+    # import-free by design) and tests/test_runtime_command_forms.py pins all
+    # three against the real launch definitions so they cannot drift apart.
+    # The old local tuple knew only the module/legacy forms, so a host started
+    # through the plist's console script (`dgc orchestrate-live`) scanned as
+    # having no daemon at all.
     needles = ORCHESTRATE_COMMAND_NEEDLES
     skip_markers = (
         "dgc doctor",

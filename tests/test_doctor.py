@@ -23,6 +23,19 @@ from dharma_swarm.doctor import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _unreadable_pid_commands(monkeypatch):
+    """Default `_pid_command` to None so pid probes are host-independent.
+
+    `_daemon_pid_alive` disconfirms a live pid only when the command line is
+    readable AND foreign; returning None means "cannot read", which never
+    downgrades. Without this, tests using low pid numbers (111, 222, ...)
+    would pass or fail depending on what happens to be running on the host.
+    Tests that exercise the recycled-pid path override it explicitly.
+    """
+    monkeypatch.setattr("dharma_swarm.doctor._pid_command", lambda pid: None)
+
+
 def _create_message_bus_db(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
@@ -287,6 +300,71 @@ def test_daemon_integrity_keeps_warn_when_a_live_process_explains_the_stale_pid(
     assert checks[0].name == "daemon_integrity"
     assert checks[0].status == "WARN"
     assert "777" in checks[0].detail
+
+
+def test_daemon_integrity_fails_when_daemon_pid_was_recycled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """A leftover daemon.pid pointing at any live program must not buy silence.
+
+    Bare `kill -0` in `_read_pid_file` made `daemon_status == "alive"`, which
+    skipped the stale-pid branch AND the `daemon_status != "alive"` launchd
+    consultation, restoring the quiet PASS for a dead organism.
+    """
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("67078", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: True)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._pid_command",
+        lambda pid: "/Applications/Safari.app/Contents/MacOS/Safari",
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("loaded", "launchctl print: loaded"),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "FAIL"
+    assert "the organism is dead" in checks[0].summary
+
+
+def test_daemon_integrity_trusts_a_daemon_pid_running_the_organism(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Negative control: a pid whose command IS the organism stays alive."""
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True)
+    (state_dir / "daemon.pid").write_text("777", encoding="utf-8")
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: True)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._pid_command",
+        lambda pid: "/Users/dhyana/dharma_swarm/.venv/bin/python "
+        "/Users/dhyana/dharma_swarm/.venv/bin/dgc orchestrate-live",
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+
+    checks = []
+    _check_daemon_integrity(checks, timeout_seconds=0.1)
+
+    assert checks[0].name == "daemon_integrity"
+    assert checks[0].status == "PASS"
 
 
 def test_daemon_integrity_sees_console_script_launch_form(

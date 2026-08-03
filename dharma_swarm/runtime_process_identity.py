@@ -57,6 +57,17 @@ def matches_orchestrate_command(command: str) -> bool:
     return any(needle in command for needle in ORCHESTRATE_COMMAND_NEEDLES)
 
 
+def orchestrate_pgrep_pattern() -> str:
+    """The needle list as an ERE alternation, for ``pgrep -f`` callers.
+
+    Only ``.`` needs escaping — ``-`` and ``_`` are literal outside brackets in
+    POSIX ERE, and nothing here contains other metacharacters.
+    """
+    return "|".join(
+        needle.replace(".", r"\.") for needle in ORCHESTRATE_COMMAND_NEEDLES
+    )
+
+
 def looks_like_runtime_command(command: str) -> bool:
     """True if ``command`` plausibly belongs to the dharma runtime at all."""
     return any(marker in command for marker in RUNTIME_IDENTITY_MARKERS)
