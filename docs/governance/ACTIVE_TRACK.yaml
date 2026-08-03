@@ -2034,6 +2034,7 @@ closed_tracks:
       - "bun test tests/compactShell.test.tsx — 4 pass / 0 fail"
       - "scripts/governance/check_track_status.py — stop exporting DHARMA_PYTHON into non-Python command_passes (fixes checker-only red bun gates)"
       - "tests/test_track_portfolio.py::test_command_passes_does_not_export_dharma_python_for_non_python — pin regression guard"
+      - "tests/test_track_portfolio.py::test_command_passes_scrubs_inherited_dharma_python_for_non_python — parent-environment leak regression guard"
       - "reports/governance/helm/HELM_TRACK_CLOSEOUT_2026-07-31.md — closeout receipt"
     notes: |
       The retained description, completion criteria, next item, non-goals,

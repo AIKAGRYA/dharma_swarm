@@ -333,6 +333,21 @@ def test_command_passes_does_not_export_dharma_python_for_non_python(
     assert result.executed
 
 
+def test_command_passes_scrubs_inherited_dharma_python_for_non_python(
+    monkeypatch,
+) -> None:
+    """An operator-level interpreter pin must not leak into Bun criteria,
+    where DHARMA_PYTHON names the bridge executable rather than the checker."""
+    monkeypatch.setenv("DHARMA_PYTHON", "/operator/system-python-3.9")
+
+    result = check_command_passes(
+        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
 def test_every_dharma_python_wrapper_is_pinned() -> None:
     """Both repo wrappers read DHARMA_PYTHON as the interpreter; either one
     left out of the allowlist silently falls back to a checkout-local .venv or

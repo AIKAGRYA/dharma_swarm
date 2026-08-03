@@ -641,14 +641,19 @@ def check_command_passes(
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     resolved_python = _resolve_python_executable()
-    if "DHARMA_PYTHON" not in os.environ and _command_should_export_dharma_python(
-        resolved_command
-    ):
+    exports_dharma_python = _command_should_export_dharma_python(resolved_command)
+    if "DHARMA_PYTHON" not in os.environ and exports_dharma_python:
         # Wrapper-routed / Python criteria honor DHARMA_PYTHON; point them at
         # this dependency-complete interpreter so track truth does not depend
-        # on one checkout's `.venv`. Non-Python commands (bun, etc.) must not
-        # inherit this pin — they repurpose DHARMA_PYTHON as the bridge path.
+        # on one checkout's `.venv`.
         env = {**os.environ, "DHARMA_PYTHON": resolved_python}
+    elif not exports_dharma_python:
+        # Non-Python commands (bun, etc.) repurpose DHARMA_PYTHON as a bridge
+        # executable. Passing env=None would inherit an operator-level pin and
+        # reproduce the checker-only poisoning this boundary prevents, so scrub
+        # the variable explicitly while preserving the rest of the environment.
+        env = dict(os.environ)
+        env.pop("DHARMA_PYTHON", None)
     try:
         result = subprocess.run(
             resolved_command,
