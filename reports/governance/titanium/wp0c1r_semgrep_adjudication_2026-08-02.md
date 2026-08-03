@@ -1,5 +1,10 @@
 # WP-0C1R — Ratified dispositions and strict-scan closure (2026-08-02)
 
+> **Amended 2026-08-03**: the execution *mechanism* items below were
+> review-hardened after ratification; where they conflict with the
+> "Amendment 2026-08-03" section at the end of this file, the amendment is
+> authoritative. The A1/B1 dispositions themselves are unchanged.
+
 **STATUS: RATIFIED AND EXECUTED — pending human merge of the carrying PR.**
 The operator ratified the two disposition decisions prepared by the
 2026-07-29 draft adjudication
@@ -85,3 +90,39 @@ DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 \
 # expect: exit 0, "Ran 10 rules on ... files: 0 findings."
 python3 -m pytest -q tests/test_semgrep_wrapper.py
 ```
+
+## Amendment 2026-08-03 — review-hardened execution mechanism (commit 29b12a560)
+
+The A1/B1 dispositions are unchanged. After six decorrelated review findings
+on the carrying PR (#1202: Devin, Greptile, Codex — one-directional lockstep,
+whole-file Rule 2 exemptions, substring role check, prose-only slice
+declaration), the execution mechanism recorded above was tightened in commit
+`29b12a560`. Where this amendment conflicts with the "executed via" items
+above, this amendment is authoritative:
+
+- **Rule 1 (supersedes Decision A1 items 2–3 in part)**: the 18 files remain
+  file-exact entries in Rule 1's `paths.exclude`. The contract test is now
+  `tests/test_semgrep_wrapper.py::test_rule1_lockstep_is_bidirectional`: in
+  addition to declared ⊆ excludes, it fails on any exclude entry lacking a
+  manifest declaration (excludes − declared − pinned canonical/operational
+  set must be empty). `research_state_participants` gained machine-readable
+  per-group `files:` + `state_slices:` (a prose-only slice list is not a
+  declaration).
+- **Rule 2 (supersedes Decision B1 items 2–3)**: the 3 files were REMOVED
+  from Rule 2's `paths.exclude` (only `dharma_swarm/runtime_state.py`
+  remains). The exemption is class-scoped `pattern-not` clauses —
+  `BridgeRegistry`, `SQLiteGraphStore`, `KnowledgeStore` — so a NEW
+  Store/Ledger/Registry in the same files is still caught. The contract test
+  is now `::test_rule2_exemptions_are_class_scoped_and_role_headed`: a
+  structural `# closure-layer-role: <role>` comment line with the role from
+  the closed vocabulary, exactly the ratified class set, and no same-named
+  class elsewhere may open SQLite (this check surfaced
+  `dharma_swarm/engine/knowledge_store.py`'s in-memory `KnowledgeStore`,
+  verified sqlite-free — the collision is inert and now guarded).
+- `::test_anti_slop_allowlists_contain_no_globs` retains its name and role.
+- Verification on `29b12a560`: strict replay `Ran 10 rules on 1577 files:
+  0 findings` (semgrep 1.168.0 pin, exit 0); pytest 13 passed / 1
+  pre-existing host-conditional skip; negative controls each proven then
+  reverted — (A) undeclared Rule 1 exclude → contract FAILs, (B) blanked
+  role value → contract FAILs, (C) `SmuggledStore` appended to
+  `graph_store.py` → strict scan FINDS `dharma.no-new-substrate`.
