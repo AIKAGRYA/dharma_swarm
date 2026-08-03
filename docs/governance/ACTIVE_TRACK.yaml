@@ -1836,10 +1836,15 @@ active_tracks:
       M1 refreshes the canonical M0 receipt against exact merged main after
       PR #1164 in
       reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
-      The selected post-1164 observation reports the evaluator's mechanical
-      7/8 result separately from no-skip and packet-acceptance evidence. That
-      receipt is point-in-time evidence, not a substitute for the current
-      completion criteria or authority to promote a blocked external decision.
+      That receipt's mechanical 7/8 result was scored against the criteria
+      set of its day and is point-in-time evidence only. The criteria block
+      now carries nine entries, and the newest generated/status projection
+      (2026-08-03) reports 8/9: the sole failure is the MISSING independent
+      clean-room receipt, and two passing suites still carry skipped tests.
+      A pass that carries skips does not discharge the no-skip obligation.
+      Neither receipt nor projection is a substitute for the current
+      completion criteria or authority to promote a blocked external
+      decision; the projection is projection-only evidence.
 
     completion_criteria:
       - id: titanium_bootstrap_contract_passes
@@ -1884,7 +1889,7 @@ active_tracks:
 
     next_items:
       - id: WP-0F1
-        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
+        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
         blocker: true
         evidence_criterion: titanium_ci_authority_contracts_pass
@@ -1898,7 +1903,7 @@ active_tracks:
         kind: governance
         blocker: true
       - id: WP-0S
-        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret, while docker-compose still declares 8080:8080 and GitHub contains no deployment evidence; actual exposure remains NEEDS_HOST/BLOCKED_OPERATOR."
+        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret and docker-compose still declares 8080:8080. The 2026-08-01 read-only observation recorded on PR #1184 (draft, unmerged) saw Rushabdev answer HTTP 401 and Meghadharma answer public HTTP 200, so live exposure is observed but unadjudicated; the verdict remains BLOCKED_OPERATOR pending fresh operator-backed observation and exact-scope attestation."
         kind: code
         blocker: true
         evidence_criterion: titanium_ingress_contracts_pass
