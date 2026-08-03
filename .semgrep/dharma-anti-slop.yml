@@ -95,15 +95,26 @@ rules:
     paths:
       exclude:
         - "dharma_swarm/runtime_state.py"
-        # WP-0C1R ratified roles (operator decision B1, 2026-08-02): each file
-        # carries a closure-layer-role header (Rule 2 vocabulary: exempt —
-        # subordinate adapter/projection under the MemoryKernel doctrine,
-        # CLAUDE.md); adjudication record
-        # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
-        - "dharma_swarm/bridge_registry.py"
-        - "dharma_swarm/graph_store.py"
-        - "dharma_swarm/knowledge_units.py"
     patterns:
+      # WP-0C1R ratified roles (operator decision B1, 2026-08-02): exemptions
+      # are CLASS-scoped, not file-scoped, so any NEW Store/Ledger/Registry
+      # added to the same files is still caught (paths.exclude runs before the
+      # class pattern and would skip the whole file — decorrelated review
+      # 2026-08-02). Each class's file carries a structural
+      # `# closure-layer-role: <role>` header (vocabulary: exempt — subordinate
+      # adapter/projection under the MemoryKernel doctrine, CLAUDE.md); the
+      # contract test proves no same-named class elsewhere opens SQLite (a
+      # collision would silently inherit the exemption). Adjudication record
+      # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+      - pattern-not: |
+          class BridgeRegistry:
+              ...
+      - pattern-not: |
+          class SQLiteGraphStore:
+              ...
+      - pattern-not: |
+          class KnowledgeStore:
+              ...
       - pattern-either:
           # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
           - pattern: |
