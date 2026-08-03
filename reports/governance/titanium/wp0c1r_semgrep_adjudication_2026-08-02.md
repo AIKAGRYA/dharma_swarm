@@ -1,9 +1,12 @@
 # WP-0C1R — Ratified dispositions and strict-scan closure (2026-08-02)
 
-> **Amended 2026-08-03**: the execution *mechanism* items below were
-> review-hardened after ratification; where they conflict with the
-> "Amendment 2026-08-03" section at the end of this file, the amendment is
-> authoritative. The A1/B1 dispositions themselves are unchanged.
+> **Amended 2026-08-03 and again 2026-08-04**: the execution *mechanism* items
+> below were review-hardened after ratification, and two claims made in that
+> hardening are corrected. Later amendments win: read
+> "Amendment 2026-08-04" (last section) first — it corrects the
+> "Amendment 2026-08-03" claim that a new Store/Ledger/Registry in the ratified
+> files "is still caught", and records that Rule 2 had no JSONL detector at
+> all until 2026-08-04. The A1/B1 dispositions themselves are unchanged.
 
 **STATUS: RATIFIED AND EXECUTED — pending human merge of the carrying PR.**
 The operator ratified the two disposition decisions prepared by the
@@ -126,3 +129,176 @@ above, this amendment is authoritative:
   reverted — (A) undeclared Rule 1 exclude → contract FAILs, (B) blanked
   role value → contract FAILs, (C) `SmuggledStore` appended to
   `graph_store.py` → strict scan FINDS `dharma.no-new-substrate`.
+
+## Amendment 2026-08-04 — Rule 2 had no JSONL detector, and the 2026-08-03 claim above is corrected
+
+The A1/B1 dispositions are still unchanged. Two statements merged on `main`
+are corrected here; nothing above is rewritten.
+
+### Correction 1 — "still caught" was a universal claim the rule cannot honor
+
+The Amendment 2026-08-03 bullet "Rule 2" states, verbatim:
+
+> The exemption is class-scoped `pattern-not` clauses — `BridgeRegistry`,
+> `SQLiteGraphStore`, `KnowledgeStore` — so a NEW Store/Ledger/Registry in the
+> same files is still caught.
+
+**False as written, in two ways.**
+
+1. It is a claim about *any* new substrate, but Rule 2's detector only ever
+   matched four SQLite assignment shapes. A new Store/Ledger/Registry that
+   appends JSONL was never caught — anywhere, not only "in the same files".
+2. "Class-scoped" is precisely **name**-scoped. Verified against semgrep
+   1.168.0: a `class X: ...` pattern also matches `class X(Base): ...`, so a
+   second, differently-based class re-using a ratified name inherits the
+   exemption. The 2026-08-03 record notes the
+   `dharma_swarm/engine/knowledge_store.py` collision was "verified
+   sqlite-free — the collision is inert and now guarded"; the guard was a
+   source-text grep in a contract test, not the scanner.
+
+The narrow claim that survives: a **differently-named** new substrate class
+added to one of the three ratified files is still caught, for the shapes the
+detector covers. That is now proven by running the scanner
+(`test_synthetic_new_substrate_is_caught_in_a_ratified_file`), not asserted.
+
+### The receipt
+
+Rule 2's message has promised, since `3ff53240e` (2026-04-26), that it catches
+a Store/Ledger/Registry that "opens its own SQLite **or appends its own
+JSONL**". The rule carried **zero** JSONL patterns. Two ledgers added after
+the rule existed (`e1aacc0fc`, 2026-07-03) prove the miss:
+
+```bash
+# rule file byte-identical at f3eb5b397 (WP-0C1R merge) and f2ffb4390 (main)
+DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 bash scripts/governance/run_semgrep_with_ca.sh \
+  --config .semgrep/dharma-anti-slop.yml --metrics=off \
+  dharma_swarm/forge_v1/forge_v2/receipts.py dharma_swarm/forge_v1/tracking.py
+# => Ran 4 rules on 2 files: 0 findings.
+```
+
+`receipts.py:69` defines `class Ledger` whose own docstring reads "Append-only
+JSONL score store"; `tracking.py:23` defines `class RunLedger` writing
+`~/.dharma/forge_v1/runs.jsonl`. Both are exactly what Rule 2's message
+describes, and the strict scan reported them as clean.
+
+Why the WP-0C1R contract tests could not have caught this: they parse YAML,
+grep class names, and search source text. `test_rule2_exemptions_are_class_scoped_and_role_headed`
+proves the config's shape; only a scanner run proves the scanner's behavior.
+
+### What changed
+
+- Rule 2 now detects append-mode file handles opened in a method body —
+  `open(p, "a")`, `open(p, mode="a")`, `p.open("a")`, `p.open(mode="a")`, and
+  the `with ... as f:` form of each (modes a/ab/at/a+/ab+/at+) — plus the
+  SQLite forms it previously missed: local variables, bare calls, `async def`,
+  and `with sqlite3.connect(...) as conn:`. Inheriting a ratified exempt class
+  is also a finding.
+- Rule 2's message now states, literally, both what it catches and what it
+  does not (wrapper/factory-opened substrates, aliased builtins, variable
+  modes, non-sqlite drivers, non-`*Store` names, class-body append handles,
+  and the same-name collision).
+- New companion rule `dharma.no-new-substrate-exempt-name-collision` makes the
+  collision guard behavioral. It fires only when a colliding class *also*
+  opens a substrate, so the sqlite-free `KnowledgeStore(Protocol)` in
+  `dharma_swarm/engine/knowledge_store.py` correctly stays silent.
+- `.semgrep/tests/test_no_new_substrate.py` (behavioral fixture, restored and
+  extended from `71097bd048`) + `tests/test_semgrep_rule2_behavior.py` run
+  semgrep against the real rule file and assert the exact set of finding
+  lines. Named gaps are `todoruleid`-annotated and asserted to stay silent, so
+  closing one fails the suite instead of passing quietly. Absent scanner =
+  named SKIP, never a green pass.
+- The strict scan now loads **11 rules**, not 10. The required scan
+  (`make semgrep`, `.semgrep/security.yml` only) and `governance-all` are
+  untouched and still clean.
+
+### Newly surfaced — OWNER_DEFERRED, awaiting their own adjudication
+
+The broadened detector surfaces **17 findings**, all
+`dharma.no-new-substrate`, all manually verified as true positives (real
+`*Store`/`*Ledger`/`*Registry` classes opening their own SQLite or appending
+their own JSONL). **None was allowlisted, exempted, or silenced.** They are
+NOT covered by decision B1 and require the same route WP-0C1R used —
+declare-then-adjudicate, operator-ratified:
+
+| File:line | Class | Substrate |
+|---|---|---|
+| `dharma_swarm/amiros.py:153` | `AMIROSRegistry` | JSONL append |
+| `dharma_swarm/cron_job_runtime.py:62` | `CronJobRuntimeStore` | JSONL append |
+| `dharma_swarm/economic_agent.py:132` | `EconomicLedger` | JSONL append |
+| `dharma_swarm/engine/conversation_memory.py:176` | `ConversationMemoryStore` | SQLite (context manager) |
+| `dharma_swarm/engine/retrieval_feedback.py:250` | `RetrievalFeedbackStore` | SQLite (context manager) |
+| `dharma_swarm/epistemic_telemetry.py:289` | `EpistemicTelemetryStore` | JSONL append |
+| `dharma_swarm/forge_v1/forge_v2/receipts.py:69` | `Ledger` | JSONL append |
+| `dharma_swarm/forge_v1/tracking.py:23` | `RunLedger` | JSONL append |
+| `dharma_swarm/observability.py:114` | `LocalTraceStore` | JSONL append |
+| `dharma_swarm/operator_core/session_store.py:57` | `SessionStore` | JSONL append |
+| `dharma_swarm/rea_runtime.py:118` | `TemporalRunStore` | JSONL append |
+| `dharma_swarm/routing_memory.py:68` | `RoutingMemoryStore` | SQLite (local variable) |
+| `dharma_swarm/session_ledger.py:67` | `SessionLedger` | JSONL append |
+| `dharma_swarm/telemetry_plane.py:619` | `TelemetryPlaneStore` | aiosqlite (bare call) |
+| `dharma_swarm/telos_gates.py:122` | `GateRegistry` | JSONL append |
+| `dharma_swarm/tui/engine/session_store.py:44` | `SessionStore` | JSONL append |
+| `dharma_swarm/vector_store.py:214` | `VectorStore` | SQLite (local variable) |
+
+Consequence, stated rather than hidden: the strict scan
+(`make semgrep-strict`, and the `.github/workflows/semgrep.yml` "Strict gate"
+when it runs **without** a baseline — i.e. the Monday drift cron) reports
+these 17 and exits nonzero until they are adjudicated. On `pull_request` and
+`push` the gate passes `--baseline-commit`, so pre-existing findings are
+filtered and the gate stays green — measured, not assumed:
+
+```
+run_semgrep_with_ca.sh --config .semgrep --error --baseline-commit f2ffb4390
+# => Ran 11 rules on 0 files: 0 findings.   exit 0
+```
+
+The **required** scan (`make semgrep`, security ruleset only) is unaffected:
+`Ran 6 rules on 1453 files: 0 findings`, exit 0 — nothing in `governance-all`
+starts failing.
+
+### Correction 2 — the work-packet JSON's stale reference stands, and why
+
+The 2026-08-03 amendment's carrying work is described as having verified the
+packet JSON free of stale mechanism references. It is not:
+`reports/agentops/work_packets/titanium-WP-0C1R-ratified-dispositions.json:6`
+still says Rule 2 should "allowlist exactly those files in Rule 2", which the
+2026-08-03 amendment reversed (the three files were removed from
+`paths.exclude`).
+
+**It is deliberately not edited here.** The packet is digest-sealed:
+`session_entry.packet_digest` covers the whole payload minus itself, and
+`parse_work_packet` raises `packet_digest does not match canonical packet
+content` on any drift. Verified 2026-08-04:
+
+```
+stored   : 7e7f01874f9c9bf50791b31246597a5bd59b9497abdd3e0b79b0bf927c347d3a
+computed : 7e7f01874f9c9bf50791b31246597a5bd59b9497abdd3e0b79b0bf927c347d3a  (seal valid)
+after adding any key: 548fd203ce53d977106836e20d16998597bd637c1e25a8e1d974fb0ad62014d9  (seal broken)
+```
+
+Editing the text and re-sealing would make an executed packet's immutability
+proof self-issued by a later agent — the opposite of what the seal is for.
+The packet records *intent at execution time*; this record is the authority on
+what the mechanism actually is. That correction is made here instead.
+
+### Verification
+
+```bash
+DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 \
+  bash scripts/governance/run_semgrep_with_ca.sh --config .semgrep --metrics=off
+# => Ran 11 rules on 1577 files: 17 findings  (all listed above, all true positives)
+
+make semgrep          # required scan, security.yml only: exit 0, unchanged
+PYTHONPATH=$PWD python3 -m pytest -q tests/test_semgrep_wrapper.py \
+                                     tests/test_semgrep_rule2_behavior.py
+```
+
+Negative controls, each proven then reverted:
+(A) `open("audit.log")` inside a `*Store` method → **no** finding (the mode
+metavariable cannot bind a filename); (B) `"w"` / `"x"` modes and a read-only
+`open(p)` → **no** finding; (C) an identical append method on a class NOT
+named `*Store/Ledger/Registry/Substrate` → **no** finding; (D) the three
+ratified files and `dharma_swarm/runtime_state.py` → **no** finding;
+(E) a `SmuggledLedger` appended to a copy of `graph_store.py` → **one**
+`dharma.no-new-substrate` finding; (F) `DHARMA_SEMGREP_BIN` pointed at a
+missing binary → 7 named SKIPs, 0 silent passes.

@@ -62,6 +62,24 @@ When a PR adds a new `Store/Ledger/Registry/Substrate` class, the
 reviewer should ask: which role above does this declare? If the answer
 is "none of these," the change should be reshaped, not waived.
 
+### Detector scope (2026-08-04)
+
+From 2026-04-26 to 2026-08-04 Rule 2's message claimed it caught classes that
+"append their own JSONL" while the rule carried zero JSONL patterns — the
+config-shape contract tests could not see it. The rule now also detects
+append-mode file handles, the SQLite forms it previously missed (local
+variables, bare calls, `async def`, context managers), and subclasses of the
+three ratified exemptions; a companion rule
+(`dharma.no-new-substrate-exempt-name-collision`) catches a substrate that
+re-uses a ratified exempt class NAME. **The authoritative statement of what
+the detector does and does not catch is Rule 2's own `message:` in
+`.semgrep/dharma-anti-slop.yml`**, and it is proven — not asserted — by
+`tests/test_semgrep_rule2_behavior.py` running semgrep over
+`.semgrep/tests/test_no_new_substrate.py`. Receipts and the 17 findings this
+broadening surfaced (OWNER_DEFERRED, unadjudicated):
+`reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md`,
+"Amendment 2026-08-04".
+
 ## Known offenders (fix before promoting Rule 3 / Rule 4 / Rule 6)
 
 Three violations were known at the time the rules were introduced.
