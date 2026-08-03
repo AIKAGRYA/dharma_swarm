@@ -107,6 +107,73 @@ def test_brief_never_reports_a_failed_read_as_never_attempted():
     )
 
 
+def test_brief_reports_isolation_from_the_read_never_asserts_it():
+    """Devin P1. The `used` branch hardcoded "supervisor-scoped ... other agents
+    omitted as agent_not_allowed". That claim is false whenever the legacy
+    escape hatch downgrades isolation to unrestricted, in which case
+    context_admission applies NO agent filter — so the brief promised an
+    isolation guarantee that did not hold, in the artifact an operator trusts
+    for provenance. The metadata already carries the truth; render it."""
+    enforced = build_operator_brief(
+        memory=MemoryRecall(
+            status=RECALL_USED,
+            metadata={
+                "isolation_applied": True,
+                "isolation_semantics": "supervisor_scoped",
+                "allowed_agent_ids": ["sarathi"],
+            },
+        )
+    )
+    assert "Isolation ENFORCED" in enforced and "supervisor_scoped" in enforced
+
+    unenforced = build_operator_brief(
+        memory=MemoryRecall(
+            status=RECALL_USED,
+            metadata={"isolation_applied": False, "isolation_semantics": "legacy"},
+        )
+    )
+    assert "Isolation NOT ENFORCED" in unenforced
+    assert "may belong to" in unenforced
+    assert "agent_not_allowed" not in unenforced, (
+        "brief claims agent filtering ran when isolation was not applied"
+    )
+
+
+def test_brief_discloses_that_the_pack_may_carry_content():
+    """Devin (security). The supported entrypoint reads with
+    include_content=True, so the excerpt carries content snippets — not the
+    reference-only recall this work originally claimed — and the brief is
+    persisted under the state root. Whatever the policy, the durable artifact
+    must not understate what it contains."""
+    rendered = build_operator_brief(
+        memory=MemoryRecall(status=RECALL_USED, excerpt="# pack\nsome atom text")
+    )
+    assert "may include content snippets" in rendered
+    assert "written to disk" in rendered
+
+
+def test_kernel_construction_failure_is_a_fault_not_an_absence():
+    """Devin P1. When MemoryKernel() raised, the daemon set memory_kernel=None,
+    which made recall_memory return `not_configured` and the brief say "no read
+    was attempted" — dropping the exception. `_unavailable_recall(detail)`
+    existed for exactly this case and was not used on this path."""
+    daemon_src = (REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py").read_text()
+    assert "memory_unavailable_detail" in daemon_src, (
+        "construction failure detail is not recorded, so it cannot reach the brief"
+    )
+    tree = ast.parse(daemon_src)
+    guarded = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and getattr(n.func, "id", None) == "_unavailable_recall"
+        and n.args  # called WITH the recorded detail, not bare
+    ]
+    assert guarded, (
+        "_unavailable_recall is never called with a detail; a kernel that failed "
+        "to construct still reports as 'no memory configured'"
+    )
+
+
 def test_brief_states_admission_counts_when_consulted():
     """0 admitted must read as policy exclusion, not as memory being skipped."""
     rendered = build_operator_brief(
@@ -117,7 +184,6 @@ def test_brief_states_admission_counts_when_consulted():
         )
     )
     assert "3 admitted of 13 candidates" in rendered
-    assert "agent_not_allowed" in rendered, "owner-filtering must be stated"
 
 
 def test_boot_pack_carries_the_recall_object_not_a_bare_string():

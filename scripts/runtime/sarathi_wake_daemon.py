@@ -291,6 +291,7 @@ async def run_daemon(
     # because the failure is legible downstream -- `memory_excerpt` stays "",
     # which the brief reports as "not consulted" rather than as "nothing
     # recalled". The two are different facts and must not collapse.
+    memory_unavailable_detail = ""
     try:
         if recall_memory is None:
             raise RuntimeError("memory organ did not import")
@@ -298,6 +299,7 @@ async def run_daemon(
 
         memory_kernel = MemoryKernel()
     except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
+        memory_unavailable_detail = str(exc)
         # stderr, not stdout: `--json` prints the report as the SOLE stdout
         # payload (:489), so a diagnostic on stdout breaks every consumer doing
         # json.loads(subprocess output) -- and it breaks them precisely in the
@@ -331,8 +333,15 @@ async def run_daemon(
         # read reaches the brief as READ FAILED instead of being erased into
         # "not consulted". The except is a backstop for an organ contract
         # break, not the normal failure route.
-        if recall_memory is None:
-            memory = _unavailable_recall()
+        # A kernel that FAILED TO CONSTRUCT is a fault, not an absence. Passing
+        # `memory_kernel = None` into recall_memory would return
+        # `not_configured`, and the brief would report "no read was attempted" —
+        # dropping the exception entirely. That is the exact collapse the four
+        # statuses exist to prevent, and an earlier revision of this daemon did
+        # it anyway while `_unavailable_recall(detail)` sat unused two functions
+        # away (Devin, PR #1208).
+        if recall_memory is None or memory_unavailable_detail:
+            memory = _unavailable_recall(memory_unavailable_detail)
         else:
             try:
                 memory = recall_memory(

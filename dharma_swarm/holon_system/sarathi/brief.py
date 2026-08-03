@@ -93,14 +93,51 @@ def build_operator_brief(
     else:
         admitted = getattr(memory, "admitted", 0)
         candidates = getattr(memory, "candidates", 0)
+        meta = getattr(memory, "metadata", {}) or {}
         lines.append(
-            f"Consulted through MemoryKernel under supervisor-scoped isolation "
-            f"({admitted} admitted of {candidates} candidates). Atoms owned by "
-            f"other agents are omitted as `agent_not_allowed`; 0 admitted means "
-            f"policy excluded them, not that memory was skipped."
+            f"Consulted through MemoryKernel ({admitted} admitted of "
+            f"{candidates} candidates). 0 admitted means policy excluded them, "
+            f"not that memory was skipped."
         )
+
+        # Isolation is REPORTED FROM THE READ, never asserted. An earlier
+        # revision hardcoded "supervisor-scoped ... other agents omitted as
+        # agent_not_allowed". That sentence is false whenever the legacy escape
+        # hatch downgrades isolation_mode to "unrestricted", in which case
+        # context_admission applies no agent filter at all — so the brief would
+        # promise an isolation guarantee that did not hold, in the one artifact
+        # an operator trusts for provenance.
+        applied = meta.get("isolation_applied")
+        semantics = meta.get("isolation_semantics") or "unknown"
+        allowed = meta.get("allowed_agent_ids") or []
+        if applied:
+            lines.append(
+                f"Isolation ENFORCED: {semantics}; readable agent ids "
+                f"{allowed or '(none declared)'}. Atoms owned by other agents "
+                f"are omitted as `agent_not_allowed`."
+            )
+        else:
+            lines.append(
+                f"Isolation NOT ENFORCED (semantics={semantics}). Agent-ownership "
+                f"filtering did not run, so atoms admitted here may belong to "
+                f"other agents. Do not read this section as Sarathi-only recall."
+            )
+        for warning in meta.get("isolation_warnings") or []:
+            lines.append(f"Isolation warning: {warning}")
+
         if excerpt:
-            lines += ["", excerpt.rstrip()]
+            # The pack below may carry content snippets, not only references:
+            # the supported entrypoint reads with include_content=True, and this
+            # brief is persisted under the state root. Stated because the
+            # alternative is a durable artifact whose contents are broader than
+            # the operator was told.
+            lines += [
+                "",
+                "The pack below may include content snippets of admitted atoms, "
+                "not references alone, and is written to disk with this brief.",
+                "",
+                excerpt.rstrip(),
+            ]
 
     lines += ["", "## Runtime audit"]
     if audit is None:
