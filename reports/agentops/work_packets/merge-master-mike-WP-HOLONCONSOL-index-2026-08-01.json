@@ -47,10 +47,10 @@
   ],
   "negative_controls": [
     {
-      "name": "holon-imports-unchanged-by-a-docs-only-change",
-      "command": "python3 -m pytest -q tests/test_holon_system_imports.py",
-      "expected_exit": 1,
-      "timeout_seconds": 120
+      "name": "sarathi-organs-unaffected-by-a-docs-only-change",
+      "command": "python3 -m pytest -q tests/test_sarathi_plan.py tests/test_sarathi_wake.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
     }
   ],
   "commit": {
@@ -99,9 +99,10 @@
       "Phase C (the four a2a scripts) is deferred: its packaging-inversion justification is false because all four bodies import from scripts/ themselves.",
       "This lands on the PR-S6 branch because the session is scoped to a single branch. It is unrelated to the wake lane and would be cleaner as its own PR.",
       "DocOps count assertions and the AUTO_INVENTORY auto-section go stale when markdown is added; on PRs these are advisory (--counts-advisory) and docops-reconcile-main.yml reconciles them post-merge. Verified: main already carried this drift before this branch.",
-      "The bare `python3 scripts/docops/check_docops_integrity.py` CANNOT be a packet gate and was removed (Devin review on PR #1198, correctly). It exits 1 on this branch because adding markdown drifts the SOVEREIGN_MANIFEST count assertions and staleness the AUTO_INVENTORY auto-section. CI only passes because .github/workflows/docops.yml:51-56 appends --counts-advisory --changed-from, and the packet runner's allowlist admits that script with NO arguments only (_ALLOWED_REPO_SCRIPT_ARGV, scripts/governance/run_agent_work_packet.py:104), so the advisory flags cannot be supplied. `make docops-integrity` fails the same way (exit 2). The gates are now `make hygiene-check` and the docops contract tests, both verified exit 0 on this branch. Count reconciliation is docops-reconcile-main.yml's job post-merge, not this packet's."
+      "The bare `python3 scripts/docops/check_docops_integrity.py` CANNOT be a packet gate and was removed (Devin review on PR #1198, correctly). It exits 1 on this branch because adding markdown drifts the SOVEREIGN_MANIFEST count assertions and staleness the AUTO_INVENTORY auto-section. CI only passes because .github/workflows/docops.yml:51-56 appends --counts-advisory --changed-from, and the packet runner's allowlist admits that script with NO arguments only (_ALLOWED_REPO_SCRIPT_ARGV, scripts/governance/run_agent_work_packet.py:104), so the advisory flags cannot be supplied. `make docops-integrity` fails the same way (exit 2). The gates are now `make hygiene-check` and the docops contract tests, both verified exit 0 on this branch. Count reconciliation is docops-reconcile-main.yml's job post-merge, not this packet's.",
+      "The original negative control pinned expected_exit 1 on tests/test_holon_system_imports.py to show a docs-only change does not touch code. Devin review on PR #1198 correctly flagged it as stale by construction: HOLON_CONSOLIDATION_PLAN_2026-08-01.md:162 makes fixing that very failure step 3 of the order of work, so the control would report a FALSE RED the moment the repair lands. Replaced with a control that stays true either way \u2014 the Sarathi organ suites must pass (exit 0) before and after. The live test_holon_system_imports.py failure is still real and is still recorded in the plan at :51-52; removing the control does not hide it."
     ],
     "rollback": "Revert the three docs and this packet together. Nothing imports them; no code changed.",
-    "packet_digest": "d9365e7e21c01073d29f5243a527687b7062e66da3a85d2886aa2fd9b627cdb2"
+    "packet_digest": "ac3d01563041ca2507345b482595f2d3b6302ccf57e987c028a6adfb738bc6c2"
   }
 }
