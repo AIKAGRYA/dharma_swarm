@@ -215,6 +215,182 @@ def test_scan_reports_down_when_nothing_matches(monkeypatch) -> None:
     assert "no live process matches" in result.detail
 
 
+# --- three-state launchd probe: "could not run" != "service is absent" -----
+
+
+class _FakeProc:
+    def __init__(self, returncode: int, stdout: str = "", stderr: str = "") -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _launchctl_raises(exc: BaseException):
+    def _run(*_a, **_kw):
+        raise exc
+
+    return _run
+
+
+def test_missing_launchctl_is_not_evidence_of_death(monkeypatch) -> None:
+    """Linux/container hosts have no launchctl. That is not a dead organism.
+
+    `Dockerfile.swarm` runs `python -m dharma_swarm.orchestrate_live` — a form
+    this sentinel explicitly claims to watch — on python:3.12-slim, where the
+    launchctl binary does not exist.
+    """
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        _launchctl_raises(FileNotFoundError("No such file or directory: 'launchctl'")),
+    )
+
+    result = sentinel.check_launchd_service()
+
+    assert result.ok is None
+    assert result.evidence["state"] == "unknown"
+    assert "could not run" in result.detail
+
+
+def test_launchctl_timeout_is_not_evidence_of_death(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        _launchctl_raises(sentinel.subprocess.TimeoutExpired(cmd="launchctl", timeout=15)),
+    )
+
+    result = sentinel.check_launchd_service()
+
+    assert result.ok is None
+    assert result.evidence["state"] == "unknown"
+
+
+def test_launchctl_answering_not_loaded_is_still_a_loud_fail(monkeypatch) -> None:
+    """Negative control for the fix above: the 2026-07-28 bootout shape.
+
+    The probe RAN and said the service is gone. That must stay ok=False, not
+    get softened into 'unknown' along with the container case.
+    """
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        lambda *a, **kw: _FakeProc(
+            113, stderr='Could not find service "com.dharma.swarm" in domain for login'
+        ),
+    )
+
+    result = sentinel.check_launchd_service()
+
+    assert result.ok is False
+    assert result.evidence["state"] == "absent"
+
+
+def test_unknown_launchd_probe_never_launders_a_dead_organism(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """THE purpose guard: no-launchctl + no process must still scream.
+
+    Making check 1 non-evidence must not open a route back to the quiet PASS.
+    With the launchd probe unable to run and nothing matching any
+    orchestrate-live command form, the verdict is still ORGANISM_DOWN, the
+    receipt is still written, and the exit code is still 1.
+    """
+    monkeypatch.setattr(
+        sentinel,
+        "check_launchd_service",
+        lambda label=None: CheckResult(
+            name="launchd_service",
+            ok=None,
+            detail="launchctl probe could not run",
+            evidence={"state": "unknown"},
+        ),
+    )
+    monkeypatch.setattr(
+        sentinel,
+        "check_orchestrate_process",
+        lambda pid: CheckResult(
+            name="orchestrate_process", ok=False, detail="no live process"
+        ),
+    )
+
+    rc = run_sentinel(state_root=tmp_path, dry_run=False)
+
+    assert rc == 1
+    receipts = list(
+        (tmp_path / "witness" / "liveness_sentinel").glob("ORGANISM_DOWN_*.json")
+    )
+    assert len(receipts) == 1
+    payload = json.loads(receipts[0].read_text())
+    assert payload["verdict"] == "ORGANISM_DOWN"
+    assert payload["non_evidence_checks"] == ["launchd_service"]
+
+
+def test_healthy_container_host_does_not_false_alarm(monkeypatch, tmp_path: Path) -> None:
+    """The regression this fix closes: alive process, no launchctl -> quiet."""
+    monkeypatch.setattr(
+        sentinel,
+        "check_launchd_service",
+        lambda label=None: CheckResult(
+            name="launchd_service",
+            ok=None,
+            detail="launchctl probe could not run",
+            evidence={"state": "unknown"},
+        ),
+    )
+    monkeypatch.setattr(
+        sentinel, "check_orchestrate_process", lambda pid: _ok("orchestrate_process")
+    )
+    err_log = tmp_path / "logs" / "swarm.err"
+    err_log.parent.mkdir(parents=True)
+    err_log.write_text("", encoding="utf-8")
+
+    rc = run_sentinel(state_root=tmp_path, dry_run=False, err_log=err_log)
+
+    assert rc == 0
+    assert list((tmp_path / "witness" / "liveness_sentinel").glob("ORGANISM_DOWN_*")) == []
+
+
+def test_no_evidence_at_all_is_fail_closed() -> None:
+    """Every probe unknown is silence, and silence is what this sentinel kills."""
+    unknown = [
+        CheckResult(name=n, ok=None, detail="probe could not run")
+        for n in ("launchd_service", "orchestrate_process", "admission_denials")
+    ]
+
+    assert sentinel._verdict_ok(unknown) is False
+
+
+def test_verdict_ignores_unknown_but_honours_every_real_answer() -> None:
+    assert sentinel._verdict_ok(
+        [CheckResult("a", None, ""), CheckResult("b", True, "")]
+    ) is True
+    assert sentinel._verdict_ok(
+        [CheckResult("a", None, ""), CheckResult("b", False, "")]
+    ) is False
+
+
+def test_sentinel_and_doctor_agree_that_a_missing_probe_is_not_evidence(
+    monkeypatch,
+) -> None:
+    """Pin the two liveness surfaces to one convention (they cannot import
+    each other: the sentinel is stdlib-only by design)."""
+    from dharma_swarm import doctor
+
+    monkeypatch.setattr(
+        sentinel.subprocess,
+        "run",
+        _launchctl_raises(FileNotFoundError("launchctl")),
+    )
+    monkeypatch.setattr(
+        doctor.subprocess,
+        "run",
+        _launchctl_raises(FileNotFoundError("launchctl")),
+    )
+
+    assert sentinel.check_launchd_service().evidence["state"] == "unknown"
+    assert doctor._launchd_service_state(5.0)[0] == "unknown"
+
+
 def test_dry_run_writes_nothing_but_reports_failure(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         sentinel,

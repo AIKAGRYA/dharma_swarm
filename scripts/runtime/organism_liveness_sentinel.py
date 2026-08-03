@@ -9,7 +9,15 @@ and nothing screamed. This sentinel is the scream.
 Three independent checks, all of which must pass:
 
 1. launchd service presence — ``launchctl print gui/<uid>/com.dharma.swarm``
-   must succeed. An absent service is a FAIL, never a WARN.
+   must succeed. An absent service is a FAIL, never a WARN. If the probe
+   itself cannot RUN (no ``launchctl`` binary — every Linux/container host,
+   including the ``Dockerfile.swarm`` deployment this file already claims to
+   watch — or a timeout), the check is recorded as ``unknown`` and carries no
+   evidence either way; checks 2 and 3 decide. Conflating "probe could not
+   run" with "service is absent" made a healthy container scream
+   ORGANISM_DOWN every 30 minutes forever, and a watchdog nobody believes is
+   not a watchdog. ``dharma_swarm/doctor.py:_launchd_service_state`` uses the
+   same three-state rule.
 2. orchestrate-live process — a live process matching ANY of the organism's
    real launch spellings (``ORCHESTRATE_COMMAND_FORMS``: the plist's console
    script ``dgc orchestrate-live``, the release runner's module form
@@ -117,9 +125,23 @@ def _state_root(raw: str | None) -> Path:
 @dataclass
 class CheckResult:
     name: str
-    ok: bool
+    ok: bool | None
     detail: str
     evidence: dict[str, object] = field(default_factory=dict)
+
+
+def _verdict_ok(checks: list[CheckResult]) -> bool:
+    """True only when every EVIDENCE-BEARING check passed.
+
+    ``ok is None`` means the probe could not run, which is not proof of
+    health and not proof of death — it is excluded from the verdict. The
+    no-evidence-at-all case is fail-closed on purpose: silence about every
+    check is exactly the quiet PASS this sentinel exists to abolish.
+    """
+    evidence = [c for c in checks if c.ok is not None]
+    if not evidence:
+        return False
+    return all(c.ok for c in evidence)
 
 
 def check_launchd_service(label: str = SERVICE_LABEL) -> CheckResult:
@@ -132,18 +154,27 @@ def check_launchd_service(label: str = SERVICE_LABEL) -> CheckResult:
             timeout=15,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
+        # The probe never ran: no launchctl (Linux/container) or it stalled.
+        # Not evidence of a dead service — see the module docstring.
         return CheckResult(
             name="launchd_service",
-            ok=False,
-            detail=f"launchctl probe failed to execute: {exc}",
-            evidence={"target": target},
+            ok=None,
+            detail=f"launchctl probe could not run ({exc}) — no evidence either way",
+            evidence={"target": target, "state": "unknown"},
         )
     if proc.returncode != 0:
+        # The probe RAN and answered "not loaded". This is the 2026-07-28
+        # bootout shape and stays a loud FAIL — deliberately stricter than
+        # the doctor, which has WARN rungs the sentinel does not.
         return CheckResult(
             name="launchd_service",
             ok=False,
             detail=f"service {target} is NOT loaded (launchctl rc={proc.returncode})",
-            evidence={"target": target, "stderr": proc.stderr.strip()[:400]},
+            evidence={
+                "target": target,
+                "state": "absent",
+                "stderr": proc.stderr.strip()[:400],
+            },
         )
     pid: int | None = None
     state: str | None = None
@@ -160,7 +191,12 @@ def check_launchd_service(label: str = SERVICE_LABEL) -> CheckResult:
         name="launchd_service",
         ok=True,
         detail=f"service {target} loaded (state={state}, pid={pid})",
-        evidence={"target": target, "pid": pid, "state": state},
+        evidence={
+            "target": target,
+            "pid": pid,
+            "state": "loaded",
+            "launchd_state": state,
+        },
     )
 
 
@@ -332,22 +368,33 @@ def run_sentinel(
     log_path = err_log if err_log is not None else state_root / "logs" / "swarm.err"
 
     service = check_launchd_service()
-    launchd_pid = service.evidence.get("pid") if service.ok else None
+    # `ok is True` only: an unknown (ok is None) probe carries no pid to
+    # cross-check against, and neither does an absent service.
+    launchd_pid = service.evidence.get("pid") if service.ok is True else None
     process = check_orchestrate_process(
         launchd_pid if isinstance(launchd_pid, int) else None
     )
     denials = check_admission_denials(log_path, baseline_path)
 
     checks = [service, process, denials]
-    ok = all(c.ok for c in checks)
+    ok = _verdict_ok(checks)
+    non_evidence = [c.name for c in checks if c.ok is None]
     verdict = {
         "sentinel": "organism_liveness_sentinel",
         "timestamp_utc": _utc_now(),
         "verdict": "OK" if ok else "ORGANISM_DOWN",
         "dry_run": dry_run,
+        "non_evidence_checks": non_evidence,
         "checks": [asdict(c) for c in checks],
     }
     print(json.dumps(verdict, indent=2))
+    if non_evidence:
+        # Visible without being fatal: a probe that cannot run is a real gap
+        # in coverage, just not a death certificate.
+        print(
+            "SENTINEL NOTICE: no evidence from " + ", ".join(non_evidence),
+            file=sys.stderr,
+        )
 
     if dry_run:
         return 0 if ok else 1
