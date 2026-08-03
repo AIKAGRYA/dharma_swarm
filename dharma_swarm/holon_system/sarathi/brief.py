@@ -32,7 +32,7 @@ def build_operator_brief(
     outcomes: Sequence[Any] | None = None,
     responses: Sequence[Mapping[str, Any]] | None = None,
     audit: Mapping[str, Any] | None = None,
-    memory_excerpt: str = "",
+    memory: Any = None,
 ) -> str:
     pulse = pulse or sarathi_pulse()
     lines = [
@@ -67,21 +67,40 @@ def build_operator_brief(
             )
 
     lines += ["", "## Memory"]
-    if not memory_excerpt:
-        # "Not consulted" and "consulted, admitted nothing" are different facts.
-        # A brief that renders both as silence lets an operator read an absent
-        # memory kernel as an empty memory.
+    status = getattr(memory, "status", None) if memory is not None else None
+    detail = str(getattr(memory, "detail", "") or "")
+    excerpt = str(getattr(memory, "excerpt", "") or "")
+
+    if status is None or status == "not_configured":
         lines.append(
-            "NOT CONSULTED — no memory kernel was available to this cycle. This "
-            "is not the same as recalling nothing; no read was attempted."
+            "NOT CONFIGURED — no memory kernel was available to this cycle. No "
+            "read was attempted. This is not the same as recalling nothing."
+        )
+    elif status == "unavailable":
+        lines.append(
+            f"UNAVAILABLE — the memory organ could not be loaded, so no read was "
+            f"attempted. This is a fault, not an empty memory: {detail}"
+        )
+    elif status == "read_failed":
+        # Never render a failed read as silence. A read that ran and broke is a
+        # live fault; collapsing it into "not consulted" hides it in the one
+        # artifact that is durably recorded.
+        lines.append(
+            f"READ FAILED — memory was consulted and the read raised. Recall is "
+            f"missing from this cycle's plan because of a fault, NOT because "
+            f"policy admitted nothing: {detail}"
         )
     else:
+        admitted = getattr(memory, "admitted", 0)
+        candidates = getattr(memory, "candidates", 0)
         lines.append(
-            "Consulted through MemoryKernel under the apex budget. The pack below "
-            "states its own admission counts; a pack admitting 0 atoms means "
-            "policy excluded them, not that memory was skipped."
+            f"Consulted through MemoryKernel under supervisor-scoped isolation "
+            f"({admitted} admitted of {candidates} candidates). Atoms owned by "
+            f"other agents are omitted as `agent_not_allowed`; 0 admitted means "
+            f"policy excluded them, not that memory was skipped."
         )
-        lines += ["", memory_excerpt.rstrip()]
+        if excerpt:
+            lines += ["", excerpt.rstrip()]
 
     lines += ["", "## Runtime audit"]
     if audit is None:

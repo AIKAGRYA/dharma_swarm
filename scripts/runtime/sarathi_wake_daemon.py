@@ -65,6 +65,7 @@ import json
 import math
 import os
 import sys
+from types import SimpleNamespace
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -89,8 +90,8 @@ try:  # noqa: E402 - memory must never prevent the daemon from STARTING
     # before main() ran -- and the wake loop never started at all. A fail-open
     # guard placed downstream of the failure it guards is not fail-open.
     from dharma_swarm.holon_system.sarathi.memory import (
-        build_memory_pack,
-        render_memory_excerpt,
+        MemoryRecall,
+        recall_memory,
     )
 except Exception as _memory_import_exc:  # noqa: BLE001
     print(
@@ -98,8 +99,11 @@ except Exception as _memory_import_exc:  # noqa: BLE001
         f"{_memory_import_exc}",
         file=sys.stderr,
     )
-    build_memory_pack = None
-    render_memory_excerpt = None
+    MemoryRecall = None
+    recall_memory = None
+    _MEMORY_IMPORT_DETAIL = str(_memory_import_exc)
+else:
+    _MEMORY_IMPORT_DETAIL = ""
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
 from dharma_swarm.holon_system.sarathi.wake import make_wake_work_fn  # noqa: E402
 from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level  # noqa: E402
@@ -109,6 +113,26 @@ AUDIT_PATH = REPO_ROOT / "reports/loop_closure/cybernetics_codex/latest_audit.js
 # Canonical kill/persistence home — the same root request_kill(name) writes to.
 DEFAULT_AGENTS_ROOT = Path.home() / ".dharma" / "agents"
 SENDER = "sarathi"
+# What the apex seat asks its memory for each cycle. A recall query is required
+# for ranked retrieval; passing none reduces the read to unranked iteration.
+RECALL_QUERY = "open delegations, recent outcomes, and standing operator intent"
+
+
+def _unavailable_recall(detail: str = ""):
+    """Status-carrying stand-in for when the memory ORGAN itself is unusable.
+
+    Distinct from `not_configured` (no kernel wired) and from `read_failed` (a
+    read ran and raised). The brief renders all three differently because they
+    are different faults; an operator must not read a broken import as an empty
+    memory. Falls back to a duck-typed object when the organ did not import at
+    all and `MemoryRecall` is therefore unavailable.
+    """
+    text = detail or _MEMORY_IMPORT_DETAIL
+    if MemoryRecall is not None:
+        return MemoryRecall(status="unavailable", detail=text)
+    return SimpleNamespace(
+        status="unavailable", detail=text, excerpt="", admitted=0, candidates=0
+    )
 # A pre-dispatch governed halt (budget lock held by another daemon) OR a
 # fail-closed halt on a corrupt persisted spend ledger: no wake cycle was
 # invoked, so these must not count toward ``cycles_run``.
@@ -268,7 +292,7 @@ async def run_daemon(
     # which the brief reports as "not consulted" rather than as "nothing
     # recalled". The two are different facts and must not collapse.
     try:
-        if build_memory_pack is None:
+        if recall_memory is None:
             raise RuntimeError("memory organ did not import")
         from dharma_swarm.memory_kernel import MemoryKernel
 
@@ -303,21 +327,30 @@ async def run_daemon(
         # cycles must reach the next plan. Fail-open for the same reason as
         # construction, and legible for the same reason -- "" means the read
         # did not happen, never "the read returned nothing".
-        try:
-            memory_excerpt = render_memory_excerpt(build_memory_pack(memory_kernel))
-        except Exception as exc:  # noqa: BLE001 - memory must never halt the loop
-            print(
-                f"[sarathi] memory read failed, planning without recall: {exc}",
-                file=sys.stderr,
-            )
-            memory_excerpt = ""
+        # `recall_memory` never raises -- it returns a status -- so a failed
+        # read reaches the brief as READ FAILED instead of being erased into
+        # "not consulted". The except is a backstop for an organ contract
+        # break, not the normal failure route.
+        if recall_memory is None:
+            memory = _unavailable_recall()
+        else:
+            try:
+                memory = recall_memory(
+                    memory_kernel, recall_query=RECALL_QUERY,
+                )
+            except Exception as exc:  # noqa: BLE001 - must never halt the loop
+                print(
+                    f"[sarathi] memory recall contract break: {exc}",
+                    file=sys.stderr,
+                )
+                memory = _unavailable_recall(str(exc))
 
         return BootPack(
             roster=roster,
             open_items=backlog,
             ready_keys=seen,
             audit=audit,
-            memory_excerpt=memory_excerpt,
+            memory=memory,
         )
 
     brief_counter = {"n": 0}

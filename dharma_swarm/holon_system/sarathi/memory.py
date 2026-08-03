@@ -1,109 +1,139 @@
-"""Memory organ for the Sarathi apex — a governed read, never a write.
+"""Memory organ for the Sarathi apex — a governed, scoped read; never a write.
 
 Sarathi had no memory at all: before this organ, ``grep -c memory_kernel`` over
 ``dharma_swarm/holon_system/sarathi/*.py`` returned 0, even though
 ``MemoryKernel`` is the canonical front door for agent memory per ``CLAUDE.md``.
-She planned every wake cycle from the backlog alone, with no recall.
 
-This organ reads through that front door and nothing else. It does not open a
-store, walk a path, or write anything: ``MemoryKernel.preview_memory_pack``
-performs the admission and returns a :class:`MemoryContextPack` whose own
-warnings state the contract (``preview_only_no_runtime_prompt_injection``,
-``preview_does_not_promote_or_write_memory``).
+This organ delegates the whole admission decision to the repo's supported
+entrypoint, ``memory_kernel.default_context.build_memory_kernel_default_context``.
+It does NOT hand-roll a :class:`MemoryContextBudget`. An earlier revision did,
+and got two things wrong that three independent reviewers caught:
 
-The kernel is **injected**, matching ``BootPack``'s discipline — the organ never
-constructs one, so a caller without memory configured degrades to an empty
-excerpt instead of fabricating recall. Source stays thin per Gate-9: no runtime
-paths, no liveness constants, no unattended claims.
+* ``require_context_admissible=True`` rejected **every** production atom. No
+  adapter ever sets that flag and ``MemoryAtom.build`` defaults it to ``False``
+  (``memory_kernel/atoms.py:424``), so recall was a permanent no-op. Measured on
+  the same 13 live atoms: the hand-rolled budget admitted **0** with
+  ``atom_not_context_admissible`` on all 13; the supported policy admits **3**.
+* ``isolation_mode="unrestricted"`` with no allowed agent ids let another
+  agent's atoms into Sarathi's brief with no owner provenance rendered —
+  demonstrated with a live repro (Greptile, P1/security).
+
+The supported entrypoint fixes both, and enforces more than the hand-rolled
+budget did (``require_source_digest``, ``require_source_row_key``,
+``block_tool_exposure``). It also **never raises**: it returns a status, which
+is why :class:`MemoryRecall` can carry ``read_failed`` as a distinct outcome
+instead of collapsing it into an empty string.
+
+Source stays thin per Gate-9: no runtime paths, no liveness constants, no
+unattended claims.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Mapping
 
-from dharma_swarm.memory_kernel import (
-    MemoryContextBudget,
-    MemoryContextPack,
-    render_memory_context_pack_markdown,
+from dharma_swarm.memory_kernel.default_context import (
+    build_memory_kernel_default_context,
+    memory_kernel_isolation_policy_from_metadata,
 )
 
-# The apex seat reads under a deliberately tight budget. Defaults that matter,
-# each verified live against `MemoryContextBudget`:
-#   include_content=False        -- carry references, not payloads
-#   require_context_admissible   -- an atom must be marked admissible to appear
-#   allow_projections=False      -- never plan from a projection of a source
-#   allow_high_risk=False        -- exclude high canon/PII risk atoms
-#   reject_stale=True            -- tightened here; an apex seat planning
-#                                   delegations must not recall stale state
-SARATHI_MEMORY_BUDGET = MemoryContextBudget(
-    max_candidate_atoms=50,
-    max_admitted_atoms=8,
-    max_total_chars=4000,
-    max_atom_chars=600,
-    include_content=False,
-    require_context_admissible=True,
-    allow_projections=False,
-    allow_high_risk=False,
-    reject_stale=True,
-)
+# Sarathi is an apex seat that delegates to sub-holons, so she reads under the
+# `supervisor` topology -> `supervisor_scoped` isolation semantics. Verified
+# live: this yields applied=True, allowed_agent_ids=('sarathi',), zero warnings.
+# Any other agent's atoms are then omitted with `agent_not_allowed`.
+SARATHI_TOPOLOGY = "supervisor"
+SARATHI_AGENT_ID = "sarathi"
+
+# Token budget for one wake cycle's recall. The supported entrypoint derives the
+# atom/char caps from this, so there is exactly one knob here and no second
+# vocabulary to drift from the kernel's.
+DEFAULT_RECALL_TOKEN_BUDGET = 1200
+
+# Statuses a brief must be able to tell apart. `not_configured` and `read_failed`
+# are DIFFERENT facts: one means no read was attempted, the other means a read
+# ran and broke. Collapsing them hides a live fault.
+RECALL_NOT_CONFIGURED = "not_configured"
+RECALL_UNAVAILABLE = "unavailable"
+RECALL_READ_FAILED = "read_failed"
+RECALL_USED = "used"
 
 
-def build_memory_pack(
+@dataclass(frozen=True)
+class MemoryRecall:
+    """One cycle's recall attempt, with its outcome carried explicitly.
+
+    ``status`` is a field, not an inference from ``excerpt`` being empty. An
+    empty excerpt is produced by four different situations and only one of them
+    is benign; a consumer that infers from emptiness reports a broken read as
+    "never attempted".
+    """
+
+    status: str
+    excerpt: str = ""
+    detail: str = ""
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def consulted(self) -> bool:
+        return self.status == RECALL_USED
+
+    @property
+    def admitted(self) -> int:
+        return int(self.metadata.get("admitted_count") or 0)
+
+    @property
+    def candidates(self) -> int:
+        return int(self.metadata.get("candidate_count") or 0)
+
+
+def sarathi_isolation_policy(agent_id: str = SARATHI_AGENT_ID):
+    """The scoped read policy for the apex seat.
+
+    Derived through the kernel's own topology policy rather than assembled by
+    hand, so an unknown topology fails closed to minimal shared allowances with
+    a stamped warning instead of silently reading everything.
+    """
+    return memory_kernel_isolation_policy_from_metadata(
+        {"topology": SARATHI_TOPOLOGY, "agent_id": agent_id}
+    )
+
+
+def recall_memory(
     kernel: Any | None,
     *,
-    budget: MemoryContextBudget | None = None,
-    query: Any | None = None,
-) -> MemoryContextPack | None:
-    """Read a governed memory pack through the kernel's front door.
+    recall_query: str = "",
+    token_budget: int = DEFAULT_RECALL_TOKEN_BUDGET,
+    isolation_policy: Any | None = None,
+) -> MemoryRecall:
+    """Read governed, agent-scoped recall through the supported entrypoint.
 
-    Returns ``None`` when no kernel is injected — the honest representation of
-    "this deployment has no memory configured". Callers must not substitute an
-    empty pack for a missing one; the two mean different things in a brief.
+    Never raises: every outcome is a status. A caller with no kernel gets
+    ``not_configured``; a read that breaks gets ``read_failed`` carrying the
+    error, which the brief must surface rather than render as silence.
     """
     if kernel is None:
-        return None
-    return kernel.preview_memory_pack(budget=budget or SARATHI_MEMORY_BUDGET, query=query)
+        return MemoryRecall(status=RECALL_NOT_CONFIGURED)
 
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query=recall_query,
+        token_budget=token_budget,
+        isolation_policy=isolation_policy or sarathi_isolation_policy(),
+    )
+    status = str((metadata or {}).get("status") or "")
 
-def render_memory_excerpt(pack: MemoryContextPack | None) -> str:
-    """Render a pack for injection into ``BootPack.memory_excerpt``.
+    if status == "used":
+        return MemoryRecall(
+            status=RECALL_USED,
+            excerpt=section.content if section is not None else "",
+            metadata=dict(metadata or {}),
+        )
+    if status == "not_configured":
+        return MemoryRecall(status=RECALL_NOT_CONFIGURED, metadata=dict(metadata or {}))
 
-    A missing kernel renders empty. A pack that admitted nothing renders its
-    own markdown anyway, because "memory was consulted and admitted 0 atoms"
-    is a materially different fact from "memory was never consulted", and the
-    operator brief must be able to tell them apart.
-    """
-    if pack is None:
-        return ""
-    return render_memory_context_pack_markdown(pack)
-
-
-def memory_pack_summary(pack: MemoryContextPack | None) -> dict[str, Any]:
-    """Machine-readable counts for the operator brief and receipts.
-
-    ``consulted`` is the flag that distinguishes a deployment with no memory
-    from one whose policy admitted nothing.
-
-    Both branches return the SAME keys. An earlier revision omitted
-    ``truncated`` and ``warnings`` on the no-kernel path, so a caller reading
-    ``summary["warnings"]`` raised ``KeyError`` only when memory was absent --
-    breaking exactly the degraded case this organ exists to survive, and only
-    on the path a dev environment is least likely to exercise.
-    """
-    if pack is None:
-        return {
-            "consulted": False,
-            "candidates": 0,
-            "admitted": 0,
-            "omitted": 0,
-            "truncated": False,
-            "warnings": [],
-        }
-    return {
-        "consulted": True,
-        "candidates": pack.candidate_count,
-        "admitted": pack.admitted_count,
-        "omitted": pack.omitted_count,
-        "truncated": pack.candidate_truncated,
-        "warnings": list(pack.warnings),
-    }
+    # "failed" -- or any status this organ does not recognise. Fail LOUD in the
+    # brief rather than quietly: an unknown status must not read as success.
+    meta = dict(metadata or {})
+    detail = str(meta.get("error") or meta.get("error_type") or status or "unknown")
+    return MemoryRecall(status=RECALL_READ_FAILED, detail=detail, metadata=meta)

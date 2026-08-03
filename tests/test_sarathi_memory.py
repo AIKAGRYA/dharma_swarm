@@ -1,4 +1,8 @@
-"""Tests for the Sarathi memory organ — governed recall through MemoryKernel."""
+"""Tests for the Sarathi memory organ — governed, agent-scoped recall.
+
+Three independent reviewers found defects in the first revision of this organ,
+all of them in a degraded or read-only path. The tests below encode each one.
+"""
 
 from __future__ import annotations
 
@@ -6,185 +10,177 @@ import ast
 import inspect
 from pathlib import Path
 
+from dharma_swarm.holon_system.sarathi.brief import build_operator_brief
 from dharma_swarm.holon_system.sarathi.memory import (
-    SARATHI_MEMORY_BUDGET,
-    build_memory_pack,
-    memory_pack_summary,
-    render_memory_excerpt,
+    RECALL_NOT_CONFIGURED,
+    RECALL_READ_FAILED,
+    RECALL_UNAVAILABLE,
+    RECALL_USED,
+    MemoryRecall,
+    recall_memory,
+    sarathi_isolation_policy,
 )
 from dharma_swarm.holon_system.sarathi.plan import BootPack
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_no_kernel_is_not_the_same_fact_as_no_memories():
-    """A deployment with no memory configured and one whose policy admitted
-    nothing are different facts. Collapsing them would let an operator brief
-    report "nothing recalled" when memory was never consulted at all."""
-    assert build_memory_pack(None) is None
-    assert render_memory_excerpt(None) == ""
+class _BrokenKernel:
+    """A kernel whose surfaces raise — the read-failed path."""
 
-    absent = memory_pack_summary(None)
-    assert absent["consulted"] is False
-    assert absent["admitted"] == 0
+    def preview_memory_pack(self, **_kw):
+        raise RuntimeError("surface unreadable")
 
-    from dharma_swarm.memory_kernel import MemoryKernel
-
-    pack = build_memory_pack(MemoryKernel())
-    assert pack is not None
-    consulted = memory_pack_summary(pack)
-    assert consulted["consulted"] is True
-    # Same admitted count as the absent case is exactly why `consulted` exists.
-    assert consulted["admitted"] >= 0
-    assert absent["consulted"] != consulted["consulted"]
+    def iter_memory_atoms(self, **_kw):
+        return []
 
 
-def test_apex_budget_refuses_projections_high_risk_and_stale():
-    """The apex seat plans delegations from what it recalls, so it must not
-    recall a projection of a source, a high canon/PII risk atom, or stale
-    state. These are the governance knobs, asserted rather than described."""
-    b = SARATHI_MEMORY_BUDGET
-    assert b.require_context_admissible is True
-    assert b.allow_projections is False
-    assert b.allow_high_risk is False
-    assert b.reject_stale is True
-    assert b.include_content is False, "carry references, not payloads"
-    assert b.max_admitted_atoms == 8 and b.max_total_chars == 4000
+def test_recall_is_agent_scoped_not_unrestricted():
+    """Greptile P1/security, with a live repro: the first revision used an
+    unrestricted budget, so another agent's admissible atom entered Sarathi's
+    pack — and the rendered excerpt showed no owner provenance, making foreign
+    memory look like Sarathi's own recall.
 
-
-def test_reading_memory_does_not_write_memory():
-    """The organ is a read. The kernel states its own contract in the pack's
-    warnings; this asserts those warnings survive the organ rather than
-    trusting the docstring."""
-    from dharma_swarm.memory_kernel import MemoryKernel
-
-    pack = build_memory_pack(MemoryKernel())
-    assert pack is not None
-    warnings = set(pack.warnings)
-    assert "preview_does_not_promote_or_write_memory" in warnings
-    assert "preview_only_no_runtime_prompt_injection" in warnings
-
-
-def test_memory_excerpt_is_actually_populated_by_the_daemon():
-    """Negative control against the `lodestone_excerpt` failure mode.
-
-    `BootPack.lodestone_excerpt` was declared and then never populated by any
-    caller -- at the time this test was written it appeared exactly once in the
-    whole repo, its own declaration. A field nothing writes is decoration that
-    reads as capability. This test fails if `memory_excerpt` ever becomes that:
-    it requires a real production caller to pass it into a BootPack.
+    The organ now derives its policy from the kernel's own topology policy.
+    `supervisor` is correct for an apex seat that delegates to sub-holons.
     """
-    assert "memory_excerpt" in BootPack.__dataclass_fields__
+    policy = sarathi_isolation_policy()
+    assert policy.applied is True, "an unapplied policy reads everything"
+    assert policy.semantics == "supervisor_scoped"
+    assert policy.allowed_agent_ids == ("sarathi",), (
+        "recall must be scoped to Sarathi; an empty allow-list disables ownership "
+        "filtering and admits other agents' atoms"
+    )
+    assert not policy.warnings
 
+
+def test_organ_does_not_hand_roll_a_budget():
+    """The two P1s both came from a hand-rolled `MemoryContextBudget`: one flag
+    no production atom can satisfy, and unrestricted isolation. The supported
+    entrypoint gets both right and enforces more besides. Constructing a budget
+    here again would re-open that whole class of defect."""
+    from dharma_swarm.holon_system.sarathi import memory as organ
+
+    source = inspect.getsource(organ)
+    assert "MemoryContextBudget(" not in source, (
+        "organ hand-rolls a MemoryContextBudget again; recall must go through "
+        "build_memory_kernel_default_context so admission policy has one owner"
+    )
+    assert "require_context_admissible" not in source.replace("#", "", 0).split('"""')[0]
+
+
+def test_every_outcome_carries_a_distinct_status():
+    """Devin and Codex, independently: four situations produced an empty
+    excerpt and the brief inferred "no read was attempted" from emptiness, so a
+    read that ran and RAISED was reported as one that never happened."""
+    from dharma_swarm.memory_kernel import MemoryKernel
+
+    assert recall_memory(None).status == RECALL_NOT_CONFIGURED
+    assert recall_memory(_BrokenKernel()).status == RECALL_READ_FAILED
+    assert recall_memory(MemoryKernel(), recall_query="x").status == RECALL_USED
+
+    failed = recall_memory(_BrokenKernel())
+    assert "surface unreadable" in failed.detail, "the fault must survive to the brief"
+    assert failed.consulted is False
+
+
+def test_brief_never_reports_a_failed_read_as_never_attempted():
+    """The durably recorded artifact is the brief. If a broken read renders the
+    same as an absent kernel, the fault is invisible everywhere except the
+    daemon's stderr."""
+    absent = build_operator_brief(memory=MemoryRecall(status=RECALL_NOT_CONFIGURED))
+    unavailable = build_operator_brief(
+        memory=MemoryRecall(status=RECALL_UNAVAILABLE, detail="no module named x")
+    )
+    failed = build_operator_brief(
+        memory=MemoryRecall(status=RECALL_READ_FAILED, detail="surface unreadable")
+    )
+
+    assert "NOT CONFIGURED" in absent and "No read was attempted" in absent
+    assert "UNAVAILABLE" in unavailable and "no module named x" in unavailable
+    assert "READ FAILED" in failed and "surface unreadable" in failed
+
+    # The whole point: these must not be the same text.
+    assert absent != failed != unavailable
+    assert "No read was attempted" not in failed, (
+        "a read that ran and raised is being reported as never attempted"
+    )
+
+
+def test_brief_states_admission_counts_when_consulted():
+    """0 admitted must read as policy exclusion, not as memory being skipped."""
+    rendered = build_operator_brief(
+        memory=MemoryRecall(
+            status=RECALL_USED,
+            excerpt="# pack",
+            metadata={"candidate_count": 13, "admitted_count": 3},
+        )
+    )
+    assert "3 admitted of 13 candidates" in rendered
+    assert "agent_not_allowed" in rendered, "owner-filtering must be stated"
+
+
+def test_boot_pack_carries_the_recall_object_not_a_bare_string():
+    """Status must be a field, not an inference from text being empty."""
+    assert "memory" in BootPack.__dataclass_fields__
+    assert "memory_excerpt" not in BootPack.__dataclass_fields__
+
+
+def test_memory_recall_reaches_the_brief_from_a_production_caller():
+    """Producer + consumer control, against the `lodestone_excerpt` failure mode:
+    that field was declared and then appeared exactly once in the whole repo —
+    its own declaration. A field nothing writes reads as capability."""
     producers = []
     for path in (REPO_ROOT / "scripts" / "runtime").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if (
                 isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "BootPack"
-                and any(kw.arg == "memory_excerpt" for kw in node.keywords)
+                and getattr(node.func, "id", None) == "BootPack"
+                and any(kw.arg == "memory" for kw in node.keywords)
             ):
-                producers.append(path.relative_to(REPO_ROOT).as_posix())
+                producers.append(path.name)
+    assert producers, "no production caller populates BootPack.memory"
 
-    assert producers, (
-        "BootPack.memory_excerpt is declared but no production caller passes it. "
-        "That is exactly what happened to lodestone_excerpt: a field that reads "
-        "as memory capability while nothing populates it. Wire it or drop it."
-    )
+    from dharma_swarm.holon_system.sarathi import wake
 
-
-def test_brief_distinguishes_not_consulted_from_admitted_nothing():
-    """The operator must be able to tell "no memory kernel" from "memory
-    consulted, policy admitted 0 atoms". Rendering both as silence would let an
-    absent kernel read as an empty memory -- a fabricated liveness claim in the
-    one direction the brief is supposed to be honest about."""
-    from dharma_swarm.holon_system.sarathi.brief import build_operator_brief
-    from dharma_swarm.memory_kernel import MemoryKernel
-
-    absent = build_operator_brief(memory_excerpt="")
-    assert "## Memory" in absent
-    assert "NOT CONSULTED" in absent
-
-    pack = build_memory_pack(MemoryKernel())
-    consulted = build_operator_brief(memory_excerpt=render_memory_excerpt(pack))
-    assert "NOT CONSULTED" not in consulted
-    assert "Consulted through MemoryKernel" in consulted
-    assert absent != consulted
+    consumed = [
+        n for n in ast.walk(ast.parse(inspect.getsource(wake)))
+        if isinstance(n, ast.Call)
+        and getattr(n.func, "id", None) == "build_operator_brief"
+        and any(kw.arg == "memory" for kw in n.keywords)
+    ]
+    assert consumed, "wake builds the brief without passing memory; recall is dropped"
 
 
-def test_wake_passes_the_boot_pack_memory_into_the_brief():
-    """Consumer-side counterpart to the producer control above. A populated
-    field nothing reads is still decoration, one level further along."""
+def test_boot_pack_load_is_offloaded_from_the_event_loop():
+    """Greptile P1, measured: the loader does blocking I/O (mailbox listing plus
+    a governed read across registered surfaces) and ran inline on the asyncio
+    thread, stalling delegation and control work for as long as the slowest
+    surface took. An exception handler does not help — a slow read is not an
+    error."""
     from dharma_swarm.holon_system.sarathi import wake
 
     tree = ast.parse(inspect.getsource(wake))
-    passed = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "build_operator_brief"
-        and any(kw.arg == "memory_excerpt" for kw in node.keywords)
+    offloaded = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Await)
+        and isinstance(n.value, ast.Call)
+        and "to_thread" in ast.dump(n.value.func)
+        and "load_boot_pack" in ast.dump(n.value)
     ]
-    assert passed, (
-        "wake.py builds the operator brief without passing memory_excerpt, so "
-        "recall is carried into the boot pack and then dropped unread"
-    )
-
-
-def test_memory_summary_shape_is_identical_on_both_paths():
-    """Devin review, PR #1208. The no-kernel branch once returned four keys
-    while the populated branch returned six, so `summary["warnings"]` raised
-    KeyError only when memory was absent -- the degraded case this organ exists
-    to survive, and the path least exercised in development."""
-    from dharma_swarm.memory_kernel import MemoryKernel
-
-    absent = memory_pack_summary(None)
-    consulted = memory_pack_summary(build_memory_pack(MemoryKernel()))
-    assert set(absent) == set(consulted), (
-        f"summary shape diverges: only-when-absent={set(absent) - set(consulted)}, "
-        f"only-when-consulted={set(consulted) - set(absent)}"
-    )
-    # Neutral defaults, not absence.
-    assert absent["truncated"] is False and absent["warnings"] == []
-
-
-def test_daemon_memory_diagnostics_go_to_stderr_not_stdout():
-    """Devin review, PR #1208. `--json` prints the report as the SOLE stdout
-    payload (sarathi_wake_daemon.py:489), so a diagnostic on stdout breaks every
-    consumer doing json.loads(subprocess output) -- and breaks them exactly when
-    memory is unavailable, which is when the fail-open path fires."""
-    daemon = REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py"
-    tree = ast.parse(daemon.read_text(encoding="utf-8"))
-
-    offenders = []
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "print"):
-            continue
-        rendered = ast.dump(node)
-        if "[sarathi]" not in rendered:
-            continue  # the report prints are the legitimate stdout payload
-        if not any(kw.arg == "file" for kw in node.keywords):
-            offenders.append(getattr(node, "lineno", "?"))
-
-    assert not offenders, (
-        f"daemon diagnostics print to stdout at line(s) {offenders}; route them to "
-        f"sys.stderr so --json output stays machine-readable"
+    assert offloaded, (
+        "load_boot_pack is called inline on the event loop; await it via "
+        "asyncio.to_thread so a slow memory surface cannot stall the wake cycle"
     )
 
 
 def test_daemon_still_imports_when_the_memory_subsystem_is_broken():
-    """Devin review, PR #1208. The fail-open guard was placed AROUND
-    `MemoryKernel()` construction, but the organ was imported at module scope and
-    `sarathi/memory.py` imports `dharma_swarm.memory_kernel` at module scope too.
-    So an unimportable memory subsystem killed the daemon during import, before
-    `main()` ran — the wake loop never started at all, which is the precise
-    outcome the guard claimed to prevent.
-
-    A fail-open guard downstream of the failure it guards is not fail-open.
-    Behavioural, not structural: the failure is reproducible here.
-    """
+    """Devin P1. The fail-open guard wrapped `MemoryKernel()` construction, but
+    the organ was imported at module scope and imports `memory_kernel` at module
+    scope too — so an unimportable subsystem killed the daemon during import,
+    before main() ran. A guard downstream of the failure it guards is not a
+    guard."""
     import builtins
     import importlib.util
     import sys
@@ -192,24 +188,21 @@ def test_daemon_still_imports_when_the_memory_subsystem_is_broken():
     real_import = builtins.__import__
     _BLOCKED = ("dharma_swarm.memory_kernel", "dharma_swarm.holon_system.sarathi.memory")
 
-    def _block_memory_kernel(name, *args, **kwargs):
+    def _block(name, *args, **kwargs):
         if name.startswith(_BLOCKED):
             raise ImportError("simulated broken memory subsystem")
         return real_import(name, *args, **kwargs)
 
-    # Evict from sys.modules first. Python resolves a cached module WITHOUT
-    # calling __import__, so with the suite's earlier imports still warm the
-    # patch never fires and this test passes against the broken code too — it
-    # silently measured nothing until the eviction was added.
-    evicted = {
-        name: mod for name, mod in list(sys.modules.items())
-        if name.startswith(_BLOCKED)
-    }
+    # Evict first: Python resolves a cached module WITHOUT calling __import__,
+    # so with the suite's earlier imports warm the patch never fires and this
+    # test passes against the broken code too — it measured nothing until the
+    # eviction was added.
+    evicted = {n: m for n, m in list(sys.modules.items()) if n.startswith(_BLOCKED)}
     for name in evicted:
         del sys.modules[name]
 
     daemon = REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py"
-    builtins.__import__ = _block_memory_kernel
+    builtins.__import__ = _block
     try:
         spec = importlib.util.spec_from_file_location("_sarathi_daemon_probe", daemon)
         module = importlib.util.module_from_spec(spec)
@@ -218,20 +211,41 @@ def test_daemon_still_imports_when_the_memory_subsystem_is_broken():
         builtins.__import__ = real_import
         sys.modules.update(evicted)
 
-    # Degraded to no-recall rather than refusing to start.
-    assert module.build_memory_pack is None
-    assert module.render_memory_excerpt is None
+    assert module.recall_memory is None
+    # Degraded to a legible status, not to silence.
+    assert module._unavailable_recall().status == RECALL_UNAVAILABLE
+
+
+def test_daemon_memory_diagnostics_go_to_stderr_not_stdout():
+    """Devin + Codex. `--json` prints the report as the SOLE stdout payload, so
+    a diagnostic on stdout breaks `json.loads(subprocess output)` — precisely
+    when memory is unavailable, which is when the fail-open path fires."""
+    daemon = REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py"
+    tree = ast.parse(daemon.read_text(encoding="utf-8"))
+
+    offenders = [
+        getattr(node, "lineno", "?")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "print"
+        and "[sarathi]" in ast.dump(node)
+        and not any(kw.arg == "file" for kw in node.keywords)
+    ]
+    assert not offenders, (
+        f"daemon diagnostics print to stdout at line(s) {offenders}; route them to "
+        f"sys.stderr so --json output stays machine-readable"
+    )
 
 
 def test_organ_reaches_memory_only_through_the_kernel_front_door():
-    """CLAUDE.md makes MemoryKernel the canonical front door. The organ must not
-    reach around it into a legacy store or a raw path -- that is how a second,
-    ungoverned memory lane gets built by accident."""
+    """CLAUDE.md makes MemoryKernel the canonical front door. Reaching around it
+    into a store or a raw path is how a second, ungoverned memory lane gets
+    built by accident."""
     from dharma_swarm.holon_system.sarathi import memory as organ
 
     source = inspect.getsource(organ)
     for reached_around in ("open(", "sqlite3", "aiosqlite", "Path.home()", ".jsonl"):
         assert reached_around not in source, (
             f"memory organ references {reached_around!r}; recall must go through "
-            f"MemoryKernel.preview_memory_pack, not a store or path"
+            f"the MemoryKernel front door, not a store or path"
         )
