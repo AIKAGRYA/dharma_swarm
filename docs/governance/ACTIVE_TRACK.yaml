@@ -1757,6 +1757,7 @@ active_tracks:
       - helm-worldclass-terminal-2026-06
       - loop-closure-2026-06
     owned_surfaces:
+      - .gitattributes
       - Makefile
       - Dockerfile
       - .github/workflows/hermetic.yml
@@ -1889,7 +1890,7 @@ active_tracks:
         blocker: true
         evidence_criterion: titanium_ci_authority_contracts_pass
       - id: WP-0G
-        what: "Choose DOCOPS_RECONCILE_TOKEN or a manually reviewed-PR delivery authority and prove the rolling reconcile head receives checks. Current-main run 30606619117 refreshed PR #1118 to a0d4c1ac but found zero checks and failed closed."
+        what: "Land the bounded 2026-08-04 WP-0G design amendment; human merge ratifies it. Then replace privileged rolling DocOps repair with contents-read-only CI that generates and verifies deterministic, non-authoritative projections for the exact tested SHA. Currentness must fail closed on the wrong commit or tree, wrong tracked-input or generator digest, missing or altered output, nondeterministic rendering, or generator failure. No PAT, push, repair branch or PR, wall-clock field, checked-in volatile-count authority, or repository-setting mutation is permitted."
         kind: code
         blocker: true
         evidence_criterion: titanium_docops_contracts_pass

@@ -1,0 +1,122 @@
+{
+  "id": "titanium-WP-0G-write-free-design-amendment",
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "docops/no-writeback-derived-status-20260803",
+  "worktree": ".",
+  "intent": "Propose the bounded WP-0G (TIT-008) prerequisite amendment that a human merge would ratify: replace the privileged rolling-repair design with contents-read-only CI that emits deterministic, non-authoritative projections bound to the exact tested commit, tree, tracked inputs, generator, and output bytes; admit .gitattributes to Titanium ownership; and immediately remove merge=union from AUTO_INVENTORY.md and SOVEREIGN_MANIFEST.md so Git cannot silently concatenate their managed blocks. This governance-only packet implements no projection generator, workflow, or delivery lane and makes no WP-0G completion claim.",
+  "allowed_files": [
+    ".gitattributes",
+    "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "reports/agentops/work_packets/titanium-WP-0G-write-free-design-amendment.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "tools/**",
+    "docs/docops/assertions.yaml",
+    "docs/docops/DOCOPS_INTEGRITY.md",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "docs/prompts/**",
+    "docs/state/**",
+    "reports/governance/**",
+    "reports/loop_closure/**",
+    "Makefile",
+    "Dockerfile",
+    "docker-compose.yml",
+    "pyproject.toml",
+    "uv.lock",
+    "INTERFACE_MISMATCH_MAP.md",
+    "CYBERNETIC_LOOP_MAP.md"
+  ],
+  "gates": [
+    {
+      "name": "amendment-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_claim_evidence_binding.py tests/test_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-rejects-unknown-flag",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(titanium): ratify write-free WP-0G design"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0G",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": []
+    },
+    "interface_mismatches": [
+      ".gitattributes assigns merge=union to docs/docops/AUTO_INVENTORY.md and docs/governance/SOVEREIGN_MANIFEST.md even though both carry machine-managed content; the existing CLAUDE.md exclusion documents that union merge can preserve both generated blocks and create invalid duplicated content.",
+      "The ratified WP-0G text requires a privileged rolling repair branch and credential-backed delivery, while the requested future-proof boundary is a write-free exact-SHA projection with no repository repair authority.",
+      "INTERFACE_MISMATCH_MAP.md contains no open entry for this bounded governance/document-merge seam at exact post-#1210 main f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd."
+    ],
+    "closest_existing_implementation": [
+      ".gitattributes",
+      "scripts/docops/check_docops_integrity.py",
+      ".github/workflows/docops.yml",
+      ".github/workflows/docops-reconcile-main.yml",
+      "scripts/governance/render_active_track_includes.py"
+    ],
+    "honest_blockers": [
+      "This packet proposes authority only. The exact-SHA projection generator, read-only workflow, artifact verifier, retirement of rolling repair, and adversarial implementation tests remain blocked until a human merges this amendment.",
+      "This candidate refreshes PR #1212 itself as the governance-only prerequisite amendment. Its previous derived-status workflow and manual-reconcile implementation are superseded rather than silently co-merged with the separate write-free core.",
+      "PR #1118 remains a separate two-file generated-count refresh whose direct parent is the same exact base. This amendment carries only its own generator-derived projection changes; whichever PR lands second must rebase and rerun the generator rather than copy the other's count delta.",
+      "Removing merge=union intentionally converts silent duplicate-block auto-merges into explicit conflicts. Reviewers must resolve or regenerate the managed blocks rather than accept concatenated truth claims.",
+      "The canonical AgentOps closeout intentionally refuses every .gitattributes mutation because a packet cannot change the policy used to measure its own scope. This amendment preserves that exact nonzero result and uses the specification's amendment-only preflight, raw-tree, focused-check, independent-review, and human-merge boundary; no successful AgentOps scope closeout is claimed.",
+      "This packet observes only a local clean checkout and local deterministic checks. It changes no production service, GitHub setting, workflow, credential, or external system."
+    ],
+    "rollback": "Revert this governance amendment as one unit: restore the prior WP-0G plan and active-track wording, remove .gitattributes from Titanium ownership, restore the two merge attributes, regenerate active-track and DocOps projections, and remove the packet. Rollback reopens the privileged rolling-repair design problem and must not be described as a safe steady state.",
+    "packet_digest": "699711fc52f657faa3c9aa5ce94760475380f7626058b17299dbaf749aba6078"
+  }
+}
