@@ -82,10 +82,24 @@ from dharma_swarm.holon_system.sarathi.plan import (  # noqa: E402
     BootPack,
     stored_dedup_key,
 )
-from dharma_swarm.holon_system.sarathi.memory import (  # noqa: E402
-    build_memory_pack,
-    render_memory_excerpt,
-)
+try:  # noqa: E402 - memory must never prevent the daemon from STARTING
+    # Guarded at module scope, not just around MemoryKernel() construction.
+    # `sarathi/memory.py` imports `dharma_swarm.memory_kernel` at module scope,
+    # so an unimportable memory subsystem raised here -- during daemon import,
+    # before main() ran -- and the wake loop never started at all. A fail-open
+    # guard placed downstream of the failure it guards is not fail-open.
+    from dharma_swarm.holon_system.sarathi.memory import (
+        build_memory_pack,
+        render_memory_excerpt,
+    )
+except Exception as _memory_import_exc:  # noqa: BLE001
+    print(
+        f"[sarathi] memory organ unimportable, planning without recall: "
+        f"{_memory_import_exc}",
+        file=sys.stderr,
+    )
+    build_memory_pack = None
+    render_memory_excerpt = None
 from dharma_swarm.holon_system.sarathi.roster import DEFAULT_ROSTER, load_roster  # noqa: E402
 from dharma_swarm.holon_system.sarathi.wake import make_wake_work_fn  # noqa: E402
 from dharma_swarm.operator_core.autonomy_dial import current_autonomy_level  # noqa: E402
@@ -254,6 +268,8 @@ async def run_daemon(
     # which the brief reports as "not consulted" rather than as "nothing
     # recalled". The two are different facts and must not collapse.
     try:
+        if build_memory_pack is None:
+            raise RuntimeError("memory organ did not import")
         from dharma_swarm.memory_kernel import MemoryKernel
 
         memory_kernel = MemoryKernel()

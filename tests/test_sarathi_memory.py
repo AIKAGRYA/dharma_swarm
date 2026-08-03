@@ -174,6 +174,55 @@ def test_daemon_memory_diagnostics_go_to_stderr_not_stdout():
     )
 
 
+def test_daemon_still_imports_when_the_memory_subsystem_is_broken():
+    """Devin review, PR #1208. The fail-open guard was placed AROUND
+    `MemoryKernel()` construction, but the organ was imported at module scope and
+    `sarathi/memory.py` imports `dharma_swarm.memory_kernel` at module scope too.
+    So an unimportable memory subsystem killed the daemon during import, before
+    `main()` ran — the wake loop never started at all, which is the precise
+    outcome the guard claimed to prevent.
+
+    A fail-open guard downstream of the failure it guards is not fail-open.
+    Behavioural, not structural: the failure is reproducible here.
+    """
+    import builtins
+    import importlib.util
+    import sys
+
+    real_import = builtins.__import__
+    _BLOCKED = ("dharma_swarm.memory_kernel", "dharma_swarm.holon_system.sarathi.memory")
+
+    def _block_memory_kernel(name, *args, **kwargs):
+        if name.startswith(_BLOCKED):
+            raise ImportError("simulated broken memory subsystem")
+        return real_import(name, *args, **kwargs)
+
+    # Evict from sys.modules first. Python resolves a cached module WITHOUT
+    # calling __import__, so with the suite's earlier imports still warm the
+    # patch never fires and this test passes against the broken code too — it
+    # silently measured nothing until the eviction was added.
+    evicted = {
+        name: mod for name, mod in list(sys.modules.items())
+        if name.startswith(_BLOCKED)
+    }
+    for name in evicted:
+        del sys.modules[name]
+
+    daemon = REPO_ROOT / "scripts" / "runtime" / "sarathi_wake_daemon.py"
+    builtins.__import__ = _block_memory_kernel
+    try:
+        spec = importlib.util.spec_from_file_location("_sarathi_daemon_probe", daemon)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # must NOT raise
+    finally:
+        builtins.__import__ = real_import
+        sys.modules.update(evicted)
+
+    # Degraded to no-recall rather than refusing to start.
+    assert module.build_memory_pack is None
+    assert module.render_memory_excerpt is None
+
+
 def test_organ_reaches_memory_only_through_the_kernel_front_door():
     """CLAUDE.md makes MemoryKernel the canonical front door. The organ must not
     reach around it into a legacy store or a raw path -- that is how a second,
