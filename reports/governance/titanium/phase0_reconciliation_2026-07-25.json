@@ -1,49 +1,65 @@
 {
   "schema": "dharma.titanium.phase0-reconciliation.v1",
-  "observed_at": "2026-08-02T07:56:40Z",
+  "observed_at": "2026-08-03T15:40:00Z",
   "initial_observed_at": "2026-07-25T12:37:53Z",
   "track_id": "repository-titanium-hardening-2026-07",
   "reviewed_main": {
     "ref": "origin/main",
-    "sha": "f0f5a8071047e8a082ff57af1e14693cf14daf93",
-    "tree": "c89eb7598d4046679ec7aa4821faec2a49af9242"
+    "sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+    "tree": "f5d3144cde59c6f241b8d5a38e22c0103e3c5175"
   },
   "generated_status": {
     "authority": "projection_only",
-    "commit": "fbb07736947210010bab14e59d4da4aaf22d46e9",
-    "derived_from_main_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
-    "generated_at": "2026-07-31T05:25:50Z",
+    "commit": "19a2cf212e5c58d90b98fe0322a50bb2bdacf4ea",
+    "derived_from_main_sha": "f654c3908fdc63e099166e234af68a969b5d1511",
+    "generated_at": "2026-08-03T13:27:40Z",
     "completion": {
-      "passed": 7,
-      "total": 8
+      "passed": 8,
+      "total": 9
     },
-    "evidence_boundary": "The projection mechanically counts command exit codes and is exact-main, but its verifier and polyglot batteries each contained one skipped test. It is selection-subordinate and cannot satisfy the campaign's no-skip or independent-review obligations.",
-    "verify": "test \"$(git rev-parse origin/generated/status)\" = fbb07736947210010bab14e59d4da4aaf22d46e9 && git log -1 --format=%B origin/generated/status | rg -q ' @ 92bec3b2c8bf5fdb5003719f7ea540345accb89e$'",
+    "sole_failing_criterion": {
+      "id": "titanium_independent_clean_room_receipt_valid",
+      "detail": "receipt reports/governance/titanium/phase0_clean_room_receipt.json MISSING"
+    },
+    "evidence_boundary": "The projection mechanically counts command exit codes, but two passing suites (titanium_verifier_support_contracts_pass, titanium_polyglot_contract_passes) each carry a skipped test. A pass that carries skips does not discharge the campaign's no-skip obligation, and the projection is selection-subordinate: it cannot satisfy the independent-review obligation or promote any operator-blocked item.",
+    "durability_note": "generated/status is a force-pushed, latest-only orphan branch (.github/workflows/active-track.yml, publish-status job: 'the branch is a latest-only publish surface, not history'). The commit named above therefore becomes unreachable on the next push to main. The branch-independent re-derivation below, not the branch, is the durable evidence for the 8/9 count; the commit SHA is recorded for provenance only.",
+    "verify": "durable (branch-independent): python3 scripts/governance/check_track_status.py && python3 -c \"import json; t=[x for x in json.load(open('reports/governance/track_portfolio.json'))['active_tracks'] if x['id']=='repository-titanium-hardening-2026-07'][0]; print(t['completion_progress'])\"  # -> {'passed': 8, 'total': 9}",
+    "verify_provenance_decaying": "test \"$(git rev-parse origin/generated/status)\" = 19a2cf212e5c58d90b98fe0322a50bb2bdacf4ea && git log -1 --format=%B origin/generated/status | rg -q ' @ f654c3908fdc63e099166e234af68a969b5d1511$'  # valid only until the next push to main",
     "previous_projection": {
       "classification": "STALE_DERIVED",
-      "commit": "98d5b17effd617615b239ef7f267fa63793c44f7",
-      "derived_from_main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
-      "generated_at": "2026-07-26T16:49:17Z",
+      "commit": "fbb07736947210010bab14e59d4da4aaf22d46e9",
+      "derived_from_main_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "generated_at": "2026-07-31T05:25:50Z",
+      "completion": {
+        "passed": 7,
+        "total": 8
+      },
       "previous_projection": {
         "classification": "STALE_DERIVED",
-        "commit": "1b9ab8f42296fbd9d68c8351c5a06d8c44de8680",
-        "derived_from_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
-        "generated_at": "2026-07-26T16:22:56Z",
+        "commit": "98d5b17effd617615b239ef7f267fa63793c44f7",
+        "derived_from_main_sha": "08ce7e208c9ac7502f81ab340e806749b7b55ffd",
+        "generated_at": "2026-07-26T16:49:17Z",
         "previous_projection": {
           "classification": "STALE_DERIVED",
-          "commit": "a09f6ef5faceb21addf85bcfae51b21b731dda0e",
-          "derived_from_main_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
-          "generated_at": "2026-07-26T14:32:34Z",
+          "commit": "1b9ab8f42296fbd9d68c8351c5a06d8c44de8680",
+          "derived_from_main_sha": "59a4bcf9403af83b069b4c0e595e47c403fdbbfe",
+          "generated_at": "2026-07-26T16:22:56Z",
           "previous_projection": {
             "classification": "STALE_DERIVED",
-            "commit": "c7804e5295733a0d12fa3ed3e69c77bf105e805a",
-            "derived_from_main_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
-            "generated_at": "2026-07-25T21:37:52Z",
+            "commit": "a09f6ef5faceb21addf85bcfae51b21b731dda0e",
+            "derived_from_main_sha": "186763792faa2a8fcdc30e00e70347e4a62e1a20",
+            "generated_at": "2026-07-26T14:32:34Z",
             "previous_projection": {
               "classification": "STALE_DERIVED",
-              "commit": "684f73458dbfb3661c634f6a7543099c638a2edb",
-              "derived_from_main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
-              "generated_at": "2026-07-25T11:33:12Z"
+              "commit": "c7804e5295733a0d12fa3ed3e69c77bf105e805a",
+              "derived_from_main_sha": "1ce32ace66c24375ec673667473bc6a6f285fd9a",
+              "generated_at": "2026-07-25T21:37:52Z",
+              "previous_projection": {
+                "classification": "STALE_DERIVED",
+                "commit": "684f73458dbfb3661c634f6a7543099c638a2edb",
+                "derived_from_main_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+                "generated_at": "2026-07-25T11:33:12Z"
+              }
             }
           }
         }
@@ -183,22 +199,22 @@
     },
     {
       "id": "WP-0C1R",
-      "classification": "BLOCKED_OPERATOR",
+      "classification": "CLOSED_MERGED_MAIN_REVERIFIED",
       "merged_commits": [
         "35b11a30f69d35712b82f70ff581959f5619f2e3",
-        "e96674d27d90144f22bc55b64ac7ea2baff63b52"
+        "e96674d27d90144f22bc55b64ac7ea2baff63b52",
+        "f3eb5b39759f4f6deae5f0562530d7ed38792458"
       ],
       "evidence": [
-        "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 92bec3b2c8bf5fdb5003719f7ea540345accb89e",
-        "DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 bash scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off --json: exit 1, 21 findings, 7 warnings, zero security-rule findings on exact current main",
-        "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md remains DRAFT \u2014 PENDING OPERATOR RATIFICATION"
+        "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 f3eb5b39759f4f6deae5f0562530d7ed38792458",
+        "PR #1202 (human-merged f3eb5b397) executed the operator-ratified dispositions recorded in reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md: decision A1 (18 dharma.no-unauthorized-dharma-write findings resolved by file-exact surface declaration) and decision B1 (3 dharma.no-new-substrate findings resolved by closure-layer-role headers). The human merge is the durable ratification signature per approval.before_merge.",
+        "merged-main strict replay on exact f3eb5b397: DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 bash scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off exited 0 with 'Ran 10 rules on 1577 files: 0 findings' (observation m3-wp0c1r-merged-main-reverification-20260803)"
       ],
       "evidence_observation_ids": [
-        "m1-strict-semgrep-92bec"
+        "m1-strict-semgrep-92bec",
+        "m3-wp0c1r-merged-main-reverification-20260803"
       ],
-      "remaining": [
-        "Ratify and owner-route all 18 unauthorized-state-writer findings and all 3 unclassified-substrate findings; no draft disposition is a PASS."
-      ]
+      "remaining": []
     },
     {
       "id": "WP-0C1",
@@ -211,7 +227,7 @@
         ".venv/bin/python -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
       ],
       "remaining": [
-        "The fail-closed scanner mechanics are landed; the strict finding-set premise remains operator-blocked."
+        "The fail-closed scanner mechanics are landed and the strict finding-set premise is no longer operator-blocked: WP-0C1R closed on merged-main reverification at f3eb5b397 (observation m3-wp0c1r-merged-main-reverification-20260803)."
       ],
       "carried_by": "WP-0C1R"
     },
@@ -367,7 +383,6 @@
   "canonical_next_items": [
     "WP-0F1",
     "WP-0G",
-    "WP-0C1R",
     "WP-0S",
     "WP-0I"
   ],
@@ -612,6 +627,33 @@
       "authority": "implementation_author_replay",
       "evidence_handle": "local full-suite replay logs (session scratchpad wp0d_mergedmain_reverify.log); PR #1194 body carries the pre-merge head battery",
       "claim": "On exact merged main f0f5a80, make test-fast passed twice consecutively (14688 passed, 0 failed; 23:52 and 22:03) and make test passed (14688 passed, 0 failed; 20:49), run as a non-root user with umask 022 and soft fd limit 4096 (disclosed: the 1024 default exhausts descriptors near test 13,046 from suite-wide leaked resources outside WP-0D's ratified scope). This satisfies the WP-0D residual's closure standard: two consecutive clean make test-fast runs plus make test, reverified on merged main after PRs #1177 and #1194. Author-replay evidence, not independent review: WP-0I retains the final clean-room authority."
+    },
+    {
+      "id": "m3-wp0c1r-merged-main-reverification-20260803",
+      "result": "PASS",
+      "observed_at": "2026-08-03T15:40:00Z",
+      "main_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "evidence_kind": "executed_current_main",
+      "authority": "implementation_author_replay",
+      "evidence_handle": "strict-scan replay log (session scratchpad pr1211-mainreplay-semgrep.log, sha256 bf5f157b14e082d0bfc13ad11621d6b55616697fa1ae7463763ed2bc12b1b2c7); PR #1202 body carries the pre-merge head replay",
+      "claim": "On exact merged main f3eb5b397 (tree f5d3144cd), in a fresh detached worktree, DHARMA_SEMGREP_EXPECTED_VERSION=1.168.0 bash scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off exited 0 and reported 'Ran 10 rules on 1577 files: 0 findings' (semgrep 1.168.0, the ratified Makefile SEMGREP_PIN; ~99.9% of lines parsed; 90 semgrepignore-v2 exclude-pattern deprecation warnings, zero findings of any severity). This meets the WP-0C1R residual's closure standard -- the strict result is ratified and owner-routed rather than draft, and no OWNER_DEFERRED finding remains -- so the prior premise of 'exit 1 with 21 findings' is superseded. Boundaries: author-replay evidence, not independent review (WP-0I retains the clean-room authority); the scan grades the anti-slop rule set as configured after the ratified declarations and file-exact allowlists, so it is not a security-completeness claim; and the separately required security-only scan is unchanged.",
+      "negative_control": {
+        "purpose": "Prove the 0-findings result is a real pass rather than a vacuously green or misconfigured scan.",
+        "method": "Added a single tracked file dharma_swarm/zz_negctl_probe.py containing BASE = Path.home() / \".dharma\" to a throwaway detached worktree at f3eb5b397 and reran the identical strict command.",
+        "result": "Exit 1, 'Ran 10 rules on 1578 files: 1 finding', flagged semgrep.dharma.no-unauthorized-dharma-write on the probe file. The rule still fires, so the merged-main exit 0 is a real pass. Probe reverted; not committed."
+      },
+      "sensitivity_boundary": "DISCLOSED LIMIT, discovered by this negative control and NOT repaired here: Rule 1's pattern is the exact expression 'Path.home() / \".dharma\"', and semgrep 1.168.0 does not match it inside an unparenthesized longer chain. Measured on isolated probes with --config .semgrep/dharma-anti-slop.yml: 'Path.home() / \".dharma\"' -> 1 finding; '(Path.home() / \".dharma\") / \"sub\"' -> 1 finding; 'Path.home() / \".dharma\" / \"sub\" / \"f.json\"' -> 0 findings. The idiomatic chained form is therefore not caught, so 'zero findings' means zero findings UNDER RULE 1 AS WRITTEN and is not a claim that no unauthorized ~/.dharma access exists. Widening the pattern is deliberately out of scope here: it would re-open the operator-ratified A1/B1 finding set and is a rule change requiring its own ratification. Recorded for operator routing, not silently absorbed."
+    },
+    {
+      "id": "m3-live-control-plane-20260803",
+      "result": "BLOCKED_OPERATOR",
+      "observed_at": "2026-08-03T15:40:00Z",
+      "main_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "evidence_kind": "live_read_only_api_observation",
+      "authority": "implementation_author_replay",
+      "evidence_handle": "gh api repos/AmitabhainArunachala/dharma_swarm/branches/main/protection; gh api repos/AmitabhainArunachala/dharma_swarm/rulesets/20024481",
+      "supersedes_in_part": "m1-live-control-plane-20260731",
+      "claim": "Read-only re-observation of the two merge-gate layers on 2026-08-03. Legacy branch protection is the sole ENFORCING layer: strict=false, required_pull_request_reviews=null (zero approvals required), enforce_admins=true, six required contexts, and required_conversation_resolution.enabled=TRUE. That last value REFUTES the 2026-07-31 observation (m1-live-control-plane-20260731), which recorded conversation resolution as disabled on both layers; the earlier record is retained as point-in-time history and is superseded only on that point. Ruleset 20024481 ('main-merge-gate') is enforcement=disabled, so its always-bypass actor (RepositoryRole 5, bypass_mode always), its non-strict policy, and its duplicate required contexts ('DocOps integrity gate' and 'Onboarding admission parity' each appear twice) are latent, not live, defects. No secret values were accessed. The WP-0F1 decision stays open and operator-owned: this observation records the premises, it does not choose the policy or the ruleset's fate."
     }
   ],
   "completion_snapshot": [
