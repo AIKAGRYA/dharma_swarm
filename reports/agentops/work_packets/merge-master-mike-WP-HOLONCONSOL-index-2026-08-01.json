@@ -1,0 +1,109 @@
+{
+  "id": "merge-master-mike-WP-HOLONCONSOL-index-2026-08-01",
+  "base_ref": "f0f5a8071047e8a082ff57af1e14693cf14daf93",
+  "branch": "claude/holon-consolidation-2026-08-01",
+  "worktree": ".",
+  "intent": "Land the DOCUMENTATION output of the holon-consolidation workflow: the persistent-agent index that PARTIALLY fulfils the P0 task filed 2026-05-28 (the P0 remains OPEN; see the report's errata) (docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md, whose required report at docs/reports/hermes_persistent_agent_index_2026-05-28.md was never written), the PersistentAgentDescriptor schema it asked for, and the verified facade-to-real-body consolidation plan. DOCS ONLY: no code moves, no runtime module touched, no gate altered. All three artifacts came back FLAWED from adversarial verification and each carries an errata block naming its own verified-false claims, so they land as verified-partial working documents rather than as truth. The consolidation plan records the finding that matters: the originally proposed move ordering breaks the repo at step 1 because dharma_swarm/holon_system/runtime/__init__.py:3-4 eagerly imports .bridge and .wake_cycle while runtime/wake_cycle.py:3 imports back out to dharma_swarm.holon_runtime; a lazy PEP-562 __init__ is a mandatory MOVE 0 prerequisite. Surface-ownership check at e1c5dff: docs/reports/**, docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md and docs/plans/HOLON_CONSOLIDATION_PLAN_2026-08-01.md match no owns: glob of any of the 10 active tracks. Two supporting edits were required by the DocOps canonical guard, which stays STRICT on PRs: the descriptor doc cites real code that contains the word 'canonical' (e.g. dharma_swarm/holon_system/identity/canonical_names.py), so the substring guard demands registration. It is registered in docs/governance/CANONICAL_DOC_STACK.md and docs/docops/assertions.yaml as a DRAFT PROPOSAL that owns nothing and defers to code for every live fact — not as an authority. Both files were ownership-checked against ACTIVE_TRACK.yaml and are unowned.",
+  "allowed_files": [
+    "docs/reports/hermes_persistent_agent_index_2026-08-01.md",
+    "docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md",
+    "docs/plans/HOLON_CONSOLIDATION_PLAN_2026-08-01.md",
+    "reports/agentops/work_packets/merge-master-mike-WP-HOLONCONSOL-index-2026-08-01.json",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/docops/assertions.yaml"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/holon_runtime.py",
+    "dharma_swarm/holon_bridge.py",
+    "dharma_swarm/holon_persistence.py",
+    "dharma_swarm/holon_health.py",
+    "dharma_swarm/holon_compass.py",
+    "dharma_swarm/holon_killswitch.py",
+    "dharma_swarm/holon_budget_guard.py",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/operator_core/execution_lease.py",
+    "dharma_swarm/operator_core/living_agent_kernel.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/autonomous_agent.py",
+    "pyproject.toml",
+    "Makefile",
+    "scripts/governance/automerge_tier_policy.json",
+    "dharma_swarm/risk_patterns.py",
+    "dharma_swarm/holon_system/observability/proof_gates.py"
+  ],
+  "gates": [
+    {
+      "name": "hygiene-integrity",
+      "command": "make hygiene-check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-contract-tests",
+      "command": "python3 -m pytest -q tests/test_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "sarathi-organs-unaffected-by-a-docs-only-change",
+      "command": "python3 -m pytest -q tests/test_sarathi_plan.py tests/test_sarathi_wake.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(holon): persistent-agent index, descriptor schema, verified consolidation plan"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HOLONCONSOL",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f0f5a8071047e8a082ff57af1e14693cf14daf93",
+      "details": []
+    },
+    "interface_mismatches": [
+      "HOLON_RUNTIME_FULL_ESTATE_MAP.md:332 states holon_system/ is 43 files / ~360 lines; it is 47 files / 1345 lines. The plan records the correction.",
+      "HOLON_RUNTIME_FULL_ESTATE_MAP.md:333-334 states there are no production consumers outside the facade; sarathi_wake_daemon.py:81,85,86 and sarathi_proof_window.py:43-55 import holon_system.sarathi.*, so the package is load-bearing on two production runners. An earlier revision also cited .github/workflows/sarathi-wake-lane.yml:152,160; that citation was REMOVED because the file is absent at this head, at origin/main and at this packet's base_ref — it existed only on the closed, force-replaced PR-S6 branch and a reader cannot verify it.",
+      "HOLON_RUNTIME_FULL_ESTATE_MAP.md:344 lists Codex AND Fugu semantic responders as absent; codex_composer_semantic_responder.py is present (1411 lines). Only the Fugu half is still true."
+    ],
+    "closest_existing_implementation": [
+      "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
+      "docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md",
+      "docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md"
+    ],
+    "honest_blockers": [
+      "All three artifacts FAILED adversarial verification and land with errata rather than corrected. The index misses browser_agent.py (719L), synthesis_agent.py (323L, production importers), sleep_time_agent.py (606L), the 2312-line cron subsystem, garden_daemon.py, and a sixth registry at docs/ops/FLEET_FIELD_REGISTRY.yaml.",
+      "No move has been executed and none should be until MOVE 0 (lazy runtime/__init__.py) lands and the suite is proven back at baseline.",
+      "Phase C (the four a2a scripts) is deferred: its packaging-inversion justification is false because all four bodies import from scripts/ themselves.",
+      "CORRECTION (5th revision, Devin review PR #1198): an earlier revision declared branch claude/sarathi-autonomy-build-vyr998 and said this work 'lands on the PR-S6 branch ... would be cleaner as its own PR'. Both were stale. The work DID become its own PR (#1198) on its own branch, claude/holon-consolidation-2026-08-01, and the PR-S6 branch was closed without merging and force-replaced. The declared branch was therefore unreachable and the packet could not be inspected or preflighted: scripts/governance/run_agent_work_packet.py:1072-1073 raises 'worktree branch expected {packet.branch}' and :1309-1310 raises 'inspect branch does not match packet.branch'. The branch field now names the real branch.",
+      "DocOps count assertions and the AUTO_INVENTORY auto-section go stale when markdown is added; on PRs these are advisory (--counts-advisory) and docops-reconcile-main.yml reconciles them post-merge. Verified: main already carried this drift before this branch.",
+      "The bare `python3 scripts/docops/check_docops_integrity.py` CANNOT be a packet gate and was removed (Devin review on PR #1198, correctly). It exits 1 on this branch because adding markdown drifts the SOVEREIGN_MANIFEST count assertions and staleness the AUTO_INVENTORY auto-section. CI only passes because .github/workflows/docops.yml:51-56 appends --counts-advisory --changed-from, and the packet runner's allowlist admits that script with NO arguments only (_ALLOWED_REPO_SCRIPT_ARGV, scripts/governance/run_agent_work_packet.py:104), so the advisory flags cannot be supplied. `make docops-integrity` fails the same way (exit 2). The gates are now `make hygiene-check` and the docops contract tests, both verified exit 0 on this branch. Count reconciliation is docops-reconcile-main.yml's job post-merge, not this packet's.",
+      "The original negative control pinned expected_exit 1 on tests/test_holon_system_imports.py to show a docs-only change does not touch code. Devin review on PR #1198 correctly flagged it as stale by construction: HOLON_CONSOLIDATION_PLAN_2026-08-01.md:162 makes fixing that very failure step 3 of the order of work, so the control would report a FALSE RED the moment the repair lands. Replaced with a control that stays true either way — the Sarathi organ suites must pass (exit 0) before and after. The live test_holon_system_imports.py failure is still real and is still recorded in the plan at :51-52; removing the control does not hide it.",
+      "CORRECTION (4th revision, Devin review PR #1198): the plan previously called tests/test_holon_system_imports.py a 'real live bug' and prescribed three different code repairs for it. All three were wrong. textual is a CORE dependency (pyproject.toml:23, inside dependencies, NOT optional-dependencies); CI installs it via pip install -e '.[dev]' (.github/workflows/tests.yml:36,69); it is simply absent from the authoring container. The test passes in CI. There is no defect and no code change is warranted — guarding the import or making the engine export lazy would weaken a working module to accommodate a missing local install."
+    ],
+    "rollback": "Revert the three docs and this packet together. Nothing imports them; no code changed.",
+    "packet_digest": "ef3a6ebe53a603b9aaf0654718f587c0b53904669435dffddffb84da9f9f3552"
+  }
+}
