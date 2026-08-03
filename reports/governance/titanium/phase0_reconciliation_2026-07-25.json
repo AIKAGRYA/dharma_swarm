@@ -75,14 +75,15 @@
     "BLOCKED_OPERATOR": "A required authority, credential, ownership, exposure, or policy decision cannot be inferred by an agent.",
     "UNIMPLEMENTED": "The canonical packet contract or required implementation artifact is absent.",
     "FINAL_REVIEW": "The work is intentionally reserved for an independent post-integration reviewer.",
-    "STALE_DERIVED": "A derived projection does not bind the exact reviewed main SHA and therefore has no selection authority."
+    "STALE_DERIVED": "A derived projection does not bind the exact reviewed main SHA and therefore has no selection authority.",
+    "CLOSED_MERGED_MAIN_REVERIFIED": "A packet whose recorded residual obligation was discharged by a recorded operator decision and then reverified by replay on the exact reviewed merged-main SHA. Definition added 2026-08-03; the token was already in use by WP-0D (introduced in M2, PR #1199) and WP-0C1R without being defined here. It carries no more promotion authority than LANDED_PROVEN: it cannot promote the phase, and the canonical completion criteria plus the independent final review still govern."
   },
   "promotion_rules": [
     {
       "source_modality": "LANDED_PROVEN",
       "target": "PHASE_0_PASS",
       "allowed": false,
-      "obligation": "Packet-scoped proof cannot promote the overall phase; all eight canonical completion criteria and the independent final review must pass."
+      "obligation": "Packet-scoped proof cannot promote the overall phase; all nine canonical completion criteria and the independent final review must pass."
     },
     {
       "source_modality": "LANDED_EVIDENCE_GAP",
@@ -166,7 +167,9 @@
       ],
       "remaining": [
         "Record the operator-backed actual deployment exposure and host-secret verdict. Live exposure is now OBSERVED rather than unknown (public HTTP 200 on meghadharma:8080), but the observation is implementation-observer authority on an unmerged PR, declares inventory_complete=false, and carries no operator attestation, so it cannot itself close the item.",
-        "Land or supersede PR #1184 so the receipt has merged custody; until then the citation depends on an unmerged ref."
+        "Land or supersede PR #1184 so the receipt has merged custody; until then the citation depends on an unmerged ref.",
+        "OPERATOR ACTION on the exposure itself, not on the record: authenticate the endpoint observed answering unauthenticated HTTP 200 (host meghadharma, runtime dharmic-quant-web, public 8080 route), close it, or attest that it is intentionally public. The cited receipt already carries operator_action=required; recording it here so the obligation is on the ledger and not only inside an unmerged receipt.",
+        "DISCLOSURE POSTURE, recorded rather than redacted (raised in PR #1211 review): this repository is PUBLIC, so this entry names a live unauthenticated endpoint in a public default branch. Measured before deciding not to redact: both addresses are already on merged main f3eb5b397 (dharma_swarm/living_map.py, dharma_swarm/ontology.py, docs/architecture/NAVIGATION.md, scripts/sync_jikoku.sh carry 167.172.95.184; docs/plans/HANDOFF_HIGH_ROI_2026-07-03.md carries 178.128.87.170), and the exact endpoint-plus-status-code pairing is already public in the receipt on open non-draft PR #1184. Redacting the verdict-bearing evidence would remove this record's verifiability without removing any exposure, and the exposure is what WP-0S exists to adjudicate. If the operator prefers redaction, the address-bearing lines here, in the ACTIVE_TRACK.yaml WP-0S item, in PR #1184's receipt, and in the five merged-main files above must be handled together, as one operator-ratified decision."
       ]
     },
     {
@@ -221,18 +224,21 @@
     },
     {
       "id": "WP-0C1",
-      "classification": "BLOCKED_OPERATOR",
+      "classification": "LANDED_PROVEN",
       "merged_commits": [
         "edf9dec1e6364209fce90e0fa2185ac41d480619"
       ],
       "evidence": [
-        "git merge-base --is-ancestor edf9dec1e6364209fce90e0fa2185ac41d480619 08ce7e208c9ac7502f81ab340e806749b7b55ffd",
-        ".venv/bin/python -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q"
+        "git merge-base --is-ancestor edf9dec1e6364209fce90e0fa2185ac41d480619 f3eb5b39759f4f6deae5f0562530d7ed38792458",
+        "python3 -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q: 22 passed on exact f3eb5b397 (observation m3-wp0c1-carried-blockage-discharged-20260803)",
+        "The packet's only operator-blocked element was inherited, not its own: required implementation item 2 (docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md WP-0C1, 'Preserve WP-0C1R's clean result rather than baselining real findings into the required scan') depended on WP-0C1R's unratified strict finding set. PR #1202's human merge as f3eb5b397 is the recorded operator decision that ratified dispositions A1/B1, and WP-0C1R is now CLOSED_MERGED_MAIN_REVERIFIED with remaining: [] on that basis, so the inherited blockage is discharged by that same operator act rather than by any agent judgement. WP-0C1's own exit condition ('Required scanners are strict and present; uplift guards finish within their declared budget in TTY and non-TTY environments') contains no operator-decidable element.",
+        "SCOPE BOUNDARY carried forward, not discharged: 'strict Semgrep is clean' means clean UNDER RULE 1 AS WRITTEN -- see the sensitivity_boundary of observation m3-wp0c1r-merged-main-reverification-20260803. Widening Rule 1's pattern is a Semgrep rule/config change, which the plan assigns to WP-0C1R's allowed files and not to WP-0C1's; it is routed to the operator in the observation record and in the track prose, and is therefore not recorded here as an open WP-0C1 obligation."
       ],
-      "remaining": [
-        "The fail-closed scanner mechanics are landed and the strict finding-set premise is no longer operator-blocked: WP-0C1R closed on merged-main reverification at f3eb5b397 (observation m3-wp0c1r-merged-main-reverification-20260803)."
+      "evidence_observation_ids": [
+        "m3-wp0c1r-merged-main-reverification-20260803",
+        "m3-wp0c1-carried-blockage-discharged-20260803"
       ],
-      "carried_by": "WP-0C1R"
+      "remaining": []
     },
     {
       "id": "WP-0C2",
@@ -668,6 +674,17 @@
       "authority": "citation_of_unmerged_receipt_not_replayed",
       "evidence_handle": "git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json  (PR #1184, open and unmerged, head c448c5ab2)",
       "claim": "This entry exists so the WP-0S exposure sentence in ACTIVE_TRACK.yaml carries a runnable citation instead of a bare narrative reference. WHAT WAS VERIFIED HERE: that PR #1184 is open and unmerged at head c448c5ab2; that it carries reports/governance/titanium/wp0s_observation_receipt_20260801.json with schema dharma.titanium.wp0s_observation_receipt.v1; and that the receipt records status_code 401 for public-http-rushabdev-dashboard-health and status_code 200 for public-http-meghadharma-quant-web-health, with authority 'implementation_observer', inventory_complete=false, and verdict {classification: BLOCKED_OPERATOR, live_exposure: observed, operator_action: required, phase0_promotion: forbidden}. WHAT WAS NOT VERIFIED: the HTTP responses themselves were NOT re-observed for this record -- no host was contacted. This is a citation of someone else's read-only observation, not a replay of it, and it inherits that receipt's own claim_boundary (read-only, no complete fleet inventory, no operator authorization, no secret values). It cannot close WP-0S."
+    },
+    {
+      "id": "m3-wp0c1-carried-blockage-discharged-20260803",
+      "result": "PASS",
+      "observed_at": "2026-08-03T15:40:00Z",
+      "main_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "evidence_kind": "executed_current_main",
+      "authority": "implementation_author_replay",
+      "evidence_handle": "python3 -m pytest tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q, run on the exact base f3eb5b397 of the branch carrying this record",
+      "claim": "Records why the WP-0C1 packet stopped being BLOCKED_OPERATOR, so its classification and its remaining[] no longer contradict each other. WP-0C1's recorded blockage was inherited: its required implementation item 2 is 'Preserve WP-0C1R's clean result rather than baselining real findings into the required scan', which could not hold while WP-0C1R's strict finding set was unratified. PR #1202's human merge as f3eb5b397 is the recorded operator decision required by promotion_rules[BLOCKED_OPERATOR], WP-0C1R is CLOSED_MERGED_MAIN_REVERIFIED with remaining: [] on that basis, and the packet's own tests were replayed here: 22 passed. WP-0C1's plan exit condition ('Required scanners are strict and present; uplift guards finish within their declared budget in TTY and non-TTY environments') contains no operator-decidable element, so nothing operator-blocked remains and carried_by was removed because its carrier is closed.",
+      "boundaries": "Author-replay evidence, not independent review: WP-0I retains the clean-room authority. This reclassification changes no completion criterion, no owned surface, and no mechanical gate -- nothing in tests/, scripts/, Makefile or .github/ reads this file; check_track_status.py derives the track's 8/9 count from the completion_criteria commands, not from these packet classifications. current_verdict stays BLOCKED, target_closure_kind stays CLOSED_NOT_PROD, and canonical_next_items is unchanged (WP-0F1, WP-0G, WP-0S, WP-0I). The strict-scan cleanliness this packet inherits is bounded by the Rule 1 pattern limit disclosed in m3-wp0c1r-merged-main-reverification-20260803."
     }
   ],
   "completion_snapshot": [
