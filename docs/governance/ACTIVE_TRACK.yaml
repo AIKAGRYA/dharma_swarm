@@ -824,6 +824,7 @@ active_tracks:
       - tests/test_sarathi_public_api.py
       - tests/test_sarathi_shell.py
       - tests/test_sarathi_import_boundaries.py
+      - docs/README.md
       - docs/persistent_agents/**
       - reports/agentops/work_packets/organism-rewire-WP-SARATHIROOT-P0.json
     moves_vital_signs:
