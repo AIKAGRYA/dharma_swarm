@@ -1838,7 +1838,7 @@ active_tracks:
       reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
       The selected post-1164 observation reports the evaluator's mechanical
       7/8 result separately from no-skip and packet-acceptance evidence. That
-      receipt is point-in-time evidence, not a substitute for the eight
+      receipt is point-in-time evidence, not a substitute for the current
       completion criteria or authority to promote a blocked external decision.
 
     completion_criteria:
@@ -1847,7 +1847,11 @@ active_tracks:
         command: ["python3", "-m", "pytest", "tests/test_bootstrap_contract.py", "-q"]
       - id: titanium_verifier_truth_contracts_pass
         kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_verifier_selfcheck_contract.py", "tests/test_fast_suite_isolation.py", "tests/test_semgrep_wrapper.py", "tests/test_uplift_guard_subprocess.py", "-q"]
+        timeout_s: 900
+        command: ["python3", "-m", "pytest", "tests/test_verifier_selfcheck_contract.py", "-q"]
+      - id: titanium_verifier_support_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_fast_suite_isolation.py", "tests/test_semgrep_wrapper.py", "tests/test_uplift_guard_subprocess.py", "-q"]
       - id: titanium_ingress_contracts_pass
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_api_auth.py", "tests/test_verify_api.py", "-q"]

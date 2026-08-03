@@ -389,7 +389,7 @@ verifier-selfcheck:
 	@echo "[2/5] lint-blockers (F821)"
 	@$(MAKE) -s lint-blockers
 	@echo "[3/5] test collection"
-	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
+	@$(VENV_PYTHON) -m pytest tests/ --collect-only --assert=plain -q >/tmp/dharma-collect-check.log 2>&1 \
 		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
 	@tail -1 /tmp/dharma-collect-check.log
 	@echo "[4/5] session status"
