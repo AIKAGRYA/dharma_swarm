@@ -154,16 +154,19 @@
         "e96674d27d90144f22bc55b64ac7ea2baff63b52"
       ],
       "evidence": [
-        "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 92bec3b2c8bf5fdb5003719f7ea540345accb89e",
-        "python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q: 65 passed on exact current main",
-        "GitHub API observation: zero webhooks, zero Deployments, no Pages site, and no DHARMA_VERIFY_WEBHOOK_SECRET repository secret name"
+        "git merge-base --is-ancestor e96674d27d90144f22bc55b64ac7ea2baff63b52 f3eb5b39759f4f6deae5f0562530d7ed38792458",
+        "python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q: 65 passed",
+        "GitHub API observation (2026-07-31): zero webhooks, zero Deployments, no Pages site, and no DHARMA_VERIFY_WEBHOOK_SECRET repository secret name. NOT SUFFICIENT for a non-exposure verdict, and as of 2026-08-01 no longer the whole picture: GitHub-side absence never bounded host-side exposure, and a direct host observation now exists (below).",
+        "2026-08-01 host observation, recorded on UNMERGED PR #1184: https://dashboard.167-172-95-184.nip.io/health answered HTTP 401 and http://178.128.87.170:8080/health answered public HTTP 200. Reachable from this repository with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803)."
       ],
       "evidence_observation_ids": [
         "m1-exact-main-contracts-92bec",
-        "m1-live-control-plane-20260731"
+        "m1-live-control-plane-20260731",
+        "m3-wp0s-citation-20260803"
       ],
       "remaining": [
-        "Record the operator-backed actual deployment exposure and host-secret verdict; declarative docker-compose still maps 8080:8080, so absence of GitHub deployment objects is not proof of non-exposure."
+        "Record the operator-backed actual deployment exposure and host-secret verdict. Live exposure is now OBSERVED rather than unknown (public HTTP 200 on meghadharma:8080), but the observation is implementation-observer authority on an unmerged PR, declares inventory_complete=false, and carries no operator attestation, so it cannot itself close the item.",
+        "Land or supersede PR #1184 so the receipt has merged custody; until then the citation depends on an unmerged ref."
       ]
     },
     {
@@ -294,17 +297,18 @@
         "2447ca565bfbd80258f7acfafb6121da7ab20886"
       ],
       "evidence": [
-        "python3 -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q: 24 passed on exact current main",
-        "legacy main protection currently has strict=false, no pull-request review requirement, conversation resolution disabled, and six app-bound contexts matching CI_TRUTH_CONTRACT and ci_parity_manifest; CI_PARITY_ADMIN_READ_TOKEN exists and PR #1164's context-set parity job succeeded",
-        "active ruleset separately reports zero approvals, review-thread resolution disabled, non-strict duplicate contexts, and an always-bypass RepositoryRole actor; the legacy parity checker proves only legacy context-set equality and does not grade either layer's strictness or inspect the ruleset"
+        "python3 -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q: 24 passed",
+        "SUPERSEDED 2026-08-03 (observation m3-live-control-plane-20260803): legacy main protection is the SOLE ENFORCING layer -- strict=false, required_pull_request_reviews=null, enforce_admins=true, six app-bound contexts matching CI_TRUTH_CONTRACT and ci_parity_manifest, and required_conversation_resolution.enabled=TRUE. The earlier record of 'conversation resolution disabled' is REFUTED on that point and retained only as 2026-07-31 history.",
+        "SUPERSEDED 2026-08-03: ruleset 20024481 ('main-merge-gate') is enforcement=disabled, so it is NOT an active second layer. Its always-bypass RepositoryRole 5 actor, non-strict policy, and duplicate contexts ('DocOps integrity gate' and 'Onboarding admission parity' each listed twice) are LATENT defects, not live ones. The legacy parity checker still proves only legacy context-set equality and grades neither layer's strictness."
       ],
       "evidence_observation_ids": [
         "m1-exact-main-contracts-92bec",
-        "m1-live-control-plane-20260731"
+        "m1-live-control-plane-20260731",
+        "m3-live-control-plane-20260803"
       ],
       "remaining": [
-        "Ratify one final required-check, human-review, and thread-resolution policy across both legacy protection and the ruleset layer, including bypass authority and duplicate contexts.",
-        "Add and prove the ratified review requirement; neither live layer currently requires an approval, and #1164 merged with zero approvals and three unresolved review threads."
+        "Ratify one final required-check, human-review, and thread-resolution policy, and decide the disabled ruleset's fate (delete it, or enable it and first remove the always-bypass actor and the duplicate contexts).",
+        "Decide and prove the review requirement: neither layer requires an approval today. Conversation resolution IS enforced on the legacy layer as of 2026-08-03, so the earlier 'thread resolution disabled' half of this item is closed; the approval half is not."
       ]
     },
     {
@@ -654,88 +658,118 @@
       "evidence_handle": "gh api repos/AmitabhainArunachala/dharma_swarm/branches/main/protection; gh api repos/AmitabhainArunachala/dharma_swarm/rulesets/20024481",
       "supersedes_in_part": "m1-live-control-plane-20260731",
       "claim": "Read-only re-observation of the two merge-gate layers on 2026-08-03. Legacy branch protection is the sole ENFORCING layer: strict=false, required_pull_request_reviews=null (zero approvals required), enforce_admins=true, six required contexts, and required_conversation_resolution.enabled=TRUE. That last value REFUTES the 2026-07-31 observation (m1-live-control-plane-20260731), which recorded conversation resolution as disabled on both layers; the earlier record is retained as point-in-time history and is superseded only on that point. Ruleset 20024481 ('main-merge-gate') is enforcement=disabled, so its always-bypass actor (RepositoryRole 5, bypass_mode always), its non-strict policy, and its duplicate required contexts ('DocOps integrity gate' and 'Onboarding admission parity' each appear twice) are latent, not live, defects. No secret values were accessed. The WP-0F1 decision stays open and operator-owned: this observation records the premises, it does not choose the policy or the ruleset's fate."
+    },
+    {
+      "id": "m3-wp0s-citation-20260803",
+      "result": "BLOCKED_OPERATOR",
+      "observed_at": "2026-08-03T15:40:00Z",
+      "main_sha": "f3eb5b39759f4f6deae5f0562530d7ed38792458",
+      "evidence_kind": "cited_external_receipt",
+      "authority": "citation_of_unmerged_receipt_not_replayed",
+      "evidence_handle": "git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json  (PR #1184, open and unmerged, head c448c5ab2)",
+      "claim": "This entry exists so the WP-0S exposure sentence in ACTIVE_TRACK.yaml carries a runnable citation instead of a bare narrative reference. WHAT WAS VERIFIED HERE: that PR #1184 is open and unmerged at head c448c5ab2; that it carries reports/governance/titanium/wp0s_observation_receipt_20260801.json with schema dharma.titanium.wp0s_observation_receipt.v1; and that the receipt records status_code 401 for public-http-rushabdev-dashboard-health and status_code 200 for public-http-meghadharma-quant-web-health, with authority 'implementation_observer', inventory_complete=false, and verdict {classification: BLOCKED_OPERATOR, live_exposure: observed, operator_action: required, phase0_promotion: forbidden}. WHAT WAS NOT VERIFIED: the HTTP responses themselves were NOT re-observed for this record -- no host was contacted. This is a citation of someone else's read-only observation, not a replay of it, and it inherits that receipt's own claim_boundary (read-only, no complete fleet inventory, no operator authorization, no secret values). It cannot close WP-0S."
     }
   ],
   "completion_snapshot": [
     {
       "id": "titanium_bootstrap_contract_passes",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "9 passed",
       "skipped": 0,
-      "admissible_under_no_skip": true
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
     },
     {
       "id": "titanium_verifier_truth_contracts_pass",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
+      "evidence_kind": "executed_current_main",
+      "authority": "implementation_author_replay",
+      "test_result": "9 passed",
+      "skipped": 0,
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "reattribution_note": "Before PR #1205 split the verifier criterion, this id carried the combined 46-test result and the semgrep-PATH projection_difference. Both belong to titanium_verifier_support_contracts_pass and have been moved there. tests/test_verifier_selfcheck_contract.py alone is 9 tests and has no semgrep dependency."
+    },
+    {
+      "id": "titanium_verifier_support_contracts_pass",
+      "passed": true,
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "46 passed with semgrep 1.168.0 on PATH",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "projection_difference": "generated/status ran without the Semgrep executable on PATH and mechanically accepted 45 passed, 1 skipped"
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "projection_difference": "generated/status ran without the Semgrep executable on PATH and mechanically accepted 45 passed, 1 skipped. The skip is environment-dependent and belongs to this criterion (tests/test_semgrep_wrapper.py), not to titanium_verifier_truth_contracts_pass."
     },
     {
       "id": "titanium_ingress_contracts_pass",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "65 passed",
       "skipped": 0,
-      "admissible_under_no_skip": true
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
     },
     {
       "id": "titanium_hermetic_live_split_contracts_pass",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "36 passed",
       "skipped": 0,
-      "admissible_under_no_skip": true
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
     },
     {
       "id": "titanium_ci_authority_contracts_pass",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "24 passed",
       "skipped": 0,
-      "admissible_under_no_skip": true
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
     },
     {
       "id": "titanium_docops_contracts_pass",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
       "test_result": "32 passed",
       "skipped": 0,
-      "admissible_under_no_skip": true
+      "admissible_under_no_skip": true,
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs."
     },
     {
       "id": "titanium_polyglot_contract_passes",
       "passed": true,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "executed_current_main",
       "authority": "implementation_author_replay",
-      "test_result": "30 passed with pinned uv available on PATH",
+      "test_result": "30 passed with uv 0.11.2 on PATH",
       "skipped": 0,
       "admissible_under_no_skip": true,
-      "projection_difference": "generated/status ran without the pinned uv executable on PATH and mechanically accepted 29 passed, 1 skipped"
+      "replay_note": "Executed at PR head 05d9c9e13, whose tree differs from merged main f3eb5b397 only in CLAUDE.md, docs/governance/ACTIVE_TRACK.yaml, docs/governance/SOVEREIGN_MANIFEST.md, and this reconciliation report (verified: git diff f3eb5b397..05d9c9e13 --name-only). No test input differs.",
+      "projection_difference": "generated/status ran without the pinned uv executable on PATH and mechanically accepted 29 passed, 1 skipped."
     },
     {
       "id": "titanium_independent_clean_room_receipt_valid",
       "passed": false,
-      "observed_on_sha": "92bec3b2c8bf5fdb5003719f7ea540345accb89e",
+      "observed_on_sha": "05d9c9e130a9dcccfae21fd5a12338d2e4b4afa0",
       "evidence_kind": "missing",
       "authority": "independent_reviewer_required",
-      "admissible_under_no_skip": false
+      "admissible_under_no_skip": false,
+      "detail": "receipt reports/governance/titanium/phase0_clean_room_receipt.json MISSING"
     }
   ],
   "missing_artifacts": [
@@ -1237,5 +1271,6 @@
     "WP-0D implementation repair",
     "command_passes evaluator semantics repair",
     "production-live or complete-security claims"
-  ]
+  ],
+  "completion_snapshot_note": "Re-derived 2026-08-03 against the nine-criterion set. The previous snapshot still carried the pre-PR-#1205 eight-criterion shape, had no row for titanium_verifier_support_contracts_pass, and attributed that suite's semgrep-PATH skip to titanium_verifier_truth_contracts_pass. Author-replay evidence; the no-skip obligation is discharged only for the environment recorded per row, and the CI projection still shows one skip each in the support and polyglot suites."
 }
