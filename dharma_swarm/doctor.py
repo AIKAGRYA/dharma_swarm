@@ -637,11 +637,55 @@ def _check_dgc_health_snapshot(checks: list[DoctorCheck]) -> None:
         detail_parts.append("daemon_pid_mismatch")
 
     if snapshot.get("daemon_pid_alive") is False:
-        # The snapshot names a PID that does not answer kill -0. A dead
-        # cited PID is a loud FAIL, never a WARN: this exact shape (PID
-        # 18104, dead 7 days, filed as WARN) masked the 2026-07/08 outage.
+        # A dead cited PID proves only that this snapshot's writer is gone.
+        # It does not prove that the organism is still gone: a healthy
+        # restart has a new PID while the old snapshot remains on disk until
+        # the replacement publisher refreshes it. Cross-check present-time
+        # process evidence before declaring an outage.
+        live_daemons, process_scan_ok = _scan_daemon_like_processes(5.0)
+        if live_daemons:
+            live_detail = ", ".join(
+                f"pid={pid} command={command}" for pid, command in live_daemons
+            )
+            detail_parts.append(f"current_daemon_processes={live_detail}")
+            _add(
+                checks,
+                name="dgc_health_snapshot",
+                status="WARN",
+                summary=(
+                    "dgc_health snapshot cites a dead PID, but a current "
+                    "daemon process is running"
+                ),
+                detail=" | ".join(detail_parts),
+                fix=(
+                    "Refresh or retire the stale dgc_health publisher so the "
+                    "snapshot binds the current daemon PID; do not diagnose "
+                    "an organism outage from the superseded PID alone."
+                ),
+            )
+            return
+
         service_state, service_detail = _launchd_service_state(5.0)
         detail_parts.append(service_detail)
+        if not process_scan_ok:
+            detail_parts.append("daemon_process_scan=unavailable")
+            _add(
+                checks,
+                name="dgc_health_snapshot",
+                status="WARN",
+                summary=(
+                    "dgc_health snapshot cites a dead PID; current daemon "
+                    "state could not be verified"
+                ),
+                detail=" | ".join(detail_parts),
+                fix=(
+                    "Inspect the current daemon process and launchd state, "
+                    "then refresh or retire dgc_health.json. An unavailable "
+                    "process scan is not proof that the organism is dead."
+                ),
+            )
+            return
+
         _add(
             checks,
             name="dgc_health_snapshot",

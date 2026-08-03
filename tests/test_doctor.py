@@ -198,6 +198,10 @@ def test_daemon_integrity_warns_on_stale_pid_file(monkeypatch, tmp_path: Path) -
         "dharma_swarm.doctor._launchd_service_state",
         lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
     )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._scan_daemon_like_processes",
+        lambda timeout_seconds: ([], True),
+    )
     monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: False)
 
     checks = []
@@ -257,6 +261,10 @@ def test_daemon_integrity_fails_on_stale_pid_when_plist_installed_but_unloaded(
     monkeypatch.setattr(
         "dharma_swarm.doctor._launchd_service_state",
         lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._scan_daemon_like_processes",
+        lambda timeout_seconds: ([], True),
     )
     monkeypatch.setattr("dharma_swarm.doctor._launchd_plist_installed", lambda: True)
 
@@ -814,6 +822,87 @@ def test_dgc_health_snapshot_passes_when_fresh_and_cited_pid_alive(
     assert "daemon_pid_alive=True" in checks[0].detail
 
 
+def test_dgc_health_snapshot_warns_after_healthy_daemon_restart(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """A superseded snapshot PID must not falsely declare a live organism dead."""
+    state_dir = tmp_path / ".dharma"
+    stigmergy_dir = state_dir / "stigmergy"
+    stigmergy_dir.mkdir(parents=True)
+    (stigmergy_dir / "dgc_health.json").write_text(
+        json.dumps(
+            {
+                "daemon_pid": 18104,
+                "timestamp": (
+                    datetime.now(timezone.utc) - timedelta(hours=2)
+                ).isoformat(),
+                "agent_count": 20,
+                "source": "orchestrate_live",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._scan_daemon_like_processes",
+        lambda timeout_seconds: (
+            [(4242, "python -m dharma_swarm.dgc_cli orchestrate-live")],
+            True,
+        ),
+    )
+
+    checks = []
+    _check_dgc_health_snapshot(checks)
+
+    assert checks[0].name == "dgc_health_snapshot"
+    assert checks[0].status == "WARN"
+    assert "current daemon process is running" in checks[0].summary
+    assert "pid=4242" in checks[0].detail
+    assert "organism outage" in checks[0].fix
+
+
+def test_dgc_health_snapshot_warns_when_current_process_scan_is_unavailable(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """An unavailable present-time probe cannot support a hard outage claim."""
+    state_dir = tmp_path / ".dharma"
+    stigmergy_dir = state_dir / "stigmergy"
+    stigmergy_dir.mkdir(parents=True)
+    (stigmergy_dir / "dgc_health.json").write_text(
+        json.dumps(
+            {
+                "daemon_pid": 18104,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "source": "orchestrate_live",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("dharma_swarm.doctor.HOME", tmp_path)
+    monkeypatch.setattr("dharma_swarm.doctor._pid_alive", lambda pid: False)
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._scan_daemon_like_processes",
+        lambda timeout_seconds: ([], False),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._launchd_service_state",
+        lambda timeout_seconds: ("unknown", "launchctl probe unavailable"),
+    )
+
+    checks = []
+    _check_dgc_health_snapshot(checks)
+
+    assert checks[0].name == "dgc_health_snapshot"
+    assert checks[0].status == "WARN"
+    assert "could not be verified" in checks[0].summary
+    assert "daemon_process_scan=unavailable" in checks[0].detail
+
+
 def test_dgc_health_snapshot_fails_when_cited_pid_was_recycled(
     monkeypatch,
     tmp_path: Path,
@@ -843,6 +932,10 @@ def test_dgc_health_snapshot_fails_when_cited_pid_was_recycled(
     monkeypatch.setattr(
         "dharma_swarm.doctor._launchd_service_state",
         lambda timeout_seconds: ("absent", "launchctl: service not loaded"),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.doctor._scan_daemon_like_processes",
+        lambda timeout_seconds: ([], True),
     )
 
     checks = []
