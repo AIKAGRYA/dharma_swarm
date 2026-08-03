@@ -28,6 +28,7 @@ inspiration:
 - product_surface
 connected_relevant_files:
 - README.md
+- docs/persistent_agents/README.md
 - docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
 - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
 - docs/REPO_RECLASSIFICATION_MATRIX_2026-04-01.md
@@ -77,6 +78,9 @@ Use the repo ontology from [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md]
 
 If you need the current repo and product truth:
 
+- [Persistent Agents, Holons, and Sarathi](persistent_agents/README.md): the
+  single start-here map for the repo-owned autonomous-agent product, its shared
+  engines, landed history, and honest readiness boundary
 - [README.md](/Users/dhyana/dharma_swarm/README.md): top-level operator entrypoint
 - [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md): agent operating contract
 - [PRODUCT_SURFACE.md](/Users/dhyana/dharma_swarm/PRODUCT_SURFACE.md): canonical product-surface statement
@@ -150,8 +154,10 @@ That command shows the active track, live ops snapshot, open broken-register ite
 These are important, but they should not compete with repo-level canon:
 
 - [HOLON_RUNTIME_FULL_ESTATE_MAP.md](architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md):
-  current holon-specific body synthesis across source, runtime state, parallel
-  Hermes boundaries, proof obligations, and a dated readiness witness
+  dated Holon body synthesis; its 2026-07-13 counts and readiness claims are
+  historical, not current inventory authority. For current Sarathi/Holon
+  navigation, start at [Persistent Agents, Holons, and Sarathi](persistent_agents/README.md)
+  and verify claims against source and tests
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)
