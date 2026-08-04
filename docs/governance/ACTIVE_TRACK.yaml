@@ -789,6 +789,8 @@ active_tracks:
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
     status: ACTIVE
     opened_at: "2026-07-02"
+    # Reverified 2/2 by ACTIVE_TRACK CI run 30831205320 on 2026-08-04 JST:
+    # https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30831205320/job/91762563074
     verified_at: "2026-08-04"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
@@ -820,7 +822,13 @@ active_tracks:
       # Operator-authorized P0 amendment (2026-08-04): establish one public,
       # repo-owned composition root for the persistent Sarathi seat. Shared
       # engines remain with their current owners and are reached by adapters.
+      # RuntimeStateStore additionally admits one generic atomic
+      # session-event-plus-receipt seam so the adapter cannot publish a torn
+      # completion claim; the surface manifest records the new receipt layer.
+      - ACTIVE_SURFACE_MANIFEST.yaml
+      - dharma_swarm/runtime_state.py
       - dharma_swarm/sarathi/**
+      - tests/test_runtime_state.py
       - tests/test_sarathi_public_api.py
       - tests/test_sarathi_shell.py
       - tests/test_sarathi_import_boundaries.py
@@ -917,7 +925,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 11
-        what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
+        what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; add only the generic RuntimeStateStore transaction seam and receipt-layer declaration needed to make reply-event plus receipt atomic; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
         kind: code
         blocker: true
 
