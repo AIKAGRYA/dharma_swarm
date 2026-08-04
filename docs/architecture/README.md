@@ -26,7 +26,6 @@ inspiration:
   - canonical_truth
 connected_relevant_files:
   - docs/README.md
-  - docs/persistent_agents/README.md
   - docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
   - docs/architecture/ORCHESTRATOR_LEDGERS.md
   - docs/architecture/PROVIDER_MATRIX_HARNESS.md
@@ -70,12 +69,9 @@ Use it for:
 
 Current examples:
 
-- [../persistent_agents/README.md](../persistent_agents/README.md) — first doorway for persistent-agent/Sarathi/Holon terminology,
-  runtime-family boundaries, current high-level composition, and the complete
-  subject document map.
-- [HOLON_RUNTIME_FULL_ESTATE_MAP.md](HOLON_RUNTIME_FULL_ESTATE_MAP.md) — dated
-  July reference for the Hermes-class code body, runtime boundaries, and a
-  readiness witness; it is no longer the current-count or first-orientation owner.
+- [HOLON_RUNTIME_FULL_ESTATE_MAP.md](HOLON_RUNTIME_FULL_ESTATE_MAP.md) — current
+  holon-specific reference for the Hermes-class code body, runtime boundaries,
+  and a dated readiness witness; live state still comes from onboarding/Live Ops.
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)

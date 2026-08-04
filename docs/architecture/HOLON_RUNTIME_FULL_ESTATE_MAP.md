@@ -6,14 +6,14 @@ status: reference
 
 # Holon Runtime Full Estate Map
 
-> **Deprecated as first/current orientation (2026-08-03).** Start at
-> [`../persistent_agents/README.md`](../persistent_agents/README.md); this remains a dated July deep reference.
-> The full deprecation record is in Section 12 below.
+This is the one holon-specific reference that synthesizes the code body,
+runtime boundaries, parallel Hermes surfaces, and a dated readiness witness.
+It is not the live-state owner or the repo's onboarding door.
 
-For current operating state, run `make onboard` and `make organism-status`, then
-inspect `docs/state/LIVE_OPS_DASHBOARD.md`. This dated file does not own present
-state. The ownership rule is recorded in `docs/governance/CANONICAL_DOC_STACK.md:3-12`
-and `:20-28`.
+For current operating state, run `make onboard` (or, while the current Makefile
+parser blocker exists, `python3 scripts/governance/agent_onboard.py`) and inspect
+`docs/state/LIVE_OPS_DASHBOARD.md`. The ownership rule is recorded in
+`docs/governance/CANONICAL_DOC_STACK.md:3-12` and `:20-28`.
 
 Use it to answer:
 
@@ -27,10 +27,10 @@ Use it to answer:
 - What has been proved, and what is still required before an agent may be called
   alive?
 
-[`AGENT_HOLON_CODE_MAP.md`](AGENT_HOLON_CODE_MAP.md) is a short call-chain index;
-both it and this dated map are subordinate to `docs/persistent_agents/README.md` for subject
-navigation. `docs/sarathi_apex_build/` owns dated build history and
-`docs/sovereign_holons/` preserves research; neither owns current body truth.
+[`AGENT_HOLON_CODE_MAP.md`](AGENT_HOLON_CODE_MAP.md) is now a short call-chain
+index subordinate to this map. `docs/sarathi_apex_build/` owns the dated Sarathi
+collapse build narrative. `docs/sovereign_holons/` is historical design and
+research. Neither is a competing current body reference.
 
 ## 1. Authority and freshness contract
 
@@ -706,22 +706,5 @@ If you need to change:
   versioned adapter contract on the Dharma side.
 
 Do not create another registry, provider router, orchestrator, task store,
-receipt spine, runtime home, or another implementation map to close these gaps.
-Compose the owners above; current body/proof changes update `docs/persistent_agents/README.md`.
-
-## 12. Deprecation record — orientation role only
-
-**Deprecated:** 2026-08-03
-
-**Reason:** this is a 2026-07-13 estate snapshot. Later behavior-first work
-remeasured the surface and proved stale counts, omitted runtimes, and import
-hazards (`docs/plans/HOLON_CONSOLIDATION_PLAN_2026-08-01.md:18-52`;
-`docs/reports/SARATHI_SHELL_CENSUS_2026-08-02.md:24-55`).
-
-**Replacement:** [`../persistent_agents/README.md`](../persistent_agents/README.md) owns subsystem terminology,
-current family boundaries, and the complete document/code map. Use the census
-for exhaustive dated evidence and the consolidation decision; retain the older
-plan only for its reproduced import hazard and move probes.
-
-**Review / removal date:** 2026-11-03. Retain as a dated deep reference unless
-that review chooses archival relocation; remeasure before restoring any current claim.
+receipt spine, runtime home, or “canonical map” to close these gaps. Compose the
+owners above and update this file when the body or proof state changes.

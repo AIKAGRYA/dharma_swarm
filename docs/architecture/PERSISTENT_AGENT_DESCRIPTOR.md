@@ -28,9 +28,9 @@ when nothing does. **The `UNSOURCED` rows are the build backlog.** The
 `CONFLICTING` rows are worse than unsourced — several surfaces supply the field
 and they disagree, so a loader must pick a winner and demote the rest.
 
-Current terminology/navigation: [`../persistent_agents/README.md`](../persistent_agents/README.md). Companion
-inventory: [`hermes_persistent_agent_index_2026-08-01.md`](../reports/hermes_persistent_agent_index_2026-08-01.md).
-Dated body reference: [`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+Companion inventory and evidence:
+[`docs/reports/hermes_persistent_agent_index_2026-08-01.md`](../reports/hermes_persistent_agent_index_2026-08-01.md).
+Body-of-code reference: [`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
 ## Design constraints
 

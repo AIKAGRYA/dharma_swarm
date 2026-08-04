@@ -1,10 +1,10 @@
 # INDEX — Historical Design Read Order
 
-> **Authority notice (2026-08-03):** Start at the canonical subject doorway,
-> [`../persistent_agents/README.md`](../persistent_agents/README.md), for current terms, runtime-family boundaries,
-> and evidence routes. This index preserves the June design sequence; its
-> present-tense implementation claims are historical. The July estate map is a
-> dated deep reference only.
+> **Authority notice (2026-07-13):** Use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> first for current code, runtime boundaries, a dated witness, and gaps. This
+> index preserves the June design sequence; its present-tense implementation
+> claims are historical.
 
 **Created:** 2026-06-08 · **Purpose:** The shortest path through the sovereign-holon initiative for someone arriving cold.
 

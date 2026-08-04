@@ -1,11 +1,23 @@
 # Sarathi Agent-Shell Element Census — 2026-08-02
 
+**Document role:** dated report. This file records descriptive audit output; it
+is not canon, an active specification, a working plan, or promotion authority.
+It replaces no document and subordinates to
+`docs/governance/CANONICAL_DOC_STACK.md`, source, tests, receipts, enforced
+policy, and operator rulings (`docs/AGENTS.md:26-51`).
+
 **Status:** P0 forensic census; no deployment or refactor authorization
 
-**Evidence revision:** `origin/main` at `9d792ceacef32a1698838dc01586ed90ecb93666`
+**Evidence revision:** immutable Git commit
+`9d792ceacef32a1698838dc01586ed90ecb93666`
 
 **Repository:** `AmitabhainArunachala/dharma_swarm`
+
 **Verdict:** `CLOSED_NOT_PROD` — Sarathi is not an end-to-end persistent agent shell on this revision. See the post-census update in §8 before applying MCP claims to current main.
+
+Unless a paragraph is explicitly labeled as a post-census update, present-tense
+language below is local to the evidence revision, not a claim about current
+`main` or another branch.
 
 ## Executive answer
 
@@ -13,7 +25,12 @@ Sarathi currently consists of a 1,124-line deterministic planning/delegation/sta
 
 The repository does contain implementations of all twelve requested element types, often several. They belong to independent shells, runners, schedulers, stores, registries, and evolution systems. That makes every row below `SCATTERED`; it does not make those capabilities reachable by Sarathi. The direct Sarathi package is imported in only five production files outside itself—the `holon_system` facade, two thin facade modules, and two runtime scripts—and no Sarathi import occurs in the generic API gateway, A2A, MCP, memory, context-compiler, agent-runner, cron, container, or evolution families. The reproducing search is in §2.13. **[X]**
 
-One folder is feasible only as a **composition root plus Sarathi-owned adapters**. It is not sound to move every discovered implementation under `dharma_swarm/sarathi/`. Shared infrastructure has other consumers, several files are pinned by active-track ownership or operator rulings, and naive moves break imports. The tested safe migration shape is add-first: add the complete Sarathi package, keep compatibility exports, update consumers, then remove old bodies only after import and governance changes land atomically. **[I]**
+The evidence favored a **composition root plus Sarathi-owned adapters**, not a
+physical move of every discovered implementation under `dharma_swarm/sarathi/`.
+Shared infrastructure had other consumers, several files were pinned by
+active-track ownership or operator rulings, and the executed move probes showed
+that move-first ordering broke imports. These are historical constraints, not
+an implementation sequence or authorization. **[I]**
 
 ### Evidence notation
 
@@ -25,16 +42,34 @@ No prose architecture inventory was used as implementation truth. In particular,
 
 ## 0. Method and scope
 
-The checkout was dirty and its branch was behind `origin/main`, so measuring the working tree would have mixed local work with stale source. The audit therefore pinned and exported exact remote main:
+The checkout was dirty and its branch was behind `origin/main`, so measuring the working tree would have mixed local work with stale source. The audit therefore recorded the remote hash, verified it, and archived that exact commit rather than a mutable tracking ref:
 
-```text
-$ git ls-remote origin refs/heads/main
-9d792ceacef32a1698838dc01586ed90ecb93666  refs/heads/main
+```bash
+SARATHI_AUDIT_COMMIT=9d792ceacef32a1698838dc01586ed90ecb93666
+git fetch origin main
+git cat-file -e "${SARATHI_AUDIT_COMMIT}^{commit}"
+git merge-base --is-ancestor "$SARATHI_AUDIT_COMMIT" FETCH_HEAD
+SARATHI_AUDIT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sarathi-census.XXXXXX")"
+git archive "$SARATHI_AUDIT_COMMIT" | tar -x -C "$SARATHI_AUDIT_ROOT"
 
-$ git archive origin/main | tar -x -C /private/tmp/sarathi_shell_census_origin_main_9d792ceacef3
+# Historical ls-remote output recorded on 2026-08-02 (not a live assertion):
+# 9d792ceacef32a1698838dc01586ed90ecb93666 refs/heads/main
 ```
 
-All source citations and LOC counts below refer to that immutable export. The export contained 5,277 tracked files and 2,444 Python files. Tests, prose docs, archived/retired code, generated reports, and vendored files were excluded from production-family counts; tests were used for verification. **[X]**
+All source citations and LOC counts below refer to that immutable export. The
+tree contained 5,277 tracked files and 2,448 Python files; reproduce both raw
+tree counts without relying on an extracted directory:
+
+```bash
+git ls-tree -r --name-only "$SARATHI_AUDIT_COMMIT" | wc -l
+# 5277
+git ls-tree -r --name-only "$SARATHI_AUDIT_COMMIT" | rg '\.py$' | wc -l
+# 2448
+```
+
+Tests, prose docs, archived/retired code, generated reports, and vendored files
+were excluded from production-family counts; tests were used for verification.
+**[X]**
 
 The search began with behavior, not names:
 
@@ -45,14 +80,18 @@ rg -l 'queue|inbox|mailbox|JetStream|consumer'
 rg -l 'sqlite|aiosqlite|CREATE TABLE|connect\('
 rg -l 'FastAPI|APIRouter|websocket|nats|NATS|listen|socket'
 rg -l 'Path\.home\(\)|~/\.dharma|~/\.hermes|DHARMA_HOME'
-rg -l 'write_text|open\(.+["'"']w|git apply|git commit|git push'
+rg -l "write_text|open\\(.+['\"]w|git apply|git commit|git push"
 find . \( -name 'Dockerfile*' -o -name 'docker-compose*' \
   -o -name '*.plist' -o -name '*.service' \)
 ```
 
 After excluding tests/docs/archive/report artifacts, the broad sweep found 226 production-ish files with process/model behavior, 407 with loop/schedule behavior, 264 with queue/mailbox behavior, 143 with database behavior, 43 with registry/identity behavior, 107 with listener behavior, 571 with state-root behavior, and 385 with runtime file-mutation behavior. These are search populations, not claims that every match is an agent shell. Each was reduced into the material independent families catalogued in §2. **[X]**
 
-The existence gate was mechanical. Ninety-seven paths in the runtime sweep and forty-one in the surface sweep were each checked with `test -e`; none was missing. A final report-wide citation check is recorded in §7. **[X]**
+The original scratch sweep did not retain its two intermediate path lists, so
+this report does not claim that those scratch-list totals are independently
+reconstructable. The report-wide gate in §7 instead derives every explicit
+source/tree path from this Markdown, checks it against the immutable commit, and
+validates each explicit line-range upper bound. **[X]**
 
 ## 1. Element table
 
@@ -303,13 +342,24 @@ There is no tracked `*.service` file and no Sarathi-named Dockerfile, Compose se
 
 The reusable **core** can be Mac/Linux portable if configuration owns state root, repo/workspace, provider, broker, and sandbox. The current **service** cannot be moved unchanged because no such service exists. The nearest standing loops are coupled to tmux, launchd, Docker/Linux, GitHub Actions, or a specific home checkout. **[I]**
 
-## 4. Consolidation verdict
+## 4. Consolidation observations — descriptive, not a plan
 
-### 4.1 Can the elements be organized into `dharma_swarm/sarathi/`?
+This section records topology, ownership, and import-order constraints observed
+at the evidence revision. Its hypothetical layout and compatibility ordering
+are audit interpretations only. They do not authorize work, allocate surfaces,
+or compete with a later active specification; a subsequently admitted contract
+and its tests supersede them.
 
-**Yes as one Sarathi-owned composition root; no as a physical collection of all implementations.** The folder should own the stable turn contract, Sarathi persona/config schema, orchestration of shared services, portable runtime entrypoint, adapters, and Sarathi-specific receipts. Shared provider, memory, context, transport, sandbox, scheduler, governance, and evolution engines must stay in their canonical homes and be consumed through explicit interfaces. **[I]**
+### 4.1 Organization supported by the evidence
 
-A concrete target shape is:
+The evidence supported one Sarathi-owned composition boundary, not a physical
+collection of every implementation. The evaluated boundary placed the stable
+turn contract, Sarathi persona/config schema, composition, adapters, and
+Sarathi-specific receipt semantics together while leaving shared provider,
+memory, context, transport, sandbox, scheduler, governance, and evolution
+engines with their existing owners. **[I]**
+
+The audit used this hypothetical shape to test that boundary:
 
 ```text
 dharma_swarm/sarathi/
@@ -335,36 +385,43 @@ dharma_swarm/sarathi/
   receipts.py             # turn/action/reply witnesses sharing ExecutionIdentity
 ```
 
-This is a plan, not a claim that the listed new files exist.
+This tree is neither a working plan nor a claim that the listed files existed.
+It records the seams considered by the audit; an accepted implementation may be
+smaller or differently factored while still respecting the measured owner and
+import constraints.
 
-### 4.2 Files that can move as a group with their bodies substantially unchanged
+### 4.2 Observed cohesion and move sensitivity
 
-| Current file(s) | Move judgment | Evidence / required compatibility |
+| Current file(s) | Audit observation | Evidence / compatibility constraint |
 |---|---|---|
-| `dharma_swarm/holon_system/sarathi/plan.py` | Move with the whole package | Pure deterministic module (`:1-8`); its only local dependency is package data/types. Moving it alone breaks `delegate.py`’s relative import. |
-| `delegate.py`, `wake.py` | Bodies can move together after the authority defect is fixed | Relative imports remain valid as a group (`delegate.py:50`; `wake.py` local imports). External dependencies—operator core, mailbox, spine—should stay imports. Do not canonize “claim fence = lease.” |
-| `brief.py`, `roster.py`, `scoreboard.py` | Move with compatibility shims | Pure formatting/roster logic. Current facade consumers are `holon_system/gateway/operator_brief.py` and `holon_system/observability/scoreboard.py`. |
-| `pulse.py`, `gateway.py` | Source can move, semantics need repair before being public shell APIs | `gateway.py` is only a snapshot; `pulse.py` accepts `agents_root` but `wake.py:121-125` does not forward it. Rename snapshot or add a real ingress separately. |
-| `proof.py` | Pure evaluator body can move | Keep it a pure evaluator, but replace its proof obligations before allowing a liveness promotion. |
+| `dharma_swarm/holon_system/sarathi/plan.py` | Cohesive only with the package in the executed probe | Pure deterministic module (`:1-8`); its only local dependency is package data/types. Moving it alone broke `delegate.py`’s relative import. |
+| `delegate.py`, `wake.py` | Relative imports stayed coherent as a group, but the authority defect blocked promotion | External dependencies were operator core, mailbox, and spine. The audit rejected treating a claim fence as an execution lease. |
+| `brief.py`, `roster.py`, `scoreboard.py` | Pure logic with compatibility consumers | Current facade consumers were `holon_system/gateway/operator_brief.py` and `holon_system/observability/scoreboard.py`. |
+| `pulse.py`, `gateway.py` | Source cohesion did not imply shell semantics | `gateway.py` was only a snapshot; `pulse.py` accepted `agents_root` but `wake.py:121-125` did not forward it. |
+| `proof.py` | Pure evaluator whose obligations were insufficient for liveness | The evaluator body was separable, but its proof contract admitted the counterexample in §7. |
 
-All nine bodies plus their local imports should be staged at once. `__init__.py` should **not** move unchanged: it eagerly imports every surface (`dharma_swarm/holon_system/sarathi/__init__.py:7-40`), so importing a pure leaf drags health, bridge, model schemas, and third-party dependencies. The target initializer should be lazy or export only a minimal shell API. **[E][I]**
+The successful probe staged all nine bodies plus local imports together. The
+existing `__init__.py` was unsuitable as a target initializer because it eagerly
+imported every surface (`dharma_swarm/holon_system/sarathi/__init__.py:7-40`),
+so importing a pure leaf dragged health, bridge, model schemas, and third-party
+dependencies. **[E][I]**
 
-### 4.3 Files that require rewriting to become host-agnostic
+### 4.3 Observed host coupling and missing abstractions
 
-| Current surface | Rewrite required |
+| Current surface | Host-independent gap observed |
 |---|---|
-| `scripts/runtime/sarathi_wake_daemon.py` | Put the executable body in the installed package; separate `run_one_cycle()` from supervisor control; use injected/configured state/workspace/provider/scheduler; keep the old script as a thin launcher. Its current bounded loop is useful, but “daemon” and “standing” overclaim the process contract. |
-| `scripts/runtime/sarathi_proof_window.py` | Package it, replace regex kill evidence with a validated/fresh supervisor/kill receipt, require durable cycle/context/provider/reply/memory witnesses, and fail closed when persistence fails. Keep old script as launcher until callers migrate. |
-| `scripts/runtime/codex_composer_wake_loop.py` | Do not copy its entire implementation. Extract a generic supervisor adapter if desired; remove the competing Sarathi profile after canonical service parity. Replace tmux and nonempty-string lease admission. |
-| Sarathi `gateway.py` + `pulse.py` | Keep snapshot/status as observability, not ingress. Add a real `handle_turn` contract and transport adapters. Liveness must be derived from fresh receipts rather than hard-coded booleans. |
-| `roaming_mailbox.py` adapter | Keep shared file queue, but add canonical execution identity and a consumer-side validated permit. For multi-host use, adapt the chosen A2A/NATS transport rather than treating git/file claims as fleet authority. |
-| Persona/identity | No move source exists. Add a version-controlled Sarathi persona/schema with an explicitly mutable state overlay; stop requiring an out-of-repo identity merely to answer HTTP. |
-| Context/memory adapters | Wrap existing canonical/shared services. Do not fork their stores under Sarathi. Ensure one turn ID spans compiled context, model attempt, reply, memory write, and receipt. |
-| Service packaging | Add an installed console entry point and package-only test; then provide launchd and systemd/container adapters generated from configuration. `scripts*` is excluded from wheels (`pyproject.toml:62-64`). |
+| `scripts/runtime/sarathi_wake_daemon.py` | Its useful bounded cycle was coupled to a checkout script and outside scheduler; a package-owned cycle boundary plus injected state/workspace/provider/scheduler did not exist. “Daemon” or “standing” overstated the process contract. |
+| `scripts/runtime/sarathi_proof_window.py` | It lacked authoritative persistence, listener, kill, context, provider, reply, and memory witnesses; persistence failure did not fail the proof closed. |
+| `scripts/runtime/codex_composer_wake_loop.py` | Its supervisor was tmux-specific, its Sarathi profile competed with the canonical organs, and activation admitted any nonempty lease string. |
+| Sarathi `gateway.py` + `pulse.py` | These were status projections, not ingress; no receipt-derived liveness or transport-neutral turn contract existed. |
+| `roaming_mailbox.py` adapter | The shared file queue lacked a single cross-host authority boundary, canonical execution identity, and consumer-side validated permit. |
+| Persona/identity | No version-controlled Sarathi persona/schema source existed; generic HTTP required an out-of-repo identity. |
+| Context/memory adapters | No adapter joined the shared services to one turn identity spanning context, model, reply, memory write, and receipt. |
+| Service packaging | No installed Sarathi entry point or package-only proof existed; `scripts*` was excluded from wheels (`pyproject.toml:62-64`). |
 
-### 4.4 Files that must stay where they are
+### 4.4 Observed shared-owner constraints
 
-| Surface | Why it stays |
+| Surface | Why the audit rejected seat-specific absorption |
 |---|---|
 | `dharma_swarm/holon_bridge.py`, `holon_runtime.py` | They are shared canonical primitives. `holon_system` explicitly promises a thin front door over existing canonical organs (`dharma_swarm/holon_system/__init__.py:1-6`), while facades import the legacy homes (`holon_system/runtime/bridge.py:1-14`, `wake_cycle.py:1-3`). The sprawl guard pins `load_holon` and `holon_wake_cycle` to these exact files (`scripts/governance/sprawl_guard.py:51-62`). Sarathi should import/adapt them, not absorb them. |
 | `holon_persistence.py`, `holon_health.py`, `holon_killswitch.py`, `holon_budget_guard.py` | Shared runtime leaves with non-Sarathi consumers. They may later move behind compatibility shims in a broader canonical-runtime migration, but not into a seat-specific package. |
@@ -378,17 +435,24 @@ All nine bodies plus their local imports should be staged at once. `__init__.py`
 | `api/routers/*`, `dharma_swarm/a2a/*`, `dharma_swarm/gateway/*`, cron, providers, Living Agent Kernel | Shared protocol/runtime families. Add Sarathi handlers/adapters at their extension seams; do not rename their canonical modules into a seat namespace. |
 | `.github/workflows/*`, Dockerfiles, Compose, launchd/systemd adapters | Host/platform integration must remain in conventional repository locations so packaging and operators can find it. The Sarathi package should expose commands/config consumed by these files. |
 
-The active-track search found **no owned surface** matching canonical Sarathi, the legacy holon runtime/control leaves, its two runtime wrappers, or the relevant operator-core modules. This is not permission to move them; it is a P0 ownership gap for a safety-critical shell. **[X][I]**
+The active-track file at the evidence revision contained **no owned surface**
+matching canonical Sarathi, the legacy Holon runtime/control leaves, its two
+runtime wrappers, or the relevant operator-core modules. This was an ownership
+gap, not permission to edit or move those surfaces. **[X][I]**
 
 ```bash
-sed -n '134,2019p' docs/governance/ACTIVE_TRACK.yaml | \
+git show "$SARATHI_AUDIT_COMMIT":docs/governance/ACTIVE_TRACK.yaml | \
   rg -n 'sarathi|holon_system|holon_(bridge|runtime|persistence|health|killswitch|budget_guard)|operator_core/(execution_lease|permissions|reversibility_gate|autonomy_dial)|scripts/runtime/sarathi_(wake_daemon|proof_window)'
 # exit 1: no active owned-surface match
 ```
 
-`owned_surfaces` is explicitly the coordination plane (`docs/governance/ACTIVE_TRACK.yaml:118-132`). Before implementation, a Sarathi track should own `dharma_swarm/sarathi/**`, its compatibility shims, tests, and service adapters; changes to the shared rows above must coordinate with their current owners. **[E][I]**
+`owned_surfaces` was explicitly the coordination plane
+(`docs/governance/ACTIVE_TRACK.yaml:118-132`). At this snapshot, any admitted
+implementation would first have needed an owner for the new surface and
+coordination with the shared owners above. This inference granted no admission.
+**[E][I]**
 
-### 4.5 Import graph and tested move order
+### 4.5 Import graph and move-probe observations
 
 The relevant current graph is:
 
@@ -431,20 +495,37 @@ The current `holon_system.runtime` facade passes import identity tests but has m
 3. **Naive legacy-runtime move fails.** Moving `dharma_swarm/holon_runtime.py` to `dharma_swarm/sarathi/runtime.py`, with editable-install fallback removed from `sys.meta_path`, made `import dharma_swarm.holon_system.runtime` fail exactly at `runtime/__init__.py:4 → wake_cycle.py:3 → ModuleNotFoundError: dharma_swarm.holon_runtime`. **[X]**
 4. **Checkout imports hide a wheel defect.** A package-only copy can import the current runtime facade, but `holon_system.transport.a2a_send` and `holon_system.responders.wake_profiles` fail with `ModuleNotFoundError: No module named 'scripts'`. `pyproject.toml:62-64` excludes `scripts*`; five packaged facades import those excluded modules. **[X]**
 
-#### Required import-safe sequence
+#### Constraints established by the probes
 
-1. Admit an owned `dharma_swarm/sarathi/**` surface and specify its public turn/authority contracts.
-2. Add the **entire** target package first, with a lazy/minimal initializer. Do not remove old files.
-3. Add a package-owned runtime command and package-only wheel test. Reverse dependencies so old scripts import package functions, never package modules importing `scripts.runtime`.
-4. Convert each old `holon_system.sarathi` module to a compatibility shim or update its five production references one by one. After each slice, import both old-first and new-first in fresh processes and run the focused tests.
-5. Bind shared context, memory, invoker, transport, scheduler, and authority adapters without moving their implementations.
-6. Only after zero consumers remain, remove old bodies. Keep legacy `holon_bridge`/`holon_runtime` canonical unless a separate, atomic runtime-wide migration also updates their 13 production import edges, sprawl guard, verifiers, policy, ownership, and shims.
+The probes established these constraints without prescribing an implementation
+sequence:
 
-This sequence keeps the repository importable at every intermediate commit. The obvious move-first sequences do not. **[X][I]**
+1. No target-package work was admitted until an owner and public
+   turn/authority contracts existed.
+2. Whole-package add-first staging preserved both old and candidate imports;
+   single-file move-first staging did not.
+3. A package-owned runtime boundary and package-only wheel test were necessary
+   to prevent installed modules from importing excluded `scripts.runtime` code.
+4. Compatibility consumers meant removal could not precede consumer migration
+   and fresh-process old-first/new-first import tests.
+5. Shared context, memory, invoker, transport, scheduler, and authority engines
+   had independent owners and could only be integrated through adapters or a
+   separately admitted migration.
+6. Removing legacy bodies while consumers remained broke imports; moving shared
+   `holon_bridge`/`holon_runtime` also implicated 13 production import edges,
+   sprawl guard, verifiers, policy, ownership, and shims.
+
+These observations explain why the move-first simulations failed. They do not
+select or authorize a future implementation plan. **[X][I]**
 
 ## 5. The callable-surface question
 
-“Any agent or model can call Sarathi” should mean that a caller does not need a checkout-specific Python import, a human terminal, a home-directory identity sidecar, or knowledge of Sarathi’s internal organs. One versioned handler must accept a transport-neutral turn envelope and return/deliver a correlated result:
+For this census, the operator phrase “any agent or model can call Sarathi” was
+evaluated against a deliberately strict, non-binding criterion: a caller would
+not need a checkout-specific Python import, human terminal, home-directory
+identity sidecar, or knowledge of internal organs, and one versioned handler
+would accept a transport-neutral turn envelope and return a correlated result.
+The evaluated shape was:
 
 ```text
 handle_turn(TurnEnvelope) -> TurnReceipt
@@ -461,7 +542,11 @@ TurnReceipt:
   effect receipts, episodic-write ref, budget use, errors
 ```
 
-The same handler should be mounted behind Python, HTTP, A2A/NATS, and MCP adapters. A caller-specific adapter may authenticate or stream, but it must not substitute a separate prompt/model/agent implementation. Effects must validate `ExecutionPermit` at the consumer boundary; callability is not blanket authority. **[I]**
+The audit treated transport adapters that authenticate or stream while calling
+the same handler as satisfying that criterion; an adapter with its own
+prompt/model/agent did not. It also treated consumer-side `ExecutionPermit`
+validation as distinct from callability, because callability alone conferred no
+effect authority. **[I]**
 
 ### Existing invocation surfaces
 
@@ -509,35 +594,141 @@ Ordered by how much downstream integration each blocks:
 
 10. **Self-modification and consolidation have no owned, import-safe lane.** Eight independent evolution families exist, none callable by Sarathi; several bypass the guarded Darwin promotion path (`dharma_swarm/autoresearch_loop.py:434-507`, `dharma_swarm/build_engine.py:166-425`). No active `owned_surfaces` glob covers Sarathi, its wrappers, or shared authority leaves, while naive moves break facade imports and shared canonical paths are policy-pinned (`scripts/governance/sprawl_guard.py:51-62`).
 
-The first closure slice should address blockers 1, 2, 3, 5, and 6 together: an installed `handle_turn`, one versioned persona/card, one actual invoker, one reply adapter, and consumer-side validated execution permits. Adding another scheduler or another store before that would increase scatter without creating a shell. **[I]**
+The dependency graph coupled blockers 1, 2, 3, 5, and 6: a turn boundary,
+versioned identity, cognition, reply path, and consumer-side authority had to
+close together to constitute a shell at this revision. Closing only another
+scheduler or store would not have connected that path. This is an audit
+dependency finding, not a work-packet prescription. **[I]**
 
 ## 7. Verification ledger
 
-### Focused source tests
+### Explicit citation-existence and line-range gate
 
-Run against the exact `origin/main` export:
+Run this from a checkout containing this report. It derives explicit source and
+tree paths from §§0–7, then validates them against the evidence commit. The
+four `dharma_swarm/sarathi` target-path spellings are intentionally checked as
+absent because they appear only in the hypothetical layout and failed move
+probes.
 
 ```bash
-.venv/bin/python -m pytest -q \
-  tests/test_holon_system_imports.py \
-  tests/test_holon_persistence.py \
-  tests/test_holon_budget_guard.py \
-  tests/test_holon_killswitch.py \
-  tests/test_holon_health.py \
-  tests/test_holon_runtime.py \
-  tests/test_holon_runtime_integration.py \
-  tests/test_autonomy_dial.py \
-  tests/test_reversibility_gate.py \
-  tests/test_operator_core_permissions.py \
-  tests/test_sarathi_plan.py \
-  tests/test_sarathi_delegate.py \
-  tests/test_sarathi_wake.py \
-  tests/test_sarathi_proof.py \
-  tests/test_sarathi_proof_window.py \
-  tests/test_sarathi_wake_daemon.py \
-  tests/test_codex_composer_wake_loop.py
+SARATHI_AUDIT_COMMIT=9d792ceacef32a1698838dc01586ed90ecb93666
+python3 - "$SARATHI_AUDIT_COMMIT" <<'PY'
+from pathlib import Path
+import re
+import subprocess
+import sys
 
-# 158 passed in 2.47s
+commit = sys.argv[1]
+report_path = Path("docs/reports/SARATHI_SHELL_CENSUS_2026-08-02.md")
+report = report_path.read_text(encoding="utf-8").split(
+    "## 8. Post-census update", 1
+)[0]
+
+spans = re.findall(r"`([^`\n]+)`", report)
+path_pattern = re.compile(
+    r"(?<![A-Za-z0-9_./-])"
+    r"((?:\.github|api|dharma_swarm|scripts|tests|docs)/[A-Za-z0-9_./-]+|"
+    r"Dockerfile(?:\.swarm)?|docker-compose\.yml|pyproject\.toml|"
+    r"garden_daemon\.py|run_mcp_stdio\.py)"
+    r"(?::([0-9][0-9,\-]*))?"
+    r"(?![A-Za-z0-9_./*-])"
+)
+
+refs: dict[str, list[str]] = {}
+for span in spans:
+    for path, line_spec in path_pattern.findall(span):
+        path = path.rstrip(".")
+        if path == report_path.as_posix():
+            continue
+        refs.setdefault(path, []).append(line_spec)
+
+expected_absent = {
+    "dharma_swarm/sarathi",
+    "dharma_swarm/sarathi/",
+    "dharma_swarm/sarathi/plan.py",
+    "dharma_swarm/sarathi/runtime.py",
+}
+missing: list[str] = []
+unexpectedly_present: list[str] = []
+range_errors: list[tuple[str, int, int]] = []
+
+for path, line_specs in sorted(refs.items()):
+    present = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}:{path}"],
+        capture_output=True,
+        check=False,
+    ).returncode == 0
+    if path in expected_absent:
+        if present:
+            unexpectedly_present.append(path)
+        continue
+    if not present:
+        missing.append(path)
+        continue
+
+    cited_lines = [
+        int(number)
+        for spec in line_specs
+        for number in re.findall(r"\d+", spec)
+    ]
+    if not cited_lines:
+        continue
+    blob = subprocess.run(
+        ["git", "cat-file", "-p", f"{commit}:{path}"],
+        capture_output=True,
+        check=True,
+    ).stdout
+    line_count = blob.count(b"\n") + int(not blob.endswith(b"\n"))
+    if max(cited_lines) > line_count:
+        range_errors.append((path, max(cited_lines), line_count))
+
+if missing or unexpectedly_present or range_errors:
+    raise SystemExit(
+        f"missing={missing}; unexpectedly_present={unexpectedly_present}; "
+        f"range_errors={range_errors}"
+    )
+
+print(f"verified_present_paths={len(set(refs) - expected_absent)}")
+print(f"verified_absent_targets={len(set(refs) & expected_absent)}")
+print("line_range_errors=0")
+PY
+
+# verified_present_paths=118
+# verified_absent_targets=4
+# line_range_errors=0
+```
+
+### Focused source tests
+
+Run against the exact exported commit using a Python 3.11+ environment with the
+project's test dependencies installed:
+
+```bash
+SARATHI_PYTHON="${SARATHI_PYTHON:-python3.11}"
+(
+  cd "$SARATHI_AUDIT_ROOT"
+  PYTHONPATH="$SARATHI_AUDIT_ROOT" "$SARATHI_PYTHON" -m pytest -q \
+    tests/test_holon_system_imports.py \
+    tests/test_holon_persistence.py \
+    tests/test_holon_budget_guard.py \
+    tests/test_holon_killswitch.py \
+    tests/test_holon_health.py \
+    tests/test_holon_runtime.py \
+    tests/test_holon_runtime_integration.py \
+    tests/test_autonomy_dial.py \
+    tests/test_reversibility_gate.py \
+    tests/test_operator_core_permissions.py \
+    tests/test_sarathi_plan.py \
+    tests/test_sarathi_delegate.py \
+    tests/test_sarathi_wake.py \
+    tests/test_sarathi_proof.py \
+    tests/test_sarathi_proof_window.py \
+    tests/test_sarathi_wake_daemon.py \
+    tests/test_codex_composer_wake_loop.py
+)
+
+# 158 passed (fresh repair rerun: 1.30s on 2026-08-04;
+# original audit run: 2.47s)
 ```
 
 Passing tests establish current intended unit behavior; they do not refute the executed authority/persistence counterexamples because those cross-module obligations are absent from the fixtures. **[X][I]**
@@ -545,12 +736,16 @@ Passing tests establish current intended unit behavior; they do not refute the e
 ### Safe one-cycle command
 
 ```bash
-DGC_SARATHI_AUTONOMY=shadow \
-  .venv/bin/python scripts/runtime/sarathi_wake_daemon.py \
-  --cycles 1 \
-  --state-root /private/tmp/sarathi-census-smoke/state \
-  --agents-root /private/tmp/sarathi-census-smoke/agents \
-  --json
+SARATHI_SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sarathi-smoke.XXXXXX")"
+(
+  cd "$SARATHI_AUDIT_ROOT"
+  PYTHONPATH="$SARATHI_AUDIT_ROOT" DGC_SARATHI_AUTONOMY=shadow \
+    "$SARATHI_PYTHON" scripts/runtime/sarathi_wake_daemon.py \
+    --cycles 1 \
+    --state-root "$SARATHI_SMOKE_ROOT/state" \
+    --agents-root "$SARATHI_SMOKE_ROOT/agents" \
+    --json
+)
 
 # exit 0; status=ran; cycles_run=1; autonomy_level=shadow;
 # wake_loop_active=false; spent_usd=0; no dispatch
@@ -581,11 +776,128 @@ package-only transport facade: FAILED (No module named 'scripts')
 
 ### Runtime counterexample command
 
-The temporary fixture monkey-patched only the persistence writer and kill-receipt reader; production classification, delegation, mailbox claiming, wake, and proof evaluation remained unchanged:
+This complete inline fixture monkey-patches only the persistence writer and
+kill-receipt reader. Production classification, delegation, mailbox claiming,
+wake, and proof evaluation remain unchanged:
 
 ```bash
-PYTHONPATH=/private/tmp/sarathi_shell_census_origin_main_9d792ceacef3 \
-  .venv/bin/python /private/tmp/sarathi_census_repros.py
+SARATHI_PYTHON="${SARATHI_PYTHON:-python3.11}"
+(
+  cd "$SARATHI_AUDIT_ROOT"
+  PYTHONPATH="$SARATHI_AUDIT_ROOT" "$SARATHI_PYTHON" - <<'PY'
+import asyncio
+import importlib.util
+import json
+import tempfile
+from pathlib import Path
+
+from dharma_swarm import holon_persistence, holon_runtime
+from dharma_swarm.holon_system.sarathi.delegate import delegate_all
+from dharma_swarm.holon_system.sarathi.plan import PlannedDelegation
+from dharma_swarm.operator_core.autonomy_dial import AutonomyLevel
+from dharma_swarm.roaming_mailbox import RoamingMailbox
+
+
+async def lease_repro() -> dict:
+    with tempfile.TemporaryDirectory(prefix="sarathi-lease-repro-") as raw:
+        mailbox = RoamingMailbox(queue_root=Path(raw) / "mailbox")
+        item = PlannedDelegation(
+            action="edit a repository file",
+            recipient="worker",
+            channel="mailbox",
+            summary="edit a repository file",
+            body="edit a repository file",
+        )
+        outcomes = await delegate_all(
+            [item], level=AutonomyLevel.DISPATCH, mailbox=mailbox
+        )
+        task = mailbox.load_task(outcomes[0].receipt_ref)
+        claimed = mailbox.claim_task(task.task_id, claimed_by="worker")
+        return {
+            "action_class": outcomes[0].gate.get("action_class"),
+            "outcome_status": outcomes[0].status,
+            "task_status_after_claim": claimed.status,
+            "metadata_keys": sorted(claimed.metadata),
+            "execution_lease_id": claimed.metadata.get("execution_lease_id"),
+        }
+
+
+async def persistence_repro() -> dict:
+    original = holon_persistence.save_cycle_record
+    calls = {"count": 0}
+
+    def fail(*args, **kwargs):
+        calls["count"] += 1
+        raise OSError("injected persistence failure")
+
+    async def work(_name: str):
+        return "inspect status", "inspection report"
+
+    holon_persistence.save_cycle_record = fail
+    try:
+        result = await holon_runtime.holon_wake_cycle(
+            "sarathi", work, spent_usd=0.0, cap_usd=1.0, persist=True
+        )
+    finally:
+        holon_persistence.save_cycle_record = original
+    return {"result_status": result.get("status"), "persist_calls": calls["count"]}
+
+
+async def proof_without_persistence_repro() -> dict:
+    proof_path = Path("scripts/runtime/sarathi_proof_window.py").resolve()
+    spec = importlib.util.spec_from_file_location("sarathi_proof_repro", proof_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {proof_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    original_save = holon_persistence.save_cycle_record
+    original_receipt = module.read_kill_path_receipt
+    calls = {"count": 0}
+
+    def fail(*args, **kwargs):
+        calls["count"] += 1
+        raise OSError("injected persistence failure")
+
+    module.read_kill_path_receipt = lambda _root: {
+        "verified": True,
+        "verified_at": "2026-08-02T00:00:00+00:00",
+        "method": "synthetic fixture",
+    }
+    holon_persistence.save_cycle_record = fail
+    try:
+        with tempfile.TemporaryDirectory(prefix="sarathi-proof-no-persist-") as raw:
+            state_root = Path(raw)
+            report = await module.run_window(
+                cycles=14,
+                state_root=state_root,
+                backlog=module.DEFAULT_BACKLOG,
+                cap_usd=1.0,
+            )
+            event_path = state_root / "agents" / "sarathi" / "holon_events.jsonl"
+            return {
+                "passed": report["passed"],
+                "statuses": sorted(set(report["statuses"])),
+                "persist_calls": calls["count"],
+                "event_log_exists": event_path.exists(),
+            }
+    finally:
+        holon_persistence.save_cycle_record = original_save
+        module.read_kill_path_receipt = original_receipt
+
+
+async def main() -> None:
+    print(json.dumps({
+        "lease_repro": await lease_repro(),
+        "persistence_repro": await persistence_repro(),
+        "proof_without_persistence_repro": await proof_without_persistence_repro(),
+    }, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+PY
+)
 
 # exit 0
 # needs_lease task: dispatched, claimed, execution_lease_id=null
@@ -595,11 +907,19 @@ PYTHONPATH=/private/tmp/sarathi_shell_census_origin_main_9d792ceacef3 \
 
 The causes are independently reproducible from cited source: `GATED_CLASSES` at `delegate.py:52`, mailbox enqueue at `:298-326`, fail-open `_persist` at `holon_runtime.py:45-50`, receipt-bearing statuses at `proof.py:22-26`, and propose-only window at `sarathi_proof_window.py:168-195`.
 
-## Final consolidation decision
+## Census conclusion — historical and non-authorizing
 
-Create `dharma_swarm/sarathi/` as the single **seat composition root**, not as a dump of shared implementations. Stage the existing Sarathi organ package add-first, package the runtime, add a real turn handler/persona/A2A card, and wire existing context, memory, provider, tools, scheduler, and governance through adapters. Keep shared engines and policy-pinned modules in place. Require a single execution identity across ingress, context, model, effect, reply, memory, and proof, and require an actual validated execution permit immediately before every effect.
+At the evidence revision, the findings favored a single **seat composition
+root** over a dump of shared implementations. The import probes favored
+add-first compatibility, and the ownership audit favored adapters over moving
+shared engines or policy-pinned modules. The audit also identified continuous
+execution identity and consumer-side permit validation as missing proof
+obligations. These findings constrain candidate designs; they do not select an
+implementation or grant edit admission.
 
-Until that path passes a real message-to-reply-and-memory integration test under both a Mac supervisor and a Linux/VPS supervisor, the truthful status remains:
+At that revision, no real message-to-reply-and-memory integration test had
+passed under both a Mac supervisor and a Linux/VPS supervisor, so the
+snapshot-local status was:
 
 ```text
 SARATHI = GENESIS SOURCE + DETERMINISTIC ORGANS + BOUNDED WRAPPERS
@@ -615,5 +935,32 @@ read-only/bootstrap-order tests (`tests/test_mcp_server.py:226-316`). Therefore
 the statements above saying “no Sarathi MCP import/tool” and
 `Sarathi-specific MCP tools: 0` are historical for `9d792ceac`, not
 current-main facts. The new tools accept no message and perform no dispatch, so
-the end-to-end-shell verdict is unchanged. Use
-[`../persistent_agents/README.md`](../persistent_agents/README.md) as the current umbrella doorway.
+the end-to-end-shell verdict is unchanged. For current orientation, use the
+current ref's code, tests, and `docs/persistent_agents/README.md` when that path
+is present; this report remains the dated evidence record.
+
+## 9. Reconciliation with the P0 composition-root work — 2026-08-04
+
+After this census, governance commit `53263627874067f076db9efd74b00ce4c556d049`
+admitted a P0 composition-root contract, and implementation commit
+`5382c92b6cec1f3fc48cb3e055189cbbd6ba2913` added a bounded
+`dharma_swarm/sarathi/` root. Those immutable commits supersede this report's
+hypothetical tree and ordering wherever they are present. They do not erase the
+pre-P0 scatter measurement or make deferred transports, governed effects,
+heartbeat, semantic-memory retrieval, or self-modification complete.
+
+Determine landed state mechanically instead of inferring it from this prose:
+
+```bash
+git fetch origin main
+SARATHI_P0_COMMIT=5382c92b6cec1f3fc48cb3e055189cbbd6ba2913
+if git merge-base --is-ancestor "$SARATHI_P0_COMMIT" origin/main; then
+  printf 'LANDED %s\n' "$SARATHI_P0_COMMIT"
+else
+  printf 'NOT_ON_MAIN %s\n' "$SARATHI_P0_COMMIT"
+fi
+git show --stat --oneline "$SARATHI_P0_COMMIT"
+```
+
+When the P0 commit is landed, `docs/persistent_agents/README.md` is the newer
+navigation owner and this census remains subordinate dated evidence.
