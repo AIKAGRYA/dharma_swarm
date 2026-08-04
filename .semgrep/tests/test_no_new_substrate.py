@@ -14,11 +14,14 @@ import codecs
 import io
 import json
 import sqlite3
+import sqlite3 as db
 from pathlib import Path
+from sqlite3 import connect as sqlite_connect
 from typing import Protocol
 
 import aiofiles
 import aiosqlite
+import aiosqlite as asq
 
 
 class GraphStore:
@@ -78,6 +81,31 @@ class NestedUnderIfSqliteStore:
 class AsyncAiosqliteStore:
     async def connect(self, path: str) -> None:
         self._conn = await aiosqlite.connect(path)
+
+
+# --- Import ALIASES. Codex read the `^(sqlite3|aiosqlite)$` metavariable
+#     regex as matching source spelling and reported `import sqlite3 as db`
+#     as an evasion. Semgrep resolves the alias to the imported module before
+#     the regex runs, so these already fired; the claim is refuted and these
+#     fixtures exist so the behavior is a locked contract, not an assumption
+#     (measured, semgrep 1.168.0 — PR #1220). ---
+
+# ruleid: dharma.no-new-substrate
+class AliasedDriverStore:
+    def __init__(self, path: str) -> None:
+        self.conn = db.connect(path)
+
+
+# ruleid: dharma.no-new-substrate
+class AliasedAsyncDriverStore:
+    async def connect(self, path: str) -> None:
+        self._conn = await asq.connect(path)
+
+
+# ruleid: dharma.no-new-substrate
+class AliasedFromImportStore:
+    def open_db(self, path: str):
+        return sqlite_connect(path)
 
 
 # --- JSONL / append substrates: promised since 2026-04-26, detected from
@@ -429,6 +457,18 @@ class AliasedOpenLedger:
     def append(self, record: dict) -> None:
         with codecs.open(self.path, "a", "utf-8") as fh:
             fh.write(json.dumps(record) + "\n")
+
+
+# todoruleid: dharma.no-new-substrate
+class OtherDriverStore:
+    """Drivers other than sqlite3/aiosqlite are a named gap in Rule 2's
+    message. Alias resolution does not help here — the module itself is out
+    of the regex."""
+
+    def open_db(self, path: str):
+        import duckdb
+
+        return duckdb.connect(path)
 
 
 # todoruleid: dharma.no-new-substrate
