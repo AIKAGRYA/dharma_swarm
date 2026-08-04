@@ -728,6 +728,34 @@ class RuntimeReceipt:
     created_at: datetime = field(default_factory=_utc_now)
 
 
+def _runtime_receipt_insert(
+    receipt: RuntimeReceipt,
+) -> tuple[str, tuple[Any, ...]]:
+    return (
+        "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
+        " run_id, task_id, trace_id, correlation_id, causation_id,"
+        " parent_run_id, agent_id, idempotency_key, side_effect_key,"
+        " status, payload_json, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            receipt.receipt_id,
+            receipt.receipt_type,
+            receipt.run_id,
+            receipt.task_id,
+            receipt.trace_id,
+            receipt.correlation_id,
+            receipt.causation_id,
+            receipt.parent_run_id,
+            receipt.agent_id,
+            receipt.idempotency_key,
+            receipt.side_effect_key,
+            receipt.status,
+            _json_dump(receipt.payload),
+            receipt.created_at.isoformat(),
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class IdempotencyRecord:
     idempotency_key: str
@@ -3187,29 +3215,7 @@ class RuntimeStateStore:
     async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
-                " run_id, task_id, trace_id, correlation_id, causation_id,"
-                " parent_run_id, agent_id, idempotency_key, side_effect_key,"
-                " status, payload_json, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    receipt.receipt_id,
-                    receipt.receipt_type,
-                    receipt.run_id,
-                    receipt.task_id,
-                    receipt.trace_id,
-                    receipt.correlation_id,
-                    receipt.causation_id,
-                    receipt.parent_run_id,
-                    receipt.agent_id,
-                    receipt.idempotency_key,
-                    receipt.side_effect_key,
-                    receipt.status,
-                    _json_dump(receipt.payload),
-                    receipt.created_at.isoformat(),
-                ),
-            )
+            await db.execute(*_runtime_receipt_insert(receipt))
             await db.commit()
         return receipt
 
@@ -3217,31 +3223,44 @@ class RuntimeStateStore:
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
-                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
-                " run_id, task_id, trace_id, correlation_id, causation_id,"
-                " parent_run_id, agent_id, idempotency_key, side_effect_key,"
-                " status, payload_json, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    receipt.receipt_id,
-                    receipt.receipt_type,
-                    receipt.run_id,
-                    receipt.task_id,
-                    receipt.trace_id,
-                    receipt.correlation_id,
-                    receipt.causation_id,
-                    receipt.parent_run_id,
-                    receipt.agent_id,
-                    receipt.idempotency_key,
-                    receipt.side_effect_key,
-                    receipt.status,
-                    _json_dump(receipt.payload),
-                    receipt.created_at.isoformat(),
-                ),
-            )
+            db.execute(*_runtime_receipt_insert(receipt))
             db.commit()
         return receipt
+
+    async def record_session_event_with_runtime_receipt(
+        self,
+        event: SessionEventRecord,
+        receipt: RuntimeReceipt,
+    ) -> tuple[SessionEventRecord, RuntimeReceipt]:
+        """Persist one session event and runtime receipt in one transaction."""
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                await self._record_session_event_async_db(db, event)
+                await db.execute(*_runtime_receipt_insert(receipt))
+                await db.commit()
+            except BaseException:
+                await db.rollback()
+                raise
+        return event, receipt
+
+    def record_session_event_with_runtime_receipt_sync(
+        self,
+        event: SessionEventRecord,
+        receipt: RuntimeReceipt,
+    ) -> tuple[SessionEventRecord, RuntimeReceipt]:
+        """Synchronously persist an event and receipt in one transaction."""
+
+        def operation(
+            db: sqlite3.Connection,
+        ) -> tuple[SessionEventRecord, RuntimeReceipt]:
+            self._record_session_event_sync_db(db, event)
+            db.execute(*_runtime_receipt_insert(receipt))
+            return event, receipt
+
+        return self._run_sync_transaction(operation, immediate=True)
 
     async def list_runtime_receipts(
         self,
