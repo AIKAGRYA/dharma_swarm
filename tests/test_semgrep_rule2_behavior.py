@@ -199,19 +199,37 @@ def test_synthetic_new_substrate_is_caught_in_a_ratified_file(tmp_path):
     """WP-0C1R's negative control (C), re-run behaviorally: exemptions are
     class-scoped, so a NEW substrate class added to a ratified file is caught.
 
-    Runs on a copy — the tree is never mutated.
+    Runs on a copy — the tree is never mutated. Because the copy sits OUTSIDE
+    the ratified path, the collision rule (name+file scoped since 2026-08-04)
+    also fires on the copied SQLiteGraphStore itself. That is the file binding
+    working: the exemption follows dharma_swarm/graph_store.py, not the text.
     """
     target = tmp_path / "graph_store_probe.py"
+    original = (REPO_ROOT / "dharma_swarm/graph_store.py").read_text(encoding="utf-8")
     target.write_text(
-        (REPO_ROOT / "dharma_swarm/graph_store.py").read_text(encoding="utf-8")
-        + "\n\nclass SmuggledLedger:\n"
+        original + "\n\nclass SmuggledLedger:\n"
         "    def append(self, record):\n"
         '        with open(self.path, "a") as fh:\n'
         "            fh.write(str(record))\n",
         encoding="utf-8",
     )
     findings = _scan(target)
-    assert [rule_id for _, rule_id in findings] == [RULE2], findings
+    smuggled_line = len(original.splitlines()) + 3
+    assert findings == [
+        (_ratified_sqlite_graph_store_line(), RULE2B),
+        (smuggled_line, RULE2),
+    ], findings
+
+
+def _ratified_sqlite_graph_store_line() -> int:
+    """1-based line of `class SQLiteGraphStore` in the ratified file."""
+    for number, line in enumerate(
+        (REPO_ROOT / "dharma_swarm/graph_store.py").read_text(encoding="utf-8").splitlines(),
+        start=1,
+    ):
+        if line.startswith("class SQLiteGraphStore"):
+            return number
+    raise AssertionError("class SQLiteGraphStore vanished from graph_store.py")
 
 
 @requires_semgrep

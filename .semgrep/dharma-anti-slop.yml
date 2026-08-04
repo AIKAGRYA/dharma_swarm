@@ -393,39 +393,61 @@ rules:
   # ratified name silently inherits its exemption. Before 2026-08-04 the only
   # guard was a config-shape test that grepped source text; this makes the
   # guard behavioral — the scanner itself refuses the collision.
+  #
+  # DISCRIMINATOR (2026-08-04, codex + devin review on PR #1220): the first
+  # version of this rule ANDed the shape set with `class $NAME($BASE):`, using
+  # "declares a base" as a proxy for "is not the ratified definition". Measured
+  # against semgrep 1.168.0 that proxy was wrong in both directions: a
+  # multi-base `class SQLiteGraphStore(Protocol, ABC):` DID match `$NAME($BASE)`
+  # (so devin's multi-parent half was already covered), while a BASE-LESS
+  # `class BridgeRegistry:` or `class KnowledgeStore:` in a new module matched
+  # nothing here and was swallowed by Rule 2's name-scoped pattern-not — zero
+  # findings for exactly the collision this rule exists to prevent. The
+  # discriminator is now the thing WP-0C1R actually ratified: three named
+  # classes in three named FILES. Any other definition of those names that
+  # opens a substrate fires, whatever its base list.
   # ===========================================================================
   - id: dharma.no-new-substrate-exempt-name-collision
     message: |
       This class re-uses one of the three WP-0C1R ratified exempt substrate
-      names (BridgeRegistry / SQLiteGraphStore / KnowledgeStore) with a
-      different definition — it declares explicit base classes — AND opens its
-      own persistence substrate. Rule 2's exemptions are class-NAME-scoped, so
-      this definition would silently inherit an exemption it was never
-      granted. Rename the class, or adjudicate it with the operator through
-      the same route WP-0C1R used (declare the closure-layer role, then record
-      the disposition in reports/governance/titanium/). The sqlite-free
-      `KnowledgeStore(Protocol)` in dharma_swarm/engine/knowledge_store.py is
-      deliberately NOT a finding: this rule fires only when the colliding
-      class actually opens a substrate.
+      names (BridgeRegistry / SQLiteGraphStore / KnowledgeStore) outside the
+      file that name was ratified in, AND opens its own persistence substrate.
+      Rule 2's exemptions are class-NAME-scoped, so this definition would
+      silently inherit an exemption it was never granted — with no base class,
+      with one, or with several. Rename the class, or adjudicate it with the
+      operator through the same route WP-0C1R used (declare the closure-layer
+      role, then record the disposition in reports/governance/titanium/). The
+      sqlite-free `KnowledgeStore(Protocol)` in
+      dharma_swarm/engine/knowledge_store.py is deliberately NOT a finding:
+      this rule fires only when the colliding class actually opens a
+      substrate.
+
+      WHAT THIS RULE DOES NOT CATCH: a SECOND class re-using a ratified name
+      INSIDE that name's own canonical file (the three paths excluded below).
+      Excluding those files is what lets the ratified definitions themselves
+      stay silent; a same-file copycat is the residue. It has a
+      `# todoruleid:` line in .semgrep/tests/test_no_new_substrate.py, and the
+      structural collision check in tests/test_semgrep_wrapper.py is the
+      backstop there.
     severity: WARNING
     languages: [python]
     paths:
       exclude:
         - "dharma_swarm/runtime_state.py"
+        # The three WP-0C1R ratified definitions, by exact path — no globs.
+        # This is the ONLY thing that keeps them silent under this rule, which
+        # is why the base-class requirement could be dropped. Verified
+        # 2026-08-04: these are the only in-tree definitions of those names
+        # other than the sqlite-free dharma_swarm/engine/knowledge_store.py
+        # Protocol, which stays silent on the evidence (no substrate opened).
+        - "dharma_swarm/bridge_registry.py"
+        - "dharma_swarm/graph_store.py"
+        - "dharma_swarm/knowledge_units.py"
     patterns:
       - pattern-either: *dharma-substrate-open-shapes
       - metavariable-regex:
           metavariable: $NAME
           regex: '^(BridgeRegistry|SQLiteGraphStore|KnowledgeStore)$'
-      # Requires explicit base classes, which the three ratified definitions
-      # in bridge_registry.py / knowledge_units.py do not have. SQLiteGraphStore
-      # legitimately has one, so its exact ratified signature is excluded.
-      - pattern: |
-          class $NAME($BASE):
-              ...
-      - pattern-not: |
-          class SQLiteGraphStore(GraphStore):
-              ...
 
   # ===========================================================================
   # Rule 4: dharma.scripts-no-git-add-all

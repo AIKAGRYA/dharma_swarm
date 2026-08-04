@@ -209,21 +209,34 @@ class IoOpenAppendStore:
         fh.write(json.dumps(record) + "\n")
 
 
-# --- Ratified WP-0C1R exemptions: must stay silent -------------------------
+# --- Ratified WP-0C1R exemptions: Rule 2 must stay silent ------------------
+# Rule 2's exemptions are NAME-scoped, so these three are silent under it
+# wherever they appear — that is what the `ok:` lines prove.
+#
+# The COLLISION rule is name+FILE scoped (from 2026-08-04): silence is granted
+# to dharma_swarm/{bridge_registry,graph_store,knowledge_units}.py only. This
+# fixture is none of those, so the same three spellings are collisions here —
+# which is the point. Proof that the real ratified files stay silent under
+# BOTH rules is
+# tests/test_semgrep_rule2_behavior.py::test_ratified_exemptions_stay_silent_in_the_real_tree,
+# which scans them in the tree.
 
 # ok: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
 class BridgeRegistry:
     def __init__(self, path: str) -> None:
         self.conn = sqlite3.connect(path)
 
 
 # ok: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
 class SQLiteGraphStore(GraphStore):
     def __init__(self, path: str) -> None:
         self.conn = sqlite3.connect(path)
 
 
 # ok: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
 class KnowledgeStore:
     def __init__(self, path: str) -> None:
         self.conn = sqlite3.connect(path)
@@ -269,9 +282,12 @@ class UnrelatedBaseStore(GraphStore, CacheMixin):
 
 
 # --- Name collision with a ratified exemption ------------------------------
-# Rule 2 itself is name-scoped and swallows this (documented gap in its
-# message); the companion rule catches it because the class declares a base
-# AND opens a substrate.
+# Rule 2 itself is name-scoped and swallows every one of these (documented gap
+# in its message); the companion rule catches them because the name is
+# re-used OUTSIDE its canonical file AND the class opens a substrate. The base
+# list is irrelevant — none, one, or several.
+
+# --- one base (the shape the first version of the companion rule covered) ---
 
 # todoruleid: dharma.no-new-substrate
 # ruleid: dharma.no-new-substrate-exempt-name-collision
@@ -280,8 +296,46 @@ class KnowledgeStore(Protocol):  # noqa: F811
         self.conn = sqlite3.connect(path)
 
 
+# todoruleid: dharma.no-new-substrate
 # ruleid: dharma.no-new-substrate-exempt-name-collision
 class BridgeRegistry(GraphStore):  # noqa: F811
+    def append(self, record: dict) -> None:
+        with open(self.path, "a") as fh:
+            fh.write(json.dumps(record) + "\n")
+
+
+# --- ZERO bases: codex's and devin's shared finding. `class $NAME($BASE):`
+#     binds exactly one base expression, so these matched nothing at all and
+#     Rule 2's name-scoped pattern-not swallowed them: zero findings for the
+#     exact collision the companion rule exists to prevent. ---
+
+# todoruleid: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
+class BridgeRegistry:  # noqa: F811
+    """A base-less copycat appending its own JSONL."""
+
+    def append(self, record: dict) -> None:
+        with open(self.path, "a") as fh:
+            fh.write(json.dumps(record) + "\n")
+
+
+# todoruleid: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
+class KnowledgeStore:  # noqa: F811
+    """A base-less copycat opening its own SQLite."""
+
+    def __init__(self, path: str) -> None:
+        self.conn = sqlite3.connect(path)
+
+
+# --- MULTIPLE bases: devin's second shape. Measured against semgrep 1.168.0
+#     this one ALREADY matched `class $NAME($BASE):` before the fix — the
+#     claim that it evaded is refuted. Kept as a fixture so the behavior is
+#     locked in rather than re-argued. ---
+
+# todoruleid: dharma.no-new-substrate
+# ruleid: dharma.no-new-substrate-exempt-name-collision
+class SQLiteGraphStore(GraphStore, CacheMixin):  # noqa: F811
     def append(self, record: dict) -> None:
         with open(self.path, "a") as fh:
             fh.write(json.dumps(record) + "\n")

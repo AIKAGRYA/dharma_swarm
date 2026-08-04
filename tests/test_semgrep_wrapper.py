@@ -326,6 +326,10 @@ _RULE2_RATIFIED_ROLE_CLASSES = {
     "KnowledgeStore": "dharma_swarm/knowledge_units.py",
 }
 
+# An append-mode open in ANY flag ordering — CPython reads the mode string as a
+# set of flags, so "+a" / "ba" / "ta" / "+ab" all append.
+_APPEND_OPEN_RE = re.compile(r"""\.?\bopen\([^)]*?["'][bt+]*a[bt+]*["']""")
+
 # Closed role vocabulary from docs/governance/ANTI_SLOP_RULES.md Rule 2.
 _RULE2_ROLE_VOCABULARY = {
     "canonical-store",
@@ -445,10 +449,26 @@ def test_rule2_exemptions_are_class_scoped_and_role_headed():
                 # tests/test_semgrep_rule2_behavior.py instead.
                 continue
             body = (REPO_ROOT / other).read_text(encoding="utf-8")
-            assert "sqlite3.connect" not in body and "aiosqlite.connect" not in body, (
-                f"{other} defines a class named {cls} AND opens SQLite — it "
-                f"would silently inherit {path}'s class-scoped Rule 2 "
-                "exemption; rename the class or adjudicate it explicitly"
+            # Substrate = SQLite OR an append handle. Checking only sqlite here
+            # was the same blind spot as the rule's own missing JSONL patterns
+            # (devin review, PR #1220): a same-named class appending JSONL was
+            # invisible to this backstop too.
+            opened = sorted(
+                {
+                    marker
+                    for marker, present in (
+                        ("sqlite3.connect", "sqlite3.connect" in body),
+                        ("aiosqlite.connect", "aiosqlite.connect" in body),
+                        ("append-mode open", bool(_APPEND_OPEN_RE.search(body))),
+                    )
+                    if present
+                }
+            )
+            assert not opened, (
+                f"{other} defines a class named {cls} AND opens a substrate "
+                f"({', '.join(opened)}) — it would silently inherit {path}'s "
+                "class-scoped Rule 2 exemption; rename the class or adjudicate "
+                "it explicitly"
             )
 
 
@@ -466,6 +486,27 @@ def test_rule2_collision_companion_pins_the_same_ratified_names():
     assert names == set(_RULE2_RATIFIED_ROLE_CLASSES), (
         "the collision companion must name exactly the WP-0C1R ratified "
         f"classes; got {sorted(names or [])}"
+    )
+    # The discriminator between "the ratified definition" and "a copycat" is
+    # the FILE, not the base list (2026-08-04). Widening this exclusion set is
+    # how the rule would be silently defanged, so it is pinned exactly.
+    assert _anti_slop_rule_excludes(
+        "dharma.no-new-substrate-exempt-name-collision"
+    ) == [
+        "dharma_swarm/runtime_state.py",
+        *sorted(set(_RULE2_RATIFIED_ROLE_CLASSES.values())),
+    ], (
+        "the collision rule's path exclusions must be exactly the canonical "
+        "store plus the three ratified definition files — nothing else may be "
+        "granted silence on a re-used exempt name"
+    )
+    assert not any(
+        "pattern" in clause and "class $NAME($BASE)" in str(clause.get("pattern", ""))
+        for clause in rule["patterns"]
+    ), (
+        "the companion rule must not gate on 'declares exactly one base' — a "
+        "base-less copycat matched nothing and was swallowed by Rule 2's "
+        "name-scoped pattern-not (codex + devin, PR #1220)"
     )
     behavioral = REPO_ROOT / "tests/test_semgrep_rule2_behavior.py"
     assert behavioral.is_file(), (
