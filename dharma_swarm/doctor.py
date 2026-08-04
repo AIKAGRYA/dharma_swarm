@@ -25,6 +25,11 @@ from urllib.parse import urlparse
 from dharma_swarm.api_keys import RUNTIME_PROVIDER_API_KEY_ENV_KEYS
 from dharma_swarm.claude_cli import unattended_claude_auth_error
 from dharma_swarm.runtime_artifacts import dgc_health_snapshot_summary
+from dharma_swarm.runtime_process_identity import (
+    ORCHESTRATE_COMMAND_NEEDLES,
+    looks_like_runtime_command,
+    pid_command as _pid_command,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,19 +137,95 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _daemon_pid_alive(pid: int) -> bool:
+    """``kill -0`` plus a recycled-PID disconfirmation.
+
+    Existence of the number is not ownership: after a PID wrap an unrelated
+    process answers ``kill -0`` and a corpse's snapshot reads as live. If the
+    pid's command line is readable and provably belongs to something else, the
+    writer is gone. Unreadable command lines never downgrade a live pid.
+    """
+    if not _pid_alive(pid):
+        return False
+    command = _pid_command(pid)
+    if command is None:
+        return True
+    return looks_like_runtime_command(command)
+
+
 def _read_pid_file(path: Path) -> tuple[int | None, str]:
+    """Classify a pid file, refusing to call a recycled number "alive".
+
+    Bare existence here was a second route back to the quiet PASS: a
+    daemon.pid holding a foreign pid made ``daemon_status == "alive"``, which
+    skipped both the stale-pid branch and the launchd consultation guarded by
+    ``daemon_status != "alive"``. The identity-aware probe keeps the
+    asymmetric rule — an unreadable command line never downgrades a live pid.
+    """
     if not path.exists():
         return None, "missing"
     try:
         pid = int(path.read_text(encoding="utf-8").strip())
     except Exception:
         return None, "invalid"
-    if _pid_alive(pid):
+    if _daemon_pid_alive(pid):
         return pid, "alive"
     return pid, "stale"
 
 
+LAUNCHD_SERVICE_LABEL = "com.dharma.swarm"
+
+
+def _launchd_service_state(timeout_seconds: float) -> tuple[str, str]:
+    """Return (state, detail) for the organism's launchd service.
+
+    state is one of ``loaded``, ``absent``, ``unknown``. ``unknown`` covers
+    non-macOS hosts and probe failures; only ``loaded``/``absent`` are
+    treated as evidence.
+    """
+    target = f"gui/{os.getuid()}/{LAUNCHD_SERVICE_LABEL}"
+    try:
+        proc = subprocess.run(
+            ["launchctl", "print", target],
+            capture_output=True,
+            text=True,
+            timeout=max(0.5, timeout_seconds),
+        )
+    except Exception as exc:
+        return "unknown", f"launchctl probe unavailable: {exc}"
+    if proc.returncode == 0:
+        return "loaded", f"launchctl print {target}: loaded"
+    stderr = (proc.stderr or "").strip()
+    if "could not find service" in stderr.lower():
+        return "absent", f"launchctl print {target}: service not loaded"
+    return "unknown", f"launchctl rc={proc.returncode}: {stderr[:200]}"
+
+
+def _launchd_plist_installed() -> bool:
+    return (
+        HOME / "Library" / "LaunchAgents" / f"{LAUNCHD_SERVICE_LABEL}.plist"
+    ).exists()
+
+
 def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]:
+    """Matches only. Callers that must not confuse "none" with "could not
+    look" want :func:`_scan_daemon_like_processes` instead."""
+    return _scan_daemon_like_processes(timeout_seconds)[0]
+
+
+def _scan_daemon_like_processes(
+    timeout_seconds: float,
+) -> tuple[list[tuple[int, str]], bool]:
+    """Return (matches, scan_ok).
+
+    ``scan_ok`` is False when the ``ps`` probe could not run (binary absent,
+    timeout, nonzero rc). An empty list then means "we did not look", not
+    "nothing is running" — a distinction that only started to matter when
+    this PR taught the caller to escalate an empty scan into a hard FAIL
+    saying the organism is dead. Absence of evidence is not evidence of
+    absence; the same rule already governs ``daemon_pid_alive``, where an
+    unreadable command line never downgrades a live pid.
+    """
     try:
         proc = subprocess.run(
             ["ps", "-axo", "pid=,command="],
@@ -153,15 +234,28 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
             timeout=max(0.5, timeout_seconds),
         )
     except Exception:
-        return []
+        return [], False
 
     if proc.returncode != 0:
-        return []
+        return [], False
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    needles = ("dharma_swarm.orchestrate_live", "orchestrate_live.py", "run_daemon.sh")
-    skip_markers = ("dgc doctor", "ps -axo", "rg ", "pytest")
+    # Canonical launch spellings live in runtime_process_identity. The doctor
+    # imports them; the sentinel and live_ops_census mirror them (both stay
+    # import-free by design) and tests/test_runtime_command_forms.py pins all
+    # three against the real launch definitions so they cannot drift apart.
+    # The old local tuple knew only the module/legacy forms, so a host started
+    # through the plist's console script (`dgc orchestrate-live`) scanned as
+    # having no daemon at all.
+    needles = ORCHESTRATE_COMMAND_NEEDLES
+    skip_markers = (
+        "dgc doctor",
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "organism_liveness_sentinel",
+    )
 
     for raw in proc.stdout.splitlines():
         line = raw.strip()
@@ -183,7 +277,7 @@ def _list_daemon_like_processes(timeout_seconds: float) -> list[tuple[int, str]]
             continue
         matches.append((pid, command))
 
-    return matches
+    return matches, True
 
 
 def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -> None:
@@ -207,7 +301,7 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
         for label, (_, status) in pid_statuses.items()
         if status == "invalid"
     ]
-    live_processes = _list_daemon_like_processes(timeout_seconds)
+    live_processes, scan_ok = _scan_daemon_like_processes(timeout_seconds)
 
     if len(live_processes) > 1:
         detail = " | ".join(f"{pid}:{command}" for pid, command in live_processes[:4])
@@ -245,6 +339,39 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
             detail_parts.append(f"live process: {pid}:{command}")
         if legacy_details:
             detail_parts.append("legacy pid files: " + ", ".join(legacy_details))
+        if not scan_ok:
+            detail_parts.append(
+                "process table unreadable (ps probe failed) — liveness unverified"
+            )
+        if not live_processes and scan_ok:
+            # A stale pid file with nothing running is the exact 2026-07-25→08-01
+            # shape: the doctor cited the corpse's pid number and filed WARN for
+            # seven days. Consult launchd BEFORE settling on WARN — if the host
+            # is supposed to be running an organism, absence is a FAIL.
+            # Gated on scan_ok: an empty list from a probe that never ran is
+            # not an observation of absence, and this branch asserts death.
+            service_state, service_detail = _launchd_service_state(timeout_seconds)
+            if service_state == "loaded" or (
+                service_state == "absent" and _launchd_plist_installed()
+            ):
+                detail_parts.append(service_detail)
+                _add(
+                    checks,
+                    name="daemon_integrity",
+                    status="FAIL",
+                    summary=(
+                        "stale pid file cited while no daemon process is running "
+                        f"({LAUNCHD_SERVICE_LABEL} is {service_state}) — the organism is dead"
+                    ),
+                    detail=" | ".join(detail_parts),
+                    fix=(
+                        "Do not trust the pid file. Inspect logs/swarm.err for "
+                        "admission denials, restart via the release runner, and "
+                        "delete the stale pid file."
+                    ),
+                )
+                return
+            detail_parts.append(service_detail)
         _add(
             checks,
             name="daemon_integrity",
@@ -295,6 +422,60 @@ def _check_daemon_integrity(checks: list[DoctorCheck], timeout_seconds: float) -
             detail=command,
         )
         return
+
+    if daemon_status != "alive" and not scan_ok:
+        # We did not observe "nothing running" — we failed to look. Saying
+        # "the organism is dead" here would manufacture a death certificate
+        # from a blind probe, which is the mirror image of the bug this PR
+        # fixes. WARN is the honest rung: loud enough not to be silence,
+        # honest enough not to be a lie.
+        _add(
+            checks,
+            name="daemon_integrity",
+            status="WARN",
+            summary="runtime liveness unverified: the process table could not be read",
+            detail="ps probe failed; no daemon.pid owner. Liveness is unknown, not absent.",
+            fix="Re-run the doctor with a longer --timeout, or check that `ps` is available on this host.",
+        )
+        return
+
+    if daemon_status != "alive":
+        # Nothing is running. Absence must never be silence: consult
+        # launchd before concluding this host simply has no organism.
+        # (2026-07-25→08-01: the service was booted out for 7 days while
+        # this check fell through to PASS.)
+        service_state, service_detail = _launchd_service_state(timeout_seconds)
+        if service_state == "loaded":
+            _add(
+                checks,
+                name="daemon_integrity",
+                status="FAIL",
+                summary="launchd service is loaded but no daemon process is running",
+                detail=service_detail,
+                fix=(
+                    "Inspect logs/swarm.err under the state dir for admission "
+                    "denials or crash loops; the service exists but the organism "
+                    "is not alive."
+                ),
+            )
+            return
+        if _launchd_plist_installed() and service_state == "absent":
+            _add(
+                checks,
+                name="daemon_integrity",
+                status="FAIL",
+                summary=(
+                    f"{LAUNCHD_SERVICE_LABEL} is installed but not loaded and no "
+                    "daemon process is running — the organism is dead"
+                ),
+                detail=service_detail,
+                fix=(
+                    "Operator: launchctl bootstrap gui/$UID "
+                    f"~/Library/LaunchAgents/{LAUNCHD_SERVICE_LABEL}.plist "
+                    "after confirming the pinned release admits against canon."
+                ),
+            )
+            return
 
     _add(
         checks,
@@ -420,7 +601,7 @@ def _check_message_bus_integrity(checks: list[DoctorCheck], timeout_seconds: flo
 
 
 def _check_dgc_health_snapshot(checks: list[DoctorCheck]) -> None:
-    snapshot = dgc_health_snapshot_summary(HOME / ".dharma")
+    snapshot = dgc_health_snapshot_summary(HOME / ".dharma", pid_alive=_daemon_pid_alive)
     if not snapshot["exists"]:
         _add(
             checks,
@@ -448,10 +629,78 @@ def _check_dgc_health_snapshot(checks: list[DoctorCheck]) -> None:
         detail_parts.append(f"age={_format_age(float(snapshot['age_seconds'] or 0.0))}")
     if snapshot["daemon_pid"] is not None:
         detail_parts.append(f"daemon_pid={snapshot['daemon_pid']}")
+    if snapshot.get("daemon_pid_alive") is not None:
+        detail_parts.append(f"daemon_pid_alive={snapshot['daemon_pid_alive']}")
     if snapshot["live_pid"] is not None:
         detail_parts.append(f"live_pid={snapshot['live_pid']}")
     if snapshot["daemon_pid_mismatch"]:
         detail_parts.append("daemon_pid_mismatch")
+
+    if snapshot.get("daemon_pid_alive") is False:
+        # A dead cited PID proves only that this snapshot's writer is gone.
+        # It does not prove that the organism is still gone: a healthy
+        # restart has a new PID while the old snapshot remains on disk until
+        # the replacement publisher refreshes it. Cross-check present-time
+        # process evidence before declaring an outage.
+        live_daemons, process_scan_ok = _scan_daemon_like_processes(5.0)
+        if live_daemons:
+            live_detail = ", ".join(
+                f"pid={pid} command={command}" for pid, command in live_daemons
+            )
+            detail_parts.append(f"current_daemon_processes={live_detail}")
+            _add(
+                checks,
+                name="dgc_health_snapshot",
+                status="WARN",
+                summary=(
+                    "dgc_health snapshot cites a dead PID, but a current "
+                    "daemon process is running"
+                ),
+                detail=" | ".join(detail_parts),
+                fix=(
+                    "Refresh or retire the stale dgc_health publisher so the "
+                    "snapshot binds the current daemon PID; do not diagnose "
+                    "an organism outage from the superseded PID alone."
+                ),
+            )
+            return
+
+        service_state, service_detail = _launchd_service_state(5.0)
+        detail_parts.append(service_detail)
+        if not process_scan_ok:
+            detail_parts.append("daemon_process_scan=unavailable")
+            _add(
+                checks,
+                name="dgc_health_snapshot",
+                status="WARN",
+                summary=(
+                    "dgc_health snapshot cites a dead PID; current daemon "
+                    "state could not be verified"
+                ),
+                detail=" | ".join(detail_parts),
+                fix=(
+                    "Inspect the current daemon process and launchd state, "
+                    "then refresh or retire dgc_health.json. An unavailable "
+                    "process scan is not proof that the organism is dead."
+                ),
+            )
+            return
+
+        _add(
+            checks,
+            name="dgc_health_snapshot",
+            status="FAIL",
+            summary="dgc_health snapshot cites a dead daemon PID",
+            detail=" | ".join(detail_parts),
+            fix=(
+                "The organism that wrote this snapshot is gone. Verify "
+                f"launchctl state for {LAUNCHD_SERVICE_LABEL} (currently: "
+                f"{service_state}), restart via the release runner, and delete "
+                "stigmergy/dgc_health.json under the state dir so a corpse "
+                "cannot keep testifying."
+            ),
+        )
+        return
 
     if snapshot["status"] == "stale":
         _add(

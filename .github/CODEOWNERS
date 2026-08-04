@@ -63,6 +63,7 @@
 /dharma_swarm/knowledge_units.py        @AmitabhainArunachala  # blast=187
 /dharma_swarm/revenue/spine_models.py   @AmitabhainArunachala  # blast=187
 /dharma_swarm/bridge_registry.py        @AmitabhainArunachala  # blast=186
+/dharma_swarm/runtime_process_identity.py @AmitabhainArunachala  # blast=188
 /dharma_swarm/anekanta_gate.py          @AmitabhainArunachala  # blast=185
 /dharma_swarm/revenue/spine.py          @AmitabhainArunachala  # blast=185
 /dharma_swarm/runtime_artifacts.py      @AmitabhainArunachala  # blast=185

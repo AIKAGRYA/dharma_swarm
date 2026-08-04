@@ -221,6 +221,7 @@
       "docs/architecture/NAVIGATION.md",
       "docs/architecture/AGENT_HOLON_CODE_MAP.md",
       "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
+      "docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md",
       "docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md",
       "docs/architecture/MODEL_ROUTING_CANON.md",
       "docs/architecture/README.md",

@@ -78,15 +78,35 @@ _MODULE_ROOTS = (
 )
 
 
+def _exact_case_file(root: Path, rel: Path) -> Path | None:
+    """Return ``root / rel`` only when every path component matches case.
+
+    ``Path.is_file()`` follows the host filesystem's case rules.  On default
+    macOS filesystems that made an imported symbol such as
+    ``telos_kernel.Manifest`` resolve to the real lowercase ``manifest.py``;
+    Linux then generated a different closure.  Walking directory entries by
+    their recorded names keeps the ledger a pure function of the tree.
+    """
+    current = root
+    for part in rel.parts:
+        try:
+            current = next(
+                child for child in current.iterdir() if child.name == part
+            )
+        except (FileNotFoundError, NotADirectoryError, StopIteration):
+            return None
+    return current if current.is_file() else None
+
+
 def _module_to_path(module: str) -> Path | None:
     """Resolve a dotted first-party module name to a repo file, or None."""
     rel = Path(*module.split("."))
     for root in _MODULE_ROOTS:
-        candidate = root / rel.with_suffix(".py")
-        if candidate.is_file():
+        candidate = _exact_case_file(root, rel.with_suffix(".py"))
+        if candidate is not None:
             return candidate
-        package_init = root / rel / "__init__.py"
-        if package_init.is_file():
+        package_init = _exact_case_file(root, rel / "__init__.py")
+        if package_init is not None:
             return package_init
     return None
 
