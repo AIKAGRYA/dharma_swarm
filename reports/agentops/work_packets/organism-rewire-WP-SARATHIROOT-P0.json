@@ -1,6 +1,6 @@
 {
   "id": "organism-rewire-WP-SARATHIROOT-P0",
-  "base_ref": "01655778baac79fa2b589b8ed59ec243e2cb4c06",
+  "base_ref": "01655778bf0953db4f4247cf55f4765d04588862",
   "branch": "feature/sarathi-composition-root-p0-20260804",
   "worktree": ".",
   "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, repository provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Add only the generic RuntimeStateStore event-plus-receipt transaction seam needed for truthful atomic completion; do not move or fork shared engines or legacy Sarathi organs.",
@@ -87,7 +87,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "01655778baac79fa2b589b8ed59ec243e2cb4c06",
+      "checked_at_sha": "01655778bf0953db4f4247cf55f4765d04588862",
       "details": []
     },
     "interface_mismatches": [
@@ -108,6 +108,6 @@
       "No liveness claim is made: importing or calling one turn does not prove a standing service."
     ],
     "rollback": "Revert the additive dharma_swarm/sarathi package, its tests, the generic RuntimeStateStore event-plus-receipt transaction seam and receipt-layer declaration, the persistent-agent index/lineage additions, and this packet. The existing state schema remains unchanged.",
-    "packet_digest": "544cc5c71ed5c5d40614175c8376026a0e72f6643612cfa99a54bb9959a56a65"
+    "packet_digest": "31a93929cb12cc8ef0f4ce9524290ec8a454af2e774f85885a0a8833be3532bc"
   }
 }
