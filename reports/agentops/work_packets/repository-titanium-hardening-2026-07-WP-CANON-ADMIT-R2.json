@@ -13,7 +13,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "base_ref": "a1668ddd8a0ad504a80c1a24cd6d56d9db622e61",
   "branch": "agent/canon-effect-convergence-current-20260803",
   "commit": {
     "allowed": false,
@@ -46,7 +46,7 @@
     }
   ],
   "id": "repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2",
-  "intent": "Rebind the already independently verified Arena and Helm CLOSED_NOT_PROD convergence plus the bounded Titanium/Sovereign-Safety effect-boundary admission to exact current main after unrelated test-only drift. No effect implementation, runtime restart, deployment, or worktree cleanup is claimed by this packet.",
+  "intent": "Final current-main rebind for the evidence-backed Arena and Helm CLOSED_NOT_PROD convergence, the exact command-environment boundary, and the bounded Titanium/Sovereign-Safety effect-boundary admission after unrelated orchestrate_live and chamber hardening landed. No effect implementation, runtime restart, deployment, or worktree cleanup is claimed.",
   "negative_controls": [
     {
       "command": "python3 -c \"raise SystemExit(7)\"",
@@ -74,7 +74,7 @@
       "bundle:a90886d75dd5b34babfff3fc5788408696c38a240560802f0417ef7dd7b51fd7"
     ],
     "collision": {
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "checked_at_sha": "a1668ddd8a0ad504a80c1a24cd6d56d9db622e61",
       "details": [],
       "status": "clear"
     },
@@ -84,13 +84,13 @@
       "Runtime restart and deployed-SHA activation remain operator-only if they could terminate the active agent session."
     ],
     "interface_mismatches": [
-      "Current main still declares Arena and Helm ACTIVE although their bounded control machinery and named implementation anchors are on main; they must close as CLOSED_NOT_PROD because the base entries retain blocker history.",
-      "check_track_status exports DHARMA_PYTHON into all command_passes environments, while the terminal suite uses that variable as a bridge executable and can be falsely red under the checker.",
+      "Current main still declares Arena and Helm ACTIVE although their bounded control machinery and named implementation anchors are landed; they must close as CLOSED_NOT_PROD because the prior entries retain blocker history.",
+      "check_track_status must inject DHARMA_PYTHON only for exact Python/wrapper command shapes while preserving explicit caller pins and avoiding shell-token heuristics.",
       "Humming V2 names a constitutional effect boundary as unowned while semantic_governance.ActionEnvelope already names a separate semantic-evaluation input; runtime types must remain distinctly named and explicitly bridged.",
       "Only two default paths carry RuntimeWarrant; the admitted implementation must raise the count to at least five without creating a second store, ledger, registry, or receipt substrate."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "f43145e8824e75fa7b7580932a629753d419511bc8e65ca2cedad4a8340244f7",
+    "packet_digest": "1251b457803c369ed3b2bca81b774d8161386e659357cffb72f64f1d3bcc6db9",
     "rollback": "Revert the packet-scoped governance commit as one unit: restore Arena and Helm active entries, remove their closed entries and effect-boundary ownership/acknowledgement rows, restore the checker behavior, and regenerate managed projections from ACTIVE_TRACK.yaml.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {

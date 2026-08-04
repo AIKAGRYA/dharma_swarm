@@ -1,15 +1,19 @@
 # Canon convergence and effect-boundary admission — 2026-08-03
 
-**Exact base:** `9917aeb2a24956d5a8df8db2d0136a5bac80e6fb`
+**Exact base:** `a1668ddd8a0ad504a80c1a24cd6d56d9db622e61`
 
-**Packet:** `repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R3`
+**Packet:** `repository-titanium-hardening-2026-07-WP-CANON-ADMIT-R2`
 
 **Claim:** governance admission and bounded track closure only; no effect
 implementation, runtime restart, deployment, or worktree removal.
 
-R3 is the merge-admission rebind after unrelated `orchestrate_live` hardening
-landed on main. The R2 packet and closeout remain preserved as historical
-evidence; they no longer authorize the merge decision for this head.
+This final R2 revision rebinds merge admission after unrelated
+`orchestrate_live` and chamber hardening landed on main. Earlier R2/R3
+packet bytes and closeouts remain preserved in campaign custody as
+historical evidence; only the packet digest bound to this base authorizes
+the final closeout. `commit.allowed=false` means the AgentOps runner never
+authors commits; normal Git commits remain outside that runner and are
+re-read by the read-only closeout.
 
 ## Current-main reproof
 
