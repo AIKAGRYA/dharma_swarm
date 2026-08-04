@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
 from typing import Any
+
+from dharma_swarm.runtime_process_identity import daemon_pid_alive
 
 
 def parse_iso_datetime(raw: Any) -> datetime | None:
@@ -60,12 +64,29 @@ def append_pulse_log(state_dir: Path, entry: str) -> None:
             handle.write(entry)
 
 
+def _pid_alive(pid: int) -> bool:
+    """Default probe: existence AND not a provably foreign (recycled) pid.
+
+    ``kill -0`` alone proves only that *a* process holds the number. See
+    ``dharma_swarm.runtime_process_identity.daemon_pid_alive``.
+    """
+    return daemon_pid_alive(pid)
+
+
 def dgc_health_snapshot_summary(
     state_dir: Path,
     *,
     stale_after_seconds: float = 3600.0,
+    pid_alive: Callable[[int], bool] | None = None,
 ) -> dict[str, Any]:
-    """Read ``dgc_health.json`` with freshness metadata."""
+    """Read ``dgc_health.json`` with freshness metadata.
+
+    A ``daemon_pid`` recorded in the snapshot is never trusted on its own:
+    it is probed with ``kill -0`` and reported via ``daemon_pid_alive``.
+    (The 2026-07/08 outage: a snapshot citing dead PID 18104 was echoed as
+    runtime truth for 7 days because nothing probed the integer.)
+    """
+    probe = pid_alive if pid_alive is not None else _pid_alive
     path = state_dir / "stigmergy" / "dgc_health.json"
     summary: dict[str, Any] = {
         "path": path,
@@ -75,6 +96,7 @@ def dgc_health_snapshot_summary(
         "timestamp": None,
         "age_seconds": None,
         "daemon_pid": None,
+        "daemon_pid_alive": None,
         "live_pid": None,
         "daemon_pid_mismatch": False,
     }
@@ -93,6 +115,11 @@ def dgc_health_snapshot_summary(
     age_seconds = None if timestamp is None else max(0.0, (now - timestamp).total_seconds())
 
     daemon_pid = payload.get("daemon_pid")
+    daemon_pid_alive = None
+    try:
+        daemon_pid_alive = probe(int(daemon_pid)) if daemon_pid is not None else None
+    except (TypeError, ValueError):
+        daemon_pid_alive = None
     live_pid = None
     pid_file = state_dir / "daemon.pid"
     if pid_file.exists():
@@ -107,6 +134,7 @@ def dgc_health_snapshot_summary(
             "timestamp": timestamp,
             "age_seconds": age_seconds,
             "daemon_pid": daemon_pid,
+            "daemon_pid_alive": daemon_pid_alive,
             "live_pid": live_pid,
             "daemon_pid_mismatch": (
                 daemon_pid is not None
@@ -123,6 +151,43 @@ def dgc_health_snapshot_summary(
     else:
         summary["status"] = "fresh"
     return summary
+
+
+def loop_liveness_summary(
+    liveness_path: Path,
+    *,
+    pid_alive: Callable[[int], bool] | None = None,
+) -> dict[str, Any] | None:
+    """Summarize ``loop_liveness.json`` with the owning pid probed.
+
+    The file outlives its writer: the recorded pid is probed for existence
+    *and* identity (``runtime_process_identity.daemon_pid_alive``) so no
+    caller can print "N running" from a corpse's snapshot — nor from a pid
+    number that has since been recycled onto an unrelated process. (A 7-day-old
+    file claiming 20 live loops from dead pid 67078 masked the 2026-07/08
+    outage.)
+
+    ``pid_alive`` is ``None`` when the record carries no usable integer pid.
+    ``None`` means *unverifiable*, not *alive*: callers must not render a
+    running claim from it.
+    """
+    probe = pid_alive if pid_alive is not None else _pid_alive
+    if not liveness_path.exists():
+        return None
+    liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
+    age_s = time.time() - liveness_path.stat().st_mtime
+    raw_pid = liveness.get("pid")
+    usable_pid = isinstance(raw_pid, int) and not isinstance(raw_pid, bool)
+    return {
+        "running": len(liveness.get("running", [])),
+        "abandoned": liveness.get("abandoned", []),
+        "hot_restarts": {
+            k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
+        },
+        "age_min": round(age_s / 60),
+        "pid": raw_pid,
+        "pid_alive": probe(raw_pid) if usable_pid else None,
+    }
 
 
 def write_dgc_health_snapshot(

@@ -33,3 +33,79 @@ def test_write_dgc_health_snapshot_persists_fresh_runtime_metadata(tmp_path: Pat
     summary = dgc_health_snapshot_summary(state_dir)
     assert summary["status"] == "fresh"
     assert summary["daemon_pid_mismatch"] is False
+
+
+def test_dgc_health_snapshot_summary_probes_daemon_pid(tmp_path: Path) -> None:
+    """daemon_pid is never trusted verbatim: kill -0 verdict is reported."""
+    state_dir = tmp_path / ".dharma"
+    write_dgc_health_snapshot(
+        state_dir,
+        daemon_pid=18104,
+        agent_count=20,
+        task_count=0,
+        anomaly_count=0,
+        source="orchestrate_live",
+    )
+
+    dead = dgc_health_snapshot_summary(state_dir, pid_alive=lambda pid: False)
+    assert dead["daemon_pid"] == 18104
+    assert dead["daemon_pid_alive"] is False
+
+    alive = dgc_health_snapshot_summary(state_dir, pid_alive=lambda pid: pid == 18104)
+    assert alive["daemon_pid_alive"] is True
+
+
+def test_dgc_health_snapshot_summary_default_probe_rejects_recycled_pid(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The default probe is identity-aware, not `kill -0` alone.
+
+    A pid that has been reassigned to an unrelated process answers `kill -0`,
+    which previously made a corpse's snapshot read as live.
+    """
+    state_dir = tmp_path / ".dharma"
+    write_dgc_health_snapshot(
+        state_dir,
+        daemon_pid=18104,
+        agent_count=20,
+        task_count=0,
+        anomaly_count=0,
+        source="orchestrate_live",
+    )
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_process_identity.pid_alive", lambda pid: True
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_process_identity.pid_command",
+        lambda pid, timeout=5.0: "/Applications/Safari.app/Contents/MacOS/Safari",
+    )
+
+    summary = dgc_health_snapshot_summary(state_dir)
+    assert summary["daemon_pid"] == 18104
+    assert summary["daemon_pid_alive"] is False
+
+
+def test_dgc_health_snapshot_summary_default_probe_accepts_real_owner(
+    monkeypatch, tmp_path: Path
+) -> None:
+    state_dir = tmp_path / ".dharma"
+    write_dgc_health_snapshot(
+        state_dir,
+        daemon_pid=18104,
+        agent_count=20,
+        task_count=0,
+        anomaly_count=0,
+        source="orchestrate_live",
+    )
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_process_identity.pid_alive", lambda pid: True
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_process_identity.pid_command",
+        lambda pid, timeout=5.0: "/opt/venv/bin/python /opt/venv/bin/dgc orchestrate-live",
+    )
+
+    summary = dgc_health_snapshot_summary(state_dir)
+    assert summary["daemon_pid_alive"] is True
