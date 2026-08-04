@@ -25,6 +25,10 @@ class GraphStore:
     pass
 
 
+class CacheMixin:
+    pass
+
+
 # --- SQLite: the shapes the pre-2026-08-04 rule already caught -------------
 
 # ruleid: dharma.no-new-substrate
@@ -227,9 +231,41 @@ class KnowledgeStore:
 
 # --- Inheriting a ratified exemption is a new substrate --------------------
 
+
+class registries:  # noqa: N801
+    """Stands in for a module namespace so the qualified-base fixture below is
+    real, importable Python rather than an unresolvable import."""
+
+    BridgeRegistry = BridgeRegistry
+
+
 # ruleid: dharma.no-new-substrate
 class InheritedProjectionStore(BridgeRegistry):
     pass
+
+
+# A base list matches like an argument list: before 2026-08-04 only the
+# exempt-base-FIRST spelling was caught. These three evaded (codex, PR #1220).
+
+# ruleid: dharma.no-new-substrate
+class TrailingBaseProjectionStore(CacheMixin, BridgeRegistry):
+    pass
+
+
+# ruleid: dharma.no-new-substrate
+class QualifiedBaseProjectionStore(registries.BridgeRegistry):
+    pass
+
+
+# ruleid: dharma.no-new-substrate
+class ThirdPositionBaseLedger(CacheMixin, GraphStore, SQLiteGraphStore):
+    pass
+
+
+# ok: dharma.no-new-substrate
+class UnrelatedBaseStore(GraphStore, CacheMixin):
+    """A composite base list with no exempt substrate in it stays silent —
+    the widened `(..., $BASE, ...)` shape must not flag every subclass."""
 
 
 # --- Name collision with a ratified exemption ------------------------------

@@ -364,16 +364,23 @@ rules:
                   regex: '^["''][bt+]*a[bt+]*["'']$'
           # --- Inheriting a ratified exempt substrate is a new substrate:
           #     the exemption was granted to those three classes, not to a
-          #     subclass tree hanging off them. ---
-          - pattern: |
-              class $NAME(BridgeRegistry):
-                  ...
-          - pattern: |
-              class $NAME(SQLiteGraphStore):
-                  ...
-          - pattern: |
-              class $NAME(KnowledgeStore):
-                  ...
+          #     subclass tree hanging off them.
+          #     A base list matches like a call-argument list, so the
+          #     pre-2026-08-04 `class $NAME(BridgeRegistry):` shape only saw
+          #     the exempt base FIRST: `class CachedStore(Mixin,
+          #     BridgeRegistry)` and `class CachedStore(registries.
+          #     BridgeRegistry)` both evaded it (codex, PR #1220 — measured:
+          #     `(BridgeRegistry, Mixin)` matched, `(Mixin, BridgeRegistry)`
+          #     did not). `(..., $BASE, ...)` admits any position, and the
+          #     regex admits a dotted qualifier. `$BASE` requires at least one
+          #     base, so a class with none never matches here. ---
+          - patterns:
+              - pattern: |
+                  class $NAME(..., $BASE, ...):
+                      ...
+              - metavariable-regex:
+                  metavariable: $BASE
+                  regex: '^([A-Za-z_]\w*\.)*(BridgeRegistry|SQLiteGraphStore|KnowledgeStore)$'
       - metavariable-regex:
           metavariable: $NAME
           regex: '.*(Store|Ledger|Registry|Substrate)$'
