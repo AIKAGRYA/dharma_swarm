@@ -463,12 +463,14 @@ class AliasedOpenLedger:
 class OtherDriverStore:
     """Drivers other than sqlite3/aiosqlite are a named gap in Rule 2's
     message. Alias resolution does not help here — the module itself is out
-    of the regex."""
+    of the regex. lancedb is a real, declared dependency of this repo, so the
+    fixture names a driver the tree actually uses rather than an invented
+    one (an undeclared import here trips the import-provenance ratchet)."""
 
     def open_db(self, path: str):
-        import duckdb
+        import lancedb
 
-        return duckdb.connect(path)
+        return lancedb.connect(path)
 
 
 # todoruleid: dharma.no-new-substrate
