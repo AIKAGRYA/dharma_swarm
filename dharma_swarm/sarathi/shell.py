@@ -251,6 +251,8 @@ def build_sarathi_shell(
             working_dir=str(working_dir) if working_dir is not None else None,
         )
     if turn_store is None:
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
         from .adapters.runtime_state import RuntimeStateTurnStore
 
         if state_root is not None:
@@ -261,13 +263,12 @@ def build_sarathi_shell(
             configured_home = str(configured_env.get("DHARMA_HOME") or "")
             if configured_state.strip():
                 db_path = Path(configured_state).expanduser() / "runtime.db"
-            else:
-                root = (
-                    Path(configured_home).expanduser()
-                    if configured_home.strip()
-                    else Path.home() / ".dharma"
+            elif configured_home.strip():
+                db_path = (
+                    Path(configured_home).expanduser() / "state" / "runtime.db"
                 )
-                db_path = root / "state" / "runtime.db"
+            else:
+                db_path = DEFAULT_RUNTIME_DB
         turn_store = RuntimeStateTurnStore(db_path)
     return SarathiShell(
         cognition=cognition,

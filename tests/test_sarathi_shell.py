@@ -25,7 +25,7 @@ from dharma_swarm.sarathi import (
     handle_turn,
 )
 from dharma_swarm.models import ProviderType
-from dharma_swarm.runtime_state import RUNTIME_RECEIPT_TYPES
+from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, RUNTIME_RECEIPT_TYPES
 from dharma_swarm.sarathi.adapters.runtime_provider import SafeRuntimeCognition
 from dharma_swarm.spine.identity import ExecutionIdentity
 
@@ -647,9 +647,7 @@ def test_factory_with_explicit_env_does_not_read_process_state_override(
         injected_home / "state" / "runtime.db"
     )
     assert process_state not in shell.turn_store.runtime_state.db_path.parents
-    assert empty_env_shell.turn_store.runtime_state.db_path == (
-        Path.home() / ".dharma" / "state" / "runtime.db"
-    )
+    assert empty_env_shell.turn_store.runtime_state.db_path == DEFAULT_RUNTIME_DB
     assert process_state not in empty_env_shell.turn_store.runtime_state.db_path.parents
 
 
