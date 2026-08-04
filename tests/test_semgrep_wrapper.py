@@ -274,6 +274,13 @@ def test_make_gitleaks_absent_is_named_nonzero_failure():
 # rule's own documented procedure so an allowlist entry can never outlive
 # its manifest declaration or role header, and the allowlists can never
 # silently widen into the broad ignores the WP-0C1R spec forbids.
+#
+# SCOPE LIMIT (2026-08-04): everything below reads YAML, greps class names, and
+# searches source text. It proves the CONFIG's shape, never the SCANNER's
+# behavior — which is how Rule 2's message promised JSONL detection it did not
+# have from 2026-04-26 to 2026-08-04. Rule 2's behavior is proven by running
+# semgrep in tests/test_semgrep_rule2_behavior.py against the fixture
+# .semgrep/tests/test_no_new_substrate.py. These tests are the supplement.
 
 _ANTI_SLOP = REPO_ROOT / ".semgrep" / "dharma-anti-slop.yml"
 _SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
@@ -305,13 +312,23 @@ _RULE1_PERMITTED_NON_RESEARCH_EXCLUDES = {
 }
 
 # WP-0C1R decision B1: the ratified substrate classes and the one file each
-# is allowed to live in. Class-scoped (not file-scoped) so a new substrate
-# class in the same file still triggers Rule 2.
+# is allowed to live in. Class-scoped (not file-scoped) so a DIFFERENTLY NAMED
+# new substrate class in the same file still triggers Rule 2 — proven
+# behaviorally by
+# test_semgrep_rule2_behavior.py::test_synthetic_new_substrate_is_caught_in_a_ratified_file.
+# A SAME-NAMED one does not: semgrep's `class X: ...` pattern also matches
+# `class X(Base): ...`, so the exemption is precisely NAME-scoped. That gap is
+# named in Rule 2's message and caught by
+# dharma.no-new-substrate-exempt-name-collision.
 _RULE2_RATIFIED_ROLE_CLASSES = {
     "BridgeRegistry": "dharma_swarm/bridge_registry.py",
     "SQLiteGraphStore": "dharma_swarm/graph_store.py",
     "KnowledgeStore": "dharma_swarm/knowledge_units.py",
 }
+
+# An append-mode open in ANY flag ordering — CPython reads the mode string as a
+# set of flags, so "+a" / "ba" / "ta" / "+ab" all append.
+_APPEND_OPEN_RE = re.compile(r"""\.?\bopen\([^)]*?["'][bt+]*a[bt+]*["']""")
 
 # Closed role vocabulary from docs/governance/ANTI_SLOP_RULES.md Rule 2.
 _RULE2_ROLE_VOCABULARY = {
@@ -385,8 +402,9 @@ def test_rule2_exemptions_are_class_scoped_and_role_headed():
     excludes = _anti_slop_rule_excludes("dharma.no-new-substrate")
     assert excludes == ["dharma_swarm/runtime_state.py"], (
         "Rule 2 must not exempt whole files beyond the canonical store — "
-        "ratified WP-0C1R exemptions are class-scoped pattern-nots so a NEW "
-        f"substrate in the same file is still caught; got {excludes}"
+        "ratified WP-0C1R exemptions are class-scoped pattern-nots so a "
+        "differently-named new substrate in the same file is still caught; "
+        f"got {excludes}"
     )
     exempted_classes: set[str] = set()
     for clause in rule["patterns"]:
@@ -422,16 +440,87 @@ def test_rule2_exemptions_are_class_scoped_and_role_headed():
         for other in defined_in:
             if other == path:
                 continue
+            if other.startswith(".semgrep/tests/"):
+                # The behavioral fixture defines the ratified names ON PURPOSE
+                # (it must, to prove the exemptions still hold) and defines a
+                # deliberate collision beside them. Semgrep auto-ignores
+                # `tests/` directories, so fixtures never enter a repo scan;
+                # their semantics are asserted by
+                # tests/test_semgrep_rule2_behavior.py instead.
+                continue
             body = (REPO_ROOT / other).read_text(encoding="utf-8")
-            assert "sqlite3.connect" not in body and "aiosqlite.connect" not in body, (
-                f"{other} defines a class named {cls} AND opens SQLite — it "
-                f"would silently inherit {path}'s class-scoped Rule 2 "
-                "exemption; rename the class or adjudicate it explicitly"
+            # Substrate = SQLite OR an append handle. Checking only sqlite here
+            # was the same blind spot as the rule's own missing JSONL patterns
+            # (devin review, PR #1220): a same-named class appending JSONL was
+            # invisible to this backstop too.
+            opened = sorted(
+                {
+                    marker
+                    for marker, present in (
+                        ("sqlite3.connect", "sqlite3.connect" in body),
+                        ("aiosqlite.connect", "aiosqlite.connect" in body),
+                        ("append-mode open", bool(_APPEND_OPEN_RE.search(body))),
+                    )
+                    if present
+                }
+            )
+            assert not opened, (
+                f"{other} defines a class named {cls} AND opens a substrate "
+                f"({', '.join(opened)}) — it would silently inherit {path}'s "
+                "class-scoped Rule 2 exemption; rename the class or adjudicate "
+                "it explicitly"
             )
 
 
+def test_rule2_collision_companion_pins_the_same_ratified_names():
+    """Structural half of the 2026-08-04 correction: the companion rule that
+    catches a same-named substrate must cover exactly the ratified class set.
+    Its behavior is proven in tests/test_semgrep_rule2_behavior.py."""
+    rule = _anti_slop_rule("dharma.no-new-substrate-exempt-name-collision")
+    names = None
+    for clause in rule["patterns"]:
+        if clause.get("metavariable-regex", {}).get("metavariable") == "$NAME":
+            names = set(
+                clause["metavariable-regex"]["regex"].strip("^$()").split("|")
+            )
+    assert names == set(_RULE2_RATIFIED_ROLE_CLASSES), (
+        "the collision companion must name exactly the WP-0C1R ratified "
+        f"classes; got {sorted(names or [])}"
+    )
+    # The discriminator between "the ratified definition" and "a copycat" is
+    # the FILE, not the base list (2026-08-04). Widening this exclusion set is
+    # how the rule would be silently defanged, so it is pinned exactly.
+    assert _anti_slop_rule_excludes(
+        "dharma.no-new-substrate-exempt-name-collision"
+    ) == [
+        "dharma_swarm/runtime_state.py",
+        *sorted(set(_RULE2_RATIFIED_ROLE_CLASSES.values())),
+    ], (
+        "the collision rule's path exclusions must be exactly the canonical "
+        "store plus the three ratified definition files — nothing else may be "
+        "granted silence on a re-used exempt name"
+    )
+    assert not any(
+        "pattern" in clause and "class $NAME($BASE)" in str(clause.get("pattern", ""))
+        for clause in rule["patterns"]
+    ), (
+        "the companion rule must not gate on 'declares exactly one base' — a "
+        "base-less copycat matched nothing and was swallowed by Rule 2's "
+        "name-scoped pattern-not (codex + devin, PR #1220)"
+    )
+    behavioral = REPO_ROOT / "tests/test_semgrep_rule2_behavior.py"
+    assert behavioral.is_file(), (
+        "Rule 2's behavioral proof vanished — config-shape tests alone are "
+        "what let the JSONL gap survive fifteen weeks"
+    )
+
+
 def test_anti_slop_allowlists_contain_no_globs():
-    for rule_id in ("dharma.no-unauthorized-dharma-write", "dharma.no-new-substrate"):
+    for rule_id in (
+        "dharma.no-unauthorized-dharma-write",
+        "dharma.no-new-substrate",
+        "dharma.no-new-substrate-exempt-name-collision",
+    ):
         for entry in _anti_slop_rule_excludes(rule_id):
             assert "*" not in entry and not entry.endswith("/"), (
                 f"{rule_id} exclude {entry!r} is a glob/directory — the "
