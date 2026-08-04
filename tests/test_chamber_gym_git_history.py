@@ -8,6 +8,8 @@ own history.
 from __future__ import annotations
 
 import json
+import os
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -85,6 +87,22 @@ def _landed_source_diff(repo: Path, task) -> str:
     return _git(repo, "diff", task.base_sha, task.merge_sha, "--", "mymod.py")
 
 
+def _install_python3_path_poison(root: Path) -> tuple[Path, Path]:
+    """Install a leading PATH python3 that records use and fails closed."""
+    poison_bin = root / "poison-bin"
+    poison_bin.mkdir()
+    marker = root / "python3-invoked"
+    shim = poison_bin / "python3"
+    shim.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' poison > {shlex.quote(str(marker))}\n"
+        "exit 97\n",
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    return poison_bin, marker
+
+
 def test_taskpack_build_pins_and_splits(fixture_repo):
     pack = build_taskpack(fixture_repo, _head(fixture_repo),
                           holdout_fraction=0.5, seed=3)
@@ -148,6 +166,30 @@ def test_scorer_passes_landed_fix_and_fails_empty_diff(fixture_repo, tmp_path):
     assert good.correct and good.passed >= 1 and not good.errored
     bad = score_candidate(fixture_repo, task, "", tmp_path / "bad")
     assert not bad.correct
+
+
+def test_scorer_uses_current_interpreter_not_path_python3(
+    fixture_repo,
+    tmp_path,
+    monkeypatch,
+):
+    poison_bin, marker = _install_python3_path_poison(tmp_path)
+    monkeypatch.setenv(
+        "PATH",
+        str(poison_bin) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    pack = build_taskpack(fixture_repo, _head(fixture_repo), holdout_fraction=0)
+    task = next(t for t in pack.tasks if "PR-1" in t.prompt)
+
+    result = score_candidate(
+        fixture_repo,
+        task,
+        _landed_source_diff(fixture_repo, task),
+        tmp_path / "path-poison",
+    )
+
+    assert result.correct and result.passed >= 1 and not result.errored, result.detail
+    assert not marker.exists()
 
 
 def test_scorer_rejects_non_applying_diff(fixture_repo, tmp_path):
