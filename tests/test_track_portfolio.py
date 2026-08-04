@@ -20,6 +20,7 @@ from check_track_status import (  # type: ignore  # noqa: E402
     detect_dependency_cycle,
     _parse_minimal_yaml,
     _resolve_command_for_current_runtime,
+    _command_requires_dharma_python_bridge,
     check_command_passes,
     Finding,
 )
@@ -331,18 +332,68 @@ def test_command_passes_does_not_export_dharma_python_for_non_python(
     assert result.executed
 
 
-def test_command_passes_removes_preset_dharma_python_for_non_python(
+def test_command_passes_preserves_preset_dharma_python_for_non_python(
     monkeypatch,
 ) -> None:
-    """An operator Python pin must not alter an unrelated command runtime."""
-    monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
+    """An explicit operator bridge remains authoritative for shell criteria."""
+    monkeypatch.setenv("DHARMA_PYTHON", sys.executable)
 
     result = check_command_passes(
-        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+        ["bash", "-c", f'test "$DHARMA_PYTHON" = "{sys.executable}"']
     )
 
     assert result.passed, result.detail
     assert result.executed
+
+
+def test_command_passes_shell_mention_does_not_inject_dharma_python(
+    monkeypatch,
+) -> None:
+    """Shell prose mentioning Python is not executable-shape evidence."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+
+    result = check_command_passes(
+        ["bash", "-c", 'echo python >/dev/null; test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
+def test_command_passes_supported_wrapper_receives_dharma_python(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """The declared repository wrapper receives the checker interpreter."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "import os, sys\n"
+        "raise SystemExit(0 if os.environ.get('DHARMA_PYTHON') == sys.executable else 1)\n",
+        encoding="utf-8",
+    )
+
+    result = check_command_passes(
+        [
+            "bash",
+            "scripts/governance/run_python_with_repo_env.sh",
+            str(probe),
+        ]
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
+def test_dharma_python_bridge_classification_is_exact() -> None:
+    assert _command_requires_dharma_python_bridge(["python3.12", "probe.py"])
+    assert _command_requires_dharma_python_bridge(
+        ["bash", "scripts/governance/run_pytest_with_repo_env.sh", "-q"]
+    )
+    assert not _command_requires_dharma_python_bridge(
+        ["bash", "-c", "echo python without executing it"]
+    )
+    assert not _command_requires_dharma_python_bridge(["./scripts/probe.py"])
 
 
 def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:

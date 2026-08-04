@@ -1882,8 +1882,8 @@ closed_tracks:
       - "commit 88458e06f — terminal integration, verified ancestor of the exact closeout base"
       - "bun install --frozen-lockfile && bun test — 650 passed, 0 failed on an isolated exact-base archive with DHARMA_PYTHON and PYTHONPATH bound to the exact-base repository bridge"
       - "bun test tests/app.test.ts tests/compactShell.test.tsx — 222 passed, 0 failed"
-      - "scripts/governance/check_track_status.py — non-Python command criteria no longer inherit the checker interpreter"
-      - "tests/test_track_portfolio.py::test_command_passes_does_not_export_dharma_python_for_non_python — regression guard"
+      - "scripts/governance/check_track_status.py — the checker injects its interpreter only for exact Python/wrapper command shapes; unrelated commands retain their own environment and explicit caller pins"
+      - "tests/test_track_portfolio.py command-environment boundary tests — regression guards for absent pins, explicit pins, wrapper routing, and shell-token false positives"
       - "reports/governance/titanium/CANON_EFFECT_ADMISSION_2026-08-03.md — current-main closure and admission receipt"
     unresolved_at_closure:
       - "No production-daemon readiness, external-operator SLO, or live tmux deployment claim."

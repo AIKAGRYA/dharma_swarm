@@ -578,29 +578,25 @@ def _missing_environment_module(output: str) -> str | None:
     return top
 
 
-def _command_should_export_dharma_python(command: list[str]) -> bool:
-    """Pin the checker interpreter only for Python-shaped criteria.
+def _command_requires_dharma_python_bridge(command: list[str]) -> bool:
+    """Return whether this exact command shape consumes ``DHARMA_PYTHON``.
 
-    Some non-Python consumers reuse ``DHARMA_PYTHON`` as the executable for
-    their own bridge process.  Exporting the track checker's interpreter into
-    every command therefore changes the behavior being measured and can turn a
-    hermetic Bun test red only under governance evaluation.
+    This intentionally recognizes only direct Python/pytest entrypoints and
+    the repository's two declared Python bridge wrappers.  Arbitrary shell
+    text is not classified by token search: merely mentioning ``python`` must
+    not change the environment being measured.
     """
     if not command:
         return False
-    executable = command[0]
-    if executable in {"python", "python3", "pytest"}:
+    executable = Path(command[0]).name
+    if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", executable):
         return True
-    if executable == sys.executable or executable.endswith(("/python", "/python3")):
+    if executable == "pytest":
         return True
-    if executable in {"./.venv/bin/python", ".venv/bin/python"}:
+    if Path(command[0]).resolve(strict=False) == Path(sys.executable).resolve(strict=False):
         return True
-    joined = " ".join(command)
-    if "run_python_with_repo_env" in joined:
-        return True
-    if executable in {"bash", "sh", "/bin/bash", "/bin/sh"}:
-        return re.search(r"(^|[\s/])(python3?|pytest)(\s|$)", joined) is not None
-    return False
+    wrappers = {"run_python_with_repo_env.sh", "run_pytest_with_repo_env.sh"}
+    return any(Path(part).name in wrappers for part in command[1:])
 
 
 def check_command_passes(
@@ -627,20 +623,17 @@ def check_command_passes(
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     resolved_python = _resolve_python_executable()
-    python_shaped = _command_should_export_dharma_python(resolved_command)
-    if "DHARMA_PYTHON" not in os.environ and python_shaped:
+    if (
+        "DHARMA_PYTHON" not in os.environ
+        and _command_requires_dharma_python_bridge(resolved_command)
+    ):
         # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
         # DHARMA_PYTHON; point them at this dependency-complete interpreter so
-        # track truth does not depend on one checkout's `.venv`.  Do not leak
-        # this variable into non-Python commands: terminal/Bun uses it as the
-        # bridge executable and must retain its own hermetic default.
+        # track truth does not depend on one checkout's `.venv`. Do not inject
+        # it into unrelated commands: terminal/Bun also uses this variable as
+        # a bridge executable. An explicit caller-provided value remains
+        # authoritative for every command shape.
         env = {**os.environ, "DHARMA_PYTHON": resolved_python}
-    elif "DHARMA_PYTHON" in os.environ and not python_shaped:
-        # A caller may have pinned DHARMA_PYTHON for this governance process.
-        # That pin remains authoritative for Python-shaped criteria, but it
-        # must not cross into unrelated runtimes that reuse the variable for a
-        # different bridge executable.
-        env = {key: value for key, value in os.environ.items() if key != "DHARMA_PYTHON"}
     try:
         result = subprocess.run(
             resolved_command,
