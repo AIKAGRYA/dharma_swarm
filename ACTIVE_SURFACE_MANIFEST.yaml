@@ -799,6 +799,7 @@ correlation_spine:
   invariant: "Receipts may differ by closure layer. Correlation identity must not."
   vocabulary:
     - canonical-store    # owns the source of truth for its layer
+    - canonical-within-layer # owns the receipt for one closure layer
     - derived-view       # read-only projection of a canonical-store
     - plugin-sink        # write-only export adapter (e.g. OTel)
     - cache              # ephemeral, rebuildable from canonical sources
@@ -845,6 +846,19 @@ correlation_spine:
         layer-prefixed renames (A2ATaskReceipt / SpineEvidenceReceipt /
         ClosureEvidenceReceipt) are tracked as a follow-up, not forced
         here.
+
+    - id: persistent_dialogue
+      label: "Sarathi persistent-dialogue turn closure"
+      receipt_class: RuntimeReceipt(sarathi_turn)
+      receipt_module: dharma_swarm.runtime_state
+      identity_field: trace_id
+      identity_alias: correlation_id
+      role: canonical-within-layer
+      owner: sarathi
+      notes: |
+        Sarathi P0 records the reply event and sarathi_turn receipt through one
+        RuntimeStateStore transaction. RuntimeStateStore remains the shared
+        persistence owner; the Sarathi adapter does not introduce a new store.
 
   cross_layer_joins:
     - "A2ATaskReceipt.correlation_id == EvidenceReceipt(spine).trace_id"

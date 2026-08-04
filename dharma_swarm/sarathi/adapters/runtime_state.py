@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import quote
@@ -118,46 +119,49 @@ class RuntimeStateTurnStore:
         event_id = f"{result.turn_id}:reply"
         receipt_id = f"{result.turn_id}:receipt"
         caller_id = str(result.execution_identity.metadata.get("caller_id") or "")
-        await self.runtime_state.record_session_event(
-            SessionEventRecord(
-                event_id=event_id,
-                session_id=self._owned_session_id(result.session_id, caller_id),
-                ledger_kind="sarathi_turn",
-                event_name="sarathi_reply",
-                task_id=result.execution_identity.task_id,
-                run_id=result.execution_identity.run_id,
-                agent_id=result.execution_identity.agent_id,
-                summary=result.reply[:240],
-                event_text=result.reply,
-                payload=result.to_dict(),
-            )
-        )
         # ``result`` is intentionally UNRECORDED until this write succeeds.
-        # The durable receipt is the commit point and therefore records the
-        # post-commit status/ref that the shell may return to its caller.
+        # Event and receipt are one commit point and carry the same post-commit
+        # status/ref that the shell may return to its caller.
         committed_status = (
             TurnStatus.COMPLETED
             if result.status is TurnStatus.UNRECORDED
             else result.status
         )
-        receipt_payload = result.to_dict()
-        receipt_payload["status"] = committed_status.value
-        receipt_payload["receipt_ref"] = receipt_id
-        await self.runtime_state.record_runtime_receipt(
-            RuntimeReceipt(
-                receipt_id=receipt_id,
-                receipt_type="sarathi_turn",
-                status=committed_status.value,
-                run_id=result.execution_identity.run_id,
-                task_id=result.execution_identity.task_id,
-                trace_id=result.execution_identity.trace_id,
-                correlation_id=result.execution_identity.correlation_id,
-                causation_id=result.execution_identity.causation_id,
-                parent_run_id=result.execution_identity.parent_run_id,
-                agent_id=result.execution_identity.agent_id,
-                idempotency_key=result.execution_identity.idempotency_key,
-                payload=receipt_payload,
-            )
+        committed = replace(
+            result,
+            status=committed_status,
+            receipt_ref=receipt_id,
+        )
+        payload = committed.to_dict()
+        event = SessionEventRecord(
+            event_id=event_id,
+            session_id=self._owned_session_id(result.session_id, caller_id),
+            ledger_kind="sarathi_turn",
+            event_name="sarathi_reply",
+            task_id=result.execution_identity.task_id,
+            run_id=result.execution_identity.run_id,
+            agent_id=result.execution_identity.agent_id,
+            summary=result.reply[:240],
+            event_text=result.reply,
+            payload=payload,
+        )
+        receipt = RuntimeReceipt(
+            receipt_id=receipt_id,
+            receipt_type="sarathi_turn",
+            status=committed_status.value,
+            run_id=result.execution_identity.run_id,
+            task_id=result.execution_identity.task_id,
+            trace_id=result.execution_identity.trace_id,
+            correlation_id=result.execution_identity.correlation_id,
+            causation_id=result.execution_identity.causation_id,
+            parent_run_id=result.execution_identity.parent_run_id,
+            agent_id=result.execution_identity.agent_id,
+            idempotency_key=result.execution_identity.idempotency_key,
+            payload=payload,
+        )
+        await self.runtime_state.record_session_event_with_runtime_receipt(
+            event,
+            receipt,
         )
         return receipt_id
 

@@ -43,7 +43,7 @@ class SafeRuntimeCognition:
         )
 
         # P0 has no budget adapter. Keep only lanes classified as FREE by the
-        # canonical provider roster; future providers do not enter by default.
+        # repository provider roster; future providers do not enter by default.
         no_spend_allowlist = frozenset(
             {
                 ProviderType.OLLAMA,
@@ -62,6 +62,11 @@ class SafeRuntimeCognition:
             for provider in PREFERRED_LOW_COST_RUNTIME_PROVIDERS
             if provider in no_spend_allowlist
         )
+        if not safe_order:
+            raise RuntimeError(
+                "Sarathi P0 has no admitted no-spend runtime provider; "
+                "refusing the shared router's broader fallback roster"
+            )
         messages = [
             {
                 "role": (

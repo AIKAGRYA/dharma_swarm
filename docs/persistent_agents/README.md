@@ -27,7 +27,7 @@ agent does not mistake one of them for a second product root.
   real message → cognition → reply → receipt path and fails closed on effects;
   transports, memory retrieval, tools, heartbeat, and self-modification remain
   follow-on work
-  ([P0:27-50](SARATHI_COMPOSITION_ROOT_P0.md#L27-L50)).
+  ([P0:34-59](SARATHI_COMPOSITION_ROOT_P0.md#L34-L59)).
 
 The organizing decision is therefore **one composition root, not one giant
 directory and not another substrate**. This is also the anti-fork rule recorded
@@ -68,7 +68,7 @@ composition, and result/receipt semantics. Shared modules must not import back
 into it. Every future transport should be a thin caller of the same
 `handle_turn`; a transport must not grow another Sarathi prompt, model loop, or
 memory store
-([P0:88-97](SARATHI_COMPOSITION_ROOT_P0.md#L88-L97)).
+([P0:98-107](SARATHI_COMPOSITION_ROOT_P0.md#L98-L107)).
 
 The stable Python direction is:
 
@@ -86,16 +86,16 @@ key; two callers using the same `session_id` must not see each other's history.
 Importing the package must not start a provider, subprocess, socket, loop, or
 state directory. The exact public types and negative controls are part of the
 active P0 contract
-([P0:52-86](SARATHI_COMPOSITION_ROOT_P0.md#L52-L86)).
+([P0:61-96](SARATHI_COMPOSITION_ROOT_P0.md#L61-L96)).
 
 ## Code map: product versus ingredients
 
 | Role | Exact code home | Relationship to the one root |
 |---|---|---|
-| **Sarathi product root** | [`dharma_swarm/sarathi/`](../../dharma_swarm/sarathi/) | **CURRENT BRANCH:** the sole public composition boundary. Its inert exports are defined at [`__init__.py:1-38`](../../dharma_swarm/sarathi/__init__.py#L1-L38); the one transaction is [`shell.py:101-219`](../../dharma_swarm/sarathi/shell.py#L101-L219). It is additive and does not replace shared engines. |
+| **Sarathi product root** | [`dharma_swarm/sarathi/`](../../dharma_swarm/sarathi/) | **CURRENT BRANCH:** the sole public composition boundary. Its inert exports are defined at [`__init__.py:1-38`](../../dharma_swarm/sarathi/__init__.py#L1-L38); the turn path is [`shell.py:102-233`](../../dharma_swarm/sarathi/shell.py#L102-L233). It is additive and does not replace shared engines. |
 | **Legacy Sarathi organs** | [`dharma_swarm/holon_system/sarathi/`](../../dharma_swarm/holon_system/sarathi/) | Landed planning, delegation, wake, proof, brief, pulse, roster, and inspection projections. Preserve compatibility; adapt selectively. Its package explicitly withholds liveness claims ([source:1-5](../../dharma_swarm/holon_system/sarathi/__init__.py#L1-L5)). |
 | **Bounded Sarathi wake command** | [`scripts/runtime/sarathi_wake_daemon.py`](../../scripts/runtime/sarathi_wake_daemon.py) | Landed fixed-cycle runtime wrapper, not the portable product root or a standing service. It calls the organ wake path and Holon wake cycle ([source:363-393](../../scripts/runtime/sarathi_wake_daemon.py#L363-L393)). |
-| **Direct Holon substrate** | [`holon_bridge.py`](../../dharma_swarm/holon_bridge.py), [`holon_runtime.py`](../../dharma_swarm/holon_runtime.py), [`holon_persistence.py`](../../dharma_swarm/holon_persistence.py), [`holon_health.py`](../../dharma_swarm/holon_health.py), [`holon_killswitch.py`](../../dharma_swarm/holon_killswitch.py), [`holon_budget_guard.py`](../../dharma_swarm/holon_budget_guard.py), [`holon_compass.py`](../../dharma_swarm/holon_compass.py) | Shared named-agent dialogue and governed wake ingredients. The canonical wake order begins at [`holon_runtime.py:53`](../../dharma_swarm/holon_runtime.py#L53). |
+| **Direct Holon substrate** | [`holon_bridge.py`](../../dharma_swarm/holon_bridge.py), [`holon_runtime.py`](../../dharma_swarm/holon_runtime.py), [`holon_persistence.py`](../../dharma_swarm/holon_persistence.py), [`holon_health.py`](../../dharma_swarm/holon_health.py), [`holon_killswitch.py`](../../dharma_swarm/holon_killswitch.py), [`holon_budget_guard.py`](../../dharma_swarm/holon_budget_guard.py), [`holon_compass.py`](../../dharma_swarm/holon_compass.py) | Shared named-agent dialogue and governed wake ingredients. The defined wake order begins at [`holon_runtime.py:53`](../../dharma_swarm/holon_runtime.py#L53). |
 | **Classic persistent actor** | [`persistent_agent.py`](../../dharma_swarm/persistent_agent.py) + [`autonomous_agent.py`](../../dharma_swarm/autonomous_agent.py) | Landed independent shell lineage: wake loop, mini-cron, memory, ReAct, and host tools ([persistent actor:117-175](../../dharma_swarm/persistent_agent.py#L117-L175), [loop:580-625](../../dharma_swarm/persistent_agent.py#L580-L625), [brain:386-423](../../dharma_swarm/autonomous_agent.py#L386-L423)). It is not silently renamed Sarathi. |
 | **Living Agent Kernel** | [`dharma_swarm/operator_core/living_agent_kernel*.py`](../../dharma_swarm/operator_core/) | Shared durable wake/lease/closeback/tool/proof family; `LivingAgentKernel` begins at [`living_agent_kernel.py:1199`](../../dharma_swarm/operator_core/living_agent_kernel.py#L1199). It is an ingredient, not a second Sarathi root. |
 | **Structured state** | [`runtime_state.py`](../../dharma_swarm/runtime_state.py) | Shared SQLite state and receipt spine; `RuntimeStateStore` begins at [`:1209`](../../dharma_swarm/runtime_state.py#L1209). P0 must reuse it, not invent a Sarathi database. |
@@ -151,13 +151,13 @@ Mac and Linux supervisors; that proof is not implied by this page.
 
 On the current branch, the tracked identity/persona is source
 ([`identity.py:41-57`](../../dharma_swarm/sarathi/identity.py#L41-L57)); cognition
-uses the canonical provider route while excluding agentic CLI and explicitly
+uses the repository provider route while excluding agentic CLI and explicitly
 paid providers until a budget adapter exists
-([`runtime_provider.py:38-117`](../../dharma_swarm/sarathi/adapters/runtime_provider.py#L38-L117));
+([`runtime_provider.py:38-121`](../../dharma_swarm/sarathi/adapters/runtime_provider.py#L38-L121));
 turn history and receipts reuse `RuntimeStateStore`
-([`runtime_state.py:19-162`](../../dharma_swarm/sarathi/adapters/runtime_state.py#L19-L162));
+([`runtime_state.py:20-166`](../../dharma_swarm/sarathi/adapters/runtime_state.py#L20-L166));
 and every requested/model-proposed effect is blocked because P0 has no effect
-adapter ([`shell.py:57-71`](../../dharma_swarm/sarathi/shell.py#L57-L71)).
+adapter ([`shell.py:58-72`](../../dharma_swarm/sarathi/shell.py#L58-L72)).
 Durable history is scoped by required `caller_id` plus normalized `session_id`,
 and an assistant reply is reloaded only when its correlated completion receipt
 exists.

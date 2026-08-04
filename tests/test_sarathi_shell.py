@@ -25,6 +25,7 @@ from dharma_swarm.sarathi import (
     handle_turn,
 )
 from dharma_swarm.models import ProviderType
+from dharma_swarm.runtime_state import RUNTIME_RECEIPT_TYPES
 from dharma_swarm.sarathi.adapters.runtime_provider import SafeRuntimeCognition
 from dharma_swarm.spine.identity import ExecutionIdentity
 
@@ -80,6 +81,35 @@ class FailingFinalStore(RecordingStore):
     async def record_result(self, result: object) -> str:
         self.results.append(result)
         raise OSError("durable receipt unavailable")
+
+
+@dataclass
+class FailingInputStore(RecordingStore):
+    failure_stage: str = "input"
+
+    async def load_history(
+        self,
+        session_id: str,
+        *,
+        caller_id: str,
+        limit: int = 50,
+    ) -> tuple[dict[str, str], ...]:
+        if self.failure_stage == "history":
+            raise OSError("history unavailable")
+        return await super().load_history(
+            session_id,
+            caller_id=caller_id,
+            limit=limit,
+        )
+
+    async def record_input(
+        self,
+        execution_identity: object,
+        request: SarathiTurnRequest,
+    ) -> str:
+        if self.failure_stage == "input":
+            raise OSError("input receipt unavailable")
+        return await super().record_input(execution_identity, request)
 
 
 class FailingCognition:
@@ -246,6 +276,46 @@ async def test_final_persistence_failure_cannot_claim_completed_or_receipted() -
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure_stage", ("history", "input"))
+async def test_input_persistence_failure_blocks_requested_effects_before_cognition(
+    failure_stage: str,
+) -> None:
+    cognition = FakeCognition()
+    shell = SarathiShell(
+        cognition=cognition,
+        turn_store=FailingInputStore(failure_stage=failure_stage),
+    )
+
+    result = await shell.handle_turn(
+        SarathiTurnRequest(
+            message="Do not execute this",
+            caller_id="test-agent",
+            effect_intents=(_effect(),),
+        )
+    )
+
+    assert result.status is TurnStatus.FAILED
+    assert cognition.requests == []
+    assert len(result.effect_reports) == 1
+    assert result.effect_reports[0].intent == _effect()
+    assert result.effect_reports[0].status is EffectStatus.BLOCKED
+    assert "effects_blocked_pending_authority_adapter" in result.uncertainties
+
+
+@pytest.mark.asyncio
+async def test_failure_receipt_failure_remains_visible() -> None:
+    shell = SarathiShell(cognition=FailingCognition(), turn_store=FailingFinalStore())
+
+    result = await shell.handle_turn(
+        SarathiTurnRequest(message="Record both failures", caller_id="test-agent")
+    )
+
+    assert result.status is TurnStatus.FAILED
+    assert "cognition_failed:RuntimeError" in result.uncertainties
+    assert "persistence_failure_record_failed:OSError" in result.uncertainties
+
+
+@pytest.mark.asyncio
 async def test_runtime_state_receipt_correlates_and_records_final_status(
     tmp_path: Path,
 ) -> None:
@@ -266,7 +336,7 @@ async def test_runtime_state_receipt_correlates_and_records_final_status(
     with sqlite3.connect(db_path) as db:
         db.row_factory = sqlite3.Row
         receipt = db.execute(
-            "SELECT receipt_id, status, run_id, trace_id, payload_json "
+            "SELECT receipt_id, receipt_type, status, run_id, trace_id, payload_json "
             "FROM runtime_receipts WHERE receipt_id = ?",
             (result.receipt_ref,),
         ).fetchone()
@@ -277,6 +347,8 @@ async def test_runtime_state_receipt_correlates_and_records_final_status(
         ).fetchall()
 
     assert receipt is not None
+    assert receipt["receipt_type"] == "sarathi_turn"
+    assert receipt["receipt_type"] in RUNTIME_RECEIPT_TYPES
     assert receipt["status"] == TurnStatus.COMPLETED.value
     assert receipt["trace_id"] == result.turn_id
     assert receipt["run_id"] == result.execution_identity.run_id
@@ -299,6 +371,9 @@ async def test_runtime_state_receipt_correlates_and_records_final_status(
     reply_payload = json.loads(events[1]["payload_json"])
     assert input_payload["execution_identity"]["trace_id"] == result.turn_id
     assert reply_payload["turn_id"] == result.turn_id
+    assert reply_payload["status"] == TurnStatus.COMPLETED.value
+    assert reply_payload["receipt_ref"] == result.receipt_ref
+    assert reply_payload == receipt_payload
 
 
 @pytest.mark.asyncio
@@ -329,12 +404,22 @@ async def test_runtime_state_receipt_preserves_cognition_failure_status(
             "WHERE run_id = ? AND event_name = 'sarathi_input'",
             (result.execution_identity.run_id,),
         ).fetchone()
+        reply_event = db.execute(
+            "SELECT payload_json FROM session_events "
+            "WHERE run_id = ? AND event_name = 'sarathi_reply'",
+            (result.execution_identity.run_id,),
+        ).fetchone()
 
     assert receipt is not None
     assert receipt["status"] == TurnStatus.FAILED.value
     receipt_payload = json.loads(receipt["payload_json"])
     assert receipt_payload["status"] == TurnStatus.FAILED.value
     assert receipt_payload["effect_reports"][0]["status"] == EffectStatus.BLOCKED.value
+    assert reply_event is not None
+    reply_payload = json.loads(reply_event["payload_json"])
+    assert reply_payload["status"] == TurnStatus.FAILED.value
+    assert reply_payload["receipt_ref"] == result.receipt_ref
+    assert reply_payload == receipt_payload
     assert input_event is not None
     input_payload = json.loads(input_event["payload_json"])
     assert input_payload["effect_intents"] == [
@@ -390,12 +475,16 @@ async def test_unreceipted_reply_is_not_rehydrated_as_history(
     cognition = FakeCognition()
     shell = build_sarathi_shell(cognition=cognition, state_root=tmp_path)
     runtime_state = shell.turn_store.runtime_state
-    original_record_receipt = runtime_state.record_runtime_receipt
+    original_record_pair = runtime_state.record_session_event_with_runtime_receipt
 
-    async def fail_receipt(receipt: object) -> None:
+    async def fail_receipt(_event: object, _receipt: object) -> None:
         raise OSError("receipt commit failed")
 
-    monkeypatch.setattr(runtime_state, "record_runtime_receipt", fail_receipt)
+    monkeypatch.setattr(
+        runtime_state,
+        "record_session_event_with_runtime_receipt",
+        fail_receipt,
+    )
     failed = await shell.handle_turn(
         SarathiTurnRequest(
             message="turn whose reply must not become memory",
@@ -404,7 +493,11 @@ async def test_unreceipted_reply_is_not_rehydrated_as_history(
     )
     assert failed.status is TurnStatus.FAILED
 
-    monkeypatch.setattr(runtime_state, "record_runtime_receipt", original_record_receipt)
+    monkeypatch.setattr(
+        runtime_state,
+        "record_session_event_with_runtime_receipt",
+        original_record_pair,
+    )
     await shell.handle_turn(
         SarathiTurnRequest(message="next turn", caller_id="test-agent")
     )
@@ -471,6 +564,93 @@ async def test_provider_adapter_isolates_system_prompt_and_excludes_paid_lanes()
     )
     assert result.effect_intents[0].kind == "model_tool_call"
     assert result.usage == {"input_tokens": 2}
+
+
+@pytest.mark.asyncio
+async def test_provider_adapter_rejects_empty_no_spend_roster_before_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dharma_swarm import runtime_provider
+
+    called = False
+
+    async def complete(**kwargs: object) -> tuple[object, object]:
+        nonlocal called
+        called = True
+        raise AssertionError(f"completion must not run: {kwargs}")
+
+    monkeypatch.setattr(
+        runtime_provider,
+        "PREFERRED_LOW_COST_RUNTIME_PROVIDERS",
+        (ProviderType.ANTHROPIC,),
+    )
+    identity = ExecutionIdentity.new(task_id="provider-test", session_id="session")
+
+    with pytest.raises(RuntimeError, match="no admitted no-spend runtime provider"):
+        await SafeRuntimeCognition(completion_fn=complete).complete(
+            CognitionRequest(
+                execution_identity=identity,
+                identity=DEFAULT_SARATHI_IDENTITY,
+                message="answer me",
+            )
+        )
+
+    assert called is False
+
+
+def test_factory_resolves_explicit_home_and_state_directory_conventions(
+    tmp_path: Path,
+) -> None:
+    explicit_root = tmp_path / "explicit-root"
+    explicit_state = tmp_path / "explicit-state"
+    explicit_home = tmp_path / "explicit-home"
+
+    from_root = build_sarathi_shell(
+        cognition=FakeCognition(),
+        state_root=explicit_root,
+    )
+    from_state_env = build_sarathi_shell(
+        cognition=FakeCognition(),
+        env={"DHARMA_STATE_DIR": str(explicit_state)},
+    )
+    from_home_env = build_sarathi_shell(
+        cognition=FakeCognition(),
+        env={"DHARMA_HOME": str(explicit_home)},
+    )
+
+    assert from_root.turn_store.runtime_state.db_path == (
+        explicit_root / "state" / "runtime.db"
+    )
+    assert from_state_env.turn_store.runtime_state.db_path == (
+        explicit_state / "runtime.db"
+    )
+    assert from_home_env.turn_store.runtime_state.db_path == (
+        explicit_home / "state" / "runtime.db"
+    )
+
+
+def test_factory_with_explicit_env_does_not_read_process_state_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process_state = tmp_path / "process-state"
+    injected_home = tmp_path / "injected-home"
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(process_state))
+
+    shell = build_sarathi_shell(
+        cognition=FakeCognition(),
+        env={"DHARMA_HOME": str(injected_home)},
+    )
+    empty_env_shell = build_sarathi_shell(cognition=FakeCognition(), env={})
+
+    assert shell.turn_store.runtime_state.db_path == (
+        injected_home / "state" / "runtime.db"
+    )
+    assert process_state not in shell.turn_store.runtime_state.db_path.parents
+    assert empty_env_shell.turn_store.runtime_state.db_path == (
+        Path.home() / ".dharma" / "state" / "runtime.db"
+    )
+    assert process_state not in empty_env_shell.turn_store.runtime_state.db_path.parents
 
 
 def test_factory_with_injected_ports_is_side_effect_free() -> None:

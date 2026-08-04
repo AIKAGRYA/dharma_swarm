@@ -350,6 +350,7 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "identity_mapping",
         "idempotency_consumed",
         "runtime_warrant",
+        "sarathi_turn",
         "topology_state",
         "topology_handoff",
         "ontology_action_requested",

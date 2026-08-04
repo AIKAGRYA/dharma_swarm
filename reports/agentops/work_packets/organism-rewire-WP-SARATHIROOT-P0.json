@@ -1,11 +1,14 @@
 {
   "id": "organism-rewire-WP-SARATHIROOT-P0",
-  "base_ref": "53263627874067f076db9efd74b00ce4c556d049",
+  "base_ref": "01655778baac79fa2b589b8ed59ec243e2cb4c06",
   "branch": "feature/sarathi-composition-root-p0-20260804",
   "worktree": ".",
-  "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, canonical provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Do not move or edit shared engines or legacy Sarathi organs in this packet.",
+  "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, repository provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Add only the generic RuntimeStateStore event-plus-receipt transaction seam needed for truthful atomic completion; do not move or fork shared engines or legacy Sarathi organs.",
   "allowed_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "dharma_swarm/runtime_state.py",
     "dharma_swarm/sarathi/**",
+    "tests/test_runtime_state.py",
     "tests/test_sarathi_public_api.py",
     "tests/test_sarathi_shell.py",
     "tests/test_sarathi_import_boundaries.py",
@@ -16,7 +19,6 @@
   ],
   "forbidden_files": [
     "dharma_swarm/operator_core/**",
-    "dharma_swarm/runtime_state.py",
     "dharma_swarm/holon_system/**",
     "dharma_swarm/autonomous_agent.py",
     "dharma_swarm/agent_runner.py",
@@ -33,13 +35,13 @@
   "gates": [
     {
       "name": "sarathi-root-contracts",
-      "command": "python3 -m pytest -q tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py",
+      "command": "python3 -m pytest -q tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py",
       "expected_exit": 0,
       "timeout_seconds": 600
     },
     {
       "name": "sarathi-root-ruff",
-      "command": "python3 -m ruff check dharma_swarm/sarathi tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py",
+      "command": "python3 -m ruff check dharma_swarm/runtime_state.py dharma_swarm/sarathi tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -50,6 +52,12 @@
       "command": "python3 -c \"import sys; from dharma_swarm.sarathi.contracts import EffectReport, EffectStatus; exec('try:\\n EffectReport(status=EffectStatus.EXECUTED)\\nexcept ValueError:\\n sys.exit(1)\\nsys.exit(0)')\"",
       "expected_exit": 1,
       "timeout_seconds": 60
+    },
+    {
+      "name": "runtime-event-receipt-atomicity",
+      "command": "python3 -m pytest -q tests/test_runtime_state.py::test_session_event_and_runtime_receipt_are_atomic_async tests/test_runtime_state.py::test_session_event_and_runtime_receipt_are_atomic_sync",
+      "expected_exit": 0,
+      "timeout_seconds": 120
     }
   ],
   "commit": {
@@ -79,7 +87,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "53263627874067f076db9efd74b00ce4c556d049",
+      "checked_at_sha": "01655778baac79fa2b589b8ed59ec243e2cb4c06",
       "details": []
     },
     "interface_mismatches": [
@@ -99,7 +107,7 @@
       "P0 is one real dialogue-and-receipt path, not a full Hermes/OpenClaw-class shell; tool execution, transport mounts, scheduler, memory retrieval, and self-modification remain follow-on adapters.",
       "No liveness claim is made: importing or calling one turn does not prove a standing service."
     ],
-    "rollback": "Revert the additive dharma_swarm/sarathi package, its three tests, the persistent-agent index/lineage additions, and this packet. Shared runtimes and state schemas are unchanged.",
-    "packet_digest": "12bfda87e7241b9eff48c29b7ceae3ac193293f63215f86715be323aeccf9682"
+    "rollback": "Revert the additive dharma_swarm/sarathi package, its tests, the generic RuntimeStateStore event-plus-receipt transaction seam and receipt-layer declaration, the persistent-agent index/lineage additions, and this packet. The existing state schema remains unchanged.",
+    "packet_digest": "544cc5c71ed5c5d40614175c8376026a0e72f6643612cfa99a54bb9959a56a65"
   }
 }

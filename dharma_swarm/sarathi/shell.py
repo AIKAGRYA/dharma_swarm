@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import os
 from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
@@ -120,10 +121,15 @@ class SarathiShell:
                 if not input_ref.strip():
                     raise RuntimeError("turn store returned an empty input receipt")
             except Exception as exc:  # noqa: BLE001 - boundary becomes typed failure
+                reports = self._blocked_effects(tuple(request.effect_intents))
+                uncertainties = (f"persistence_input_failed:{type(exc).__name__}",)
+                if reports:
+                    uncertainties += ("effects_blocked_pending_authority_adapter",)
                 return self._result(
                     execution_identity,
                     status=TurnStatus.FAILED,
-                    uncertainties=(f"persistence_input_failed:{type(exc).__name__}",),
+                    effect_reports=reports,
+                    uncertainties=uncertainties,
                 )
 
         caller_history = tuple(
@@ -214,9 +220,17 @@ class SarathiShell:
             receipt_ref = await self.turn_store.record_result(failure)
             if receipt_ref.strip():
                 return replace(failure, receipt_ref=receipt_ref)
-        except Exception:  # noqa: BLE001 - original failure remains authoritative
-            pass
-        return failure
+            return replace(
+                failure,
+                uncertainties=failure.uncertainties
+                + ("persistence_failure_record_failed:empty_receipt",),
+            )
+        except Exception as exc:  # noqa: BLE001 - preserve both failures
+            return replace(
+                failure,
+                uncertainties=failure.uncertainties
+                + (f"persistence_failure_record_failed:{type(exc).__name__}",),
+            )
 
 
 def build_sarathi_shell(
@@ -237,19 +251,24 @@ def build_sarathi_shell(
             working_dir=str(working_dir) if working_dir is not None else None,
         )
     if turn_store is None:
-        from dharma_swarm.daemon_config import dharma_state_dir
-
         from .adapters.runtime_state import RuntimeStateTurnStore
 
-        configured_root = None
-        if env is not None:
-            configured_root = env.get("DHARMA_STATE_DIR") or env.get("DHARMA_HOME")
-        root = Path(
-            state_root
-            if state_root is not None
-            else configured_root or dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
-        ).expanduser()
-        turn_store = RuntimeStateTurnStore(root / "state" / "runtime.db")
+        if state_root is not None:
+            db_path = Path(state_root).expanduser() / "state" / "runtime.db"
+        else:
+            configured_env = os.environ if env is None else env
+            configured_state = str(configured_env.get("DHARMA_STATE_DIR") or "")
+            configured_home = str(configured_env.get("DHARMA_HOME") or "")
+            if configured_state.strip():
+                db_path = Path(configured_state).expanduser() / "runtime.db"
+            else:
+                root = (
+                    Path(configured_home).expanduser()
+                    if configured_home.strip()
+                    else Path.home() / ".dharma"
+                )
+                db_path = root / "state" / "runtime.db"
+        turn_store = RuntimeStateTurnStore(db_path)
     return SarathiShell(
         cognition=cognition,
         turn_store=turn_store,
