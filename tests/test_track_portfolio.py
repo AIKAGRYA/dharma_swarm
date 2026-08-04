@@ -331,6 +331,20 @@ def test_command_passes_does_not_export_dharma_python_for_non_python(
     assert result.executed
 
 
+def test_command_passes_removes_preset_dharma_python_for_non_python(
+    monkeypatch,
+) -> None:
+    """An operator Python pin must not alter an unrelated command runtime."""
+    monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
+
+    result = check_command_passes(
+        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
 def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:
     monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
     probe = (

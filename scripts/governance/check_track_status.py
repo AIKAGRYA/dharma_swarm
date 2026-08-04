@@ -627,16 +627,20 @@ def check_command_passes(
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     resolved_python = _resolve_python_executable()
-    if (
-        "DHARMA_PYTHON" not in os.environ
-        and _command_should_export_dharma_python(resolved_command)
-    ):
+    python_shaped = _command_should_export_dharma_python(resolved_command)
+    if "DHARMA_PYTHON" not in os.environ and python_shaped:
         # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
         # DHARMA_PYTHON; point them at this dependency-complete interpreter so
         # track truth does not depend on one checkout's `.venv`.  Do not leak
         # this variable into non-Python commands: terminal/Bun uses it as the
         # bridge executable and must retain its own hermetic default.
         env = {**os.environ, "DHARMA_PYTHON": resolved_python}
+    elif "DHARMA_PYTHON" in os.environ and not python_shaped:
+        # A caller may have pinned DHARMA_PYTHON for this governance process.
+        # That pin remains authoritative for Python-shaped criteria, but it
+        # must not cross into unrelated runtimes that reuse the variable for a
+        # different bridge executable.
+        env = {key: value for key, value in os.environ.items() if key != "DHARMA_PYTHON"}
     try:
         result = subprocess.run(
             resolved_command,
