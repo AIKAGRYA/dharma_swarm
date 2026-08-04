@@ -76,11 +76,13 @@ The implementation packet must run at least:
 
 ```bash
 python -m pytest -q \
+  tests/test_runtime_state.py \
   tests/test_sarathi_public_api.py \
   tests/test_sarathi_shell.py \
   tests/test_sarathi_import_boundaries.py \
   tests/test_holon_system_imports.py
-python -m ruff check dharma_swarm/sarathi \
+python -m ruff check dharma_swarm/runtime_state.py dharma_swarm/sarathi \
+  tests/test_runtime_state.py \
   tests/test_sarathi_public_api.py \
   tests/test_sarathi_shell.py \
   tests/test_sarathi_import_boundaries.py
