@@ -11,11 +11,13 @@ Annotations follow semgrep's convention:
   # todoruleid: <id> -> a KNOWN, NAMED gap: it should fire and does not
 """
 import codecs
+import io
 import json
 import sqlite3
 from pathlib import Path
 from typing import Protocol
 
+import aiofiles
 import aiosqlite
 
 
@@ -170,6 +172,39 @@ class KeywordReorderedModeLedger:
             fh.write(json.dumps(record).encode())
 
 
+# --- Qualified `.open(path, mode)`: aiofiles (a core dependency) and the
+#     aliased builtins io/codecs/gzip. Mode is the SECOND positional argument
+#     here, unlike Path.open — the pre-2026-08-04 shapes bound it to the path
+#     and rejected every one of these (codex review, PR #1220).
+
+# ruleid: dharma.no-new-substrate
+class AiofilesPositionalAppendLedger:
+    async def append(self, record: dict) -> None:
+        async with aiofiles.open(self.path, "a") as fh:
+            await fh.write(json.dumps(record) + "\n")
+
+
+# ruleid: dharma.no-new-substrate
+class AiofilesKeywordAppendLedger:
+    async def append(self, record: dict) -> None:
+        async with aiofiles.open(self.path, mode="a") as fh:
+            await fh.write(json.dumps(record) + "\n")
+
+
+# ruleid: dharma.no-new-substrate
+class AiofilesAwaitAssignStore:
+    async def append(self, record: dict) -> None:
+        fh = await aiofiles.open(self.path, "a")
+        await fh.write(json.dumps(record) + "\n")
+
+
+# ruleid: dharma.no-new-substrate
+class IoOpenAppendStore:
+    def append(self, record: dict) -> None:
+        fh = io.open(self.path, "a")
+        fh.write(json.dumps(record) + "\n")
+
+
 # --- Ratified WP-0C1R exemptions: must stay silent -------------------------
 
 # ok: dharma.no-new-substrate
@@ -297,7 +332,9 @@ class WrapperFunctionSqliteStore:
         self.conn = _open_connection(path)
 
 
-# todoruleid: dharma.no-new-substrate
+# Was a `todoruleid` gap ("aliased builtins") until 2026-08-04; the qualified
+# path-first `.open` shape added for aiofiles closes it for free.
+# ruleid: dharma.no-new-substrate
 class AliasedOpenLedger:
     def append(self, record: dict) -> None:
         with codecs.open(self.path, "a", "utf-8") as fh:

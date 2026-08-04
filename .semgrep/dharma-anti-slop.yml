@@ -283,13 +283,17 @@ rules:
               - metavariable-regex:
                   metavariable: $MODE
                   regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Keyword `mode=` on ANY qualified `.open` — Path.open,
+          #     aiofiles.open, io.open, gzip.open ... The leading `...`
+          #     admits a preceding positional path, which the pre-2026-08-04
+          #     `$P.open(mode=$MODE, ...)` shape did not (codex, PR #1220).
           - patterns:
               - pattern: |
                   class $NAME:
                       ...
                       def $M(...):
                           ...
-                          $P.open(mode=$MODE, ...)
+                          $P.open(..., mode=$MODE, ...)
                           ...
               - metavariable-regex:
                   metavariable: $MODE
@@ -300,7 +304,60 @@ rules:
                       ...
                       def $M(...):
                           ...
-                          with $P.open(mode=$MODE, ...) as $F:
+                          with $P.open(..., mode=$MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Qualified `.open(path, mode)` — the PATH-FIRST signature.
+          #     `aiofiles.open` (a core dependency, pyproject.toml), plus the
+          #     aliased builtins `io.open` / `codecs.open` / `gzip.open`.
+          #     Distinct from Path.open above, where mode is the FIRST
+          #     positional parameter: there the shapes above would bind $MODE
+          #     to the path and reject it (codex, PR #1220). `await` is
+          #     transparent to the statement shape, so `fh = await
+          #     aiofiles.open(p, "a")` matches it. `async with` is a distinct
+          #     node from `with` and needs its own alternative. ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          $P.open($PATH, $MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with $P.open($PATH, $MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          async with $P.open($PATH, $MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          async with $P.open(..., mode=$MODE, ...) as $F:
                               ...
               - metavariable-regex:
                   metavariable: $MODE
