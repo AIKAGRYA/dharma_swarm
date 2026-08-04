@@ -67,15 +67,23 @@ is "none of these," the change should be reshaped, not waived.
 From 2026-04-26 to 2026-08-04 Rule 2's message claimed it caught classes that
 "append their own JSONL" while the rule carried zero JSONL patterns — the
 config-shape contract tests could not see it. The rule now also detects
-append-mode file handles, the SQLite forms it previously missed (local
-variables, bare calls, `async def`, context managers), and subclasses of the
-three ratified exemptions; a companion rule
+append-mode file handles in **any** flag ordering (CPython reads the mode as
+a set, so `"+a"` / `"ba"` / `"ta"` / `"+ab"` all append), qualified
+path-first opens (`aiofiles.open(p, "a")` — a core dependency — plus
+`io.open` / `codecs.open`), the SQLite forms it previously missed (local
+variables, bare calls, `async def`, context managers, and aliased imports),
+and subclasses of the three ratified exemptions in any base position
+including dotted references. A companion rule
 (`dharma.no-new-substrate-exempt-name-collision`) catches a substrate that
-re-uses a ratified exempt class NAME. **The authoritative statement of what
-the detector does and does not catch is Rule 2's own `message:` in
-`.semgrep/dharma-anti-slop.yml`**, and it is proven — not asserted — by
-`tests/test_semgrep_rule2_behavior.py` running semgrep over
-`.semgrep/tests/test_no_new_substrate.py`. Receipts and the 17 findings this
+re-uses a ratified exempt class NAME **outside that name's canonical file** —
+the discriminator is the file, not the base list, so a base-less copycat is
+caught too. **The authoritative statement of what the detector does and does
+not catch is Rule 2's own `message:` in `.semgrep/dharma-anti-slop.yml`**, and
+it is proven — not asserted — by `tests/test_semgrep_rule2_behavior.py`
+running semgrep over `.semgrep/tests/test_no_new_substrate.py`. Those
+assertions execute in CI in the `rule2-behavior` job of
+`.github/workflows/semgrep.yml`, which sets `DHARMA_REQUIRE_SEMGREP=1` so a
+missing scanner fails instead of skipping. Receipts and the 17 findings this
 broadening surfaced (OWNER_DEFERRED, unadjudicated):
 `reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md`,
 "Amendment 2026-08-04".

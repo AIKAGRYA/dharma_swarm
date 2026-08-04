@@ -472,6 +472,15 @@ class OtherDriverStore:
 
 
 # todoruleid: dharma.no-new-substrate
+class ParquetAppendStore:
+    """A non-text append sink: the handle is never opened with a mode literal
+    here, so there is no syntactic shape to match."""
+
+    def append(self, table) -> None:
+        self._writer.write_table(table)
+
+
+# todoruleid: dharma.no-new-substrate
 class VariableModeLedger:
     def append(self, record: dict, mode: str = "a") -> None:
         with open(self.path, mode) as fh:

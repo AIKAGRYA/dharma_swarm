@@ -106,34 +106,49 @@ rules:
         - sqlite3/aiosqlite `.connect(...)` reached from a class body or any
           method body — attribute assignment, local variable, bare call,
           `async def`, nested inside if/try/with, and the
-          `with sqlite3.connect(...) as conn:` context-manager form;
+          `with sqlite3.connect(...) as conn:` context-manager form. Import
+          ALIASES are covered: semgrep resolves `import sqlite3 as db` and
+          `from sqlite3 import connect as c` before the driver regex runs
+          (measured, semgrep 1.168.0);
         - an append-mode file handle opened in a method body:
           `open(path, "a")`, `open(path, mode="a")`, `p.open("a")`,
-          `p.open(mode="a")`, and the `with ... as f:` form of each
-          (append modes a / ab / at / a+ / ab+ / at+). This is the JSONL
+          `p.open(mode="a")`, the qualified path-first form
+          `aiofiles.open(path, "a")` / `io.open` / `codecs.open`, and the
+          `with` / `async with ... as f:` form of each. This is the JSONL
           substrate this message promised from 2026-04-26 and did not
-          actually detect until 2026-08-04;
+          actually detect until 2026-08-04. The mode is read as a SET of
+          flags, the way CPython reads it, so every ordering matches:
+          a / ab / at / a+ / +a / ba / ta / +ab / b+a / ...;
         - a class inheriting from one of the three ratified exempt
-          substrates below.
+          substrates below, in ANY base position and through a dotted
+          reference: `class X(Mixin, BridgeRegistry)` and
+          `class X(registries.BridgeRegistry)` both fire.
 
-      WHAT IT STILL DOES NOT CATCH (named, not silently missed):
+      WHAT IT STILL DOES NOT CATCH (named, not silently missed). Every gap
+      expressible as a fixture line carries `# todoruleid:` in
+      .semgrep/tests/test_no_new_substrate.py, so a gap that starts firing
+      FAILS the suite and gets promoted instead of forgotten. Two cannot be:
+      the class-name boundary is a deliberate `# ok:` control, and the
+      same-canonical-file collision is path-scoped, so no single fixture file
+      can express it.
         - a substrate opened through a helper/wrapper function, a factory,
           or an injected connection object — that needs interprocedural
           taint, not a syntactic pattern;
-        - aliased builtins (`io.open(p, "a")`, `codecs.open(p, "a")`) and a
-          mode passed as a variable rather than a literal;
+        - a mode passed as a variable rather than a literal;
         - drivers other than sqlite3/aiosqlite (duckdb, lmdb, psycopg, ...)
           and non-text append sinks (csv/parquet/binary writers);
         - a class whose name does not end in Store/Ledger/Registry/Substrate;
         - an append handle opened directly in a class body rather than in a
           method;
-        - a SECOND class re-using a ratified exempt NAME inside that class's
-          own module — the exemptions are name-scoped and a semgrep class
-          pattern written without bases also matches a class WITH bases, so
-          `class KnowledgeStore(Protocol)` is swallowed here. That specific
-          collision is caught by dharma.no-new-substrate-exempt-name-collision
-          below (behavioral), backed by the structural collision check in
-          tests/test_semgrep_wrapper.py.
+        - a SECOND class re-using a ratified exempt NAME inside that name's
+          own CANONICAL FILE (dharma_swarm/bridge_registry.py, graph_store.py,
+          knowledge_units.py). The exemptions here are name-scoped, so a
+          re-used name is swallowed; the companion rule
+          dharma.no-new-substrate-exempt-name-collision catches it everywhere
+          ELSE, and those three files are the exclusion that keeps the
+          ratified definitions themselves silent. The structural collision
+          check in tests/test_semgrep_wrapper.py — which now looks for append
+          opens, not only sqlite — is the backstop inside them.
     severity: WARNING
     languages: [python]
     paths:
@@ -147,9 +162,12 @@ rules:
       # 2026-08-02). Each class's file carries a structural
       # `# closure-layer-role: <role>` header (vocabulary: exempt — subordinate
       # adapter/projection under the MemoryKernel doctrine, CLAUDE.md).
-      # NOTE (2026-08-04): "class-scoped" is precisely NAME-scoped — see the
-      # message's last "does not catch" bullet and the companion collision
-      # rule. Adjudication record
+      # NOTE (2026-08-04): "class-scoped" is precisely NAME-scoped — a class
+      # pattern written without bases also matches a class WITH bases, and a
+      # re-used name is swallowed here regardless of its base list. That is
+      # why the companion rule below is bound to the three canonical FILES:
+      # it, not this pattern-not, is what distinguishes the ratified
+      # definition from a copycat. Adjudication record
       # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
       - pattern-not: |
           class BridgeRegistry:
