@@ -1,7 +1,12 @@
 # Sarathi Composition Root P0
 
-**Status:** active build contract, not a liveness or completeness claim  
-**Owner:** `organism-rewire-2026-07`, item 11  
+**Document role:** `active_spec`; subordinate to
+`docs/governance/ACTIVE_TRACK.yaml` (`organism-rewire-2026-07`, item 11), the
+repo-level documentation authorities named by `docs/AGENTS.md`, and source/tests
+for executable truth. It replaces no existing document; the older Sarathi build
+corpus remains dated reference and history.
+**Status:** active build contract, not a liveness or completeness claim
+**Owner:** `organism-rewire-2026-07`, item 11
 **Product root:** `dharma_swarm/sarathi/`
 
 ## Decision
@@ -26,13 +31,17 @@ found plentiful organs but almost no composition
 
 ## P0 deliverable
 
-The first implementation slice owns only `dharma_swarm/sarathi/**` and its three
-named tests. It must provide:
+The first implementation slice owns `dharma_swarm/sarathi/**`, its three named
+tests, and one narrowly admitted shared-state change: a generic
+`RuntimeStateStore` transaction that writes one session event and one runtime
+receipt atomically, with its test and receipt-layer declaration. The shared
+store remains owned by its existing module; Sarathi consumes that public seam
+through an adapter. The slice must provide:
 
 1. An async, ingress-neutral `handle_turn(request) -> result` Python contract.
 2. One generated `turn_id` carried through the result and durable receipt.
 3. A version-controlled Sarathi identity/persona that can be revised in Git.
-4. A real provider-backed cognition adapter using the canonical runtime-provider
+4. A real provider-backed cognition adapter using the repository runtime-provider
    door, plus dependency injection for hermetic tests.
 5. A shared `RuntimeStateStore` adapter for session history and turn receipts;
    no new database schema or store.
@@ -82,6 +91,7 @@ Required negative controls:
 - importing the package with an empty temporary home leaves that home empty;
 - a cognition response containing effect intents cannot execute them;
 - a failed receipt write cannot be reported as a receipted successful turn;
+- a receipt-write abort rolls back the paired reply event;
 - no module under the new root imports `agent_runner`, `autonomous_agent`, or a
   host-specific runtime script.
 
