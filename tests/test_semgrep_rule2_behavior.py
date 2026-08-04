@@ -57,15 +57,37 @@ def _semgrep_binary() -> str | None:
     return shutil.which(candidate)
 
 
+# The lane that declares itself authoritative sets this (the `rule2-behavior`
+# job in .github/workflows/semgrep.yml). It turns "the scanner is missing" from
+# a skip into a hard failure, so a skip can never be this contract's CI
+# outcome — which was the defect codex found on PR #1220: the tests skipped in
+# every automated lane, so a regression that deleted a detection shape stayed
+# green everywhere. Same defect class as the one this rule file exists to fix.
+_SCANNER_REQUIRED = os.environ.get("DHARMA_REQUIRE_SEMGREP") == "1"
+
 requires_semgrep = pytest.mark.skipif(
-    _semgrep_binary() is None,
+    _semgrep_binary() is None and not _SCANNER_REQUIRED,
     reason=(
         "semgrep binary not found (checked $DHARMA_SEMGREP_BIN then PATH) — "
         "Rule 2's behavioral contract cannot be proven on this host; it runs in "
-        "the .github/workflows/semgrep.yml lane. Install: "
+        "the .github/workflows/semgrep.yml `rule2-behavior` lane. Install: "
         'pip install "semgrep==1.168.0", or set DHARMA_SEMGREP_BIN.'
     ),
 )
+
+
+def test_scanner_is_present_where_this_contract_is_required():
+    """A skip must never be the outcome in the lane that owns this contract."""
+    if not _SCANNER_REQUIRED:
+        pytest.skip(
+            "DHARMA_REQUIRE_SEMGREP is unset — this host may legitimately skip "
+            "the scanner-backed tests; CI's rule2-behavior job sets it to 1"
+        )
+    assert _semgrep_binary() is not None, (
+        "DHARMA_REQUIRE_SEMGREP=1 declares this lane authoritative for Rule 2's "
+        "behavioral contract, but no semgrep binary is on PATH (checked "
+        "$DHARMA_SEMGREP_BIN then PATH). A green run here would mean nothing."
+    )
 
 
 def _scan(*targets: str | Path) -> list[tuple[int, str]]:
