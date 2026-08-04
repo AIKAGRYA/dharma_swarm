@@ -207,6 +207,13 @@ rules:
           # --- Append-mode handle from the builtin `open`, positional mode.
           #     `$PATH` is a required first argument: `open(..., $MODE, ...)`
           #     would let $MODE bind the FILENAME and flag `open("audit.log")`.
+          #     MODE REGEX (2026-08-04): CPython parses the mode string as a
+          #     SET of flags — `open(p, "+a")`, `"ba"`, `"ta"`, `"+ab"` and
+          #     `"b+a"` all append (io.open: `modes = set(mode)`; appending =
+          #     `"a" in modes`). An anchored `^"a[bt+]*"$` therefore missed
+          #     every non-canonical ordering, so the flag characters are now
+          #     matched independent of position. `"w+"`, `"rb"`, `"x"` and the
+          #     filename `"audit.log"` still do not match.
           - patterns:
               - pattern: |
                   class $NAME:
@@ -217,7 +224,7 @@ rules:
                           ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           - patterns:
               - pattern: |
                   class $NAME:
@@ -228,7 +235,7 @@ rules:
                               ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           # --- Append-mode handle from the builtin `open`, keyword mode ---
           - patterns:
               - pattern: |
@@ -240,7 +247,7 @@ rules:
                           ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           - patterns:
               - pattern: |
                   class $NAME:
@@ -251,7 +258,7 @@ rules:
                               ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           # --- Append-mode handle from `Path.open` (mode is the first
           #     positional parameter there), plain and context-manager. ---
           - patterns:
@@ -264,7 +271,7 @@ rules:
                           ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           - patterns:
               - pattern: |
                   class $NAME:
@@ -275,7 +282,7 @@ rules:
                               ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           - patterns:
               - pattern: |
                   class $NAME:
@@ -286,7 +293,7 @@ rules:
                           ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           - patterns:
               - pattern: |
                   class $NAME:
@@ -297,7 +304,7 @@ rules:
                               ...
               - metavariable-regex:
                   metavariable: $MODE
-                  regex: '^["'']a[bt+]*["'']$'
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
           # --- Inheriting a ratified exempt substrate is a new substrate:
           #     the exemption was granted to those three classes, not to a
           #     subclass tree hanging off them. ---

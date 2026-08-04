@@ -129,6 +129,47 @@ class NestedAppendLedger:
                 fh.write(json.dumps(record) + "\n")
 
 
+# --- Append mode flags in a non-canonical ORDER. CPython treats the mode
+#     string as a set (io.open: `modes = set(mode)`), so every one of these
+#     appends exactly like "a". The pre-2026-08-04 regex anchored on a leading
+#     "a" and missed all of them (codex review, PR #1220).
+
+# ruleid: dharma.no-new-substrate
+class PlusFirstAppendLedger:
+    def append(self, record: dict) -> None:
+        with open(self.path, "+a") as fh:
+            fh.write(json.dumps(record) + "\n")
+
+
+# ruleid: dharma.no-new-substrate
+class BinaryFirstAppendStore:
+    def append(self, blob: bytes) -> None:
+        with open(self.path, "ba") as fh:
+            fh.write(blob)
+
+
+# ruleid: dharma.no-new-substrate
+class TextFirstAppendRegistry:
+    def append(self, record: dict) -> None:
+        fh = open(self.path, "ta")
+        fh.write(json.dumps(record) + "\n")
+        fh.close()
+
+
+# ruleid: dharma.no-new-substrate
+class PlusBinaryPathOpenLedger:
+    def append(self, blob: bytes) -> None:
+        with self.path.open("+ab") as fh:
+            fh.write(blob)
+
+
+# ruleid: dharma.no-new-substrate
+class KeywordReorderedModeLedger:
+    def append(self, record: dict) -> None:
+        with open(self.path, mode="b+a") as fh:
+            fh.write(json.dumps(record).encode())
+
+
 # --- Ratified WP-0C1R exemptions: must stay silent -------------------------
 
 # ok: dharma.no-new-substrate
@@ -204,6 +245,23 @@ class ExclusiveCreateStore:
     def create(self, payload: str) -> None:
         with open(self.path, "x") as fh:
             fh.write(payload)
+
+
+# ok: dharma.no-new-substrate
+class ReadWriteTruncateStore:
+    """`"w+"` and `"rb"` share flag characters with the append modes — the
+    order-independent mode regex must still reject them."""
+
+    def rewrite(self, payload: str) -> None:
+        with open(self.path, "w+") as fh:
+            fh.write(payload)
+
+
+# ok: dharma.no-new-substrate
+class BinaryReadStore:
+    def load(self) -> bytes:
+        with open(self.path, "rb") as fh:
+            return fh.read()
 
 
 # ok: dharma.no-new-substrate
