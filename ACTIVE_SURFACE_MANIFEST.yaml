@@ -849,16 +849,17 @@ correlation_spine:
 
     - id: persistent_dialogue
       label: "Sarathi persistent-dialogue turn closure"
-      receipt_class: RuntimeReceipt(sarathi_turn)
+      receipt_class: RuntimeReceipt
       receipt_module: dharma_swarm.runtime_state
       identity_field: trace_id
       identity_alias: correlation_id
       role: canonical-within-layer
       owner: sarathi
       notes: |
-        Sarathi P0 records the reply event and sarathi_turn receipt through one
-        RuntimeStateStore transaction. RuntimeStateStore remains the shared
-        persistence owner; the Sarathi adapter does not introduce a new store.
+        Sarathi P0 records the reply event and RuntimeReceipt subtype
+        sarathi_turn through one RuntimeStateStore transaction. RuntimeStateStore
+        remains the shared persistence owner; the Sarathi adapter does not
+        introduce a new store.
 
   cross_layer_joins:
     - "A2ATaskReceipt.correlation_id == EvidenceReceipt(spine).trace_id"

@@ -5,11 +5,13 @@ authority
 
 **Measured:** 2026-08-04
 
-**Main comparison point:**
-`origin/main@f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd`
+**Main comparison procedure:** resolve `origin/main` immediately before running
+the classification commands below; this pre-landing report does not predict a
+future integration SHA.
 
-**Current build branch base:** main plus governance commits `c48594ac5`,
-`b100d3162`, and `532636278`
+**Governance dependency:** PR #1215 landed on main as squash commit
+`d5fec94eab54f1b924c1fd659b36240b32ca9b39`. The exact P0 integration base is
+intentionally unbound here and must be remeasured immediately before landing.
 
 This file answers the historical question: did the repo spend months trying to
 build a custom Hermes/OpenClaw-class persistent agent, and how do the resulting
@@ -54,7 +56,7 @@ landed runtime.
 | 2026-08-03 | **LANDED** | PR #1198 merge `f654c3908` — verified-partial index | Added the broad Hermes persistent-agent index and move-plan evidence. The report's core finding is many correct organs with almost no composition ([report:106-115](../reports/hermes_persistent_agent_index_2026-08-01.md#L106-L115)). | Its mandatory errata lists missed systems and false claims, and its proposed three-PR build plan is explicitly non-executable as written ([errata:10-55](../reports/hermes_persistent_agent_index_2026-08-01.md#L10-L55)). |
 | 2026-08-03 | **UNMERGED / PARALLEL** | `df4ee41cc` on `origin/claude/sarathi-autonomy-build-vyr998` | Added a candidate `holon_system.sarathi.memory` recall adapter plus tests. Inspect with `git show --stat df4ee41cc`. | It is not on `origin/main` or the P0 branch; no current code may assume the module exists. |
 | 2026-08-03 | **UNMERGED / PARALLEL** | `90fa0025a` on `origin/census/sarathi-shell-20260802` | Added a behavior-first census/navigation umbrella after finding the August index omissions. Inspect its permanent-map draft with `git show 90fa0025a:docs/persistent_agents/README.md`. | The commit is not on `origin/main`; paths that exist only there must not be linked as if landed. |
-| 2026-08-04 | **CURRENT BRANCH** | PR #1215 head `01655778b` | Admitted `dharma_swarm/sarathi/**`, exact P0 tests, the atomic shared-state seam, this documentation surface, and its docs-index pointer under `organism-rewire-2026-07` ([ownership:822-837](../governance/ACTIVE_TRACK.yaml#L822-L837), [item 11:927-930](../governance/ACTIVE_TRACK.yaml#L927-L930)). The active contract fixes one stable `handle_turn` composition root ([P0:14-30](SARATHI_COMPOSITION_ROOT_P0.md#L14-L30)). | Governance and a spec are not proof that the P0 implementation works or has landed. The source/tests must pass and the branch must merge before the status becomes **LANDED**. |
+| 2026-08-04 | **LANDED** | PR #1215 squash merge `d5fec94e` | Admitted `dharma_swarm/sarathi/**`, exact P0 tests, the atomic shared-state seam, this documentation surface, and its docs-index pointer under `organism-rewire-2026-07` ([ownership:822-837](../governance/ACTIVE_TRACK.yaml#L822-L837), [item 11:927-930](../governance/ACTIVE_TRACK.yaml#L927-L930)). The active contract fixes one stable `handle_turn` composition root ([P0:14-30](SARATHI_COMPOSITION_ROOT_P0.md#L14-L30)). | Governance and a spec are not proof that the P0 implementation works or has landed. The source/tests must pass and the P0 branch must merge before the implementation becomes **LANDED**. |
 | 2026-08-04 | **CURRENT BRANCH** | P0 implementation change / branch | Added the inert public package and types ([`__init__.py:1-38`](../../dharma_swarm/sarathi/__init__.py#L1-L38), [`contracts.py:15-212`](../../dharma_swarm/sarathi/contracts.py#L15-L212)), repo-owned identity ([`identity.py:41-57`](../../dharma_swarm/sarathi/identity.py#L41-L57)), one message→cognition→reply→receipt turn path ([`shell.py:102-233`](../../dharma_swarm/sarathi/shell.py#L102-L233)), repository provider adapter ([`runtime_provider.py:38-121`](../../dharma_swarm/sarathi/adapters/runtime_provider.py#L38-L121)), and shared `RuntimeStateStore` adapter ([`runtime_state.py:20-166`](../../dharma_swarm/sarathi/adapters/runtime_state.py#L20-L166)). | It deliberately executes no effects ([`shell.py:58-72`](../../dharma_swarm/sarathi/shell.py#L58-L72)); it has no HTTP/MCP/A2A/CLI mount, standing supervisor, or self-modification adapter, and remains non-landed until its PR merges. |
 | after P0 | **ASPIRATION** | transport, memory retrieval, effects, heartbeat, evolution adapters | The intended product class is a full repo-owned, mutable, portable persistent shell callable by any agent/model. | These capabilities remain explicitly deferred in the P0 contract ([P0:98-107](SARATHI_COMPOSITION_ROOT_P0.md#L98-L107)); do not write “full Hermes/OpenClaw equivalent” yet. |
 
@@ -131,7 +133,7 @@ for COMMIT in \
   0beef7584 c5653967e e7856fed9 \
   04f9bd5e8 b65030b7d f654c3908 \
   39291ad3d df4ee41cc 90fa0025a \
-  c48594ac5 b100d3162 532636278; do
+  d5fec94e; do
   if git merge-base --is-ancestor "$COMMIT" "$MAIN_REF"; then
     printf 'LANDED %s\n' "$COMMIT"
   else
@@ -143,7 +145,7 @@ git show -s --format='%H %cs %s' \
   94191530f 0c7fec942 f57660c9f 57b6bfe66 2e6406a28 \
   6b9b51e1b b659713c6 76702ce4d e7856fed9 \
   0beef7584 c5653967e 04f9bd5e8 b65030b7d \
-  f654c3908 c48594ac5 b100d3162 532636278
+  f654c3908 d5fec94e
 
 test -e dharma_swarm/persistent_agent.py
 test -e dharma_swarm/autonomous_agent.py

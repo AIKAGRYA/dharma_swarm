@@ -1,6 +1,6 @@
 {
   "id": "organism-rewire-WP-SARATHIROOT-P0",
-  "base_ref": "01655778bf0953db4f4247cf55f4765d04588862",
+  "base_ref": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
   "branch": "feature/sarathi-composition-root-p0-20260804",
   "worktree": ".",
   "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, repository provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Add only the generic RuntimeStateStore event-plus-receipt transaction seam needed for truthful atomic completion; do not move or fork shared engines or legacy Sarathi organs.",
@@ -12,6 +12,7 @@
     "tests/test_sarathi_public_api.py",
     "tests/test_sarathi_shell.py",
     "tests/test_sarathi_import_boundaries.py",
+    "tests/test_assurance_boundary.py",
     "docs/README.md",
     "docs/persistent_agents/README.md",
     "docs/persistent_agents/BUILD_LINEAGE.md",
@@ -35,13 +36,13 @@
   "gates": [
     {
       "name": "sarathi-root-contracts",
-      "command": "python3 -m pytest -q tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py",
+      "command": "python3 -m pytest -q tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py tests/test_assurance_boundary.py",
       "expected_exit": 0,
       "timeout_seconds": 600
     },
     {
       "name": "sarathi-root-ruff",
-      "command": "python3 -m ruff check dharma_swarm/runtime_state.py dharma_swarm/sarathi tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py",
+      "command": "python3 -m ruff check dharma_swarm/runtime_state.py dharma_swarm/sarathi tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_assurance_boundary.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -71,9 +72,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
-      "git": "2.50.1",
-      "make": "3.81"
+      "python": "3.12.13",
+      "git": "2.51.1",
+      "make": "4.3"
     },
     "authority_precedence": [
       "executable",
@@ -87,7 +88,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "01655778bf0953db4f4247cf55f4765d04588862",
+      "checked_at_sha": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
       "details": []
     },
     "interface_mismatches": [
@@ -103,11 +104,11 @@
       "dharma_swarm/holon_system/sarathi/delegate.py:delegate_all"
     ],
     "honest_blockers": [
-      "This stacked branch cannot merge before governance PR #1215 lands.",
+      "Governance PR #1215 landed as d5fec94eab54f1b924c1fd659b36240b32ca9b39; this packet is rebound to exact post-#1230 main 9fd1bfc39e6dc471c3ebddbde668e383bd818110.",
       "P0 is one real dialogue-and-receipt path, not a full Hermes/OpenClaw-class shell; tool execution, transport mounts, scheduler, memory retrieval, and self-modification remain follow-on adapters.",
       "No liveness claim is made: importing or calling one turn does not prove a standing service."
     ],
     "rollback": "Revert the additive dharma_swarm/sarathi package, its tests, the generic RuntimeStateStore event-plus-receipt transaction seam and receipt-layer declaration, the persistent-agent index/lineage additions, and this packet. The existing state schema remains unchanged.",
-    "packet_digest": "31a93929cb12cc8ef0f4ce9524290ec8a454af2e774f85885a0a8833be3532bc"
+    "packet_digest": "4185c43fcae1d39b10a7529236109fde2dcde68171ae57fdd7553f640a83588f"
   }
 }
