@@ -511,6 +511,36 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+### 8.12 v10 shipped — the verified Obsidian lock (2026-08-05)
+
+Five-agent verification panel ran against the build before publish:
+- Mechanics 5/6 → pin-dim defect found (pins lacked hlDom) → FIXED.
+- Grammar regression 8/8 (unfold/dive/no-self-orbit/sibling-floor-5/
+  cards+strokes/surfacing/swipes/pinch-travel), zero pageerrors.
+- Chain navigation 5/5 (word→word→word, word→kanji with radical pins
+  耳・又 from 取, tap preserves lock, dive+surface clean, camera pulled
+  edge-word 280px to center) → insight: canvas members untouchable →
+  FIXED (touch materializes them into real words).
+- Chaos: ~600 gestures + 3 seeded fuzz runs + storage poison + 200°
+  twists: zero crashes/dups/desyncs/orphans; ONE real defect — fps
+  collapse at min zoom (7.8fps, software rendering) → FIXED via dot
+  batching+thinning, cached hub-glyph sprites, and half-resolution
+  linework at far zoom (relative cliff halved; SwiftShader floor now
+  ~23fps at extreme zoom-out vs 30-61 baseline variance; GPU devices
+  expected 60). Tap-bloom now decays after 12s idle (panel note).
+- Consistency floor 16/17 → root cause of the one failure (壷): all-
+  fallback members drew arms past the viewport → FIXED with a viewport
+  containment force in the lock simulation; 壷 now 12/12 observable
+  including the previously-lost 限定. Slider narrowed (38→26px) so it
+  cannot swallow word presses.
+
+The semantic tier is LIVE in the lock: SEM pilot (27 words + 5 new N1
+lexicon entries) feeds shells first — verified 過酷 assembles 16 members
+(苛酷・酷使・酷暑 family / 厳しい・劣悪・熾烈 synonyms / 試練・逆境・
+極限 themes / 過酷な労働・環境・運命 collocations as gold ghosts) with
+typed edge colors; mechanical channels top up everything else to the
+floor. `window.__lockWord(word)` added as the search-to-lock API seam.
+
 ### 8.11 The semantic tier — LLM as the relation engine (2026-08-05)
 
 Operator asked me for 過酷's top-20 constellation, then asked why. The
