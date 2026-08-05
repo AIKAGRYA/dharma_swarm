@@ -511,6 +511,38 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+### 8.8 v8 — the web of life (2026-08-05, operator voice note, redrafted
+as directive at operator request)
+
+**Redrafted operator prompt:** (1) Zooming IN must NEVER auto-open a
+word — kill the reflex; only deliberate taps open. (2) A center word must
+never orbit a copy of itself. (3) Left alone, the universe keeps moving —
+every word in frame drifts perpetually. (4) Constellationality must exist
+AT REST: families, shared-kanji relatives, compounds visible as webbing in
+the field itself; the level slider must VISIBLY change the register of the
+sky; the destination is sentence-depth — words + particles conjoining into
+real example sentences/paragraphs 3–4 levels down — the whole field
+navigable like the language model's own vector space rendered as a
+Japanese universe.
+
+**v8 shipped (same artifact URL):** zoom-through-dive REMOVED entirely
+(zoom is pure travel; taps open — verified: 3 consecutive aggressive
+zoom-ins leave depth empty); duplicate-satellite bug fixed (dive sibling
+scan excludes the center word and dedupes — verified 1 visible copy);
+perpetual drift (per-word wander velocities integrated each frame, no
+trig, + a gentle ambient fluid impulse every 3.6s — verified 26px of
+motion in 2.2s of pure idle at 62fps); constellation mesh at rest
+(shared-non-hub-kanji chains, up to 9,000 precomputed edges, batched
+single-stroke, viewport-culled) + level register made LOUD (match dots
+bigger/brighter, off-register dots near-invisible, tide responds in
+300ms — N1 slide visibly fills the sky with 目論見/賑わす/素っ気無い).
+
+**Data-tier roadmap for full §8.8(4)** (real app, not prototype-fakeable):
+JMdict sense groups → synonym families; Tanaka/Tatoeba corpus → example
+sentences and the particle-conjoining sentence layer; frequency-ranked
+compound lists per kanji. The prototype now shows the SHAPE of the web;
+these corpora give it flesh.
+
 **v7.1 — exploration must never collapse (operator: "the fluid was NOT
 WORKING… a word we touch pops up as the center and collapses the
 depth").** Root cause: zoom-through-to-dive triggered on ABSOLUTE zoom —
