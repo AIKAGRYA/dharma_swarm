@@ -7,7 +7,7 @@ Re-exported by ``scheduler`` so existing imports keep working.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Literal, Protocol
 
 __all__ = [
     "CheckpointSink",
@@ -15,6 +15,7 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "NodeTimeoutError",
     "SuperstepLimitError",
 ]
 
@@ -52,6 +53,63 @@ class GraphRuntimeError(RuntimeError):
 
 class NodeExecutionError(GraphRuntimeError):
     """A node callable raised; the original exception is chained as __cause__."""
+
+
+class NodeTimeoutError(GraphRuntimeError):
+    """A node attempt exceeded one of its configured timeout bounds.
+
+    Mirrors ``langgraph.errors.NodeTimeoutError``: ``run_timeout`` and
+    ``idle_timeout`` both report the policy in force when the bound fired
+    (``None`` when unconfigured), and ``kind`` says which one it was.
+
+    Deliberately NOT a subclass of the built-in ``TimeoutError`` (which is an
+    ``OSError``, a class the default retry predicate refuses to retry) — the
+    reference makes the same choice for the same reason, so a timed-out node is
+    retryable under the DEFAULT policy. See ``retry.default_retry_on``.
+    """
+
+    def __init__(
+        self,
+        node: str,
+        elapsed: float,
+        *,
+        kind: Literal["run", "idle"],
+        run_timeout: float | None = None,
+        idle_timeout: float | None = None,
+        graph_run_id: str = "",
+        superstep: int = -1,
+    ) -> None:
+        if kind == "run":
+            if run_timeout is None:
+                raise ValueError("run_timeout is required when kind='run'")
+            bound = run_timeout
+            message = (
+                f"Node {node!r} exceeded its run timeout of {run_timeout:.3f}s "
+                f"(elapsed: {elapsed:.3f}s)."
+            )
+        elif kind == "idle":
+            if idle_timeout is None:
+                raise ValueError("idle_timeout is required when kind='idle'")
+            bound = idle_timeout
+            message = (
+                f"Node {node!r} exceeded its idle timeout of "
+                f"{idle_timeout:.3f}s without making progress "
+                f"(elapsed: {elapsed:.3f}s)."
+            )
+        else:
+            raise ValueError("kind must be 'run' or 'idle'")
+        super().__init__(
+            message,
+            graph_run_id=graph_run_id,
+            superstep=superstep,
+            node_id=node,
+        )
+        self.node = node
+        self.elapsed = elapsed
+        self.kind = kind
+        self.timeout = bound
+        self.run_timeout = run_timeout
+        self.idle_timeout = idle_timeout
 
 
 class NodeResultError(GraphRuntimeError):

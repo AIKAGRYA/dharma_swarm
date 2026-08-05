@@ -46,6 +46,13 @@ from dharma_swarm.graph.persistence import (
     GraphSerializer,
     JsonGraphSerializer,
 )
+from dharma_swarm.graph.retry import (
+    RetryPolicy,
+    backoff_interval,
+    default_retry_on,
+    select_retry_policy,
+    should_retry_on,
+)
 from dharma_swarm.graph.routing import (
     BranchDestinationError,
     Command,
@@ -54,6 +61,8 @@ from dharma_swarm.graph.routing import (
     SendTargetError,
 )
 from dharma_swarm.graph.subgraph import as_node
+from dharma_swarm.graph.timeouts import TimeoutPolicy, heartbeat
+from dharma_swarm.graph.errors import NodeTimeoutError
 from dharma_swarm.graph.scheduler import (
     CompiledGraph,
     GraphRuntimeError,
@@ -123,9 +132,17 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "NodeTimeoutError",
     "ParentCommand",
     "ReducerChannel",
+    "RetryPolicy",
+    "TimeoutPolicy",
     "as_node",
+    "backoff_interval",
+    "default_retry_on",
+    "heartbeat",
+    "select_retry_policy",
+    "should_retry_on",
     "RemainingSteps",
     "SchemaError",
     "Send",

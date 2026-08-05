@@ -261,9 +261,18 @@ class TypedStateGraph:
                     "are not state-schema keys (fail closed)"
                 )
 
-    def add_node(self, node_id: str, fn: Callable[..., Any]) -> "TypedStateGraph":
+    def add_node(
+        self,
+        node_id: str,
+        fn: Callable[..., Any],
+        *,
+        retry_policy: Any = None,
+        timeout: Any = None,
+    ) -> "TypedStateGraph":
         wrapped = _context_adapter(node_id, fn) if _wants_context(fn) else fn
-        self._builder.add_node(node_id, wrapped)
+        self._builder.add_node(
+            node_id, wrapped, retry_policy=retry_policy, timeout=timeout
+        )
         return self
 
     def add_edge(self, source: Any, target: str) -> "TypedStateGraph":

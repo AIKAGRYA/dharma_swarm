@@ -13,6 +13,7 @@ the wall clock.
 
 from __future__ import annotations
 
+import asyncio
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -49,6 +50,10 @@ class EffectsProvider(Protocol):
         """The order in which concurrent work is dispatched."""
         ...
 
+    async def retry_sleep(self, seconds: float) -> None:
+        """Wait out a node's retry backoff."""
+        ...
+
 
 @dataclass(frozen=True)
 class LiveEffects:
@@ -64,6 +69,9 @@ class LiveEffects:
 
     def dispatch_order(self, items: Sequence[T]) -> list[T]:
         return list(items)
+
+    async def retry_sleep(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
 
 
 class SimulatedEffects:
@@ -84,6 +92,7 @@ class SimulatedEffects:
         self._clock = start
         self._tick = timedelta(seconds=tick_seconds)
         self._rng = random.Random(seed)
+        self.retry_sleeps: list[float] = []
 
     def now(self) -> datetime:
         current = self._clock
@@ -101,3 +110,12 @@ class SimulatedEffects:
         ordered = list(items)
         self._rng.shuffle(ordered)
         return ordered
+
+    async def retry_sleep(self, seconds: float) -> None:
+        """Record a retry backoff and jump the clock — never really wait.
+
+        Retry-heavy scenarios stay instantaneous and the recorded sequence is a
+        pure function of the seed, so a failing retry ladder replays exactly.
+        """
+        self.retry_sleeps.append(seconds)
+        self.advance(seconds)
