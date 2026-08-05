@@ -339,6 +339,38 @@ orbiters at every level, both swipe grades intact at all depths. JS gotcha
 recorded: CJK *radical-block* characters (⻌ etc.) are not valid unquoted
 object keys — quote all kanji/kana map keys.
 
+### 8.3 Drift v3.1 field test → v4 directives (2026-08-05, operator on-device)
+
+Six operator directives, verbatim in spirit:
+
+1. **Swipe legibility failure.** Operator had to ASK whether left/right
+   differ — the grammar exists (right = know it, left = don't) but the two
+   feel identical. v4 law: the word itself must act out the judgment —
+   right = blooms up-and-away in pigment; left = turns 朱, falls the full
+   height into the ink pool at the bottom. No ambiguity at a glance.
+2. **Orbit speed.** Second-tap orbiters "a bit too fast" — all ring speeds
+   cut ~3.5x; drift must stay patient at every depth.
+3. **RADICALS, explicitly.** Particles are nice but the operator's real
+   ask: break kanji down into radicals and keep forking/diverging from
+   there. The component ring becomes the RADICAL ring — boxed
+   radical-dictionary styling, named, present for every kanji that can
+   decompose, and each radical remains a door to every kanji built on it.
+4. **Paper still not felt.** "Doesn't have a patient paper feel or any
+   real sense of texture." v4 ground gains 簀の目 laid screen-lines +
+   chain lines (handmade washi), per-grain dot noise, heavier fiber
+   strands, stronger deckle vignette — texture must survive a phone
+   screenshot.
+5. **Pigment-colored words.** Kanji must not be only-black or only-white:
+   per-theme word palettes drawn from nihonga practice — tonal sumi scale
+   (濃→淡) in 墨; mineral pigments on warm ground in 岩絵具; 紺紙金泥
+   (gold/gofun ink on indigo-dark paper) in 夜; aerial perspective =
+   distant words take the palest tones. Study source: the great nihonga
+   colorists' restraint — few pigments, layered, never noisy.
+6. **Stroke order.** A toggle (placement TBD by operator) that shows each
+   kanji handwritten on note paper with proper stroke order and very
+   light numbering — v4 embeds real KanjiVG stroke data for the pool's
+   kanji + radicals, drawn stroke-by-stroke on a genkouyoushi-style cell.
+
 **v3.1 — the dive is a true magnification (operator-picked).** Offered two
 zoom grammars: re-orbit (the old layer steps back small, looking down
 through water) vs. literal magnification (a forward dolly — the layer you
