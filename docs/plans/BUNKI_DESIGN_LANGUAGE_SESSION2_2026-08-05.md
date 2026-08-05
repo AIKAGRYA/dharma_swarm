@@ -248,3 +248,41 @@ the flow to say so.
 - Motion must serve trance, not spectacle: continuous, low-contrast,
   interruption-free; no scores, streaks, or confetti (spec §8 honest-metrics
   stance carries over).
+
+### 8.1 Drift v1 field test → v2 direction (2026-08-05, operator on-device)
+
+Operator ran prototype v1 on iPhone. Verdict: "a good start, I like where
+it is going" — the tap-depth + swipe grammar survives contact. Three
+corrections drive v2:
+
+1. **Palette absent.** v1 shipped only a pale 北斎 and a night toggle. v2
+   must carry the actual §2 theme set (北斎 / 墨 / 岩絵具 / 緑青 / 夜) with
+   the real pigment hexes, cycling in-app.
+2. **Tendrils point off-screen.** When connections ripple out, sibling
+   words are often outside the viewport, so lines shoot into the void.
+   Law: **connections pull the relatives to you** — on dive, siblings swim
+   in from the edges and take orbit around the focus; a tendril may never
+   terminate off-screen.
+3. **"Flat and clinical."** Words on a static ground is not suminagashi.
+   Operator's ask, verbatim in spirit: *fractally zoom in and out of this
+   theme* and get "way way more powerful on graphics, effects, feeling,
+   immersive quality."
+
+**v2 concept — the fractal dive.** The drift is a surface; every element
+is a depth. Tap a word: it unfolds. Tap again: DIVE — the word slides to
+center and becomes the sun of its own local universe; its component kanji
+detach as orbiting glyphs; sibling words swim in and orbit; brush-stroke
+tendrils connect them; everything else recedes (smaller, blurred, dimmed —
+atmospheric perspective, not a modal). Tap an orbiting kanji: dive again —
+now the KANJI is the sun and every word containing it takes orbit. Word →
+kanji → word → kanji, indefinitely: the dictionary as a fractal. Tap open
+water to surface one level. Swipes keep their meaning at every depth
+(right = bloom into pigment mist; left = sink as heavy ink), and the §8
+honesty contract is unchanged.
+
+**Atmosphere requirements (anti-flat):** living suminagashi ground — ink
+marbling in the active theme's pigments, slowly advected, disturbed by
+touch ripples; words live in parallax depth bands (near = large/sharp,
+far = small/soft); tendrils are tapered brush strokes, not hairlines;
+grading dissolves are particle pigment, not CSS fades. Trance boundary
+still binds: no flash, no score, continuous motion only.
