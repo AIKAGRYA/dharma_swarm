@@ -427,6 +427,39 @@ family expansion work across the whole jōyō space, not just the 52-word
 demo pool. Out-of-pool kanji dive onward via kradfile components; word
 orbits and 筆順 sheets stay pool-scoped for now.
 
+### 8.5 v4.2 field test → v5 directives (2026-08-05, operator)
+
+"Getting better. Let's keep going." Seven directives:
+
+1. **Radical index completeness.** The family list must carry the Kangxi
+   radical NUMBER (Kodansha: "Kanji with radical 163"), merge variant
+   forms under one number (忄/心/⺗ = 61; 氵/水 = 85; ⻌ = 162; ⻏ = 163;
+   ⻖ = 170), and list the whole family (drop the ≥3-member threshold).
+2. **Both readings.** Every kanji row and kanji card shows ON (katakana)
+   and kun (hiragana), not one collapsed reading.
+3. **Stroke order must be visible without hunting.** Operator still
+   "doesn't see anywhere that shows stroke order written out" — the 筆順
+   sheet now renders automatically inside every kanji/radical card,
+   animating on open; the button becomes replay.
+4. **Swipes must mean something and add up.** Judgments persist
+   (localStorage in the prototype): lifetime counts survive reload;
+   known words return to the drift faded and settled; unknown words
+   return enlarged and haloed (exposure-evidence visuals only — the
+   §8 honesty contract still bars direct memory-state writes).
+5. **The whole dictionary floats.** 52 demo words → thousands of
+   JLPT-tagged words (N5–N1) drifting through the field.
+6. **Level slider.** Thin, faint vertical scale on the LEFT edge;
+   strengthens under the finger; stops N5→N1 blended with school-grade
+   and 漢検 labels (N3 ≈ 小5-6 ≈ 漢検6-5級 etc.). Sliding re-seeds the
+   drift — a tide change — so the field speaks that register. Top stop
+   自 (custom): in the real app the level is estimated continuously from
+   AI conversation/assessment, SRS progression, mock-test results, and
+   other deterministic factors; the prototype shows the stop + intent.
+7. **More dimensions.** Pinch-out over a word/kanji = dive into it;
+   pinch-in anywhere = surface — zoom joins the tap grammar. More
+   connections: faint second-degree links between orbiters that share
+   components.
+
 **v4.2 shipped (same artifact URL).** Source pivot: edrdg.org is
 proxy-blocked, so the family index is built from KanjiVG's own
 `kvg:element` component annotations (same dataset as our stroke order —
