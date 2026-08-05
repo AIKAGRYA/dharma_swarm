@@ -338,3 +338,14 @@ simulated iPhone — full recursion chains (報告 › 報 › 土, 習慣 › �
 orbiters at every level, both swipe grades intact at all depths. JS gotcha
 recorded: CJK *radical-block* characters (⻌ etc.) are not valid unquoted
 object keys — quote all kanji/kana map keys.
+
+**v3.1 — the dive is a true magnification (operator-picked).** Offered two
+zoom grammars: re-orbit (the old layer steps back small, looking down
+through water) vs. literal magnification (a forward dolly — the layer you
+leave GROWS ×2, blurs, and rushes past the screen edges as you pass
+through it; a zoom shock-ripple disturbs the ink; surfacing reverses the
+dolly, the old layer flying back in from beyond the frame while the
+abandoned universe falls away beneath). Operator chose magnification.
+Interaction law learned on-device: anything receded, dying, or graded must
+become **tap-transparent** (pointer-events none) the moment it fades —
+scaled-up ghosts otherwise swallow water-taps invisibly.
