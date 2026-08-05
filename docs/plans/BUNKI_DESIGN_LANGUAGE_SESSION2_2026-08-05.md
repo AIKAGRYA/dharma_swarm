@@ -403,6 +403,30 @@ its own components), box restored on surfacing. Verified chain:
 方言 in word orbit. Interaction law added to §8.2's list: **an orbit ring
 must never sit inside the center body's own bounding box.**
 
+### 8.4 Radical expansion — the Kodansha index inside the Drift
+(2026-08-05, operator screenshots: KKLC "Kanji with radical 44/163")
+
+Operator confirms the radical-planet moment ("I do see it now") and names
+the missing half: from a radical you must be able to EXPAND to the
+complete family — Kodansha shows a full list of every kanji using that
+radical (尸 → 尻尼尽尾局尿届屈居屋屑展…), reading + core meaning per
+row. "I don't know how you'll do it spatially on the drift but that's
+what I meant."
+
+Spatial answer (v4.2): two layers of expansion —
+1. **Orbit = a taste.** The radical planet's rings carry a sample of its
+   family (pool kanji first, then common jōyō members), every one a door.
+2. **Card = the full index.** Tapping the radical planet itself opens the
+   Kodansha-style list: 「◯の漢字 · N字」, scrollable rows of glyph +
+   reading + core meaning covering the ENTIRE jōyō family — and every row
+   is itself a door that dives that kanji as a new planet.
+
+Data: real radkfile radical→kanji index + kanjidic2 readings/meanings
+(EDRDG licences), filtered to jōyō, embedded — so decomposition and
+family expansion work across the whole jōyō space, not just the 52-word
+demo pool. Out-of-pool kanji dive onward via kradfile components; word
+orbits and 筆順 sheets stay pool-scoped for now.
+
 **v3.1 — the dive is a true magnification (operator-picked).** Offered two
 zoom grammars: re-orbit (the old layer steps back small, looking down
 through water) vs. literal magnification (a forward dolly — the layer you
