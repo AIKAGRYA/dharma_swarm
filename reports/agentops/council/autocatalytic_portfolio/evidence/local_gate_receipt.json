@@ -1,14 +1,20 @@
 {
   "schema": "dharma.autocatalytic.local_gate_receipt.v1",
-  "observed_at": "2026-08-05T07:07:04Z",
+  "observed_at": "2026-08-05T07:41:32Z",
   "base_commit": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
   "verified_implementation_commit": "2323d3a42f9419204db16222b6652010ea6aefc7",
   "branch": "codex/autocatalytic-organism3-20260805",
   "gates": [
     {
       "name": "work_packet_python_gate",
-      "command": "python -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_manifest_health.py tests/test_a2a.py tests/test_catalytic_graph.py",
-      "result": "198 passed, 1 third-party deprecation warning",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_manifest_health.py tests/test_store_inventory_census.py tests/test_a2a.py tests/test_catalytic_graph.py",
+      "result": "202 passed, 1 third-party deprecation warning",
+      "exit": 0
+    },
+    {
+      "name": "store_inventory_census",
+      "command": "python scripts/store_inventory_census.py --check; python -m pytest -q tests/test_store_inventory_census.py",
+      "result": "canonical artifact current; 4 passed; JSONL exact baseline explicitly justified 218 -> 219 for {cycle_id}.tasks.jsonl",
       "exit": 0
     },
     {

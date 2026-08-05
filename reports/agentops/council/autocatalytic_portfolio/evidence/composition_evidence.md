@@ -12,7 +12,7 @@ The implementation is split by responsibility and imports the existing substrate
 - every task submission goes through `submit_task_via_spine_sync`, which owns runtime-truth and idempotency receipts before delegating to `A2AServer`;
 - `RuntimeStateStore`, `RuntimeReceipt`, `correlation_scope_sync`, `CatalyticGraph`, and `dharma_state_dir` remain their existing canonical owners.
 
-No second task store, graph implementation, card registry, correlation context, truth spine, or runtime database is introduced. The only new persisted artifact is a read-model witness under the already declared Dharma state directory. Project adapters are read-only and record `side_effects_performed=false`.
+No second task-store implementation, graph implementation, card registry, correlation context, truth spine, or runtime database is introduced. A persisted run reuses the canonical `A2AServer`, `CardRegistry`, and `RuntimeStateStore` implementations and materializes `{cycle_id}.json`, the mutable `latest.json` alias, `{cycle_id}.tasks.jsonl`, ten card JSON files, and receipt rows in the existing `state/runtime.db`, all beneath the already declared Dharma state directory. Project adapters are read-only and record `side_effects_performed=false`; none of these local mutable artifacts authorizes an authority upgrade.
 
 ## Source identity and seams
 
@@ -53,4 +53,4 @@ Each of the 20 project-evidence rows also carries a `dharma.autocatalytic.promot
 
 Because adapter replay shares implementation with the producer, it is a drift/tamper check rather than diversity evidence. A common-mode adapter bug may survive both invocations. No authority above `local_rehearsal` may rely on this shared implementation without a separately owned evaluator or trust root.
 
-Witness aliases and runtime receipts resolve from one state-root function on every call. `DHARMA_STATE_DIR`, the manifest-declared override, takes precedence over legacy `DHARMA_HOME`; the resolved root owns `a2a/autocatalytic_portfolio` and `state/runtime.db`. An integration test runs a complete two-turn default cycle under an alternate root, reloads it without explicit paths, and confirms both witness and receipt database stayed beneath that root.
+Witnesses, canonical A2A task logs, card files, and runtime receipts resolve from one state-root function on every call. `DHARMA_STATE_DIR`, the manifest-declared override, takes precedence over legacy `DHARMA_HOME`; the resolved root owns `a2a/autocatalytic_portfolio` and `state/runtime.db`. An integration test runs a complete two-turn default cycle under an alternate root, reloads it without explicit paths, and confirms the witness materializations and receipt database stayed beneath that root.
