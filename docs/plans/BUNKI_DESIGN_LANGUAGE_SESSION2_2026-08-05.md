@@ -511,6 +511,34 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+### 8.9 v9 — tap-bloom + the self-satellite diagnosis (2026-08-05)
+
+Operator re-stated §8.8 with force: (a) the HOME field must carry obvious
+relationality — "a light tap on one word will bring up at least ten"
+connected words/compounds, Obsidian-vault local-graph semantics (research
+confirmed: hover a node → its connections highlight, rest dims; local
+graph assembles connected notes at chosen depth); (b) duplicates STILL
+present — "almost every word" orbits its own copy.
+
+**Duplicate diagnosis (empirical, 8 scripted dives):** word-node dedupe
+from v8 was correct — the real duplicate was SEMANTIC: single-kanji words
+(謎, 生, 崖 — abundant since the v5 dictionary) spawned their own kanji
+as a satellite glyph: 謎 orbiting 謎. The word-dive was designed when all
+pool words had 2+ kanji. Fix: a single-kanji word IS its kanji — its
+inner ring is now its RADICALS (謎 → 言口米), never itself. Law: **no
+node may ever orbit its own name.**
+
+**Tap-bloom shipped (same artifact URL):** a light tap on any word (first
+tap, surface level) now assembles up to 14 shared-kanji relatives around
+it in a loose ring — they physically swim in from wherever they drift,
+get bright dots + canvas labels + direct ink edges to the tapped word —
+while every other dot, edge, mesh line, and DOM word dims to ~40%.
+Tap water: the family swims home (eased return, wander resumes). Second
+tap still dives; grading the focus clears the bloom. Verified: light tap
+on 取り上げる assembled 取り出す/取り付け/見上げる/立ち上がる/お手上げ/
+引き上げる/取引/上位/上手 with depth untouched; dive of 謎 shows
+radicals 言口米, zero self-glyphs.
+
 ### 8.8 v8 — the web of life (2026-08-05, operator voice note, redrafted
 as directive at operator request)
 
