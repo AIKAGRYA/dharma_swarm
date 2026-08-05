@@ -286,3 +286,55 @@ touch ripples; words live in parallax depth bands (near = large/sharp,
 far = small/soft); tendrils are tapered brush strokes, not hairlines;
 grading dissolves are particle pigment, not CSS fades. Trance boundary
 still binds: no flash, no score, continuous motion only.
+
+### 8.2 Drift v2 field test → v3 direction (2026-08-05, operator on-device)
+
+v2 verdict: "getting better… I like the 5 themes option… the moving drift
+sense and the inter-click ability." Then the ask: level up ~2000x — depth,
+nuance, layered texture ("words on old parchment paper"), Hokusai-grade
+nihonga contrast, MORE connections and exploratory layers (particles as
+doors; kanji branching into other kanji), more gamified — with the hard
+ceiling restated: never noisy, cluttered, chaotic. Named vibe:
+"ancient Japan meets anime meets outer space meets obsidian graph meets
+additive AI study app."
+
+**v3 organizing idea — the surface is ancient paper; depth is outer
+space.** At rest you drift over layered parchment (pre-rendered per theme:
+tonal mottling, laid fibers, foxing age-spots on light sheets, edge
+vignette) with Hokusai contrast: concentrated pigment masses in the lower
+field + an undulating wave band, over the mist blobs. Every dive deepens a
+veil and *gold-leaf / star flecks emerge through it* — by depth 3 the sheet
+has dissolved into cosmos (in 夜 the stars are always out). Surfacing all
+the way home draws the visited chain (e.g. 報告 › を › 報 › 土) as a brief
+gold constellation that fades — the journey acknowledged, never scored.
+
+**Graph completed — four node kinds, four door types:**
+- word → its kanji (inner ring), its particles (circled hiragana stamps,
+  accent-colored tendrils — 助詞 as first-class doors, per §4), sibling
+  words (outer ring);
+- kanji → words that contain it (outer), sibling kanji built from the same
+  parts (mid), its own components (inner, e.g. 報 → 土/又);
+- component → every kanji built with it (kanji→kanji branching: 習慣 › 習 › 羽);
+- particle → every word that travels with it (交渉 › を).
+Tendril color encodes door type: pigment-1 words, pigment-2 kanji,
+accent particles. At the surface an obsidian-graph whisper: shared-kanji
+words within ~200px link with faint node-dot lines while they drift.
+
+**Quiet gamification (allowed set):** 深さ N (deepest dive) joins the
+拾った/済み tray; journey constellation on surfacing; permanent ink stains
+along the bottom for gathered words (stigmergic trail, §5). Still no
+scores, streaks, confetti, or interruptions.
+
+**Craft details locked in v3:** per-word ±1.5° tilt (hand-laid type on the
+sheet); ink-bleed text edge; red hanko seal 分 as the brand mark; light
+well behind the dive center (the diving eye brings its own lantern);
+elliptical orbit rings separated **vertically** when phone width caps the
+x-radius (a tendril still may never point off-screen); free-drifting words
+carry a gentle mutual repulsion so the surface never piles up.
+
+**Prototype status:** v3 live at the same artifact URL; verified on
+simulated iPhone — full recursion chains (報告 › 報 › 土, 習慣 › 習 › 羽,
+交渉 › を), pool returns to exactly 22 on surfacing, zero off-screen
+orbiters at every level, both swipe grades intact at all depths. JS gotcha
+recorded: CJK *radical-block* characters (⻌ etc.) are not valid unquoted
+object keys — quote all kanji/kana map keys.
