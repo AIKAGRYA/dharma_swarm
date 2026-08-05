@@ -58,7 +58,9 @@ from dharma_swarm.graph.persistence_runtime import (
     persist_failure_remains,
 )
 from dharma_swarm.graph.routing import BranchSpec, Command
+from dharma_swarm.graph.runtime import GraphRuntime, normalized_config
 from dharma_swarm.graph.state import GraphState
+from dharma_swarm.graph.store import KVStore
 from dharma_swarm.graph.types import (
     RESERVED_PREFIX,
     START,
@@ -114,6 +116,11 @@ class CompiledGraph:
         persistence: GraphPersistenceKernel | None = None,
         thread_id: str | None = None,
         checkpoint_id: str | None = None,
+        config: Mapping[str, Any] | None = None,
+        context: Any = None,
+        store: KVStore | None = None,
+        stream_writer: Callable[[Any], None] | None = None,
+        previous: Any = None,
     ) -> GraphRunResult:
         """Run the graph from START to quiescence and return the committed result.
 
@@ -126,11 +133,30 @@ class CompiledGraph:
         :class:`RunCheckpoint` and continues from ``superstep + 1`` (fork = a
         checkpoint copied under a new run id). ``on_checkpoint`` receives a
         RunCheckpoint after every committed superstep (0 included).
+
+        ``config`` / ``context`` / ``store`` / ``stream_writer`` / ``previous``
+        are the LG30 runtime-injection surface: they are visible to node code
+        through ``graph.runtime`` accessors (``get_config``, ``get_runtime``,
+        ``get_store``, ``get_stream_writer``) for the duration of a task and
+        nowhere else. None of them is state — none is written to a channel,
+        checkpointed, or digested, so passing them cannot change a committed
+        trace.
         """
         active_effects: EffectsProvider = (
             effects if effects is not None else LiveEffects()
         )
-        executor = SuperstepExecutor(self, active_effects)
+        runtime_template = GraphRuntime(
+            context=context,
+            store=store,
+            previous=previous,
+            config=normalized_config(config, thread_id=thread_id),
+            **(
+                {"stream_writer": stream_writer}
+                if stream_writer is not None
+                else {}
+            ),
+        )
+        executor = SuperstepExecutor(self, active_effects, runtime_template)
         resume_command: Command | None = None
         if isinstance(input, Command):
             if not input.has_resume:
