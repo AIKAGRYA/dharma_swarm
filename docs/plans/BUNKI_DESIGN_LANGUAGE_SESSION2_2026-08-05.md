@@ -162,3 +162,55 @@ Interaction details to preserve: results update incrementally WHILE
 drawing; kana readings shown in the single red accent (one color doing
 semantic work — readings pop, nothing else is colored); candidate strip
 above the canvas; instant, offline-fast.
+
+## 8. The Drift — 墨流し Suminagashi mode (concept v0.1, 2026-08-05)
+
+Second voice note refined §7.1's floating-words direction. Operator's own
+framing: not sure of the exact shape, but the qualities are — movement; many
+options at once; the mind going very deep and very fast through layers of
+the whole dictionary (words, kanji, concepts) in a graphic, visual,
+interactive way; intuitive and moving; showing the interconnections. NOT
+pinch-zoom — tap-depth. A rapid swipe as instant self-judgment. "Gamified
+is not the right word" — fluid, HYPNOTIC. Explicitly its own layer within
+the app, distinct from the rock-solid A+++ dictionary/kanji/SRS bones.
+
+**Name:** 墨流し (suminagashi — the traditional art of floating ink on
+water, touch-responsive and trance-inducing). The floating words are ink on
+the surface; touches disturb and redirect the flow. Direct continuation of
+the Nihonga material world (§1–2).
+
+### Interaction grammar v0.1
+
+- **Drift:** the learner's own words (from the Trace) float in the active
+  pigment theme; weather variants (slow drift, rain, spiral).
+- **One tap:** word unfolds in place — reading + meaning bloom around it;
+  flow never breaks.
+- **Double tap:** connections ripple out as ink tendrils — component kanji,
+  sibling compounds, attached particles, near-synonyms; every rippled node
+  is itself tappable (fast deep travel through the dictionary without
+  opening a "page"). This is §4's every-element-is-a-door at speed.
+- **Triple tap / hold:** commit — open the full solid entry (hand-off to
+  the bones).
+- **Swipe right / left:** "I've got it" / "I don't." Instant, wordless, no
+  confirmation UI, next word flows in.
+- **Partial-knowledge move:** on an unfolded word, swiping a LAYER (one
+  kanji within it, or the reading, or the meaning) grades that depth
+  independently — "know the word, not its second kanji." Maps directly to
+  the modality/contract-split memory model (spec §2.2, convergence A1).
+
+### Honesty contract (non-negotiable)
+
+Swipes are self-assessment, not retrieval proof. Per convergence A2/C3:
+right-swipe = "claims known" → logs exposure/self-report evidence and
+quietly schedules a real retrieval probe; left-swipe = nomination into the
+SRS intake queue with raised priority. The Drift feeds the scheduler but
+can never write FSRS memory state directly — and no popup ever interrupts
+the flow to say so.
+
+### Boundaries
+
+- Own layer/mode; the dictionary, kanji pages, and review sessions remain
+  conventional, sturdy, and fast (§3 foundation bar).
+- Motion must serve trance, not spectacle: continuous, low-contrast,
+  interruption-free; no scores, streaks, or confetti (spec §8 honest-metrics
+  stance carries over).
