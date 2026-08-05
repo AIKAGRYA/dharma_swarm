@@ -511,6 +511,19 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+**v7.1 — exploration must never collapse (operator: "the fluid was NOT
+WORKING… a word we touch pops up as the center and collapses the
+depth").** Root cause: zoom-through-to-dive triggered on ABSOLUTE zoom —
+a pinch-out starting with fingers close multiplies zoom 2–3x in one
+gesture and blasted past the threshold, force-diving the nearest word on
+nearly every exploratory pinch. Law: navigation gestures may never cost
+the traveler their altitude. Fix: dive-through now requires the pinch to
+BEGIN already pressed close (start z >= 2.0) and push past the raised
+ceiling (2.55; max zoom 2.6), with a tighter 110px target radius; the
+camera stays at close range after the dive instead of resetting. Verified:
+the previously-collapsing gesture now purely zooms; a deliberate second
+press dives (文房具); taps remain the primary way to open a word.
+
 **v7 shipped (same artifact URL) — iterated to 60fps.** World plane 3.2
 viewports square; 42 kanji-hub suns on a phyllotaxis spiral; every one of
 the 6,687 words anchored near its hubs (multi-hub words bridge between);
