@@ -511,6 +511,24 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+**v7 shipped (same artifact URL) — iterated to 60fps.** World plane 3.2
+viewports square; 42 kanji-hub suns on a phyllotaxis spiral; every one of
+the 6,687 words anchored near its hubs (multi-hub words bridge between);
+camera pans (one finger on water — which also stirs the fluid), pinch
+zooms continuously about the midpoint (0.34–2.35×), twist rotates
+(positions rotate, glyphs stay upright); pinching past 2.25× over a word
+zooms THROUGH into its dive universe; hub suns are tappable doors; ~64
+highest-priority words (unknown > fragile > level-match) are DOM, the
+rest render as ink dots + word→hub edges — the Obsidian vault as
+constellation map. Self-iteration log: r1 camera edge-clamp + sun/edge
+tuning; r2 gesture telemetry (probe error, camera correct); r3 fps 26 at
+galaxy zoom → dots as rects (40) → edge batching (42) → sprite-cached
+blobs + stain patina layer (40) → PROFILED per-subsystem: drawWorld was
+the entire cost — per-call cos/sin + object allocation in the 6.7k-word
+hot loop; hoisted transform + precomputed hub screens → **61fps stirred
+at full galaxy zoom**. Stains now accumulate on a permanent patina canvas
+(deeper stigmergy, cheaper frames).
+
 **v6 shipped (same artifact URL).** (1) Universal expandability: the
 kanji-ring filter now accepts any CJK ideograph with jōyō glosses —
 verified on dictionary word 磁気 (N1): 2 kanji glyphs, 磁 → 3 radicals;
