@@ -371,6 +371,23 @@ Six operator directives, verbatim in spirit:
    light numbering — v4 embeds real KanjiVG stroke data for the pool's
    kanji + radicals, drawn stroke-by-stroke on a genkouyoushi-style cell.
 
+**v4 shipped (same artifact URL), all six directives implemented:**
+swipe judgments act out their meaning (right = pigment bloom up-and-away;
+left = word turns 朱, falls the full screen height into the ink pool);
+orbit speeds ÷3.5; the component ring is now the RADICAL ring — boxed
+radical-dictionary chips (土/羊/⻌ around 達), each a door onward, COMP
+map extended (交/成/変); washi ground gains 簀の目 laid lines + chain
+lines + per-grain speckle + kozo strands + deeper vignette; per-theme
+nihonga word palettes with aerial perspective (北斎 indigo family; 墨
+tonal sumi scale 濃→淡; 岩絵具 rust/ochre/malachite; 緑青 greens +
+gunjō; 夜 = 紺紙金泥 gofun-white/gold-ink/pale-ultramarine on iron
+dark); 筆順 button on every kanji/radical card animates real KanjiVG
+strokes (114 characters embedded, ~85KB) on a note-paper cell with
+light numbering. Verified on simulated iPhone: 摩擦 › 摩 › 麻 chain,
+both swipe grades, stroke animation, clean surfacing to a 22-word pool.
+Toggle placement for stroke order = card-level 筆順 button for now;
+operator to decide the final home.
+
 **v3.1 — the dive is a true magnification (operator-picked).** Offered two
 zoom grammars: re-orbit (the old layer steps back small, looking down
 through water) vs. literal magnification (a forward dolly — the layer you
