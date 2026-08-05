@@ -11,6 +11,20 @@ langgraph 1.2.4 parity, verified empirically 2026-07-17:
 - ``Command(resume=...)`` without a persistence kernel fails closed
   (langgraph: RuntimeError "Cannot use Command(resume=...) without
   checkpointer").
+- EVERY task that suspends in one superstep surfaces its own interrupt:
+  a step with N interrupting tasks raises ONE error carrying all N
+  (LG20 multiple_interrupts), ordered canonically by ``(node_id,
+  task_seq)`` — NOT by dispatch order, so the surfaced sequence is
+  execution-order-invariant like every other committed artifact
+  (LG20 interrupt_order).
+- ``Command(resume={interrupt_id: value})`` resolves pending interrupts
+  individually by id; a bare ``Command(resume=value)`` is legal only
+  while exactly one interrupt is pending (langgraph 1.2.4 parity,
+  verified empirically 2026-08-05: a scalar resume against multiple
+  pending interrupts raises RuntimeError "When there are multiple
+  pending interrupts, you must specify the interrupt id when
+  resuming"). Resolving a subset is legal: the unresolved interrupts
+  re-surface on the next step and their tasks stay suspended.
 
 The dharma engine RAISES :class:`GraphInterrupted` (failure doctrine: runs
 raise, they never return suspended results); the payload rides the error.
@@ -26,7 +40,7 @@ from __future__ import annotations
 import contextvars
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from dharma_swarm.graph.errors import GraphRuntimeError
 
@@ -35,12 +49,21 @@ __all__ = [
     "GraphInterrupted",
     "Interrupt",
     "InterruptFrame",
+    "InterruptRecord",
     "RESUME_PREFIX",
     "interrupt",
+    "interrupt_id",
+    "resolve_resume_values",
     "resume_channel",
+    "task_key",
 ]
 
 RESUME_PREFIX = "__resume__:"
+
+
+def task_key(node_id: str, task_seq: int = 0) -> str:
+    """Resume-map key for one task identity (``"<node_id>:<task_seq>"``)."""
+    return f"{node_id}:{task_seq}"
 
 
 def resume_channel(node_id: str, task_seq: int = 0) -> str:
@@ -51,7 +74,21 @@ def resume_channel(node_id: str, task_seq: int = 0) -> str:
     independently (a node-only key would replay one resume into every
     packet).
     """
-    return f"{RESUME_PREFIX}{node_id}:{task_seq}"
+    return f"{RESUME_PREFIX}{task_key(node_id, task_seq)}"
+
+
+def interrupt_id(run_id: str, node_id: str, task_seq: int = 0) -> str:
+    """The deterministic, task-scoped public id of a task's interrupt.
+
+    Pure function of the task identity, so it is stable across resumes and
+    recomputable by the scheduler from a pending record's task keys — that
+    recomputation is what lets ``Command(resume={id: value})`` address an
+    individual pending interrupt without persisting an id->task index.
+    """
+    digest = hashlib.sha256(
+        f"{run_id}:{node_id}:{task_seq}".encode("utf-8")
+    ).hexdigest()
+    return digest[:32]
 
 
 @dataclass(frozen=True)
@@ -77,19 +114,118 @@ class GraphInterrupt(Exception):
         self.consumed = consumed
 
 
+@dataclass(frozen=True)
+class InterruptRecord:
+    """One suspended TASK: its identity, surfaced interrupt, consumed resumes.
+
+    A superstep may suspend several tasks at once, so the public error carries
+    a tuple of these rather than a single node identity. ``consumed_resumes``
+    is that task's own ordered resume history, which the persistence layer
+    re-journals under its own ``__resume__:<node>:<seq>`` entry — one task's
+    answers must never replay into another's call sequence.
+    """
+
+    node_id: str
+    task_seq: int
+    interrupt: Interrupt
+    consumed_resumes: tuple[Any, ...] = ()
+
+    @property
+    def key(self) -> str:
+        return task_key(self.node_id, self.task_seq)
+
+
 class GraphInterrupted(GraphRuntimeError):
     """A run suspended on :func:`interrupt`; resume with ``Command(resume=)``.
 
     Carries the surfaced interrupt(s) plus the inherited ``succeeded_*``
-    sibling payload so the scheduler persists surviving work exactly like a
-    task failure. ``consumed_resumes`` is the full ordered list of resume
-    values the interrupted node consumed before suspending again — the
-    persistence layer stores it for the next resume's replay.
+    sibling payload so the persistence layer stores surviving work exactly like a
+    task failure. ``suspended`` is the authoritative per-task view: every task
+    that suspended this superstep, ordered canonically by ``(node_id,
+    task_seq)``. ``interrupts`` is the matching payload tuple (langgraph's
+    ``__interrupt__`` shape).
+
+    ``node_id``, ``task_seq`` and ``consumed_resumes`` describe the FIRST
+    canonical suspended task and exist so single-interrupt callers written
+    against the LG08 resume slice keep working unchanged; anything handling
+    multiple interrupts must read ``suspended``.
     """
 
     interrupts: tuple[Interrupt, ...] = ()
+    suspended: tuple[InterruptRecord, ...] = ()
     consumed_resumes: tuple[Any, ...] = ()
     task_seq: int = 0
+
+    def attach(self, records: Sequence[InterruptRecord]) -> None:
+        """Bind every suspended task, canonically ordered, to this error."""
+        ordered = tuple(
+            sorted(records, key=lambda record: (record.node_id, record.task_seq))
+        )
+        if not ordered:
+            raise ValueError("GraphInterrupted requires at least one record")
+        self.suspended = ordered
+        self.interrupts = tuple(record.interrupt for record in ordered)
+        first = ordered[0]
+        self.node_id = first.node_id
+        self.task_seq = first.task_seq
+        self.consumed_resumes = first.consumed_resumes
+
+    def resume_entries(self) -> list[tuple[str, list[Any]]]:
+        """Reserved pending-record entries carrying each task's resume history."""
+        return [
+            (
+                resume_channel(record.node_id, record.task_seq),
+                list(record.consumed_resumes),
+            )
+            for record in self.suspended
+        ]
+
+
+def resolve_resume_values(
+    resume: Any,
+    pending_keys: Sequence[str],
+    run_id: str,
+) -> dict[str, Any]:
+    """Map one ``Command(resume=...)`` payload onto pending task keys.
+
+    ``pending_keys`` are the ``"<node_id>:<task_seq>"`` keys of the tasks that
+    are currently suspended. Returns ``{task_key: value}`` for the tasks this
+    command answers — possibly a subset, since resolving some interrupts and
+    leaving others pending is legal.
+
+    Dict form is recognised by CONTENT, not by type: a mapping is read as an
+    id->value map only when every key is a known pending interrupt id. That
+    keeps a plain dict usable as an ordinary resume *value* (the common
+    ``{"approved": True}`` case) while a partially-matching mapping — genuinely
+    ambiguous — fails closed rather than guessing.
+    """
+    by_id: dict[str, str] = {}
+    for key in pending_keys:
+        node_id, _, raw_seq = key.rpartition(":")
+        by_id[interrupt_id(run_id, node_id, int(raw_seq))] = key
+    if isinstance(resume, Mapping) and resume:
+        matched = [key for key in resume if key in by_id]
+        if len(matched) == len(resume):
+            return {by_id[key]: resume[key] for key in matched}
+        if matched:
+            unknown = sorted(str(key) for key in resume if key not in by_id)
+            raise GraphRuntimeError(
+                "Command(resume=...) mixes known interrupt ids with "
+                f"unrecognised keys {unknown!r}; pass only interrupt ids to "
+                "resume individually, or a bare value to resume a single "
+                "pending interrupt (fail closed)",
+                graph_run_id=run_id,
+            )
+    if len(pending_keys) != 1:
+        raise GraphRuntimeError(
+            "Command(resume=...) carries a single value but "
+            f"{len(pending_keys)} interrupts are pending "
+            f"({sorted(pending_keys)!r}); address them by interrupt id "
+            "(langgraph parity: resuming multiple pending interrupts "
+            "requires the interrupt id) (fail closed)",
+            graph_run_id=run_id,
+        )
+    return {pending_keys[0]: resume}
 
 
 @dataclass
@@ -103,10 +239,7 @@ class InterruptFrame:
     counter: int = 0
 
     def interrupt_id(self) -> str:
-        digest = hashlib.sha256(
-            f"{self.run_id}:{self.node_id}:{self.task_seq}".encode("utf-8")
-        ).hexdigest()
-        return digest[:32]
+        return interrupt_id(self.run_id, self.node_id, self.task_seq)
 
 
 _ACTIVE_FRAME: contextvars.ContextVar[InterruptFrame | None] = (

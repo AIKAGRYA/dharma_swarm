@@ -13,7 +13,6 @@ from dharma_swarm.graph.errors import GraphRuntimeError
 from dharma_swarm.graph.interrupts import (
     RESUME_PREFIX,
     GraphInterrupted,
-    resume_channel,
 )
 from dharma_swarm.graph.persistence import (
     GraphCheckpointRecord,
@@ -351,12 +350,9 @@ def persist_failure_remains(
     writes = list(error.succeeded_writes)
     resume_entries: list[tuple[str, Any]] = []
     if isinstance(error, GraphInterrupted):
-        resume_entries = [
-            (
-                resume_channel(error.node_id, error.task_seq),
-                list(error.consumed_resumes),
-            )
-        ]
+        # One entry per SUSPENDED TASK: a step may suspend several tasks at
+        # once, and each owns an independent call-order resume history.
+        resume_entries = list(error.resume_entries())
     if not writes and not resume_entries:
         return
     task_path = "+".join(

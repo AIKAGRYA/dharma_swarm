@@ -25,7 +25,9 @@ from dharma_swarm.graph.channels import (
 from dharma_swarm.graph.interrupts import (
     GraphInterrupted,
     Interrupt,
+    InterruptRecord,
     interrupt,
+    interrupt_id,
 )
 from dharma_swarm.graph.schema import (
     RemainingSteps,
@@ -116,7 +118,9 @@ __all__ = [
     "GraphTelosBridge",
     "GraphTelosBridgeResult",
     "Interrupt",
+    "InterruptRecord",
     "interrupt",
+    "interrupt_id",
     "GATE_GRAPH_RECEIPT_ANCHOR",
     "LastValueChannel",
     "LiveEffects",

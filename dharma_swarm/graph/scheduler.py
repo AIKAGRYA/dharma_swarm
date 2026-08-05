@@ -51,7 +51,11 @@ from dharma_swarm.graph.errors import (
     SuperstepLimitError,
 )
 from dharma_swarm.graph.executor import SuperstepExecutor
-from dharma_swarm.graph.interrupts import GraphInterrupted, resume_channel
+from dharma_swarm.graph.interrupts import (
+    RESUME_PREFIX,
+    GraphInterrupted,
+    resolve_resume_values,
+)
 from dharma_swarm.graph.persistence import GraphPersistenceKernel
 from dharma_swarm.graph.persistence_runtime import (
     GraphRunPersistence,
@@ -249,17 +253,13 @@ class CompiledGraph:
             tasks = executor.prepare_tasks(state, start_versions, versions_seen)
             plan = run_persistence.pending_replay_plan(tasks, run_id, superstep)
             if resume_command is not None:
-                if len(plan.resumes) != 1:
-                    raise GraphRuntimeError(
-                        "Command(resume=...) needs exactly one interrupted "
-                        f"node in the pending record; found "
-                        f"{sorted(plan.resumes)!r} (fail closed)",
-                        graph_run_id=run_id,
-                        superstep=superstep,
-                    )
-                plan.resumes[next(iter(plan.resumes))].append(
-                    resume_command.resume
-                )
+                # A bare value is only unambiguous with ONE pending interrupt;
+                # otherwise the command must address interrupts by id. Any
+                # subset may be answered — the rest stay suspended.
+                for key, value in resolve_resume_values(
+                    resume_command.resume, sorted(plan.resumes), run_id
+                ).items():
+                    plan.resumes[key].append(value)
             if plan.full:
                 run_persistence.replay(
                     state, versions_seen, self.triggers, tasks, run_id, superstep
@@ -297,6 +297,15 @@ class CompiledGraph:
                             + [n for n, _seq in suspended.succeeded_tasks]
                         )
                     )
+                    # Carry EVERY task's resume history forward, not just the
+                    # tasks that suspended again: with several interrupts in
+                    # flight, a task that consumed its answer and succeeded
+                    # must not have that answer dropped from the record.
+                    histories = {
+                        f"{RESUME_PREFIX}{key}": list(values)
+                        for key, values in plan.resumes.items()
+                    }
+                    histories.update(suspended.resume_entries())
                     run_persistence.journal_replace(
                         [
                             (w.channel, w.value)
@@ -306,15 +315,7 @@ class CompiledGraph:
                             (w.channel, w.value)
                             for w in suspended.succeeded_writes
                         ]
-                        + [
-                            (
-                                resume_channel(
-                                    suspended.node_id,
-                                    suspended.task_seq,
-                                ),
-                                list(suspended.consumed_resumes),
-                            )
-                        ],
+                        + sorted(histories.items()),
                         plan.task_id,
                         task_path=merged_path,
                     )

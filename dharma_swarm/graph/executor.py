@@ -36,8 +36,10 @@ from dharma_swarm.graph.interrupts import (
     GraphInterrupt,
     GraphInterrupted,
     InterruptFrame,
+    InterruptRecord,
     pop_frame,
     push_frame,
+    task_key,
 )
 from dharma_swarm.graph.routing import (
     Command,
@@ -149,6 +151,14 @@ class SuperstepExecutor:
         (``succeeded_*``) for the scheduler's pending-write persistence. A
         node raising :class:`asyncio.CancelledError` propagates unwrapped
         after the step drains.
+
+        Interrupts are the one failure class that AGGREGATES: when the
+        step-deciding failure is an interrupt, every task that suspended in
+        this step is collected into a single :class:`GraphInterrupted` in
+        canonical ``(node_id, task_seq)`` order, so one resume round can
+        answer all of them (LG20 multiple_interrupts / interrupt_order).
+        Surfacing only the first would strand the siblings' payloads and make
+        the visible interrupt set depend on ``dispatch_order``.
         """
         graph = self._graph
         exec_order = self._validated_dispatch_order(tasks, run_id, superstep)
@@ -182,20 +192,9 @@ class SuperstepExecutor:
                 raise asyncio.CancelledError()
             order = {t.identity: i for i, t in enumerate(exec_order)}
             failures.sort(key=lambda pair: order[pair[0].identity])
-            failed_task, error = failures[0]
+            error = failures[0][1]
             if isinstance(error, GraphInterrupt):
-                public = GraphInterrupted(
-                    f"node {failed_task.node_id!r} interrupted in superstep "
-                    f"{superstep} of run {run_id!r}; resume with "
-                    "Command(resume=...)",
-                    graph_run_id=run_id,
-                    superstep=superstep,
-                    node_id=failed_task.node_id,
-                )
-                public.interrupts = (error.interrupt,)
-                public.consumed_resumes = error.consumed
-                public.task_seq = failed_task.seq
-                error = public
+                error = self._aggregate_interrupts(failures, run_id, superstep)
             if isinstance(error, GraphRuntimeError):
                 succeeded = [t for t in exec_order if t.identity in bundles]
                 writes = [w for t in succeeded for w in bundles[t.identity]]
@@ -236,6 +235,43 @@ class SuperstepExecutor:
         )
         return pending, executed, event_ids
 
+    @staticmethod
+    def _aggregate_interrupts(
+        failures: list[tuple[_Task, BaseException]],
+        run_id: str,
+        superstep: int,
+    ) -> GraphInterrupted:
+        """Fold every suspended task of this step into ONE public error.
+
+        Only interrupts are folded; a hard failure among the same batch keeps
+        riding its own task's error path (it is not resumable data), and its
+        task simply re-executes on the next resume like any failed task.
+        """
+        records = [
+            InterruptRecord(
+                node_id=task.node_id,
+                task_seq=task.seq,
+                interrupt=failure.interrupt,
+                consumed_resumes=failure.consumed,
+            )
+            for task, failure in failures
+            if isinstance(failure, GraphInterrupt)
+        ]
+        names = sorted({record.node_id for record in records})
+        addressing = (
+            "Command(resume={interrupt_id: value})"
+            if len(records) > 1
+            else "Command(resume=...)"
+        )
+        public = GraphInterrupted(
+            f"{len(records)} interrupt(s) raised by {names!r} in superstep "
+            f"{superstep} of run {run_id!r}; resume with {addressing}",
+            graph_run_id=run_id,
+            superstep=superstep,
+        )
+        public.attach(records)
+        return public
+
     async def _run_one(
         self,
         task: _Task,
@@ -270,7 +306,7 @@ class SuperstepExecutor:
             node_id=task.node_id,
             task_seq=task.seq,
             resumes=list(
-                (resumes or {}).get(f"{task.node_id}:{task.seq}", ())
+                (resumes or {}).get(task_key(task.node_id, task.seq), ())
             ),
         )
         token = push_frame(frame)

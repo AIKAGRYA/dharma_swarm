@@ -2004,6 +2004,9 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_dynamic_interrupt_evidence(
+        capabilities, row_lookup, workloads["seeded_dynamic_interrupt"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -3121,3 +3124,390 @@ def _apply_command_parent_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# LG20: dynamic HITL interrupt and resume.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entries; nothing above this section is modified.
+#
+# The workload suspends TWO sibling tasks in ONE superstep, which is the only
+# way to obtain two distinct interrupts (consecutive interrupt() calls inside
+# one task share that task's id and replay by call order). It then drives
+# three independent threads per arm:
+#   1. resume BOTH interrupts by id in a single command;
+#   2. resume ONE, observe the other still pending, then resume it;
+#   3. attempt a bare (id-less) resume while two interrupts are pending.
+# Only per-arm derived observations are compared — never raw interrupt ids,
+# which are legitimately different hashes on the two runtimes.
+# ---------------------------------------------------------------------------
+
+
+class _DynamicInterruptState(TypedDict, total=False):
+    log: Annotated[list[Any], operator.add]
+
+
+def _dynamic_interrupt_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "dynamic-interrupt"))
+    # Shared workload PARAMETERS (legal); no shared expected-value literals.
+    ask_left = f"q-left-{rng.randint(100, 999)}"
+    ask_right = f"q-right-{rng.randint(100, 999)}"
+    answer_left = f"ans-left-{rng.randint(100, 999)}"
+    answer_right = f"ans-right-{rng.randint(100, 999)}"
+    solo_answer = f"ans-solo-{rng.randint(100, 999)}"
+
+    if arm == "langgraph":
+        from langgraph.checkpoint.memory import InMemorySaver
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Command as LGCommand
+        from langgraph.types import interrupt as lg_interrupt
+
+        def factory() -> tuple[Any, dict[str, int]]:
+            calls = {"left": 0, "right": 0}
+
+            def left(state):
+                calls["left"] += 1
+                return {"log": [f"left={lg_interrupt({'ask': ask_left})}"]}
+
+            def right(state):
+                calls["right"] += 1
+                return {"log": [f"right={lg_interrupt({'ask': ask_right})}"]}
+
+            builder = StateGraph(_DynamicInterruptState)
+            builder.add_node("left", left)
+            builder.add_node("right", right)
+            builder.add_edge(START, "left")
+            builder.add_edge(START, "right")
+            builder.add_edge("left", END)
+            builder.add_edge("right", END)
+            return builder.compile(checkpointer=InMemorySaver()), calls
+
+        def surfaced(result) -> tuple[Any, ...]:
+            return tuple(result.get("__interrupt__") or ())
+
+        # 1. Both interrupts surfaced in one step, then resumed together.
+        app, calls = factory()
+        config = {"configurable": {"thread_id": f"dyn-both-{seed}"}}
+        first = surfaced(app.invoke({"log": []}, config))
+        first_payloads = [item.value for item in first]
+        first_ids = [item.id for item in first]
+        calls_after_first = dict(calls)
+        answers = dict(
+            zip(first_ids, (answer_left, answer_right), strict=True)
+        )
+        both = app.invoke(LGCommand(resume=answers), config)
+
+        # 2. Partial resume: answer the first id only; the second re-surfaces.
+        partial_app, partial_calls = factory()
+        partial_config = {"configurable": {"thread_id": f"dyn-partial-{seed}"}}
+        opened = surfaced(partial_app.invoke({"log": []}, partial_config))
+        held = surfaced(
+            partial_app.invoke(
+                LGCommand(resume={opened[0].id: answer_left}), partial_config
+            )
+        )
+        partial_calls_mid = dict(partial_calls)
+        partial_final = partial_app.invoke(
+            LGCommand(resume={opened[1].id: answer_right}), partial_config
+        )
+
+        # 3. A bare resume cannot address two pending interrupts.
+        bare_app, _bare_calls = factory()
+        bare_config = {"configurable": {"thread_id": f"dyn-bare-{seed}"}}
+        bare_app.invoke({"log": []}, bare_config)
+        bare_rejected = False
+        try:
+            bare_app.invoke(LGCommand(resume=solo_answer), bare_config)
+        except RuntimeError:
+            bare_rejected = True
+        return _dynamic_interrupt_report(
+            first_payloads=first_payloads,
+            first_ids=first_ids,
+            calls_after_first=calls_after_first,
+            both_log=list(both["log"]),
+            both_calls=dict(calls),
+            held_payloads=[item.value for item in held],
+            held_ids=[item.id for item in held],
+            opened_ids=[item.id for item in opened],
+            partial_calls_mid=partial_calls_mid,
+            partial_log=list(partial_final["log"]),
+            partial_calls=dict(partial_calls),
+            bare_rejected=bare_rejected,
+        )
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        Command,
+        GraphBuilder,
+        GraphInterrupted,
+        GraphPersistenceKernel,
+        GraphRuntimeError,
+        interrupt,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    def factory() -> tuple[Any, dict[str, int]]:
+        calls = {"left": 0, "right": 0}
+
+        def left(state):
+            calls["left"] += 1
+            return {"log": [f"left={interrupt({'ask': ask_left})}"]}
+
+        def right(state):
+            calls["right"] += 1
+            return {"log": [f"right={interrupt({'ask': ask_right})}"]}
+
+        compiled = (
+            GraphBuilder("gauntlet-dynamic-interrupt")
+            .add_channel("log", AppendChannel)
+            .add_node("left", left)
+            .add_node("right", right)
+            .add_edge(START, "left")
+            .add_edge(START, "right")
+            .add_edge("left", END)
+            .add_edge("right", END)
+            .compile()
+        )
+        return compiled, calls
+
+    with tempfile.TemporaryDirectory(prefix="dharmagraph-dynamic-") as raw:
+        root = Path(raw)
+
+        def start(compiled: Any, kernel: Any, thread: str) -> Any:
+            """Seed a run that is expected to suspend; return the interrupt."""
+            try:
+                _run_awaitable(
+                    compiled.invoke(
+                        input={"log": []},
+                        effects=SimulatedEffects(seed),
+                        graph_run_id=thread,
+                        persistence=kernel,
+                        thread_id=thread,
+                    )
+                )
+            except GraphInterrupted as suspended:
+                return suspended
+            raise AssertionError("expected the seeded step to suspend")
+
+        def resume(compiled: Any, kernel: Any, thread: str, payload: Any) -> Any:
+            return _run_awaitable(
+                compiled.invoke(
+                    input=Command(resume=payload),
+                    effects=SimulatedEffects(seed),
+                    persistence=kernel,
+                    thread_id=thread,
+                )
+            )
+
+        # 1. Both interrupts surfaced in one step, then resumed together.
+        compiled, calls = factory()
+        kernel = GraphPersistenceKernel(root / "both")
+        thread = f"dyn-both-{seed}"
+        opened = start(compiled, kernel, thread)
+        first_payloads = [item.value for item in opened.interrupts]
+        first_ids = [item.id for item in opened.interrupts]
+        calls_after_first = dict(calls)
+        answers = dict(zip(first_ids, (answer_left, answer_right), strict=True))
+        both = resume(compiled, kernel, thread, answers)
+
+        # 2. Partial resume: answer the first id only; the second re-surfaces.
+        partial_compiled, partial_calls = factory()
+        partial_kernel = GraphPersistenceKernel(root / "partial")
+        partial_thread = f"dyn-partial-{seed}"
+        partial_opened = start(partial_compiled, partial_kernel, partial_thread)
+        partial_ids = [item.id for item in partial_opened.interrupts]
+        try:
+            resume(
+                partial_compiled,
+                partial_kernel,
+                partial_thread,
+                {partial_ids[0]: answer_left},
+            )
+            raise AssertionError("expected the unresolved interrupt to hold")
+        except GraphInterrupted as still_open:
+            held_payloads = [item.value for item in still_open.interrupts]
+            held_ids = [item.id for item in still_open.interrupts]
+        partial_calls_mid = dict(partial_calls)
+        partial_final = resume(
+            partial_compiled,
+            partial_kernel,
+            partial_thread,
+            {partial_ids[1]: answer_right},
+        )
+
+        # 3. A bare resume cannot address two pending interrupts.
+        bare_compiled, _bare_calls = factory()
+        bare_kernel = GraphPersistenceKernel(root / "bare")
+        bare_thread = f"dyn-bare-{seed}"
+        start(bare_compiled, bare_kernel, bare_thread)
+        bare_rejected = False
+        try:
+            resume(bare_compiled, bare_kernel, bare_thread, solo_answer)
+        except GraphRuntimeError:
+            bare_rejected = True
+    return _dynamic_interrupt_report(
+        first_payloads=first_payloads,
+        first_ids=first_ids,
+        calls_after_first=calls_after_first,
+        both_log=list(both.state["log"]),
+        both_calls=dict(calls),
+        held_payloads=held_payloads,
+        held_ids=held_ids,
+        opened_ids=partial_ids,
+        partial_calls_mid=partial_calls_mid,
+        partial_log=list(partial_final.state["log"]),
+        partial_calls=dict(partial_calls),
+        bare_rejected=bare_rejected,
+    )
+
+
+def _dynamic_interrupt_report(
+    *,
+    first_payloads: list[Any],
+    first_ids: list[Any],
+    calls_after_first: Mapping[str, int],
+    both_log: list[Any],
+    both_calls: Mapping[str, int],
+    held_payloads: list[Any],
+    held_ids: list[Any],
+    opened_ids: list[Any],
+    partial_calls_mid: Mapping[str, int],
+    partial_log: list[Any],
+    partial_calls: Mapping[str, int],
+    bare_rejected: bool,
+) -> dict[str, Any]:
+    """Reduce one arm's raw run to engine-neutral, comparable observations.
+
+    Raw interrupt ids are deliberately NOT reported: both runtimes mint
+    opaque hashes over their own identity scheme, so only derived properties
+    of the ids (count, distinctness, stability across a resume) are
+    comparable engine-to-engine.
+    """
+    return {
+        "interrupt_count": len(first_payloads),
+        "ordered_payloads": list(first_payloads),
+        "ids_distinct": len(set(first_ids)) == len(first_ids),
+        "calls_after_first_suspend": dict(calls_after_first),
+        "resume_all_log": list(both_log),
+        "resume_all_calls": dict(both_calls),
+        "partial_held_payloads": list(held_payloads),
+        "partial_held_id_stable": held_ids == [opened_ids[1]],
+        "partial_calls_mid": dict(partial_calls_mid),
+        "partial_final_log": list(partial_log),
+        "partial_final_calls": dict(partial_calls),
+        "bare_resume_with_multiple_pending_rejected": bare_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_dynamic_interrupt"] = _dynamic_interrupt_arm
+_support("LG20", ("dynamic_interrupt",), "dharma_swarm.graph:interrupt")
+_support("LG20", ("resume_value",), "dharma_swarm.graph:Command#resume")
+_support(
+    "LG20",
+    ("multiple_interrupts",),
+    "dharma_swarm.graph:GraphInterrupted.suspended",
+)
+_support("LG20", ("interrupt_order",), "dharma_swarm.graph:InterruptRecord")
+_support(
+    "LG20",
+    ("node_reexecution",),
+    "dharma_swarm.graph:GraphInterrupted.resume_entries",
+)
+
+
+# Each LG20 facet is proven by the subset of the executed two-arm observations
+# that actually measures it; a facet never claims evidence it did not exercise.
+_DYNAMIC_INTERRUPT_FACET_FIELDS: dict[str, tuple[str, ...]] = {
+    "dynamic_interrupt": (
+        "interrupt_count",
+        "ordered_payloads",
+        "calls_after_first_suspend",
+    ),
+    "resume_value": (
+        "resume_all_log",
+        "partial_final_log",
+    ),
+    "multiple_interrupts": (
+        "interrupt_count",
+        "ids_distinct",
+        "resume_all_log",
+        "partial_held_payloads",
+        "partial_held_id_stable",
+        "bare_resume_with_multiple_pending_rejected",
+    ),
+    "interrupt_order": (
+        "ordered_payloads",
+        "partial_held_payloads",
+        "resume_all_log",
+        "partial_final_log",
+    ),
+    "node_reexecution": (
+        "calls_after_first_suspend",
+        "resume_all_calls",
+        "partial_calls_mid",
+        "partial_final_calls",
+    ),
+}
+
+
+def _apply_dynamic_interrupt_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG20's five facets from the seeded two-arm dynamic-interrupt workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    probes = {
+        "dynamic_interrupt": (
+            "suspend a node mid-execution via interrupt() and surface the "
+            "payload without committing the superstep on both runtimes"
+        ),
+        "resume_value": (
+            "return the supplied resume value from the interrupt() call site "
+            "and commit the resulting writes on both runtimes"
+        ),
+        "multiple_interrupts": (
+            "suspend two sibling tasks in one superstep, resume them by "
+            "interrupt id together and singly, and reject a bare resume "
+            "while several are pending, on both runtimes"
+        ),
+        "interrupt_order": (
+            "compare the order of the surfaced interrupt payloads and of the "
+            "resulting committed reducer writes on both runtimes"
+        ),
+        "node_reexecution": (
+            "count node invocations across suspend and resume to confirm the "
+            "interrupted node re-executes from the top on both runtimes"
+        ),
+    }
+    for facet, fields in _DYNAMIC_INTERRUPT_FACET_FIELDS.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG20"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_dynamic_interrupt:{facet}",
+                command_or_probe=probes[facet],
+                outcome="parity" if equal else "mismatch",
+                dharma={
+                    name: workload["dharma"].get(name) for name in fields
+                },
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row_lookup["LG20"]),
+            )
+        )
