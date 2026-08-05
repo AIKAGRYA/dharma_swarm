@@ -460,6 +460,32 @@ orbits and 筆順 sheets stay pool-scoped for now.
    connections: faint second-degree links between orbiters that share
    components.
 
+### 8.6 v5 field test → v6 directives (2026-08-05, operator voice note)
+
+1. **Consistency law: every element opens, everywhere.** Operator noticed
+   not all words expand into their kanji, and radicals aren't clickable
+   everywhere. Root cause: v5's dictionary words only got kanji rings
+   when their kanji happened to be in the 52-word seed gloss table (K) —
+   the ring filter must accept ANY CJK ideograph, with glosses from the
+   full jōyō table. Law: word → kanji → radical → kanji → word, with no
+   dead ends, across all 6,687 words.
+2. **Fluid dynamics — "super super super important."** The drift plane
+   becomes a real fluid: drag a finger and everything moves against it —
+   currents, wakes, weaving. Research done: browser bleeding edge is
+   WebGPU MLS-MPM (matsuoka-601 WebGPU-Ocean / WaterBall, ~100k–300k
+   particles real-time); the foundational interactive technique is Jos
+   Stam's stable fluids (real-time Navier-Stokes, GDC 2003) that powers
+   the canonical WebGL fluid demos. v6 implements a true Stam solver on
+   a coarse CPU grid (damping → pressure projection for vortices →
+   semi-Lagrangian advection) — same physics, phone-safe, CSP-safe —
+   coupling free words (strong), orbiters (subtle), ink blobs (medium),
+   plus visible "flow motes" riding the currents. WebGPU MLS-MPM is the
+   named real-app tier.
+3. **Hofstadterian strange loop.** Depth is unbounded (500 layers if you
+   like); when a dive chain revisits a label already in the journey
+   (言葉 › 言 › 語 › 言 …), the breadcrumb earns an ∞ mark and a gold
+   ripple — the Escher moment acknowledged, never interrupted.
+
 **v5 shipped (same artifact URL, ~620KB all-in).** All seven §8.5
 directives: (1) radical cards carry Kangxi numbers (部首 61 etc.),
 variant forms merged under their number (忄=心=⺗→61; 阝 shows 163·170),
