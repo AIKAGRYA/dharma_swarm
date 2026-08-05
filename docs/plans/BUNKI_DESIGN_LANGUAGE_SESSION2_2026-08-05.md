@@ -388,6 +388,21 @@ both swipe grades, stroke animation, clean surfacing to a 22-word pool.
 Toggle placement for stroke order = card-level 筆順 button for now;
 operator to decide the final home.
 
+**v4.1 — radicals as planets (operator: "radicals are not able to be
+seen as their own planet or zoomed in on or separated from the kanji").**
+Root cause found on-device: the radical ring orbited so close to the
+enlarged center kanji that the chips sat UNDER it — invisible and
+un-tappable (the planet swallowed their touches). Fixed: radical ring
+pushed out to the clear inner orbit; radicals detach one by one (staggered
+fade-out-of-the-glyph); chips render above the planet (a moon transiting);
+tendril only draws once a radical is actually visible. And when a radical
+takes the center it sheds its chip box entirely — it becomes a bare, large
+planet with its own universe (kanji built from it + words carrying it +
+its own components), box restored on surfacing. Verified chain:
+記憶 › 記 › 言 — 言 centered huge with 記/語 orbiting, 口 detached, 言葉/
+方言 in word orbit. Interaction law added to §8.2's list: **an orbit ring
+must never sit inside the center body's own bounding box.**
+
 **v3.1 — the dive is a true magnification (operator-picked).** Offered two
 zoom grammars: re-orbit (the old layer steps back small, looking down
 through water) vs. literal magnification (a forward dolly — the layer you
