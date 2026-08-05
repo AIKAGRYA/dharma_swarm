@@ -427,6 +427,20 @@ family expansion work across the whole jōyō space, not just the 52-word
 demo pool. Out-of-pool kanji dive onward via kradfile components; word
 orbits and 筆順 sheets stay pool-scoped for now.
 
+**v4.2 shipped (same artifact URL).** Source pivot: edrdg.org is
+proxy-blocked, so the family index is built from KanjiVG's own
+`kvg:element` component annotations (same dataset as our stroke order —
+self-consistent) over all 2,136 jōyō kanji, + kanji.json
+readings/meanings: 457 radical families (言 70字, 氵 122字, 尸 43字
+matching the operator's Kodansha screenshot, 阝 46字 merged from the
+⻏/⻖ variant forms). Verified chain: 感情 › 情 › 忄 → card 「この部首の
+漢字 · 31字」 scrollable rows (忙 ボウ Busy / 快 カイ Cheerful …) → tap
+恨 → out-of-pool kanji becomes a depth-4 planet with its own radicals
+(忄心艮) detached. Fix ridden along: tapping the card's own paper now
+closes it (before, an open card silently swallowed water-taps). File is
+~300KB all-in (stroke + family data embedded). Radical orbit shows an
+8-body family sample; the card holds the complete index.
+
 **v3.1 — the dive is a true magnification (operator-picked).** Offered two
 zoom grammars: re-orbit (the old layer steps back small, looking down
 through water) vs. literal magnification (a forward dolly — the layer you
