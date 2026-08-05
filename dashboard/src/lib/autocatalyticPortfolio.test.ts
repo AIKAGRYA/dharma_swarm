@@ -11,6 +11,7 @@ import {
   normalizeAuthority,
   orderedPortfolioNodes,
   promotionRuleLines,
+  semanticReceiptCountForWitness,
   summarizePortfolio,
   type AutocatalyticCycleWitness,
   type AutocatalyticNode,
@@ -143,6 +144,14 @@ test("cycle witness presentation requires structure and exact local receipt cons
     "unverified",
   );
   assert.equal(cycleWitnessPresentation(null).state, "missing");
+});
+
+test("semantic receipt count follows the witnessed turn count", () => {
+  assert.equal(semanticReceiptCountForWitness(witness()), 41);
+  assert.equal(semanticReceiptCountForWitness(witness({ turns_proven: 3 })), 61);
+  assert.equal(semanticReceiptCountForWitness(witness({ turns_proven: 1 })), null);
+  assert.equal(semanticReceiptCountForWitness(witness({ turns_proven: 2.5 })), null);
+  assert.equal(semanticReceiptCountForWitness(null), null);
 });
 
 test("transport acknowledgement is stated as a non-promotion rule", () => {

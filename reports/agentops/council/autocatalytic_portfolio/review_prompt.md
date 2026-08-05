@@ -58,9 +58,9 @@ The claim is deliberately narrower than “the production organism is live”:
 - a locally writable SQLite store is explicitly forgeable by a local operator,
   so local receipt consistency is never described or rendered as authenticated
   execution provenance;
-- the verifier fingerprint byte-frames and hashes all four implementation
-  modules once at import, preventing a running old evaluator from stamping
-  replacement on-disk bytes as its own;
+- the verifier fingerprint byte-frames names and bytes for an explicit closed
+  tuple of all 14 semantic implementation modules once at import, preventing a
+  running old evaluator from stamping replacement on-disk bytes as its own;
 - latest-witness alias loading preserves the attested cycle path and the
   returned API witness must reverify unchanged;
 - the strongest result is `local_rehearsal`; independent peers, live provider
@@ -77,12 +77,20 @@ Hardening evidence before this council:
   contract valid, zero validation errors;
 - Python work-packet gate: 198 passed, one third-party deprecation warning;
 - focused adversarial matrix: 20/20 passed; complete portfolio module: 45/45;
-- dashboard contract assertions: 10 passed;
+- dashboard contract assertions: 11 passed, including variable-turn semantic
+  receipt counts (2 turns -> 41, 3 turns -> 61, invalid -> count-neutral prose);
 - focused Ruff and ESLint: clean;
 - Next production build: overview and dynamic node routes compiled;
 - mounted FastAPI TestClient response-contract test passes;
-- the complete staged pre-commit suite passes: test hygiene, contract tests,
+- the committed pre-commit suite passes: test hygiene, contract tests,
   uplift/forge/docops/hygiene/manifest guards, gitleaks, Semgrep, and syntax;
+  the structural split used the deletion guard's documented single-guard
+  override and retains `[structural-delete-approved]` in the commit body;
+- the global quality ratchet is green: `modules_over_500_lines` remains
+  207 -> 207 and `silent_exception_swallows` improves 241 -> 239;
+- the PR DocOps gate passes with generated counts advisory and all other
+  integrity checks strict; committed packet-scope validation passes with
+  exactly one P1 Session Entry packet covering every changed path;
 - adversarial review proved that raw SQL can forge local mutable receipt rows;
   the implementation now represents that as a bounded consistency modality
   instead of claiming independent authority;
@@ -91,12 +99,13 @@ Hardening evidence before this council:
 - alternate-root integration proves the manifest-declared `DHARMA_STATE_DIR`
   override wins over legacy `DHARMA_HOME`, and a default two-turn run plus
   reload keeps both witness files and `state/runtime.db` under one resolved root;
-- fresh cycle `autocat_682808db6cbc4d50` reloads in a fresh process with structural
+- fresh cycle `autocat_fa3d5a51405c4bb4` reloads in a fresh process with structural
   and local-consistency checks valid; witness SHA-256 is
-  `bc5b2e3752349fee00cb1077f6a9c5bb7a05fb060f0907148aa49768d6970de2`;
+  `a45846d82a6b7afabd8457cc09d70beb0ffe809e381073c06bc9f317d80da4b3`;
 - its 20 project-evidence rows contain 20 unsatisfied promotion gates and zero
-  authority upgrades; its four-module implementation fingerprint is
-  `ef857d247921d142f27ceeccc1ae1f40fe91c35531be3b27e735b99fe200a5c3`;
+  authority upgrades; its independently recomputed 14-module implementation
+  fingerprint is
+  `e22f39820f483f33c581323f27c845bddbb5669178fdc0047cd3c89d218d956e`;
 - the persistent `palantir-pilot` witness must be running with a heartbeat
   younger than the council threshold;
 - a requested model lane counts only when `actual_model` matches its required
@@ -104,6 +113,10 @@ Hardening evidence before this council:
 
 Prior blocker dispositions for this exact tree:
 
+- run 9 identified that `TruthBoundaryNotice` hardcoded 41 semantic receipt
+  rows even though the runner accepts more than two turns; the notice now
+  derives `turns_proven * 20 + 1` through a tested helper and falls back to
+  exact-set wording when the turn count is absent or invalid;
 - trusted CI is a post-commit, exact-SHA authenticity gate and will run after
   this packet is committed and pushed; this local council is not asked to grant
   merge authority and must not treat absent pre-commit CI as an internal code

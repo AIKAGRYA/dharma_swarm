@@ -348,6 +348,14 @@ export interface CycleWitnessPresentation {
   color: string;
 }
 
+export function semanticReceiptCountForWitness(
+  witness: AutocatalyticCycleWitness | null | undefined,
+): number | null {
+  const turns = witness?.turns_proven;
+  if (!Number.isSafeInteger(turns) || turns === undefined || turns < 2) return null;
+  return turns * AUTOCATALYTIC_NODE_COUNT * 2 + 1;
+}
+
 export function cycleWitnessPresentation(
   witness: AutocatalyticCycleWitness | null | undefined,
 ): CycleWitnessPresentation {

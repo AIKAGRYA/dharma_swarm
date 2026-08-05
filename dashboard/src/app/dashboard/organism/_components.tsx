@@ -14,6 +14,7 @@ import {
 import {
   authorityPresentation,
   cycleWitnessPresentation,
+  semanticReceiptCountForWitness,
   type AutocatalyticCycleWitness,
   type PresentedAuthorityState,
 } from "@/lib/autocatalyticPortfolio";
@@ -117,16 +118,24 @@ export function ErrorSurface({ message }: { message: string }) {
   );
 }
 
-export function TruthBoundaryNotice() {
+export function TruthBoundaryNotice({
+  witness,
+}: {
+  witness?: AutocatalyticCycleWitness | null;
+}) {
+  const semanticReceiptCount = semanticReceiptCountForWitness(witness);
+  const receiptScope =
+    semanticReceiptCount === null
+      ? "its exact matching mutable receipt set"
+      : `${semanticReceiptCount} matching mutable rows`;
   return (
     <div className="rounded-lg border border-fuji/25 bg-fuji/5 px-4 py-3">
       <div className="flex items-start gap-2.5">
         <ShieldCheck size={15} className="mt-0.5 shrink-0 text-fuji" />
         <p className="text-[11px] leading-relaxed text-sumi-600">
           Graph edges are declared metabolic contracts, not observed production traffic. A ten-hop
-          structural witness plus 41 matching mutable rows proves local receipt consistency only;
-          it is not authenticated execution provenance, and transport acknowledgement is never
-          enough.
+          structural witness plus {receiptScope} proves local receipt consistency only; it is not
+          authenticated execution provenance, and transport acknowledgement is never enough.
         </p>
       </div>
     </div>

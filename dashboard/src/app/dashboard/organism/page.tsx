@@ -233,7 +233,7 @@ export default function OrganismPage() {
         </div>
       </motion.header>
 
-      <TruthBoundaryNotice />
+      <TruthBoundaryNotice witness={witness} />
 
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard

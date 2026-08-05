@@ -233,7 +233,7 @@ export default function OrganismNodePage({
         </div>
       </motion.header>
 
-      <TruthBoundaryNotice />
+      <TruthBoundaryNotice witness={data?.latest_cycle} />
 
       <section className="glass-panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -1,7 +1,8 @@
 {
   "schema": "dharma.autocatalytic.local_gate_receipt.v1",
-  "observed_at": "2026-08-05T05:26:13Z",
+  "observed_at": "2026-08-05T06:59:52Z",
   "base_commit": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+  "verified_implementation_commit": "ede0faad9cacd2aa913f1ee10db172f107169ebf",
   "branch": "codex/autocatalytic-organism3-20260805",
   "gates": [
     {
@@ -36,20 +37,32 @@
     },
     {
       "name": "focused_ruff_and_module_budget",
-      "command": "ruff check on four implementation modules, manifest/API seams, and focused tests; wc -l",
-      "result": "All checks passed; implementation LOC 791/960/585/918 and focused portfolio test LOC 998",
+      "command": "ruff check on the complete autocatalytic implementation, manifest/API seams, and focused tests; explicit 14-module wc -l",
+      "result": "All checks passed; all 14 fingerprinted semantic modules are at or below 406 LOC except no module exceeds 500 LOC (facades 216/259/156; verifier 374)",
+      "exit": 0
+    },
+    {
+      "name": "global_quality_ratchet",
+      "command": "python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45 --baseline-merge-base-of 9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+      "result": "green; modules_over_500_lines 207 -> 207; silent_exception_swallows improved 241 -> 239; every other counter non-regressing",
       "exit": 0
     },
     {
       "name": "dashboard_contract_tests",
       "command": "node --experimental-strip-types --test src/lib/dashboardNav.test.ts src/lib/autocatalyticPortfolio.test.ts",
-      "result": "10 passed",
+      "result": "11 passed",
+      "exit": 0
+    },
+    {
+      "name": "variable_turn_receipt_count_regression",
+      "command": "semanticReceiptCountForWitness unit cases plus TruthBoundaryNotice witness binding",
+      "result": "2 turns -> 41 semantic rows; 3 turns -> 61; invalid or absent turn count -> generic exact-set wording instead of a fabricated number",
       "exit": 0
     },
     {
       "name": "focused_frontend_static_checks",
       "command": "Node contract tests plus ESLint for organism routes, portfolio contract, and navigation",
-      "result": "10 Node tests passed; ESLint clean",
+      "result": "11 Node tests passed; ESLint clean",
       "exit": 0
     },
     {
@@ -59,15 +72,27 @@
       "exit": 0
     },
     {
-      "name": "staged_precommit_suite",
-      "command": "pre-commit run with canonical Python/PATH",
-      "result": "test hygiene, contract, uplift, forge, docops, hygiene, manifest, gitleaks, Semgrep, whitespace, conflict, size, YAML, and TOML hooks passed",
+      "name": "committed_precommit_suite",
+      "command": "pre-commit hooks during commit ede0faad9; documented single-guard DHARMA_UPLIFT_BYPASS_DESTRUCTION=1 for the 14-module structural split, with [structural-delete-approved] retained in the commit body",
+      "result": "test hygiene, contract, uplift, forge, docops, hygiene, manifest, gitleaks, Semgrep, whitespace, conflict, size, YAML, and TOML hooks passed; no hook was disabled wholesale",
+      "exit": 0
+    },
+    {
+      "name": "pr_docops_gate",
+      "command": "python scripts/docops/check_docops_integrity.py --counts-advisory --changed-from origin/main",
+      "result": "passed; generated count drift remained advisory as declared by the PR workflow; all non-count integrity checks stayed strict",
+      "exit": 0
+    },
+    {
+      "name": "committed_packet_scope",
+      "command": "python scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base 9fd1bfc39e6dc471c3ebddbde668e383bd818110 --event-head ede0faad9cacd2aa913f1ee10db172f107169ebf",
+      "result": "PASSED; exactly one P1 Session Entry packet covers every changed path at the verified implementation commit",
       "exit": 0
     },
     {
       "name": "canonical_snapshot_check",
       "command": "python -m dharma_swarm.autocatalytic_portfolio run --turns 2; fresh process check",
-      "result": "10 nodes; 13 edges; one SCC/set; validation_errors=[]; structure_only valid; local_mutable_runtime_receipt_consistency valid and independently_authenticated=false; 20 promotion gates evaluated, zero satisfied, zero authority upgrades",
+      "result": "cycle autocat_fa3d5a51405c4bb4 under isolated DHARMA_STATE_DIR: 10 nodes; 13 edges; one SCC/set; validation_errors=[]; structure_only valid; local_mutable_runtime_receipt_consistency valid and independently_authenticated=false; 20 promotion gates evaluated, zero satisfied, zero authority upgrades; 14-module fingerprint independently matched",
       "exit": 0
     }
   ],

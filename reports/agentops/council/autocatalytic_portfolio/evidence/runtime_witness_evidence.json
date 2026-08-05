@@ -1,13 +1,13 @@
 {
   "schema": "dharma.autocatalytic.runtime_witness_evidence.v1",
-  "observed_at": "2026-08-05T05:26:13Z",
-  "cycle_id": "autocat_682808db6cbc4d50",
-  "trace_id": "trc_d423db5ea4104557",
-  "generated_at": "2026-08-05T05:25:43.136136+00:00",
-  "witness_path": "/Users/dhyana/.dharma/a2a/autocatalytic_portfolio/autocat_682808db6cbc4d50.json",
-  "source_alias_path": "/Users/dhyana/.dharma/a2a/autocatalytic_portfolio/latest.json",
-  "witness_sha256": "bc5b2e3752349fee00cb1077f6a9c5bb7a05fb060f0907148aa49768d6970de2",
-  "witness_bytes": 1427245,
+  "observed_at": "2026-08-05T06:49:23Z",
+  "cycle_id": "autocat_fa3d5a51405c4bb4",
+  "trace_id": "trc_4153bebfef1d4c53",
+  "generated_at": "2026-08-05T06:48:38.481210+00:00",
+  "witness_path": "/Users/dhyana/.dharma/autocatalytic-post-refactor.iZIWnV/a2a/autocatalytic_portfolio/autocat_fa3d5a51405c4bb4.json",
+  "source_alias_path": "/Users/dhyana/.dharma/autocatalytic-post-refactor.iZIWnV/a2a/autocatalytic_portfolio/latest.json",
+  "witness_sha256": "a45846d82a6b7afabd8457cc09d70beb0ffe809e381073c06bc9f317d80da4b3",
+  "witness_bytes": 1427280,
   "raw_file_reverification": {
     "archive_and_alias_byte_identical": true,
     "structural_valid": true,
@@ -20,14 +20,24 @@
   },
   "implementation": {
     "verifier_version": "autocatalytic-verifier/1.1",
-    "four_module_bundle_sha256": "ef857d247921d142f27ceeccc1ae1f40fe91c35531be3b27e735b99fe200a5c3",
-    "declaration_canonical_sha256": "fdf967c8895b6f07b392ac01a2238037c977bb6422ff94cff6822566f30dc0b4",
+    "implementation_bundle_sha256": "e22f39820f483f33c581323f27c845bddbb5669178fdc0047cd3c89d218d956e",
+    "declaration_sha256": "fdf967c8895b6f07b392ac01a2238037c977bb6422ff94cff6822566f30dc0b4",
     "manifest_file_sha256": "8cfd10d07b272ed38b541f010ef42a1896616a44fb83f0ba9c8c5795d272775b",
     "modules": {
-      "dharma_swarm/autocatalytic_contracts.py": "94b85af9657e4812492364a4fe27b28f3ed6e9b46e7dc8844f0372062c4f1741",
-      "dharma_swarm/autocatalytic_adapters.py": "860a2a17bae5734be0096c3b6b2efee2c9dbe67f470b372d5ec9c5635b74015c",
-      "dharma_swarm/autocatalytic_verifier.py": "a7f6809a8f9e545ffb584e7811e968dc1107481c3f6e047575a8908dc143fae6",
-      "dharma_swarm/autocatalytic_portfolio.py": "14ebeeb3fb44a0e86b9a0c100d5f25a252737434638b01c5fdf3ab971c6c86d3"
+      "dharma_swarm/autocatalytic_adapter_evidence.py": "8cf4d89339c9c77f8310231e00e639a533a4834d3b37e591dc1414600f4cf8c2",
+      "dharma_swarm/autocatalytic_adapters.py": "a10ab7e60b8cc05227766e8674fe353b6cf56c6ecaed530ba8c721b991b37a7f",
+      "dharma_swarm/autocatalytic_adapters_research_promote.py": "0ca82001cdd416d240ad182f6e48dc3f8e2f0e42ee84a8da5d3bce52656633e5",
+      "dharma_swarm/autocatalytic_adapters_sense_execute.py": "8dc0c9cae5fe6d44a3be052c964cd5ac5c0c673039ec60a51ec2882562ea3fe2",
+      "dharma_swarm/autocatalytic_contract_primitives.py": "f6cac0c582b8d2540e2f5f6ee2e5d1a41ff9ee27eae12697696d371d9b83c50c",
+      "dharma_swarm/autocatalytic_contracts.py": "19824e95d7e8956d9fd5634c59eea52118f5843e3b8799165a8c36e065faab52",
+      "dharma_swarm/autocatalytic_cycle_runtime.py": "689c21a9aad21d3b9a2d06ab9acdf4afced1a57613e8b758ca85f67bbade6aaa",
+      "dharma_swarm/autocatalytic_manifest_contracts.py": "3b6781f8c883d2a3be0e761caef6bc8883b8b3ae97852676e5be41aab07ff450",
+      "dharma_swarm/autocatalytic_portfolio.py": "67810f32da2a5185329e8ea561277b3d7c5625e3be85ba8cbf91e600a0153965",
+      "dharma_swarm/autocatalytic_proof_builders.py": "2c9f90b5188096e9ec133aaa88303f0e09b96bfd9fb8e9927ef6f162d9a109ac",
+      "dharma_swarm/autocatalytic_receipt_verifier.py": "1aa4c7856b7a42006e798d668267ce3b18b963a8ced270ec8e28493565638f8a",
+      "dharma_swarm/autocatalytic_source_contracts.py": "a85ed31a47d97edfeb4441467811b065e16f874336503afa6ef473cdaffbc096",
+      "dharma_swarm/autocatalytic_task_runtime.py": "f640326193967522b75938a09a8cc2e10263e3be1369c22bc529d81b62937481",
+      "dharma_swarm/autocatalytic_verifier.py": "fcf1d3286b206f8f0b835ecaf5fe181ded8decd61208686b54cede180d37b16d"
     },
     "independent_bundle_recomputation_matched": true
   },
@@ -41,8 +51,8 @@
     "execution_provenance_authenticated": false,
     "claim_ceiling": "local_rehearsal",
     "external_effects_proven": false,
-    "turn_0_proof_hash": "fa50410e1c59421e696c29ce0e66ce4a429b6cf0c8d26cdd14e031f9c785aa4c",
-    "turn_1_proof_hash": "2cb045574f71033b68c1edef2fa4147af20bd21fa862a8cd69c6978dfc2561f2"
+    "turn_0_proof_hash": "4680037303c9b2338900cd0e61b77c76675ddf24a3eae761f11a61fe1ac09a2c",
+    "turn_1_proof_hash": "5a91ff81ab1ed6dd9e54e34d52d1f9f9e2a674e3a214f3619a0399c00f2bf950"
   },
   "runtime_receipt_counts": {
     "semantic_consistency_selection": {
@@ -60,7 +70,7 @@
     "correlation_total_across_both_sets": 101
   },
   "runtime_attestation": {
-    "attestation_hash": "c6551c70c77f70866550ff4cca165cf991dbb5abfc03e11ac9574f67a216319f",
+    "attestation_hash": "fd5c94dbbd8b97a98b531a8c7536854c0c528a2391bc2c8539c5efb82559128b",
     "evidence_scope": "local_mutable_runtime_receipt_consistency",
     "independently_authenticated": false
   },
@@ -97,8 +107,8 @@
       "signal": "oracle_evidence",
       "source": "world_signal_supply",
       "target": "chamber_research",
-      "turn_0": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "aa786f637f4d8b24cc38b86fe2d64a8e677c8ea603f6afaba6586f86f187e96c"},
-      "turn_1": {"status": "consumed", "emitted_turn": 1, "source_evidence_hash": "b03da4182f49cae5f364c11783a5d90a466f64056c00aed033b1f464c914e250"},
+      "turn_0": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "f0cf6bd2eab21a3a4ebf39edacea0a07020a2775a5e85ac8513ca9cb90fdc99a"},
+      "turn_1": {"status": "consumed", "emitted_turn": 1, "source_evidence_hash": "bbbabec3ff0600df90e1b71d4ac1048978236205dbeda13e83afb2095a3871de"},
       "target_effect": "oracle_evidence_bound=true; oracle_evidence_authorized=false"
     },
     {
@@ -106,7 +116,7 @@
       "source": "assurance_merge",
       "target": "dharmagraph_execution",
       "turn_0": {"status": "not_available", "expected_turn": -1},
-      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "cceaf24a8ae06969cd368e5ce6cac895380efc6dedd340114461bcf5c3f8d528", "state": "not_verified"},
+      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "480350dbc3c2fdd3b626acaa11a45f41ec4de61ea891a08c93f48ec18eda4c73", "state": "not_verified"},
       "target_effect": "safety_contract_bound=true; safety_contract_satisfied=false"
     },
     {
@@ -114,7 +124,7 @@
       "source": "operator_experience",
       "target": "sarathi_runtime",
       "turn_0": {"status": "not_available", "expected_turn": -1},
-      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "053cf6c6b787b83b9099ba7bce09d68ff7691eb177eb4664b633358f648be829", "state": "authorization_not_observed"},
+      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "6c9e2228eecc4ac762ad73f92b5d576a55d10c5212e2e50e3d80ca7a19c4a918", "state": "authorization_not_observed"},
       "target_effect": "operator_intent_bound=true; plan_hash perturbed; dispatch_proven=false"
     }
   ],
