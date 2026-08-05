@@ -511,6 +511,30 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+### 8.10 v10 — the Obsidian lock (2026-08-05, operator escalation;
+self-authored contract at operator request)
+
+Operator: still not Obsidian; too drawn out; fix in one shot with
+subagents. Contract (self-authored prompt, verbatim):
+
+- Gesture grammar: tap = furigana+gloss · double-tap = planet dive ·
+  LONG-PRESS (~430ms) = constellation lock: the viewed universe
+  reorganizes around the pressed word — all relations pulled into view in
+  shells (1: strong = shares 2+ kanji, plus its own kanji glyphs and
+  radicals; 2: family = shares a kanji; 3: loose = radical-kin +
+  same-register), camera glides to center it, arrangement STAYS after
+  release. Long-press any member (word or kanji) re-orients around it —
+  chainable. Tap water releases.
+- CONSISTENCY FLOOR: every word, no exceptions, yields >=12 members via
+  cascading channels (shared-kanji -> radical-kin -> same-register).
+  Dive satellites get a >=4 sibling floor through the same cascade.
+- Verification: parallel subagent panel (long-press mechanics; chain
+  navigation; 30-word consistency sample; tap/dive grammar regression;
+  perf/idle/slider regression; adversarial free-play) before publish.
+- Honest scope: true synonyms/conceptual similarity need JMdict senses /
+  embeddings (real-app data tier, §8.8); prototype "loose" = radical-kin
+  and register neighbors, labeled as such here.
+
 ### 8.9 v9 — tap-bloom + the self-satellite diagnosis (2026-08-05)
 
 Operator re-stated §8.8 with force: (a) the HOME field must carry obvious
