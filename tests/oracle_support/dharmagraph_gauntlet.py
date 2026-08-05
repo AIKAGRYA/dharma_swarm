@@ -2004,6 +2004,9 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_runtime_config_evidence(
+        capabilities, row_lookup, workloads["seeded_runtime_config_injection"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -3121,3 +3124,408 @@ def _apply_command_parent_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# LG30: config, context, runtime injection, and propagation workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entries; nothing above this section is modified.
+#
+# Engine-neutral observables only: the two engines name a task differently
+# (langgraph ``checkpoint_ns='<node>:<uuid>'`` vs DharmaGraph ``node_id``),
+# so identity facts are compared as DERIVED predicates over each arm's own
+# vocabulary rather than as raw ids. Opaque values (uuid task ids, digests)
+# are never compared across arms — only their stability and non-emptiness.
+# ---------------------------------------------------------------------------
+
+
+class _RuntimeInjectionState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _runtime_config_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "runtime-config"))
+    initial = rng.randint(2, 30)
+    multiplier = rng.randint(2, 5)
+    addend = rng.randint(1, 9)
+    label = f"ctx-{rng.randint(1000, 9999)}"
+    thread_token = f"thread-{rng.randint(1000, 9999)}"
+    config_token = f"cfg-{rng.randint(1000, 9999)}"
+    store_namespace = ("gauntlet", "lg30")
+    store_key = "memo"
+
+    if arm == "langgraph":
+        from dataclasses import dataclass
+
+        from langgraph.config import get_config, get_store, get_stream_writer
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.runtime import get_runtime
+        from langgraph.store.memory import InMemoryStore
+
+        @dataclass
+        class _Ctx:
+            multiplier: int
+            label: str
+
+        # Fail-closed probe: every accessor outside a running node raises.
+        outside: dict[str, bool] = {}
+        for name, accessor in (
+            ("get_config", get_config),
+            ("get_runtime", get_runtime),
+            ("get_store", get_store),
+            ("get_stream_writer", get_stream_writer),
+        ):
+            try:
+                accessor()
+                outside[name] = False
+            except RuntimeError:
+                outside[name] = True
+
+        observed: dict[str, Any] = {}
+
+        def first(state: _RuntimeInjectionState) -> dict[str, Any]:
+            config = get_config()
+            runtime = get_runtime()
+            store = get_store()
+            writer = get_stream_writer()
+            info = runtime.execution_info
+            configurable = config.get("configurable", {})
+            observed["config_visible"] = {
+                "has_configurable": isinstance(configurable, Mapping),
+                "thread_id": configurable.get("thread_id"),
+                "custom_value": configurable.get("gauntlet_token"),
+            }
+            observed["runtime_injection"] = {
+                "context_label": runtime.context.label,
+                "context_multiplier": runtime.context.multiplier,
+                "store_identity_matches_accessor": runtime.store is store,
+                "stream_writer_callable": callable(runtime.stream_writer),
+                "previous_is_none": runtime.previous is None,
+            }
+            observed["execution_info"] = {
+                # langgraph names the task ``<node>:<uuid>`` in checkpoint_ns.
+                "node_identified": info.checkpoint_ns.split(":")[0] == "first",
+                "task_id_nonempty": bool(info.task_id),
+                "task_id_stable_within_task": (
+                    get_runtime().execution_info.task_id == info.task_id
+                ),
+                "node_attempt": info.node_attempt,
+            }
+            observed["first_task_id"] = info.task_id
+            writer({"stage": "first", "x": state["x"]})
+            store.put(store_namespace, store_key, {"v": state["x"]})
+            return {
+                "x": state["x"] * runtime.context.multiplier,
+                "log": ["first"],
+            }
+
+        def second(state: _RuntimeInjectionState) -> dict[str, Any]:
+            runtime = get_runtime()
+            store = get_store()
+            writer = get_stream_writer()
+            item = store.get(store_namespace, store_key)
+            observed["propagation"] = {
+                "downstream_saw_context": runtime.context.label,
+                "downstream_saw_store_value": item.value["v"] if item else None,
+                "downstream_task_id_differs": (
+                    runtime.execution_info.task_id != observed["first_task_id"]
+                ),
+                "downstream_config_token": get_config()
+                .get("configurable", {})
+                .get("gauntlet_token"),
+            }
+            observed["store_search_keys"] = [
+                found.key for found in store.search(store_namespace)
+            ]
+            writer({"stage": "second", "x": state["x"]})
+            return {"x": state["x"] + addend, "log": ["second"]}
+
+        store_instance = InMemoryStore()
+        builder = StateGraph(_RuntimeInjectionState, context_schema=_Ctx)
+        builder.add_node("first", first)
+        builder.add_node("second", second)
+        builder.add_edge(START, "first")
+        builder.add_edge("first", "second")
+        builder.add_edge("second", END)
+        compiled = builder.compile(store=store_instance)
+
+        chunks: list[Any] = []
+        values: list[Any] = []
+        for mode, chunk in compiled.stream(
+            {"x": initial, "log": []},
+            config={
+                "configurable": {
+                    "thread_id": thread_token,
+                    "gauntlet_token": config_token,
+                }
+            },
+            context=_Ctx(multiplier=multiplier, label=label),
+            stream_mode=["custom", "values"],
+        ):
+            if mode == "custom":
+                chunks.append(chunk)
+            else:
+                values.append(chunk)
+        final = values[-1]
+
+        # A declared context schema with NO context passed yields None, and a
+        # graph with no store yields None from get_store() — neither raises.
+        absent: dict[str, Any] = {}
+
+        def probe_absent(state: _RuntimeInjectionState) -> dict[str, Any]:
+            absent["context_absent_is_none"] = get_runtime().context is None
+            absent["store_absent_is_none"] = get_store() is None
+            return {"log": ["absent"]}
+
+        bare = StateGraph(_RuntimeInjectionState, context_schema=_Ctx)
+        bare.add_node("probe", probe_absent)
+        bare.add_edge(START, "probe")
+        bare.add_edge("probe", END)
+        bare.compile().invoke({"x": initial, "log": []})
+
+        stored = store_instance.get(store_namespace, store_key)
+        return {
+            "outside_accessors_raise_runtime_error": outside,
+            "config_visible": observed["config_visible"],
+            "runtime_injection": observed["runtime_injection"],
+            "execution_info": observed["execution_info"],
+            "propagation": observed["propagation"],
+            "emitted_chunks": chunks,
+            "store_roundtrip": dict(stored.value) if stored else None,
+            "store_search_keys": observed["store_search_keys"],
+            "final_state": {"x": final["x"], "log": list(final["log"])},
+            "context_absent_is_none": absent["context_absent_is_none"],
+            "store_absent_is_none": absent["store_absent_is_none"],
+        }
+
+    from dataclasses import dataclass
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        InMemoryKVStore,
+        TypedStateGraph,
+        get_config,
+        get_runtime,
+        get_store,
+        get_stream_writer,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    @dataclass
+    class _Ctx:
+        multiplier: int
+        label: str
+
+    outside = {}
+    for name, accessor in (
+        ("get_config", get_config),
+        ("get_runtime", get_runtime),
+        ("get_store", get_store),
+        ("get_stream_writer", get_stream_writer),
+    ):
+        try:
+            accessor()
+            outside[name] = False
+        except RuntimeError:
+            outside[name] = True
+
+    observed = {}
+
+    def first(state: Mapping[str, Any]) -> dict[str, Any]:
+        config = get_config()
+        runtime = get_runtime()
+        store = get_store()
+        writer = get_stream_writer()
+        info = runtime.execution_info
+        configurable = config.get("configurable", {})
+        observed["config_visible"] = {
+            "has_configurable": isinstance(configurable, Mapping),
+            "thread_id": configurable.get("thread_id"),
+            "custom_value": configurable.get("gauntlet_token"),
+        }
+        observed["runtime_injection"] = {
+            "context_label": runtime.context.label,
+            "context_multiplier": runtime.context.multiplier,
+            "store_identity_matches_accessor": runtime.store is store,
+            "stream_writer_callable": callable(runtime.stream_writer),
+            "previous_is_none": runtime.previous is None,
+        }
+        observed["execution_info"] = {
+            # DharmaGraph names the task directly: (run_id, node_id, task_seq).
+            "node_identified": info.node_id == "first",
+            "task_id_nonempty": bool(info.task_id),
+            "task_id_stable_within_task": (
+                get_runtime().execution_info.task_id == info.task_id
+            ),
+            "node_attempt": info.node_attempt,
+        }
+        observed["first_task_id"] = info.task_id
+        writer({"stage": "first", "x": state["x"]})
+        store.put(store_namespace, store_key, {"v": state["x"]})
+        return {"x": state["x"] * runtime.context.multiplier, "log": ["first"]}
+
+    def second(state: Mapping[str, Any]) -> dict[str, Any]:
+        runtime = get_runtime()
+        store = get_store()
+        writer = get_stream_writer()
+        item = store.get(store_namespace, store_key)
+        observed["propagation"] = {
+            "downstream_saw_context": runtime.context.label,
+            "downstream_saw_store_value": item.value["v"] if item else None,
+            "downstream_task_id_differs": (
+                runtime.execution_info.task_id != observed["first_task_id"]
+            ),
+            "downstream_config_token": get_config()
+            .get("configurable", {})
+            .get("gauntlet_token"),
+        }
+        observed["store_search_keys"] = [
+            found.key for found in store.search(store_namespace)
+        ]
+        writer({"stage": "second", "x": state["x"]})
+        return {"x": state["x"] + addend, "log": ["second"]}
+
+    store_instance = InMemoryKVStore()
+    chunks = []
+    typed = (
+        TypedStateGraph(
+            _RuntimeInjectionState,
+            context=_Ctx,
+            graph_id="gauntlet-runtime-config",
+        )
+        .add_node("first", first)
+        .add_node("second", second)
+        .add_edge(START, "first")
+        .add_edge("first", "second")
+        .add_edge("second", END)
+        .compile()
+    )
+    result = _run_awaitable(
+        typed.invoke(
+            input={"x": initial, "log": []},
+            context=_Ctx(multiplier=multiplier, label=label),
+            config={
+                "configurable": {
+                    "thread_id": thread_token,
+                    "gauntlet_token": config_token,
+                }
+            },
+            store=store_instance,
+            stream_writer=chunks.append,
+            effects=SimulatedEffects(seed),
+        )
+    )
+
+    absent = {}
+
+    def probe_absent(state: Mapping[str, Any]) -> dict[str, Any]:
+        absent["context_absent_is_none"] = get_runtime().context is None
+        absent["store_absent_is_none"] = get_store() is None
+        return {"log": ["absent"]}
+
+    bare = (
+        TypedStateGraph(
+            _RuntimeInjectionState,
+            context=_Ctx,
+            graph_id="gauntlet-runtime-config-absent",
+        )
+        .add_node("probe", probe_absent)
+        .add_edge(START, "probe")
+        .add_edge("probe", END)
+        .compile()
+    )
+    _run_awaitable(
+        bare.invoke(
+            input={"x": initial, "log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+
+    stored = store_instance.get(store_namespace, store_key)
+    return {
+        "outside_accessors_raise_runtime_error": outside,
+        "config_visible": observed["config_visible"],
+        "runtime_injection": observed["runtime_injection"],
+        "execution_info": observed["execution_info"],
+        "propagation": observed["propagation"],
+        "emitted_chunks": chunks,
+        "store_roundtrip": dict(stored.value) if stored else None,
+        "store_search_keys": observed["store_search_keys"],
+        "final_state": {
+            "x": result.state["x"],
+            "log": list(result.state["log"]),
+        },
+        "context_absent_is_none": absent["context_absent_is_none"],
+        "store_absent_is_none": absent["store_absent_is_none"],
+    }
+
+
+_WORKLOAD_ARMS["seeded_runtime_config_injection"] = _runtime_config_arm
+_support("LG30", ("runnable_config",), "dharma_swarm.graph:CompiledGraph.invoke#config")
+_support("LG30", ("context_schema",), "dharma_swarm.graph:context_schema")
+_support("LG30", ("runtime_injection",), "dharma_swarm.graph:GraphRuntime")
+_support("LG30", ("execution_info",), "dharma_swarm.graph:ExecutionInfo")
+_support("LG30", ("get_runtime",), "dharma_swarm.graph:get_runtime")
+_support("LG30", ("get_config",), "dharma_swarm.graph:get_config")
+_support("LG30", ("get_store",), "dharma_swarm.graph:get_store")
+_support("LG30", ("stream_writer",), "dharma_swarm.graph:get_stream_writer")
+_support("LG30", ("propagation",), "dharma_swarm.graph:GraphRuntime.for_task")
+
+
+def _apply_runtime_config_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG30 config/context/runtime-injection facets from the seeded two-arm run.
+
+    Fail-closed per the error-parity rule: a probe_error on EITHER arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    field_by_facet = {
+        "runnable_config": ("config_visible",),
+        "context_schema": ("runtime_injection", "context_absent_is_none"),
+        "runtime_injection": ("runtime_injection", "final_state"),
+        "execution_info": ("execution_info",),
+        "get_runtime": (
+            "outside_accessors_raise_runtime_error",
+            "runtime_injection",
+        ),
+        "get_config": ("outside_accessors_raise_runtime_error", "config_visible"),
+        "get_store": (
+            "store_roundtrip",
+            "store_search_keys",
+            "store_absent_is_none",
+        ),
+        "stream_writer": ("emitted_chunks",),
+        "propagation": ("propagation", "final_state"),
+    }
+    row = row_lookup["LG30"]
+    for facet, fields in field_by_facet.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG30"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_runtime_config_injection:{facet}",
+                command_or_probe=(
+                    f"compare {'+'.join(fields)} from the runtime-injection "
+                    "workload on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row),
+            )
+        )

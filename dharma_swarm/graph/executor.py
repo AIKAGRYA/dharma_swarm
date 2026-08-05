@@ -46,6 +46,7 @@ from dharma_swarm.graph.routing import (
     interpret_result,
     send_write,
 )
+from dharma_swarm.graph.runtime import GraphRuntime, bind_runtime, unbind_runtime
 from dharma_swarm.graph.state import GraphState
 from dharma_swarm.graph.types import END, TASKS_CHANNEL, trigger_channel
 
@@ -87,9 +88,18 @@ class SuperstepExecutor:
     part of the execution contract) stays with the scheduler's commit path.
     """
 
-    def __init__(self, graph: "CompiledGraph", effects: EffectsProvider) -> None:
+    def __init__(
+        self,
+        graph: "CompiledGraph",
+        effects: EffectsProvider,
+        runtime: GraphRuntime | None = None,
+    ) -> None:
         self._graph = graph
         self._effects = effects
+        # Run-scoped injection template (config/context/store/stream_writer);
+        # refined per task with that task's ExecutionInfo. Defaulting to a
+        # bare GraphRuntime keeps every pre-LG30 caller working unchanged.
+        self._runtime = runtime if runtime is not None else GraphRuntime()
 
     def prepare_tasks(
         self,
@@ -253,7 +263,11 @@ class SuperstepExecutor:
         pre-concurrency commit sequence. A declared managed-remaining field
         is injected into pull-task snapshots only — never committed state.
         Every task runs under an interrupt frame carrying its recorded
-        resume values (task-scoped, call-order replay).
+        resume values (task-scoped, call-order replay) AND a
+        :class:`GraphRuntime` carrying the run's config/context/store/
+        stream_writer plus this task's ExecutionInfo (LG30 injection). Both
+        bind inside the task's own asyncio context, so concurrent siblings
+        never observe each other's frame or runtime.
         """
         graph = self._graph
         node_input = (
@@ -274,6 +288,14 @@ class SuperstepExecutor:
             ),
         )
         token = push_frame(frame)
+        runtime_token = bind_runtime(
+            self._runtime.for_task(
+                run_id=run_id,
+                node_id=task.node_id,
+                task_seq=task.seq,
+                superstep=superstep,
+            )
+        )
         try:
             if task.timeout is not None:
                 try:
@@ -299,6 +321,7 @@ class SuperstepExecutor:
                     task.node_id, node_input, run_id, superstep
                 )
         finally:
+            unbind_runtime(runtime_token)
             pop_frame(token)
         task_writes = self._writes_from_result(
             task.node_id, result, run_id, superstep, task.seq
