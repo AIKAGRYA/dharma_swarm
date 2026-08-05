@@ -1,8 +1,9 @@
 {
   "schema": "dharma.autocatalytic.local_gate_receipt.v1",
-  "observed_at": "2026-08-05T07:41:32Z",
+  "observed_at": "2026-08-05T08:16:15Z",
   "base_commit": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
   "verified_implementation_commit": "2323d3a42f9419204db16222b6652010ea6aefc7",
+  "candidate_parent_commit": "0feebfacc4500d99f9192d336d762c0f6d339f2e",
   "branch": "codex/autocatalytic-organism3-20260805",
   "gates": [
     {
@@ -38,7 +39,7 @@
     {
       "name": "state_root_override_integration",
       "command": "alternate DHARMA_STATE_DIR precedence/fallback unit check plus default two-turn run and reload",
-      "result": "2 focused cases passed; witness and runtime.db remained under one canonical alternate root",
+      "result": "2 focused cases passed; archive, byte-identical alias, 20-row task log, exact ten-card set, and runtime.db remained under one alternate root",
       "exit": 0
     },
     {
@@ -91,8 +92,8 @@
     },
     {
       "name": "committed_packet_scope",
-      "command": "python scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base 9fd1bfc39e6dc471c3ebddbde668e383bd818110 --event-head ede0faad9cacd2aa913f1ee10db172f107169ebf",
-      "result": "PASSED; exactly one P1 Session Entry packet covers every changed path at the verified implementation commit",
+      "command": "python scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base 9fd1bfc39e6dc471c3ebddbde668e383bd818110 --event-head 0feebfacc4500d99f9192d336d762c0f6d339f2e",
+      "result": "PASSED; exactly one P1 Session Entry packet covers every committed path through the candidate parent; final-head scope remains a post-commit gate",
       "exit": 0
     },
     {
@@ -103,13 +104,13 @@
     },
     {
       "name": "decorrelated_council_content_review",
-      "command": "fast-default six-lane council run 10 after variable-turn UI repair",
+      "command": "fast-default six-lane council run 11 after persistence-layout evidence closure",
       "result": "runner content gate pass_fullness; 6/6 parsed, minimum score 100, zero blockers and zero required changes",
       "exit": 0
     },
     {
       "name": "council_provider_identity_audit",
-      "command": "requested_model versus actual_model family audit for every required run-10 lane",
+      "command": "requested_model versus actual_model family audit for every required run-11 lane",
       "result": "five required families matched; requested Qwen returned deepseek-v4-pro, so effective gate is hold_required_provider_substitution and the substituted review is not counted as Qwen-family decorrelation",
       "exit": 0
     }

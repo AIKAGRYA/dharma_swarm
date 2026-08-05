@@ -1,6 +1,6 @@
 # Canonical-substrate composition evidence
 
-Observed 2026-08-05T07:01:55Z at committed head `2323d3a42f94` over base `9fd1bfc39e6d`.
+The semantic bundle and hashes below were observed at implementation head `2323d3a42f94` over base `9fd1bfc39e6d`. Persistence-layout and gate evidence were refreshed 2026-08-05T08:09:57Z against committed parent `0feebfacc450`; no fingerprinted semantic module or manifest byte changed between those heads.
 
 The implementation is split by responsibility and imports the existing substrate directly:
 
@@ -53,4 +53,4 @@ Each of the 20 project-evidence rows also carries a `dharma.autocatalytic.promot
 
 Because adapter replay shares implementation with the producer, it is a drift/tamper check rather than diversity evidence. A common-mode adapter bug may survive both invocations. No authority above `local_rehearsal` may rely on this shared implementation without a separately owned evaluator or trust root.
 
-Witnesses, canonical A2A task logs, card files, and runtime receipts resolve from one state-root function on every call. `DHARMA_STATE_DIR`, the manifest-declared override, takes precedence over legacy `DHARMA_HOME`; the resolved root owns `a2a/autocatalytic_portfolio` and `state/runtime.db`. An integration test runs a complete two-turn default cycle under an alternate root, reloads it without explicit paths, and confirms the witness materializations and receipt database stayed beneath that root.
+Witnesses, canonical A2A task logs, card files, and runtime receipts resolve from one state-root function on every call. `DHARMA_STATE_DIR`, the manifest-declared override, takes precedence over legacy `DHARMA_HOME`; the resolved root owns `a2a/autocatalytic_portfolio` and `state/runtime.db`. An integration test runs a complete two-turn default cycle under an alternate root, reloads it without explicit paths, and checks the cycle archive, byte-identical mutable alias, 20-row cycle task log, exact ten-card set, and receipt database beneath that root.

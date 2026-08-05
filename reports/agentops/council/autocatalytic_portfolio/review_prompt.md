@@ -1,4 +1,4 @@
-# Decorrelated review: ten-node autocatalytic A2A portfolio, stabilized pass
+# Decorrelated review: ten-node autocatalytic A2A portfolio, final candidate
 
 RESPONSE PROTOCOL (mandatory): reason silently, then emit one minified JSON
 object of at most 2,000 characters. Do not restate the task. Do not expose
@@ -75,7 +75,9 @@ Hardening evidence before this council:
 
 - portfolio snapshot: 10 nodes, 13 edges, one SCC, one autocatalytic set,
   contract valid, zero validation errors;
-- Python work-packet gate: 198 passed, one third-party deprecation warning;
+- Python work-packet gate: 202 passed; its four store-census assertions include
+  deterministic rendering, committed-artifact equality, and the explicit 219
+  JSONL target baseline for the per-cycle A2A task log;
 - focused adversarial matrix: 20/20 passed; complete portfolio module: 45/45;
 - dashboard contract assertions: 11 passed, including variable-turn semantic
   receipt counts (2 turns -> 41, 3 turns -> 61, invalid -> count-neutral prose);
@@ -89,8 +91,9 @@ Hardening evidence before this council:
 - the global quality ratchet is green: `modules_over_500_lines` remains
   207 -> 207 and `silent_exception_swallows` improves 241 -> 239;
 - the PR DocOps gate passes with generated counts advisory and all other
-  integrity checks strict; committed packet-scope validation passes with
-  exactly one P1 Session Entry packet covering every changed path;
+  integrity checks strict; committed packet-scope validation passed through
+  candidate parent `0feebfacc450` with exactly one P1 Session Entry packet;
+  final-head scope remains a post-commit gate, not a pre-commit council claim;
 - adversarial review proved that raw SQL can forge local mutable receipt rows;
   the implementation now represents that as a bounded consistency modality
   instead of claiming independent authority;
@@ -98,7 +101,8 @@ Hardening evidence before this council:
   gate authority, and the all-true-still-non-authorizing invariant;
 - alternate-root integration proves the manifest-declared `DHARMA_STATE_DIR`
   override wins over legacy `DHARMA_HOME`, and a default two-turn run plus
-  reload keeps both witness files and `state/runtime.db` under one resolved root;
+  reload checks the cycle archive, byte-identical alias, 20-row cycle task log,
+  exact ten-card set, and `state/runtime.db` under one resolved root;
 - fresh cycle `autocat_fa3d5a51405c4bb4` reloads in a fresh process with structural
   and local-consistency checks valid; witness SHA-256 is
   `a45846d82a6b7afabd8457cc09d70beb0ffe809e381073c06bc9f317d80da4b3`;
@@ -106,12 +110,13 @@ Hardening evidence before this council:
   authority upgrades; its independently recomputed 14-module implementation
   fingerprint is
   `e22f39820f483f33c581323f27c845bddbb5669178fdc0047cd3c89d218d956e`;
-- the persistent `palantir-pilot` witness must be running with a heartbeat
-  younger than the council threshold;
+- the council runner must independently observe the persistent `palantir-pilot`
+  worker and a heartbeat younger than its threshold; the checked-in JSON is a
+  frozen point-in-time snapshot and never a claim of current final-head liveness;
 - a requested model lane counts only when `actual_model` matches its required
   decorrelated family; a Kimi substitution does not satisfy the Qwen lane.
 
-Prior blocker dispositions for this exact tree:
+Prior blocker dispositions for this candidate:
 
 - run 9 identified that `TruthBoundaryNotice` hardcoded 41 semantic receipt
   rows even though the runner accepts more than two turns; the notice now

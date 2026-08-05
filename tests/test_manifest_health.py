@@ -78,7 +78,19 @@ class TestLoadManifest:
             loaded = load_latest_cycle(portfolio)
         assert witness["local_receipt_consistency_valid"] is True
         assert loaded and loaded["local_receipt_consistency_valid"] is True
-        assert (canonical / "a2a/autocatalytic_portfolio/latest.json").is_file()
+        output_dir = canonical / "a2a/autocatalytic_portfolio"
+        cycle_id = str(witness["cycle_id"])
+        archive = output_dir / f"{cycle_id}.json"
+        latest = output_dir / "latest.json"
+        task_log = output_dir / f"{cycle_id}.tasks.jsonl"
+        assert archive.is_file()
+        assert latest.is_file()
+        assert archive.read_bytes() == latest.read_bytes()
+        assert task_log.is_file()
+        assert len(task_log.read_text(encoding="utf-8").splitlines()) == 20
+        assert {path.stem for path in (output_dir / "cards").glob("*.json")} == {
+            str(node["id"]) for node in portfolio["nodes"]
+        }
         assert (canonical / "state/runtime.db").is_file()
 
     def test_has_api_routers(self) -> None:
