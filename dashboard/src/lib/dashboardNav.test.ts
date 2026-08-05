@@ -44,9 +44,24 @@ test("buildDashboardNavSections avoids advertising /dashboard/claude as a second
   assert.equal(items.some((item) => item.label === "Control Plane"), false);
 });
 
+test("buildDashboardNavSections exposes the organism beside the ecosystem map", () => {
+  const items = commandSection().items;
+  const ecosystemIndex = items.findIndex((item) => item.href === "/dashboard/ecosystem");
+  const organismIndex = items.findIndex((item) => item.href === "/dashboard/organism");
+
+  assert.ok(ecosystemIndex >= 0, "expected Ecosystem Map in COMMAND");
+  assert.equal(organismIndex, ecosystemIndex + 1);
+  assert.equal(items[organismIndex]?.label, "Organism");
+  assert.equal(items[organismIndex]?.icon, "Orbit");
+});
+
 test("isDashboardPathActive keeps nested routes attached to their canonical top-level nav item", () => {
   assert.equal(isDashboardPathActive("/dashboard/agents", "/dashboard/agents/agent-7"), true);
   assert.equal(isDashboardPathActive("/dashboard/qwen35", "/dashboard/qwen35/telemetry"), true);
+  assert.equal(
+    isDashboardPathActive("/dashboard/organism", "/dashboard/organism/world-radar"),
+    true,
+  );
 });
 
 test("isDashboardPathActive does not let /dashboard match every nested route", () => {

@@ -1,0 +1,32 @@
+{
+  "schema": "dharma.autocatalytic.persistent_agent_evidence.v1",
+  "observed_at": "2026-08-05T08:10:52Z",
+  "agent": "palantir-pilot",
+  "status": "running",
+  "fresh": true,
+  "freshness_scope": "point_in_time_observation",
+  "current_freshness_claimed": false,
+  "current_status_claimed": false,
+  "session": "dharma_palantir_pilot_a2a_worker",
+  "heartbeat": {
+    "schema_version": "dharma.a2a.palantir_pilot.worker_heartbeat.v1",
+    "timestamp": "2026-08-05T08:10:50Z",
+    "status": "IDLE",
+    "cycle": 2,
+    "subject": "dharma.a2a.palantir-pilot",
+    "stream": "DHARMA_FLEET",
+    "consumer": "palantir_pilot_a2a",
+    "receipt_count": 0,
+    "suppress_no_messages": true
+  },
+  "consumer": {
+    "delivered_consumer_seq": 20479,
+    "ack_floor_consumer_seq": 20479,
+    "num_pending": 0,
+    "num_ack_pending": 0,
+    "num_redelivered": 0,
+    "num_waiting": 1
+  },
+  "freshness_policy_seconds": 300,
+  "claim_boundary": "The fresh boolean is a frozen evaluation at observed_at, not a claim of current or final-head liveness. At that observation time, an idle heartbeat plus zero pending, unacknowledged, and redelivered messages proves only that this persistent worker loop was running and caught up. It does not prove live peer contact, a semantic reply, model processing, or any external effect."
+}
