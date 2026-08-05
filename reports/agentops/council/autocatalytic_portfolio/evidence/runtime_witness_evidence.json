@@ -1,0 +1,134 @@
+{
+  "schema": "dharma.autocatalytic.runtime_witness_evidence.v1",
+  "observed_at": "2026-08-05T05:26:13Z",
+  "cycle_id": "autocat_682808db6cbc4d50",
+  "trace_id": "trc_d423db5ea4104557",
+  "generated_at": "2026-08-05T05:25:43.136136+00:00",
+  "witness_path": "/Users/dhyana/.dharma/a2a/autocatalytic_portfolio/autocat_682808db6cbc4d50.json",
+  "source_alias_path": "/Users/dhyana/.dharma/a2a/autocatalytic_portfolio/latest.json",
+  "witness_sha256": "bc5b2e3752349fee00cb1077f6a9c5bb7a05fb060f0907148aa49768d6970de2",
+  "witness_bytes": 1427245,
+  "raw_file_reverification": {
+    "archive_and_alias_byte_identical": true,
+    "structural_valid": true,
+    "structural_modality": "structure_only",
+    "local_receipt_consistency_valid": true,
+    "receipt_modality": "local_mutable_runtime_receipt_consistency",
+    "independently_authenticated": false,
+    "fresh_process_load_latest_succeeded": true,
+    "error": ""
+  },
+  "implementation": {
+    "verifier_version": "autocatalytic-verifier/1.1",
+    "four_module_bundle_sha256": "ef857d247921d142f27ceeccc1ae1f40fe91c35531be3b27e735b99fe200a5c3",
+    "declaration_canonical_sha256": "fdf967c8895b6f07b392ac01a2238037c977bb6422ff94cff6822566f30dc0b4",
+    "manifest_file_sha256": "8cfd10d07b272ed38b541f010ef42a1896616a44fb83f0ba9c8c5795d272775b",
+    "modules": {
+      "dharma_swarm/autocatalytic_contracts.py": "94b85af9657e4812492364a4fe27b28f3ed6e9b46e7dc8844f0372062c4f1741",
+      "dharma_swarm/autocatalytic_adapters.py": "860a2a17bae5734be0096c3b6b2efee2c9dbe67f470b372d5ec9c5635b74015c",
+      "dharma_swarm/autocatalytic_verifier.py": "a7f6809a8f9e545ffb584e7811e968dc1107481c3f6e047575a8908dc143fae6",
+      "dharma_swarm/autocatalytic_portfolio.py": "14ebeeb3fb44a0e86b9a0c100d5f25a252737434638b01c5fdf3ab971c6c86d3"
+    },
+    "independent_bundle_recomputation_matched": true
+  },
+  "proof": {
+    "structural_proof_valid": true,
+    "local_receipt_consistency_valid": true,
+    "turns_proven": 2,
+    "completed_hops_per_turn": 10,
+    "cycle_closed": true,
+    "execution_evidence_scope": "local_mutable_runtime_receipt_consistency",
+    "execution_provenance_authenticated": false,
+    "claim_ceiling": "local_rehearsal",
+    "external_effects_proven": false,
+    "turn_0_proof_hash": "fa50410e1c59421e696c29ce0e66ce4a429b6cf0c8d26cdd14e031f9c785aa4c",
+    "turn_1_proof_hash": "2cb045574f71033b68c1edef2fa4147af20bd21fa862a8cd69c6978dfc2561f2"
+  },
+  "runtime_receipt_counts": {
+    "semantic_consistency_selection": {
+      "a2a_task": 20,
+      "autocatalytic_hop_proof": 20,
+      "autocatalytic_cycle_proof": 1,
+      "total": 41
+    },
+    "runtime_truth_spine": {
+      "side_effect_intent": 20,
+      "side_effect_complete": 20,
+      "idempotency_consumed": 20,
+      "total": 60
+    },
+    "correlation_total_across_both_sets": 101
+  },
+  "runtime_attestation": {
+    "attestation_hash": "c6551c70c77f70866550ff4cca165cf991dbb5abfc03e11ac9574f67a216319f",
+    "evidence_scope": "local_mutable_runtime_receipt_consistency",
+    "independently_authenticated": false
+  },
+  "promotion_gate_result": {
+    "schema": "dharma.autocatalytic.promotion_gate.v1",
+    "evaluated_gates": 20,
+    "satisfied_gates": 0,
+    "authority_upgrades_authorized": 0,
+    "manifest_contract": "Every node declaration exactly matches its code-owned ordered predicate set.",
+    "authority_boundary": "Predicate satisfaction is evidence readiness only. Every gate remains blocked and requires a new authority-bearing evaluator and work packet."
+  },
+  "state_root_result": {
+    "declared_override": "DHARMA_STATE_DIR",
+    "legacy_fallback": "DHARMA_HOME",
+    "resolution_time": "per_call",
+    "witness_suffix": "a2a/autocatalytic_portfolio",
+    "runtime_db_suffix": "state/runtime.db",
+    "same_root_integration_test": true
+  },
+  "node_states": [
+    ["world_signal_supply", "world_radar.historical_receipt_projection", "historical_grounded_fixture"],
+    ["sarathi_runtime", "sarathi.pure_bootpack_plan", "planned_not_accepted"],
+    ["dharmagraph_execution", "dharmagraph.pure_execution_identity", "rehearsal_intent_no_domain_execution"],
+    ["cybernetic_supervision", "cybernetics_codex.committed_audit_projection", "closure_gaps_observed"],
+    ["arena_selection", "arena.hermetic_truth_receipt", "candidate_only_not_selected"],
+    ["chamber_research", "chamber.receipt_corpus_projection", "blocked_no_proposal"],
+    ["assurance_merge", "assurance.ci_contract_fail_closed", "not_verified"],
+    ["operator_experience", "helm.read_only_authorization_projection", "authorization_not_observed"],
+    ["external_value_delivery", "darshan.effect_receipt_gate", "external_gate_closed"],
+    ["learning_promotion", "arena.zero_weight_learning_gate", "promotion_blocked"]
+  ],
+  "cross_feed_observations": [
+    {
+      "signal": "oracle_evidence",
+      "source": "world_signal_supply",
+      "target": "chamber_research",
+      "turn_0": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "aa786f637f4d8b24cc38b86fe2d64a8e677c8ea603f6afaba6586f86f187e96c"},
+      "turn_1": {"status": "consumed", "emitted_turn": 1, "source_evidence_hash": "b03da4182f49cae5f364c11783a5d90a466f64056c00aed033b1f464c914e250"},
+      "target_effect": "oracle_evidence_bound=true; oracle_evidence_authorized=false"
+    },
+    {
+      "signal": "safety_contract",
+      "source": "assurance_merge",
+      "target": "dharmagraph_execution",
+      "turn_0": {"status": "not_available", "expected_turn": -1},
+      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "cceaf24a8ae06969cd368e5ce6cac895380efc6dedd340114461bcf5c3f8d528", "state": "not_verified"},
+      "target_effect": "safety_contract_bound=true; safety_contract_satisfied=false"
+    },
+    {
+      "signal": "operator_intent",
+      "source": "operator_experience",
+      "target": "sarathi_runtime",
+      "turn_0": {"status": "not_available", "expected_turn": -1},
+      "turn_1": {"status": "consumed", "emitted_turn": 0, "source_evidence_hash": "053cf6c6b787b83b9099ba7bce09d68ff7691eb177eb4664b633358f648be829", "state": "authorization_not_observed"},
+      "target_effect": "operator_intent_bound=true; plan_hash perturbed; dispatch_proven=false"
+    }
+  ],
+  "source_contract_result": {
+    "source_rows_across_two_turns": 30,
+    "present": 28,
+    "explicit_optional_absence": 2,
+    "all_valid": true,
+    "declared_digests_checked_and_valid": 12,
+    "declared_digests_invalid": 0,
+    "structured_json": 22,
+    "jsonl": 4,
+    "raw_utf8_markdown": 4,
+    "adversarial_source_and_feed_cases_passed": 20
+  },
+  "threat_boundary": "The local operator can mutate the SQLite database and witness files. Exact recomputation establishes structural and local-store consistency only; it does not authenticate execution, peers, provider semantics, publication, revenue, or any external effect."
+}

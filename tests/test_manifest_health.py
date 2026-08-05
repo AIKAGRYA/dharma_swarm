@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
+from fastapi.testclient import TestClient
 
+from api.main import app
+from dharma_swarm.autocatalytic_contracts import (
+    PROMOTION_CHECKS_BY_NODE,
+    evaluate_promotion_gate,
+    validate_portfolio,
+)
+from dharma_swarm.autocatalytic_portfolio import (
+    _default_runtime_db,
+    _default_witness_dir,
+    load_latest_cycle,
+    load_portfolio_manifest,
+    run_local_cycle,
+)
 from dharma_swarm.manifest_health import (
     _check_api_endpoint_registered,
     _check_api_router_registered,
+    _check_autocatalytic_node_page_exists,
     _check_dashboard_route_exists,
     _check_module_file_exists,
     _check_test_file_exists,
@@ -34,6 +49,37 @@ class TestLoadManifest:
         assert "integrations" in manifest
         assert "loops" in manifest
         assert "health_check_registry" in manifest
+        assert "autocatalytic_portfolio" in manifest
+
+    def test_autocatalytic_state_defaults_follow_manifest_override(
+        self, tmp_path: Path
+    ) -> None:
+        canonical = tmp_path / "canonical-state"
+        legacy = tmp_path / "legacy-home"
+        assert load_manifest()["state_dir"]["env_override"] == "DHARMA_STATE_DIR"
+        with patch.dict(
+            "os.environ",
+            {"DHARMA_STATE_DIR": str(canonical), "DHARMA_HOME": str(legacy)},
+            clear=True,
+        ):
+            assert _default_witness_dir() == canonical / "a2a/autocatalytic_portfolio"
+            assert _default_runtime_db() == canonical / "state/runtime.db"
+        with patch.dict("os.environ", {"DHARMA_HOME": str(legacy)}, clear=True):
+            assert _default_witness_dir() == legacy / "a2a/autocatalytic_portfolio"
+            assert _default_runtime_db() == legacy / "state/runtime.db"
+
+    def test_default_cycle_keeps_witness_and_receipts_under_one_root(
+        self, tmp_path: Path
+    ) -> None:
+        canonical = tmp_path / "canonical-state"
+        portfolio = load_portfolio_manifest()
+        with patch.dict("os.environ", {"DHARMA_STATE_DIR": str(canonical)}):
+            witness = run_local_cycle(portfolio=portfolio, turns=2)
+            loaded = load_latest_cycle(portfolio)
+        assert witness["local_receipt_consistency_valid"] is True
+        assert loaded and loaded["local_receipt_consistency_valid"] is True
+        assert (canonical / "a2a/autocatalytic_portfolio/latest.json").is_file()
+        assert (canonical / "state/runtime.db").is_file()
 
     def test_has_api_routers(self) -> None:
         manifest = load_manifest()
@@ -86,12 +132,44 @@ class TestHealthChecks:
         assert prefix_passed is True  # prefix-level is fooled
         assert endpoint_passed is False, evidence  # endpoint-level is not
 
+    def test_autocatalytic_endpoint_is_mounted(self) -> None:
+        manifest = load_manifest()
+        entity = {"api_dependencies": ["/api/manifest/autocatalytic"]}
+        passed, evidence = _check_api_endpoint_registered(entity, manifest)
+        assert passed is True, evidence
+
+    def test_autocatalytic_endpoint_returns_fail_closed_topology_contract(self) -> None:
+        response = TestClient(app).get("/api/manifest/autocatalytic")
+        assert response.status_code == 200
+        body = response.json()
+        assert body.get("error") in (None, "")
+        data = body["data"]
+        assert data["topology"]["contract_valid"] is True
+        assert data["topology"]["validation_errors"] == []
+        assert data["topology"]["required_nodes"] == 10
+        latest = data.get("latest_cycle")
+        if latest is not None:
+            assert "local_receipt_consistency_valid" in latest
+            assert latest.get("execution_provenance_authenticated") is not True
+
+    def test_autocatalytic_node_page_is_locked_to_node_identity(self) -> None:
+        manifest = load_manifest()
+        node = manifest["autocatalytic_portfolio"]["nodes"][0]
+        passed, evidence = _check_autocatalytic_node_page_exists(node, manifest)
+        assert passed is True, evidence
+        drifted = {**node, "page": "/dashboard/organism/shared"}
+        passed, evidence = _check_autocatalytic_node_page_exists(drifted, manifest)
+        assert passed is False
+        assert "manifest page must be" in evidence
+
     def test_api_endpoint_checks_mounted_app_routes(self) -> None:
         # The module-local router can define the endpoint, but health must prove
         # the route is mounted on api.main.app.
         manifest = load_manifest()
         entity = {"api_dependencies": ["/api/operator-coherence/report"]}
-        with patch("dharma_swarm.manifest_health._mounted_api_route_paths", return_value=[]):
+        with patch(
+            "dharma_swarm.manifest_health._mounted_api_route_paths", return_value=[]
+        ):
             passed, evidence = _check_api_endpoint_registered(entity, manifest)
         assert passed is False
         assert "mounted app route" in evidence
@@ -104,9 +182,7 @@ class TestCockpitSurfaceContract:
         cockpit = surfaces["cockpit"]
         assert cockpit["api_dependencies"] == ["/api/operator-coherence/report"]
         assert "api_endpoint_registered" in cockpit["health_check_ids"]
-        assert not any(
-            "control-surface" in dep for dep in cockpit["api_dependencies"]
-        )
+        assert not any("control-surface" in dep for dep in cockpit["api_dependencies"])
 
     def test_control_surface_entry_untouched(self) -> None:
         manifest = load_manifest()
@@ -115,6 +191,15 @@ class TestCockpitSurfaceContract:
         assert cs["api_dependencies"] == [
             "/api/control-surface/summary",
             "/api/control-surface/rows",
+        ]
+
+    def test_organism_overview_and_dynamic_node_surfaces_are_declared(self) -> None:
+        manifest = load_manifest()
+        surfaces = {s["id"]: s for s in manifest.get("dashboard_surfaces", [])}
+        assert surfaces["organism"]["route"] == "/dashboard/organism"
+        assert surfaces["organism_node"]["route"] == "/dashboard/organism/[nodeId]"
+        assert surfaces["organism_node"]["api_dependencies"] == [
+            "/api/manifest/autocatalytic"
         ]
 
     def test_module_file_exists(self) -> None:
@@ -211,6 +296,39 @@ class TestBuildHealthReport:
         section_names = [s["section"] for s in report["sections"]]
         assert "Dashboard Surfaces" in section_names
         assert "Agents & Subsystems" in section_names
+        assert "Autocatalytic Portfolio" in section_names
+
+    def test_autocatalytic_section_has_exactly_ten_typed_nodes(self) -> None:
+        report = build_health_report()
+        section = next(
+            row
+            for row in report["sections"]
+            if row["section"] == "Autocatalytic Portfolio"
+        )
+        assert len(section["entities"]) == 10
+        assert [row["ordinal"] for row in section["entities"]] == list(range(1, 11))
+        assert all(
+            row["input_signal"] and row["output_signal"] for row in section["entities"]
+        )
+        assert all(row["promotion_checks"] for row in section["entities"])
+        portfolio = load_manifest()["autocatalytic_portfolio"]
+        expected = list(PROMOTION_CHECKS_BY_NODE["world_signal_supply"])
+        for checks in ([], expected[:1], [*expected, "manifest_only"], expected[::-1]):
+            drift = copy.deepcopy(portfolio)
+            drift["nodes"][0]["promotion_checks"] = checks
+            assert any("promotion_checks" in error for error in validate_portfolio(drift))
+        unknown = copy.deepcopy(portfolio)
+        unknown["nodes"][0]["id"] = "manifest_only"
+        assert any("no code-owned" in error for error in validate_portfolio(unknown))
+        malformed = evaluate_promotion_gate(
+            "world_signal_supply", {"fresh_signal_promoted": True, "bronze_bound": 1}
+        )
+        assert malformed["checks"][1]["actual"] is None and not malformed["satisfied"]
+        satisfied = evaluate_promotion_gate(
+            "world_signal_supply", {"fresh_signal_promoted": True, "bronze_bound": True}
+        )
+        assert satisfied["satisfied"] and satisfied["state"] == "blocked"
+        assert satisfied["authority_upgrade_authorized"] is False
 
     def test_entity_has_required_fields(self) -> None:
         report = build_health_report()
