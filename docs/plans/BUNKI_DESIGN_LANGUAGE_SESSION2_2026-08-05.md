@@ -110,7 +110,7 @@ knows or doesn't) leaves trails; trails influence the system.
    renzo (five-tab Search/Text/Reference/Lists/Study — same app as spec
    §10.1; "ring key" was a voice-transcription artifact). Screenshot rounds
    2–3 still incoming.
-2. Kodansha kanji app screenshots — incoming; extract the capability bar.
+2. ~~Kodansha kanji app screenshots~~ RESOLVED round 2 → §7.3 capability bar.
 3. Particle-page reference source (the per-particle PDF specialist) — obtain
    name/examples from operator.
 4. Theme toggle scope: global vs per-surface (reading surface may want its
@@ -162,6 +162,40 @@ Interaction details to preserve: results update incrementally WHILE
 drawing; kana readings shown in the single red accent (one color doing
 semantic work — readings pop, nothing else is colored); candidate strip
 above the canvas; instant, offline-fast.
+
+### 7.3 Reference analysis — Kodansha Kanji Learner's Dictionary app, round 2 (2026-08-05)
+
+Reference 2 (open item 2 → RESOLVED). Screens: 川 entry (full anatomy +
+grade-explanation popup), 局 entry, radical-44 family index. This is the
+kanji-page capability/design bar:
+
+1. **Hero glyph** — huge vermilion calligraphic character dominates; the
+   page is a specimen case. Entry number + SKIP quietly beneath.
+2. **Core meaning as 1–3 emphatic red words** (▶RIVER; ▶BUREAU ▶LIMITED
+   PART), readings directly under. No prose before the point.
+3. **Join keys in one compact bordered table** (radical/number, Jōyō grade,
+   SKIP, frequency, Ⓚ, Unicode) — AND tappable: tapping a cell yields a
+   plain-language explanation ("part of the Education Kanji list, taught
+   in grade 1"). Metadata as doors, never inline noise. Solves spec §5's
+   "join keys, not curriculum" with an interaction, not just placement.
+4. **Compounds grouped by sense** with sense markers (❶❷, ⓐⓑ), each
+   compound tagged to its sense (小川=ⓐ, 江戸川=ⓑ; 薬局 under ❶, post
+   office under ❷); reading in warm color, tight gloss. The compound list
+   teaches the sense structure — the cure for v12's flat UNSEEN-badge wall.
+5. **Cross-references as doors even in print:** homophones ⇒entry-number
+   (かわ 河 ⇒0298), →Ⓢ/→Ⓤ appendix arrows, SPECIAL READINGS section.
+   Kodansha wanted §4's recursion; paper couldn't deliver it; Bunki can.
+6. **Radical family index** (radical 44 → 尻 尾 尽 局 尿 届 屈 居 屋 屑
+   展…): one component opens its whole kanji family, each row = glyph +
+   representative reading + one-word gloss, each row a door. Same anatomy
+   the particle pages need for their "connects to N kanji" lists.
+
+**Meta-observation:** both reference apps (renzo, Kodansha) are white
+ground + black ink + exactly ONE deep red doing all semantic work. The
+operator's daily visual diet already is the ink-and-vermilion language;
+the Nihonga theme system (§2) extends it with more pigments. v12's
+cream-and-gold is the outlier. Triple confirmation of the palette
+direction.
 
 ## 8. The Drift — 墨流し Suminagashi mode (concept v0.1, 2026-08-05)
 
