@@ -1,15 +1,15 @@
 {
   "schema": "dharma.autocatalytic.persistent_agent_evidence.v1",
-  "observed_at": "2026-08-05T06:53:17Z",
+  "observed_at": "2026-08-05T07:07:44Z",
   "agent": "palantir-pilot",
   "status": "running",
   "fresh": true,
   "session": "dharma_palantir_pilot_a2a_worker",
   "heartbeat": {
     "schema_version": "dharma.a2a.palantir_pilot.worker_heartbeat.v1",
-    "timestamp": "2026-08-05T06:52:56Z",
+    "timestamp": "2026-08-05T07:07:24Z",
     "status": "IDLE",
-    "cycle": 1,
+    "cycle": 29,
     "subject": "dharma.a2a.palantir-pilot",
     "stream": "DHARMA_FLEET",
     "consumer": "palantir_pilot_a2a",

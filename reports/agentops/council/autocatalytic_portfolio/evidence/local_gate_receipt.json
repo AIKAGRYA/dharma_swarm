@@ -1,8 +1,8 @@
 {
   "schema": "dharma.autocatalytic.local_gate_receipt.v1",
-  "observed_at": "2026-08-05T06:59:52Z",
+  "observed_at": "2026-08-05T07:07:04Z",
   "base_commit": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
-  "verified_implementation_commit": "ede0faad9cacd2aa913f1ee10db172f107169ebf",
+  "verified_implementation_commit": "2323d3a42f9419204db16222b6652010ea6aefc7",
   "branch": "codex/autocatalytic-organism3-20260805",
   "gates": [
     {
@@ -38,7 +38,7 @@
     {
       "name": "focused_ruff_and_module_budget",
       "command": "ruff check on the complete autocatalytic implementation, manifest/API seams, and focused tests; explicit 14-module wc -l",
-      "result": "All checks passed; all 14 fingerprinted semantic modules are at or below 406 LOC except no module exceeds 500 LOC (facades 216/259/156; verifier 374)",
+      "result": "All checks passed; every one of the 14 fingerprinted semantic modules is below 500 LOC, with a maximum of 406 (facades 216/259/156; verifier 374)",
       "exit": 0
     },
     {
@@ -93,6 +93,18 @@
       "name": "canonical_snapshot_check",
       "command": "python -m dharma_swarm.autocatalytic_portfolio run --turns 2; fresh process check",
       "result": "cycle autocat_fa3d5a51405c4bb4 under isolated DHARMA_STATE_DIR: 10 nodes; 13 edges; one SCC/set; validation_errors=[]; structure_only valid; local_mutable_runtime_receipt_consistency valid and independently_authenticated=false; 20 promotion gates evaluated, zero satisfied, zero authority upgrades; 14-module fingerprint independently matched",
+      "exit": 0
+    },
+    {
+      "name": "decorrelated_council_content_review",
+      "command": "fast-default six-lane council run 10 after variable-turn UI repair",
+      "result": "runner content gate pass_fullness; 6/6 parsed, minimum score 100, zero blockers and zero required changes",
+      "exit": 0
+    },
+    {
+      "name": "council_provider_identity_audit",
+      "command": "requested_model versus actual_model family audit for every required run-10 lane",
+      "result": "five required families matched; requested Qwen returned deepseek-v4-pro, so effective gate is hold_required_provider_substitution and the substituted review is not counted as Qwen-family decorrelation",
       "exit": 0
     }
   ],

@@ -1,6 +1,6 @@
 # Canonical-substrate composition evidence
 
-Observed 2026-08-05T06:49:23Z at committed head `ede0faad9cac` over base `9fd1bfc39e6d`.
+Observed 2026-08-05T07:01:55Z at committed head `2323d3a42f94` over base `9fd1bfc39e6d`.
 
 The implementation is split by responsibility and imports the existing substrate directly:
 
