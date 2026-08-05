@@ -486,6 +486,31 @@ orbits and 筆順 sheets stay pool-scoped for now.
    (言葉 › 言 › 語 › 言 …), the breadcrumb earns an ∞ mark and a gold
    ripple — the Escher moment acknowledged, never interrupted.
 
+### 8.7 v6 field test → v7 directive: the vault-field (2026-08-05)
+
+Operator scores the work so far 50/100 and names the gap: "an interactive
+obsidian vault type of field — navigate in and out, rotate, see whole
+clusters, zoom in and out of galaxies, see grouping and connection and
+depth, all in a 5D interactive environment." Standing order: self-iterate
+— engage, take notes, rewrite, polish, verify, repeat until convinced.
+
+**v7 architecture — from pond to universe:**
+- **World space + camera.** Words live on a world plane ~3.2 viewports
+  square; a camera (pan / continuous pinch-zoom / two-finger rotate,
+  positions rotate but glyphs stay upright) navigates it. One-finger drag
+  on open water pans AND stirs the fluid — swimming through the field.
+- **Galaxies.** The most word-productive kanji become hubs, laid out on a
+  phyllotaxis spiral; every word anchors near its hubs (multi-hub words
+  sit between them as bridges); hub kanji render as large faint suns.
+- **The whole dictionary, always.** All 6,687 words exist in-world:
+  the ~64 most relevant nearby (unknown > fragile > level-match) are
+  full DOM words; the rest draw as canvas points with word→hub edge
+  lines — the Obsidian graph made of ink.
+- **Zoom-through-to-dive.** Pinching past max zoom over a word pushes
+  THROUGH it into its dive universe — continuous zoom and the fractal
+  dive become one gesture. Level slider re-weights brightness/priority
+  instead of respawning.
+
 **v6 shipped (same artifact URL).** (1) Universal expandability: the
 kanji-ring filter now accepts any CJK ideograph with jōyō glosses —
 verified on dictionary word 磁気 (N1): 2 kanji glyphs, 磁 → 3 radicals;
