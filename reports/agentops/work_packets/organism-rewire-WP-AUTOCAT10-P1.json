@@ -6,11 +6,9 @@
   "intent": "Connect the ten load-bearing metabolic mechanisms through one declared portfolio, an exactly-ten-node semantic A2A rehearsal cycle, independently checked completion promotion, causal cross-feeds, and one operator page per node. Decompose the implementation beneath the repository module budget and fail closed on malformed structured evidence while preserving the distinction between transport acknowledgement, local mutable-receipt consistency, and externally authenticated effects.",
   "allowed_files": [
     "ACTIVE_SURFACE_MANIFEST.yaml",
-    "dharma_swarm/autocatalytic_contracts.py",
-    "dharma_swarm/autocatalytic_adapters.py",
-    "dharma_swarm/autocatalytic_verifier.py",
-    "dharma_swarm/autocatalytic_portfolio.py",
+    "dharma_swarm/autocatalytic_*.py",
     "dharma_swarm/manifest_health.py",
+    "dharma_swarm/manifest_health_autocatalytic.py",
     "api/routers/manifest.py",
     "tests/test_autocatalytic_portfolio.py",
     "tests/test_manifest_health.py",
@@ -38,6 +36,7 @@
     "dharma_swarm/council/**",
     "dharma_swarm/graph/**",
     "packages/telos-kernel/**",
+    "docs/docops/**",
     "scripts/docops/**",
     "scripts/governance/hygiene/**"
   ],
@@ -79,7 +78,7 @@
       "owner_files"
     ],
     "work_packet": "WP-AUTOCAT10-P1",
-    "packet_digest": "c8826d8b709fd78d18d92ed8d6309db881c9ebb8a5be1f6e4ad00c391d73d6ac",
+    "packet_digest": "1ddf66714efa6e7700d1a8f256455f0b9f63f59f9d3143a1ffab52c365d046ce",
     "active_track": "organism-rewire-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
@@ -93,7 +92,10 @@
       "Existing A2A transport and idempotency acknowledgements can overstate nonterminal task completion, so this packet adds stricter independent structural and local-consistency result types without changing the A2A substrate.",
       "Cross-feed observation alone is not causation, so target adapters must consume typed feed state and perturbation tests must prove the dependency.",
       "Structured project receipts must parse and replay their declared digest; raw Markdown and JSONL sources remain explicitly content-addressed without being misrepresented as receipt JSON.",
-      "Three required membranes are not production-live and remain projection_only or external_gated until their declared proof obligations pass."
+      "Three required membranes are not production-live and remain projection_only or external_gated until their declared proof obligations pass.",
+      "The PR-level AgentOps checker admits exactly one Session Entry packet for a high-risk range, so post-implementation DocOps and CI hardening remain consolidated under this merge-base-bound packet rather than separate tracked packets.",
+      "The repository-wide quality ratchet counts every modified Python module over 500 lines, so the implementation must be split into behavior-preserving submodules without changing its public facade, fingerprint coverage, or authority semantics.",
+      "Generated DocOps counts belong to post-merge reconciliation and are forbidden in this PR; changed architecture prose must instead pass the strict canonical-claim delta check without claiming a new documentation owner."
     ],
     "closest_existing_implementation": [
       "ACTIVE_SURFACE_MANIFEST.yaml",

@@ -1,13 +1,6 @@
-"""Manifest Health — declared-vs-observed comparison engine.
+"""Compare ACTIVE_SURFACE_MANIFEST declarations with registered health checks.
 
-Reads ACTIVE_SURFACE_MANIFEST.yaml and runs safe, registered health
-checks against live runtime state.  Returns a structured report of
-every entity with its declared status, observed status, and gap.
-
-Health checks are a hardcoded registry of safe operations — no
-arbitrary shell commands.  The manifest declares *which* check IDs
-to run; this module maps them to Python functions.
-"""
+The fixed registry prevents manifest-defined arbitrary shell execution."""
 
 from __future__ import annotations
 
@@ -17,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from dharma_swarm import manifest_health_autocatalytic
 
 logger = logging.getLogger(__name__)
 
@@ -214,81 +209,18 @@ def _check_api_health_responds(
         return False, f"api.routers.health import failed: {exc}"
 
 
-def _check_autocatalytic_contract_complete(
-    entity: dict[str, Any],
-    manifest: dict[str, Any],
-) -> tuple[bool, str]:
-    """Check the local one-in/one-out metabolic node contract."""
-    required = (
-        "id",
-        "ordinal",
-        "label",
-        "role",
-        "authority",
-        "input_signal",
-        "output_signal",
-        "transform",
-        "next_node",
-        "page",
-        "doc",
-    )
-    missing = [name for name in required if not entity.get(name)]
-    if missing:
-        return False, f"missing contract fields: {missing}"
-    nodes = manifest.get("autocatalytic_portfolio", {}).get("nodes", [])
-    ids = {node.get("id") for node in nodes if isinstance(node, dict)}
-    if entity.get("next_node") not in ids:
-        return False, f"next_node is not declared: {entity.get('next_node')}"
-    obligations = entity.get("proof_obligations")
-    if not isinstance(obligations, list) or not obligations:
-        return False, "no proof obligations declared"
-    return True, (
-        f"{entity['input_signal']} -> {entity['output_signal']} -> "
-        f"{entity['next_node']} ({entity['authority']})"
-    )
-
-
-def _check_autocatalytic_proof_refs_exist(
-    entity: dict[str, Any],
-    _manifest: dict[str, Any],
-) -> tuple[bool, str]:
-    refs = entity.get("proof_refs")
-    if not isinstance(refs, list) or not refs:
-        return False, "no proof_refs declared"
-    missing = [str(ref) for ref in refs if not (_REPO_ROOT / str(ref)).is_file()]
-    if missing:
-        return False, f"missing proof refs: {missing}"
-    return True, f"all {len(refs)} proof ref(s) exist"
-
-
-def _check_autocatalytic_node_page_exists(
-    entity: dict[str, Any],
-    _manifest: dict[str, Any],
-) -> tuple[bool, str]:
-    doc = _REPO_ROOT / str(entity.get("doc") or "")
-    dynamic_page = (
-        _REPO_ROOT
-        / "dashboard"
-        / "src"
-        / "app"
-        / "dashboard"
-        / "organism"
-        / "[nodeId]"
-        / "page.tsx"
-    )
-    missing = []
-    expected_route = f"/dashboard/organism/{entity.get('id') or ''}"
-    if entity.get("page") != expected_route:
-        missing.append(
-            f"manifest page must be {expected_route}, got {entity.get('page')!r}"
-        )
-    if not doc.is_file():
-        missing.append(str(entity.get("doc") or "no doc declared"))
-    if not dynamic_page.is_file():
-        missing.append("dashboard/src/app/dashboard/organism/[nodeId]/page.tsx")
-    if missing:
-        return False, f"missing node page(s): {missing}"
-    return True, f"canonical doc + dynamic operator page found for {entity.get('id')}"
+_AUTOCATALYTIC_HEALTH_CHECKS = manifest_health_autocatalytic.build_health_checks(
+    lambda: _REPO_ROOT
+)
+_check_autocatalytic_contract_complete = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_contract_complete"
+]
+_check_autocatalytic_proof_refs_exist = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_proof_refs_exist"
+]
+_check_autocatalytic_node_page_exists = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_node_page_exists"
+]
 
 
 # The registry: check_id → function
@@ -304,9 +236,7 @@ _HEALTH_CHECK_REGISTRY: dict[
     "runtime_db_present": _check_runtime_db_present,
     "ontology_db_present": _check_ontology_db_present,
     "api_health_responds": _check_api_health_responds,
-    "autocatalytic_contract_complete": _check_autocatalytic_contract_complete,
-    "autocatalytic_proof_refs_exist": _check_autocatalytic_proof_refs_exist,
-    "autocatalytic_node_page_exists": _check_autocatalytic_node_page_exists,
+    **_AUTOCATALYTIC_HEALTH_CHECKS,
 }
 
 
@@ -535,54 +465,13 @@ def build_health_report() -> dict[str, Any]:
             }
         )
 
-    # Ten-node autocatalytic portfolio. ``local_evidence`` is intentionally
-    # represented as degraded rather than live: the declared portfolio and
-    # local semantic rehearsal are not production-domain completion proof.
-    portfolio = manifest.get("autocatalytic_portfolio", {})
-    metabolic_records = []
-    for node in portfolio.get("nodes", []) if isinstance(portfolio, dict) else []:
-        checks = run_checks_for_entity(node, manifest)
-        declared = "degraded" if node.get("authority") == "local_evidence" else "stub"
-        if checks and all(check["passed"] for check in checks):
-            observed = declared
-        elif checks and any(check["passed"] for check in checks):
-            observed = "degraded"
-        elif checks:
-            observed = "broken"
-        else:
-            observed = "unknown"
-        metabolic_records.append(
-            {
-                "id": node["id"],
-                "label": node.get("label", node["id"]),
-                "entity_type": "autocatalytic_node",
-                "declared_status": declared,
-                "observed_status": observed,
-                "gap": _compute_gap(declared, observed, node, checks),
-                "priority": "p0",
-                "next_action": "",
-                "health_checks": checks,
-                "ordinal": node.get("ordinal"),
-                "role": node.get("role", ""),
-                "authority": node.get("authority", ""),
-                "input_signal": node.get("input_signal", ""),
-                "output_signal": node.get("output_signal", ""),
-                "next_node": node.get("next_node", ""),
-                "page": node.get("page", ""),
-                "proof_refs": node.get("proof_refs", []),
-                "proof_obligations": node.get("proof_obligations", []),
-                "promotion_checks": node.get("promotion_checks", []),
-                "project_bindings": node.get("project_bindings", []),
-            }
-        )
-    if metabolic_records:
-        sections.append(
-            {
-                "section": "Autocatalytic Portfolio",
-                "entity_type": "autocatalytic_node",
-                "entities": metabolic_records,
-            }
-        )
+    autocatalytic_section = manifest_health_autocatalytic.project_autocatalytic_section(
+        manifest,
+        run_checks=run_checks_for_entity,
+        compute_gap=_compute_gap,
+    )
+    if autocatalytic_section:
+        sections.append(autocatalytic_section)
 
     # Summary counts — all buckets are by observed_status.
     all_entities = [e for s in sections for e in s["entities"]]

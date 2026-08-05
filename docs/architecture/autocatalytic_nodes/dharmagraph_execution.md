@@ -17,7 +17,7 @@ Current adapter projection: `dharmagraph.pure_execution_identity` derives the re
 Promotion obligations:
 
 - reject `unprotected_dispatch` for consequential work;
-- bind graph events to canonical runtime receipts;
+- bind graph events to persisted `EvidenceReceipt` rows in `RuntimeStateStore`;
 - prove replay, checkpoint, and idempotent recovery on the adopted production path.
 
 Forbidden claim: `TypedStateGraph` compilation or an event-shaped record alone is not a durable domain receipt.

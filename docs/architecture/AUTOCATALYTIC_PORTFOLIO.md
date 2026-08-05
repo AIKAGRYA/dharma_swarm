@@ -54,7 +54,7 @@ Three cross-feeds are exercised, not merely drawn. `oracle_evidence` reaches Cha
 
 `TransportAck` cannot inhabit `StructuralHop`.
 
-`StructuralHop` is deliberately non-authoritative. It requires all of:
+`StructuralHop` deliberately carries no execution or promotion authority. It requires all of:
 
 1. exact A2A status `completed`;
 2. exactly one `dharma.a2a.semantic_hop.v1` data artifact;
@@ -66,13 +66,13 @@ Three cross-feeds are exercised, not merely drawn. `oracle_evidence` reaches Cha
 
 `StructuralCycleProof` requires exactly ten ordered `StructuralHop` values and closure from node 10 back to node 1. Its result type is `StructuralCycleCheck(modality="structure_only")`; it cannot be mistaken for the receipt evaluator. The local harness proves two turns so the second turn consumes node 10's actual prior output, not only a bootstrap fixture.
 
-A locally receipt-consistent two-turn witness must join to exactly 41 semantic-proof rows selected from the canonical runtime database:
+A locally receipt-consistent two-turn witness must join to exactly 41 semantic-proof rows selected from the runtime database managed by `RuntimeStateStore`:
 
 - 20 `a2a_task` receipts written by `A2AServer`;
 - 20 `autocatalytic_hop_proof` receipts binding the semantic artifact and project evidence;
 - one `autocatalytic_cycle_proof` attestation binding the proof root, implementation fingerprint, and runtime receipt set.
 
-Submission also traverses the canonical runtime-truth spine, which records `side_effect_intent`, `side_effect_complete`, and `idempotency_consumed` rows for each hop. Those 60 substrate rows are operational evidence and are reported separately; they are not silently promoted into the verifier's 41-row semantic-consistency result.
+Submission also traverses the runtime-truth spine via `submit_task_via_spine_sync`, which records `side_effect_intent`, `side_effect_complete`, and `idempotency_consumed` rows for each hop. Those 60 substrate rows are operational evidence and are reported separately; they are not silently promoted into the verifier's 41-row semantic-consistency result.
 
 The receipt evaluator opens the runtime database read-only and compares the exact run, task, idempotency key, message, trace, correlation, artifact, completion, and proof identities. It returns `LocalReceiptConsistencyCheck(modality="local_mutable_runtime_receipt_consistency", independently_authenticated=false)`. A self-consistent JSON witness without the rows fails this check.
 
@@ -89,7 +89,7 @@ The strongest allowed result is `local_rehearsal`. It establishes ten logical A2
 
 ## Replay and evidence drift
 
-The verifier fingerprint binds the exact portfolio declaration, verifier version, and byte-framed bundle of all four implementation modules (`autocatalytic_contracts`, `autocatalytic_adapters`, `autocatalytic_verifier`, and `autocatalytic_portfolio`) captured once when the verifier loads. Capturing that bundle hash once prevents a running old evaluator from stamping newly replaced on-disk bytes as its own. Project evidence additionally binds each source artifact's bytes and validates any declared JSON digest. Declared governance-receipt digests replay their producer convention (`sort_keys`, compact separators, escaped Unicode); the portfolio witness uses its separately named unescaped canonical form. A non-ASCII regression fixture prevents those two authorities from being silently conflated. A code, manifest, or source-evidence change intentionally makes an older “latest” witness fail current verification. The immutable artifact remains useful as an archive of what the older evaluator accepted, but a fresh witness must be minted before the dashboard may present the cycle as locally receipt-consistent under the new evaluator.
+The verifier fingerprint binds the exact portfolio declaration, verifier version, and byte-framed, explicitly enumerated implementation source bundle captured once when the verifier loads. The closed bundle includes the contracts, source/manifest helpers, adapters, task/proof/cycle runtime, receipt verifier, and compatibility facades. Capturing that bundle hash once prevents a running old evaluator from stamping newly replaced on-disk bytes as its own. Project evidence additionally binds each source artifact's bytes and validates any declared JSON digest. Declared governance-receipt digests replay their producer convention (`sort_keys`, compact separators, escaped Unicode); the portfolio witness uses its separately named sorted, compact, unescaped JSON serialization. A non-ASCII regression fixture prevents those two serializations from being silently conflated. A code, manifest, or source-evidence change intentionally makes an older “latest” witness fail current verification. The immutable artifact remains useful as an archive of what the older evaluator accepted, but a fresh witness must be minted before the dashboard may present the cycle as locally receipt-consistent under the new evaluator.
 
 Default witness and runtime-receipt paths share one dynamically resolved state root. The manifest-declared `DHARMA_STATE_DIR` override wins over the legacy `DHARMA_HOME` alias; the witness lives under `a2a/autocatalytic_portfolio` and its receipt database under `state/runtime.db`. Resolving both at call time prevents an import-order environment change from splitting the witness and its local receipt rows across different roots.
 
