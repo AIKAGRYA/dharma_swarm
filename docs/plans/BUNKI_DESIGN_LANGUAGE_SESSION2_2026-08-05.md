@@ -486,7 +486,18 @@ orbits and 筆順 sheets stay pool-scoped for now.
    (言葉 › 言 › 語 › 言 …), the breadcrumb earns an ∞ mark and a gold
    ripple — the Escher moment acknowledged, never interrupted.
 
-**v5 shipped (same artifact URL, ~620KB all-in).** All seven §8.5
+**v6 shipped (same artifact URL).** (1) Universal expandability: the
+kanji-ring filter now accepts any CJK ideograph with jōyō glosses —
+verified on dictionary word 磁気 (N1): 2 kanji glyphs, 磁 → 3 radicals;
+no dead ends. (2) The water is real: Stam stable-fluids on a 26×44 CPU
+grid — inject (finger drag + tap bursts), damp, 6-iteration pressure
+projection (true vortices), semi-Lagrangian advection — coupling free
+words (strong), orbiters (subtle), pigment blobs (medium), plus 44 flow
+motes that draw the currents as living streaks. Measured 60fps on the
+simulated phone after vigorous stirring. (3) Strange loop: a dive chain
+that revisits a label earns ∞ in the breadcrumb + a gold ripple; depth
+unbounded. Real-app tier named: WebGPU MLS-MPM (matsuoka-601
+WebGPU-Ocean/WaterBall class) for full-particle suminagashi. All seven §8.5
 directives: (1) radical cards carry Kangxi numbers (部首 61 etc.),
 variant forms merged under their number (忄=心=⺗→61; 阝 shows 163·170),
 threshold dropped to 2 → 592 families; (2) ON (katakana) + kun readings
