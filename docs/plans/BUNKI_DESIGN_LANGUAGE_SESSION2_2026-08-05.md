@@ -511,6 +511,60 @@ depth, all in a 5D interactive environment." Standing order: self-iterate
   dive become one gesture. Level slider re-weights brightness/priority
   instead of respawning.
 
+### 8.11 The semantic tier — LLM as the relation engine (2026-08-05)
+
+Operator asked me for 過酷's top-20 constellation, then asked why. The
+answer became the directive: the relationality the Drift keeps missing
+(厳しい as register-adjacent synonym, 試練/逆境 as host themes, 過労死 as
+collocational endpoint) lives in the LANGUAGE MODEL, not in character
+data — kanji-overlap can never surface 試練 for 過酷 (zero shared ink).
+Operator: integrate this as the edge, research + brainstorm included.
+
+**Research grounding (2025 frontier):** CEFR-Annotated WordNet
+(arXiv:2510.18466) — LLM-annotated proficiency-graded semantic network,
+110k word instances — and DIY-MKG (arXiv:2507.01872) — LLM-built personal
+knowledge-graph language learning. Bunki's thesis (LLM-authored,
+level-aware semantic web rendered as a living nihonga universe) sits
+exactly on this line, ahead of both on embodiment.
+
+**Pipeline (real app):** one batch LLM pass over the full lexicon →
+per word: typed relations [synonym | kanji-family | collocation | theme |
+register-twin | contrast] each with shell rank + one-line use-note,
+merged with JMdict senses + Tatoeba sentences + embeddings (UMAP of
+embedding space becomes the GALAXY LAYOUT — semantic geography where
+near-in-meaning IS near-in-space, replacing hash placement).
+
+**Methodology brainstorm (mine, as instructed — each maps to a §8 organ):**
+1. Semantic-gradient bridges: LLM precomputes shortest meaning-paths
+   between any two words (寒い→涼しい→冷たい→冷酷→過酷); the Drift can
+   draw a walkable path across galaxies — the "two words decorrelated"
+   navigation.
+2. i+1 tide (自 mode): field composition targeting ~95% known /
+   5% frontier vocabulary from SRS state — comprehensible-input dosing as
+   a TIDE, not a lesson.
+3. Elaborative whisper: each lock carries one LLM-written line of WHY
+   these belong together (JP+EN) — elaborative encoding at the moment of
+   curiosity.
+4. Generation-effect probes: bloom members reveal reading first, gloss on
+   demand — retrieval attempt before answer, feeding the honesty
+   contract's probe queue.
+5. Register twins as a visible axis (話す/しゃべる/語る) — formality as
+   geometry.
+6. Story threads: micro-narratives binding 8–10 due words into one
+   coherent paragraph — the sentence layer (§8.8) born from the SRS deck.
+7. Error-driven mnemonics: repeated left-swipes trigger an LLM keyword
+   mnemonic + component story on that word's card.
+8. Contrastive discrimination: near-synonym forks as micro-choices
+   (過酷/残酷/冷酷 — which fits 労働?) — desirable difficulty.
+
+**Pilot (this prototype, hand-authored by me):** SEM table for ~27
+flagship words (+5 missing N1 entries added to the lexicon: 過酷 試練
+逆境 熾烈 劣悪) with typed, ordered relations incl. out-of-lexicon GHOST
+satellites (rendered gold, labeled, force-simulated — the semantic web
+visibly exceeding the dictionary). Lock consumes SEM first, mechanical
+channels top up to the ≥12 floor. Typed edge colors: synonym=pigment-1,
+family=pigment-2, collocation=accent, theme/ghost=gold.
+
 ### 8.10 v10 — the Obsidian lock (2026-08-05, operator escalation;
 self-authored contract at operator request)
 
