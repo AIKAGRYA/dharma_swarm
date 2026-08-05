@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import inspect
+import time
 from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
@@ -31,6 +32,7 @@ from dharma_swarm.graph.errors import (
     GraphRuntimeError,
     MalformedDispatchOrderError,
     NodeExecutionError,
+    NodeTimeoutError,
 )
 from dharma_swarm.graph.interrupts import (
     GraphInterrupt,
@@ -38,6 +40,12 @@ from dharma_swarm.graph.interrupts import (
     InterruptFrame,
     pop_frame,
     push_frame,
+)
+from dharma_swarm.graph.retry import (
+    RetryPolicy,
+    retry_candidate,
+    retry_sleep_seconds,
+    select_retry_policy,
 )
 from dharma_swarm.graph.routing import (
     Command,
@@ -47,6 +55,12 @@ from dharma_swarm.graph.routing import (
     send_write,
 )
 from dharma_swarm.graph.state import GraphState
+from dharma_swarm.graph.timeouts import (
+    IdleWatchdog,
+    TimeoutPolicy,
+    pop_watchdog,
+    push_watchdog,
+)
 from dharma_swarm.graph.types import END, TASKS_CHANNEL, trigger_channel
 
 if TYPE_CHECKING:
@@ -69,6 +83,10 @@ class _Task:
     seq: int
     arg: Any = None  # PUSH input; PULL tasks read the shared snapshot
     timeout: float | None = None  # PUSH execution bound (Send.timeout)
+    # Declared per-node hard/idle bounds (NodeSpec.timeout); applies to PULL
+    # and PUSH tasks alike, per ATTEMPT, and is independent of Send.timeout.
+    timeout_policy: TimeoutPolicy | None = None
+    retry: tuple[RetryPolicy, ...] = ()  # first-match ladder (NodeSpec.retry)
 
     @property
     def is_pull(self) -> bool:
@@ -104,7 +122,12 @@ class SuperstepExecutor:
         """
         graph = self._graph
         pull = [
-            _Task(node_id, 0)
+            _Task(
+                node_id,
+                0,
+                timeout_policy=graph.nodes[node_id].timeout,
+                retry=graph.nodes[node_id].retry,
+            )
             for node_id in graph.canonical_order
             if any(
                 start_versions.get(name, 0) > versions_seen[node_id].get(name, 0)
@@ -118,7 +141,17 @@ class SuperstepExecutor:
             for send in tasks_channel.drain():
                 seq = seq_counter.get(send.node, 0) + 1
                 seq_counter[send.node] = seq
-                push.append(_Task(send.node, seq, send.arg, send.timeout))
+                spec = graph.nodes.get(send.node)
+                push.append(
+                    _Task(
+                        send.node,
+                        seq,
+                        send.arg,
+                        send.timeout,
+                        timeout_policy=spec.timeout if spec is not None else None,
+                        retry=spec.retry if spec is not None else (),
+                    )
+                )
         return pull + push
 
     async def run_tasks(
@@ -254,6 +287,14 @@ class SuperstepExecutor:
         is injected into pull-task snapshots only — never committed state.
         Every task runs under an interrupt frame carrying its recorded
         resume values (task-scoped, call-order replay).
+
+        Under a declared retry ladder the ATTEMPT body (frame push, node run,
+        timeout envelopes) repeats while the ladder claims the failure; the
+        write bundle is interpreted once, from the SUCCEEDING attempt's result
+        only. That is the engine's ``task.writes.clear()`` equivalent: a failed
+        attempt returns nothing, contributes no proposal, and nothing commits
+        before the scheduler's barrier — so a node that fails twice and then
+        succeeds commits exactly one set of writes.
         """
         graph = self._graph
         node_input = (
@@ -265,6 +306,59 @@ class SuperstepExecutor:
             and remaining is not None
         ):
             node_input[graph.managed_remaining] = remaining
+        failed = 0
+        while True:
+            try:
+                result = await self._run_attempt(
+                    task, node_input, run_id, superstep, resumes
+                )
+            except (GraphInterrupt, asyncio.CancelledError):
+                # Control-flow signals, never failures: interrupts must reach
+                # run_tasks unretried (GraphBubbleUp parity) and cancellation
+                # belongs to the step teardown.
+                raise
+            except Exception as exc:
+                policy = select_retry_policy(task.retry, retry_candidate(exc))
+                if policy is None:
+                    raise
+                failed += 1
+                if failed >= policy.max_attempts:
+                    # max_attempts INCLUDES the first attempt (reference parity).
+                    raise
+                await self._retry_sleep(
+                    retry_sleep_seconds(policy, failed, self._effects)
+                )
+                continue
+            break
+        task_writes = self._writes_from_result(
+            task.node_id, result, run_id, superstep, task.seq
+        )
+        bundle = list(task_writes)
+        bundle.extend(self.trigger_writes(task.node_id, task_seq=task.seq))
+        if task.node_id in graph.branches:
+            view = state.own_writes_view(task_writes, superstep)
+            bundle.extend(
+                self.branch_writes(
+                    task.node_id, task.seq, view, run_id, superstep
+                )
+            )
+        return bundle
+
+    async def _run_attempt(
+        self,
+        task: _Task,
+        node_input: Any,
+        run_id: str,
+        superstep: int,
+        resumes: Mapping[str, list[Any]] | None,
+    ) -> Mapping[str, Any] | Command | None:
+        """ONE attempt: fresh interrupt frame + fresh timeout deadlines.
+
+        Resume values are replayed from the top on every attempt (a retried
+        node re-executes from its first ``interrupt()`` call), and each attempt
+        gets its own hard/idle deadline pair — the langgraph contract that makes
+        ``timeout`` and ``retry_policy`` compose.
+        """
         frame = InterruptFrame(
             run_id=run_id,
             node_id=task.node_id,
@@ -275,10 +369,14 @@ class SuperstepExecutor:
         )
         token = push_frame(frame)
         try:
+            if task.timeout_policy is not None:
+                return await self._run_timed_attempt(
+                    task, node_input, run_id, superstep
+                )
             if task.timeout is not None:
                 try:
                     async with asyncio.timeout(task.timeout):
-                        result = await self._execute_node(
+                        return await self._execute_node(
                             task.node_id,
                             node_input,
                             run_id,
@@ -294,25 +392,109 @@ class SuperstepExecutor:
                         superstep=superstep,
                         node_id=task.node_id,
                     ) from exc
-            else:
-                result = await self._execute_node(
-                    task.node_id, node_input, run_id, superstep
-                )
+            return await self._execute_node(
+                task.node_id, node_input, run_id, superstep
+            )
         finally:
             pop_frame(token)
-        task_writes = self._writes_from_result(
-            task.node_id, result, run_id, superstep, task.seq
-        )
-        bundle = list(task_writes)
-        bundle.extend(self.trigger_writes(task.node_id, task_seq=task.seq))
-        if task.node_id in graph.branches:
-            view = state.own_writes_view(task_writes, superstep)
-            bundle.extend(
-                self.branch_writes(
-                    task.node_id, task.seq, view, run_id, superstep
+
+    async def _run_timed_attempt(
+        self,
+        task: _Task,
+        node_input: Any,
+        run_id: str,
+        superstep: int,
+    ) -> Mapping[str, Any] | Command | None:
+        """Run one attempt under its node's hard and/or idle bounds.
+
+        The node runs as its own asyncio task so the watchdog can observe it
+        while it works. The HARD bound (``run_timeout``) is measured from this
+        attempt's start and is never refreshed; the IDLE bound is measured from
+        the last :func:`~dharma_swarm.graph.timeouts.heartbeat` and IS. The
+        watchdog re-derives both deadlines after every wake-up, so a heartbeat
+        that lands during a wait extends only the idle deadline. Whichever bound
+        expires first cancels the node and raises
+        :class:`NodeTimeoutError` — a ``GraphRuntimeError``, so the failed
+        superstep keeps its normal fail-closed semantics.
+        """
+        policy = task.timeout_policy
+        assert policy is not None  # guarded by the caller
+        run_timeout = policy.run_timeout
+        idle_timeout = policy.idle_timeout
+        started = time.monotonic()
+        watchdog = IdleWatchdog(task.node_id) if idle_timeout is not None else None
+        wd_token = push_watchdog(watchdog)
+        try:
+            node_task = asyncio.ensure_future(
+                self._execute_node(
+                    task.node_id,
+                    node_input,
+                    run_id,
+                    superstep,
+                    sync_in_thread=True,
                 )
             )
-        return bundle
+            try:
+                while True:
+                    now = time.monotonic()
+                    deadlines: list[float] = []
+                    if run_timeout is not None:
+                        deadlines.append(started + float(run_timeout))
+                    if idle_timeout is not None and watchdog is not None:
+                        deadlines.append(
+                            watchdog.idle_deadline(float(idle_timeout))
+                        )
+                    budget = min(deadlines) - now
+                    if budget <= 0:
+                        kind: str = "idle"
+                        if run_timeout is not None and (
+                            now - started >= float(run_timeout)
+                        ):
+                            kind = "run"
+                        raise NodeTimeoutError(
+                            task.node_id,
+                            now - started,
+                            kind=kind,  # type: ignore[arg-type]
+                            run_timeout=(
+                                float(run_timeout)
+                                if run_timeout is not None
+                                else None
+                            ),
+                            idle_timeout=(
+                                float(idle_timeout)
+                                if idle_timeout is not None
+                                else None
+                            ),
+                            graph_run_id=run_id,
+                            superstep=superstep,
+                        )
+                    done, _pending = await asyncio.wait(
+                        {node_task}, timeout=budget
+                    )
+                    if done:
+                        return node_task.result()
+                    # Woke on the bound, not on completion: loop and re-derive
+                    # the deadlines, since a heartbeat may have moved the idle
+                    # one forward while we waited.
+            finally:
+                if not node_task.done():
+                    node_task.cancel()
+                    await asyncio.wait({node_task})
+        finally:
+            pop_watchdog(wd_token)
+
+    async def _retry_sleep(self, seconds: float) -> None:
+        """Wait out a retry backoff through the effects seam when available.
+
+        Duck-typed providers predating the seam fall back to a real sleep; the
+        engine's own providers implement ``retry_sleep`` so seeded runs record
+        the ladder and never actually wait.
+        """
+        seam = getattr(self._effects, "retry_sleep", None)
+        if seam is None:
+            await asyncio.sleep(seconds)
+            return
+        await seam(seconds)
 
     def trigger_writes(
         self, node_id: str, task_seq: int = 0

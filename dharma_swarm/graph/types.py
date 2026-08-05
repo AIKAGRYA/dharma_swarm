@@ -15,8 +15,11 @@ reverse; this module imports neither.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Final, Literal, Mapping
+
+from dharma_swarm.graph.retry import RetryPolicy
+from dharma_swarm.graph.timeouts import TimeoutPolicy
 
 __all__ = [
     "END",
@@ -55,10 +58,18 @@ def trigger_channel(node_id: str) -> str:
 
 @dataclass(frozen=True)
 class NodeSpec:
-    """A named node: an async-or-sync callable from state snapshot to writes."""
+    """A named node: an async-or-sync callable from state snapshot to writes.
+
+    ``retry`` is the node's per-attempt retry ladder in FIRST-MATCH order (empty
+    = run exactly once) and ``timeout`` its per-attempt hard/idle bounds; both
+    are declared through ``GraphBuilder.add_node`` and consumed by the executor,
+    never by the topology validator.
+    """
 
     node_id: str
     fn: NodeCallable
+    retry: tuple[RetryPolicy, ...] = field(default=())
+    timeout: TimeoutPolicy | None = None
 
 
 @dataclass(frozen=True)

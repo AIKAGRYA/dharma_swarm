@@ -2004,6 +2004,12 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_retry_evidence(
+        capabilities, row_lookup, workloads["seeded_retry_policy"]
+    )
+    _apply_node_timeout_evidence(
+        capabilities, row_lookup, workloads["seeded_node_timeout"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -3121,3 +3127,1044 @@ def _apply_command_parent_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S9 (LG24): per-node retry policy workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entries for the retry_selection / backoff /
+# jitter / max_attempts / retry_on / writes_cleared facets.
+# ---------------------------------------------------------------------------
+
+
+class _RetryState(TypedDict, total=False):
+    log: Annotated[list[Any], operator.add]
+
+
+class _RecordingTime:
+    """``time`` stand-in whose ``sleep`` RECORDS instead of waiting.
+
+    Installed on ``langgraph.pregel._retry`` for the duration of one scenario so
+    the reference arm's backoff ladder is observable without spending it, which
+    is what makes the Dharma arm's ``SimulatedEffects.retry_sleeps`` comparable
+    to it. Every other ``time`` attribute is delegated untouched.
+    """
+
+    def __init__(self, sink: list[float]) -> None:
+        self._sink = sink
+
+    def sleep(self, seconds: float) -> None:
+        self._sink.append(seconds)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(time, name)
+
+
+class _SeededRandom:
+    """``random`` stand-in whose ``uniform`` draws from a SEEDED generator.
+
+    The reference draws jitter from module-global entropy; seeding it is the
+    only way a jitter comparison can be a determinism claim rather than a coin
+    flip. Mirrors the Dharma arm, which draws through ``effects.random()``.
+    """
+
+    def __init__(self, rng: random.Random) -> None:
+        self._rng = rng
+
+    def uniform(self, a: float, b: float) -> float:
+        return self._rng.uniform(a, b)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(random, name)
+
+
+def _langgraph_retry_scenario(
+    seed: int, body: Callable[[], Any]
+) -> tuple[Any, list[float]]:
+    """Run one reference-arm retry scenario with a recorded, seeded sleep seam."""
+
+    from langgraph.pregel import _retry as lg_retry
+
+    sink: list[float] = []
+    original_time = lg_retry.time
+    original_random = lg_retry.random
+    lg_retry.time = _RecordingTime(sink)  # type: ignore[assignment]
+    lg_retry.random = _SeededRandom(random.Random(seed))  # type: ignore[assignment]
+    try:
+        return body(), sink
+    finally:
+        lg_retry.time = original_time
+        lg_retry.random = original_random
+
+
+def _jitter_summary(sleeps: list[float], bases: list[float], repeat: list[float]):
+    """Arm-comparable jitter claims: additive, bounded in [0, 1), reproducible."""
+
+    return {
+        "count": len(sleeps),
+        "applied": bool(sleeps) and sleeps != bases,
+        "bounded": bool(sleeps)
+        and len(sleeps) == len(bases)
+        and all(0.0 <= sleep - base < 1.0 for sleep, base in zip(sleeps, bases)),
+        "deterministic": sleeps == repeat,
+    }
+
+
+def _retry_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "retry"))
+    jitter_seed = rng.getrandbits(32)
+    # Sub-second ladder: nothing here ever really sleeps (both arms record),
+    # but a tiny ladder keeps the cap-hit visible in four sleeps.
+    initial = 0.01
+    factor = 3.0
+    cap = 0.05
+    ladder_attempts = 5
+    jitter_attempts = 4
+    jitter_bases = [
+        min(cap, initial * (factor ** (k - 1))) for k in range(1, jitter_attempts)
+    ]
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import RetryPolicy as LGRetryPolicy
+
+        def build(node_id: str, fn: Callable[..., Any], **kwargs: Any):
+            builder = StateGraph(_RetryState)
+            builder.add_node(node_id, fn, **kwargs)
+            builder.add_edge(START, node_id)
+            builder.add_edge(node_id, END)
+            return builder.compile()
+
+        # (a) selection + writes_cleared: only the policy-bearing node retries,
+        # and its two failed attempts contribute no committed writes.
+        counts = {"guarded": 0, "plain": 0}
+
+        def guarded(state):
+            counts["guarded"] += 1
+            if counts["guarded"] < 3:
+                raise ConnectionError("transient")
+            return {"log": ["guarded"]}
+
+        def plain(state):
+            counts["plain"] += 1
+            return {"log": ["plain"]}
+
+        def run_selection():
+            builder = StateGraph(_RetryState)
+            builder.add_node(
+                "guarded",
+                guarded,
+                retry_policy=LGRetryPolicy(
+                    initial_interval=initial,
+                    backoff_factor=factor,
+                    max_interval=cap,
+                    max_attempts=ladder_attempts,
+                    jitter=False,
+                ),
+            )
+            builder.add_node("plain", plain)
+            builder.add_edge(START, "guarded")
+            builder.add_edge(START, "plain")
+            builder.add_edge("guarded", END)
+            builder.add_edge("plain", END)
+            return builder.compile().invoke({"log": []})
+
+        selection_out, _selection_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_selection
+        )
+
+        # (b) backoff + max_attempts: an always-failing node burns exactly
+        # max_attempts executions and sleeps the capped exponential ladder.
+        def exhausting(counter: dict[str, int]):
+            def node(state):
+                counter["n"] += 1
+                raise ConnectionError("always")
+
+            return node
+
+        exhausted = {"n": 0}
+
+        def run_exhausted():
+            raised = False
+            try:
+                build(
+                    "f",
+                    exhausting(exhausted),
+                    retry_policy=LGRetryPolicy(
+                        initial_interval=initial,
+                        backoff_factor=factor,
+                        max_interval=cap,
+                        max_attempts=ladder_attempts,
+                        jitter=False,
+                    ),
+                ).invoke({"log": []})
+            except ConnectionError:
+                raised = True
+            return raised
+
+        exhausted_raised, ladder_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_exhausted
+        )
+
+        single = {"n": 0}
+
+        def run_single():
+            raised = False
+            try:
+                build(
+                    "f",
+                    exhausting(single),
+                    retry_policy=LGRetryPolicy(
+                        initial_interval=initial, max_attempts=1, jitter=False
+                    ),
+                ).invoke({"log": []})
+            except ConnectionError:
+                raised = True
+            return raised
+
+        single_raised, single_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_single
+        )
+
+        # (c) jitter: identical seed twice must reproduce the sleep sequence.
+        def run_jitter():
+            try:
+                build(
+                    "f",
+                    exhausting({"n": 0}),
+                    retry_policy=LGRetryPolicy(
+                        initial_interval=initial,
+                        backoff_factor=factor,
+                        max_interval=cap,
+                        max_attempts=jitter_attempts,
+                        jitter=True,
+                    ),
+                ).invoke({"log": []})
+            except ConnectionError:
+                pass
+
+        _first, jitter_sleeps = _langgraph_retry_scenario(jitter_seed, run_jitter)
+        _second, jitter_repeat = _langgraph_retry_scenario(jitter_seed, run_jitter)
+
+        # (d) first-match selection across a policy sequence: the EARLIER
+        # policy's max_attempts wins even though a later one also matches.
+        first_match = {"n": 0}
+
+        def key_error(state):
+            first_match["n"] += 1
+            raise KeyError("missing")
+
+        def run_first_match():
+            raised = False
+            try:
+                build(
+                    "f",
+                    key_error,
+                    retry_policy=[
+                        LGRetryPolicy(
+                            retry_on=(KeyError,),
+                            initial_interval=initial,
+                            max_attempts=3,
+                            jitter=False,
+                        ),
+                        LGRetryPolicy(
+                            retry_on=(Exception,),
+                            initial_interval=initial,
+                            max_attempts=5,
+                            jitter=False,
+                        ),
+                    ],
+                ).invoke({"log": []})
+            except KeyError:
+                raised = True
+            return raised
+
+        first_match_raised, _fm_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_first_match
+        )
+
+        # (e) retry_on: class-tuple mismatch, callable predicate, and the
+        # DEFAULT predicate's deterministic-vs-transient classification.
+        nonmatching = {"n": 0}
+
+        def value_error(state):
+            nonmatching["n"] += 1
+            raise ValueError("deterministic")
+
+        def run_nonmatching():
+            raised = False
+            try:
+                build(
+                    "f",
+                    value_error,
+                    retry_policy=LGRetryPolicy(
+                        retry_on=(KeyError,),
+                        initial_interval=initial,
+                        max_attempts=4,
+                        jitter=False,
+                    ),
+                ).invoke({"log": []})
+            except ValueError:
+                raised = True
+            return raised
+
+        nonmatching_raised, _nm_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_nonmatching
+        )
+
+        predicate = {"n": 0}
+
+        def predicate_node(state):
+            predicate["n"] += 1
+            if predicate["n"] < 2:
+                raise ValueError("retry me")
+            return {"log": ["predicate"]}
+
+        def run_predicate():
+            return build(
+                "f",
+                predicate_node,
+                retry_policy=LGRetryPolicy(
+                    retry_on=lambda exc: isinstance(exc, ValueError),
+                    initial_interval=initial,
+                    max_attempts=3,
+                    jitter=False,
+                ),
+            ).invoke({"log": []})
+
+        predicate_out, _p_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_predicate
+        )
+
+        default_deterministic = {"n": 0}
+
+        def run_default_deterministic():
+            raised = False
+            try:
+                build(
+                    "f",
+                    exhausting(default_deterministic),
+                    retry_policy=LGRetryPolicy(
+                        initial_interval=initial, max_attempts=3, jitter=False
+                    ),
+                ).invoke({"log": []})
+            except ConnectionError:
+                raised = True
+            return raised
+
+        # ConnectionError is the DEFAULT predicate's canonical transient error.
+        default_transient_raised, _dt_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_default_deterministic
+        )
+        default_value = {"n": 0}
+
+        def default_value_node(state):
+            default_value["n"] += 1
+            raise ValueError("deterministic")
+
+        def run_default_value():
+            raised = False
+            try:
+                build(
+                    "f",
+                    default_value_node,
+                    retry_policy=LGRetryPolicy(
+                        initial_interval=initial, max_attempts=3, jitter=False
+                    ),
+                ).invoke({"log": []})
+            except ValueError:
+                raised = True
+            return raised
+
+        default_value_raised, _dv_sleeps = _langgraph_retry_scenario(
+            jitter_seed, run_default_value
+        )
+
+        return {
+            "executions_by_node": dict(counts),
+            "writes_cleared_log": sorted(selection_out["log"]),
+            "sleep_intervals": ladder_sleeps,
+            "jitter": _jitter_summary(jitter_sleeps, jitter_bases, jitter_repeat),
+            "exhausted_executions": exhausted["n"],
+            "exhausted_raised": exhausted_raised,
+            "single_attempt_executions": single["n"],
+            "single_attempt_sleeps": single_sleeps,
+            "single_attempt_raised": single_raised,
+            "first_match_executions": first_match["n"],
+            "first_match_raised": first_match_raised,
+            "nonmatching_executions": nonmatching["n"],
+            "nonmatching_raised": nonmatching_raised,
+            "callable_predicate_executions": predicate["n"],
+            "callable_predicate_log": list(predicate_out["log"]),
+            "default_transient_executions": default_deterministic["n"],
+            "default_transient_raised": default_transient_raised,
+            "default_deterministic_executions": default_value["n"],
+            "default_deterministic_raised": default_value_raised,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        NodeExecutionError,
+        RetryPolicy,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    def build(node_id: str, fn: Callable[..., Any], **kwargs: Any):
+        return (
+            GraphBuilder(f"gauntlet-retry-{node_id}")
+            .add_channel("log", AppendChannel)
+            .add_node(node_id, fn, **kwargs)
+            .add_edge(START, node_id)
+            .add_edge(node_id, END)
+            .compile()
+        )
+
+    counts = {"guarded": 0, "plain": 0}
+
+    def guarded(state):
+        counts["guarded"] += 1
+        if counts["guarded"] < 3:
+            raise ConnectionError("transient")
+        return {"log": ["guarded"]}
+
+    def plain(state):
+        counts["plain"] += 1
+        return {"log": ["plain"]}
+
+    selection_graph = (
+        GraphBuilder("gauntlet-retry-selection")
+        .add_channel("log", AppendChannel)
+        .add_node(
+            "guarded",
+            guarded,
+            retry_policy=RetryPolicy(
+                initial_interval=initial,
+                backoff_factor=factor,
+                max_interval=cap,
+                max_attempts=ladder_attempts,
+                jitter=False,
+            ),
+        )
+        .add_node("plain", plain)
+        .add_edge(START, "guarded")
+        .add_edge(START, "plain")
+        .add_edge("guarded", END)
+        .add_edge("plain", END)
+        .compile()
+    )
+    selection_out = _run_awaitable(
+        selection_graph.invoke(input={"log": []}, effects=SimulatedEffects(seed))
+    )
+
+    def exhausting(counter: dict[str, int]):
+        def node(state):
+            counter["n"] += 1
+            raise ConnectionError("always")
+
+        return node
+
+    def drive(graph, effects) -> bool:
+        """Invoke and report whether the ladder gave up by RAISING."""
+        try:
+            _run_awaitable(graph.invoke(input={"log": []}, effects=effects))
+        except NodeExecutionError:
+            return True
+        return False
+
+    exhausted = {"n": 0}
+    ladder_effects = SimulatedEffects(seed)
+    exhausted_raised = drive(
+        build(
+            "f",
+            exhausting(exhausted),
+            retry_policy=RetryPolicy(
+                initial_interval=initial,
+                backoff_factor=factor,
+                max_interval=cap,
+                max_attempts=ladder_attempts,
+                jitter=False,
+            ),
+        ),
+        ladder_effects,
+    )
+
+    single = {"n": 0}
+    single_effects = SimulatedEffects(seed)
+    single_raised = drive(
+        build(
+            "f",
+            exhausting(single),
+            retry_policy=RetryPolicy(
+                initial_interval=initial, max_attempts=1, jitter=False
+            ),
+        ),
+        single_effects,
+    )
+
+    def run_jitter() -> list[float]:
+        effects = SimulatedEffects(jitter_seed)
+        drive(
+            build(
+                "f",
+                exhausting({"n": 0}),
+                retry_policy=RetryPolicy(
+                    initial_interval=initial,
+                    backoff_factor=factor,
+                    max_interval=cap,
+                    max_attempts=jitter_attempts,
+                    jitter=True,
+                ),
+            ),
+            effects,
+        )
+        return list(effects.retry_sleeps)
+
+    jitter_sleeps = run_jitter()
+    jitter_repeat = run_jitter()
+
+    first_match = {"n": 0}
+
+    def key_error(state):
+        first_match["n"] += 1
+        raise KeyError("missing")
+
+    first_match_raised = drive(
+        build(
+            "f",
+            key_error,
+            retry_policy=[
+                RetryPolicy(
+                    retry_on=(KeyError,),
+                    initial_interval=initial,
+                    max_attempts=3,
+                    jitter=False,
+                ),
+                RetryPolicy(
+                    retry_on=(Exception,),
+                    initial_interval=initial,
+                    max_attempts=5,
+                    jitter=False,
+                ),
+            ],
+        ),
+        SimulatedEffects(seed),
+    )
+
+    nonmatching = {"n": 0}
+
+    def value_error(state):
+        nonmatching["n"] += 1
+        raise ValueError("deterministic")
+
+    nonmatching_raised = drive(
+        build(
+            "f",
+            value_error,
+            retry_policy=RetryPolicy(
+                retry_on=(KeyError,),
+                initial_interval=initial,
+                max_attempts=4,
+                jitter=False,
+            ),
+        ),
+        SimulatedEffects(seed),
+    )
+
+    predicate = {"n": 0}
+
+    def predicate_node(state):
+        predicate["n"] += 1
+        if predicate["n"] < 2:
+            raise ValueError("retry me")
+        return {"log": ["predicate"]}
+
+    predicate_out = _run_awaitable(
+        build(
+            "f",
+            predicate_node,
+            retry_policy=RetryPolicy(
+                retry_on=lambda exc: isinstance(exc, ValueError),
+                initial_interval=initial,
+                max_attempts=3,
+                jitter=False,
+            ),
+        ).invoke(input={"log": []}, effects=SimulatedEffects(seed))
+    )
+
+    default_transient = {"n": 0}
+    default_transient_raised = drive(
+        build(
+            "f",
+            exhausting(default_transient),
+            retry_policy=RetryPolicy(
+                initial_interval=initial, max_attempts=3, jitter=False
+            ),
+        ),
+        SimulatedEffects(seed),
+    )
+
+    default_value = {"n": 0}
+
+    def default_value_node(state):
+        default_value["n"] += 1
+        raise ValueError("deterministic")
+
+    default_value_raised = drive(
+        build(
+            "f",
+            default_value_node,
+            retry_policy=RetryPolicy(
+                initial_interval=initial, max_attempts=3, jitter=False
+            ),
+        ),
+        SimulatedEffects(seed),
+    )
+
+    return {
+        "executions_by_node": dict(counts),
+        "writes_cleared_log": sorted(selection_out.state["log"]),
+        "sleep_intervals": list(ladder_effects.retry_sleeps),
+        "jitter": _jitter_summary(jitter_sleeps, jitter_bases, jitter_repeat),
+        "exhausted_executions": exhausted["n"],
+        "exhausted_raised": exhausted_raised,
+        "single_attempt_executions": single["n"],
+        "single_attempt_sleeps": list(single_effects.retry_sleeps),
+        "single_attempt_raised": single_raised,
+        "first_match_executions": first_match["n"],
+        "first_match_raised": first_match_raised,
+        "nonmatching_executions": nonmatching["n"],
+        "nonmatching_raised": nonmatching_raised,
+        "callable_predicate_executions": predicate["n"],
+        "callable_predicate_log": list(predicate_out.state["log"]),
+        "default_transient_executions": default_transient["n"],
+        "default_transient_raised": default_transient_raised,
+        "default_deterministic_executions": default_value["n"],
+        "default_deterministic_raised": default_value_raised,
+    }
+
+
+_WORKLOAD_ARMS["seeded_retry_policy"] = _retry_arm
+_support(
+    "LG24",
+    ("retry_selection",),
+    "dharma_swarm.graph:GraphBuilder.add_node#retry_policy",
+)
+_support("LG24", ("backoff",), "dharma_swarm.graph:RetryPolicy#backoff_factor")
+_support("LG24", ("jitter",), "dharma_swarm.graph:RetryPolicy#jitter")
+_support("LG24", ("max_attempts",), "dharma_swarm.graph:RetryPolicy#max_attempts")
+_support("LG24", ("retry_on",), "dharma_swarm.graph:RetryPolicy#retry_on")
+_support("LG24", ("writes_cleared",), "dharma_swarm.graph:RetryPolicy")
+_LANGGRAPH_FACET_SURFACE[("LG24", "retry_selection")] = (
+    "langgraph.graph:StateGraph.add_node#retry_policy"
+)
+_LANGGRAPH_FACET_SURFACE[("LG24", "backoff")] = (
+    "langgraph.types:RetryPolicy#backoff_factor"
+)
+_LANGGRAPH_FACET_SURFACE[("LG24", "jitter")] = "langgraph.types:RetryPolicy#jitter"
+_LANGGRAPH_FACET_SURFACE[("LG24", "max_attempts")] = (
+    "langgraph.types:RetryPolicy#max_attempts"
+)
+_LANGGRAPH_FACET_SURFACE[("LG24", "retry_on")] = (
+    "langgraph.types:RetryPolicy#retry_on"
+)
+_LANGGRAPH_FACET_SURFACE[("LG24", "writes_cleared")] = "langgraph.types:RetryPolicy"
+
+
+_RETRY_FACET_FIELDS: dict[str, tuple[str, ...]] = {
+    "retry_selection": (
+        "executions_by_node",
+        "first_match_executions",
+        "first_match_raised",
+    ),
+    "backoff": ("sleep_intervals",),
+    "jitter": ("jitter",),
+    "max_attempts": (
+        "exhausted_executions",
+        "exhausted_raised",
+        "single_attempt_executions",
+        "single_attempt_sleeps",
+        "single_attempt_raised",
+    ),
+    "retry_on": (
+        "nonmatching_executions",
+        "nonmatching_raised",
+        "callable_predicate_executions",
+        "callable_predicate_log",
+        "default_transient_executions",
+        "default_transient_raised",
+        "default_deterministic_executions",
+        "default_deterministic_raised",
+    ),
+    "writes_cleared": ("writes_cleared_log",),
+}
+
+
+def _apply_retry_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG24's six facets from the seeded two-arm retry-policy workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    for facet, fields in _RETRY_FACET_FIELDS.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG24"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_retry_policy:{facet}",
+                command_or_probe=(
+                    f"compare {', '.join(fields)} under one identically "
+                    "configured retry ladder on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row_lookup["LG24"]),
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S10 (LG25): per-node hard/idle timeout workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entries for the hard_timeout / idle_timeout /
+# heartbeat_refresh / timeout_retry facets.
+# ---------------------------------------------------------------------------
+
+
+class _NodeTimeoutState(TypedDict, total=False):
+    log: Annotated[list[Any], operator.add]
+
+
+def _node_timeout_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "node-timeout"))
+    beats = rng.randint(20, 30)
+    tight = 0.05  # bound a stuck node trips
+    generous = 5.0  # bound a working node never trips
+    stuck = 30.0  # a node that will never finish on its own
+    beat_interval = 0.005  # << tight, so `beats` beats outlive the idle bound
+
+    if arm == "langgraph":
+        from langgraph.errors import NodeTimeoutError as LGNodeTimeoutError
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.runtime import get_runtime
+        from langgraph.types import RetryPolicy as LGRetryPolicy
+        from langgraph.types import TimeoutPolicy as LGTimeoutPolicy
+
+        def build(fn: Callable[..., Any], **kwargs: Any):
+            builder = StateGraph(_NodeTimeoutState)
+            builder.add_node("worker", fn, **kwargs)
+            builder.add_edge(START, "worker")
+            builder.add_edge("worker", END)
+            return builder.compile()
+
+        async def fast(state):
+            await asyncio.sleep(0.001)
+            return {"log": ["fast"]}
+
+        async def hung(state):
+            await asyncio.sleep(stuck)
+            return {"log": ["hung"]}
+
+        async def beating(state):
+            runtime = get_runtime()
+            for _ in range(beats):
+                await asyncio.sleep(beat_interval)
+                runtime.heartbeat()
+            return {"log": ["beating"]}
+
+        completed = _run_awaitable(
+            build(fast, timeout=LGTimeoutPolicy(run_timeout=generous)).ainvoke(
+                {"log": []}
+            )
+        )
+
+        def expect_timeout(app) -> tuple[bool, str | None]:
+            try:
+                _run_awaitable(app.ainvoke({"log": []}))
+            except LGNodeTimeoutError as exc:
+                return True, exc.kind
+            return False, None
+
+        hard_timed_out, hard_kind = expect_timeout(
+            build(hung, timeout=LGTimeoutPolicy(run_timeout=tight))
+        )
+        idle_timed_out, idle_kind = expect_timeout(
+            build(
+                hung,
+                timeout=LGTimeoutPolicy(idle_timeout=tight, refresh_on="heartbeat"),
+            )
+        )
+        # A heartbeating node whose TOTAL runtime exceeds the idle bound but
+        # not the hard bound must survive: that pair is what distinguishes
+        # "no progress" from "too long".
+        heartbeat_survived = True
+        try:
+            heartbeat_out = _run_awaitable(
+                build(
+                    beating,
+                    timeout=LGTimeoutPolicy(
+                        idle_timeout=tight,
+                        run_timeout=generous,
+                        refresh_on="heartbeat",
+                    ),
+                ).ainvoke({"log": []})
+            )
+        except LGNodeTimeoutError:
+            heartbeat_survived = False
+            heartbeat_out = {"log": []}
+
+        def flapping(counter: dict[str, int]):
+            async def node(state):
+                counter["n"] += 1
+                if counter["n"] == 1:
+                    await asyncio.sleep(stuck)
+                return {"log": ["flapping"]}
+
+            return node
+
+        explicit = {"n": 0}
+        explicit_out = _run_awaitable(
+            build(
+                flapping(explicit),
+                timeout=LGTimeoutPolicy(run_timeout=tight),
+                retry_policy=LGRetryPolicy(
+                    retry_on=(LGNodeTimeoutError,),
+                    initial_interval=0.001,
+                    max_attempts=2,
+                    jitter=False,
+                ),
+            ).ainvoke({"log": []})
+        )
+        default = {"n": 0}
+        default_out = _run_awaitable(
+            build(
+                flapping(default),
+                timeout=LGTimeoutPolicy(run_timeout=tight),
+                retry_policy=LGRetryPolicy(
+                    initial_interval=0.001, max_attempts=2, jitter=False
+                ),
+            ).ainvoke({"log": []})
+        )
+        return {
+            "completed": list(completed["log"]),
+            "hard_timed_out": hard_timed_out,
+            "hard_kind": hard_kind,
+            "idle_timed_out": idle_timed_out,
+            "idle_kind": idle_kind,
+            "heartbeat_survived": heartbeat_survived,
+            "heartbeat_log": list(heartbeat_out["log"]),
+            "timeout_retry_attempts": explicit["n"],
+            "timeout_retry_log": list(explicit_out["log"]),
+            "default_policy_retries_timeout_attempts": default["n"],
+            "default_policy_retries_timeout_log": list(default_out["log"]),
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        NodeTimeoutError,
+        RetryPolicy,
+        TimeoutPolicy,
+        heartbeat,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    def build(fn: Callable[..., Any], **kwargs: Any):
+        return (
+            GraphBuilder("gauntlet-node-timeout")
+            .add_channel("log", AppendChannel)
+            .add_node("worker", fn, **kwargs)
+            .add_edge(START, "worker")
+            .add_edge("worker", END)
+            .compile()
+        )
+
+    async def fast(state):
+        await asyncio.sleep(0.001)
+        return {"log": ["fast"]}
+
+    async def hung(state):
+        await asyncio.sleep(stuck)
+        return {"log": ["hung"]}
+
+    async def beating(state):
+        for _ in range(beats):
+            await asyncio.sleep(beat_interval)
+            heartbeat()
+        return {"log": ["beating"]}
+
+    completed = _run_awaitable(
+        build(fast, timeout=TimeoutPolicy(run_timeout=generous)).invoke(
+            input={"log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+
+    def expect_timeout(app) -> tuple[bool, str | None]:
+        try:
+            _run_awaitable(
+                app.invoke(input={"log": []}, effects=SimulatedEffects(seed))
+            )
+        except NodeTimeoutError as exc:
+            return True, exc.kind
+        return False, None
+
+    hard_timed_out, hard_kind = expect_timeout(
+        build(hung, timeout=TimeoutPolicy(run_timeout=tight))
+    )
+    idle_timed_out, idle_kind = expect_timeout(
+        build(hung, timeout=TimeoutPolicy(idle_timeout=tight, refresh_on="heartbeat"))
+    )
+    heartbeat_survived = True
+    try:
+        heartbeat_out = _run_awaitable(
+            build(
+                beating,
+                timeout=TimeoutPolicy(
+                    idle_timeout=tight,
+                    run_timeout=generous,
+                    refresh_on="heartbeat",
+                ),
+            ).invoke(input={"log": []}, effects=SimulatedEffects(seed))
+        )
+        heartbeat_log = list(heartbeat_out.state["log"])
+    except NodeTimeoutError:
+        heartbeat_survived = False
+        heartbeat_log = []
+
+    def flapping(counter: dict[str, int]):
+        async def node(state):
+            counter["n"] += 1
+            if counter["n"] == 1:
+                await asyncio.sleep(stuck)
+            return {"log": ["flapping"]}
+
+        return node
+
+    explicit = {"n": 0}
+    explicit_out = _run_awaitable(
+        build(
+            flapping(explicit),
+            timeout=TimeoutPolicy(run_timeout=tight),
+            retry_policy=RetryPolicy(
+                retry_on=(NodeTimeoutError,),
+                initial_interval=0.001,
+                max_attempts=2,
+                jitter=False,
+            ),
+        ).invoke(input={"log": []}, effects=SimulatedEffects(seed))
+    )
+    default = {"n": 0}
+    default_out = _run_awaitable(
+        build(
+            flapping(default),
+            timeout=TimeoutPolicy(run_timeout=tight),
+            retry_policy=RetryPolicy(
+                initial_interval=0.001, max_attempts=2, jitter=False
+            ),
+        ).invoke(input={"log": []}, effects=SimulatedEffects(seed))
+    )
+    return {
+        "completed": list(completed.state["log"]),
+        "hard_timed_out": hard_timed_out,
+        "hard_kind": hard_kind,
+        "idle_timed_out": idle_timed_out,
+        "idle_kind": idle_kind,
+        "heartbeat_survived": heartbeat_survived,
+        "heartbeat_log": heartbeat_log,
+        "timeout_retry_attempts": explicit["n"],
+        "timeout_retry_log": list(explicit_out.state["log"]),
+        "default_policy_retries_timeout_attempts": default["n"],
+        "default_policy_retries_timeout_log": list(default_out.state["log"]),
+    }
+
+
+_WORKLOAD_ARMS["seeded_node_timeout"] = _node_timeout_arm
+_support("LG25", ("hard_timeout",), "dharma_swarm.graph:TimeoutPolicy#run_timeout")
+_support("LG25", ("idle_timeout",), "dharma_swarm.graph:TimeoutPolicy#idle_timeout")
+_support("LG25", ("heartbeat_refresh",), "dharma_swarm.graph:heartbeat")
+_support("LG25", ("timeout_retry",), "dharma_swarm.graph:NodeTimeoutError")
+_LANGGRAPH_FACET_SURFACE[("LG25", "hard_timeout")] = (
+    "langgraph.types:TimeoutPolicy#run_timeout"
+)
+_LANGGRAPH_FACET_SURFACE[("LG25", "idle_timeout")] = (
+    "langgraph.types:TimeoutPolicy#idle_timeout"
+)
+_LANGGRAPH_FACET_SURFACE[("LG25", "heartbeat_refresh")] = (
+    "langgraph.runtime:Runtime.heartbeat"
+)
+_LANGGRAPH_FACET_SURFACE[("LG25", "timeout_retry")] = (
+    "langgraph.errors:NodeTimeoutError"
+)
+
+
+_NODE_TIMEOUT_FACET_FIELDS: dict[str, tuple[str, ...]] = {
+    "hard_timeout": ("completed", "hard_timed_out", "hard_kind"),
+    "idle_timeout": ("idle_timed_out", "idle_kind"),
+    "heartbeat_refresh": ("heartbeat_survived", "heartbeat_log"),
+    "timeout_retry": (
+        "timeout_retry_attempts",
+        "timeout_retry_log",
+        "default_policy_retries_timeout_attempts",
+        "default_policy_retries_timeout_log",
+    ),
+}
+
+
+def _apply_node_timeout_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG25's four facets from the seeded two-arm node-timeout workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    for facet, fields in _NODE_TIMEOUT_FACET_FIELDS.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG25"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_node_timeout:{facet}",
+                command_or_probe=(
+                    f"compare {', '.join(fields)} under identically "
+                    "configured hard/idle node bounds on both installed "
+                    "runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row_lookup["LG25"]),
+            )
+        )
