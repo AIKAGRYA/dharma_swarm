@@ -106,8 +106,10 @@ knows or doesn't) leaves trails; trails influence the system.
 
 ## 6. Open items
 
-1. Confirm reference dictionary app name ("ring key" transcription) —
-   screenshots incoming from operator.
+1. ~~Confirm reference dictionary app name~~ RESOLVED: it is "Japanese" by
+   renzo (five-tab Search/Text/Reference/Lists/Study — same app as spec
+   §10.1; "ring key" was a voice-transcription artifact). Screenshot rounds
+   2–3 still incoming.
 2. Kodansha kanji app screenshots — incoming; extract the capability bar.
 3. Particle-page reference source (the per-particle PDF specialist) — obtain
    name/examples from operator.
@@ -116,3 +118,47 @@ knows or doesn't) leaves trails; trails influence the system.
 5. Reconcile with the v12 critique's "where to start" list (copy pass,
    de-spreadsheeting, empty states) — those repairs should land *in* this
    language, not before it.
+
+## 7. Reference analysis — "Japanese" (renzo), round 1 screenshots (2026-08-05)
+
+Operator's main daily app. Two surfaces captured; rounds 2–3 incoming.
+
+### 7.1 Opening screen — the silence lesson
+
+White void + search bar + words drifting at varied sizes/gray depths
+(事業 弁解 好き 風呂 一致 節約 気難しい 全力 / 続き 浮かぶ 大嫌い 過ぎる
+銀行 増える). No onboarding, no greeting, no system voice, no noise.
+
+- **Bar:** Bunki's front door must be this quiet. (Direct inverse of v12's
+  Today screen: greeting + philosophy copy + six empty dashboards.)
+- **But renzo's words are dead** — random, non-interactive. Operator
+  directions: interactive · connected to SRS entries · emergence patterns
+  (shapes, rain, "5D interactive universe graph") · or three deepening
+  recursive layers of the theme.
+- **Proposed synthesis (one idea, not four):** the floating words are the
+  SURFACE of the learner's knowledge graph. They are the learner's own
+  words — fragile/due items drift nearest and largest, rendered in the
+  active Nihonga theme's pigments, patina-weighted by stigmergic trails
+  (§5). Every word is a door (§4). The "three deepening versions" become
+  zoom strata: (1) ambient drift → (2) pinch: constellation neighborhood →
+  (3) pinch: full observatory (the Kanji Garden wallpaper made alive, per
+  convergence C4). Rain/shapes are weathers of this one surface. Opening
+  screen = ambient SRS = universe graph = living wallpaper: one centerpiece.
+
+### 7.2 Search — the four doors of entry (baseline requirements)
+
+Entry-mode bar observed: keyboard · handwriting · radical picker · SKIP.
+
+1. **Typed** — one field eating kanji/kana/romaji/English, no mode switch.
+2. **Handwritten** — draw the kanji you can see but not read; live
+   recognition with a candidate strip (operator drew 持; candidates
+   持 焚 挺 括 挿 封 村…). Doubles as Kanken writing practice — connects
+   to v12's existing trace canvas.
+3. **Radical/component picker** — assemble from visible parts, grouped by
+   stroke count ("I can see what it's made of").
+4. **SKIP code** — shape-based lookup for power users.
+
+Interaction details to preserve: results update incrementally WHILE
+drawing; kana readings shown in the single red accent (one color doing
+semantic work — readings pop, nothing else is colored); candidate strip
+above the canvas; instant, offline-fast.
