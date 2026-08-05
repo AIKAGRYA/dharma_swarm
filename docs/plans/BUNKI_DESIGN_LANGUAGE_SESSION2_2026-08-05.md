@@ -460,6 +460,28 @@ orbits and 筆順 sheets stay pool-scoped for now.
    connections: faint second-degree links between orbiters that share
    components.
 
+**v5 shipped (same artifact URL, ~620KB all-in).** All seven §8.5
+directives: (1) radical cards carry Kangxi numbers (部首 61 etc.),
+variant forms merged under their number (忄=心=⺗→61; 阝 shows 163·170),
+threshold dropped to 2 → 592 families; (2) ON (katakana) + kun readings
+on every family row and kanji card; (3) 筆順 sheet auto-writes itself the
+moment any kanji/radical card opens — button is now replay (もう一度);
+(4) swipes persist via localStorage: lifetime 拾った/済み survive
+reload, right-swipe redeems an unknown mark, unknown words return
+fragile+haloed, twice-known words return settled at 55% presence;
+(5) the dictionary drifts: 6,687 JLPT-tagged words (open-anki-jlpt-decks,
+N5:553 N4:535 N3:1836 N2:1489 N1:2274) unified with the seed pool;
+(6) level slider on the left edge — faint until touched, stops
+自/N1/N2/N3/N4/N5 with school-grade + 漢検 blend labels, commit triggers
+a tide change (field re-seeds ~70% target level); 自 stop states the
+adaptive intent; (7) pinch-out over a body dives it, pinch-in surfaces,
+and orbiters sharing a kanji now link with second-degree whisper lines.
+Verified: N1 tide brings 採掘/判決/崖; dictionary word 判決 dives to 決
+with auto-strokes + ケツ/き.める; pinch-in surfaced; store JSON survives
+reload. Honest scope: particles remain seed-pool only; 筆順 covers the
+114 embedded characters; Kanken values are label-blends, not per-word
+data.
+
 **v4.2 shipped (same artifact URL).** Source pivot: edrdg.org is
 proxy-blocked, so the family index is built from KanjiVG's own
 `kvg:element` component annotations (same dataset as our stroke order —
