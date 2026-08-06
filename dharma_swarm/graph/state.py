@@ -66,6 +66,12 @@ class GraphState:
             channel = factory()
             channel.name = name
             self._channels[name] = channel
+        # Step-boundary bookkeeping for Channel.end_step: a superstep can
+        # apply writes in more than one batch (seed + START-branch routing),
+        # so "nobody wrote this channel this step" is judged against every
+        # batch of the CURRENT superstep, never one batch in isolation.
+        self._step: int | None = None
+        self._step_written: set[str] = set()
 
     def channel(self, name: str) -> Channel[Any]:
         if name.startswith(TRIGGER_PREFIX):
@@ -104,7 +110,36 @@ class GraphState:
             group = groups[name]
             if channel.commit(group, superstep):
                 advanced.add(channel.name)
+        self._end_step(groups, superstep)
         return frozenset(advanced)
+
+    def _end_step(
+        self, groups: Mapping[str, list[ChannelWrite]], superstep: int
+    ) -> None:
+        """Notify every channel of the barrier (langgraph step-notification).
+
+        Step-scoped channels (ephemeral / any-value) clear themselves here
+        when nobody wrote them this superstep; every other channel ignores
+        the hook. Versions never move: a cleared cell is not a new value.
+        """
+        if superstep != self._step:
+            self._step = superstep
+            self._step_written = set()
+        self._step_written.update(groups)
+        for name, channel in self._channels.items():
+            channel.end_step(name in self._step_written)
+
+    def finish_all(self) -> frozenset[str]:
+        """Notify every channel that the run reached (tentative) quiescence.
+
+        langgraph parity (``pregel/_algo.apply_writes``): ``finish()`` runs
+        inside the barrier whose commits cannot trigger another node, so the
+        published after-finish values are part of that superstep's committed
+        state, digest, and checkpoint.
+        """
+        return frozenset(
+            name for name, channel in self._channels.items() if channel.finish()
+        )
 
     def validate_writes(
         self, writes: Sequence[ChannelWrite], superstep: int
@@ -172,8 +207,21 @@ class GraphState:
             if not name.startswith(RESERVED_PREFIX) and not channel.is_empty
         }
 
+    def tracked_snapshot(self) -> dict[str, Any]:
+        """:meth:`snapshot` minus untracked channels (the digest domain).
+
+        An untracked channel's value is never checkpointed, so including it
+        in the digest would make every resume fail its integrity check
+        against a state it can no longer rebuild.
+        """
+        return {
+            name: value
+            for name, value in self.snapshot().items()
+            if self._channels[name].tracked
+        }
+
     def digest(self) -> str:
-        return state_digest(self.snapshot())
+        return state_digest(self.tracked_snapshot())
 
     def checkpoint_channels(self) -> dict[str, dict[str, Any]]:
         """Per-channel STATE for resume/fork (Send packets serialized)."""

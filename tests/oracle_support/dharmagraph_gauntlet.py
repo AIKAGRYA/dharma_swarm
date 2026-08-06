@@ -2004,6 +2004,9 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_channel_semantics_evidence(
+        capabilities, row_lookup, workloads["seeded_channel_semantics"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -3121,3 +3124,363 @@ def _apply_command_parent_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core LG10: channel-semantics workload.
+# Append-only harness extension — one seeded two-arm workload exercising the
+# whole channel family (topic, named barrier, ephemeral, any-value,
+# untracked, batch-reducer delta, and both after-finish channels) plus its
+# evidence applier and surface support entries. Nothing above is touched.
+# ---------------------------------------------------------------------------
+
+
+def _channel_semantics_delta_reducer(current: Any, updates: Any) -> Any:
+    """Batch reducer shared verbatim by both arms.
+
+    Batching-invariant by construction (concatenation), which is the
+    DeltaChannel contract: ``reduce(reduce(s, xs), ys) == reduce(s, xs+ys)``.
+    """
+
+    return list(current) + [int(update) for update in updates]
+
+
+def _channel_semantics_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "channel-semantics"))
+    ephemeral_value = rng.randint(2, 40)
+    shared_any = rng.randint(2, 40)
+    final_any = shared_any + rng.randint(1, 9)
+    untracked_value = rng.randint(2, 40)
+    first_delta = rng.randint(1, 9)
+    second_delta = rng.randint(10, 19)
+    third_delta = rng.randint(20, 29)
+    after_finish_value = rng.randint(2, 40)
+    members = ("m1", "m2")
+    stray_member = "m9"
+
+    def pub_a(state: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "log": ["pub_a"],
+            "topic": ["a"],
+            "eph": ephemeral_value,
+            "anyv": shared_any,
+            "untracked": untracked_value,
+            "delta": first_delta,
+            "afterfinish": after_finish_value,
+            "joined": "pub_a",
+        }
+
+    def pub_b(state: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "log": ["pub_b"],
+            "topic": ["b"],
+            "anyv": shared_any,
+            "delta": second_delta,
+            "joined": "pub_b",
+        }
+
+    def reader(state: Mapping[str, Any]) -> dict[str, Any]:
+        # One superstep after the publishers: the ephemeral and any-value
+        # cells are still readable here and gone at this barrier; the two
+        # after-finish channels must NOT be readable yet.
+        return {
+            "log": ["reader"],
+            "eph_seen": [state.get("eph", -1)],
+            "any_seen": [state.get("anyv", -1)],
+            "probe": [key for key in ("afterfinish", "joined") if key in state],
+        }
+
+    def tail(state: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "log": ["tail"],
+            "eph_late": ["eph" in state],
+            "anyv": final_any,
+            "delta": third_delta,
+        }
+
+    if arm == "langgraph":
+        from langgraph.channels import (
+            AnyValue,
+            DeltaChannel,
+            EphemeralValue,
+            LastValueAfterFinish,
+            NamedBarrierValue,
+            NamedBarrierValueAfterFinish,
+            Topic,
+            UntrackedValue,
+        )
+        from langgraph.checkpoint.memory import InMemorySaver
+        from langgraph.errors import InvalidUpdateError
+        from langgraph.graph import END, START, StateGraph
+
+        # Functional TypedDict: the channel instances must survive as real
+        # objects (this module uses postponed annotations, so a class-form
+        # TypedDict declared here would stringify them).
+        semantics_state = TypedDict(  # type: ignore[operator]
+            "_ChannelSemanticsState",
+            {
+                "log": Annotated[list, operator.add],
+                "topic": Annotated[list, Topic(str, accumulate=True)],
+                "eph": Annotated[int, EphemeralValue(int)],
+                "eph_seen": Annotated[list, operator.add],
+                "eph_late": Annotated[list, operator.add],
+                "any_seen": Annotated[list, operator.add],
+                "probe": Annotated[list, operator.add],
+                "anyv": Annotated[int, AnyValue(int)],
+                "untracked": Annotated[int, UntrackedValue(int)],
+                "delta": Annotated[
+                    list, DeltaChannel(_channel_semantics_delta_reducer, list)
+                ],
+                "afterfinish": Annotated[int, LastValueAfterFinish(int)],
+                "joined": Annotated[
+                    str, NamedBarrierValueAfterFinish(str, {"pub_a", "pub_b"})
+                ],
+            },
+            total=False,
+        )
+
+        builder = StateGraph(semantics_state)
+        builder.add_node("pub_a", pub_a)
+        builder.add_node("pub_b", pub_b)
+        builder.add_node("reader", reader)
+        builder.add_node("tail", tail)
+        builder.add_edge(START, "pub_a")
+        builder.add_edge(START, "pub_b")
+        builder.add_edge(["pub_a", "pub_b"], "reader")
+        builder.add_edge("reader", "tail")
+        builder.add_edge("tail", END)
+        saver = InMemorySaver()
+        config = {"configurable": {"thread_id": f"lg10-{seed}"}}
+        final = dict(builder.compile(checkpointer=saver).invoke({"log": []}, config))
+        checkpoint_keys = set(saver.get_tuple(config).checkpoint["channel_values"])
+
+        barrier_state = TypedDict(  # type: ignore[operator]
+            "_ChannelBarrierState",
+            {
+                "gate": Annotated[str, NamedBarrierValue(str, set(members))],
+                "log": Annotated[list, operator.add],
+            },
+            total=False,
+        )
+
+        def barrier_run(
+            writes: tuple[tuple[str, str], ...]
+        ) -> Mapping[str, Any]:
+            barrier = StateGraph(barrier_state)
+            for node_id, value in writes:
+                barrier.add_node(
+                    node_id,
+                    (lambda v: lambda state: {"log": [v], "gate": v})(value),
+                )
+                barrier.add_edge(START, node_id)
+                barrier.add_edge(node_id, END)
+            return barrier.compile().invoke({"log": []})
+
+        both = barrier_run((("m1", "m1"), ("m2", "m2")))
+        partial = barrier_run((("m1", "m1"),))
+        stray_rejected = False
+        try:
+            barrier_run((("m1", stray_member), ("m2", "m2")))
+        except InvalidUpdateError:
+            stray_rejected = True
+        untracked_absent = "untracked" not in checkpoint_keys
+    else:
+        from dharma_swarm.graph import (
+            END,
+            START,
+            AnyValueChannel,
+            AppendChannel,
+            BarrierChannel,
+            BarrierMemberError,
+            DeltaChannel,
+            EphemeralChannel,
+            GraphBuilder,
+            LastValueAfterFinishChannel,
+            NamedBarrierAfterFinishChannel,
+            TopicChannel,
+            UntrackedValueChannel,
+            RunCheckpoint,
+        )
+        from dharma_swarm.graph.effects import SimulatedEffects
+
+        compiled = (
+            GraphBuilder("gauntlet-channel-semantics")
+            .add_channel("log", AppendChannel)
+            .add_channel("topic", TopicChannel)
+            .add_channel("eph", EphemeralChannel)
+            .add_channel("eph_seen", AppendChannel)
+            .add_channel("eph_late", AppendChannel)
+            .add_channel("any_seen", AppendChannel)
+            .add_channel("probe", AppendChannel)
+            .add_channel("anyv", AnyValueChannel)
+            .add_channel("untracked", UntrackedValueChannel)
+            .add_channel(
+                "delta",
+                lambda: DeltaChannel(_channel_semantics_delta_reducer, []),
+            )
+            .add_channel("afterfinish", LastValueAfterFinishChannel)
+            .add_channel(
+                "joined",
+                lambda: NamedBarrierAfterFinishChannel(
+                    frozenset({"pub_a", "pub_b"})
+                ),
+            )
+            .add_node("pub_a", pub_a)
+            .add_node("pub_b", pub_b)
+            .add_node("reader", reader)
+            .add_node("tail", tail)
+            .add_edge(START, "pub_a")
+            .add_edge(START, "pub_b")
+            .add_edge(["pub_a", "pub_b"], "reader")
+            .add_edge("reader", "tail")
+            .add_edge("tail", END)
+            .compile()
+        )
+        checkpoints: dict[int, RunCheckpoint] = {}
+        result = _run_awaitable(
+            compiled.invoke(
+                input={"log": []},
+                effects=SimulatedEffects(seed),
+                on_checkpoint=lambda checkpoint: checkpoints.__setitem__(
+                    checkpoint.superstep, checkpoint
+                ),
+            )
+        )
+        final = dict(result.state)
+        last_checkpoint = checkpoints[max(checkpoints)]
+        untracked_absent = "value" not in last_checkpoint.channels["untracked"]
+
+        def barrier_run(
+            writes: tuple[tuple[str, str], ...]
+        ) -> Mapping[str, Any]:
+            barrier = (
+                GraphBuilder("gauntlet-channel-barrier")
+                .add_channel("log", AppendChannel)
+                .add_channel(
+                    "gate", lambda: BarrierChannel(frozenset(members))
+                )
+            )
+            for node_id, value in writes:
+                barrier = (
+                    barrier.add_node(
+                        node_id,
+                        (lambda v: lambda state: {"log": [v], "gate": v})(value),
+                    )
+                    .add_edge(START, node_id)
+                    .add_edge(node_id, END)
+                )
+            run = _run_awaitable(
+                barrier.compile().invoke(
+                    input={"log": []}, effects=SimulatedEffects(seed)
+                )
+            )
+            return run.state
+
+        both = barrier_run((("m1", "m1"), ("m2", "m2")))
+        partial = barrier_run((("m1", "m1"),))
+        stray_rejected = False
+        try:
+            barrier_run((("m1", stray_member), ("m2", "m2")))
+        except BarrierMemberError:
+            stray_rejected = True
+
+    return {
+        "topic_accumulated": sorted(final.get("topic", [])),
+        "barrier_tripped": "gate" in both,
+        "barrier_partial_open": "gate" not in partial,
+        "barrier_stray_rejected": stray_rejected,
+        "ephemeral_next_step_visible": list(final.get("eph_seen", [])),
+        "ephemeral_cleared_after": [
+            "eph" not in final,
+            list(final.get("eph_late", [])) == [False],
+        ],
+        "any_value_concurrent_accepted": list(final.get("any_seen", [])),
+        "any_value_final": final.get("anyv"),
+        "untracked_in_final": final.get("untracked"),
+        "untracked_absent_from_checkpoint": untracked_absent,
+        "delta_final": list(final.get("delta", [])),
+        "after_finish_last": final.get("afterfinish"),
+        "after_finish_barrier_ready": "joined" in final,
+        "after_finish_hidden_midrun": list(final.get("probe", [])),
+    }
+
+
+_WORKLOAD_ARMS["seeded_channel_semantics"] = _channel_semantics_arm
+_support("LG10", ("ephemeral",), "dharma_swarm.graph:EphemeralChannel")
+_support("LG10", ("any_value",), "dharma_swarm.graph:AnyValueChannel")
+_support("LG10", ("untracked_value",), "dharma_swarm.graph:UntrackedValueChannel")
+_support("LG10", ("delta_channel",), "dharma_swarm.graph:DeltaChannel")
+_support(
+    "LG10",
+    ("last_value_after_finish",),
+    "dharma_swarm.graph:LastValueAfterFinishChannel",
+)
+_support(
+    "LG10",
+    ("named_barrier_after_finish",),
+    "dharma_swarm.graph:NamedBarrierAfterFinishChannel",
+)
+
+
+def _apply_channel_semantics_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG10 channel facets from the seeded two-arm channel-semantics workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    field_by_facet = {
+        "topic": ("topic_accumulated",),
+        "barrier": (
+            "barrier_tripped",
+            "barrier_partial_open",
+            "barrier_stray_rejected",
+        ),
+        "ephemeral": (
+            "ephemeral_next_step_visible",
+            "ephemeral_cleared_after",
+        ),
+        "any_value": ("any_value_concurrent_accepted", "any_value_final"),
+        "untracked_value": (
+            "untracked_in_final",
+            "untracked_absent_from_checkpoint",
+        ),
+        "delta_channel": ("delta_final",),
+        "last_value_after_finish": (
+            "after_finish_last",
+            "after_finish_hidden_midrun",
+        ),
+        "named_barrier_after_finish": (
+            "after_finish_barrier_ready",
+            "after_finish_hidden_midrun",
+        ),
+    }
+    row = row_lookup["LG10"]
+    for facet, fields in field_by_facet.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG10"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_channel_semantics:{facet}",
+                command_or_probe=(
+                    f"compare {'+'.join(fields)} from the channel-semantics "
+                    "workload on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={name: workload["langgraph"].get(name) for name in fields},
+                citations=_row_citations(row),
+            )
+        )

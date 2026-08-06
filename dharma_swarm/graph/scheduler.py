@@ -319,9 +319,10 @@ class CompiledGraph:
                         task_path=merged_path,
                     )
                     raise
-                state.apply_writes(
+                advanced = state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
                 )
+                self._finish_if_quiescent(state, advanced)
                 # Recorded siblings commit in this same barrier: emit their
                 # receipts too, matching the full-replay convention (their
                 # work is in the committed state even though only live
@@ -384,7 +385,8 @@ class CompiledGraph:
                 pending_task_id,
                 task_path="+".join(sorted(executed)),
             )
-            state.apply_writes(pending, superstep)
+            advanced = state.apply_writes(pending, superstep)
+            self._finish_if_quiescent(state, advanced)
             digest = state.digest()
             for node_id, task_seq in event_ids:
                 events.append(
@@ -416,6 +418,22 @@ class CompiledGraph:
             supersteps=committed,
             events=tuple(events),
         )
+
+    def _finish_if_quiescent(
+        self, state: GraphState, advanced: frozenset[str]
+    ) -> frozenset[str]:
+        """Publish after-finish channels when a barrier can trigger nobody.
+
+        langgraph parity (``pregel/_algo.apply_writes``): a superstep whose
+        committed channels are disjoint from every node's trigger set is
+        (tentatively) the last one, so ``finish()`` runs INSIDE that barrier
+        — before the digest and the checkpoint, keeping resume integrity and
+        the published value in the same committed state.
+        """
+        triggers = {name for names in self.triggers.values() for name in names}
+        if advanced & triggers:
+            return frozenset()
+        return state.finish_all()
 
     def _validated_seed(
         self, input: Mapping[str, Any] | None, run_id: str
