@@ -12,15 +12,22 @@ into the production dispatch hot path.
 from __future__ import annotations
 
 from dharma_swarm.graph.channels import (
+    AnyValueChannel,
     AppendChannel,
     BarrierChannel,
     BarrierMemberError,
     ChannelWriteConflictError,
+    DeltaChannel,
+    EmptyChannelError,
+    EphemeralChannel,
+    LastValueAfterFinishChannel,
     LastValueChannel,
+    NamedBarrierAfterFinishChannel,
     ReducerChannel,
     TopicChannel,
     TriggerChannel,
     UnknownChannelError,
+    UntrackedValueChannel,
 )
 from dharma_swarm.graph.interrupts import (
     GraphInterrupted,
@@ -89,6 +96,7 @@ from dharma_swarm.graph.telos_bridge import (
 )
 
 __all__ = [
+    "AnyValueChannel",
     "AppendChannel",
     "BarrierChannel",
     "BarrierMemberError",
@@ -96,11 +104,14 @@ __all__ = [
     "ChannelWriteConflictError",
     "Command",
     "CompiledGraph",
+    "DeltaChannel",
     "DispatchCheckpoint",
     "DuplicateDispatchInFlight",
     "DurableInvoker",
     "EffectsProvider",
+    "EmptyChannelError",
     "END",
+    "EphemeralChannel",
     "GraphBuilder",
     "GraphCheckpointStore",
     "GraphCompileError",
@@ -118,9 +129,11 @@ __all__ = [
     "Interrupt",
     "interrupt",
     "GATE_GRAPH_RECEIPT_ANCHOR",
+    "LastValueAfterFinishChannel",
     "LastValueChannel",
     "LiveEffects",
     "MalformedDispatchOrderError",
+    "NamedBarrierAfterFinishChannel",
     "NodeExecutionError",
     "NodeResultError",
     "ParentCommand",
@@ -142,6 +155,7 @@ __all__ = [
     "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
+    "UntrackedValueChannel",
     "JsonGraphSerializer",
     "derive_graph_side_effect_key",
     "append_dispatch_receipt_to_machine_chain",
