@@ -27,14 +27,36 @@ commits nothing, checkpoints nothing, returns no result. ``resume_from`` /
 ``on_checkpoint`` add crash-resume and fork; the resume integrity contract
 is digest equality at the join point, never event-stream identity.
 
+Invocation surfaces (LG12 parity): the run lifecycle IS the async
+generator :meth:`CompiledGraph._run_supersteps`, which emits one
+:class:`SuperstepEmission` per COMMITTED barrier (seed included) and a
+final :class:`GraphRunResult`. Every public surface is a projection of
+that one loop, so no surface can observe uncommitted state:
+``invoke`` (async, the historical entry point) drains it and returns the
+result; ``stream`` re-yields each barrier; ``invoke_sync`` / ``stream_sync``
+run the same coroutine on a PRIVATE event loop and fail closed inside a
+live loop (an async-native engine never re-enters a running loop). The
+``stream_mode`` / ``version`` pair matches langgraph 1.2.4 empirically:
+``values`` yields the post-barrier state snapshot (seed snapshot first),
+``updates`` yields one ``{node: writes}`` chunk PER TASK in canonical node
+order (never for the seed), and ``version="v2"`` wraps each chunk as the
+StreamPart mapping ``{"type", "ns", "data"}`` with ``ns=()`` for flat
+graphs. Recorded deviation: ``invoke(stream_mode="values", version="v2")``
+returns this engine's ``GraphRunResult`` envelope, not langgraph's
+``GraphOutput`` — the envelope is the sovereign result type and carries
+the digest the receipt chain anchors.
+
 claim_mode: candidate / test_only. Not wired into production dispatch.
 """
 
 from __future__ import annotations
 
+import asyncio
+import copy
 import logging
+from collections.abc import AsyncIterator, Awaitable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping, TypeVar
 
 from dharma_swarm.graph.channels import (
     Channel,
@@ -75,10 +97,90 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "StreamMode",
+    "StreamVersion",
+    "SuperstepEmission",
     "SuperstepLimitError",
+    "run_on_private_loop",
 ]
 
 logger = logging.getLogger(__name__)
+
+StreamMode = Literal["values", "updates"]
+StreamVersion = Literal["v1", "v2"]
+
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class SuperstepEmission:
+    """One COMMITTED barrier, as seen by every invocation surface.
+
+    ``values`` is the post-commit user-state snapshot (already deep-copied
+    by :meth:`GraphState.snapshot`). ``updates`` is one ``{node: writes}``
+    mapping per executed TASK, in canonical node order then Send task order
+    — langgraph 1.2.4 emits a separate updates chunk per task, not one per
+    superstep (verified empirically). ``is_seed`` marks the superstep-0
+    emission, which has state but no task updates.
+    """
+
+    superstep: int
+    values: Mapping[str, Any]
+    updates: tuple[Mapping[str, Mapping[str, Any]], ...] = ()
+    is_seed: bool = False
+
+
+def _reject_running_loop(surface: str) -> None:
+    """Fail closed when a sync surface is called from inside a live loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    raise GraphRuntimeError(
+        f"{surface} needs a private event loop but one is already running in "
+        "this thread; await the async surface instead (fail closed — an "
+        "async-native engine never re-enters a running loop)"
+    )
+
+
+def run_on_private_loop(
+    factory: Callable[[], Awaitable[_T]], surface: str
+) -> _T:
+    """Run one engine coroutine from sync code on a private event loop.
+
+    The coroutine is built only AFTER the live-loop check, so a fail-closed
+    call never leaves an un-awaited coroutine behind.
+    """
+    _reject_running_loop(surface)
+    return asyncio.run(factory())  # type: ignore[arg-type]
+
+
+def _validate_stream_contract(stream_mode: str, version: str) -> None:
+    if stream_mode not in ("values", "updates"):
+        raise ValueError(
+            f"stream_mode {stream_mode!r} is not supported; expected "
+            "'values' or 'updates' (fail closed)"
+        )
+    if version not in ("v1", "v2"):
+        raise ValueError(
+            f"version {version!r} is not supported; expected 'v1' or 'v2' "
+            "(fail closed)"
+        )
+
+
+def _stream_chunks(
+    emission: SuperstepEmission, stream_mode: str, version: str
+) -> list[Any]:
+    """Project one barrier into the chunks a stream surface yields."""
+    if stream_mode == "values":
+        chunks: list[Any] = [emission.values]
+    else:
+        chunks = list(emission.updates)
+    if version == "v2":
+        return [
+            {"type": stream_mode, "ns": (), "data": chunk} for chunk in chunks
+        ]
+    return chunks
 
 
 @dataclass(frozen=True)
@@ -105,6 +207,150 @@ class CompiledGraph:
         self,
         input: Mapping[str, Any] | None = None,
         *,
+        stream_mode: StreamMode = "values",
+        version: StreamVersion = "v1",
+        **kwargs: Any,
+    ) -> GraphRunResult | list[Any]:
+        """Run to quiescence (async) and return the committed outcome.
+
+        Default ``stream_mode="values"`` is the historical contract: the
+        :class:`GraphRunResult` envelope, unchanged. ``stream_mode="updates"``
+        returns the LIST of per-task update chunks the stream would have
+        yielded — raw dicts under ``version="v1"``, StreamPart mappings
+        (``{"type", "ns", "data"}``) under ``version="v2"`` — matching
+        langgraph 1.2.4's ``Pregel.ainvoke(stream_mode=..., version=...)``.
+        Run keywords (``effects``, ``resume_from``, ``persistence``, ...)
+        pass through to :meth:`_run_supersteps` unchanged.
+        """
+        _validate_stream_contract(stream_mode, version)
+        parts: list[Any] = []
+        result: GraphRunResult | None = None
+        async for kind, payload in self._run_supersteps(input, **kwargs):
+            if kind == "result":
+                result = payload
+            elif stream_mode != "values":
+                parts.extend(_stream_chunks(payload, stream_mode, version))
+        if stream_mode == "values":
+            assert result is not None  # the generator always ends with one
+            return result
+        return parts
+
+    def invoke_sync(
+        self,
+        input: Mapping[str, Any] | None = None,
+        *,
+        stream_mode: StreamMode = "values",
+        version: StreamVersion = "v1",
+        **kwargs: Any,
+    ) -> GraphRunResult | list[Any]:
+        """Blocking twin of :meth:`invoke` on a private event loop.
+
+        langgraph is sync-native with async twins; this engine is the mirror
+        image, so the sync surface is a thin private-loop wrapper and fails
+        closed (``GraphRuntimeError``) when a loop is already running in this
+        thread rather than silently nesting loops or spawning hidden threads.
+        """
+        _validate_stream_contract(stream_mode, version)
+        return run_on_private_loop(
+            lambda: self.invoke(
+                input, stream_mode=stream_mode, version=version, **kwargs
+            ),
+            "CompiledGraph.invoke_sync",
+        )
+
+    async def stream(
+        self,
+        input: Mapping[str, Any] | None = None,
+        *,
+        stream_mode: StreamMode = "values",
+        version: StreamVersion = "v1",
+        **kwargs: Any,
+    ) -> AsyncIterator[Any]:
+        """Yield each COMMITTED barrier as it lands (langgraph astream parity).
+
+        ``values`` yields the seed snapshot first, then the state after every
+        committed superstep; ``updates`` yields one ``{node: writes}`` chunk
+        per executed task and nothing for the seed. Failure doctrine is
+        preserved by construction: the run raises out of the generator and
+        nothing is yielded past the last COMMITTED barrier.
+        """
+        _validate_stream_contract(stream_mode, version)
+        async for kind, payload in self._run_supersteps(input, **kwargs):
+            if kind != "step":
+                continue
+            for chunk in _stream_chunks(payload, stream_mode, version):
+                yield chunk
+
+    def stream_sync(
+        self,
+        input: Mapping[str, Any] | None = None,
+        *,
+        stream_mode: StreamMode = "values",
+        version: StreamVersion = "v1",
+        **kwargs: Any,
+    ) -> Iterator[Any]:
+        """Blocking twin of :meth:`stream`, pumped on a private event loop.
+
+        Eagerly fails closed inside a live loop (this is a plain function
+        returning a generator, so the check does not wait for the first
+        ``next()``). The private loop is closed when the iterator is
+        exhausted or garbage-collected.
+        """
+        _validate_stream_contract(stream_mode, version)
+        _reject_running_loop("CompiledGraph.stream_sync")
+        emitter = self.stream(
+            input, stream_mode=stream_mode, version=version, **kwargs
+        )
+
+        def _pump() -> Iterator[Any]:
+            loop = asyncio.new_event_loop()
+            try:
+                while True:
+                    try:
+                        yield loop.run_until_complete(emitter.__anext__())
+                    except StopAsyncIteration:
+                        return
+            finally:
+                loop.run_until_complete(emitter.aclose())
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
+
+        return _pump()
+
+    def _update_chunks(
+        self, writes: Sequence[ChannelWrite]
+    ) -> tuple[Mapping[str, Mapping[str, Any]], ...]:
+        """One ``{node: writes}`` chunk per TASK, in canonical dispatch order.
+
+        Reserved (``__``) routing writes never surface. Chunk order is the
+        compiled canonical node order then Send task order — never the
+        effects-driven execution order — so a stream is as execution-order
+        invariant as the committed state it reports.
+        """
+        grouped: dict[tuple[str, int], dict[str, Any]] = {}
+        for write in writes:
+            if write.channel.startswith(RESERVED_PREFIX):
+                continue
+            grouped.setdefault((write.node_id, write.task_seq), {})[
+                write.channel
+            ] = copy.deepcopy(write.value)
+        rank = {node: index for index, node in enumerate(self.canonical_order)}
+        return tuple(
+            {node_id: payload}
+            for (node_id, task_seq), payload in sorted(
+                grouped.items(),
+                key=lambda item: (
+                    rank.get(item[0][0], len(rank)),
+                    item[0][0],
+                    item[0][1],
+                ),
+            )
+        )
+
+    async def _run_supersteps(
+        self,
+        input: Mapping[str, Any] | None = None,
+        *,
         effects: EffectsProvider | None = None,
         checkpoint_store: CheckpointSink | None = None,
         graph_run_id: str | None = None,
@@ -114,8 +360,14 @@ class CompiledGraph:
         persistence: GraphPersistenceKernel | None = None,
         thread_id: str | None = None,
         checkpoint_id: str | None = None,
-    ) -> GraphRunResult:
-        """Run the graph from START to quiescence and return the committed result.
+    ) -> AsyncIterator[tuple[str, Any]]:
+        """The run lifecycle: yield every committed barrier, then the result.
+
+        Emits ``("step", SuperstepEmission)`` after each barrier COMMITS —
+        never before — and finally ``("result", GraphRunResult)``. Every
+        public invocation surface consumes this one generator, so sync,
+        async, streaming, and typed-v2 callers observe byte-identical
+        committed state.
 
         ``graph_run_id`` resolution: explicit wins; else a passed
         ``checkpoint_store``'s ``run_id`` is adopted; else one id is minted
@@ -209,6 +461,13 @@ class CompiledGraph:
                 )
             committed = resume_from.superstep
             superstep = resume_from.superstep
+            # A resumed run has no seed barrier; its restored state is the
+            # stream's starting snapshot, so a values stream still opens on
+            # the state the caller resumes FROM.
+            yield (
+                "step",
+                SuperstepEmission(superstep, state.snapshot(), (), is_seed=True),
+            )
         else:
             seed_input = self._validated_seed(input, run_id)
             seed_writes = [
@@ -236,6 +495,10 @@ class CompiledGraph:
             committed = 0
             superstep = 0
             _emit_checkpoint(0, digest)
+            yield (
+                "step",
+                SuperstepEmission(0, state.snapshot(), (), is_seed=True),
+            )
 
         # Superstep budgets are per-INVOCATION (langgraph parity: every
         # invoke gets its full recursion budget, including resume —
@@ -260,6 +523,7 @@ class CompiledGraph:
                 plan.resumes[next(iter(plan.resumes))].append(
                     resume_command.resume
                 )
+            replayed_writes: list[ChannelWrite] = []
             if plan.full:
                 run_persistence.replay(
                     state, versions_seen, self.triggers, tasks, run_id, superstep
@@ -319,6 +583,7 @@ class CompiledGraph:
                         task_path=merged_path,
                     )
                     raise
+                replayed_writes = list(plan.recorded_writes) + list(live_pending)
                 state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
                 )
@@ -340,6 +605,17 @@ class CompiledGraph:
                 for node_id, seq in replayed_ids
             )
             _emit_checkpoint(superstep, digest, plan.task_id)
+            # Full replay re-applies journalled writes inside the persistence
+            # runtime, so only the partial path can report per-task updates;
+            # the values projection is exact either way.
+            yield (
+                "step",
+                SuperstepEmission(
+                    superstep,
+                    state.snapshot(),
+                    self._update_chunks(replayed_writes),
+                ),
+            )
         while True:
             superstep += 1
             start_versions = state.versions
@@ -406,15 +682,24 @@ class CompiledGraph:
                 )
             committed = superstep
             _emit_checkpoint(superstep, digest, pending_task_id)
+            yield (
+                "step",
+                SuperstepEmission(
+                    superstep, state.snapshot(), self._update_chunks(pending)
+                ),
+            )
 
-        return GraphRunResult(
-            graph_run_id=run_id,
-            graph_id=self.graph_id,
-            status="completed",
-            state=state.snapshot(),
-            state_digest=digest,
-            supersteps=committed,
-            events=tuple(events),
+        yield (
+            "result",
+            GraphRunResult(
+                graph_run_id=run_id,
+                graph_id=self.graph_id,
+                status="completed",
+                state=state.snapshot(),
+                state_digest=digest,
+                supersteps=committed,
+                events=tuple(events),
+            ),
         )
 
     def _validated_seed(
