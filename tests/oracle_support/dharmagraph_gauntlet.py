@@ -2004,6 +2004,9 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_invocation_surfaces_evidence(
+        capabilities, row_lookup, workloads["seeded_invocation_surfaces"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -3121,3 +3124,259 @@ def _apply_command_parent_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S12 (LG12): compilation and sync/async invocation surfaces.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entries for the five unproven LG12 facets.
+# ---------------------------------------------------------------------------
+
+
+class _InvocationState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _call_offloaded(fn: Callable[[], Any]) -> Any:
+    """Call a BLOCKING engine surface, moving off a live loop if one exists.
+
+    The Dharma sync surfaces fail closed inside a running event loop by
+    design, so the harness gives them the private-loop context they require
+    instead of weakening the engine contract.  Mirrors ``_run_awaitable``.
+    """
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return fn()
+
+    result: list[Any] = []
+    failure: list[BaseException] = []
+
+    def runner() -> None:
+        try:
+            result.append(fn())
+        except BaseException as exc:  # pragma: no cover - live-loop fallback
+            failure.append(exc)
+
+    thread = threading.Thread(target=runner, daemon=True)
+    thread.start()
+    thread.join()
+    if failure:
+        raise failure[0]
+    return result[0]
+
+
+def _stream_parts_typed(parts: Any) -> bool:
+    """True iff every emitted part is a ``{type, ns, data}`` StreamPart."""
+
+    return isinstance(parts, list) and bool(parts) and all(
+        isinstance(part, Mapping) and set(part) == {"type", "ns", "data"}
+        for part in parts
+    )
+
+
+def _invocation_surface_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "invocation-surfaces"))
+    initial = rng.randint(2, 40)
+    delta = rng.randint(1, 9)
+    factor = rng.randint(2, 4)
+    seed_input = {"x": initial, "log": []}
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+
+        builder = StateGraph(_InvocationState)
+        builder.add_node(
+            "a", lambda state: {"x": state["x"] + delta, "log": ["a"]}
+        )
+        builder.add_node(
+            "b", lambda state: {"x": state["x"] * factor, "log": ["b"]}
+        )
+        builder.add_edge(START, "a")
+        builder.add_edge("a", "b")
+        builder.add_edge("b", END)
+        graph = builder.compile()
+
+        final = graph.invoke(dict(seed_input))
+        sync_values = list(
+            graph.stream(dict(seed_input), stream_mode="values")
+        )
+        async_values = _run_awaitable(
+            _collect_langgraph_astream(graph, dict(seed_input))
+        )
+        invoke_parts = graph.invoke(
+            dict(seed_input), stream_mode="updates", version="v2"
+        )
+        ainvoke_parts = _run_awaitable(
+            graph.ainvoke(
+                dict(seed_input), stream_mode="updates", version="v2"
+            )
+        )
+        return {
+            "sync_final_state": {"x": final["x"], "log": list(final["log"])},
+            "values_stream_sequence_sync": sync_values,
+            "values_stream_sequence_async": async_values,
+            "v2_invoke_parts": invoke_parts,
+            "v2_ainvoke_parts": ainvoke_parts,
+            "v2_parts_typed": (
+                _stream_parts_typed(invoke_parts)
+                and _stream_parts_typed(ainvoke_parts)
+            ),
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        LastValueChannel,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    graph = (
+        GraphBuilder("gauntlet-invocation-surfaces")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("a", lambda state: {"x": state["x"] + delta, "log": ["a"]})
+        .add_node("b", lambda state: {"x": state["x"] * factor, "log": ["b"]})
+        .add_edge(START, "a")
+        .add_edge("a", "b")
+        .add_edge("b", END)
+        .compile()
+    )
+
+    result = _call_offloaded(
+        lambda: graph.invoke_sync(
+            input=dict(seed_input), effects=SimulatedEffects(seed)
+        )
+    )
+    sync_values = _call_offloaded(
+        lambda: list(
+            graph.stream_sync(
+                input=dict(seed_input),
+                stream_mode="values",
+                effects=SimulatedEffects(seed),
+            )
+        )
+    )
+    async_values = _run_awaitable(
+        _collect_dharma_stream(
+            graph, dict(seed_input), SimulatedEffects(seed)
+        )
+    )
+    invoke_parts = _call_offloaded(
+        lambda: graph.invoke_sync(
+            input=dict(seed_input),
+            stream_mode="updates",
+            version="v2",
+            effects=SimulatedEffects(seed),
+        )
+    )
+    ainvoke_parts = _run_awaitable(
+        graph.invoke(
+            dict(seed_input),
+            stream_mode="updates",
+            version="v2",
+            effects=SimulatedEffects(seed),
+        )
+    )
+    return {
+        "sync_final_state": {
+            "x": result.state["x"],
+            "log": list(result.state["log"]),
+        },
+        "values_stream_sequence_sync": sync_values,
+        "values_stream_sequence_async": async_values,
+        "v2_invoke_parts": invoke_parts,
+        "v2_ainvoke_parts": ainvoke_parts,
+        "v2_parts_typed": (
+            _stream_parts_typed(invoke_parts)
+            and _stream_parts_typed(ainvoke_parts)
+        ),
+    }
+
+
+async def _collect_langgraph_astream(graph: Any, seed_input: Any) -> list[Any]:
+    return [
+        chunk
+        async for chunk in graph.astream(seed_input, stream_mode="values")
+    ]
+
+
+async def _collect_dharma_stream(
+    graph: Any, seed_input: Any, effects: Any
+) -> list[Any]:
+    return [
+        chunk
+        async for chunk in graph.stream(
+            seed_input, stream_mode="values", effects=effects
+        )
+    ]
+
+
+_WORKLOAD_ARMS["seeded_invocation_surfaces"] = _invocation_surface_arm
+_support("LG12", ("sync_invoke",), "dharma_swarm.graph:CompiledGraph.invoke_sync")
+_support("LG12", ("sync_stream",), "dharma_swarm.graph:CompiledGraph.stream_sync")
+_support("LG12", ("async_stream",), "dharma_swarm.graph:CompiledGraph.stream")
+_support(
+    "LG12",
+    ("typed_v2_invoke",),
+    "dharma_swarm.graph:CompiledGraph.invoke_sync#version",
+)
+_support(
+    "LG12",
+    ("typed_v2_ainvoke",),
+    "dharma_swarm.graph:CompiledGraph.invoke#version",
+)
+
+
+def _apply_invocation_surfaces_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG12 invocation-surface facets from the seeded two-arm workload.
+
+    One compiled two-node reducer chain is driven through every surface on
+    each arm and the emitted sequences are compared field by field.  Fail
+    closed per the error-parity rule: a probe_error on EITHER arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    field_by_facet = {
+        "sync_invoke": ("sync_final_state",),
+        "sync_stream": ("values_stream_sequence_sync",),
+        "async_stream": ("values_stream_sequence_async",),
+        "typed_v2_invoke": ("v2_invoke_parts", "v2_parts_typed"),
+        "typed_v2_ainvoke": ("v2_ainvoke_parts", "v2_parts_typed"),
+    }
+    row = row_lookup["LG12"]
+    for facet, fields in field_by_facet.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG12"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_invocation_surfaces:{facet}",
+                command_or_probe=(
+                    f"compare {'+'.join(fields)} after driving one compiled "
+                    "graph through the sync, streaming, and typed-v2 "
+                    "invocation surfaces on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row),
+            )
+        )

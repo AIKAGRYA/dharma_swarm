@@ -31,7 +31,7 @@ from typing import (
 
 from dharma_swarm.graph.channels import Channel, LastValueChannel, ReducerChannel
 from dharma_swarm.graph.compiler import GraphBuilder
-from dharma_swarm.graph.scheduler import CompiledGraph
+from dharma_swarm.graph.scheduler import CompiledGraph, run_on_private_loop
 from dharma_swarm.graph.state import state_digest
 from dharma_swarm.graph.types import GraphRunResult
 
@@ -317,6 +317,12 @@ class TypedCompiledGraph:
             raise SchemaError(
                 "invoke(context=...) requires a context schema declaration"
             )
+        if kwargs.get("stream_mode", "values") != "values":
+            raise SchemaError(
+                "typed graphs project a state RESULT, not stream chunks; "
+                "stream the compiled inner graph "
+                "(TypedCompiledGraph.inner.stream) instead (fail closed)"
+            )
         seed = input
         if (
             seed is not None
@@ -341,3 +347,21 @@ class TypedCompiledGraph:
                 result, state=projected, state_digest=state_digest(projected)
             )
         return result
+
+    def invoke_sync(
+        self,
+        input: Mapping[str, Any] | None = None,
+        *,
+        context: Any = None,
+        **kwargs: Any,
+    ) -> GraphRunResult:
+        """Blocking twin of :meth:`invoke` (private loop, same projections).
+
+        Fails closed inside a live event loop exactly like
+        ``CompiledGraph.invoke_sync`` — the projection layer adds no loop
+        semantics of its own.
+        """
+        return run_on_private_loop(
+            lambda: self.invoke(input, context=context, **kwargs),
+            "TypedCompiledGraph.invoke_sync",
+        )
