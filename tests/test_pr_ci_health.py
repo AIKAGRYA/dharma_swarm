@@ -179,27 +179,37 @@ def test_workflow_validates_push_authority_before_rebase():
     ) not in workflow
 
 
-def test_workflow_rebases_on_merge_to_main_not_only_hourly():
-    """Every merge to main strands every other open PR behind it. If the
-    only rebase trigger is the hourly cron, those PRs wait up to 59 minutes
-    — long enough that the operator hand-taps "Update branch" on each one
-    and restarts full CI. The push trigger must stay, and must run in
-    rebase mode so the merge event is answered in ~1 minute."""
+def test_workflow_does_not_rebase_on_every_merge_to_main():
+    """REVERSED 2026-08-07. This test previously asserted the opposite.
+
+    It used to require `push: branches: [main]`, on the reasoning that a merge
+    to main strands every other PR behind it and they would otherwise wait up
+    to 59 minutes for the cron. That reasoning assumed "require branches up to
+    date before merging" was enabled, which made a behind-main PR unmergeable.
+
+    That premise no longer holds — a behind-main PR reports
+    `mergeable_state: unstable` (mergeable), not `behind`. With it gone, the
+    trigger only bought cost: each merge rebased every conflict-free
+    behind-main PR, and each rebase relaunches that PR's full workflow set.
+    Measured 2026-08-07: four merges produced four rebase waves of ~13-20 PRs,
+    a 676-deep queue, a 2-second required job waiting 80 minutes, and PR #1286
+    having a complete 38/38 green sweep discarded four times.
+
+    The hourly cron still rebases, so the capability is retained — it is
+    bounded to once an hour instead of once per merge.
+    """
     import yaml  # noqa: PLC0415
 
     path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     triggers = doc.get("on", doc.get(True))
-    assert "push" in triggers, "merge-to-main must trigger the rebase sweep"
-    assert triggers["push"]["branches"] == ["main"]
+    assert "push" not in triggers, (
+        "the merge-to-main rebase stampede is back: every merge will rebase the "
+        "whole backlog and relaunch a full CI run per open PR"
+    )
     assert "schedule" in triggers, "the hourly backstop must remain"
 
-    mode = doc["jobs"]["triage-and-heal"]["env"]["MODE"]
-    assert "github.event_name == 'push'" in mode and "'rebase'" in mode, (
-        "push events must select rebase mode"
-    )
-    # The rebase step is what actually unblocks the PRs; it must accept the
-    # mode a push event selects.
+    # The rebase capability itself must survive — the cron still uses it.
     rebase_step = next(
         step for step in doc["jobs"]["triage-and-heal"]["steps"]
         if step.get("name", "").startswith("Rebase conflict-free")
