@@ -185,12 +185,20 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
             "check_name_drift.py ALLOWLIST_REL",
         ),
     ),
+}
+
+# Gates whose input IS the whole diff. A `paths:` filter on one of these is
+# never merely narrow — it deletes the gate for the PRs it excludes. Listed
+# with the reason it cannot be scoped, because "add the missing patterns" is
+# the wrong fix here: any enumeration is a list nobody can prove complete, and
+# a filter that is silently short is worse than no filter at all.
+WHOLE_DIFF_GATES: dict[str, str] = {
     "fourfold-warrant.yml": (
-        (
-            ".pre-commit-config.yaml",
-            "the only non-.py member of _HOT_PATHS in shakti_warrant.py:185, "
-            "so **/*.py alone cannot cover the hot-path set",
-        ),
+        "check_shakti_warrant.py runs with --diff-scope base; _path_stats "
+        "(shakti_warrant.py:243-273) scores docs, config and governance paths "
+        "as first-class inputs and _explicit_block_reasons (:379-399) matches "
+        "against the request text, so a docs-only or Go-only PR earns a real "
+        "graded verdict that a language filter would delete"
     ),
 }
 
@@ -228,11 +236,23 @@ def test_the_terminal_lane_runs_when_the_python_bridge_it_boots_changes() -> Non
 
 
 def test_the_hot_path_set_has_no_input_the_warrant_filter_cannot_see() -> None:
-    """GATE_INPUTS lists .pre-commit-config.yaml by hand. If a future non-.py
-    entry joins _HOT_PATHS, this catches it rather than the table silently
-    going stale — the AI-N4 shape (a check never exercised against the instance
-    it should catch)."""
+    """Defence in depth behind WHOLE_DIFF_GATES.
+
+    fourfold-warrant is unfiltered today, so the hot-path set is trivially
+    covered and this passes on the first branch. It stays live because if
+    anyone ever re-adds a filter there, `.pre-commit-config.yaml` — the only
+    non-.py member of _HOT_PATHS — is the input a `**/*.py` filter silently
+    drops, and this names it explicitly. Re-parsed from the source so the
+    hand-written table cannot go stale (AI-N4)."""
     import re
+
+    doc = yaml.safe_load(
+        (WORKFLOWS / "fourfold-warrant.yml").read_text(encoding="utf-8")
+    )
+    stanza = _pull_request_stanza(doc)
+    paths = list((stanza or {}).get("paths") or [])
+    if not paths:
+        return
 
     source = (REPO_ROOT / "dharma_swarm" / "shakti_warrant.py").read_text(
         encoding="utf-8"
@@ -242,16 +262,30 @@ def test_the_hot_path_set_has_no_input_the_warrant_filter_cannot_see() -> None:
     entries = re.findall(r'"([^"]+)"', block.group(1))
     assert entries, "no _HOT_PATHS entries parsed"
 
-    doc = yaml.safe_load(
-        (WORKFLOWS / "fourfold-warrant.yml").read_text(encoding="utf-8")
-    )
-    paths = list(_pull_request_stanza(doc).get("paths") or [])
     uncovered = [
-        entry
-        for entry in entries
+        entry for entry in entries
         if not entry.endswith(".py") and entry not in paths
     ]
     assert not uncovered, (
         "hot paths the fourfold-warrant filter cannot see, so a PR touching "
         f"only them would skip the attestation gate: {uncovered}"
     )
+
+
+def test_a_whole_diff_gate_never_carries_a_paths_filter() -> None:
+    """Some gates grade the entire diff. Filtering one does not make it narrow,
+    it makes it absent for every PR the filter excludes — and the failure is
+    invisible, because the workflow still passes on `push: main` afterwards.
+
+    Found on PR #1285: fourfold-warrant had been filtered to Python sources
+    while its measurement table advertised "docs-only governance PR" as the
+    biggest saving, i.e. the gate vanished on precisely the PRs the change was
+    optimising for."""
+    for filename, why in WHOLE_DIFF_GATES.items():
+        doc = yaml.safe_load((WORKFLOWS / filename).read_text(encoding="utf-8"))
+        stanza = _pull_request_stanza(doc)
+        assert stanza is not None, f"{filename} lost its pull_request stanza"
+        assert "paths" not in stanza, (
+            f"{filename} carries a paths filter, but it grades the whole diff: "
+            f"{why}. Every PR the filter excludes now runs no warrant at all."
+        )

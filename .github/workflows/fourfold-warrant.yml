@@ -3,15 +3,19 @@ name: fourfold-warrant
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
-    paths:
-      - '**/*.py'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      # The only non-Python member of _HOT_PATHS (shakti_warrant.py:185). A PR
-      # touching just this file needs the [impact-checked] attestation, and
-      # without this line the gate demanding it would not run.
-      - '.pre-commit-config.yaml'
-      - '.github/workflows/fourfold-warrant.yml'
+    # DELIBERATELY UNFILTERED. This gate grades the WHOLE diff, not a language:
+    # check_shakti_warrant.py runs with --diff-scope base, and _path_stats
+    # (shakti_warrant.py:243-273) counts docs, config and governance paths as
+    # first-class scoring inputs, while _explicit_block_reasons (:379-399)
+    # matches block patterns against the request text. A docs-only, dashboard-
+    # only or Go-only PR therefore earns a real graded verdict — and a Python
+    # filter would delete it for exactly those PRs.
+    #
+    # Enumerating every file class the warrant grades (**/*.md, **/*.yaml,
+    # **/*.json, **/*.ts, **/*.sh, ...) would be a list nobody can prove
+    # complete, and a filter that is silently short is worse than no filter:
+    # tests/test_workflow_path_filters.py pins this as unfilterable instead.
+    # Cost: one extra run per PR. Correct price for a whole-diff gate.
   merge_group:
 
 concurrency:
