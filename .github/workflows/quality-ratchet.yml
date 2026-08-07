@@ -10,6 +10,11 @@ name: quality-ratchet
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/quality-ratchet.yml'
   merge_group:
   push:
     branches: [main]

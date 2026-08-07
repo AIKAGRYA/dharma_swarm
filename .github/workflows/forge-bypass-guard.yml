@@ -3,6 +3,11 @@ name: forge-bypass-guard
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/forge-bypass-guard.yml'
   merge_group:
 
 concurrency:

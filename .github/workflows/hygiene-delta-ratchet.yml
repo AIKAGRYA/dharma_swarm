@@ -3,6 +3,11 @@ name: hygiene-delta-ratchet
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/hygiene-delta-ratchet.yml'
   merge_group:
 
 concurrency:

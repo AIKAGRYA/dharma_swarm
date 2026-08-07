@@ -3,6 +3,16 @@ name: semgrep
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.go'
+      - '.github/workflows/semgrep.yml'
   merge_group:
   push:
     branches: [main]

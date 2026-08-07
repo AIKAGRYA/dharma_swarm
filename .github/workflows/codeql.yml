@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/codeql.yml'
   merge_group:
   schedule:
     # Sunday 09:00 UTC (Mon 17:00 GMT+8) — weekly variant analysis

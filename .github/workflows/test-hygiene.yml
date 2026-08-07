@@ -3,6 +3,11 @@ name: test-hygiene
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/test-hygiene.yml'
   merge_group:
 
 concurrency:

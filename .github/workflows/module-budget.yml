@@ -3,6 +3,11 @@ name: module-budget
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/module-budget.yml'
   merge_group:
 
 concurrency:

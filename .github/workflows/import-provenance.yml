@@ -3,6 +3,11 @@ name: import-provenance
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/import-provenance.yml'
   merge_group:
 
 concurrency:

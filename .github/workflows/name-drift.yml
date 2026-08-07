@@ -3,6 +3,11 @@ name: name-drift
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/name-drift.yml'
   merge_group:
 
 concurrency:

@@ -10,6 +10,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'requirements*.txt'
+      - 'Dockerfile*'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/package-lock.json'
+      - '.github/workflows/hermetic.yml'
   merge_group:
 
 permissions:

@@ -15,6 +15,11 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
     types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/spine-adoption.yml'
   merge_group:
 
 concurrency:

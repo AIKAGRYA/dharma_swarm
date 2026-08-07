@@ -3,6 +3,11 @@ name: fourfold-warrant
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/fourfold-warrant.yml'
   merge_group:
 
 concurrency:
