@@ -165,3 +165,39 @@ def test_the_classifier_never_raises_on_any_resolve_path(monkeypatch) -> None:
         pass  # only FileNotFoundError/Timeout are caught by contract
     # resolve must still be total for the cases it owns
     assert ccp.resolve("push", "", "")[0] == ccp.all_true()
+
+
+# --- self-coverage (PR #1285 review round 2) --------------------------------
+#
+# The workflow-level rule "a filtered workflow must list its own file" has a
+# per-job twin that the classifier did not honour: a PR editing tests.yml
+# classified every class false, so each advisory job it defines was skipped and
+# the change to a job could not exercise that job.
+
+
+def test_editing_the_workflow_that_defines_the_jobs_runs_every_job() -> None:
+    classes = ccp.classify([".github/workflows/tests.yml"])
+    assert all(classes.values()), (
+        "a PR editing tests.yml skips the very jobs it edits: " + repr(classes)
+    )
+
+
+def test_editing_the_classifier_itself_runs_every_job() -> None:
+    classes = ccp.classify(["scripts/ci/classify_changed_paths.py"])
+    assert all(classes.values()), (
+        "the rules deciding which jobs run are an input to every job: "
+        + repr(classes)
+    )
+
+
+def test_self_coverage_does_not_leak_into_unrelated_paths() -> None:
+    """The escape hatch must be exact-match, not a prefix or suffix rule, or it
+    would quietly re-enable everything and undo the whole change."""
+    classes = ccp.classify(["docs/governance/tests.yml", "scripts/ci/other.txt"])
+    assert not any(classes.values()), repr(classes)
+
+
+def test_the_go_lanes_run_when_the_make_target_they_invoke_changes() -> None:
+    """Both Go jobs run `make go-ci`; nothing else in tests.yml uses make."""
+    classes = ccp.classify(["Makefile"])
+    assert classes["go"], "a change to the go-ci target skipped the Go lanes"

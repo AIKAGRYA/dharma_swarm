@@ -143,6 +143,32 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
             "semgrep.yml invokes it directly",
         ),
     ),
+    # Second review round on #1285 found the same defect in three more filters.
+    "import-provenance.yml": (
+        ("requirements*.txt", "check_import_provenance.py declared_dists()"),
+        (
+            "packages/*/pyproject.toml",
+            "declared_dists() globs packages/*/pyproject.toml; the root-only "
+            "'pyproject.toml' pattern does not match it",
+        ),
+        (
+            "scripts/governance/import_provenance_allowlist.txt",
+            "check_import_provenance.py ALLOWLIST_REL",
+        ),
+    ),
+    "name-drift.yml": (
+        (
+            "scripts/governance/name_drift_allowlist.txt",
+            "check_name_drift.py ALLOWLIST_REL",
+        ),
+    ),
+    "fourfold-warrant.yml": (
+        (
+            ".pre-commit-config.yaml",
+            "the only non-.py member of _HOT_PATHS in shakti_warrant.py:185, "
+            "so **/*.py alone cannot cover the hot-path set",
+        ),
+    ),
 }
 
 
@@ -175,4 +201,34 @@ def test_the_terminal_lane_runs_when_the_python_bridge_it_boots_changes() -> Non
     assert "needs.changes.outputs.python != 'false'" in condition, (
         "the terminal lane no longer runs on Python-only changes, but its "
         "behavioral tests boot dharma_swarm.terminal_bridge; got: " + condition
+    )
+
+
+def test_the_hot_path_set_has_no_input_the_warrant_filter_cannot_see() -> None:
+    """GATE_INPUTS lists .pre-commit-config.yaml by hand. If a future non-.py
+    entry joins _HOT_PATHS, this catches it rather than the table silently
+    going stale — the AI-N4 shape (a check never exercised against the instance
+    it should catch)."""
+    import re
+
+    source = (REPO_ROOT / "dharma_swarm" / "shakti_warrant.py").read_text(
+        encoding="utf-8"
+    )
+    block = re.search(r"_HOT_PATHS = frozenset\(\s*\{(.*?)\}", source, re.DOTALL)
+    assert block, "_HOT_PATHS literal not found in shakti_warrant.py"
+    entries = re.findall(r'"([^"]+)"', block.group(1))
+    assert entries, "no _HOT_PATHS entries parsed"
+
+    doc = yaml.safe_load(
+        (WORKFLOWS / "fourfold-warrant.yml").read_text(encoding="utf-8")
+    )
+    paths = list(_pull_request_stanza(doc).get("paths") or [])
+    uncovered = [
+        entry
+        for entry in entries
+        if not entry.endswith(".py") and entry not in paths
+    ]
+    assert not uncovered, (
+        "hot paths the fourfold-warrant filter cannot see, so a PR touching "
+        f"only them would skip the attestation gate: {uncovered}"
     )

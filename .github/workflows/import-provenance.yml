@@ -7,6 +7,14 @@ on:
       - '**/*.py'
       - 'pyproject.toml'
       - 'uv.lock'
+      # The gate's other inputs. declared_dists() reads requirements*.txt and
+      # packages/*/pyproject.toml (the root-only 'pyproject.toml' pattern above
+      # does not match the latter), and load_allowlist() reads the exemption
+      # list. Deleting a declaration or widening the allowlist must run the
+      # check that polices it.
+      - 'requirements*.txt'
+      - 'packages/*/pyproject.toml'
+      - 'scripts/governance/import_provenance_allowlist.txt'
       - '.github/workflows/import-provenance.yml'
   merge_group:
 

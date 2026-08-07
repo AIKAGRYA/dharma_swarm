@@ -7,6 +7,10 @@ on:
       - '**/*.py'
       - 'pyproject.toml'
       - 'uv.lock'
+      # The only non-Python member of _HOT_PATHS (shakti_warrant.py:185). A PR
+      # touching just this file needs the [impact-checked] attestation, and
+      # without this line the gate demanding it would not run.
+      - '.pre-commit-config.yaml'
       - '.github/workflows/fourfold-warrant.yml'
   merge_group:
 

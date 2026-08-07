@@ -7,6 +7,8 @@ on:
       - '**/*.py'
       - 'pyproject.toml'
       - 'uv.lock'
+      # The exemption list the gate grades against (check_name_drift.py:67).
+      - 'scripts/governance/name_drift_allowlist.txt'
       - '.github/workflows/name-drift.yml'
   merge_group:
 

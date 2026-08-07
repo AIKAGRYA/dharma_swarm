@@ -46,8 +46,11 @@ import sys
 # A class is "changed" when any changed path matches one of its rules. Suffix
 # rules end with the extension; every other rule is a path prefix.
 CLASS_RULES: dict[str, tuple[str, ...]] = {
-    # Go sources plus the Python bridges that assert against them.
-    "go": ("tools/", "*.go", "go.mod", "go.sum"),
+    # Go sources plus the Python bridges that assert against them. Makefile is
+    # in here because both Go lanes invoke `make go-ci` and nothing else in
+    # tests.yml uses make -- a change to that target must run the lanes it
+    # drives.
+    "go": ("tools/", "*.go", "go.mod", "go.sum", "Makefile"),
     "dashboard": ("dashboard/",),
     "terminal": ("terminal/",),
     # Anything that can change Python behaviour, including the dependency
@@ -63,6 +66,17 @@ CLASS_RULES: dict[str, tuple[str, ...]] = {
 
 CLASSES: tuple[str, ...] = tuple(CLASS_RULES)
 
+# Self-coverage. Editing the file that DEFINES the gated jobs, or this
+# classifier that decides which of them run, must run all of them -- otherwise
+# the change to a job cannot exercise that job, and you could break a lane
+# while CI agreed with you. This is the same property
+# tests/test_workflow_path_filters.py enforces for workflow-level `paths:`
+# filters, which the per-job filters did not honour until PR #1285 review.
+SELF_COVERAGE_PATHS: tuple[str, ...] = (
+    ".github/workflows/tests.yml",
+    "scripts/ci/classify_changed_paths.py",
+)
+
 
 def _matches(path: str, rule: str) -> bool:
     if rule.startswith("*"):
@@ -71,7 +85,14 @@ def _matches(path: str, rule: str) -> bool:
 
 
 def classify(paths: list[str]) -> dict[str, bool]:
-    """Map changed paths to work classes. Pure; no I/O, no git."""
+    """Map changed paths to work classes. Pure; no I/O, no git.
+
+    A change to any SELF_COVERAGE_PATHS entry marks every class changed: the
+    definition of the jobs, and the rules deciding which jobs run, are inputs
+    to every job here.
+    """
+    if any(p in SELF_COVERAGE_PATHS for p in paths):
+        return all_true()
     return {
         name: any(_matches(p, rule) for p in paths for rule in rules)
         for name, rules in CLASS_RULES.items()
