@@ -70,18 +70,17 @@ The repository already contains the enterprise A2A substrate:
 - AgentOps JSON packets, BoardStore, and the dashboard are projections around canonical task/runtime owners.
 - DHARMA COMMAND already provides cockpit, command-post, agents, tasks, Kanban, A2A receipt, gates, runtime, telemetry, and stigmergy surfaces.
 
-### Current diagnosis: candidate causes, not a confirmed live root cause
+### Delivery symptom: candidate causes, not a confirmed live root cause
 
-The symptom can be explained by several independently sufficient candidates. The evidence establishes these candidates exist and are reachable in the relevant design, but does not establish which one is firing in live traffic:
+The observed symptom is that messages published to fleet subjects do not reach agents and no replies come back. Each candidate below is independently *sufficient* to produce that symptom, but none is confirmed as the one firing in live traffic:
 
-1. The Fleet Hub prototype publishes ad-hoc messages instead of using the versioned canonical envelope.
-2. It uses a parallel roster rather than `FLEET_FIELD_REGISTRY.yaml`, `contact_registry.py`, `agent_directory.py`, and Agent Cards.
-3. It uses a flat Kanban API rather than the canonical TaskBoard and BoardStore projection.
-4. It uses a new dashboard rather than extending or sharing DHARMA COMMAND.
-5. It tails flat-file chat history rather than JetStream and task receipts.
-6. It uses callsign subjects rather than the UID-derived topology.
+1. **Subject collision:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:84-122` records AGNI Hermes with UID `hermes` while rushabdev also listens on `dharma.a2a.hermes`. Two durable consumers competing on one subject means each message lands wherever the broker's competing-consumer delivery sends it, so replies can appear randomly missing. Registry decision **FFR-D2 remains OPEN**.
+2. **Devin drains only the compatibility subject:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:124-141` records stable UID `devin-roaming-2987d222`, while the compatibility process pulls only `dharma.a2a.devin`; the UID inbox and reply/ACK wildcard routes remain undrained.
+3. **Roster fragmentation:** competing identity projections disagree, including `perplexity` versus `perplexity-computer` at `docs/ops/FLEET_FIELD_REGISTRY.yaml:179-195` and `contact_registry.py:110-152` UIDs such as `hermes-m5` and `claude-code` that do not match probed reality. A publisher can therefore address a subject from one projection while the bridge listens according to another.
 
-The one known design hazard is direct operator publication: it bypasses Telos gates, TaskBoard transition validation, claim leases, cost ceilings, and the witness/receipt trail. The ADR in `docs/architecture/ADRs/ADR-011-operator-actions-through-taskboard.md` records that boundary.
+Before fixing any candidate, run the discriminating check for one message: log the published subject and every consumer bound to it, then observe whether delivery lands somewhere unexpected. This distinguishes the actual live cause from the first plausible explanation. Milestone **M0** is the migration step that closes these identity and routing seams.
+
+The separate direct-operator-publication hazard remains: it bypasses Telos gates, TaskBoard transition validation, claim leases, cost ceilings, and the witness/receipt trail. The ADR in `docs/architecture/ADRs/ADR-011-operator-actions-through-taskboard.md` records that boundary.
 
 ### Live-versus-target topology seam
 
@@ -242,7 +241,7 @@ The 2-hour projection is unsuitable for a live/dead dot: an agent can be dead fo
 | governance | TelosGatekeeper, kernel/tool policy, receipt gates | Surface verdicts; never bypass |
 | operator UI | DHARMA COMMAND or separate phone client, decision open | Thin client over shared API |
 
-The architecture doc is a DRAFT and does not itself become repo-level canon. It is subordinate to the canonical owners in `docs/governance/CANONICAL_DOC_STACK.md`.
+The architecture doc is a DRAFT and does not itself become repo-level canon. It replaces nothing. It subordinates to `docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md` for the A2A spine and to `docs/governance/CANONICAL_DOC_STACK.md` for document authority and hierarchy; executable truth remains with the cited code and runtime owners.
 
 ## Failure and migration semantics
 
