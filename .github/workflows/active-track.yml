@@ -183,8 +183,32 @@ jobs:
   onboarding-admission-parity-compat:
     name: Onboarding admission parity
     needs: onboarding-status
+    # `!cancelled()`, not `always()`, and not a skip-on-cancelled guard.
+    #
+    # Three outcomes must stay distinct on this REQUIRED context:
+    #   session-status SUCCEEDS -> bridge runs, passes.
+    #   session-status FAILS    -> bridge runs and fails with it. `!cancelled()`
+    #                              overrides the implicit needs-success gate, so
+    #                              a real failure still blocks. That is the
+    #                              false-green this job has always guarded.
+    #   the run is CANCELLED    -> this job is CANCELLED too, not skipped.
+    #
+    # The last case is the point. `always()` made the bridge run after a
+    # cancellation and compare "cancelled" against "success", reporting hard
+    # `failure` on a PR that did nothing wrong. But SKIPPING on cancelled is
+    # worse: a skipped required check counts as a PASS, both in branch
+    # protection and in scripts/runtime/pr_merge_control.py:53
+    # (PASS_CONCLUSIONS = SUCCESS, SKIPPED, NEUTRAL). An operator clicking
+    # "Cancel workflow" is a cancellation with NO successor run, and would then
+    # turn this gate green with the onboarding evidence never gathered.
+    # `Onboarding session status` is not itself a required context, so nothing
+    # else catches the gap.
+    #
+    # A cancelled job reports CANCELLED, which is in BAD_CONCLUSIONS and blocks.
+    # On a supersession the newer run reports for the same head and the latest
+    # result per context name wins. Indeterminate never reads as a definite pass.
     if: >-
-      always() &&
+      !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'merge_group')
     runs-on: ubuntu-latest
     timeout-minutes: 2
