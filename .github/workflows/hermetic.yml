@@ -18,6 +18,14 @@ on:
       - '**/go.mod'
       - '**/go.sum'
       - '**/package-lock.json'
+      # The codeowners-blast-radius job in this same workflow builds the import
+      # graph over dharma_swarm/**/*.py (codeowners_blast_radius.py:68) and
+      # grades it against .github/CODEOWNERS (:224). Without these three lines
+      # the routing check would fire only on dependency bumps — i.e. never on
+      # the changes it exists to catch.
+      - 'dharma_swarm/**/*.py'
+      - '.github/CODEOWNERS'
+      - 'scripts/governance/codeowners_blast_radius.py'
       - '.github/workflows/hermetic.yml'
   merge_group:
 

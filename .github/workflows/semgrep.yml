@@ -12,6 +12,15 @@ on:
       - '**/*.js'
       - '**/*.jsx'
       - '**/*.go'
+      # The scanner's own rules and its invoker. Deleting a detection rule must
+      # run the scanner, not silence it — the self-coverage rule this PR applies
+      # to workflow files, applied one level down to rule definitions.
+      - '.semgrep/**'
+      - 'scripts/governance/run_semgrep_with_ca.sh'
+      # p/security-audit carries Dockerfile and shell rules; without these a
+      # risky container or script change would produce no scan.
+      - 'Dockerfile*'
+      - '**/*.sh'
       - '.github/workflows/semgrep.yml'
   merge_group:
   push:

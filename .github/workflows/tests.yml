@@ -253,7 +253,13 @@ jobs:
 
   terminal:
     needs: changes
-    if: always() && needs.changes.outputs.terminal != 'false'
+    # OR-in python: the behavioral tests spawn `python3 -m
+    # dharma_swarm.terminal_bridge` (terminal/src/bridge.ts:54), which is why
+    # this job installs the Python package below. A bridge change is a terminal
+    # change even when nothing under terminal/ moves.
+    if: >-
+      always() && (needs.changes.outputs.terminal != 'false'
+      || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     defaults:
       run:

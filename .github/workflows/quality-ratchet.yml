@@ -14,6 +14,11 @@ on:
       - '**/*.py'
       - 'pyproject.toml'
       - 'uv.lock'
+      # The graded-against artifact and the grader itself. --baseline-merge-base-of
+      # already stops a PR raising its own ceiling, but only when the workflow
+      # runs at all; a PR touching only the baseline JSON matched nothing here.
+      - 'docs/governance/hygiene/ratchet_baselines.json'
+      - 'scripts/governance/hygiene/**'
       - '.github/workflows/quality-ratchet.yml'
   merge_group:
   push:
