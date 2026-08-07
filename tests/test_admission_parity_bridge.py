@@ -17,13 +17,22 @@ session-status, no PR can earn a green parity check at all.
 
 Both halves of the condition are load-bearing and this file pins both:
 
-  * `always()` must stay — without it a genuinely FAILING session-status would
-    skip the bridge, and a skipped required check counts as success. That is the
-    false-green the job's own comment exists to prevent.
-  * `!= 'cancelled'` must stay — without it a supersession reads as a verdict.
+  * a real FAILURE must still block — the condition must override the implicit
+    needs-success gate, or a failing session-status would skip the bridge, and a
+    skipped required check counts as success.
+  * a CANCELLATION must not read as a verdict — neither as a failure (the
+    original bug: a superseded run turned red) nor as a PASS.
 
-Skipping on cancelled is safe because a cancellation means a newer run already
-exists for this head and will report.
+The second half is why `!cancelled()` replaced an earlier `always() && result !=
+'cancelled'` attempt. Skipping on cancelled looked safe on the assumption that a
+cancellation implies a successor run — but an operator clicking "Cancel
+workflow" has no successor, the job would be SKIPPED, and
+scripts/runtime/pr_merge_control.py:53 counts SKIPPED as passing
+(PASS_CONCLUSIONS = SUCCESS, SKIPPED, NEUTRAL). That converts an indeterminate
+upstream into a definite green on a required gate, with `Onboarding session
+status` not itself required so nothing else catches it. Caught in review.
+
+`!cancelled()` cancels the job instead, and CANCELLED is in BAD_CONCLUSIONS.
 """
 
 from __future__ import annotations
@@ -43,21 +52,30 @@ def _condition() -> str:
     return " ".join(str(doc["jobs"][JOB]["if"]).split())
 
 
-def test_a_cancelled_dependency_does_not_report_as_failure() -> None:
-    """THE regression. A superseded run must skip the bridge, not fail it."""
-    assert "needs.onboarding-status.result != 'cancelled'" in _condition(), (
-        "the parity bridge will report a cancelled dependency as a hard failure "
-        "on a required context; a PR that did nothing wrong goes red"
+def test_a_cancellation_cancels_the_bridge_rather_than_failing_it() -> None:
+    """THE regression. A superseded run must not turn a required context red."""
+    assert "!cancelled()" in _condition(), (
+        "without !cancelled() the bridge runs after a cancellation and compares "
+        "\"cancelled\" against \"success\", reporting hard failure on a required "
+        "context for a PR that did nothing wrong"
     )
 
 
-def test_always_is_retained_so_a_real_failure_still_blocks() -> None:
-    """The opposite error: dropping always() would skip the bridge whenever
-    session-status fails, and GitHub counts a skipped required check as
-    success. That converts a real failure into a green merge."""
-    assert "always()" in _condition(), (
-        "always() removed — a failing session-status would now SKIP this bridge, "
-        "and a skipped required check passes branch protection (false green)"
+def test_a_cancellation_is_never_converted_into_a_pass() -> None:
+    """The opposite and worse error, caught in review on PR #1287.
+
+    Skipping the bridge on cancellation makes it report SKIPPED, and
+    pr_merge_control.py:53 counts SKIPPED as passing. An operator-initiated
+    cancel has no successor run, so the required gate would go green with the
+    onboarding evidence never gathered."""
+    condition = _condition()
+    assert "result != 'cancelled'" not in condition, (
+        "skip-on-cancelled is back: a cancellation with no successor run now "
+        "SKIPS this required check, and SKIPPED counts as a pass"
+    )
+    assert "always()" not in condition, (
+        "always() is back: the bridge will run after a cancellation and report "
+        "that indeterminate state as a definite failure"
     )
 
 

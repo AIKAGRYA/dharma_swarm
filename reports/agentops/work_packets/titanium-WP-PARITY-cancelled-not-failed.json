@@ -3,7 +3,7 @@
   "base_ref": "73fe7a07b2995d5e5e4671038f6966e0d137c875",
   "branch": "fix/parity-bridge-cancelled",
   "worktree": ".",
-  "intent": "Stop the admission-parity bridge reporting a CANCELLED dependency as a hard failure on a REQUIRED context. Observed twice on 2026-08-07: pr-ci-health supersedes a run whose session-status has starved in the queue, the bridge still runs under always(), and `test cancelled = success` fails. While the queue starves session-status, no PR can earn a green parity check. Skips on cancelled only; always() is retained so a genuine session-status failure still blocks.",
+  "intent": "Stop the admission-parity bridge turning a CANCELLED dependency into a verdict on a REQUIRED context, in EITHER direction. Observed twice on 2026-08-07: pr-ci-health supersedes a run whose session-status has starved in the queue, the bridge still runs under always(), and `test cancelled = success` reports hard failure. While the queue starves session-status, no PR can earn a green parity check. The fix is `!cancelled()`: a real FAILURE still runs the bridge and blocks (overriding the implicit needs-success gate), and a CANCELLATION cancels the bridge rather than skipping it. Skipping would be worse than the original bug \u2014 SKIPPED counts as a pass in branch protection and in scripts/runtime/pr_merge_control.py:53, and an operator-initiated cancel has no successor run, so the gate would go green with the onboarding evidence never gathered.",
   "allowed_files": [
     ".github/workflows/active-track.yml",
     "reports/agentops/work_packets/titanium-WP-PARITY-cancelled-not-failed.json",
@@ -39,14 +39,14 @@
   ],
   "negative_controls": [
     {
-      "name": "reverting-the-cancelled-guard-is-caught",
-      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); p.write_text(t.replace(\\\"always() && needs.onboarding-status.result != 'cancelled' &&\\\",'always() &&',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_a_cancelled_dependency_does_not_report_as_failure'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "name": "reverting-to-always-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); n=t.replace('!cancelled() &&','always() &&',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_a_cancellation_cancels_the_bridge_rather_than_failing_it'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
-      "name": "dropping-always-is-caught",
-      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); p.write_text(t.replace(\\\"always() && needs.onboarding-status.result != 'cancelled' &&\\\",\\\"needs.onboarding-status.result != 'cancelled' &&\\\",1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_always_is_retained_so_a_real_failure_still_blocks'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "name": "skip-on-cancelled-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); n=t.replace('!cancelled() &&',\\\"always() && needs.onboarding-status.result != 'cancelled' &&\\\",1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_a_cancellation_is_never_converted_into_a_pass'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -90,11 +90,11 @@
     ],
     "honest_blockers": [
       "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO: the fix and its tests were authored before this packet existed. Read the binding as scope CONFORMANCE, not scope-declared-first.",
-      "Verified by contract tests over the workflow YAML and two negative controls, NOT by observing a real superseded run go green. The proof that it works is the next cancellation, which I cannot schedule.",
-      "A SKIPPED required check counts as success in branch protection. This is safe only because a cancellation implies a newer run exists for the same head. If GitHub ever cancels without a successor, this would convert that into a silent pass.",
-      "Does not address the cause: the queue depth that starves session-status for 90 minutes, and the pr-ci-health rebase loop that supersedes it. This only stops the symptom being mislabelled."
+      "I SHIPPED A FALSE-GREEN ON A REQUIRED SAFETY GATE AND REVIEW CAUGHT IT, NOT ME. The first version of this fix skipped the bridge on cancellation (`always() && result != 'cancelled'`). A SKIPPED required check counts as a PASS (scripts/runtime/pr_merge_control.py:53, PASS_CONCLUSIONS = SUCCESS, SKIPPED, NEUTRAL), and `Onboarding session status` is not itself required, so nothing else covered the gap. The reasoning error was assuming a cancellation implies a successor run for the same head; an operator clicking \"Cancel workflow\" breaks that invariant. I had recorded this exact risk in this file's own honest_blockers and shipped anyway \u2014 a written blocker is not a control. Corrected to `!cancelled()`, which cancels the job instead; CANCELLED is in BAD_CONCLUSIONS and blocks.",
+      "Verified by contract tests over the workflow YAML and two negative controls, NOT by observing a real superseded run go green, nor by observing a real operator cancel block. The proof that it works is the next cancellation, which I cannot schedule.",
+      "Does not address the cause: the queue depth that starves session-status for 90 minutes. The pr-ci-health merge-to-main rebase trigger that drove that depth was removed separately (#1289, merged). This only stops the symptom being mislabelled."
     ],
     "rollback": "Single revert. The bridge returns to reporting cancelled dependencies as failures.",
-    "packet_digest": "58c57b2696e540ea896281a924a97fe900d21feba67f686bc95a4adf905a0c82"
+    "packet_digest": "fd6991cb16f2693d948e9dceeae1467cbdca7f7486d5641e78a4d758f464fa01"
   }
 }
