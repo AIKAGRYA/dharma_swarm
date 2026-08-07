@@ -30,10 +30,17 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TSCONFIG = REPO_ROOT / "dashboard" / "tsconfig.json"
-DASHBOARD_SRC = REPO_ROOT / "dashboard" / "src"
+DASHBOARD = REPO_ROOT / "dashboard"
+TSCONFIG = DASHBOARD / "tsconfig.json"
 
-_TS_SUFFIXED_IMPORT = re.compile(r"""from\s+["'][^"']+\.ts["']""")
+# Mirror the tsconfig's include surface (**/*.ts, **/*.tsx, **/*.mts across
+# dashboard/), not just src/**/*.ts, and every import form TS5097 fires on:
+# `from "./x.ts"`, side-effect `import "./x.ts"`, dynamic `import("./x.ts")`.
+_SCAN_SUFFIXES = ("*.ts", "*.tsx", "*.mts", "*.cts")
+_EXCLUDED_PARTS = frozenset({"node_modules", ".next"})
+_TS_SUFFIXED_IMPORT = re.compile(
+    r"""(?:from\s+|import\s+|import\s*\(\s*)["'][^"']+\.(?:ts|tsx|mts|cts)["']"""
+)
 
 
 def _compiler_options() -> dict:
@@ -43,8 +50,10 @@ def _compiler_options() -> dict:
 def _ts_suffixed_import_files() -> list[str]:
     return sorted(
         str(path.relative_to(REPO_ROOT))
-        for path in DASHBOARD_SRC.rglob("*.ts")
-        if _TS_SUFFIXED_IMPORT.search(path.read_text(encoding="utf-8"))
+        for suffix in _SCAN_SUFFIXES
+        for path in DASHBOARD.rglob(suffix)
+        if not _EXCLUDED_PARTS.intersection(path.parts)
+        and _TS_SUFFIXED_IMPORT.search(path.read_text(encoding="utf-8"))
     )
 
 
