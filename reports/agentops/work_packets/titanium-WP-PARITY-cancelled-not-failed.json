@@ -6,6 +6,8 @@
   "intent": "Stop the admission-parity bridge turning a CANCELLED dependency into a verdict on a REQUIRED context, in EITHER direction. Observed twice on 2026-08-07: pr-ci-health supersedes a run whose session-status has starved in the queue, the bridge still runs under always(), and `test cancelled = success` reports hard failure. While the queue starves session-status, no PR can earn a green parity check. The fix is `!cancelled()`: a real FAILURE still runs the bridge and blocks (overriding the implicit needs-success gate), and a CANCELLATION cancels the bridge rather than skipping it. Skipping would be worse than the original bug \u2014 SKIPPED counts as a pass in branch protection and in scripts/runtime/pr_merge_control.py:53, and an operator-initiated cancel has no successor run, so the gate would go green with the onboarding evidence never gathered.",
   "allowed_files": [
     ".github/workflows/active-track.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
     "reports/agentops/work_packets/titanium-WP-PARITY-cancelled-not-failed.json",
     "tests/test_admission_parity_bridge.py",
     "tests/test_onboarding_ci_contract.py"
@@ -40,6 +42,12 @@
     {
       "name": "onboarding-ci-contract",
       "command": "python3 -m pytest tests/test_onboarding_ci_contract.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-integrity",
+      "command": "python3 scripts/docops/check_docops_integrity.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -106,9 +114,12 @@
       "I SHIPPED A FALSE-GREEN ON A REQUIRED SAFETY GATE AND REVIEW CAUGHT IT, NOT ME. The first version of this fix skipped the bridge on cancellation (`always() && result != 'cancelled'`). A SKIPPED required check counts as a PASS (scripts/runtime/pr_merge_control.py:53, PASS_CONCLUSIONS = SUCCESS, SKIPPED, NEUTRAL), and `Onboarding session status` is not itself required, so nothing else covered the gap. The reasoning error was assuming a cancellation implies a successor run for the same head; an operator clicking \"Cancel workflow\" breaks that invariant. I had recorded this exact risk in this file's own honest_blockers and shipped anyway \u2014 a written blocker is not a control. Corrected to `!cancelled()`, which cancels the job instead; CANCELLED is in BAD_CONCLUSIONS and blocks.",
       "I SATISFIED A GATE WITH MY OWN COMMENT PROSE \u2014 the exact CLAUDE.md hard rule \"never add prose to satisfy a gate\", committed accidentally, and caught by Devin, not by me. tests/test_onboarding_ci_contract.py:_job_block() returned raw job text INCLUDING comments, and every assertion in that file is a substring test over it. When I replaced `always()` with `!cancelled()`, the 24-line comment I wrote to explain the replacement contained the literal string `always()` twice, so `assert \"always()\" in compat` stayed green while asserting nothing about the condition. My own earlier test run reported this file as passing and I read that as evidence. Fixed at the class level, not the instance: _job_block() now strips comment-only lines, so no `in` assertion in that file can be satisfied by prose and no `not in` assertion can be broken by it; the condition assertion additionally reads the parsed YAML `if` value. One caller that deliberately asserts a comment leads the steps list uses an explicit _job_block_with_comments(). Negative control 'condition-reverted-while-prose-still-claims-the-fix-is-caught' reproduces the original bypass and proves it now fails.",
       "Verified by contract tests over the workflow YAML and two negative controls, NOT by observing a real superseded run go green, nor by observing a real operator cancel block. The proof that it works is the next cancellation, which I cannot schedule.",
-      "Does not address the cause: the queue depth that starves session-status for 90 minutes. The pr-ci-health merge-to-main rebase trigger that drove that depth was removed separately (#1289, merged). This only stops the symptom being mislabelled."
+      "Does not address the cause: the queue depth that starves session-status for 90 minutes. The pr-ci-health merge-to-main rebase trigger that drove that depth was removed separately (#1289, merged). This only stops the symptom being mislabelled.",
+      "THE GENERATED COUNT DOCS ARE IN THIS PR'S SCOPE BY FORCE, NOT BY CHOICE, AND MY FIRST PACKET DID NOT DECLARE THEM (Devin, #1287). DocOps integrity is a REQUIRED context and it grades the committed counts against the PR's OWN tree, so any PR that adds a `def test_` must regenerate them or go red: this branch moves test_def_occurrences from 14,556 to 14,560. Verified by reverting both files to origin/main and re-running the checker, which fails on three assertions. That also means the numbers here are correct for THIS tree and will be stale the moment another test-adding PR merges first -- #1285 adds tests and will do exactly that. Whoever merges second must regenerate. The counts themselves are #1286's subject; the overlap is unavoidable, not duplication.",
+      "SEPARATELY: main is currently RED on this required gate on its own tree (957 committed vs 958 measured test files). #1286 carries that fix. Not this PR's to make.",
+      "NOT FIXED HERE, AND IT IS A REAL GAP: the manifest's top-level-module PERCENTAGE is not mechanically checked. docs/docops/assertions.yaml:17 captures 'Top-level \\(flat\\) modules \\| \\*\\*([\\d,]+)' -- the group stops before ' (44.4%)', so the writer never rewrites the percentage and it stales silently. That is how it stayed at 43.5% while the counts moved from 455/1046 to 471/1062. I corrected the value by hand here and Devin caught it, which is reviewer vigilance where CLAUDE.md asks for an uncharmable mechanical check. The durable fix is a derived-percentage metric in check_docops_integrity.py, which is a change to the CHECKER and does not belong in a parity-bridge PR."
     ],
     "rollback": "Single revert. The bridge returns to reporting cancelled dependencies as failures.",
-    "packet_digest": "0ef46af275d80c200732d6809cd1e456aaaeb1b4e3989f64957e7f0332c65b06"
+    "packet_digest": "c8cd150703cf895aeddd1bffea0960fe00cb902f404ea309b59a6e83a09cc9f1"
   }
 }

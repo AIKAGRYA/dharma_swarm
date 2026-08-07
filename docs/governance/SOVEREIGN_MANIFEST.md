@@ -167,7 +167,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **1,062** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **471 (43.5%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Top-level (flat) modules | **471 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
 | Total Python LOC | **379,032** | wc -l across dharma_swarm Python modules |
 | Test files | **958** | git ls-files tests \| rg '\.py$' \| wc -l |
 | Test functions | **14,560 `def test_` occurrences under tests/** | rg "def test_" tests |
