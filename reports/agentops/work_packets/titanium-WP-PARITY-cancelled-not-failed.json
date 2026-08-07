@@ -1,0 +1,100 @@
+{
+  "id": "titanium-WP-PARITY-cancelled-not-failed",
+  "base_ref": "73fe7a07b2995d5e5e4671038f6966e0d137c875",
+  "branch": "fix/parity-bridge-cancelled",
+  "worktree": ".",
+  "intent": "Stop the admission-parity bridge reporting a CANCELLED dependency as a hard failure on a REQUIRED context. Observed twice on 2026-08-07: pr-ci-health supersedes a run whose session-status has starved in the queue, the bridge still runs under always(), and `test cancelled = success` fails. While the queue starves session-status, no PR can earn a green parity check. Skips on cancelled only; always() is retained so a genuine session-status failure still blocks.",
+  "allowed_files": [
+    ".github/workflows/active-track.yml",
+    "reports/agentops/work_packets/titanium-WP-PARITY-cancelled-not-failed.json",
+    "tests/test_admission_parity_bridge.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/tests.yml",
+    ".github/workflows/gitleaks.yml",
+    ".github/workflows/docops.yml",
+    ".github/workflows/coherence-delta.yml",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "parity-bridge-contract",
+      "command": "python3 -m pytest tests/test_admission_parity_bridge.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "ci-parity-structure",
+      "command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "cache-token-guard",
+      "command": "python3 scripts/governance/check_workflow_cache_token.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "reverting-the-cancelled-guard-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); p.write_text(t.replace(\\\"always() && needs.onboarding-status.result != 'cancelled' &&\\\",'always() &&',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_a_cancelled_dependency_does_not_report_as_failure'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "dropping-always-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/active-track.yml'); t=p.read_text(); p.write_text(t.replace(\\\"always() && needs.onboarding-status.result != 'cancelled' &&\\\",\\\"needs.onboarding-status.result != 'cancelled' &&\\\",1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_admission_parity_bridge.py::test_always_is_retained_so_a_real_failure_still_blocks'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): admission-parity bridge must not read cancelled as failed"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PARITY",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "73fe7a07b2995d5e5e4671038f6966e0d137c875",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The bridge's condition decides whether it runs; its body decides pass/fail. A cancelled dependency was reaching the body, where the only vocabulary is success/not-success, so an infrastructure event became a verdict."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/active-track.yml",
+      "docs/governance/CI_TRUTH_CONTRACT.json"
+    ],
+    "honest_blockers": [
+      "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO: the fix and its tests were authored before this packet existed. Read the binding as scope CONFORMANCE, not scope-declared-first.",
+      "Verified by contract tests over the workflow YAML and two negative controls, NOT by observing a real superseded run go green. The proof that it works is the next cancellation, which I cannot schedule.",
+      "A SKIPPED required check counts as success in branch protection. This is safe only because a cancellation implies a newer run exists for the same head. If GitHub ever cancels without a successor, this would convert that into a silent pass.",
+      "Does not address the cause: the queue depth that starves session-status for 90 minutes, and the pr-ci-health rebase loop that supersedes it. This only stops the symptom being mislabelled."
+    ],
+    "rollback": "Single revert. The bridge returns to reporting cancelled dependencies as failures.",
+    "packet_digest": "58c57b2696e540ea896281a924a97fe900d21feba67f686bc95a4adf905a0c82"
+  }
+}

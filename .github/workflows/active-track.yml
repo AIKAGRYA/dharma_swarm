@@ -183,8 +183,16 @@ jobs:
   onboarding-admission-parity-compat:
     name: Onboarding admission parity
     needs: onboarding-status
+    # `always()` must stay: when session-status genuinely FAILS this bridge has
+    # to run and fail with it, which is the false-green its own comment guards.
+    # But a CANCELLED dependency is not a verdict. When pr-ci-health supersedes
+    # a run, `needs.onboarding-status.result` is 'cancelled', and the body below
+    # then compares "cancelled" against "success" and reports hard `failure` on
+    # a REQUIRED context -- a PR that did nothing wrong goes red. Skipping on
+    # cancelled is safe precisely because a cancellation means a newer run
+    # already exists and will report for this head.
     if: >-
-      always() &&
+      always() && needs.onboarding-status.result != 'cancelled' &&
       (github.event_name == 'pull_request' || github.event_name == 'merge_group')
     runs-on: ubuntu-latest
     timeout-minutes: 2
