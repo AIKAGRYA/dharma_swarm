@@ -3,11 +3,22 @@ name: module-budget
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
-    paths:
-      - '**/*.py'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/module-budget.yml'
+    # DELIBERATELY UNFILTERED — this workflow publishes a CONTRACTED check name
+    # ('Rule 10 — module line budget' in docs/governance/CI_TRUTH_CONTRACT.json).
+    #
+    # A workflow-level `paths:` filter makes the workflow not run at all, so no
+    # check appears in the rollup, and ci_truth.classify_check(None) returns
+    # MISSING. PASS_CONCLUSIONS (ci_truth.py:20) contains SKIPPED but NOT
+    # MISSING, so evaluate_rollup sets verdict = DEGRADED and the CLI exits 3 —
+    # permanently, on every docs-only and dependency-only PR. The operator
+    # report then cannot tell "advisory gate broken" from "advisory gate not
+    # applicable", which is the whole value of the report.
+    #
+    # Per-JOB filtering (as tests.yml does) is the correct answer here: the job
+    # reports `skipped`, and SKIPPED counts as PASS. That needs a classifier job
+    # in this workflow and a contract entry for its check name; it is deliberate
+    # follow-up, not done here. Filtering it back at the workflow level is not
+    # the fix and is blocked by test_workflow_path_filters.py.
   merge_group:
 
 concurrency:

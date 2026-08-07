@@ -142,30 +142,6 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
         ("dharma_swarm/**/*.py", "codeowners_blast_radius.py:68 rglob"),
         (".github/CODEOWNERS", "codeowners_blast_radius.py:224 reads it"),
     ),
-    "quality-ratchet.yml": (
-        # The ratchet grades counters against this JSON and enforces
-        # --max-baseline-age-days 45 on it. A PR touching only the baseline
-        # matched nothing and ran no gate.
-        (
-            "docs/governance/hygiene/ratchet_baselines.json",
-            "quality-ratchet.yml --max-baseline-age-days grades this file",
-        ),
-        (
-            "docs/governance/hygiene/patterns/**",
-            "ratchet_counters.py measure_hygiene_patterns_enforced_or_resolved "
-            "globs docs/governance/hygiene/patterns/*.yaml as an UP counter, so "
-            "lowering a pattern's stage is a regression",
-        ),
-    ),
-    "semgrep.yml": (
-        # --config .semgrep at semgrep.yml:54,:82,:84. Deleting a detection rule
-        # must run the scanner, not silence it.
-        (".semgrep/**", "semgrep.yml --config .semgrep"),
-        (
-            "scripts/governance/run_semgrep_with_ca.sh",
-            "semgrep.yml invokes it directly",
-        ),
-    ),
     # Second review round on #1285 found the same defect in three more filters.
     "import-provenance.yml": (
         ("requirements*.txt", "check_import_provenance.py declared_dists()"),
@@ -215,6 +191,14 @@ def test_a_filtered_workflow_still_runs_when_its_gate_inputs_change() -> None:
         stanza = _pull_request_stanza(doc)
         assert stanza is not None, f"{filename} lost its pull_request stanza"
         paths = list(stanza.get("paths") or [])
+        # A stale entry must be LOUD. If a workflow stops being filtered, its
+        # requirements here become vacuously satisfiable, and the table would
+        # quietly stop meaning anything — the AI-N4 shape this table exists to
+        # avoid, one level up.
+        assert paths, (
+            f"{filename} is listed in GATE_INPUTS but carries no paths filter; "
+            "remove the entry rather than leaving it to pass vacuously"
+        )
         for pattern, why in requirements:
             assert pattern in paths, (
                 f"{filename} filters out {pattern!r}, but its gate reads it "
@@ -289,3 +273,50 @@ def test_a_whole_diff_gate_never_carries_a_paths_filter() -> None:
             f"{filename} carries a paths filter, but it grades the whole diff: "
             f"{why}. Every PR the filter excludes now runs no warrant at all."
         )
+
+
+def test_no_contracted_check_name_comes_from_a_path_filtered_workflow() -> None:
+    """A workflow-level `paths:` filter on a CONTRACTED check is not a narrowing
+    — it is a permanent DEGRADED verdict.
+
+    When the filter excludes a PR the workflow never runs, so no check appears
+    in the rollup and `ci_truth.classify_check(None)` returns MISSING.
+    PASS_CONCLUSIONS (ci_truth.py:20) contains SKIPPED but not MISSING, so
+    evaluate_rollup records `advisory CI <id> is MISSING` and sets
+    verdict = DEGRADED; the CLI exits 3. Every docs-only and dependency-only PR
+    then reports degraded CI forever, and the operator report can no longer
+    distinguish a broken advisory gate from an inapplicable one.
+
+    Per-JOB filtering is the supported way to skip contracted work: the job
+    reports `skipped`, and SKIPPED counts as PASS. Found on PR #1285 after five
+    workflows had been filtered at the workflow level."""
+    contract = json.loads(
+        (REPO_ROOT / "docs" / "governance" / "CI_TRUTH_CONTRACT.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    contracted: set[str] = set()
+    for group in ("required", "advisory"):
+        for entry in contract.get(group, []):
+            contracted.update(entry.get("names", []))
+
+    offenders = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        stanza = _pull_request_stanza(doc)
+        if not stanza or "paths" not in stanza:
+            continue
+        published = {str(doc.get("name") or path.stem)}
+        for job_id, job in (doc.get("jobs") or {}).items():
+            published.add(str(job.get("name") or job_id))
+        # matrix job names carry an expression; compare on the literal prefix.
+        for name in sorted(contracted):
+            base = name.split(" / ")[0]
+            if name in published or base in published:
+                offenders.append(f"{path.name} publishes contracted {name!r}")
+
+    assert not offenders, (
+        "these path-filtered workflows publish contracted check names, so every "
+        "excluded PR reports the check as MISSING and the CI verdict as "
+        f"DEGRADED: {offenders}"
+    )
