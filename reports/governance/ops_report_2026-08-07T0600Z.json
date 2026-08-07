@@ -1,0 +1,1458 @@
+{
+  "schema": "dharma.ops_report.v1",
+  "run_id": "2026-08-07T06:00Z",
+  "generated_at": "2026-08-07T06:06:29Z",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "base_sha": "73fe7a07b2995d5e5e4671038f6966e0d137c875",
+  "authority": {
+    "role": "evidence-only ops agent",
+    "merge_authority": "operator (sole)",
+    "mutations_performed": [
+      "3 advisory PR comments (1063 spine status, 1118 duplicate advisory, 1224 conflict notice)",
+      "1 report artifact committed under reports/governance/"
+    ],
+    "mutations_forbidden_and_not_performed": [
+      "merge",
+      "approve",
+      "close",
+      "source-code change",
+      "governance-file change"
+    ]
+  },
+  "onboarding": {
+    "command": "make onboard",
+    "result": "READY (exit 0)",
+    "repo_state": "main @ 73fe7a07b299, clean, ahead 0 behind 0",
+    "primary_blocker": "none",
+    "conditions_passing": [
+      "broken_register_parses",
+      "receipt_persisted",
+      "repo_clean",
+      "repo_unconflicted",
+      "toolchain_git",
+      "toolchain_make"
+    ]
+  },
+  "mission_1_spine_adoption": {
+    "command": "python3 tools/spine_adoption_metric.py --repo-root . --output reports/governance/spine_adoption_metric.json --print",
+    "audit_sha": "73fe7a07b2995d5e5e4671038f6966e0d137c875",
+    "source_status": "clean",
+    "doc_anchor_status": "ok",
+    "target_pct": 95.0,
+    "adoption_pct": 93.8,
+    "gap_to_target_pts": 1.2,
+    "joined_percent": 81.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "total_surfaces": 16,
+    "non_joined_surface_ids": [
+      "self_modification_loop",
+      "mcp_tool_access",
+      "legacy_no_identity_escape_hatch"
+    ],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "label": "Self-modification propose/gate/apply/verify loop",
+        "status": "adapter-ready",
+        "missing_joined_patterns": [
+          "begin_idempotent"
+        ],
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ]
+      },
+      {
+        "id": "mcp_tool_access",
+        "label": "MCP/tool access boundary",
+        "status": "adapter-ready",
+        "missing_joined_patterns": [
+          "identity_import",
+          "runtime_store",
+          "side_effect_receipt"
+        ],
+        "files": [
+          "dharma_swarm/dharma_context_mcp.py",
+          "dharma_swarm/mcp_server.py"
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "label": "Legacy no-identity escape hatch",
+        "status": "legacy",
+        "missing_joined_patterns": [],
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ]
+      }
+    ],
+    "committed_comparison": {
+      "committed_audit_sha": "9b67ed5baa8d707a0da02ca48d993efcdd02d8ed",
+      "committed_adoption_pct": 93.8,
+      "adoption_pct_changed": false,
+      "surfaces_that_moved_status": [],
+      "non_classification_drift": {
+        "audit_sha": "9b67ed5b -> 73fe7a07",
+        "tracked_file_count": "4890 -> 5363",
+        "evidence_line_shifts": 18,
+        "new_evidence_file": "dharma_swarm/operator_core/onboarding/nats_status.py folded into nats_jetstream_transport; matched an already-satisfied pattern, so the surface stayed joined"
+      }
+    },
+    "commit_decision": {
+      "rule": "commit and push only when adoption_pct changed",
+      "committed": false,
+      "reason": "adoption_pct unchanged (93.8 -> 93.8)",
+      "known_consequence": "the committed metric's audit_sha anchor is stale relative to HEAD, while every adoption figure inside it remains accurate"
+    },
+    "celebration_comment_posted": false,
+    "celebration_reason": "adoption_pct 93.8 < 95.0 target",
+    "status_comment": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1063#issuecomment-5213166173",
+    "arithmetic_finding": "adoption_pct counts joined + adapter-ready, so landing #1060 and #1061 raises joined_percent 81.2 -> 93.8 but leaves adoption_pct at 93.8. With 16 surfaces, the only remaining step above 95% is retiring legacy_no_identity_escape_hatch (16/16 = 100%). Reaching the target is therefore an operator decision on the legacy hatch, not additional implementation work."
+  },
+  "mission_2_pr_lifecycle": {
+    "required_contexts": [
+      "Coherence Delta PR body",
+      "DocOps integrity gate",
+      "Onboarding admission parity",
+      "gitleaks",
+      "pytest (3.11)",
+      "pytest (3.12)"
+    ],
+    "required_contexts_source": "docs/governance/CI_TRUTH_CONTRACT.json v5",
+    "total_open_before": 58,
+    "total_open_after": 58,
+    "closed_by_this_run": [],
+    "auto_close_rule": "mergeable=CONFLICTING AND createdAt older than 7 days",
+    "auto_close_eligible": [],
+    "auto_closes_performed": 0,
+    "conflicting": [
+      {
+        "number": 1224,
+        "title": "chore(deps): bump time from 0.3.44 to 0.3.55 in /desktop-shell/src-tauri",
+        "author": "app/dependabot",
+        "createdAt": "2026-08-03T17:46:50Z",
+        "age_days": 3.51,
+        "eligible_at": "2026-08-10T17:46:50Z",
+        "eligible_now": false
+      },
+      {
+        "number": 1189,
+        "title": "governance(humming): admit V2 P0 surfaces across existing tracks",
+        "author": "AmitabhainArunachala",
+        "createdAt": "2026-08-01T12:31:53Z",
+        "age_days": 5.73,
+        "eligible_at": "2026-08-08T12:31:53Z",
+        "eligible_now": false
+      }
+    ],
+    "duplicates": {
+      "auto_grounding_open": [],
+      "auto_grounding_note": "No open auto-grounding PRs exist; the research(palantir-ontology) auto-grounding family is entirely historical and merged.",
+      "exact_duplicate_pairs": [
+        {
+          "keep": 1286,
+          "flag_older": 1118,
+          "shared_files": [
+            "docs/docops/AUTO_INVENTORY.md",
+            "docs/governance/SOVEREIGN_MANIFEST.md"
+          ],
+          "identical_diffstat": true,
+          "comment": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1118#issuecomment-5213172335",
+          "action_taken": "advisory comment only; not closed"
+        }
+      ]
+    },
+    "green_and_ready": {
+      "definition": "all 6 required contexts PASS on the latest run per context, and mergeable=MERGEABLE",
+      "count": 25,
+      "numbers": [
+        1286,
+        1285,
+        1283,
+        1231,
+        1229,
+        1228,
+        1222,
+        1218,
+        1213,
+        1212,
+        1211,
+        1208,
+        1206,
+        1200,
+        1185,
+        1184,
+        1182,
+        1179,
+        1173,
+        1171,
+        1153,
+        1145,
+        1118,
+        1070,
+        1067
+      ],
+      "non_draft": [
+        1231,
+        1229,
+        1228,
+        1222,
+        1218,
+        1213,
+        1212,
+        1211,
+        1208,
+        1200,
+        1185,
+        1184,
+        1182,
+        1153,
+        1145,
+        1118,
+        1067
+      ]
+    },
+    "failing_required": {
+      "1219": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1214": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1129": [
+        "pytest (3.12)"
+      ],
+      "1115": [
+        "DocOps integrity gate"
+      ]
+    },
+    "pending_required": {
+      "1287": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1284": [
+        "Onboarding admission parity"
+      ],
+      "1282": [
+        "Onboarding admission parity"
+      ],
+      "1227": [
+        "Onboarding admission parity"
+      ],
+      "1201": [
+        "Onboarding admission parity"
+      ],
+      "1149": [
+        "Onboarding admission parity"
+      ],
+      "1111": [
+        "Onboarding admission parity",
+        "pytest (3.11)"
+      ],
+      "1086": [
+        "Onboarding admission parity",
+        "pytest (3.11)"
+      ],
+      "1084": [
+        "Onboarding admission parity"
+      ],
+      "1082": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1081": [
+        "Onboarding admission parity",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1080": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1063": [
+        "Onboarding admission parity",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1061": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1060": [
+        "Onboarding admission parity",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "904": [
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ]
+    },
+    "unreported_required": {
+      "1276": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1275": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1274": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1273": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1272": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1271": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1223": [
+        "Onboarding admission parity"
+      ],
+      "1204": [
+        "Onboarding admission parity"
+      ],
+      "1142": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "1013": [
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ],
+      "930": [
+        "Coherence Delta PR body",
+        "DocOps integrity gate",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)"
+      ]
+    },
+    "measurement_caveat": "A repo-wide CI wave was in flight during this snapshot (required checks starting 04:55-06:05Z). 16 PRs have genuinely queued or in-progress required checks, so the green count is a lower bound and is not comparable to the 00:00Z run's count without accounting for the wave.",
+    "methodology": {
+      "latest_run_per_context": "A required context can appear multiple times in statusCheckRollup across re-runs; the node with the newest completedAt/startedAt wins.",
+      "stale_vs_pending": "A required check still QUEUED or IN_PROGRESS more than 24h after it started is counted as unreported, not pending.",
+      "mergeable_resolution": "GitHub computes mergeability lazily and returned UNKNOWN for 43 PRs on first query; every PR was re-queried until it resolved. 0 remained UNKNOWN."
+    }
+  },
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "action": "Decide on legacy_no_identity_escape_hatch. It is the only surface that can move adoption_pct above 93.8%; #1060 and #1061 cannot, because adapter-ready already counts toward adoption_pct.",
+      "owner": "operator"
+    },
+    {
+      "priority": 2,
+      "action": "Land #1060 and #1061 to convert both adapter-ready surfaces to joined (joined_percent 81.2 -> 93.8). Both are drafts 19 days old with required checks currently re-running.",
+      "owner": "operator"
+    },
+    {
+      "priority": 3,
+      "action": "Close #1118 in favour of #1286. #1118 would write 13-day-old generated counts into SOVEREIGN_MANIFEST.md and immediately re-trigger the drift it removes.",
+      "owner": "operator"
+    },
+    {
+      "priority": 4,
+      "action": "Rebase #1189 before 2026-08-08T12:31:53Z and #1224 before 2026-08-10T17:46:50Z, or accept auto-close at the sweep past those timestamps.",
+      "owner": "operator"
+    },
+    {
+      "priority": 5,
+      "action": "Investigate the 6 LangGraph PRs #1271-#1276, which have never reported any of the 6 required contexts. A whole cohort with zero reported checks points at workflow triggering, not per-PR failure.",
+      "owner": "ci"
+    },
+    {
+      "priority": 6,
+      "action": "Triage the 4 required-check failures: #1219 and #1214 (pytest 3.11 + 3.12), #1129 (pytest 3.12), #1115 (DocOps integrity gate).",
+      "owner": "runtime/docops"
+    }
+  ],
+  "pr_inventory": [
+    {
+      "number": 1287,
+      "title": "fix(ci): admission-parity bridge must not read cancelled as failed",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-07T05:20:24Z",
+      "age_days": 0.03,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PENDING",
+        "DocOps integrity gate": "PENDING",
+        "gitleaks": "PENDING",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING"
+      }
+    },
+    {
+      "number": 1286,
+      "title": "chore(docops): reconcile generated counts (supersedes #1118)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-07T02:12:38Z",
+      "age_days": 0.16,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1285,
+      "title": "perf(ci): path-filter 13 advisory workflows and 6 advisory tests.yml jobs",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-07T02:06:23Z",
+      "age_days": 0.17,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1284,
+      "title": "chore(deps): bump h2 from 4.3.0 to 4.4.1",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-07T00:27:32Z",
+      "age_days": 0.24,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1283,
+      "title": "report(governance): ops run 2026-08-07T00:00Z \u2014 spine adoption 93.8% (unchanged, 1.2 pts to target), 58 open PRs, 0 auto-closes",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-07T00:07:43Z",
+      "age_days": 0.25,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1282,
+      "title": "chore(deps): bump langgraph-checkpoint-sqlite from 3.1.0 to 3.1.1",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-06T20:37:42Z",
+      "age_days": 0.39,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1276,
+      "title": "feat(graph): LG10 channel semantics \u2014 ephemeral, delta, untracked, any-value, barrier-after-finish (+2 pts)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-06T09:10:15Z",
+      "age_days": 0.87,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "UNSTABLE",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1275,
+      "title": "feat(graph): LG11 message accumulation, replacement, removal (+2 pts)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-06T09:07:58Z",
+      "age_days": 0.87,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "UNSTABLE",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1274,
+      "title": "feat(graph): LG12 invocation surfaces \u2014 sync, astream, typed-v2 (+2 pts)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-06T09:07:04Z",
+      "age_days": 0.87,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1273,
+      "title": "feat(graph): LG24+LG25 retry policy and timeout (+6 pts)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-05T15:35:27Z",
+      "age_days": 1.6,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1272,
+      "title": "feat(graph): LG20 dynamic HITL interrupt aggregation and per-id resume",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-05T15:07:46Z",
+      "age_days": 1.62,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "UNSTABLE",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1271,
+      "title": "feat(graph): LG30 runtime config/context injection (+4 pts, 58.00 -> 62.00)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-05T14:58:17Z",
+      "age_days": 1.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "UNSTABLE",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1231,
+      "title": "governance: converge tracks and admit typed effect boundary",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T23:51:41Z",
+      "age_days": 3.26,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1229,
+      "title": "fix(loop1): restore clean WP-LC4 independent verifier range",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T20:12:19Z",
+      "age_days": 3.41,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1228,
+      "title": "governance(dharmagraph): freeze COMPLETE01 V3 installed-surface routes",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T18:30:32Z",
+      "age_days": 3.48,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1227,
+      "title": "chore(deps): bump mcp from 1.27.2 to 1.28.1",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-03T17:57:05Z",
+      "age_days": 3.51,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1224,
+      "title": "chore(deps): bump time from 0.3.44 to 0.3.55 in /desktop-shell/src-tauri",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-03T17:46:50Z",
+      "age_days": 3.51,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1223,
+      "title": "chore(deps): bump langsmith from 0.8.14 to 0.8.18",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-03T17:45:05Z",
+      "age_days": 3.51,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "unreported_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS"
+      }
+    },
+    {
+      "number": 1222,
+      "title": "chore(deps-dev): bump setuptools from 82.0.1 to 83.0.0",
+      "author": "app/dependabot",
+      "draft": false,
+      "createdAt": "2026-08-03T17:34:53Z",
+      "age_days": 3.52,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1219,
+      "title": "feat(sarathi): establish the persistent-agent composition root",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T16:46:50Z",
+      "age_days": 3.56,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "failing_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "FAIL",
+        "pytest (3.12)": "FAIL",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1218,
+      "title": "fix(compose): keep dashboard publication loopback-only",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T16:39:15Z",
+      "age_days": 3.56,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1214,
+      "title": "governance: close orchestration-arena-v1 track (CLOSED_NOT_PROD)",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T14:34:02Z",
+      "age_days": 3.65,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "failing_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "FAIL",
+        "pytest (3.12)": "FAIL",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1213,
+      "title": "governance: close helm-worldclass-terminal track (CLOSED_NOT_PROD)",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T14:33:56Z",
+      "age_days": 3.65,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1212,
+      "title": "governance(titanium): ratify write-free WP-0G design",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T14:26:56Z",
+      "age_days": 3.65,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1211,
+      "title": "governance(titanium): prose-truth reconciliation \u2014 8/9 arithmetic, live-layer premises, WP-0S observation (no criteria/authority changes)",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T14:23:19Z",
+      "age_days": 3.65,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1208,
+      "title": "feat(sarathi): give the apex seat governed memory recall",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-03T10:06:00Z",
+      "age_days": 3.83,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1206,
+      "title": "fix(onboard): show the loop kill-switch in session status",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-03T02:17:01Z",
+      "age_days": 4.16,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1204,
+      "title": "governance(hygiene): register cluster N \u2014 measurement integrity (AI-N1..N4)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-03T00:42:14Z",
+      "age_days": 4.23,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "unreported_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS"
+      }
+    },
+    {
+      "number": 1201,
+      "title": "docs: canonical persistent-agent, Holon, and Sarathi map",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-02T09:41:03Z",
+      "age_days": 4.85,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1200,
+      "title": "fix(loop-closure): close 10 post-merge review findings on the hardening lane \u2014 two verified denylist bypasses",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-02T08:30:10Z",
+      "age_days": 4.9,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1189,
+      "title": "governance(humming): admit V2 P0 surfaces across existing tracks",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-01T12:31:53Z",
+      "age_days": 5.73,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1185,
+      "title": "fix(mike): gate recomputes risk at the current head and binds packet head",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-01T07:14:52Z",
+      "age_days": 5.95,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1184,
+      "title": "docs(titanium): record WP-0S live exposure observation",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-01T07:03:32Z",
+      "age_days": 5.96,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1182,
+      "title": "fix(docops): keep rolling reconcile heads check-triggering",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-08-01T06:34:30Z",
+      "age_days": 5.98,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1179,
+      "title": "test(mike): prove both cloud fallback contracts independently",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-08-01T06:18:03Z",
+      "age_days": 5.99,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1173,
+      "title": "report(governance): ops runs 2026-07-31 through 2026-08-06T18:00Z \u2014 spine adoption saturated at 93.8% (21 runs), 57 open, only 6 PRs fail a required check",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-31T06:08:10Z",
+      "age_days": 7.0,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1171,
+      "title": "formal(crisp-open): closed log ceiling and open-information fork [impact-checked]",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-31T00:38:45Z",
+      "age_days": 7.23,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1153,
+      "title": "fix(loop1): WP-LC4 read-only digest-aware checker with malformed-receipt needs_host gap [impact-checked]",
+      "author": "app/devin-ai-integration",
+      "draft": false,
+      "createdAt": "2026-07-27T16:41:30Z",
+      "age_days": 10.56,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1149,
+      "title": "feat(dgc): open Darwin/DGC apply gate in sandbox mode [impact-checked] (BR-003)",
+      "author": "app/devin-ai-integration",
+      "draft": false,
+      "createdAt": "2026-07-27T14:21:29Z",
+      "age_days": 10.66,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1145,
+      "title": "fix(runtime): seal source-only swarm image provenance",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-07-26T15:39:04Z",
+      "age_days": 11.6,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1142,
+      "title": "forge-lab: increase Mac-first signal without overstating evolution",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-26T02:04:58Z",
+      "age_days": 12.17,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 1129,
+      "title": "fix(memory-plane): stop pairwise idea-link clique creation",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-07-25T15:06:20Z",
+      "age_days": 12.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "failing_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "FAIL",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1118,
+      "title": "chore(docops): reconcile generated counts",
+      "author": "app/github-actions",
+      "draft": false,
+      "createdAt": "2026-07-25T11:08:08Z",
+      "age_days": 12.79,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1115,
+      "title": "a2a: harden semantic responder restart boundary",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-25T01:30:33Z",
+      "age_days": 13.19,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "failing_required",
+      "required_states": {
+        "DocOps integrity gate": "FAIL",
+        "Coherence Delta PR body": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1111,
+      "title": "C3: opt CostEntry into the storage schema registry",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-24T12:15:09Z",
+      "age_days": 13.74,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1086,
+      "title": "feat(ops): add AGNI hub readiness probe",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-21T15:48:19Z",
+      "age_days": 16.6,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1084,
+      "title": "feat(darshan): Issue One assembled + honest DRAFT receipt + fail-closed seal script",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-07-21T15:06:16Z",
+      "age_days": 16.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1082,
+      "title": "docs(ops): Backup Triad Runbook 2026-07-21 \u2014 megha off-host litestream, Mac fallback, restore drills",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-21T15:05:14Z",
+      "age_days": 16.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1081,
+      "title": "governance: TELOS canon reconciliation + honest re-admission candidate [BLOCKED-ON-OPERATOR-DECISION]",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-21T15:00:50Z",
+      "age_days": 16.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1080,
+      "title": "docs(governance): land REMOTE_HOLON_MESH v1.1 + Synadia CAR bridge spec + proposed tracks (sole-copy salvage)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-21T14:55:48Z",
+      "age_days": 16.63,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING"
+      }
+    },
+    {
+      "number": 1070,
+      "title": "fix(xray): make discover_files cap deterministic and proportional (#1057)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-20T03:31:32Z",
+      "age_days": 18.11,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1067,
+      "title": "docs: record pre-constitutional founder direction",
+      "author": "AmitabhainArunachala",
+      "draft": false,
+      "createdAt": "2026-07-19T15:25:33Z",
+      "age_days": 18.61,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "green",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PASS",
+        "pytest (3.12)": "PASS",
+        "Onboarding admission parity": "PASS"
+      }
+    },
+    {
+      "number": 1063,
+      "title": "feat(store-sync): project ValueEvents \u2014 second ontology\u2192runtime pass (spine B2)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-19T14:06:19Z",
+      "age_days": 18.67,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1061,
+      "title": "feat(mcp-server): join the MCP tool boundary to the runtime spine (spine A2)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-19T13:59:49Z",
+      "age_days": 18.67,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING"
+      }
+    },
+    {
+      "number": 1060,
+      "title": "feat(diff-applier): idempotency-fence the consequential diff apply (spine A1)",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-19T13:53:22Z",
+      "age_days": 18.68,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING",
+        "Onboarding admission parity": "PENDING"
+      }
+    },
+    {
+      "number": 1013,
+      "title": "feat(ops): bounded mobile recovery for Codex Composer",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-17T20:02:35Z",
+      "age_days": 20.42,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN",
+      "bucket": "unreported_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS"
+      }
+    },
+    {
+      "number": 930,
+      "title": "feat(chamber): add exact-scope proof membrane v0",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-13T23:50:28Z",
+      "age_days": 24.26,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "unreported_required",
+      "required_states": {}
+    },
+    {
+      "number": 904,
+      "title": "feat(holon): authority-scoped remote fast path [impact-checked]",
+      "author": "AmitabhainArunachala",
+      "draft": true,
+      "createdAt": "2026-07-12T15:40:29Z",
+      "age_days": 25.6,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BEHIND",
+      "bucket": "pending_required",
+      "required_states": {
+        "Coherence Delta PR body": "PASS",
+        "DocOps integrity gate": "PASS",
+        "gitleaks": "PASS",
+        "pytest (3.11)": "PENDING",
+        "pytest (3.12)": "PENDING"
+      }
+    }
+  ]
+}
