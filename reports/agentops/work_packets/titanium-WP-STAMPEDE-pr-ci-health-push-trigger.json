@@ -1,0 +1,97 @@
+{
+  "id": "titanium-WP-STAMPEDE-pr-ci-health-push-trigger",
+  "base_ref": "2b3ede8c6aade14374c106c4264a2a6f15519071",
+  "branch": "fix/pr-ci-health-no-push-stampede",
+  "worktree": ".",
+  "intent": "Remove pr-ci-health's `push: branches: [main]` trigger. It rebased every conflict-free behind-main PR on every merge to main, and each rebase relaunches that PR's full workflow set. Its stated premise -- 'require branches up to date' making a behind-main PR unmergeable -- no longer holds, so the cost bought nothing.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "reports/agentops/work_packets/titanium-WP-STAMPEDE-pr-ci-health-push-trigger.json",
+    "tests/test_pr_ci_health.py",
+    "tests/test_pr_ci_health_triggers.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/tests.yml",
+    ".github/workflows/active-track.yml",
+    ".github/workflows/gitleaks.yml",
+    ".github/workflows/docops.yml",
+    "scripts/governance/pr_ci_health.py",
+    "scripts/governance/pr_ci_safe_rebase.py",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "trigger-contract-both-files",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py tests/test_pr_ci_health_triggers.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "cache-token-guard",
+      "command": "python3 scripts/governance/check_workflow_cache_token.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "ci-parity-structure",
+      "command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "re-adding-the-push-trigger-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); p.write_text(t.replace('  workflow_dispatch:\\n','  push:\\n    branches: [main]\\n  workflow_dispatch:\\n',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_health_triggers.py::test_no_push_to_main_trigger'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): stop pr-ci-health rebasing the backlog on every merge to main"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-STAMPEDE",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "2b3ede8c6aade14374c106c4264a2a6f15519071",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The trigger encoded a branch-protection assumption ('require branches up to date') in a workflow that never verifies it. When the setting changed, the workflow kept paying its cost with no way to notice."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/governance/pr_ci_safe_rebase.py"
+    ],
+    "honest_blockers": [
+      "I SHIPPED THIS BROKEN AND A REVIEWER CAUGHT IT. The first push removed the trigger but left tests/test_pr_ci_health.py::test_workflow_rebases_on_merge_to_main_not_only_hourly asserting the trigger must EXIST. That test failed deterministically, which would have failed pytest 3.11/3.12 -- both REQUIRED -- on every PR in the repo. I ran only my own new test file and never the pre-existing one that covered the same workflow. Devin Review found it. The gate that would have caught it is running the suite, not the file.",
+      "THIS REDUCES THE WAVES, IT DOES NOT END THEM. The hourly cron still runs `all`, which still includes the rebase step. Rebases go from once-per-merge to once-per-hour. Ending them entirely means gating the rebase step too, which is a larger change and removes a capability.",
+      "The premise claim rests on ONE observation: PR #1227 was behind main and reported mergeable_state 'unstable', not 'behind'. I could not read the branch-protection settings directly. If 'require branches up to date' is in fact still enabled, removing this trigger means behind-main PRs wait up to 59 minutes for the cron instead of ~1 minute. Annoying, not dangerous, and revertible.",
+      "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO: the edit and its test were authored before this packet existed. Read the binding as scope CONFORMANCE.",
+      "Not verified against a real merge-to-main. The proof is the next merge producing no wave, which I cannot schedule."
+    ],
+    "rollback": "Re-add `push: branches: [main]` to the on: block. The stampede returns.",
+    "packet_digest": "b5687de11986c02ae547287bed701def8a035f7690dabacd4af8312c6671f468"
+  }
+}
