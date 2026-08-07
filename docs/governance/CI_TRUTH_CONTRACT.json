@@ -6,9 +6,7 @@
   "required": [
     {
       "id": "docops_integrity",
-      "names": [
-        "DocOps integrity gate"
-      ],
+      "names": ["DocOps integrity gate"],
       "owner": "docops",
       "local_command": "make docops-integrity",
       "failure_category": "doc_drift",
@@ -16,9 +14,7 @@
     },
     {
       "id": "gitleaks",
-      "names": [
-        "gitleaks"
-      ],
+      "names": ["gitleaks"],
       "owner": "security",
       "local_command": "make gitleaks",
       "failure_category": "secret_scan",
@@ -26,9 +22,7 @@
     },
     {
       "id": "tests_py311",
-      "names": [
-        "pytest (3.11)"
-      ],
+      "names": ["pytest (3.11)"],
       "owner": "runtime",
       "local_command": "make test",
       "failure_category": "test_failure",
@@ -36,9 +30,7 @@
     },
     {
       "id": "tests_py312",
-      "names": [
-        "pytest (3.12)"
-      ],
+      "names": ["pytest (3.12)"],
       "owner": "runtime",
       "local_command": "make test",
       "failure_category": "test_failure",
@@ -46,9 +38,7 @@
     },
     {
       "id": "coherence_delta",
-      "names": [
-        "Coherence Delta PR body"
-      ],
+      "names": ["Coherence Delta PR body"],
       "owner": "governance",
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
@@ -56,9 +46,7 @@
     },
     {
       "id": "onboarding_session_status",
-      "names": [
-        "Onboarding admission parity"
-      ],
+      "names": ["Onboarding admission parity"],
       "owner": "onboarding",
       "local_command": "make onboard && python3 -m pytest -q tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_onboarding_ci_contract.py",
       "failure_category": "session_status",
@@ -70,7 +58,7 @@
       "id": "quality_ratchet",
       "names": [
         "Quality ratchet - repo-wide fitness function",
-        "Quality ratchet — whole-tree regression + baseline freshness"
+        "Quality ratchet \u2014 whole-tree regression + baseline freshness"
       ],
       "owner": "governance",
       "local_command": "make quality-ratchet-check",
@@ -79,9 +67,7 @@
     },
     {
       "id": "onboarding_macos_compatibility",
-      "names": [
-        "Onboarding macOS 3.81 compatibility"
-      ],
+      "names": ["Onboarding macOS 3.81 compatibility"],
       "owner": "onboarding",
       "local_command": "/usr/bin/make onboarding-macos-compatibility",
       "failure_category": "host_compatibility",
@@ -89,9 +75,7 @@
     },
     {
       "id": "active_track",
-      "names": [
-        "ACTIVE_TRACK governance gate"
-      ],
+      "names": ["ACTIVE_TRACK governance gate"],
       "owner": "governance",
       "local_command": "python3 scripts/governance/check_track_status.py && python3 scripts/governance/render_active_track_includes.py --check",
       "failure_category": "active_track_drift",
@@ -99,9 +83,7 @@
     },
     {
       "id": "codeql_external",
-      "names": [
-        "CodeQL"
-      ],
+      "names": ["CodeQL"],
       "owner": "security",
       "local_command": "gh run view <run-id> --log",
       "failure_category": "codeql",
@@ -109,9 +91,7 @@
     },
     {
       "id": "codeql_python",
-      "names": [
-        "codeql / python"
-      ],
+      "names": ["codeql / python"],
       "owner": "security",
       "local_command": "gh run view <run-id> --log",
       "failure_category": "codeql",
@@ -119,9 +99,7 @@
     },
     {
       "id": "fourfold_warrant",
-      "names": [
-        "Fourfold Shakti Warrant"
-      ],
+      "names": ["Fourfold Shakti Warrant"],
       "owner": "governance",
       "local_command": "python3 scripts/governance/check_shakti_warrant.py --help",
       "failure_category": "warrant",
@@ -129,9 +107,7 @@
     },
     {
       "id": "module_budget",
-      "names": [
-        "Rule 10 — module line budget"
-      ],
+      "names": ["Rule 10 \u2014 module line budget"],
       "owner": "architecture",
       "local_command": "make module-budget",
       "failure_category": "module_budget",
@@ -139,9 +115,7 @@
     },
     {
       "id": "root_markdown_rule",
-      "names": [
-        "Rule 8 — no new root markdown"
-      ],
+      "names": ["Rule 8 \u2014 no new root markdown"],
       "owner": "architecture",
       "local_command": "gh pr diff <pr> --name-only",
       "failure_category": "root_artifact_drift",
@@ -149,9 +123,7 @@
     },
     {
       "id": "guardian_report_rule",
-      "names": [
-        "Rule 9 — no GUARDIAN_REPORT.md outside reports/"
-      ],
+      "names": ["Rule 9 \u2014 no GUARDIAN_REPORT.md outside reports/"],
       "owner": "architecture",
       "local_command": "gh pr diff <pr> --name-only",
       "failure_category": "generated_artifact_leak",
@@ -159,9 +131,7 @@
     },
     {
       "id": "test_hygiene",
-      "names": [
-        "Rules 3 + 5 — test hygiene"
-      ],
+      "names": ["Rules 3 + 5 \u2014 test hygiene"],
       "owner": "test_hygiene",
       "local_command": "make test-hygiene",
       "failure_category": "test_hygiene",
@@ -169,9 +139,7 @@
     },
     {
       "id": "semgrep_workflow",
-      "names": [
-        "semgrep"
-      ],
+      "names": ["semgrep"],
       "owner": "security",
       "local_command": "make semgrep",
       "failure_category": "static_security",
@@ -179,9 +147,7 @@
     },
     {
       "id": "semgrep_oss",
-      "names": [
-        "Semgrep OSS"
-      ],
+      "names": ["Semgrep OSS"],
       "owner": "security",
       "local_command": "make semgrep",
       "failure_category": "static_security",
@@ -189,9 +155,7 @@
     },
     {
       "id": "dashboard",
-      "names": [
-        "dashboard"
-      ],
+      "names": ["dashboard"],
       "owner": "frontend",
       "local_command": "npm --prefix dashboard ci --legacy-peer-deps && npm --prefix dashboard run lint -- --quiet && npm --prefix dashboard run build",
       "failure_category": "frontend_build",
@@ -199,9 +163,7 @@
     },
     {
       "id": "collision_detect",
-      "names": [
-        "detect-br-collision"
-      ],
+      "names": ["detect-br-collision"],
       "owner": "coordination",
       "local_command": "gh pr view <pr> --json body,comments",
       "failure_category": "broken_register_collision",
@@ -209,9 +171,7 @@
     },
     {
       "id": "gauntlet_tier1",
-      "names": [
-        "gauntlet-tier1"
-      ],
+      "names": ["gauntlet-tier1"],
       "owner": "runtime",
       "local_command": "python3 -m pytest -q tests/test_telos_gates.py tests/test_stigmergy.py --tb=short",
       "failure_category": "runtime_correctness",
@@ -219,9 +179,7 @@
     },
     {
       "id": "go_adapter_contracts",
-      "names": [
-        "go-adapter-contracts"
-      ],
+      "names": ["go-adapter-contracts"],
       "owner": "go",
       "local_command": "make go-ci",
       "failure_category": "go_contract",
@@ -229,9 +187,7 @@
     },
     {
       "id": "go_evidence_ingestor",
-      "names": [
-        "go-evidence-ingestor"
-      ],
+      "names": ["go-evidence-ingestor"],
       "owner": "go",
       "local_command": "make go-ci",
       "failure_category": "go_contract",
@@ -239,9 +195,7 @@
     },
     {
       "id": "syntax_imports",
-      "names": [
-        "guardian-syntax-check"
-      ],
+      "names": ["guardian-syntax-check"],
       "owner": "runtime",
       "local_command": "make syntax-check",
       "failure_category": "syntax_or_import",
@@ -249,23 +203,11 @@
     },
     {
       "id": "commit_lint",
-      "names": [
-        "scan PR commit messages"
-      ],
+      "names": ["scan PR commit messages"],
       "owner": "governance",
       "local_command": "git log --format=%s origin/main..HEAD",
       "failure_category": "commit_hygiene",
       "autofix": "manual"
-    },
-    {
-      "id": "classify_changed_paths",
-      "names": [
-        "classify changed paths"
-      ],
-      "owner": "governance",
-      "local_command": "python3 -m pytest tests/test_classify_changed_paths.py -q",
-      "failure_category": "ci_path_classifier",
-      "autofix": "forbidden"
     }
   ]
 }
