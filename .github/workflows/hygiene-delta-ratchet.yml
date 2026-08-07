@@ -4,7 +4,12 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
     paths:
-      - '**/*.py'
+      # '**.py', not '**/*.py'. GitHub documents ** as "zero or more of
+      # any character" and gives '**.js' as the repo-wide spelling,
+      # contrasted with root-only '*.js'. Under that reading '**/*.py'
+      # needs a literal slash and would skip every root-level module.
+      # '**.py' is correct under either reading. (#1285 review, round 6)
+      - '**.py'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/hygiene-delta-ratchet.yml'

@@ -139,7 +139,7 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
         # codeowners_blast_radius.py:68 builds the import graph over the package;
         # :224 grades it against CODEOWNERS. Filtering to lockfiles meant a PR
         # adding a heavy module, or deleting an ownership entry, ran no check.
-        ("dharma_swarm/**/*.py", "codeowners_blast_radius.py:68 rglob"),
+        ("dharma_swarm/**.py", "codeowners_blast_radius.py:68 rglob"),
         (".github/CODEOWNERS", "codeowners_blast_radius.py:224 reads it"),
     ),
     # Second review round on #1285 found the same defect in three more filters.
@@ -320,3 +320,58 @@ def test_no_contracted_check_name_comes_from_a_path_filtered_workflow() -> None:
         "excluded PR reports the check as MISSING and the CI verdict as "
         f"DEGRADED: {offenders}"
     )
+
+
+def test_no_filter_uses_the_slash_star_double_star_spelling() -> None:
+    """`**/*.ext` may not match root-level files, and the failure is silent.
+
+    GitHub documents `**` as "matches zero or more of any character" and gives
+    `'**.js'` as the way to match a file type anywhere in the repository,
+    explicitly contrasted with root-only `'*.js'`. Read literally, `**/*.py`
+    requires a slash after the `**`, so it would match `pkg/mod/file.py` but
+    NOT `file.py` — and `dharma_swarm/**/*.py` would miss every one of the
+    package's top-level modules, which are the bulk of what
+    codeowners_blast_radius.py grades.
+
+    This repo has no `**/*.ext` precedent to learn from: every pre-existing
+    filter uses the `dir/**` form. Rather than resolve the ambiguity, use the
+    spelling that is correct under BOTH readings — `**.py` — and pin it here.
+    An exact filename at any depth (`**/go.mod`) is fine as long as the root
+    copy is listed alongside it, which is why this only rejects the wildcard
+    form. (#1285 review, round 6.)"""
+    offenders = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        stanza = _pull_request_stanza(yaml.safe_load(path.read_text(encoding="utf-8")))
+        if not stanza or "paths" not in stanza:
+            continue
+        patterns = [str(p) for p in stanza["paths"]]
+        for pattern in patterns:
+            if "**/*" not in pattern:
+                continue
+            offenders.append(
+                f"{path.name}: {pattern!r} may skip root-level files; "
+                f"use {pattern.replace('**/*', '**')!r} instead"
+            )
+    assert not offenders, offenders
+
+
+def test_an_exact_name_at_depth_also_lists_its_root_copy() -> None:
+    """`**/go.mod` matches nested manifests but, under the same reading, not the
+    root one. Pairing it with a bare `go.mod` is correct under both readings and
+    stays exact — unlike `**go.mod`, which would also match `cargo.mod`."""
+    offenders = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        stanza = _pull_request_stanza(yaml.safe_load(path.read_text(encoding="utf-8")))
+        if not stanza or "paths" not in stanza:
+            continue
+        patterns = [str(p) for p in stanza["paths"]]
+        for pattern in patterns:
+            if not pattern.startswith("**/") or "*" in pattern[3:]:
+                continue
+            bare = pattern[3:]
+            if bare not in patterns:
+                offenders.append(
+                    f"{path.name}: {pattern!r} without a bare {bare!r}, so the "
+                    "root-level copy may never trigger the workflow"
+                )
+    assert not offenders, offenders
