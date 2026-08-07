@@ -47,7 +47,7 @@ jobs:
     # Runs the Go harness AND tests/test_go_adapter_contracts.py, so a Python
     # change to the bridge must run it too.
     if: >-
-      always() && (needs.changes.outputs.go != 'false'
+      !cancelled() && (needs.changes.outputs.go != 'false'
       || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     steps:
@@ -154,7 +154,8 @@ jobs:
 
   guardian-syntax-check:
     needs: changes
-    if: always() && needs.changes.outputs.python != 'false'
+    if: >-
+      !cancelled() && needs.changes.outputs.python != 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -201,7 +202,7 @@ jobs:
   go-evidence-ingestor:
     needs: changes
     if: >-
-      always() && (needs.changes.outputs.go != 'false'
+      !cancelled() && (needs.changes.outputs.go != 'false'
       || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     steps:
@@ -222,7 +223,8 @@ jobs:
 
   dashboard:
     needs: changes
-    if: always() && needs.changes.outputs.dashboard != 'false'
+    if: >-
+      !cancelled() && needs.changes.outputs.dashboard != 'false'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -258,7 +260,7 @@ jobs:
     # this job installs the Python package below. A bridge change is a terminal
     # change even when nothing under terminal/ moves.
     if: >-
-      always() && (needs.changes.outputs.terminal != 'false'
+      !cancelled() && (needs.changes.outputs.terminal != 'false'
       || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     defaults:
@@ -307,7 +309,8 @@ jobs:
 
   gauntlet-tier1:
     needs: changes
-    if: always() && needs.changes.outputs.python != 'false'
+    if: >-
+      !cancelled() && needs.changes.outputs.python != 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

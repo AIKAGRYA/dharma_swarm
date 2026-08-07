@@ -70,17 +70,34 @@ def test_every_conditional_job_fails_open() -> None:
     """Advisory jobs key off the classifier. They must test `!= 'false'`, not
     `== 'true'`: when the classifier fails, is skipped, or times out, its
     outputs are empty strings. `'' == 'true'` skips the job (fail closed);
-    `'' != 'false'` runs it (fail open). Only the second is safe."""
+    `'' != 'false'` runs it (fail open). Only the second is safe.
+
+    The guard must also override the implicit "all needs succeeded" gate, or a
+    FAILED classifier would skip every advisory job. `!cancelled()` does that
+    while still honouring cancellation; `always()` does it too but keeps the
+    jobs running after the run is cancelled, so pressing Cancel would not
+    release their runners -- directly against this change's purpose (#1285
+    review). Empty outputs still evaluate true under either, so fail-open is
+    unaffected.
+    """
     doc = yaml.safe_load((WORKFLOWS / "tests.yml").read_text())
     offenders = []
     for name, body in doc["jobs"].items():
-        condition = str(body.get("if", ""))
+        condition = " ".join(str(body.get("if", "")).split())
         if "needs.changes.outputs" not in condition:
             continue
         if "== 'true'" in condition or '== "true"' in condition:
-            offenders.append(f"{name}: {condition.strip()}")
-        if "always()" not in condition:
-            offenders.append(f"{name}: missing always(), skips when classifier fails")
+            offenders.append(f"{name}: fail-closed comparison: {condition}")
+        if "!cancelled()" not in condition:
+            offenders.append(
+                f"{name}: missing !cancelled(), so a FAILED classifier would "
+                f"skip this job instead of running it: {condition}"
+            )
+        if "always()" in condition:
+            offenders.append(
+                f"{name}: always() keeps this job running after the run is "
+                f"cancelled, so Cancel stops freeing runners: {condition}"
+            )
     assert not offenders, offenders
 
 
@@ -132,6 +149,12 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
         (
             "docs/governance/hygiene/ratchet_baselines.json",
             "quality-ratchet.yml --max-baseline-age-days grades this file",
+        ),
+        (
+            "docs/governance/hygiene/patterns/**",
+            "ratchet_counters.py measure_hygiene_patterns_enforced_or_resolved "
+            "globs docs/governance/hygiene/patterns/*.yaml as an UP counter, so "
+            "lowering a pattern's stage is a regression",
         ),
     ),
     "semgrep.yml": (

@@ -19,6 +19,8 @@
     ".github/workflows/spine-adoption.yml",
     ".github/workflows/test-hygiene.yml",
     ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
     "reports/agentops/work_packets/titanium-WP-CIPF-workflow-path-filters.json",
     "scripts/ci/classify_changed_paths.py",
     "tests/test_classify_changed_paths.py",
@@ -62,6 +64,12 @@
       "command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
       "expected_exit": 0,
       "timeout_seconds": 300
+    },
+    {
+      "name": "docops-integrity",
+      "command": "python3 scripts/docops/check_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
     }
   ],
   "negative_controls": [
@@ -85,7 +93,7 @@
     },
     {
       "name": "terminal-lane-dropping-the-python-class-is-caught",
-      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/tests.yml'); t=p.read_text(); n=t.replace(\\\"      always() && (needs.changes.outputs.terminal != 'false'\\n      || needs.changes.outputs.python != 'false')\\\",\\\"      always() && needs.changes.outputs.terminal != 'false'\\\",1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_workflow_path_filters.py::test_the_terminal_lane_runs_when_the_python_bridge_it_boots_changes'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/tests.yml'); t=p.read_text(); n=t.replace(' || needs.changes.outputs.python != \\'false\\')',')',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_workflow_path_filters.py::test_the_terminal_lane_runs_when_the_python_bridge_it_boots_changes'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -116,6 +124,18 @@
     {
       "name": "go-lanes-losing-the-makefile-input-is-caught",
       "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('scripts/ci/classify_changed_paths.py'); t=p.read_text(); n=t.replace('\\\"go.sum\\\", \\\"Makefile\\\")','\\\"go.sum\\\")',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_classify_changed_paths.py::test_the_go_lanes_run_when_the_make_target_they_invoke_changes'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "always-instead-of-cancelled-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/tests.yml'); t=p.read_text(); n=t.replace('!cancelled() && needs.changes.outputs.dashboard','always() && needs.changes.outputs.dashboard',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_workflow_path_filters.py::test_every_conditional_job_fails_open'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "quality-ratchet-losing-the-hygiene-patterns-input-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/quality-ratchet.yml'); t=p.read_text(); n=t.replace('hygiene/patterns/**','hygiene/patternsX/**',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_workflow_path_filters.py::test_a_filtered_workflow_still_runs_when_its_gate_inputs_change'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
       "expected_exit": 0,
       "timeout_seconds": 300
     }
@@ -162,11 +182,14 @@
       "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO. The change was authored, committed and pushed before this packet existed; the packet-scope gate failing on PR #1285 is what prompted it. Read the binding as a scope-CONFORMANCE check, not as evidence that scope was declared first.",
       "REVIEW ROUND 1 FOUND FOUR REAL GATE-SILENCING BUGS I SHIPPED (Devin, PR #1285). Every filter I wrote was keyed on the TOPIC of its workflow rather than on the INPUTS its jobs actually read, so four gates stopped firing on exactly the change each exists to catch: hermetic's codeowners-blast-radius (reads dharma_swarm/**/*.py and .github/CODEOWNERS, filtered to lockfiles); quality-ratchet (grades ratchet_baselines.json, not in its filter); semgrep (--config .semgrep, rules not in its filter, so deleting a detection rule silenced the scanner); and the terminal lane (boots dharma_swarm.terminal_bridge, gated on terminal/ alone). All four still ran on push:main, so the failure mode was a green PR board and a post-merge red. Fixed with six negative controls, one per pattern. The general lesson is now encoded as a test table, not prose: GATE_INPUTS in tests/test_workflow_path_filters.py.",
       "REVIEW ROUND 2 FOUND THE SAME DEFECT IN FOUR MORE PLACES (Devin, PR #1285). Fixing the first four instances did not make me go back and re-derive the remaining nine filters from their gates' actual inputs, so the review had to find them for me: import-provenance (reads requirements*.txt, packages/*/pyproject.toml -- which the root-only 'pyproject.toml' pattern does not match -- and its allowlist); name-drift (reads its allowlist); fourfold-warrant (.pre-commit-config.yaml is the only non-.py member of _HOT_PATHS, so **/*.py could not cover the hot-path set); and the classifier itself, which had no self-coverage: a PR editing .github/workflows/tests.yml classified every class false and skipped all six jobs it was editing, contradicting the very rule this PR enforces one level up. Makefile was also absent from the go class though both Go lanes run `make go-ci`. Twelve negative controls now, one per guard. The generalisable lesson -- derive a filter from the gate's INPUTS, never from its topic -- is encoded in the GATE_INPUTS table with a file:line citation per entry, plus a test that re-parses _HOT_PATHS so the table cannot silently go stale (AI-N4).",
+      "REVIEW ROUND 3 (Devin, #1285). Three more, all valid. (a) quality-ratchet still could not see docs/governance/hygiene/patterns/*.yaml, which ratchet_counters.py:252 globs as an UP counter with baseline 2 -- lowering a pattern's stage is a regression that ran no gate. My own GATE_INPUTS entry for that workflow listed only the baseline JSON, so my guard passed while the hole remained: the AI-N4 shape, in the very table I added to prevent it. (b) allowed_files omitted the two generated count docs this branch modifies. (c) The six advisory jobs used always(), which keeps them running after a run is CANCELLED -- so pressing Cancel would not release their runners, directly against this PR's purpose. Changed to !cancelled(), which still overrides the implicit needs-success gate (a FAILED classifier runs the jobs, preserving fail-open) while honouring cancellation. Same correction made independently on #1287 for a required gate; I did not carry the insight here until review pointed at it.",
+      "MY OWN COMPLETENESS SWEEP IS WEAK AND I AM NOT CLAIMING THE CLASS IS CLOSED. After three rounds of the same defect I wrote a script over all 13 filtered workflows, matching each filter against literal quoted paths and pathlib chains in the scripts those workflows invoke. It surfaced two candidates, both false positives on inspection (tests/**/*.py and packages/*/pyproject.toml are already covered). It would NOT have found the quality-ratchet defect above, because quality-ratchet.yml invokes ratchet.py and the glob lives in ratchet_counters.py, one import away -- the sweep does not follow transitive reads, dynamically built paths, or anything a subprocess opens. Absence of findings from it is not evidence of absence.",
+      "TWO OF MY OWN NEGATIVE CONTROLS WERE BROKEN AND ONE OF THEM PASSED WHILE BROKEN. Running the full packet after this round: 'terminal-lane-dropping-the-python-class' exited 2 (anchor went stale when always() became !cancelled()) -- a loud failure. Worse, 'quality-ratchet-losing-the-hygiene-patterns-input' exited 1 having SILENTLY passed: its replace() anchor matched the explanatory COMMENT above the paths list before reaching the filter entry, so it mutated prose, left the gate intact, and scored the guard as working. That is the same defect as the comment-satisfied assertion on #1287 -- a check whose subject turned out to be a comment. Both re-anchored on strings that occur only in the live entry, and all 11 controls plus 5 gates re-run green. The lesson is that a negative control needs its own no-op detection; ours has it (sys.exit(2) when the text is unchanged), and that is exactly what caught the first one.",
       "Before/after run counts are from a local approximation of GitHub's glob engine, not from GitHub. If the engines disagree on any pattern a workflow may not fire where I predicted. Mitigated but not eliminated by the required-context guard.",
       "structure.yml and manifest-check.yml are deliberately unfiltered: structure.yml must see any new root file, and I could not bound manifest-check's scope honestly. Guessing there is the AI-N4 shape this change otherwise guards.",
       "The classifier is exercised by unit tests and one real-git rename case, not against a live GitHub pull_request payload."
     ],
     "rollback": "Single revert. CI returns to ~28 runs per PR event; no gate changes meaning.",
-    "packet_digest": "e44f4c45571b54abdcab1d3c019bec31dc55ab1f280cc98c38e213e7545aed5c"
+    "packet_digest": "51a8ecf24a26f9b2c2dad6abcc380bb868d6fe2ce82f9e6278cf3b3cfd2d2ae2"
   }
 }

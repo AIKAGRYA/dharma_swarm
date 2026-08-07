@@ -18,6 +18,11 @@ on:
       # already stops a PR raising its own ceiling, but only when the workflow
       # runs at all; a PR touching only the baseline JSON matched nothing here.
       - 'docs/governance/hygiene/ratchet_baselines.json'
+      # measure_hygiene_patterns_enforced_or_resolved globs
+      # docs/governance/hygiene/patterns/*.yaml and is an UP counter, so
+      # lowering a pattern's stage is a ratchet regression. Without this
+      # line, undoing an enforced hygiene rule ran no gate.
+      - 'docs/governance/hygiene/patterns/**'
       - 'scripts/governance/hygiene/**'
       - '.github/workflows/quality-ratchet.yml'
   merge_group:
