@@ -83,7 +83,8 @@ Current examples:
 
 Proposed decisions related to the Fleet Command surface live under
 `ADRs/ADR-011-operator-actions-through-taskboard.md` and
-`ADRs/ADR-012-canonical-fleet-roster.md`.
+`ADRs/ADR-012-canonical-fleet-roster.md` and
+`ADRs/ADR-013-separate-phone-client.md`.
 
 Rule:
 

@@ -35,13 +35,13 @@ schema_version: pkm-phd-stigmergy-v1
 
 Date: 2026-08-07
 
-Status: DRAFT — implementation-driving design; six operator decisions remain open.
+Status: DRAFT — implementation-driving design; four operator decisions remain open.
 
 ## Intent and status
 
 This document ports the revised Fleet Hub plan into the repository's architecture-document convention. It is a design for a thin, phone-first operator client over existing `dharma_swarm` owners. It does not create a new A2A envelope, roster, board, authority, or truth store.
 
-The source plan is authoritative for this design. The diagnosis below names candidate causes that are each sufficient to explain the observed symptom; it does **not** claim that one candidate has been confirmed as the cause firing in live traffic.
+The source plan is authoritative for this design. The live evidence below records what the broker counters and permissions prove, and separates that from what remains unresolved about end-to-end handler behavior.
 
 The spec as written builds a third parallel implementation of things `dharma_swarm` already owns canonically. `/root/agni/fleet_hub/server.py` reinvents:
 
@@ -70,21 +70,32 @@ The repository already contains the enterprise A2A substrate:
 - AgentOps JSON packets, BoardStore, and the dashboard are projections around canonical task/runtime owners.
 - DHARMA COMMAND already provides cockpit, command-post, agents, tasks, Kanban, A2A receipt, gates, runtime, telemetry, and stigmergy surfaces.
 
-### Delivery symptom: candidate causes, not a confirmed live root cause
+### Delivery symptom: stale durables, visibility failure, and remaining uncertainty
 
-The observed symptom is that messages published to fleet subjects do not reach agents and no replies come back. Each candidate below is independently *sufficient* to produce that symptom, but none is confirmed as the one firing in live traffic:
+The observed symptom is that messages published to fleet subjects do not reach an agent in a way the operator can observe, and no reply appears. JetStream distinct durable names sharing a filter subject are independent subscriptions: each receives its own copy. Competing delivery requires processes sharing one durable name. The repeated Hermes filter therefore creates approximately 19-way fan-out on `dharma.a2a.hermes`, with duplicate work and duplicate replies as the risk; it does not make messages disappear. The binding map and counters come from the session artifact `/tmp/nats_readonly_inventory.json`, produced by the runnable command `PYTHONPATH=/home/ubuntu/repos/dharma-swarm PATH=.venv/bin:$PATH .venv/bin/python /tmp/nats_readonly_inventory.py > /tmp/nats_readonly_inventory.json`.
 
-1. **Subject collision:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:84-122` records AGNI Hermes with UID `hermes` while rushabdev also listens on `dharma.a2a.hermes`. Two durable consumers competing on one subject means each message lands wherever the broker's competing-consumer delivery sends it, so replies can appear randomly missing. Registry decision **FFR-D2 remains OPEN**.
-2. **Devin drains only the compatibility subject:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:124-141` records stable UID `devin-roaming-2987d222`, while the compatibility process pulls only `dharma.a2a.devin`; the UID inbox and reply/ACK wildcard routes remain undrained.
-3. **Roster fragmentation:** competing identity projections disagree, including `perplexity` versus `perplexity-computer` at `docs/ops/FLEET_FIELD_REGISTRY.yaml:179-195` and `contact_registry.py:110-152` UIDs such as `hermes-m5` and `claude-code` that do not match probed reality. A publisher can therefore address a subject from one projection while the bridge listens according to another.
+The counters evidence delivery into queues with no current drain:
 
-Before fixing any candidate, run the discriminating check for one message: log the published subject and every consumer bound to it, then observe whether delivery lands somewhere unexpected. This distinguishes the actual live cause from the first plausible explanation. Milestone **M0** is the migration step that closes these identity and routing seams.
+- `agni_hermes_inbox` is at `num_pending=0`, `delivered.stream_seq=8123228` (the captured stream head), and `ack_floor.stream_seq=8123225`.
+- `hermes_inbox`, `rushabdev_hermes_inbox`, and `fleet_agni_inbox` each have `num_pending=380`, with delivered sequences `8118474`, `8118756`, and `8118886`, respectively.
+- `devin_inbox` has `num_pending=3` and `delivered.stream_seq=8109056`, showing arrival and accumulation rather than disappearance.
+- `gw_dharma_command_node_a2a` tracks the fleet stream head at `8123228` with no pending messages, while `merge_master_mike_fleet` has `num_pending=306` and delivered sequence `8106912`.
+
+These counters prove stream acceptance and durable accumulation, and strongly evidence abandoned or unread durables. They do not prove whether an agent receives a newly published message and elects not to reply, or whether an agent replies on a route the operator cannot see. The single-probe session accepted one message (`DHARMA_A2A` head `8123228 → 8123229`), but ACLs blocked the follow-up consumer snapshots and reply watch. The discriminating check is an authorized one-message trace that records the target durable's pending/delivery movement and observes the correlated reply route end to end.
+
+The operator credential itself cannot subscribe to `dharma.a2a.hermes.reply.>` (`permissions violation for subscription to "dharma.a2a.hermes.reply.>"`). It is also denied individual `consumer.info` and `consumer.list` on every stream other than `DHARMA_A2A`; these denials were observed by `PYTHONPATH=/home/ubuntu/repos/dharma-swarm PATH=.venv/bin:$PATH .venv/bin/python /tmp/hermes_single_probe.py`. An operator surface without reply-route visibility cannot display replies regardless of UI quality. A hub ACL grant for reply subscriptions and required consumer metadata is therefore a **blocking dependency** for the phone client.
+
+Approximately 18 stale consumers are largely leftover debug scans, including `temp_full_scan`, `peer_check`, and `temp_wildcard_scan`, accumulating messages indefinitely. Reaping these durables is an M0 item and requires explicit operator approval because it mutates the live hub.
+
+Roster fragmentation remains a real routing and identity risk, not an evidenced cause of silence. Live corroboration includes `gw_perplexity_computer_a2a` filtering `dharma.a2a.perplexity`; the naming drift remains tracked at `docs/ops/FLEET_FIELD_REGISTRY.yaml:179-195`. The Hermes/rushabdev identity seam remains at `docs/ops/FLEET_FIELD_REGISTRY.yaml:84-122`, and Devin's compatibility route remains at `docs/ops/FLEET_FIELD_REGISTRY.yaml:124-141`; these require reconciliation because they can create duplicate delivery or undrained routes, not because distinct durables compete.
 
 The separate direct-operator-publication hazard remains: it bypasses Telos gates, TaskBoard transition validation, claim leases, cost ceilings, and the witness/receipt trail. The ADR in `docs/architecture/ADRs/ADR-011-operator-actions-through-taskboard.md` records that boundary.
 
-### Live-versus-target topology seam
+### Live topology
 
-`NatsTransportConfig` defaults to `DS_TASKS`/`DS_DLQ`, but `docs/ops/FLEET_FIELD_REGISTRY.yaml` states that **no DS_* stream runs live anywhere** and that live traffic is on `DHARMA_A2A`. A contractor reading only the transport defaults could wire the hub to a stream that does not exist and receive silence. This seam must remain prominent until a dated topology decision closes it.
+The live hub inventory captured on 2026-08-07 contains `DHARMA_A2A` (2,292 messages, 73 consumers), `A2A_INBOX`, `A2A_TASKS`, `A2A_DLQ`, `A2A_RECEIPTS`, `CODEX_COMPOSER_JOBS`, `CODEX_COMPOSER_RESULTS`, `CODEX_COMPOSER_DLQ`, `KV_PRESENCE`, and `DHARMA_TEST`. `DS_TASKS` and `DS_DLQ` do not exist. The evidence source is `/tmp/nats_readonly_inventory.json`, produced by `PYTHONPATH=/home/ubuntu/repos/dharma-swarm PATH=.venv/bin:$PATH .venv/bin/python /tmp/nats_readonly_inventory.py > /tmp/nats_readonly_inventory.json`; the artifact is a session file outside the repository.
+
+UID inbox subjects live on the separate `A2A_INBOX` stream, while compatibility subjects live on `DHARMA_A2A`. The phone client must preserve that stream distinction when presenting route health and selecting subscriptions. The live `A2A_*` names resolve the former `DS_*` topology question as of 2026-08-07; repository transport defaults remain implementation drift to reconcile, not a live topology choice.
 
 ### Hard gaps already admitted by the repository
 
@@ -122,7 +133,7 @@ Phone / DHARMA COMMAND / CLI
   -> shared API / policy / human approval
   -> TaskBoard command path for consequential work
   -> BoardStore projection + event stream
-  -> A2A task envelope on the selected live topology
+  -> A2A task envelope on the live A2A_* topology
   -> A2ANatsTransport / compatibility bridge
   -> agent runtime / handler
   -> RuntimeReceipt + IdempotencyRecord + trace
@@ -167,14 +178,14 @@ Use `context_id` as the thread ID. Do not introduce a parallel `thread_id` field
 
 Use `scripts/runtime/a2a_topology.py` as the subject source:
 
-| Route | Subject |
+| Route | Subject / stream |
 |---|---|
-| UID inbox | `dharma.agent.<uid>.inbox` |
-| compatibility recipient | `dharma.a2a.<recipient>` |
-| reply | `dharma.a2a.reply.<packet_id>` |
-| DLQ | `dharma.dlq.<stream>.<consumer>` |
+| UID inbox | `dharma.agent.<uid>.inbox` on `A2A_INBOX` |
+| compatibility recipient | `dharma.a2a.<recipient>` on `DHARMA_A2A` |
+| reply | `dharma.a2a.reply.<packet_id>` or per-agent reply routes on `DHARMA_A2A` |
+| DLQ | `dharma.dlq.<stream>.<consumer>` on `A2A_DLQ` |
 
-The hub must not silently select `DS_TASKS`/`DS_DLQ` while the field registry says live traffic is `DHARMA_A2A`. The decision is open and must be dated before production wiring.
+The hub must use the live `A2A_TASKS` and `A2A_DLQ` names and must preserve the separate `A2A_INBOX` versus `DHARMA_A2A` route boundary. `DS_TASKS` and `DS_DLQ` are absent from the live hub as of 2026-08-07.
 
 ### Identity and roster contract
 
@@ -239,7 +250,7 @@ The 2-hour projection is unsuitable for a live/dead dot: an agent can be dead fo
 | roster/routing | canonical roster to be established; currently field registry plus competing projections | Consume one selected owner after M0 |
 | presence | transport contact plus presence projection | Display both truth levels |
 | governance | TelosGatekeeper, kernel/tool policy, receipt gates | Surface verdicts; never bypass |
-| operator UI | DHARMA COMMAND or separate phone client, decision open | Thin client over shared API |
+| operator UI | separate lightweight phone client; DHARMA COMMAND remains the cockpit | Thin client over shared API |
 
 The architecture doc is a DRAFT and does not itself become repo-level canon. It replaces nothing. It subordinates to `docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md` for the A2A spine and to `docs/governance/CANONICAL_DOC_STACK.md` for document authority and hierarchy; executable truth remains with the cited code and runtime owners.
 
@@ -260,8 +271,8 @@ The architecture doc is a DRAFT and does not itself become repo-level canon. It 
 
 | # | Milestone | Done when |
 |---|---|---|
-| **M0** | **Reconcile identity** | One canonical roster; FFR-D2 closed (hermes/rushabdev collision resolved); Devin drains UID inbox + reply/ACK; `perplexity-computer` drift closed. Verify: every agent gets a probe DM and replies, on subjects derived solely from the canonical roster |
-| **M1** | Lock down + topology decision | Hub reachable only via Tailscale/mTLS; exposed credential rotated; NATS perms subject-scoped per node; DHARMA_A2A vs DS_* written down as a dated decision |
+| **M0** | **Reconcile identity and stale consumers** | One canonical roster; FFR-D2 reconciled; Devin drains UID inbox + reply/ACK; `perplexity-computer` drift closed; operator-approved debug durable reaping; reply-route and consumer-metadata ACLs granted. Verify: every agent gets a probe DM and replies, on subjects derived solely from the canonical roster |
+| **M1** | Lock down access | Hub reachable only via Tailscale/mTLS; exposed credential rotated; NATS permissions subject-scoped per node; live `A2A_*` topology is used |
 | **M2** | Envelope + repo | `hops` added to envelope + enforced in bridges; Fleet Hub code in git; docker-compose NATS + fake agent so the client is buildable with zero prod access |
 | **M3** | Vertical slice | One agent, streamed reply, first token < 2s p95 / complete < 20s p95 over 20 runs. Prove latency before wiring ten |
 | **M4** | Board authority + org rules | Phone board issues TaskBoard commands (never direct writes); authority tiers, escalation SLA, delegation depth cap, capability-gated claims enforced; a Telos BLOCK renders with its reason |
@@ -306,12 +317,16 @@ The operator surface is ready for a scale rehearsal when:
 
 ### Open decisions
 
-1. **Reframe accepted?** Fleet Hub as a thin phone client onto existing canonical surfaces, rather than a parallel implementation. Everything above depends on this answer.
-2. **Phone client: extend DHARMA COMMAND, or separate lightweight app?** The Next.js dashboard has the panels but is laptop-shaped; a separate phone client duplicates rendering but ships faster and will not destabilize the cockpit. The source plan leans separate client, shared API.
-3. **Tailscale on the phone?** Still unanswered; it collapses most of the auth problem.
-4. **DHARMA_A2A or DS_\*** for the hub to build against?
-5. **Per-objective cost ceiling default**, and who may raise it — the field exists and needs a number.
-6. **Authority tiers**: which agents are `command` versus `worker`? At 50 agents this is the difference between an organization and a mob.
+1. **Tailscale on the phone?** Still unanswered; it collapses most of the auth problem.
+2. **Per-objective cost ceiling default**, and who may raise it — the field exists and needs a number.
+3. **Authority tiers**: which agents are `command` versus `worker`? At 50 agents this is the difference between an organization and a mob.
+4. **Reply and metadata ACL scope:** exact subject and JetStream API permissions for the phone operator credential after the M0 blocking grant.
+
+Resolved on 2026-08-07:
+
+- The thin-client reframe is accepted.
+- The operator surface is a separate lightweight phone client rather than an extension of DHARMA COMMAND, so the cockpit remains stable while the phone surface iterates.
+- The live topology is `DHARMA_A2A`, `A2A_INBOX`, `A2A_TASKS`, `A2A_DLQ`, and the other streams recorded above; `DS_TASKS` and `DS_DLQ` are absent.
 
 ### Hard gaps
 
@@ -336,3 +351,4 @@ The operator surface is ready for a scale rehearsal when:
 - `api/main.py:188-203,234-239` — TaskBoard authority and fail-closed dashboard authentication.
 - `docs/architecture/ADRs/ADR-011-operator-actions-through-taskboard.md`
 - `docs/architecture/ADRs/ADR-012-canonical-fleet-roster.md`
+- `docs/architecture/ADRs/ADR-013-separate-phone-client.md`

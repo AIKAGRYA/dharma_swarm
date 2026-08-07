@@ -20,7 +20,7 @@ The survey found no single roster owning all identity, subject, model, host, cap
 
 The field registry documents concrete seams:
 
-- **FFR-D2 Hermes/rushabdev collision:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:84-122` records AGNI Hermes with UID `hermes` while rushabdev also listens on `dharma.a2a.hermes`; the registry identifies the collision and leaves FFR-D2 OPEN.
+- **FFR-D2 Hermes/rushabdev collision:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:84-122` records AGNI Hermes with UID `hermes` while rushabdev also listens on `dharma.a2a.hermes`; distinct durables fan out independent copies, creating duplicate work and abandoned queues rather than competing delivery or message loss. The registry identifies the collision and leaves FFR-D2 OPEN.
 - **Devin compatibility-subject-only drain:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:124-141` records stable UID `devin-roaming-2987d222` while the compatibility route is `dharma.a2a.devin`; the compatibility process does not drain the UID inbox plus reply/ACK routes.
 - **Perplexity naming drift:** `docs/ops/FLEET_FIELD_REGISTRY.yaml:179-195` resolves `perplexity` versus `perplexity-computer` in favor of UID `perplexity-computer`.
 - **Competing in-code names:** `contact_registry.py:110-152` includes names such as `claude-code` and `hermes-m5` that do not line up one-for-one with field-registry names such as `fable_claude_code` and `hermes`.
@@ -67,7 +67,7 @@ The canonical roster must generate subject routes through `scripts/runtime/a2a_t
 ### Neutral
 
 - `FLEET_FIELD_REGISTRY.yaml` remains valuable field evidence during migration.
-- This ADR does not decide whether the live hub topology is `DHARMA_A2A` or `DS_*`.
+- Live stream names and route separation are recorded in the Fleet Command architecture document; this ADR does not own stream topology.
 
 ## Enforcement
 

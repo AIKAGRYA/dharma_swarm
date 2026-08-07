@@ -55,7 +55,7 @@ Free-text chat remains allowed over A2A directly when it does not mutate work st
 ### Neutral
 
 - BoardStore remains useful as the dashboard projection and event surface.
-- The chosen NATS stream remains a separate open topology decision; this ADR does not select `DHARMA_A2A` or `DS_*`.
+- The live topology is recorded by the Fleet Command architecture document; this ADR does not own stream topology.
 
 ## Enforcement
 
