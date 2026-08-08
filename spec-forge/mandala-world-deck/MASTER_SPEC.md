@@ -24,7 +24,7 @@ connected_relevant_files:
 Candidate master product, interaction, truth, and rollout specification v0.2
 
 **Status:** CANDIDATE / INCUBATING — no implementation authority, no active-track admission, and no runtime authority
-**Role:** `active_spec` candidate in the forge lane; not canonical until separately ratified and promoted
+**Role:** `reference` candidate design record in the forge lane; it carries no implementation authority and may become an `active_spec` only after separate Gate 0 ratification and promotion
 **Date:** 2026-08-09
 **Observed checkout:** `bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4` (`origin/main` at the start of this work)
 **Requested by:** the operator, to make the whole organism understandable and governable as a precise, visual, interactive experience
