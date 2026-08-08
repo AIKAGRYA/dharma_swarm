@@ -345,24 +345,27 @@ open PRs faster).
 
 ## 6. Mechanical Backstop (`pr-ci-health.yml`)
 
-An hourly cron workflow provides automated triage and healing:
+The hourly cron is **report-only**: it classifies the open backlog and updates
+the tracking issue, but it never reruns CI or rebases a PR. Healing requires an
+explicit `workflow_dispatch`; rebase additionally requires exactly one
+positive-integer `pr_number` input.
 
-| Action | What it does |
-|--------|-------------|
-| **Report** | Classifies all open PRs into categories and updates a tracking issue |
-| **Re-run** | Re-triggers failed runs caused by transient infra (umbrella status flakes) |
-| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main` via `pr_ci_safe_rebase.py`, except packet-bound / non-same-repo / race-failed PRs |
+| Invocation | What it does |
+|------------|--------------|
+| **Scheduled report** | Hourly `schedule` classifies all open PRs and updates one tracking issue; no healing step is reachable |
+| **Manual re-run** | `workflow_dispatch` with `mode=rerun` re-triggers failed runs classified as transient infrastructure failures |
+| **Manual rebase** | `workflow_dispatch` with `mode=rebase` plus one `pr_number` delegates only that conflict-free behind-main PR to `pr_ci_safe_rebase.py`; packet-bound / non-same-repo / race-failed PRs remain fail-closed |
 
 ### Session Entry branch preservation
 
-The rebase action must never rewrite a PR whose changed-file set contains a
+The manual rebase action must never rewrite a PR whose changed-file set contains a
 Session Entry packet under `reports/agentops/work_packets/*.json` (current
 `.filename` or rename-away `.previous_filename`). Those packets bind `base_ref`,
 collision evidence, and packet digest to a specific merge base; an automated
 rebase makes those claims stale even when the resulting source tree is
 byte-identical.
 
-`pr-ci-health.yml` delegates each candidate to
+`pr-ci-health.yml` delegates the explicitly selected candidate to
 `scripts/governance/pr_ci_safe_rebase.py` **before** any PR-head
 fetch/checkout/rebase/push. The helper is fail-closed and claims only:
 

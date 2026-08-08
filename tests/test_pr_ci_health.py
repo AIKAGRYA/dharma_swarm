@@ -179,24 +179,11 @@ def test_workflow_validates_push_authority_before_rebase():
     ) not in workflow
 
 
-def test_workflow_does_not_rebase_on_every_merge_to_main():
-    """REVERSED 2026-08-07. This test previously asserted the opposite.
+def test_workflow_rebase_is_manual_and_targeted_not_scheduled():
+    """Neither push nor cron may rewrite the open-PR backlog.
 
-    It used to require `push: branches: [main]`, on the reasoning that a merge
-    to main strands every other PR behind it and they would otherwise wait up
-    to 59 minutes for the cron. That reasoning assumed "require branches up to
-    date before merging" was enabled, which made a behind-main PR unmergeable.
-
-    That premise no longer holds — a behind-main PR reports
-    `mergeable_state: unstable` (mergeable), not `behind`. With it gone, the
-    trigger only bought cost: each merge rebased every conflict-free
-    behind-main PR, and each rebase relaunches that PR's full workflow set.
-    Measured 2026-08-07: four merges produced four rebase waves of ~13-20 PRs,
-    a 676-deep queue, a 2-second required job waiting 80 minutes, and PR #1286
-    having a complete 38/38 green sweep discarded four times.
-
-    The hourly cron still rebases, so the capability is retained — it is
-    bounded to once an hour instead of once per merge.
+    Rebase remains available as a fail-closed recovery operation, but only for
+    an explicit workflow_dispatch invocation whose selector matches one PR.
     """
     import yaml  # noqa: PLC0415
 
@@ -207,14 +194,23 @@ def test_workflow_does_not_rebase_on_every_merge_to_main():
         "the merge-to-main rebase stampede is back: every merge will rebase the "
         "whole backlog and relaunch a full CI run per open PR"
     )
-    assert "schedule" in triggers, "the hourly backstop must remain"
+    assert "schedule" in triggers, "the hourly report backstop must remain"
 
-    # The rebase capability itself must survive — the cron still uses it.
+    job = doc["jobs"]["triage-and-heal"]
+    assert job["env"]["MODE"] == (
+        "${{ github.event_name == 'workflow_dispatch' "
+        "&& github.event.inputs.mode || 'report' }}"
+    )
+
+    # The rebase capability survives, but cron cannot satisfy its event guard.
     rebase_step = next(
-        step for step in doc["jobs"]["triage-and-heal"]["steps"]
+        step for step in job["steps"]
         if step.get("name", "").startswith("Rebase conflict-free")
     )
-    assert "rebase" in rebase_step["if"]
+    assert rebase_step["if"] == (
+        "github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'"
+    )
+    assert " | select(.number == $target_pr)" in rebase_step["run"]
 
 
 def test_behind_main_is_detected_when_state_says_blocked():
