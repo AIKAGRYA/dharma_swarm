@@ -6,7 +6,7 @@ authority: projection_only
 
 # Operator Experience Membrane
 
-Producer: the shipped Helm JSON bridge and terminal approval store project runtime truth to the operator. This candidate node is bound to `helm-worldclass-terminal-2026-06`.
+Producer: the shipped Helm JSON bridge and terminal approval store project runtime truth to the operator. Helm remains a read-only proof surface after its `CLOSED_NOT_PROD` closure; active project responsibility for this candidate node is bound to `organism-rewire-2026-07`.
 
 Contract: consume `verified_release`; apply `request_operator_authority`; emit `authorized_action` to [External Value Delivery](external_value_delivery.md).
 
@@ -16,7 +16,7 @@ Current adapter projection: `helm.read_only_authorization_projection` reads a bo
 
 Promotion obligations:
 
-- define a fresh measurable operator-experience delta rather than reopening a shipped label;
+- define a fresh measurable operator-experience delta under Organism Rewire rather than reopening the shipped Helm label;
 - persist approval identity and scope before consequential action;
 - prove the view projects owner truth without becoming a second authority.
 

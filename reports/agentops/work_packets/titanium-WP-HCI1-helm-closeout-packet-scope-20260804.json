@@ -1,11 +1,14 @@
 {
   "id": "titanium-WP-HCI1-helm-closeout-packet-scope-20260804",
-  "intent": "Bind PR #1213's complete Helm CLOSED_NOT_PROD closure event to one reviewable AgentOps Session Entry packet. The event starts at exact main f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd, preserves the six already-authored Helm governance, receipt, checker, and test paths, and adds only this packet as the seventh path. This is a Titanium CI-admission repair: it proves declared scope and replayable checks, but neither ratifies Helm's closure nor grants production, deployment, policy, credential, or merge authority.",
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "intent": "Bind PR #1213's complete Helm CLOSED_NOT_PROD closure and current-main integration repair to one reviewable AgentOps Session Entry packet. The event starts at exact main bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4, preserves the six Helm governance, receipt, checker, and test paths plus this packet, and adds the three organism-owned/current architecture projection paths needed to remove Helm from the active autocatalytic metabolism without erasing its shipped read-only proof surface. This proves declared scope and replayable checks, but neither self-ratifies Helm's closure nor grants production, deployment, policy, credential, or merge authority.",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "governance/close-helm-track-v2-20260803",
   "worktree": ".",
   "allowed_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
     "CLAUDE.md",
+    "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+    "docs/architecture/autocatalytic_nodes/operator_experience.md",
     "docs/governance/ACTIVE_TRACK.yaml",
     "docs/governance/SOVEREIGN_MANIFEST.md",
     "reports/governance/helm/HELM_TRACK_CLOSEOUT_2026-07-31.md",
@@ -143,6 +146,18 @@
       "timeout_seconds": 900
     },
     {
+      "name": "active-metabolism-closure-contracts",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_manifest_health.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "managed-active-track-projections",
+      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
       "name": "touched-python-ruff",
       "command": "python3 -m ruff check scripts/governance/check_track_status.py tests/test_track_portfolio.py",
       "expected_exit": 0,
@@ -166,7 +181,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
+      "python": "3.11.15",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -178,33 +193,39 @@
       "owner_files"
     ],
     "work_packet": "WP-HCI1",
-    "active_track": "repository-titanium-hardening-2026-07",
+    "active_track": "organism-rewire-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": []
     },
     "interface_mismatches": [
-      "PR #1213 changes the hot path scripts/governance/check_track_status.py, but its six-path event has no Session Entry packet and therefore fails the risk-triggered AgentOps packet-scope gate.",
-      "Helm is ACTIVE at the exact base and SHIPPED at the proposed head. Local closeout admits only an ACTIVE or SHIPPABLE authority, so this CI-admission packet binds to the still-ACTIVE Titanium hardening track without transferring Helm ownership or changing Helm's closure result.",
-      "The implementation and governance closeout already exist in the six-path range; this repair adds only the missing packet and does not rewrite that evidence."
+      "PR #1213 changes the hot path scripts/governance/check_track_status.py, so its complete current-main event remains bound to one exact-base Session Entry packet.",
+      "Current main added an executable autocatalytic portfolio whose active-project set includes Helm. Closing Helm without repairing that owner projection makes tests/test_autocatalytic_portfolio.py::test_every_active_project_is_bound_into_the_metabolism fail with Helm as the sole inactive extra.",
+      "The operator-experience adapter still reads shipped Helm artifacts, but read-only proof provenance is not active-track authority. The manifest and current architecture pages therefore bind active responsibility to organism-rewire-2026-07 while naming Helm only as the closed shipped proof surface.",
+      "The original Helm implementation and governance closeout predate this refresh. This packet changes no terminal product bytes and does not rewrite historical autocatalytic council evidence."
     ],
     "closest_existing_implementation": [
       "scripts/governance/check_agentops_packet_scope.py",
       "scripts/governance/run_agent_work_packet.py",
       "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+      "ACTIVE_SURFACE_MANIFEST.yaml",
+      "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+      "docs/architecture/autocatalytic_nodes/operator_experience.md",
       "reports/governance/helm/HELM_TRACK_CLOSEOUT_2026-07-31.md",
-      "tests/test_track_portfolio.py"
+      "tests/test_track_portfolio.py",
+      "tests/test_autocatalytic_portfolio.py"
     ],
     "honest_blockers": [
       "This packet establishes scope coverage and replayable local checks only. It does not self-ratify Helm's CLOSED_NOT_PROD verdict, satisfy before-merge approval, or exercise merge authority.",
-      "The six pre-existing PR paths were authored before this packet. Preflight is therefore bound to the exact event base and closeout must replay the complete seven-path candidate range; no claim is made that preflight preceded the original implementation work.",
-      "The active Titanium track owns none of the seven event paths. All live sibling-owned surfaces from both event endpoints are explicitly forbidden, and an independent collision check found no overlap; this is admission authority, not a transfer of surface ownership.",
+      "The original six Helm paths were authored before the initial packet, and the current-main integration repair was identified before this exact-base packet refresh. The exact-base preflight is a reconstruction and no claim is made that it preceded either earlier implementation event.",
+      "Organism Rewire owns ACTIVE_SURFACE_MANIFEST.yaml and this refresh binds to that active owner for the integration repair. The packet grants no ownership over Helm's closed terminal surface, the historical governance paths, or sibling tracks.",
+      "The committed autocatalytic council runs and active-track projection are immutable point-in-time evidence for their original ten-active-track base; they remain unchanged and do not attest to this nine-track candidate.",
       "No production process, policy setting, deployment, credential, external communication, or GitHub state is changed by this packet commit."
     ],
-    "rollback": "Revert only the packet commit. The original six-path Helm closeout remains byte-for-byte unchanged, while the PR correctly returns to a failing AgentOps packet-scope state until another valid packet is supplied.",
-    "packet_digest": "4a398844f814c04ffc167ebc7529629ece8966815faa447905aaa247031c1359"
+    "rollback": "Revert the current-main merge and integration-repair commits together. The remote branch returns to its prior seven-path Helm closeout event; no terminal product bytes or runtime state require surgery.",
+    "packet_digest": "b6d9a68f55d8e2947eed79b24f7565132793d5ed1494ada87c4d4066ecbe664f"
   },
   "approval": {
     "before_commit": false,
@@ -212,6 +233,6 @@
   },
   "commit": {
     "allowed": true,
-    "message": "ci(agentops): bind Helm closeout packet scope"
+    "message": "fix(governance): reconcile Helm closure projections"
   }
 }
