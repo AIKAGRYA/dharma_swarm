@@ -1,6 +1,6 @@
 {
   "id": "dharmagraph-WP-COMPLETE01-v3-freeze-20260804",
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "governance/dharmagraph-v3-complete01-freeze-20260804",
   "worktree": ".",
   "intent": "Freeze the COMPLETE01 V3 measurement design before any V3 implementation or results: bind all four installed LangGraph distributions by exact version and RECORD/METADATA digest, enumerate all 68 non-private shipped modules from distribution RECORD ownership, assign each exact module to explicit existing frozen row/facet coverage or a narrowly reasoned operator-ratified exclusion, and state the future executable totality, reverse-coverage, and fail-closed proof obligations without modifying code, V1/V2 rubric bytes, scores, or receipts.",
@@ -56,7 +56,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
+      "python": "3.11.15",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -72,7 +72,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": []
     },
     "interface_mismatches": [
@@ -94,6 +94,6 @@
       "No daemon, production, deployment, exposure, credentials, branch policy, approval, or merge action is performed."
     ],
     "rollback": "Remove the unconsumed V3 freeze file. If implementation has already consumed it, revert the implementation and its receipts first; never silently fall back to V2's hard-coded COMPLETE01 literal.",
-    "packet_digest": "6d668a47e2ff8d0cf1bed90046786884a6ef775ff04b52d4d2501887181e2b0e"
+    "packet_digest": "306169112bc9f06a5309a0895486ebd3a4769a67ac486a677811bd8fa66b130c"
   }
 }
