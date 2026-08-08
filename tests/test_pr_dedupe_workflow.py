@@ -70,8 +70,10 @@ def _run_step(
     name: str,
     rows: list[dict[str, object]],
     dry_run: bool,
+    list_rc: int = 0,
     comment_rc: int = 0,
     close_rc: int = 0,
+    delete_rc: int = 0,
     fail_jq: bool = False,
 ) -> tuple[subprocess.CompletedProcess[str], str, str]:
     tmp_path.mkdir()
@@ -85,7 +87,10 @@ def _run_step(
         """#!/bin/sh
 printf '%s\\n' "$*" >> "$GH_CALL_LOG"
 case "$1:$2" in
-  pr:list) printf '%s\\n' "$GH_ROWS" ;;
+  pr:list)
+    [ "${GH_LIST_RC:-0}" -eq 0 ] || exit "$GH_LIST_RC"
+    printf '%s\\n' "$GH_ROWS"
+    ;;
   pr:comment) exit "${GH_COMMENT_RC:-0}" ;;
   pr:close) exit "${GH_CLOSE_RC:-0}" ;;
   api:*) exit "${GH_DELETE_RC:-0}" ;;
@@ -111,9 +116,10 @@ esac
             "GH_REPO": "owner/repo",
             "GH_ROWS": json.dumps(rows),
             "GH_CALL_LOG": str(calls),
+            "GH_LIST_RC": str(list_rc),
             "GH_COMMENT_RC": str(comment_rc),
             "GH_CLOSE_RC": str(close_rc),
-            "GH_DELETE_RC": "0",
+            "GH_DELETE_RC": str(delete_rc),
             "DRY_RUN": "true" if dry_run else "false",
             "GITHUB_STEP_SUMMARY": str(summary),
         }
@@ -303,6 +309,18 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             title="[automated] ordinary dependency update",
             head="chore/dependency-update",
         ),
+        _pr(
+            14,
+            # A marker plus broad report language is still not an admitted
+            # Pass 1 branch grammar.
+            title="[automated] ops report: fix bug",
+            head="chore/unrelated-automation",
+        ),
+        _pr(
+            15,
+            title="[auto] refresh spine adoption metric",
+            head="ops/pr-lifecycle-spine-experiment",
+        ),
     ]
 
     assert _matching_numbers(rows) == []
@@ -328,9 +346,12 @@ def test_dedupe_reporting_is_outcome_bound_and_filter_errors_fail_closed() -> No
     for step in (snapshot_step, duplicate_step):
         assert "**WOULD CLOSE**" in step
         assert "**FAILED TO CLOSE**" in step
+        assert "**FAILED TO LIST OPEN PRS**" in step
+        assert "**FAILED TO CLASSIFY" in step
         assert "governance comment failed" in step
+        assert "echo -e" not in step
         assert step.index('if gh pr close "$number"') < step.index(
-            'summary+="- **CLOSED**'
+            "printf -- '- **CLOSED**"
         )
 
 
@@ -392,6 +413,18 @@ def test_dedupe_steps_report_dry_run_and_api_outcomes_honestly(
         assert "**FAILED TO CLOSE**" in summary
         assert "**CLOSED**" not in summary
 
+    result, summary, calls = _run_step(
+        tmp_path / "delete-failure",
+        name="Find and close duplicate automated PRs",
+        rows=duplicate_rows,
+        dry_run=False,
+        delete_rc=11,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "**CLOSED**" in summary
+    assert "branch cleanup failed" in summary
+    assert "api --method DELETE" in calls
+
 
 def test_dedupe_steps_do_not_report_empty_state_when_jq_fails(
     tmp_path: Path,
@@ -410,7 +443,30 @@ def test_dedupe_steps_do_not_report_empty_state_when_jq_fails(
             fail_jq=True,
         )
         assert result.returncode == 7
-        assert summary == ""
+        assert "**FAILED TO CLASSIFY" in summary
+        assert "No snapshot-report PRs open." not in summary
+        assert "No duplicate automated PRs found." not in summary
+
+
+def test_dedupe_steps_report_list_failures_before_classification(
+    tmp_path: Path,
+) -> None:
+    for index, name in enumerate(
+        (
+            "Close ephemeral snapshot-report PRs",
+            "Find and close duplicate automated PRs",
+        )
+    ):
+        result, summary, calls = _run_step(
+            tmp_path / str(index),
+            name=name,
+            rows=[],
+            dry_run=False,
+            list_rc=12,
+        )
+        assert result.returncode == 12
+        assert "**FAILED TO LIST OPEN PRS**" in summary
+        assert "pr close" not in calls
 
 
 def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:

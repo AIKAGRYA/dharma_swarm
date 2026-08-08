@@ -23,9 +23,9 @@ name: pr-dedupe
 #   (`make onboard`, reports/governance/**) — so this pass CLOSES every such
 #   snapshot PR outright (not keep-newest) with a governance comment while
 #   preserving its branch ref for recovery. The match is conservative:
-#   same-repo owner AND either an exact snapshot-only branch paired with its
-#   own anchored title grammar, or an automation marker paired with a known
-#   legacy snapshot intent.
+#   same-repo owner AND one of two exact snapshot-only branch grammars paired
+#   with that lane's independently anchored title grammar. Automation markers
+#   and broad intent phrases never grant Pass 1 close authority.
 #
 #   Pass 2 — duplicate consolidation: groups remaining open PRs by normalized
 #   title (lowercased, whitespace collapsed, timestamps stripped) and, for
@@ -79,9 +79,22 @@ jobs:
 
           repo_owner="${GH_REPO%%/*}"
 
-          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+          printf '%s\n\n' "## Ephemeral Snapshot-Report PR Cleanup" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          # This bounded scan fails safe: PRs outside the newest 200 remain
+          # untouched, and the job never claims global backlog completeness.
+          if gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
-            > /tmp/open_prs.json
+            > /tmp/open_prs.json; then
+            :
+          else
+            list_status=$?
+            printf '%s\n' "- **FAILED TO LIST OPEN PRS**; no PR was classified or closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::open PR listing failed — cleanup aborted"
+            exit "$list_status"
+          fi
 
           # A snapshot-report PR is a pure status projection that should never
           # have been a PR. The external Oz lane historically omitted
@@ -108,27 +121,26 @@ jobs:
                 elif $legacy_ops_snapshot then
                   ($t | test("^chore\\(governance\\): ops report [0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{2}:?[0-9]{2}z)?([^a-z0-9]|$)"))
                 else
-                  ($t | test("\\[automated\\]|\\[auto\\]"))
-                  and (
-                    ($t | test("pr lifecycle \\+ spine adoption ops report"))
-                    or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
-                    or ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
-                    or ($t | test("refresh spine adoption metric"))
-                    or ($h | test("pr-lifecycle-spine"))
-                    or ($h | test("spine-adoption-metric"))
-                  )
+                  false
                 end;
             [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
             | sort_by(.number) | .[]
           JQ
           )"
-          jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
-            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl
+          if jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
+            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl; then
+            :
+          else
+            jq_status=$?
+            printf '%s\n' "- **FAILED TO CLASSIFY SNAPSHOTS**; no PR was closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::snapshot classifier failed — cleanup aborted"
+            exit "$jq_status"
+          fi
 
           closed_count=0
-          summary="## Ephemeral Snapshot-Report PR Cleanup\n\n"
           if [ ! -s /tmp/snapshot_prs.jsonl ]; then
-            summary+="No snapshot-report PRs open.\n"
+            printf '%s\n' "No snapshot-report PRs open." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           while IFS= read -r entry; do
@@ -136,7 +148,8 @@ jobs:
             title="$(echo "$entry" | jq -r '.title')"
             head_ref="$(echo "$entry" | jq -r '.headRefName')"
             if [ "$DRY_RUN" != "false" ]; then
-              summary+="- **WOULD CLOSE** #${number} (branch \`${head_ref}\`) — ${title}\n"
+              printf -- '- **WOULD CLOSE** #%s (branch `%s`) — %s\n' \
+                "$number" "$head_ref" "$title" >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
 
@@ -160,15 +173,19 @@ jobs:
             fi
             if gh pr close "$number" --repo "$GH_REPO"; then
               closed_count=$((closed_count + 1))
-              summary+="- **CLOSED** #${number} (branch \`${head_ref}\`) — ${title}${comment_note}\n"
+              printf -- '- **CLOSED** #%s (branch `%s`) — %s%s\n' \
+                "$number" "$head_ref" "$title" "$comment_note" \
+                >> "$GITHUB_STEP_SUMMARY"
             else
-              summary+="- **FAILED TO CLOSE** #${number} (branch \`${head_ref}\`) — ${title}${comment_note}\n"
+              printf -- '- **FAILED TO CLOSE** #%s (branch `%s`) — %s%s\n' \
+                "$number" "$head_ref" "$title" "$comment_note" \
+                >> "$GITHUB_STEP_SUMMARY"
               echo "::warning::close of #${number} was rejected — not counted as closed"
             fi
           done < /tmp/snapshot_prs.jsonl
 
-          summary+="\n**Summary:** ${closed_count} snapshot PR(s) closed (dry_run=${DRY_RUN})\n"
-          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n**Summary:** %s snapshot PR(s) closed (dry_run=%s)\n' \
+            "$closed_count" "$DRY_RUN" >> "$GITHUB_STEP_SUMMARY"
           echo "Snapshot closed: $closed_count"
 
       - name: Find and close duplicate automated PRs
@@ -178,16 +195,28 @@ jobs:
           repo_owner="${GH_REPO%%/*}"
           trusted_head_re='^(ops|chore|codex|devin|governance)/'
 
-          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+          printf '%s\n\n' "## Duplicate Automated PR Dedupe" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          # As above, the 200-PR bound is fail-safe: unseen PRs are untouched.
+          if gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
-            > /tmp/open_prs.json
+            > /tmp/open_prs.json; then
+            :
+          else
+            list_status=$?
+            printf '%s\n' "- **FAILED TO LIST OPEN PRS**; no duplicate was classified or closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::open PR listing failed — dedupe aborted"
+            exit "$list_status"
+          fi
 
           # Normalize titles and group. Title markers are not trusted by
           # themselves: pull_request_target has write credentials, so dedupe
           # only touches same-repo PRs that also have a trusted automation
           # signal (bot author, trusted head prefix, or maintainer-applied
           # opt-in label).
-          jq -c '
+          if jq -c '
             def label_names: (.labels // [] | map(.name));
             def trusted($owner; $head_re):
               ((.headRepositoryOwner.login // "") == $owner)
@@ -213,24 +242,33 @@ jobs:
             | map(select(length > 1) | sort_by(.number))
             | .[]
           ' --arg repo_owner "$repo_owner" --arg trusted_head_re "$trusted_head_re" \
-            /tmp/open_prs.json > /tmp/dupe_groups.jsonl
+            /tmp/open_prs.json > /tmp/dupe_groups.jsonl; then
+            :
+          else
+            jq_status=$?
+            printf '%s\n' "- **FAILED TO CLASSIFY DUPLICATES**; no PR was closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::duplicate classifier failed — dedupe aborted"
+            exit "$jq_status"
+          fi
 
           closed_count=0
-          summary="## Duplicate Automated PR Dedupe\n\n"
 
           if [ ! -s /tmp/dupe_groups.jsonl ]; then
-            summary+="No duplicate automated PRs found.\n"
+            printf '%s\n' "No duplicate automated PRs found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           while IFS= read -r group; do
             keep="$(echo "$group" | jq -r '.[-1].number')"
             title="$(echo "$group" | jq -r '.[-1].title')"
-            summary+="### \`${title}\` — keeping #${keep}\n"
+            printf -- '### `%s` — keeping #%s\n' "$title" "$keep" \
+              >> "$GITHUB_STEP_SUMMARY"
             while IFS= read -r entry; do
               number="$(echo "$entry" | jq -r '.number')"
               head_ref="$(echo "$entry" | jq -r '.headRefName')"
               if [ "$DRY_RUN" != "false" ]; then
-                summary+="- **WOULD CLOSE** #${number} (branch \`${head_ref}\`)\n"
+                printf -- '- **WOULD CLOSE** #%s (branch `%s`)\n' \
+                  "$number" "$head_ref" >> "$GITHUB_STEP_SUMMARY"
                 continue
               fi
 
@@ -254,14 +292,18 @@ jobs:
                   echo "::warning::branch cleanup for #${number} failed"
                 fi
                 closed_count=$((closed_count + 1))
-                summary+="- **CLOSED** #${number} (branch \`${head_ref}\`)${comment_note}${delete_note}\n"
+                printf -- '- **CLOSED** #%s (branch `%s`)%s%s\n' \
+                  "$number" "$head_ref" "$comment_note" "$delete_note" \
+                  >> "$GITHUB_STEP_SUMMARY"
               else
-                summary+="- **FAILED TO CLOSE** #${number} (branch \`${head_ref}\`)${comment_note}\n"
+                printf -- '- **FAILED TO CLOSE** #%s (branch `%s`)%s\n' \
+                  "$number" "$head_ref" "$comment_note" \
+                  >> "$GITHUB_STEP_SUMMARY"
                 echo "::warning::close of #${number} was rejected — not counted as closed"
               fi
             done < <(echo "$group" | jq -c '.[:-1][]')
           done < /tmp/dupe_groups.jsonl
 
-          summary+="\n**Summary:** ${closed_count} closed (dry_run=${DRY_RUN})\n"
-          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n**Summary:** %s closed (dry_run=%s)\n' \
+            "$closed_count" "$DRY_RUN" >> "$GITHUB_STEP_SUMMARY"
           echo "Closed: $closed_count"
