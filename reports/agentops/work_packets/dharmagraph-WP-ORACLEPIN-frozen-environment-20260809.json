@@ -1,0 +1,88 @@
+{
+  "id": "dharmagraph-WP-ORACLEPIN-frozen-environment-20260809",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "codex/langgraph-oracle-pin-20260809",
+  "worktree": ".",
+  "intent": "Restore the LangGraph differential oracle to the exact comparison environment frozen in the materialized DharmaGraph rubric: pin langgraph, langgraph-checkpoint, and langgraph-checkpoint-sqlite as one tuple; update the lock consistently; and add an executable contract that prevents an isolated dependency bump or open version range from silently invalidating the rubric-frozen gauntlet.",
+  "allowed_files": [
+    "pyproject.toml",
+    "uv.lock",
+    "tests/test_langgraph_oracle_environment_contract.py",
+    "reports/agentops/work_packets/dharmagraph-WP-ORACLEPIN-frozen-environment-20260809.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "oracle-environment-contract",
+      "command": "python3 -m pytest -q tests/test_langgraph_oracle_environment_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "oracle-pin-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "checkpoint-range-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('pyproject.toml'); t=p.read_text(); old='langgraph-checkpoint==4.1.1'; assert old in t; p.write_text(t.replace(old,'langgraph-checkpoint>=4.1,<5',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','-p','no:cacheprovider','tests/test_langgraph_oracle_environment_contract.py'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(dharmagraph): pin frozen oracle environment"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-ORACLEPIN",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The frozen rubric requires langgraph-checkpoint 4.1.1 and langgraph-checkpoint-sqlite 3.1.0, while pyproject currently permits checkpoint 4.2.0 and pins sqlite 3.1.1.",
+      "The oracle workflow installs from pyproject with pip rather than consuming uv.lock, so a range in the test-oracle extra can diverge even when the lock still records the frozen checkpoint core.",
+      "Merged dependency PR #1282 updated the adapter package without updating or deliberately resealing the rubric-bound comparison environment, leaving main's scheduled oracle red.",
+      "PR #1284 changes only h2 and hpack; its oracle failure is therefore owner-environment drift rather than evidence about that dependency bump."
+    ],
+    "closest_existing_implementation": [
+      "pyproject.toml:test-oracle",
+      ".github/workflows/langgraph-oracle.yml:Install package + oracle extra",
+      "scripts/governance/dharmagraph_parity_gauntlet.py:run_gauntlet",
+      "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json:comparison_target",
+      "reports/governance/dharmagraph_parity/builder_receipt.json:environment"
+    ],
+    "honest_blockers": [
+      "This repair restores the frozen comparison environment; it does not reseal or rewrite the existing builder/judge parity receipts.",
+      "PR #1284 must be refreshed or retriggered only after this owner-scoped fix actually merges; its h2/hpack update is deliberately not changed here.",
+      "Fresh exact-head hosted CI, independent review, and human merge authority remain required.",
+      "The repository-wide DocOps inventory assertions are already stale on current main and are outside this packet's DharmaGraph scope."
+    ],
+    "rollback": "Revert the exact pins, lockfile downgrade, environment-contract test, and this packet together. Do not modify the frozen rubric or signed parity receipts as a rollback shortcut.",
+    "packet_digest": "cd2a81e8795ce8917958716e3ae784036ad59724a4f20a8c99d3f2b0ad4ff255"
+  }
+}
