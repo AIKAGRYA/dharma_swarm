@@ -1,6 +1,6 @@
 {
   "id": "titanium-WP-PRSNAP1-snapshot-branch-matcher",
-  "base_ref": "15452eae3f11985066caa6a7fad5148b12972c53",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "codex/pr-flow-recovery-20260808",
   "worktree": ".",
   "intent": "Repair the live snapshot-PR cleanup without broadening deletion authority: require same-repository ownership, an exact timestamped ops/spine-adoption-pr-lifecycle branch, and an independently anchored report(governance): ops run title for that lane. Preserve closed snapshot branch refs for recovery. Keep legacy snapshot matchers unchanged outside this new branch-specific rule.",
@@ -59,7 +59,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "15452eae3f11985066caa6a7fad5148b12972c53",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": []
     },
     "interface_mismatches": [
@@ -75,6 +75,6 @@
       "Decorrelated council rounds one and two held earlier heads on false-positive title authority and provider-schema failures. The final consolidated head requires a fresh full council and current-head GitHub checks before merge."
     ],
     "rollback": "Revert the bounded PR. Snapshot PRs remain in closed history and their branch refs are preserved, so a mistaken closure can be reopened without reconstructing the head.",
-    "packet_digest": "a24c482c7cc541d3c49d60725cd058396494ce2a8650c511899c6df06a493f8e"
+    "packet_digest": "d2d25bab2a5f8ed149bad11d4cede0ee388354ddad2a36b79e89c3e993e74410"
   }
 }
