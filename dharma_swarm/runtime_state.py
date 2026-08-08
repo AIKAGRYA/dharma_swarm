@@ -1436,12 +1436,29 @@ class RuntimeStateStore:
                 db.execute("BEGIN IMMEDIATE")
             return operation(db)
 
-    async def record_session_event(self, event: SessionEventRecord) -> SessionEventRecord:
+    async def _record_session_event_transaction(
+        self,
+        event: SessionEventRecord,
+        *,
+        runtime_receipt: RuntimeReceipt | None = None,
+    ) -> None:
+        """Own the async transaction boundary for session-event writes."""
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
-            await self._record_session_event_async_db(db, event)
-            await db.commit()
+            if runtime_receipt is not None:
+                await db.execute("BEGIN IMMEDIATE")
+            try:
+                await self._record_session_event_async_db(db, event)
+                if runtime_receipt is not None:
+                    await db.execute(*_runtime_receipt_insert(runtime_receipt))
+                await db.commit()
+            except BaseException:
+                await db.rollback()
+                raise
+
+    async def record_session_event(self, event: SessionEventRecord) -> SessionEventRecord:
+        await self._record_session_event_transaction(event)
         return event
 
     async def get_session(self, session_id: str) -> SessionState | None:
@@ -3234,17 +3251,10 @@ class RuntimeStateStore:
         receipt: RuntimeReceipt,
     ) -> tuple[SessionEventRecord, RuntimeReceipt]:
         """Persist one session event and runtime receipt in one transaction."""
-        await self.init_db()
-        async with aiosqlite.connect(self.db_path) as db:
-            await _apply_connection_pragmas_async(db)
-            await db.execute("BEGIN IMMEDIATE")
-            try:
-                await self._record_session_event_async_db(db, event)
-                await db.execute(*_runtime_receipt_insert(receipt))
-                await db.commit()
-            except BaseException:
-                await db.rollback()
-                raise
+        await self._record_session_event_transaction(
+            event,
+            runtime_receipt=receipt,
+        )
         return event, receipt
 
     def record_session_event_with_runtime_receipt_sync(
