@@ -12,6 +12,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
 WORKFLOW = REPO_ROOT / ".github/workflows/active-track.yml"
@@ -27,6 +29,42 @@ FOCUSED_ONBOARDING_COMMAND = (
 )
 
 def _job_block(name: str) -> str:
+    """Raw job text with comment-only lines REMOVED.
+
+    Every assertion in this file is a substring test over this string, so
+    comments were load-bearing in the worst way: an `in` assertion could be
+    satisfied by prose alone, and a `not in` assertion could be broken by prose
+    alone. Caught on PR #1287, where a comment block explaining why `always()`
+    had been REPLACED kept `assert "always()" in compat` green after the real
+    condition became `!cancelled()` — a guard reporting on its own explanation.
+    That is precisely the CLAUDE.md rule "never add prose to satisfy a gate",
+    committed accidentally.
+
+    Inline comments are left alone: the only ones present are action SHA pins
+    (`uses: ...@sha # v4`), no assertion depends on them, and stripping `#`
+    mid-line would corrupt any legitimate `#` inside a shell step.
+    """
+    text = WORKFLOW.read_text(encoding="utf-8")
+    match = re.search(
+        rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert match, f"workflow job {name!r} not found in active-track.yml"
+    return "\n".join(
+        line for line in match.group(0).splitlines()
+        if not line.lstrip().startswith("#")
+    )
+
+
+def _job_block_with_comments(name: str) -> str:
+    """Raw job text, comments included.
+
+    Exactly one caller wants this: the test that asserts a specific warning
+    comment leads the steps list. Every other assertion in this file must go
+    through _job_block(), which strips comments, so that no gate here can be
+    satisfied — or broken — by prose.
+    """
     text = WORKFLOW.read_text(encoding="utf-8")
     match = re.search(
         rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
@@ -35,6 +73,12 @@ def _job_block(name: str) -> str:
     )
     assert match, f"workflow job {name!r} not found in active-track.yml"
     return match.group(0)
+
+
+def _job_condition(name: str) -> str:
+    """The parsed `if:` value — structure, never text. Immune to comments."""
+    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    return " ".join(str(doc["jobs"][name].get("if", "")).split())
 
 
 def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -109,12 +153,29 @@ def test_ci_and_local_status_command_equivalence() -> None:
 
 
 def test_legacy_required_context_fails_closed_on_session_status() -> None:
-    """The phase-1 bridge cannot mask a failed or cancelled real status job."""
+    """The phase-1 bridge cannot mask a failed or cancelled real status job.
+
+    The condition is read from the parsed YAML, not from the job text. It was
+    `always() &&` until 2026-08-07; it is now `!cancelled() &&`, which still
+    overrides the implicit needs-success gate (so a FAILED session-status runs
+    the bridge and blocks) but CANCELS rather than SKIPS when the run is
+    cancelled. Skipping would be worse than the bug it fixed: a SKIPPED
+    required check counts as a pass in branch protection and in
+    scripts/runtime/pr_merge_control.py:53, and an operator-initiated cancel
+    has no successor run. See tests/test_admission_parity_bridge.py."""
 
     compat = _job_block("onboarding-admission-parity-compat")
+    condition = _job_condition("onboarding-admission-parity-compat")
     assert "name: Onboarding admission parity" in compat
     assert "needs: onboarding-status" in compat
-    assert "always()" in compat
+    assert "!cancelled()" in condition, (
+        "the bridge must run even when session-status failed, or a failure "
+        f"would skip it and a skipped required check passes; got: {condition}"
+    )
+    assert "always()" not in condition, (
+        "always() runs the bridge after a cancellation and reports that "
+        f"indeterminate state as a hard failure; got: {condition}"
+    )
     assert "SESSION_STATUS_RESULT: ${{ needs.onboarding-status.result }}" in compat
     assert 'test "${SESSION_STATUS_RESULT}" = "success"' in compat
     assert "continue-on-error" not in compat
@@ -245,7 +306,12 @@ def test_ci_runner_context_is_resolved_only_after_job_assignment() -> None:
     job = _job_block("onboarding-status")
     job_header, steps = job.split("    steps:\n", maxsplit=1)
     assert "${{ runner." not in job_header
-    assert steps.startswith(
+    # The leading-comment assertion is the one place a comment IS the subject,
+    # so it reads the unstripped text on purpose.
+    _, raw_steps = _job_block_with_comments("onboarding-status").split(
+        "    steps:\n", maxsplit=1
+    )
+    assert raw_steps.startswith(
         "      # `runner` is unavailable while GitHub evaluates job-level `env`."
     )
     assert "- name: Confine tool state outside checkout" in steps

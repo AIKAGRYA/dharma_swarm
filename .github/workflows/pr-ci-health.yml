@@ -34,17 +34,24 @@ name: pr-ci-health
 on:
   schedule:
     - cron: "0 * * * *"
-  # Rebase on the event that actually strands PRs. Every merge to main puts
-  # every other open PR behind; with "require branches up to date" on, those
-  # PRs cannot merge (and armed auto-merge cannot fire) until something
-  # rebases them. On the hourly cron alone that wait was up to 59 minutes,
-  # so the operator hand-tapped "Update branch" on each PR instead — which
-  # restarts full CI on all of them, every time. Reacting to the merge
-  # itself closes that window to ~1 minute and the queue drains unattended.
-  # Runs in `rebase` mode only: triage feeds the rebase step, while the
-  # tracking-issue upsert and flake-rerun sweeps stay on the hourly pass.
-  push:
-    branches: [main]
+  # NO `push: branches: [main]` TRIGGER. It was removed 2026-08-07.
+  #
+  # It existed because "require branches up to date before merging" was on:
+  # every merge to main left the other PRs unmergeable until something rebased
+  # them, so reacting to the merge closed a 59-minute window. That premise no
+  # longer holds — a behind-main PR now reports `mergeable_state: unstable`
+  # (mergeable), not `behind`, so being behind main does not block a merge.
+  #
+  # With the premise gone the trigger was pure cost. Each merge to main rebased
+  # every conflict-free behind-main PR, and each rebase relaunches that PR's
+  # full workflow set. Measured 2026-08-07: 4 merges (01:42, 03:03, 04:37,
+  # 06:04Z) produced 4 rebase waves of ~18-20 PRs each. The queue reached 676
+  # runs; a 2-second required job waited 80 minutes; PR #1286 was rebased four
+  # times and had a complete 38/38 green sweep discarded.
+  #
+  # The hourly cron below still runs `all`, which still includes the rebase
+  # step, so rebases have NOT stopped -- they are bounded to once an hour
+  # instead of once per merge.
   workflow_dispatch:
     inputs:
       mode:
