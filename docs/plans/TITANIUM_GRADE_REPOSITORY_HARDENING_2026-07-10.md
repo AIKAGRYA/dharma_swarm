@@ -1232,8 +1232,11 @@ result is an expected authority boundary, not a successful closeout.
 
 Review eligibility instead requires all of the following on one candidate:
 
-1. a passed AgentOps preflight bound to exact clean base
-   `f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd` before any edit;
+1. the preserved passed AgentOps preflight bound to original clean base
+   `f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd` before any amendment edit,
+   plus a final packet/collision refresh bound to the exact current-main
+   integration base recorded in the packet; the refresh is integration
+   evidence, not a retroactive claim that the amended branch was unedited;
 2. the preserved canonical closeout refusal above, with no later claim that
    AgentOps certified the changed scope;
 3. raw Git tree review showing exactly the seven amendment files named by its

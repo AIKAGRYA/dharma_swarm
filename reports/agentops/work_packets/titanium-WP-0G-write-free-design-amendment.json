@@ -1,9 +1,9 @@
 {
   "id": "titanium-WP-0G-write-free-design-amendment",
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "docops/no-writeback-derived-status-20260803",
   "worktree": ".",
-  "intent": "Propose the bounded WP-0G (TIT-008) prerequisite amendment that a human merge would ratify: replace the privileged rolling-repair design with contents-read-only CI that emits deterministic, non-authoritative projections bound to the exact tested commit, tree, tracked inputs, generator, and output bytes; admit .gitattributes to Titanium ownership; and immediately remove merge=union from AUTO_INVENTORY.md and SOVEREIGN_MANIFEST.md so Git cannot silently concatenate their managed blocks. This governance-only packet implements no projection generator, workflow, or delivery lane and makes no WP-0G completion claim.",
+  "intent": "Refresh exact-current-main evidence for the bounded WP-0G (TIT-008) prerequisite amendment that a human merge would ratify: replace the privileged rolling-repair design with contents-read-only CI that emits deterministic, non-authoritative projections bound to the exact tested commit, tree, tracked inputs, generator, and output bytes; admit .gitattributes to Titanium ownership; and immediately remove merge=union from AUTO_INVENTORY.md and SOVEREIGN_MANIFEST.md so Git cannot silently concatenate their managed blocks. This governance-only packet implements no projection generator, workflow, or delivery lane and makes no WP-0G completion claim.",
   "allowed_files": [
     ".gitattributes",
     "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
@@ -68,7 +68,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "governance(titanium): ratify write-free WP-0G design"
+    "message": "chore(agentops): refresh PR #1212 exact-base evidence"
   },
   "approval": {
     "before_commit": false,
@@ -77,7 +77,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
+      "python": "3.11.15",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -93,13 +93,13 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": []
     },
     "interface_mismatches": [
       ".gitattributes assigns merge=union to docs/docops/AUTO_INVENTORY.md and docs/governance/SOVEREIGN_MANIFEST.md even though both carry machine-managed content; the existing CLAUDE.md exclusion documents that union merge can preserve both generated blocks and create invalid duplicated content.",
       "The ratified WP-0G text requires a privileged rolling repair branch and credential-backed delivery, while the requested future-proof boundary is a write-free exact-SHA projection with no repository repair authority.",
-      "INTERFACE_MISMATCH_MAP.md contains no open entry for this bounded governance/document-merge seam at exact post-#1210 main f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd."
+      "INTERFACE_MISMATCH_MAP.md contained no open entry for this bounded governance/document-merge seam at original clean base f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd, and the final refresh found no competing implementation at current-main integration base bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4."
     ],
     "closest_existing_implementation": [
       ".gitattributes",
@@ -111,12 +111,13 @@
     "honest_blockers": [
       "This packet proposes authority only. The exact-SHA projection generator, read-only workflow, artifact verifier, retirement of rolling repair, and adversarial implementation tests remain blocked until a human merges this amendment.",
       "This candidate refreshes PR #1212 itself as the governance-only prerequisite amendment. Its previous derived-status workflow and manual-reconcile implementation are superseded rather than silently co-merged with the separate write-free core.",
-      "PR #1118 remains a separate two-file generated-count refresh whose direct parent is the same exact base. This amendment carries only its own generator-derived projection changes; whichever PR lands second must rebase and rerun the generator rather than copy the other's count delta.",
+      "Generated-count repair PRs remain independent from this amendment. Whichever change lands first can move the count inputs, so any later candidate must integrate current main and rerun the sanctioned generators rather than copy an earlier count delta.",
+      "The original amendment preflight was bound to clean base f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd before any edit. This final refresh rebinds packet and collision evidence to current-main integration base bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4; it does not retroactively describe the amended branch as an unedited base.",
       "Removing merge=union intentionally converts silent duplicate-block auto-merges into explicit conflicts. Reviewers must resolve or regenerate the managed blocks rather than accept concatenated truth claims.",
       "The canonical AgentOps closeout intentionally refuses every .gitattributes mutation because a packet cannot change the policy used to measure its own scope. This amendment preserves that exact nonzero result and uses the specification's amendment-only preflight, raw-tree, focused-check, independent-review, and human-merge boundary; no successful AgentOps scope closeout is claimed.",
       "This packet observes only a local clean checkout and local deterministic checks. It changes no production service, GitHub setting, workflow, credential, or external system."
     ],
     "rollback": "Revert this governance amendment as one unit: restore the prior WP-0G plan and active-track wording, remove .gitattributes from Titanium ownership, restore the two merge attributes, regenerate active-track and DocOps projections, and remove the packet. Rollback reopens the privileged rolling-repair design problem and must not be described as a safe steady state.",
-    "packet_digest": "699711fc52f657faa3c9aa5ce94760475380f7626058b17299dbaf749aba6078"
+    "packet_digest": "497cacc85bc757949bc8f02b1550e43b7cf7d9a741a054fe37ff0a4c8f1b4c84"
   }
 }
