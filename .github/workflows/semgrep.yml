@@ -3,6 +3,22 @@ name: semgrep
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    # DELIBERATELY UNFILTERED — this workflow publishes a CONTRACTED check name
+    # ('semgrep' in docs/governance/CI_TRUTH_CONTRACT.json).
+    #
+    # A workflow-level `paths:` filter makes the workflow not run at all, so no
+    # check appears in the rollup, and ci_truth.classify_check(None) returns
+    # MISSING. PASS_CONCLUSIONS (ci_truth.py:20) contains SKIPPED but NOT
+    # MISSING, so evaluate_rollup sets verdict = DEGRADED and the CLI exits 3 —
+    # permanently, on every docs-only and dependency-only PR. The operator
+    # report then cannot tell "advisory gate broken" from "advisory gate not
+    # applicable", which is the whole value of the report.
+    #
+    # Per-JOB filtering (as tests.yml does) is the correct answer here: the job
+    # reports `skipped`, and SKIPPED counts as PASS. That needs a classifier job
+    # in this workflow and a contract entry for its check name; it is deliberate
+    # follow-up, not done here. Filtering it back at the workflow level is not
+    # the fix and is blocked by test_workflow_path_filters.py.
   merge_group:
   push:
     branches: [main]
@@ -73,3 +89,62 @@ jobs:
           else
             scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off
           fi
+
+  # ===========================================================================
+  # The behavioral contract for anti-slop Rule 2 (.semgrep/dharma-anti-slop.yml
+  # + .semgrep/tests/test_no_new_substrate.py). Added 2026-08-04.
+  #
+  # WHY A SEPARATE JOB. Until now these tests SKIPPED in every automated lane:
+  # the pytest jobs install `.[dev]`, which carries no scanner, and the job
+  # above only runs production scans — so a regression deleting a detection
+  # shape went green everywhere, and the PR-time strict gate is
+  # `--baseline-commit`-scoped and examines no unchanged Python file. That is
+  # the same defect class as the one Rule 2's own message carried for fifteen
+  # weeks: a promise no execution ever checked.
+  #
+  # WHY NOT `semgrep` IN THE `dev` EXTRA. That would install the scanner into
+  # both required pytest matrix jobs and put its transitive pins (click, rich,
+  # requests, ...) into resolution with the whole package — a dependency
+  # conflict there takes down a REQUIRED lane. This job installs only
+  # `semgrep` + `pytest`, pinned to the ratified 1.168.0, and the test file
+  # imports nothing from dharma_swarm.
+  #
+  # LIMITATION, STATED: as of 2026-08-04 `semgrep` is not among main's
+  # required status checks (those are DocOps integrity gate, Coherence Delta
+  # PR body, gitleaks, pytest 3.11, pytest 3.12, Onboarding admission parity),
+  # so this job is visible-and-red rather than merge-blocking until the
+  # operator adds it to branch protection. It executes; it does not yet gate.
+  # ===========================================================================
+  rule2-behavior:
+    name: anti-slop rule 2 behavioral contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the ratified scanner and pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install "semgrep==1.168.0" "pytest>=7.0"
+
+      - name: Behavioral contract (fixture assertions, no skips permitted)
+        env:
+          # Turns a missing scanner into a hard failure instead of a skip.
+          DHARMA_REQUIRE_SEMGREP: "1"
+          # Fails closed if the installed scanner ever drifts off the pin.
+          DHARMA_SEMGREP_EXPECTED_VERSION: "1.168.0"
+        run: |
+          # --noconftest: tests/conftest.py has an autouse fixture that imports
+          # dharma_swarm; this test file needs no repo fixtures, only the
+          # scanner. -rs surfaces any skip in the log, and the
+          # test_scanner_is_present_where_this_contract_is_required guard turns
+          # the one that would matter into a failure.
+          python -m pytest -q -rs --noconftest tests/test_semgrep_rule2_behavior.py

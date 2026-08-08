@@ -789,7 +789,9 @@ active_tracks:
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
     status: ACTIVE
     opened_at: "2026-07-02"
-    verified_at: "2026-07-02"
+    # Reverified 2/2 by ACTIVE_TRACK CI run 30831205320 on 2026-08-04 JST:
+    # https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/30831205320/job/91762563074
+    verified_at: "2026-08-04"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -817,6 +819,22 @@ active_tracks:
       - dharma_swarm/archive.py
       - docker-compose.yml
       - Dockerfile.swarm
+      # Operator-authorized P0 amendment (2026-08-04): establish one public,
+      # repo-owned composition root for the persistent Sarathi seat. Shared
+      # engines remain with their current owners and are reached by adapters.
+      # RuntimeStateStore additionally admits one generic atomic
+      # session-event-plus-receipt seam so the adapter cannot publish a torn
+      # completion claim; the surface manifest records the new receipt layer.
+      - ACTIVE_SURFACE_MANIFEST.yaml
+      - dharma_swarm/runtime_state.py
+      - dharma_swarm/sarathi/**
+      - tests/test_runtime_state.py
+      - tests/test_sarathi_public_api.py
+      - tests/test_sarathi_shell.py
+      - tests/test_sarathi_import_boundaries.py
+      - docs/README.md
+      - docs/persistent_agents/**
+      - reports/agentops/work_packets/organism-rewire-WP-SARATHIROOT-P0.json
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -906,6 +924,10 @@ active_tracks:
         what: "D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on."
         kind: code
         blocker: false
+      - id: 11
+        what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; add only the generic RuntimeStateStore transaction seam and receipt-layer declaration needed to make reply-event plus receipt atomic; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -913,6 +935,7 @@ active_tracks:
       - Do not unlock DarwinEngine standing apply before the external-gradient signal exists (item 9 sequencing is doctrine).
       - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
       - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
+      - The Sarathi P0 root must compose shared engines through adapters; it must not copy, fork, or move sibling-owned runtimes, stores, gateways, schedulers, evolution engines, or tool executors.
 
   - id: dharmagraph-engine-2026-07
     name: DharmaGraph — sovereign durable graph runtime consolidation
@@ -1792,6 +1815,8 @@ active_tracks:
       - tests/test_semgrep_wrapper.py
       - tests/test_uplift_guard_subprocess.py
       - tests/test_fast_suite_isolation.py
+      - tests/test_agent_work_packet.py
+      - tests/test_make_onboarding_contract.py
       - tests/test_diff_applier.py
       - tests/test_sandbox.py
       - tests/test_nats_verification_split.py
@@ -1834,10 +1859,40 @@ active_tracks:
       M1 refreshes the canonical M0 receipt against exact merged main after
       PR #1164 in
       reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
-      The selected post-1164 observation reports the evaluator's mechanical
-      7/8 result separately from no-skip and packet-acceptance evidence. That
-      receipt is point-in-time evidence, not a substitute for the eight
-      completion criteria or authority to promote a blocked external decision.
+      That receipt's mechanical 7/8 result was scored against the criteria
+      set of its day and is point-in-time evidence only. The criteria block
+      now carries nine entries and the current mechanical result is 8/9:
+      the sole failure is the MISSING independent clean-room receipt, and
+      two passing suites still carry skipped tests. That 8/9 count is NOT
+      anchored to the generated/status branch, which is force-pushed
+      latest-only and retains no history; its provenance (projection commit
+      and derived-from-main SHA) and its branch-independent re-derivation
+      command are recorded in that same reconciliation report's
+      generated_status block, and any reader can re-derive the count from
+      this repository with
+      `python3 scripts/governance/check_track_status.py`.
+      A pass that carries skips does not discharge the no-skip obligation.
+      Neither receipt nor projection is a substitute for the current
+      completion criteria or authority to promote a blocked external
+      decision; the projection is projection-only evidence.
+
+      M3 retires the WP-0C1R next item after merged-main reverification, on
+      the same standard M2 used for WP-0D: PR #1202 (human-merged as
+      f3eb5b397) executed the operator-ratified A1/B1 dispositions, and the
+      strict scan replayed on exact merged main f3eb5b397 now exits 0 with
+      `Ran 10 rules on 1577 files: 0 findings`. A negative control confirms
+      the gate still has teeth: injecting one `Path.home() / ".dharma"`
+      reference returns exit 1 with 1 finding. Retiring the item retires the
+      adjudication blocker only. It is implementation-author replay, not
+      independent review. It is not a security-completeness claim, and that
+      control also exposed a disclosed limit: Rule 1 does not match the
+      idiomatic chained form `Path.home() / ".dharma" / "sub"`, so zero
+      findings means zero findings UNDER RULE 1 AS WRITTEN. Widening the
+      rule is deliberately NOT done here — it would re-open the ratified
+      A1/B1 finding set and needs its own ratification; the measurement is
+      recorded in the reconciliation report for operator routing. WP-0F1,
+      WP-0G, WP-0S, and WP-0I stay open with Phase 0 BLOCKED targeting
+      CLOSED_NOT_PROD.
 
     completion_criteria:
       - id: titanium_bootstrap_contract_passes
@@ -1845,7 +1900,11 @@ active_tracks:
         command: ["python3", "-m", "pytest", "tests/test_bootstrap_contract.py", "-q"]
       - id: titanium_verifier_truth_contracts_pass
         kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_verifier_selfcheck_contract.py", "tests/test_fast_suite_isolation.py", "tests/test_semgrep_wrapper.py", "tests/test_uplift_guard_subprocess.py", "-q"]
+        timeout_s: 900
+        command: ["python3", "-m", "pytest", "tests/test_verifier_selfcheck_contract.py", "-q"]
+      - id: titanium_verifier_support_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_fast_suite_isolation.py", "tests/test_semgrep_wrapper.py", "tests/test_uplift_guard_subprocess.py", "-q"]
       - id: titanium_ingress_contracts_pass
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_api_auth.py", "tests/test_verify_api.py", "-q"]
@@ -1877,12 +1936,8 @@ active_tracks:
           - verdict
 
     next_items:
-      - id: WP-0D
-        what: "First obtain an approved bounded specification amendment and ownership admission for tests/test_agent_work_packet.py, which is outside WP-0D's ratified allowed-file list. Then repair the current-main repeatability defects without weakening the 10-second item budget: split the six independent AgentOps closeout scenarios, replace the environment-dependent hollow-module fixture, and prove two consecutive clean make test-fast runs plus make test."
-        kind: code
-        blocker: true
       - id: WP-0F1
-        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
+        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
         blocker: true
         evidence_criterion: titanium_ci_authority_contracts_pass
@@ -1891,12 +1946,8 @@ active_tracks:
         kind: code
         blocker: true
         evidence_criterion: titanium_docops_contracts_pass
-      - id: WP-0C1R
-        what: "Ratify and owner-route the exact-current-main strict Semgrep result: exit 1 with 21 OWNER_DEFERRED findings (18 unauthorized state writers and 3 unclassified substrates), 7 parser warnings, and zero security-rule findings. No draft disposition is a PASS."
-        kind: governance
-        blocker: true
       - id: WP-0S
-        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret, while docker-compose still declares 8080:8080 and GitHub contains no deployment evidence; actual exposure remains NEEDS_HOST/BLOCKED_OPERATOR."
+        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret and docker-compose still declares 8080:8080. The 2026-08-01 read-only observation recorded on PR #1184 (open, unmerged, head c448c5ab2) classified one receipt endpoint alias as HTTP 401 and another as unauthenticated public HTTP 200, so live exposure is observed but unadjudicated. Exact live network coordinates are intentionally omitted from this public governance projection. Cite the immutable source receipt with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803 records that this is a citation, not a replay). That receipt is implementation-observer authority, declares inventory_complete false, and carries no operator attestation, so the verdict remains BLOCKED_OPERATOR pending fresh operator-backed observation and exact-scope attestation. The exposed alias requires operator action: authenticate it, close it, or attest it as intentionally public. Sanitizing the projection changes no evidence authority, inventory boundary, classification, or operator obligation."
         kind: code
         blocker: true
         evidence_criterion: titanium_ingress_contracts_pass

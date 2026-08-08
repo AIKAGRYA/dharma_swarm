@@ -1,0 +1,105 @@
+{
+  "allowed_files": [
+    ".github/workflows/hardening-lane.yml",
+    "reports/agentops/work_packets/loop-closure-WP-LOOPE2-lane-split.json",
+    "scripts/runtime/lane_deliver.py",
+    "scripts/runtime/lane_propose.py",
+    "tests/test_lane_deliver.py",
+    "tests/test_lane_propose.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "1fec9d958529841da7ad698f894c67f39f76450a",
+  "branch": "claude/graph-of-loops-audit-design-eh3lz5",
+  "commit": {
+    "allowed": false,
+    "message": "feat(loop-closure): hardening lane v2 — propose/deliver trust split"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/loop-watcher.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "packages/telos-kernel/**",
+    "scripts/docops/**",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/governance/hygiene/**",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_lane_propose.py tests/test_lane_deliver.py -q",
+      "expected_exit": 0,
+      "name": "lane-split-contract",
+      "timeout_seconds": 600
+    }
+  ],
+  "id": "loop-closure-WP-LOOPE2-lane-split",
+  "intent": "PR-E v2 of the walking-mode loop-closure plan. PR #1162 built the hardening lane as one process: agent, tests, commit and push in a single checkout holding contents:write. Fourteen review findings reduced to one fact — the agent and the delivery step shared a machine, filesystem, UID and process namespace, so every guard was a point-in-time check in a space the adversary could still write to, and Greptile's T-Rex drove a real git push to an attacker repository through the full guard set. The measured limit: `git -c` overrides single-valued keys, but credential.helper and url.BASE.insteadOf are multi-valued, so -c only appends and the hostile entry survives. This packet replaces mitigation with dissolution: a propose job with permissions contents:read and persist-credentials:false runs the agent and emits a git bundle; a separate deliver job on a separate runner verifies that bundle against origin and pushes. Delivery never runs agent code, never runs the suite, never checks out the candidate tree, and never stages.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('.github/workflows/hardening-lane.yml'); orig=p.read_text(); mut=orig.replace('      contents: read   # public repo: worth no more than an anonymous fetch','      contents: write',1); assert mut!=orig, 'propose permission line not found'; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_lane_deliver.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "granting-propose-write-breaks-the-trust-split-test",
+      "timeout_seconds": 600
+    },
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/lane_deliver.py'); orig=p.read_text(); mut=orig.replace('    forbidden = denied_paths(paths)','    forbidden = []',1); assert mut!=orig, 'denylist call not found'; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_lane_deliver.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "disabling-referee-denylist-breaks-delivery-tests",
+      "timeout_seconds": 600
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/roaming_mailbox.py",
+      ".github/workflows/nightly-tests.yml",
+      "docs/ops/loop_control/README.md",
+      "scripts/governance/loop_watcher.py"
+    ],
+    "collision": {
+      "checked_at_sha": "1fec9d958529841da7ad698f894c67f39f76450a",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "First live run still requires the operator to configure the DHARMA_LANE_AGENT_CMD repo secret; without it the propose job refuses with a BLOCKED receipt instead of improvising an agent.",
+      "The mailbox ready-set selection activates only where the loop-tasks branch carries tasks; otherwise selection falls through to the failing-nightly probe or a NO_WORK receipt.",
+      "This is a Tier-2 change (.github/workflows/**): operator hand-merge only, and it is opened as a draft for that reason. Scheduled runs fire only from main, so the first live receipt is provable post-merge only.",
+      "The agent still authors the content. The split removes the credential, not the authorship: a hostile change set can be proposed, but only ever as a capped draft PR outside the referee paths, with CI and human review ahead of it.",
+      "The merge-base --is-ancestor check in lane_deliver.py is a redundant backstop today — the one-commit rule already implies it — and is retained only against a future relaxation of that rule. tests/test_lane_deliver.py states this explicitly rather than claiming an independent gate."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "eaea7742646c81782c7b57c63067523044f730ab471679f851f267130e4b6ac2",
+    "rollback": "Revert the single commit: both lane drivers, the two-job workflow, and the tests disappear. Any lane branches or draft PRs already opened remain inert drafts the operator can close.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPE2"
+  },
+  "worktree": "."
+}

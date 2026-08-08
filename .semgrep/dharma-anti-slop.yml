@@ -43,6 +43,29 @@ rules:
         - "scripts/memory_retrieval_broad_sweep.py"
         - "scripts/memory_retrieval_live_gate.py"
         - "scripts/memory_retrieval_system_gate.py"
+        # WP-0C1R ratified research participants (operator decision A1,
+        # 2026-08-02): declared in ACTIVE_SURFACE_MANIFEST.yaml
+        # research_state_participants; adjudication record
+        # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+        # Exact files only — no globs (plan forbids broad ignores).
+        - "dharma_swarm/palantir_pilot_manifest.py"
+        - "scripts/governance/palantir_pilot_audit.py"
+        - "scripts/governance/register_palantir_pilot.py"
+        - "scripts/research/palantir_contribution_packets.py"
+        - "scripts/research/palantir_deep_ingest.py"
+        - "scripts/research/palantir_learning_backlog.py"
+        - "scripts/research/palantir_pilot_curriculum.py"
+        - "scripts/research/palantir_pilot_orientation.py"
+        - "scripts/research/palantir_pilot_query.py"
+        - "scripts/research/palantir_playbook_evals.py"
+        - "scripts/research/palantir_public_source_cards.py"
+        - "scripts/research/palantir_public_source_index.py"
+        - "scripts/research/palantir_query_cookbook.py"
+        - "scripts/research/palantir_source_card_balanced_expand.py"
+        - "scripts/research/palantir_source_card_cleanup.py"
+        - "scripts/research/palantir_source_card_playbooks.py"
+        - "scripts/research/palantir_source_card_quality.py"
+        - "dharma_swarm/verifier_ranker_v0/inventory.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
@@ -50,6 +73,15 @@ rules:
   # New persistent stores (Store/Ledger/Registry classes that open
   # their own SQLite or append their own JSONL) should be wrapped by
   # RuntimeStateStore, not created as new substrates.
+  #
+  # Detector scope is stated literally in the message below and proven by
+  # BEHAVIORAL fixtures — .semgrep/tests/test_no_new_substrate.py executed
+  # against THIS file by tests/test_semgrep_rule2_behavior.py. Config-shape
+  # assertions in tests/test_semgrep_wrapper.py are a supplement, not the
+  # proof: before 2026-08-04 this message promised JSONL detection the rule
+  # never had, and only a scanner run could have shown it (correction:
+  # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md,
+  # "Amendment 2026-08-04").
   # ===========================================================================
   - id: dharma.no-new-substrate
     message: |
@@ -65,45 +97,375 @@ rules:
             plugin-sink | cache | legacy-mirror | migration-mirror |
             exempt) in a file-header comment AND, if it is a receipt,
             add an entry to ACTIVE_SURFACE_MANIFEST.yaml
-            correlation_spine.layers, then add the class name to this
-            rule's allowlist with the role and PR link as justification.
+            correlation_spine.layers, then adjudicate the class with the
+            operator. The three exemptions below are NAME-scoped grants to
+            three specific classes, not a general waiver.
+
+      WHAT THIS DETECTOR CATCHES (each shape has a fixture line in
+      .semgrep/tests/test_no_new_substrate.py):
+        - sqlite3/aiosqlite `.connect(...)` reached from a class body or any
+          method body — attribute assignment, local variable, bare call,
+          `async def`, nested inside if/try/with, and the
+          `with sqlite3.connect(...) as conn:` context-manager form. Import
+          ALIASES are covered: semgrep resolves `import sqlite3 as db` and
+          `from sqlite3 import connect as c` before the driver regex runs
+          (measured, semgrep 1.168.0);
+        - an append-mode file handle opened in a method body:
+          `open(path, "a")`, `open(path, mode="a")`, `p.open("a")`,
+          `p.open(mode="a")`, the qualified path-first form
+          `aiofiles.open(path, "a")` / `io.open` / `codecs.open`, and the
+          `with` / `async with ... as f:` form of each. This is the JSONL
+          substrate this message promised from 2026-04-26 and did not
+          actually detect until 2026-08-04. The mode is read as a SET of
+          flags, the way CPython reads it, so every ordering matches:
+          a / ab / at / a+ / +a / ba / ta / +ab / b+a / ...;
+        - a class inheriting from one of the three ratified exempt
+          substrates below, in ANY base position and through a dotted
+          reference: `class X(Mixin, BridgeRegistry)` and
+          `class X(registries.BridgeRegistry)` both fire.
+
+      WHAT IT STILL DOES NOT CATCH (named, not silently missed). Every gap
+      expressible as a fixture line carries `# todoruleid:` in
+      .semgrep/tests/test_no_new_substrate.py, so a gap that starts firing
+      FAILS the suite and gets promoted instead of forgotten. Two cannot be:
+      the class-name boundary is a deliberate `# ok:` control, and the
+      same-canonical-file collision is path-scoped, so no single fixture file
+      can express it.
+        - a substrate opened through a helper/wrapper function, a factory,
+          or an injected connection object — that needs interprocedural
+          taint, not a syntactic pattern;
+        - a mode passed as a variable rather than a literal;
+        - drivers other than sqlite3/aiosqlite (duckdb, lmdb, psycopg, ...)
+          and non-text append sinks (csv/parquet/binary writers);
+        - a class whose name does not end in Store/Ledger/Registry/Substrate;
+        - an append handle opened directly in a class body rather than in a
+          method;
+        - a SECOND class re-using a ratified exempt NAME inside that name's
+          own CANONICAL FILE (dharma_swarm/bridge_registry.py, graph_store.py,
+          knowledge_units.py). The exemptions here are name-scoped, so a
+          re-used name is swallowed; the companion rule
+          dharma.no-new-substrate-exempt-name-collision catches it everywhere
+          ELSE, and those three files are the exclusion that keeps the
+          ratified definitions themselves silent. The structural collision
+          check in tests/test_semgrep_wrapper.py — which now looks for append
+          opens, not only sqlite — is the backstop inside them.
     severity: WARNING
     languages: [python]
     paths:
       exclude:
         - "dharma_swarm/runtime_state.py"
     patterns:
-      - pattern-either:
-          # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
-          - pattern: |
-              class $NAME:
-                  ...
-                  $X = sqlite3.connect(...)
-                  ...
-          - pattern: |
-              class $NAME:
-                  ...
-                  $X = aiosqlite.connect(...)
-                  ...
-          # Method-body attribute assignment: `self.conn = sqlite3.connect(...)`
-          # (the idiomatic __init__ form the bare-name patterns above miss).
-          - pattern: |
-              class $NAME:
-                  ...
-                  def $M(...):
+      # WP-0C1R ratified roles (operator decision B1, 2026-08-02): exemptions
+      # are CLASS-scoped, not file-scoped, so any NEW Store/Ledger/Registry
+      # added to the same files is still caught (paths.exclude runs before the
+      # class pattern and would skip the whole file — decorrelated review
+      # 2026-08-02). Each class's file carries a structural
+      # `# closure-layer-role: <role>` header (vocabulary: exempt — subordinate
+      # adapter/projection under the MemoryKernel doctrine, CLAUDE.md).
+      # NOTE (2026-08-04): "class-scoped" is precisely NAME-scoped — a class
+      # pattern written without bases also matches a class WITH bases, and a
+      # re-used name is swallowed here regardless of its base list. That is
+      # why the companion rule below is bound to the three canonical FILES:
+      # it, not this pattern-not, is what distinguishes the ratified
+      # definition from a copycat. Adjudication record
+      # reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md.
+      - pattern-not: |
+          class BridgeRegistry:
+              ...
+      - pattern-not: |
+          class SQLiteGraphStore:
+              ...
+      - pattern-not: |
+          class KnowledgeStore:
+              ...
+      # The shared shape set. Anchored here and reused verbatim by the
+      # collision rule below so the two rules can never drift apart.
+      # NOTE: every alternative that constrains a metavariable nests its own
+      # `patterns:` block — a top-level metavariable-regex naming a
+      # metavariable that a given alternative does not bind DISCARDS that
+      # alternative's matches (verified against semgrep 1.168.0).
+      - pattern-either: &dharma-substrate-open-shapes
+          # --- SQLite / aiosqlite, opened in the class body ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
                       ...
-                      self.$X = sqlite3.connect(...)
+                      $DRIVER.connect(...)
                       ...
-          - pattern: |
-              class $NAME:
-                  ...
-                  def $M(...):
+              - metavariable-regex:
+                  metavariable: $DRIVER
+                  regex: '^(sqlite3|aiosqlite)$'
+          # --- SQLite / aiosqlite, reached from any method body. Covers
+          #     `self.conn = ...`, a bare local `conn = ...`, a bare call,
+          #     `async def` + `await`, and nesting inside if/try/with. ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
                       ...
-                      self.$X = aiosqlite.connect(...)
+                      def $M(...):
+                          ...
+                          $DRIVER.connect(...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $DRIVER
+                  regex: '^(sqlite3|aiosqlite)$'
+          # --- SQLite / aiosqlite as a context manager. A `with` header is
+          #     not a statement, so the shapes above never see it. ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
                       ...
+                      def $M(...):
+                          ...
+                          with $DRIVER.connect(...) as $CONN:
+                              ...
+              - metavariable-regex:
+                  metavariable: $DRIVER
+                  regex: '^(sqlite3|aiosqlite)$'
+          # --- Append-mode handle from the builtin `open`, positional mode.
+          #     `$PATH` is a required first argument: `open(..., $MODE, ...)`
+          #     would let $MODE bind the FILENAME and flag `open("audit.log")`.
+          #     MODE REGEX (2026-08-04): CPython parses the mode string as a
+          #     SET of flags — `open(p, "+a")`, `"ba"`, `"ta"`, `"+ab"` and
+          #     `"b+a"` all append (io.open: `modes = set(mode)`; appending =
+          #     `"a" in modes`). An anchored `^"a[bt+]*"$` therefore missed
+          #     every non-canonical ordering, so the flag characters are now
+          #     matched independent of position. `"w+"`, `"rb"`, `"x"` and the
+          #     filename `"audit.log"` still do not match.
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          open($PATH, $MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with open($PATH, $MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Append-mode handle from the builtin `open`, keyword mode ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          open(..., mode=$MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with open(..., mode=$MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Append-mode handle from `Path.open` (mode is the first
+          #     positional parameter there), plain and context-manager. ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          $P.open($MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with $P.open($MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Keyword `mode=` on ANY qualified `.open` — Path.open,
+          #     aiofiles.open, io.open, gzip.open ... The leading `...`
+          #     admits a preceding positional path, which the pre-2026-08-04
+          #     `$P.open(mode=$MODE, ...)` shape did not (codex, PR #1220).
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          $P.open(..., mode=$MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with $P.open(..., mode=$MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Qualified `.open(path, mode)` — the PATH-FIRST signature.
+          #     `aiofiles.open` (a core dependency, pyproject.toml), plus the
+          #     aliased builtins `io.open` / `codecs.open` / `gzip.open`.
+          #     Distinct from Path.open above, where mode is the FIRST
+          #     positional parameter: there the shapes above would bind $MODE
+          #     to the path and reject it (codex, PR #1220). `await` is
+          #     transparent to the statement shape, so `fh = await
+          #     aiofiles.open(p, "a")` matches it. `async with` is a distinct
+          #     node from `with` and needs its own alternative. ---
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          $P.open($PATH, $MODE, ...)
+                          ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          with $P.open($PATH, $MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          async with $P.open($PATH, $MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          - patterns:
+              - pattern: |
+                  class $NAME:
+                      ...
+                      def $M(...):
+                          ...
+                          async with $P.open(..., mode=$MODE, ...) as $F:
+                              ...
+              - metavariable-regex:
+                  metavariable: $MODE
+                  regex: '^["''][bt+]*a[bt+]*["'']$'
+          # --- Inheriting a ratified exempt substrate is a new substrate:
+          #     the exemption was granted to those three classes, not to a
+          #     subclass tree hanging off them.
+          #     A base list matches like a call-argument list, so the
+          #     pre-2026-08-04 `class $NAME(BridgeRegistry):` shape only saw
+          #     the exempt base FIRST: `class CachedStore(Mixin,
+          #     BridgeRegistry)` and `class CachedStore(registries.
+          #     BridgeRegistry)` both evaded it (codex, PR #1220 — measured:
+          #     `(BridgeRegistry, Mixin)` matched, `(Mixin, BridgeRegistry)`
+          #     did not). `(..., $BASE, ...)` admits any position, and the
+          #     regex admits a dotted qualifier. `$BASE` requires at least one
+          #     base, so a class with none never matches here. ---
+          - patterns:
+              - pattern: |
+                  class $NAME(..., $BASE, ...):
+                      ...
+              - metavariable-regex:
+                  metavariable: $BASE
+                  regex: '^([A-Za-z_]\w*\.)*(BridgeRegistry|SQLiteGraphStore|KnowledgeStore)$'
       - metavariable-regex:
           metavariable: $NAME
           regex: '.*(Store|Ledger|Registry|Substrate)$'
+
+  # ===========================================================================
+  # Rule 2b: dharma.no-new-substrate-exempt-name-collision
+  # Rule 2's ratified exemptions are class-NAME-scoped `pattern-not` clauses,
+  # and a semgrep class pattern written without bases ALSO matches a class
+  # with bases (verified, semgrep 1.168.0). So a second class re-using a
+  # ratified name silently inherits its exemption. Before 2026-08-04 the only
+  # guard was a config-shape test that grepped source text; this makes the
+  # guard behavioral — the scanner itself refuses the collision.
+  #
+  # DISCRIMINATOR (2026-08-04, codex + devin review on PR #1220): the first
+  # version of this rule ANDed the shape set with `class $NAME($BASE):`, using
+  # "declares a base" as a proxy for "is not the ratified definition". Measured
+  # against semgrep 1.168.0 that proxy was wrong in both directions: a
+  # multi-base `class SQLiteGraphStore(Protocol, ABC):` DID match `$NAME($BASE)`
+  # (so devin's multi-parent half was already covered), while a BASE-LESS
+  # `class BridgeRegistry:` or `class KnowledgeStore:` in a new module matched
+  # nothing here and was swallowed by Rule 2's name-scoped pattern-not — zero
+  # findings for exactly the collision this rule exists to prevent. The
+  # discriminator is now the thing WP-0C1R actually ratified: three named
+  # classes in three named FILES. Any other definition of those names that
+  # opens a substrate fires, whatever its base list.
+  # ===========================================================================
+  - id: dharma.no-new-substrate-exempt-name-collision
+    message: |
+      This class re-uses one of the three WP-0C1R ratified exempt substrate
+      names (BridgeRegistry / SQLiteGraphStore / KnowledgeStore) outside the
+      file that name was ratified in, AND opens its own persistence substrate.
+      Rule 2's exemptions are class-NAME-scoped, so this definition would
+      silently inherit an exemption it was never granted — with no base class,
+      with one, or with several. Rename the class, or adjudicate it with the
+      operator through the same route WP-0C1R used (declare the closure-layer
+      role, then record the disposition in reports/governance/titanium/). The
+      sqlite-free `KnowledgeStore(Protocol)` in
+      dharma_swarm/engine/knowledge_store.py is deliberately NOT a finding:
+      this rule fires only when the colliding class actually opens a
+      substrate.
+
+      WHAT THIS RULE DOES NOT CATCH: a SECOND class re-using a ratified name
+      INSIDE that name's own canonical file (the three paths excluded below).
+      Excluding those files is what lets the ratified definitions themselves
+      stay silent; a same-file copycat is the residue. It has a
+      `# todoruleid:` line in .semgrep/tests/test_no_new_substrate.py, and the
+      structural collision check in tests/test_semgrep_wrapper.py is the
+      backstop there.
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "dharma_swarm/runtime_state.py"
+        # The three WP-0C1R ratified definitions, by exact path — no globs.
+        # This is the ONLY thing that keeps them silent under this rule, which
+        # is why the base-class requirement could be dropped. Verified
+        # 2026-08-04: these are the only in-tree definitions of those names
+        # other than the sqlite-free dharma_swarm/engine/knowledge_store.py
+        # Protocol, which stays silent on the evidence (no substrate opened).
+        - "dharma_swarm/bridge_registry.py"
+        - "dharma_swarm/graph_store.py"
+        - "dharma_swarm/knowledge_units.py"
+    patterns:
+      - pattern-either: *dharma-substrate-open-shapes
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: '^(BridgeRegistry|SQLiteGraphStore|KnowledgeStore)$'
 
   # ===========================================================================
   # Rule 4: dharma.scripts-no-git-add-all

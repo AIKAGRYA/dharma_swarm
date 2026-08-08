@@ -1,0 +1,116 @@
+{
+  "allowed_files": [
+    ".github/workflows/semgrep.yml",
+    ".semgrep/dharma-anti-slop.yml",
+    ".semgrep/tests/test_no_new_substrate.py",
+    "docs/governance/ANTI_SLOP_RULES.md",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md",
+    "reports/agentops/work_packets/titanium-WP-SEMGREP2CI-rule2-behavioral-lane.json",
+    "tests/test_semgrep_rule2_behavior.py",
+    "tests/test_semgrep_wrapper.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "fix/semgrep-rule2-jsonl-substrates",
+  "commit": {
+    "allowed": true,
+    "message": "ci(semgrep): actually execute Rule 2's behavioral contract [impact-checked]"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_semgrep_rule2_behavior.py tests/test_semgrep_wrapper.py",
+      "expected_exit": 0,
+      "name": "rule2-behavioral-contract",
+      "timeout_seconds": 600
+    },
+    {
+      "command": "make semgrep",
+      "expected_exit": 0,
+      "name": "semgrep-required-scan",
+      "timeout_seconds": 900
+    },
+    {
+      "command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "expected_exit": 0,
+      "name": "ci-parity-structure",
+      "timeout_seconds": 180
+    }
+  ],
+  "id": "titanium-WP-SEMGREP2CI-rule2-behavioral-lane",
+  "intent": "Make anti-slop Rule 2's behavioral contract actually execute in CI, and close the five detector gaps decorrelated review found in the rule itself. The tests that prove Rule 2 detects JSONL and SQLite substrates skipped in every automated lane, so a regression removing a detection shape stayed green everywhere - the same defect class as a rule message promising a capability no execution ever checked.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess, sys; from pathlib import Path; p = Path('.semgrep/dharma-anti-slop.yml'); t = p.read_text(); assert '[bt+]*a[bt+]*' in t; p.write_text(t.replace('[bt+]*a[bt+]*', 'a[bt+]*')); r = subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_semgrep_rule2_behavior.py'], check=False); p.write_text(t); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "reverting-the-append-mode-regex-fails-the-contract",
+      "timeout_seconds": 600
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "active_track_checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+    "agent_identity": "claude-fable-5",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      ".semgrep/dharma-anti-slop.yml",
+      ".semgrep/tests/test_no_new_substrate.py",
+      "tests/test_semgrep_rule2_behavior.py",
+      "tests/test_semgrep_wrapper.py",
+      ".github/workflows/semgrep.yml",
+      "scripts/governance/run_semgrep_with_ca.sh"
+    ],
+    "collision": {
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "semgrep is not among main's required status checks (DocOps integrity gate, Coherence Delta PR body, gitleaks, pytest 3.11, pytest 3.12, Onboarding admission parity), so the new rule2-behavior job executes and goes red on a regression but does not block merge until the operator adds it to branch protection. A pull request cannot change branch protection.",
+      "Adding semgrep to the dev extra would have put the contract inside the required pytest lanes, but pyproject.toml is an owned surface of the dharmagraph-engine-2026-07 track, so that route trespasses on sibling ownership. The workflow route was chosen for that reason as well as dependency isolation.",
+      "The 17 strict-scan findings remain OWNER_DEFERRED and unadjudicated; this work changed none of them, and the count and file:line set are unchanged.",
+      "Two named detector gaps cannot be expressed as fixture lines: the class-name boundary is a deliberate negative control, and the same-canonical-file collision is path-scoped."
+    ],
+    "interface_mismatches": [
+      "tests/conftest.py carries an autouse fixture that imports dharma_swarm.agent_runner, so a scanner-only CI lane must run the behavioral file with --noconftest; the test module itself imports nothing from the package."
+    ],
+    "open_broken_register_items": [
+      "The behavioral contract for Rule 2 skipped in every automated lane: the pytest jobs install .[dev], which declares no scanner, and the semgrep container ran only production scans.",
+      "Rule 2's append detector required a leading 'a' in the mode literal, missed qualified path-first opens such as aiofiles.open(path, 'a'), matched an exempt base only in leading position, and gated exempt-name collisions on 'declares exactly one base'."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "534c221d7236488e8aa5f76a71e96e12d99735a4fff07242fb6a292c68b88e85",
+    "rollback": "Revert the seven-commit range on this branch. Rule 2 returns to its 2026-08-04 detector scope and the behavioral tests return to skipping in every automated lane; no runtime, no daemon and no merge authority is affected.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "selected_tracks": [
+      "repository-titanium-hardening-2026-07"
+    ],
+    "tests_intended": [
+      "tests/test_semgrep_rule2_behavior.py",
+      "tests/test_semgrep_wrapper.py"
+    ],
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12",
+      "semgrep": "1.168.0"
+    },
+    "work_packet": "WP-SEMGREP2CI"
+  },
+  "tool_versions": {
+    "git": "2.50.1",
+    "make": "3.81",
+    "python": "3.13.12",
+    "semgrep": "1.168.0"
+  },
+  "worktree": "."
+}
