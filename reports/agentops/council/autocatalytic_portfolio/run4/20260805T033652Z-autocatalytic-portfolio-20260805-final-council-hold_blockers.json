@@ -1,0 +1,214 @@
+{
+  "blockers": [
+    "glm52: score=94 < 100",
+    "kimik3: score=90 < 100",
+    "qwen3coder: CriticResponseError invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=18397; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as a strict JSON-only production review critic for the lane \"qwen3coder\". I need to review the target \"autocatalytic-portfolio-20260805-final-council\" and return ONLY a JSON object, no markdown fences, no prose outside JSON.\\ ... l issue: The prompt says \"whether any code or UI still overstates mutable local receipts as execution provenance\". I don't see any. The code is very careful.\\n\\nAnother potential issue: The prompt says \"whether stale verifier/source evidence, altered",
+    "qwen3coder: disagreement=invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=18397; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as a strict JSON-only production rev",
+    "deepseekv4pro: score=95 < 100",
+    "minimaxm3: score=97 < 100",
+    "nemotron3ultra: CriticResponseError invalid critic JSON from openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free; actual_model=nvidia/nemotron-3-ultra-550b-a55b:free; content_len=18454; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to review the autocatalytic portfolio implementation as a skeptical architecture, epistemics, safety, integration, and operability critic. I need to return a JSON object with specific fields.\\n\\nLet me analyze the evidence provided: ... k separate type. No model consensus in this system. Self-authored hashes fail independent recomputation.\\n\\n4. \"whether structure-only and local mutable-receipt consistency are distinct result types with no public authority-erasing switch\"\\n   - Yes,",
+    "nemotron3ultra: disagreement=invalid critic JSON from openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free; actual_model=nvidia/nemotron-3-ultra-550b-a55b:free; content_len=18454; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The use"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 25573,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml portfolio nodes/edges/promotion_rule",
+          "autocatalytic_portfolio.py StructuralHop/StructuralCycleProof constructors",
+          "TransportAck has no to_structural_hop conversion",
+          "_project_evidence sets promotion_authorized=False on all signal envelopes",
+          "_check_structural_cycle_witness revalidates adapter evidence per hop",
+          "verify_cycle_witness opens SQLite read-only and checks exact 41-row set",
+          "StructuralCycleCheck.modality and LocalReceiptConsistencyCheck fields are init=False immutable",
+          "test suite covers tampered artifact, stale verifier, broken turn chain, forged promotion, missing DB, corrupt JSON",
+          "composition_evidence.md confirms no rival substrate introduced",
+          "runtime_witness_evidence.json shows 20+20+1 receipts and independently_authenticated=false",
+          "active_track_projection.json shows bound==active set equality",
+          "proof_ref_inventory.json shows 20/20 refs present",
+          "local_gate_receipt.json shows 174 passed, clean lint, production build"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [
+          "Fix ensure_ascii inconsistency in _source_snapshot declared_digest_valid check: it uses ensure_ascii=True while _digest/_canonical_json use ensure_ascii=False. If a source JSON file contains non-ASCII characters and its digest was computed with ensure_ascii=False, the check will falsely report declared_digest_valid=False and raise SemanticPromotionError. Align to ensure_ascii=False for consistency with the rest of the verifier."
+        ],
+        "score": 94,
+        "summary": "Honest local_rehearsal ceiling with ten distinct read-only project adapters, enforced ring/cross-feed topology, immutable structure-only vs receipt-consistency modalities, and comprehensive fail-closed tests. One latent digest-encoding inconsistency.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":94,\"summary\":\"Honest local_rehearsal ceiling with ten distinct read-only project adapters, enforced ring/cross-feed topology, immutable structure-only vs receipt-consistency modalities, and comprehensive fail-closed tests. One latent digest-encoding inconsistency.\",\"blockers\":[],\"required_changes\":[\"Fix ensure_ascii inconsistency in _source_snapshot declared_digest_valid check: it uses ensure_ascii=True while _digest/_canonical_json use ensure_ascii=False. If a source JSON file contains non-ASCII characters and its digest was computed with ensure_ascii=False, the check will falsely report declared_digest_valid=False and raise SemanticPromotionError. Align to ensure_ascii=False for consistency with the rest of the verifier.\"],\"evidence_checked\":[\"ACTIVE_SURFACE_MANIFEST.yaml portfolio nodes/edges/promotion_rule\",\"autocatalytic_portfolio.py StructuralHop/StructuralCycleProof constructors\",\"TransportAck has no to_structural_hop conversion\",\"_project_evidence sets promotion_authorized=False on all signal envelopes\",\"_check_structural_cycle_witness revalidates adapter evidence per hop\",\"verify_cycle_witness opens SQLite read-only and checks exact 41-row set\",\"StructuralCycleCheck.modality and LocalReceiptConsistencyCheck fields are init=False immutable\",\"test suite covers tampered artifact, stale verifier, broken turn chain, forged promotion, missing DB, corrupt JSON\",\"composition_evidence.md confirms no rival substrate introduced\",\"runtime_witness_evidence.json shows 20+20+1 receipts and independently_authenticated=false\",\"active_track_projection.json shows bound==active set equality\",\"proof_ref_inventory.json shows 20/20 refs present\",\"local_gate_receipt.json shows 174 passed, clean lint, production build\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "k3",
+      "lane_id": "kimik3",
+      "latency_ms": 31697,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "dharma_swarm/autocatalytic_portfolio.py",
+          "tests/test_autocatalytic_portfolio.py",
+          "ACTIVE_SURFACE_MANIFEST.yaml portfolio block",
+          "AUTOCATALYTIC_PORTFOLIO.md",
+          "runtime_witness_evidence.json",
+          "local_gate_receipt.json",
+          "active_track_projection.json",
+          "composition_evidence.md"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [
+          "Rerun the 174-test gate, Ruff/ESLint, and Next build on a clean CI checkout from base 9fd1bfc39e6d and attach runner output",
+          "Enforce palantir-pilot heartbeat freshness in code (freshness_policy_seconds) rather than evidence prose only",
+          "Add a regression test that load_latest_cycle rejects a tampered latest.json alias pointing at a different cycle_id",
+          "Publish the exact fresh canonical witness + receipt-count dossier promised post-stabilization and re-verify against this verifier_sha256"
+        ],
+        "score": 90,
+        "summary": "Claim is honest and code-backed: TransportAck/StructuralHop separated, distinct structure_only vs local_mutable_receipt_consistency modalities, immutable verifier fingerprint, fail-closed witness loading, 41-row exact join, negative adapter states, and UI fail-closed. Ceiling stays local_rehearsal. Gates are self-reported, not independently reproduced here.",
+        "verdict": "approve"
+      },
+      "provider": "kimi_code",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":90,\"summary\":\"Claim is honest and code-backed: TransportAck/StructuralHop separated, distinct structure_only vs local_mutable_receipt_consistency modalities, immutable verifier fingerprint, fail-closed witness loading, 41-row exact join, negative adapter states, and UI fail-closed. Ceiling stays local_rehearsal. Gates are self-reported, not independently reproduced here.\",\"blockers\":[],\"required_changes\":[\"Rerun the 174-test gate, Ruff/ESLint, and Next build on a clean CI checkout from base 9fd1bfc39e6d and attach runner output\",\"Enforce palantir-pilot heartbeat freshness in code (freshness_policy_seconds) rather than evidence prose only\",\"Add a regression test that load_latest_cycle rejects a tampered latest.json alias pointing at a different cycle_id\",\"Publish the exact fresh canonical witness + receipt-count dossier promised post-stabilization and re-verify against this verifier_sha256\"],\"evidence_checked\":[\"dharma_swarm/autocatalytic_portfolio.py\",\"tests/test_autocatalytic_portfolio.py\",\"ACTIVE_SURFACE_MANIFEST.yaml portfolio block\",\"AUTOCATALYTIC_PORTFOLIO.md\",\"runtime_witness_evidence.json\",\"local_gate_receipt.json\",\"active_track_projection.json\",\"composition_evidence.md\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "k3",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.6",
+      "failure_reason": "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=18397; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as a strict JSON-only production review critic for the lane \"qwen3coder\". I need to review the target \"autocatalytic-portfolio-20260805-final-council\" and return ONLY a JSON object, no markdown fences, no prose outside JSON.\\ ... l issue: The prompt says \"whether any code or UI still overstates mutable local receipts as execution provenance\". I don't see any. The code is very careful.\\n\\nAnother potential issue: The prompt says \"whether stale verifier/source evidence, altered",
+      "failure_type": "CriticResponseError",
+      "lane_id": "qwen3coder",
+      "latency_ms": 38824,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=18397; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as a strict JSON-only production review critic for the lane \"qwen3coder\". I need to review the target \"autocatalytic-portfolio-20260805-final-council\" and return ONLY a JSON object, no markdown fences, no prose outside JSON.\\ ... l issue: The prompt says \"whether any code or UI still overstates mutable local receipts as execution provenance\". I don't see any. The code is very careful.\\n\\nAnother potential issue: The prompt says \"whether stale verifier/source evidence, altered"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=18397; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as a strict JSON-only production review critic for the lane \"qwen3coder\". I need to review the target \"autocatalytic-portfolio-20260805-final-council\" and return ONLY a JSON object, no markdown fences, no prose outside JSON.\\ ... l issue: The prompt says \"whether any code or UI still overstates mutable local receipts as execution provenance\". I don't see any. The code is very careful.\\n\\nAnother potential issue: The prompt says \"whether stale verifier/source evidence, altered",
+        "required_changes": [
+          "Make ollama:qwen3-coder:480b-cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "qwen3coder could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "The user wants me to act as a strict JSON-only production review critic for the lane \"qwen3coder\". I need to review the target \"autocatalytic-portfolio-20260805-final-council\" and return ONLY a JSON object, no markdown fences, no prose outside JSON.\\ ... l issue: The prompt says \"whether any code or UI still overstates mutable local receipts as execution provenance\". I don't see any. The code is very careful.\\n\\nAnother potential issue: The prompt says \"whether stale verifier/source evidence, altered",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 46591,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "dharma_swarm/autocatalytic_portfolio.py",
+          "tests/test_autocatalytic_portfolio.py",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/active_track_projection.json",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/proof_ref_inventory.json",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/persistent_agent_evidence.json"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 95,
+        "summary": "The ten-node autocatalytic portfolio is a well-bounded local rehearsal with rigorous structural and receipt-consistency checks, no overclaims, and all gates passing. Minor operational hardening could be added, but no blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 95,\n  \"summary\": \"The ten-node autocatalytic portfolio is a well-bounded local rehearsal with rigorous structural and receipt-consistency checks, no overclaims, and all gates passing. Minor operational hardening could be added, but no blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml\",\n    \"dharma_swarm/autocatalytic_portfolio.py\",\n    \"tests/test_autocatalytic_portfolio.py\",\n    \"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/active_track_projection.json\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/proof_ref_inventory.json\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/persistent_agent_evidence.json\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 42414,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml nodes/edges/promotion_rule/claim_ceiling",
+          "dharma_swarm/autocatalytic_portfolio.py TransportAck/StructuralHop/LocalReceiptConsistencyCheck invariant enforcement",
+          "tests/test_autocatalytic_portfolio.py 17 tests + 2 parametrize covering forgery and re-verification",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md aligned with local_rehearsal ceiling",
+          "active_track_projection.json sets_equal=true (10/10)",
+          "proof_ref_inventory.json 20/20 refs present with sha256",
+          "runtime_witness_evidence.json 20 a2a + 20 semantic + 1 cycle receipts",
+          "local_gate_receipt.json 7 gates green + palantir-pilot heartbeat fresh"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 97,
+        "summary": "Production-grade local_rehearsal implementation: 10 typed nodes, 13 edges, closed SCC, runtime-enforced topology, 41-row receipt join, distinct structure_only vs local_consistency types, no overclaim, all hardening gates green.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":97,\"summary\":\"Production-grade local_rehearsal implementation: 10 typed nodes, 13 edges, closed SCC, runtime-enforced topology, 41-row receipt join, distinct structure_only vs local_consistency types, no overclaim, all hardening gates green.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"ACTIVE_SURFACE_MANIFEST.yaml nodes/edges/promotion_rule/claim_ceiling\",\"dharma_swarm/autocatalytic_portfolio.py TransportAck/StructuralHop/LocalReceiptConsistencyCheck invariant enforcement\",\"tests/test_autocatalytic_portfolio.py 17 tests + 2 parametrize covering forgery and re-verification\",\"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md aligned with local_rehearsal ceiling\",\"active_track_projection.json sets_equal=true (10/10)\",\"proof_ref_inventory.json 20/20 refs present with sha256\",\"runtime_witness_evidence.json 20 a2a + 20 semantic + 1 cycle receipts\",\"local_gate_receipt.json 7 gates green + palantir-pilot heartbeat fresh\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "failure_reason": "invalid critic JSON from openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free; actual_model=nvidia/nemotron-3-ultra-550b-a55b:free; content_len=18454; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to review the autocatalytic portfolio implementation as a skeptical architecture, epistemics, safety, integration, and operability critic. I need to return a JSON object with specific fields.\\n\\nLet me analyze the evidence provided: ... k separate type. No model consensus in this system. Self-authored hashes fail independent recomputation.\\n\\n4. \"whether structure-only and local mutable-receipt consistency are distinct result types with no public authority-erasing switch\"\\n   - Yes,",
+      "failure_type": "CriticResponseError",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 105291,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free; actual_model=nvidia/nemotron-3-ultra-550b-a55b:free; content_len=18454; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to review the autocatalytic portfolio implementation as a skeptical architecture, epistemics, safety, integration, and operability critic. I need to return a JSON object with specific fields.\\n\\nLet me analyze the evidence provided: ... k separate type. No model consensus in this system. Self-authored hashes fail independent recomputation.\\n\\n4. \"whether structure-only and local mutable-receipt consistency are distinct result types with no public authority-erasing switch\"\\n   - Yes,"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free; actual_model=nvidia/nemotron-3-ultra-550b-a55b:free; content_len=18454; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to review the autocatalytic portfolio implementation as a skeptical architecture, epistemics, safety, integration, and operability critic. I need to return a JSON object with specific fields.\\n\\nLet me analyze the evidence provided: ... k separate type. No model consensus in this system. Self-authored hashes fail independent recomputation.\\n\\n4. \"whether structure-only and local mutable-receipt consistency are distinct result types with no public authority-erasing switch\"\\n   - Yes,",
+        "required_changes": [
+          "Make openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "nemotron3ultra could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "openrouter_free",
+      "raw_response_preview": "The user wants me to review the autocatalytic portfolio implementation as a skeptical architecture, epistemics, safety, integration, and operability critic. I need to return a JSON object with specific fields.\\n\\nLet me analyze the evidence provided: ... k separate type. No model consensus in this system. Self-authored hashes fail independent recomputation.\\n\\n4. \"whether structure-only and local mutable-receipt consistency are distinct result types with no public authority-erasing switch\"\\n   - Yes,",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260805T033652Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 4000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 29,
+    "heartbeat_timestamp": "2026-08-05T03:36:23Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 47,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-08-05T03:36:23Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-08-05T03:36:52.101324Z\"\n}\n--- pane tail ---\nUsing CPython 3.13.12\nCreating virtual environment at: .venv\n   Building dharma-swarm @ file:///Users/dhyana/ds_autocatalytic_organism2_20260\n805\n      Built dharma-swarm @ file:///Users/dhyana/ds_autocatalytic_organism2_20260\n805\nInstalled 48 packages in 89ms\nInstalled 1 package in 1ms\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 202121,
+  "prompt_file": "/Users/dhyana/ds_autocatalytic_organism2_20260805/reports/agentops/council/autocatalytic_portfolio/review_prompt.md",
+  "prompt_words_estimate": 15348,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 62.67,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 300
+}

@@ -333,7 +333,8 @@ def default_gates(target: str = "dharma_swarm/") -> list[GateSpec]:
                   "--base-ref", "origin/main", "--head-ref", "HEAD"],
                  requires=("scripts/governance/check_module_budget.py",)),
         GateSpec("verify-corral", AGAMA, "medium",
-                 ["python3", "scripts/governance/verify_corral_findings.py"],
+                 ["python3", "scripts/governance/verify_corral_findings.py",
+                  "--strict"],
                  requires=("scripts/governance/verify_corral_findings.py",)),
         # deep — anumana (inference from measured signs): the Stop-the-Slop
         # probe (docs/stop-the-slop/probe, 13 instrument-routed signals) as a

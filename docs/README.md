@@ -149,6 +149,7 @@ That command shows the active track, live ops snapshot, open broken-register ite
 
 These are important, but they should not compete with repo-level canon:
 
+- [AUTOCATALYTIC_PORTFOLIO.md](architecture/AUTOCATALYTIC_PORTFOLIO.md): ten-node metabolic contract, semantic A2A promotion rule, and per-node pages
 - [HOLON_RUNTIME_FULL_ESTATE_MAP.md](architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md):
   current holon-specific body synthesis across source, runtime state, parallel
   Hermes boundaries, proof obligations, and a dated readiness witness
