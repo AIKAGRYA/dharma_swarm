@@ -8,11 +8,11 @@
   "before_commit": false,
   "before_merge": true
  },
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+ "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
  "branch": "agent/loop1-wplc4-repair-20260804",
  "commit": {
   "allowed": true,
-  "message": "feat(loop1): WP-LC4 disjoint checker for receipt-grounded provider consumption [impact-checked]"
+  "message": "chore(loop1): refresh WP-LC4 exact-base evidence [impact-checked]"
  },
  "forbidden_files": [
   ".github/workflows/automerge.yml",
@@ -87,10 +87,10 @@
   }
  ],
  "id": "loop-closure-WP-LC4-consumption-check-2026-07-27",
-  "intent": "WP-LC4 (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md section 6): disjoint read-only checker scripts/governance/loop1_consumption_check.py that independently validates the four Loop-1 closure properties P1..P4 from raw read-only runtime.db receipts and persisted router-audit JSONL, emitting a digest-bound producer/consumer chain witness, and supports --check replay with an honest needs_host typed gap when host evidence is absent.",
+ "intent": "WP-LC4 (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md section 6): disjoint read-only checker scripts/governance/loop1_consumption_check.py that independently validates the four Loop-1 closure properties P1..P4 from raw read-only runtime.db receipts and persisted router-audit JSONL, emitting a digest-bound producer/consumer chain witness, and supports --check replay with an honest needs_host typed gap when host evidence is absent.",
  "negative_controls": [
   {
-      "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','merge-base','--is-ancestor','f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd','HEAD'],capture_output=True); sys.exit(0 if r.returncode==0 else 9)\"",
+   "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','merge-base','--is-ancestor','bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4','HEAD'],capture_output=True); sys.exit(0 if r.returncode==0 else 9)\"",
    "env": {},
    "expected_exit": 0,
    "max_output_chars": 1000,
@@ -106,7 +106,7 @@
    "timeout_seconds": 60
   },
   {
-      "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','ls-tree','-r','--name-only','f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd'],capture_output=True,text=True); out=r.stdout; sys.exit(0 if 'scripts/governance/loop1_consumption_check.py' not in out and 'tests/test_loop1_consumption_check.py' not in out else 9)\"",
+   "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','ls-tree','-r','--name-only','bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4'],capture_output=True,text=True); out=r.stdout; sys.exit(0 if 'scripts/governance/loop1_consumption_check.py' not in out and 'tests/test_loop1_consumption_check.py' not in out else 9)\"",
    "env": {},
    "expected_exit": 0,
    "max_output_chars": 1000,
@@ -129,7 +129,7 @@
    "tests/test_loop1_consumption.py"
   ],
   "collision": {
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+   "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
    "details": [],
    "status": "clear"
   },
@@ -138,18 +138,18 @@
    "Loop-closure track items 1 (dispatch dropoff quarantine host execution), 8 (docker-compose loopback binding), and 10 (D-LC5 closure claim) remain open.",
    "Current main does not persist the complete consumption trace, boot, and decision-delta fields in router audit rows; those hosts must report needs_host rather than closure."
   ],
-    "interface_mismatches": [
-      "The stalled PR called the production ranking function from its verifier, so a shared parser or decision bug could self-certify.",
-      "The stalled receipt omitted a complete digest-bound producer/consumer trace, boot, routing-delta, row-count, host-SHA, and image-provenance witness."
-    ],
+  "interface_mismatches": [
+   "The stalled PR called the production ranking function from its verifier, so a shared parser or decision bug could self-certify.",
+   "The stalled receipt omitted a complete digest-bound producer/consumer trace, boot, routing-delta, row-count, host-SHA, and image-provenance witness."
+  ],
   "owner": "@AmitabhainArunachala",
-  "packet_digest": "11197dc12f328cc48e4ad0ecba8e02d4b365dfa0e2c54227e48747993832d7be",
+  "packet_digest": "0613bab373c4e627051655ac17b4cc6adb7fcb6fff5d574311555c41edd068d9",
   "rollback": "remove scripts/governance/loop1_consumption_check.py, tests/test_loop1_consumption_check.py, and this packet",
   "schema": "dharma_swarm.session_entry.v1",
   "tool_versions": {
-      "git": "2.50.1",
-      "make": "3.81",
-      "python": "3.13.12"
+   "git": "2.50.1",
+   "make": "3.81",
+   "python": "3.13.12"
   },
   "work_packet": "WP-LC4"
  },
