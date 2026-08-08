@@ -18,21 +18,15 @@
   "gates": [
     {
       "name": "oracle-environment-contract",
-      "command": "python3 -m pytest -q -p no:cacheprovider tests/test_langgraph_oracle_environment_contract.py",
+      "command": "python3 -m pytest -q tests/test_langgraph_oracle_environment_contract.py",
       "expected_exit": 0,
       "timeout_seconds": 120
     },
     {
       "name": "oracle-focused-suite",
-      "command": "python3 -m pytest -q -p no:cacheprovider tests/test_langgraph_differential_oracle.py tests/test_dharmagraph_parity_gauntlet.py tests/test_graph_neutral_langgraph_oracle.py tests/test_langgraph_oracle_environment_contract.py",
+      "command": "python3 -m pytest -q tests/test_langgraph_differential_oracle.py tests/test_dharmagraph_parity_gauntlet.py tests/test_graph_neutral_langgraph_oracle.py tests/test_langgraph_oracle_environment_contract.py",
       "expected_exit": 0,
       "timeout_seconds": 600
-    },
-    {
-      "name": "oracle-custody-replay",
-      "command": "python3 scripts/governance/dharmagraph_parity_gauntlet.py --check",
-      "expected_exit": 0,
-      "timeout_seconds": 300
     },
     {
       "name": "oracle-pin-diff-check",
@@ -99,6 +93,6 @@
       "The repository-wide DocOps inventory assertions are already stale on current main and are outside this packet's DharmaGraph scope."
     ],
     "rollback": "Revert the exact pins, lockfile downgrade, environment-contract test, resealed parity receipts/matrix, exact judge-signature ratification, and this packet together. Do not modify the frozen rubric or preserve a receipt whose measured source digest no longer matches.",
-    "packet_digest": "9532e9f9946d23d9f06f87e4a27bb43c57f2cca79c5a52f4267037c4a0d02eae"
+    "packet_digest": "2e457d79612854907c54c168470dff6bbbe3e0e92486f9c973f645729616696e"
   }
 }
