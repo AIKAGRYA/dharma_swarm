@@ -73,6 +73,29 @@ def test_snapshot_filter_closes_trusted_unmarked_ops_reports() -> None:
     assert _matching_numbers(rows) == [950, 953]
 
 
+def test_snapshot_filter_closes_live_spine_lifecycle_branch_shape() -> None:
+    rows = [
+        _pr(
+            1173,
+            title="report(governance): ops runs 2026-07-31 through 2026-08-06",
+            head="ops/spine-adoption-pr-lifecycle-2026-07-31",
+        ),
+        _pr(
+            1306,
+            title="report(governance): ops run 2026-08-08T12:00Z",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1200Z",
+        ),
+        _pr(
+            1307,
+            title="report(governance): ops run from a fork",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1800Z",
+            owner="fork-owner",
+        ),
+    ]
+
+    assert _matching_numbers(rows) == [1173, 1306]
+
+
 def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> None:
     rows = [
         _pr(
@@ -100,6 +123,13 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             # still a human branch, not the automation lane.
             title="ops report parser implementation",
             head="chore/ops-report-20260715-parser",
+        ),
+        _pr(
+            7,
+            # A human suffix on the lifecycle prefix is not the exact
+            # timestamped automation lane and must survive cleanup.
+            title="spine lifecycle report parser implementation",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08-parser",
         ),
         _pr(
             3,

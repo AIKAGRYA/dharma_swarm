@@ -1,0 +1,76 @@
+{
+  "id": "titanium-WP-PRSNAP1-snapshot-branch-matcher",
+  "base_ref": "15452eae3f11985066caa6a7fad5148b12972c53",
+  "branch": "codex/pr-flow-recovery-20260808",
+  "worktree": ".",
+  "intent": "Repair the fail-closed snapshot-PR cleanup matcher so the live external ops/spine-adoption-pr-lifecycle timestamped lane is recognized as an ephemeral status projection and closed instead of accumulating in the production merge queue. Preserve same-repository ownership and known-intent checks so human topic branches and fork PRs remain untouched.",
+  "allowed_files": [
+    ".github/workflows/pr-dedupe.yml",
+    "tests/test_pr_dedupe_workflow.py",
+    "reports/agentops/work_packets/titanium-WP-PRSNAP1-snapshot-branch-matcher.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "snapshot-dedupe-contract",
+      "command": "python3 -m pytest -q tests/test_pr_dedupe_workflow.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "snapshot-filter-remains-fail-closed",
+      "command": "python3 -m pytest -q tests/test_pr_dedupe_workflow.py::test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): close live ops snapshot PR shape"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRSNAP1",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "15452eae3f11985066caa6a7fad5148b12972c53",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The cleanup policy declares PR-lifecycle/spine-adoption snapshots non-mergeable, but its matcher recognizes pr-lifecycle-spine and spine-adoption-metric while the live external lane emits a timestamped ops/spine-adoption-pr-lifecycle branch."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-dedupe.yml",
+      "tests/test_pr_dedupe_workflow.py"
+    ],
+    "honest_blockers": [],
+    "rollback": "Revert the matcher predicate, its regression fixture, and this packet together. Previously closed snapshot PRs remain recoverable from GitHub history.",
+    "packet_digest": "b8d9d10bb89ff4a215f5b7750ff4862dabd3c85de260c0a0767009a43729cb09"
+  }
+}
