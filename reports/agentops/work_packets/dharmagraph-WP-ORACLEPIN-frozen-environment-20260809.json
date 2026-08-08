@@ -8,15 +8,31 @@
     "pyproject.toml",
     "uv.lock",
     "tests/test_langgraph_oracle_environment_contract.py",
+    "reports/governance/dharmagraph_parity/PARITY_MATRIX.md",
+    "reports/governance/dharmagraph_parity/builder_receipt.json",
+    "reports/governance/dharmagraph_parity/judge_receipt.json",
+    "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json",
     "reports/agentops/work_packets/dharmagraph-WP-ORACLEPIN-frozen-environment-20260809.json"
   ],
   "forbidden_files": [],
   "gates": [
     {
       "name": "oracle-environment-contract",
-      "command": "python3 -m pytest -q tests/test_langgraph_oracle_environment_contract.py",
+      "command": "python3 -m pytest -q -p no:cacheprovider tests/test_langgraph_oracle_environment_contract.py",
       "expected_exit": 0,
       "timeout_seconds": 120
+    },
+    {
+      "name": "oracle-focused-suite",
+      "command": "python3 -m pytest -q -p no:cacheprovider tests/test_langgraph_differential_oracle.py tests/test_dharmagraph_parity_gauntlet.py tests/test_graph_neutral_langgraph_oracle.py tests/test_langgraph_oracle_environment_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "oracle-custody-replay",
+      "command": "python3 scripts/governance/dharmagraph_parity_gauntlet.py --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
     },
     {
       "name": "oracle-pin-diff-check",
@@ -77,12 +93,12 @@
       "reports/governance/dharmagraph_parity/builder_receipt.json:environment"
     ],
     "honest_blockers": [
-      "This repair restores the frozen comparison environment; it does not reseal or rewrite the existing builder/judge parity receipts.",
+      "The builder receipt is mechanically resealed only after the frozen tuple is installed under Python 3.11; a separate independent judge must rerun and reconcile it before its exact signature can enter the measurement-excluded source-review registry.",
       "PR #1284 must be refreshed or retriggered only after this owner-scoped fix actually merges; its h2/hpack update is deliberately not changed here.",
       "Fresh exact-head hosted CI, independent review, and human merge authority remain required.",
       "The repository-wide DocOps inventory assertions are already stale on current main and are outside this packet's DharmaGraph scope."
     ],
-    "rollback": "Revert the exact pins, lockfile downgrade, environment-contract test, and this packet together. Do not modify the frozen rubric or signed parity receipts as a rollback shortcut.",
-    "packet_digest": "cd2a81e8795ce8917958716e3ae784036ad59724a4f20a8c99d3f2b0ad4ff255"
+    "rollback": "Revert the exact pins, lockfile downgrade, environment-contract test, resealed parity receipts/matrix, exact judge-signature ratification, and this packet together. Do not modify the frozen rubric or preserve a receipt whose measured source digest no longer matches.",
+    "packet_digest": "9532e9f9946d23d9f06f87e4a27bb43c57f2cca79c5a52f4267037c4a0d02eae"
   }
 }
