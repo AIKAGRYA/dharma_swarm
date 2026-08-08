@@ -8,7 +8,7 @@
     "before_commit": true,
     "before_merge": true
   },
-  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "codex/wp0s-compose-loopback-prevention",
   "commit": {
     "allowed": false,
@@ -66,7 +66,7 @@
       "tests/test_swarm_health_api.py TestBindHost compose boundary assertion"
     ],
     "collision": {
-      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": [],
       "status": "clear"
     },
@@ -77,13 +77,13 @@
       "Titanium WP-0S owns the API containment seam but marks deployment manifests read-only; this stacked packet stays under docker-compose.yml owner organism-rewire-2026-07."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "a9134c258af7ced8b4cb7609c9981bbecadbe2e524c89aa1853ac6ea4eac46a8",
+    "packet_digest": "6cbbfd66e57839d2d25dbf6b3707b52ec931d47b920c71b4d9defac06df8f640",
     "rollback": "Revert the compose publication and its paired structural assertion together; do not redeploy while a world-bound 8080 publication would be restored.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
       "git": "2.50.1",
       "make": "3.81",
-      "python": "3.13.12"
+      "python": "3.11.15"
     },
     "work_packet": "WP-0S"
   },
