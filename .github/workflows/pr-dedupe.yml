@@ -21,9 +21,10 @@ name: pr-dedupe
 #   they pile up (12+ at a time, burying real PRs). These snapshots carry no
 #   merge value — their data is a projection already rendered from owners
 #   (`make onboard`, reports/governance/**) — so this pass CLOSES every such
-#   snapshot PR outright (not keep-newest) with a governance comment + branch
-#   cleanup. The match is conservative: same-repo owner AND a known snapshot
-#   intent, plus either an automation marker or a declared snapshot-only branch.
+#   snapshot PR outright (not keep-newest) with a governance comment while
+#   preserving its branch ref for recovery. The match is conservative:
+#   same-repo owner AND a known snapshot intent, plus either an automation
+#   marker or a declared snapshot-only branch.
 #
 #   Pass 2 — duplicate consolidation: groups remaining open PRs by normalized
 #   title (lowercased, whitespace collapsed, timestamps stripped) and, for
@@ -85,30 +86,35 @@ jobs:
           # have been a PR. The external Oz lane historically omitted
           # [automated] while using one of two dedicated timestamped branch
           # shapes: chore/ops-report-YYYYMMDD... or
-          # ops/spine-adoption-pr-lifecycle-YYYY-MM-DD.... Accept either a
-          # title marker or those exact automation shapes — never a bare
-          # prefix, which a human topic branch could legitimately use. The
-          # same-repo-owner check remains mandatory because this workflow
-          # runs with pull_request_target write credentials.
+          # ops/spine-adoption-pr-lifecycle-YYYY-MM-DD.... The lifecycle lane
+          # is special-cased: its exact branch grammar must be paired with its
+          # anchored report(governance): ops run title, and cannot inherit any
+          # broader legacy title matcher. Never trust a bare prefix, which a
+          # human topic branch could legitimately use. The same-repo-owner
+          # check remains mandatory because this workflow runs with
+          # pull_request_target write credentials.
           SNAPSHOT_FILTER="$(cat <<'JQ'
             def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
             def snapshot_intent:
               ((.title // "") | ascii_downcase) as $t
               | ((.headRefName // "") | ascii_downcase) as $h
               | ($h | test("^ops/spine-adoption-pr-lifecycle-[0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{4}z)?$")) as $lifecycle_snapshot
-              | (
-                  ($t | test("\\[automated\\]|\\[auto\\]"))
-                  or ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$"))
-                  or $lifecycle_snapshot
-                )
-                and (
-                  ($t | test("pr lifecycle \\+ spine adoption ops report"))
-                  or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
-                  or ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
-                  or ($t | test("refresh spine adoption metric"))
-                  or ($h | test("pr-lifecycle-spine"))
-                  or ($h | test("spine-adoption-metric"))
-                );
+              | if $lifecycle_snapshot then
+                  ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
+                else
+                  (
+                    ($t | test("\\[automated\\]|\\[auto\\]"))
+                    or ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$"))
+                  )
+                  and (
+                    ($t | test("pr lifecycle \\+ spine adoption ops report"))
+                    or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
+                    or ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
+                    or ($t | test("refresh spine adoption metric"))
+                    or ($h | test("pr-lifecycle-spine"))
+                    or ($h | test("spine-adoption-metric"))
+                  )
+                end;
             [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
             | sort_by(.number) | .[]
           JQ
@@ -138,11 +144,11 @@ jobs:
           as artifacts/comments, never as standing PRs, so they are closed on
           sight to keep the PR list readable. No action needed.
 
-          If this was a real change, reopen and retitle so it no longer matches a
-          snapshot intent."
+          Its branch ref is intentionally preserved for recovery. If this was a
+          real change, reopen and retitle so it no longer matches a snapshot
+          intent."
               gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
               if gh pr close "$number" --repo "$GH_REPO"; then
-                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
                 closed_count=$((closed_count + 1))
               else
                 echo "::warning::close of #${number} was rejected — not counted as closed"

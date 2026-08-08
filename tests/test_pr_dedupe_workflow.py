@@ -139,6 +139,18 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             head="ops/spine-adoption-pr-lifecycle-2026-08-08T1800Z",
         ),
         _pr(
+            9,
+            # Broad legacy title language cannot authorize the reserved
+            # lifecycle branch without its anchored governance report title.
+            title="fix: ops report renderer",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1900Z",
+        ),
+        _pr(
+            10,
+            title="chore: refresh spine adoption metric docs",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2000Z",
+        ),
+        _pr(
             3,
             title="chore(docops): reconcile generated counts",
             head="chore/docops-autorefresh",
@@ -151,6 +163,15 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
     ]
 
     assert _matching_numbers(rows) == []
+
+    # Pass 1 closes a projection, but cannot destroy its recovery ref. Pass 2
+    # retains its existing duplicate-automation cleanup behavior.
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    snapshot_step = workflow.split(
+        "- name: Close ephemeral snapshot-report PRs", 1
+    )[1].split("- name: Find and close duplicate automated PRs", 1)[0]
+    assert 'git/refs/heads/${head_ref}' not in snapshot_step
+    assert "--method DELETE" not in snapshot_step
 
 
 def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:
