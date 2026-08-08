@@ -1,0 +1,130 @@
+{
+  "schema": "dharma.autocatalytic.proof_ref_inventory.v1",
+  "observed_at": "2026-08-05T05:26:13Z",
+  "declared_ref_count": 20,
+  "present_ref_count": 20,
+  "all_present": true,
+  "refs": [
+    {
+      "node_id": "world_signal_supply",
+      "path": "dharma_swarm/world_radar/go_bridge.py",
+      "size_bytes": 33960,
+      "sha256": "c0712b5a314d0b726c33df84ec2c4e5587b36647fe14b48647b0ac22ac2de01d"
+    },
+    {
+      "node_id": "world_signal_supply",
+      "path": "tests/test_world_radar_go_bridge.py",
+      "size_bytes": 29348,
+      "sha256": "b56ddb06895356440e42588d023043e60f434a3b2ba74d3dab6fa1f00d4c1c60"
+    },
+    {
+      "node_id": "sarathi_runtime",
+      "path": "scripts/runtime/sarathi_wake_daemon.py",
+      "size_bytes": 21293,
+      "sha256": "5181d0c57996b09f715076fa7497fcd9fb7bc080649332c723add994624ed383"
+    },
+    {
+      "node_id": "sarathi_runtime",
+      "path": "tests/test_sarathi_wake_daemon.py",
+      "size_bytes": 13847,
+      "sha256": "1cb0f1abe095585900ca646b3b9db7b24ec58283c432ec275c99e51bac9d504f"
+    },
+    {
+      "node_id": "dharmagraph_execution",
+      "path": "dharma_swarm/graph/durable_invoker.py",
+      "size_bytes": 31880,
+      "sha256": "9717427cac5a1ecaf8f10a3f56ae24aa84c8b6e100071394ffd0da6ded5aa114"
+    },
+    {
+      "node_id": "dharmagraph_execution",
+      "path": "tests/test_graph_durable_invoker.py",
+      "size_bytes": 25709,
+      "sha256": "c4afffbafbff5b65e1bef28e9dca2b7de0a937748be6428f562a685fd8ca5648"
+    },
+    {
+      "node_id": "cybernetic_supervision",
+      "path": "dharma_swarm/cybernetics_codex.py",
+      "size_bytes": 58305,
+      "sha256": "e853eda7aab62615436df6fb95d427bd482a9656b4f21e5960417658d43da19e"
+    },
+    {
+      "node_id": "cybernetic_supervision",
+      "path": "tests/test_cybernetics_codex.py",
+      "size_bytes": 27507,
+      "sha256": "798d6313c309ab92b8d9e16ce658924cf1079119be02ae700fe5bee451c473ad"
+    },
+    {
+      "node_id": "arena_selection",
+      "path": "dharma_swarm/coordination/arena/measure.py",
+      "size_bytes": 18427,
+      "sha256": "c4d68fab6c9be924aafae54a1d0ffb606b3959a7ad07fc61527fdb04f0c67cce"
+    },
+    {
+      "node_id": "arena_selection",
+      "path": "tests/test_arena_parity_controls.py",
+      "size_bytes": 24638,
+      "sha256": "7a09341d9dcf60bf3b62d180523c5c81d0b8778bd78d328ede1a1bafc9c05704"
+    },
+    {
+      "node_id": "chamber_research",
+      "path": "dharma_swarm/chamber/traces.py",
+      "size_bytes": 4687,
+      "sha256": "53d3763b0a2308abbfa7243d388a61c525bb8899ecdf80af6a7a3a7ae5d95329"
+    },
+    {
+      "node_id": "chamber_research",
+      "path": "tests/test_chamber_traces.py",
+      "size_bytes": 2515,
+      "sha256": "e1f52dfcea6f0f414390a0415a00d10cce3c626b5feb7dfbffff50650e2fa40c"
+    },
+    {
+      "node_id": "assurance_merge",
+      "path": "scripts/governance/check_claim_evidence_binding.py",
+      "size_bytes": 7734,
+      "sha256": "c5ebfc39a6d71755980c77ef8a073b7f5e0cf993bee274b2df8e35080b5fc28a"
+    },
+    {
+      "node_id": "assurance_merge",
+      "path": "scripts/runtime/ci_truth.py",
+      "size_bytes": 13798,
+      "sha256": "479ef58cf115bb5bc358939ab480d6448dafd0099b3e29a7ca616deb89e356b2"
+    },
+    {
+      "node_id": "assurance_merge",
+      "path": "scripts/runtime/pr_merge_control.py",
+      "size_bytes": 110990,
+      "sha256": "b690b9a08433014361882e8f562001cc0ad11e948597ee84037d589f285524cb"
+    },
+    {
+      "node_id": "operator_experience",
+      "path": "dharma_swarm/terminal_bridge.py",
+      "size_bytes": 115745,
+      "sha256": "0ba3a54115e664867d42acb5af2e2fcff0916e2793910be89eeaac9577be435d"
+    },
+    {
+      "node_id": "operator_experience",
+      "path": "tests/test_terminal_bridge.py",
+      "size_bytes": 39762,
+      "sha256": "1498b41d66de9d07cee9f4cc77fea3adc0b002918adc11ec5b0077c163c3adb4"
+    },
+    {
+      "node_id": "external_value_delivery",
+      "path": "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+      "size_bytes": 4073,
+      "sha256": "46771117e933ebd969cc6eac025f48d638662ef2c9f3b84eaaa29a59beac2040"
+    },
+    {
+      "node_id": "learning_promotion",
+      "path": "dharma_swarm/coordination/arena/corpus.py",
+      "size_bytes": 3950,
+      "sha256": "eb13c2b517feefdd5d23928108ce0c19fb92e3bc48047533649b639b3bbc931b"
+    },
+    {
+      "node_id": "learning_promotion",
+      "path": "tests/test_agent_runner_routing_feedback.py",
+      "size_bytes": 8007,
+      "sha256": "812de598b39056749eb8ce6c36276703db99647f8efc0e228c588b3dfe99cc48"
+    }
+  ],
+  "claim_boundary": "Existence and content identity are not pass/fail results; adapter-specific current evidence is recomputed separately."
+}

@@ -1,0 +1,205 @@
+{
+  "blockers": [],
+  "conviction_gate": "pass_fullness",
+  "conviction_gate_scope": "content_only",
+  "effective_gate": "hold_required_provider_substitution",
+  "provider_identity_audit": "20260805T081511Z-autocatalytic-portfolio-20260805-final-evidence-closure-run11-pass_fullness-provider-identity.json",
+  "required_provider_identity_satisfied": false,
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 22809,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "validate_portfolio enforces ring/cross-feed/promotion-check/active-track equality at runtime",
+          "20/20 promotion gates unsatisfied, 0 authority upgrades in fresh witness",
+          "TransportAck has no StructuralHop conversion; test_transport_ack_fails_with_controlled_structural_type_error",
+          "StructuralCycleCheck vs LocalReceiptConsistencyCheck distinct modalities with __bool__ TypeError guard",
+          "test_hash_valid_self_authored_project_promotion_is_rejected proves hash-valid self-promotion fails",
+          "Cross-feed ledger-bound one-shot consumption tested across 3 feeds with forgery variants",
+          "202 portfolio tests + 45 complete + 20 adversarial passed; 11 dashboard contract tests",
+          "14-module fingerprint e22f39820f483f33 matches independently recomputed bundle",
+          "Dashboard TruthBoundaryNotice and API docstring both say not authenticated provenance",
+          "Store census ratchet 218->219 explicitly justified for {cycle_id}.tasks.jsonl"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Ten-node autocatalytic portfolio is honestly bounded at local_rehearsal with distinct structure-only and local-receipt-consistency types, fail-closed promotion gates, canonical substrate composition, and challengeable content-addressed evidence across all nodes.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"Ten-node autocatalytic portfolio is honestly bounded at local_rehearsal with distinct structure-only and local-receipt-consistency types, fail-closed promotion gates, canonical substrate composition, and challengeable content-addressed evidence across all nodes.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"validate_portfolio enforces ring/cross-feed/promotion-check/active-track equality at runtime\",\"20/20 promotion gates unsatisfied, 0 authority upgrades in fresh witness\",\"TransportAck has no StructuralHop conversion; test_transport_ack_fails_with_controlled_structural_type_error\",\"StructuralCycleCheck vs LocalReceiptConsistencyCheck distinct modalities with __bool__ TypeError guard\",\"test_hash_valid_self_authored_project_promotion_is_rejected proves hash-valid self-promotion fails\",\"Cross-feed ledger-bound one-shot consumption tested across 3 feeds with forgery variants\",\"202 portfolio tests + 45 complete + 20 adversarial passed; 11 dashboard contract tests\",\"14-module fingerprint e22f39820f483f33 matches independently recomputed bundle\",\"Dashboard TruthBoundaryNotice and API docstring both say not authenticated provenance\",\"Store census ratchet 218->219 explicitly justified for {cycle_id}.tasks.jsonl\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "k3",
+      "lane_id": "kimik3",
+      "latency_ms": 108854,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "manifest validator: ring/pages/tracks/cross-feeds",
+          "adapters: typed sources + negative states",
+          "promotion gate: all-true still blocked",
+          "hop/cycle proof + verifier replay",
+          "41-row local receipt join + forge caveat",
+          "dashboard fail-closed + variable-turn notice",
+          "state-root override + latest alias reverify",
+          "witness/fingerprint/gate receipt hashes"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "No blocker found: ring/cross-feeds, fail-closed promotion, distinct structure/local-receipt modalities, canonical A2A/spine composition, dashboard/docs ceiling, and bounded local_rehearsal claims are concretely evidenced.",
+        "verdict": "pass"
+      },
+      "provider": "kimi_code",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"No blocker found: ring/cross-feeds, fail-closed promotion, distinct structure/local-receipt modalities, canonical A2A/spine composition, dashboard/docs ceiling, and bounded local_rehearsal claims are concretely evidenced.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"manifest validator: ring/pages/tracks/cross-feeds\",\"adapters: typed sources + negative states\",\"promotion gate: all-true still blocked\",\"hop/cycle proof + verifier replay\",\"41-row local receipt join + forge caveat\",\"dashboard fail-closed + variable-turn notice\",\"state-root override + latest alias reverify\",\"witness/fingerprint/gate receipt hashes\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "k3",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "qwen3coder",
+      "latency_ms": 147004,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "dharma_swarm/autocatalytic_*.py (14 modules)",
+          "tests/test_autocatalytic_portfolio.py (45/45, 20 adversarial)",
+          "tests/test_manifest_health.py (11 dashboard contract)",
+          "dashboard/src/lib/autocatalyticPortfolio.ts and test",
+          "dashboard/src/app/dashboard/organism/**",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/* (fresh cycle witness, gate receipt, composition evidence)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Ten-node autocatalytic portfolio meets all production-grade integration, anti-slop, governance, and code assurance criteria. Evidence shows distinct adapters, fail-closed promotion, distinct structural/local checks, no authority overstatement, and comprehensive adversarial tests.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"Ten-node autocatalytic portfolio meets all production-grade integration, anti-slop, governance, and code assurance criteria. Evidence shows distinct adapters, fail-closed promotion, distinct structural/local checks, no authority overstatement, and comprehensive adversarial tests.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml\",\n    \"dharma_swarm/autocatalytic_*.py (14 modules)\",\n    \"tests/test_autocatalytic_portfolio.py (45/45, 20 adversarial)\",\n    \"tests/test_manifest_health.py (11 dashboard contract)\",\n    \"dashboard/src/lib/autocatalyticPortfolio.ts and test\",\n    \"dashboard/src/app/dashboard/organism/**\",\n    \"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/* (fresh cycle witness, gate receipt, composition evidence)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 18585,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "tests/test_autocatalytic_portfolio.py",
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json",
+          "dashboard/src/lib/autocatalyticPortfolio.test.ts",
+          "dharma_swarm/autocatalytic_contracts.py",
+          "dharma_swarm/autocatalytic_source_contracts.py"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All claims verified: ten-node closed ring, cross-feeds, project adapters, promotion gates blocked, local receipt consistency distinct, no authority overstatement. Evidence comprehensive, tests pass, governance truthful.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All claims verified: ten-node closed ring, cross-feeds, project adapters, promotion gates blocked, local receipt consistency distinct, no authority overstatement. Evidence comprehensive, tests pass, governance truthful.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"tests/test_autocatalytic_portfolio.py\",\n    \"ACTIVE_SURFACE_MANIFEST.yaml\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json\",\n    \"dashboard/src/lib/autocatalyticPortfolio.test.ts\",\n    \"dharma_swarm/autocatalytic_contracts.py\",\n    \"dharma_swarm/autocatalytic_source_contracts.py\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 39465,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "validate_portfolio enforces ring/cross-feed/active-track equality",
+          "LocalReceiptConsistencyCheck.init=False on independently_authenticated",
+          "evaluate_promotion_gate stays blocked with authority_upgrade_authorized=False when all-true",
+          "TransportAck has no to_completed_hop surface",
+          "14-module bundle fingerprint matches fresh witness",
+          "Cross-feeds are ledger-bound, causal, and one-shot",
+          "State root resolves under one DHARMA_STATE_DIR",
+          "Three declared cross-feeds exercised across two turns"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All evidence aligns with the local_rehearsal claim. Architecture fails closed, canonical substrate preserved, honest ceiling, no concrete blockers.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"All evidence aligns with the local_rehearsal claim. Architecture fails closed, canonical substrate preserved, honest ceiling, no concrete blockers.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"validate_portfolio enforces ring/cross-feed/active-track equality\",\"LocalReceiptConsistencyCheck.init=False on independently_authenticated\",\"evaluate_promotion_gate stays blocked with authority_upgrade_authorized=False when all-true\",\"TransportAck has no to_completed_hop surface\",\"14-module bundle fingerprint matches fresh witness\",\"Cross-feeds are ledger-bound, causal, and one-shot\",\"State root resolves under one DHARMA_STATE_DIR\",\"Three declared cross-feeds exercised across two turns\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 44572,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml portfolio declaration",
+          "autocatalytic_contracts.py typed contracts",
+          "autocatalytic_adapters.py + research_promote/sense_execute project adapters",
+          "autocatalytic_cycle_runtime.py two-turn execution",
+          "autocatalytic_verifier.py structural + receipt verification",
+          "autocatalytic_manifest_contracts.py topology validation",
+          "tests/test_autocatalytic_portfolio.py 45 executable contracts",
+          "dashboard organism pages + autocatalyticPortfolio.ts presentation",
+          "runtime_witness_evidence.json fresh cycle verification",
+          "local_gate_receipt.json gate evaluations all blocked"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Ten-node autocatalytic portfolio implements declared local_rehearsal ceiling with content-addressed project adapters, typed cross-feeds, structural proof, and local mutable-receipt consistency. All negative states explicit, promotion gates blocked, no authority overstatement. Evidence challengeable and verified.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"Ten-node autocatalytic portfolio implements declared local_rehearsal ceiling with content-addressed project adapters, typed cross-feeds, structural proof, and local mutable-receipt consistency. All negative states explicit, promotion gates blocked, no authority overstatement. Evidence challengeable and verified.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml portfolio declaration\",\n    \"autocatalytic_contracts.py typed contracts\",\n    \"autocatalytic_adapters.py + research_promote/sense_execute project adapters\",\n    \"autocatalytic_cycle_runtime.py two-turn execution\",\n    \"autocatalytic_verifier.py structural + receipt verification\",\n    \"autocatalytic_manifest_contracts.py topology validation\",\n    \"tests/test_autocatalytic_portfolio.py 45 executable contracts\",\n    \"dashboard organism pages + autocatalyticPortfolio.ts presentation\",\n    \"runtime_witness_evidence.json fresh cycle verification\",\n    \"local_gate_receipt.json gate evaluations all blocked\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260805T081511Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 13,
+    "heartbeat_timestamp": "2026-08-05T08:14:58Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 10,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-08-05T08:14:58Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-08-05T08:15:11.4299Z\"\n}\n--- pane tail ---\nUsing CPython 3.13.12\nCreating virtual environment at: .venv\nInstalled 48 packages in 110ms\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 507577,
+  "prompt_file": "/Users/dhyana/ds_autocatalytic_organism2_20260805/reports/agentops/council/autocatalytic_portfolio/review_prompt.md",
+  "prompt_words_estimate": 41856,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 100.0,
+  "score_min": 100,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

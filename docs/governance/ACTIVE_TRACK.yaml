@@ -1859,10 +1859,40 @@ active_tracks:
       M1 refreshes the canonical M0 receipt against exact merged main after
       PR #1164 in
       reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
-      The selected post-1164 observation reports the evaluator's mechanical
-      7/8 result separately from no-skip and packet-acceptance evidence. That
-      receipt is point-in-time evidence, not a substitute for the current
-      completion criteria or authority to promote a blocked external decision.
+      That receipt's mechanical 7/8 result was scored against the criteria
+      set of its day and is point-in-time evidence only. The criteria block
+      now carries nine entries and the current mechanical result is 8/9:
+      the sole failure is the MISSING independent clean-room receipt, and
+      two passing suites still carry skipped tests. That 8/9 count is NOT
+      anchored to the generated/status branch, which is force-pushed
+      latest-only and retains no history; its provenance (projection commit
+      and derived-from-main SHA) and its branch-independent re-derivation
+      command are recorded in that same reconciliation report's
+      generated_status block, and any reader can re-derive the count from
+      this repository with
+      `python3 scripts/governance/check_track_status.py`.
+      A pass that carries skips does not discharge the no-skip obligation.
+      Neither receipt nor projection is a substitute for the current
+      completion criteria or authority to promote a blocked external
+      decision; the projection is projection-only evidence.
+
+      M3 retires the WP-0C1R next item after merged-main reverification, on
+      the same standard M2 used for WP-0D: PR #1202 (human-merged as
+      f3eb5b397) executed the operator-ratified A1/B1 dispositions, and the
+      strict scan replayed on exact merged main f3eb5b397 now exits 0 with
+      `Ran 10 rules on 1577 files: 0 findings`. A negative control confirms
+      the gate still has teeth: injecting one `Path.home() / ".dharma"`
+      reference returns exit 1 with 1 finding. Retiring the item retires the
+      adjudication blocker only. It is implementation-author replay, not
+      independent review. It is not a security-completeness claim, and that
+      control also exposed a disclosed limit: Rule 1 does not match the
+      idiomatic chained form `Path.home() / ".dharma" / "sub"`, so zero
+      findings means zero findings UNDER RULE 1 AS WRITTEN. Widening the
+      rule is deliberately NOT done here — it would re-open the ratified
+      A1/B1 finding set and needs its own ratification; the measurement is
+      recorded in the reconciliation report for operator routing. WP-0F1,
+      WP-0G, WP-0S, and WP-0I stay open with Phase 0 BLOCKED targeting
+      CLOSED_NOT_PROD.
 
     completion_criteria:
       - id: titanium_bootstrap_contract_passes
@@ -1907,7 +1937,7 @@ active_tracks:
 
     next_items:
       - id: WP-0F1
-        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
+        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
         blocker: true
         evidence_criterion: titanium_ci_authority_contracts_pass
@@ -1916,12 +1946,8 @@ active_tracks:
         kind: code
         blocker: true
         evidence_criterion: titanium_docops_contracts_pass
-      - id: WP-0C1R
-        what: "Ratify and owner-route the exact-current-main strict Semgrep result: exit 1 with 21 OWNER_DEFERRED findings (18 unauthorized state writers and 3 unclassified substrates), 7 parser warnings, and zero security-rule findings. No draft disposition is a PASS."
-        kind: governance
-        blocker: true
       - id: WP-0S
-        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret, while docker-compose still declares 8080:8080 and GitHub contains no deployment evidence; actual exposure remains NEEDS_HOST/BLOCKED_OPERATOR."
+        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret and docker-compose still declares 8080:8080. The 2026-08-01 read-only observation recorded on PR #1184 (open, unmerged, head c448c5ab2) classified one receipt endpoint alias as HTTP 401 and another as unauthenticated public HTTP 200, so live exposure is observed but unadjudicated. Exact live network coordinates are intentionally omitted from this public governance projection. Cite the immutable source receipt with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803 records that this is a citation, not a replay). That receipt is implementation-observer authority, declares inventory_complete false, and carries no operator attestation, so the verdict remains BLOCKED_OPERATOR pending fresh operator-backed observation and exact-scope attestation. The exposed alias requires operator action: authenticate it, close it, or attest it as intentionally public. Sanitizing the projection changes no evidence authority, inventory boundary, classification, or operator obligation."
         kind: code
         blocker: true
         evidence_criterion: titanium_ingress_contracts_pass
