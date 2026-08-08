@@ -72,7 +72,7 @@
       "docs/ops/loop_control/README.md"
     ],
     "collision": {
-      "checked_at_sha": "0786ae36fe0f90c872368c714bcd9b7dedc1d290",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": [],
       "status": "clear"
     },
@@ -85,7 +85,7 @@
     ],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "553931b7e93618649234c07696e0cf8f2b34aeec2309814947ae5145915f1cc4",
+    "packet_digest": "b824e0ca38f3bd52ba8d9ae07cce4675cb4fdc61e549d46d1783bcee6789719e",
     "rollback": "Revert the packet-refresh commit; the semantic implementation remains unchanged and the unresolved P1 remains operator-gated.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
