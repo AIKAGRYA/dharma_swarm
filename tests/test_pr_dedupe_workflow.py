@@ -132,6 +132,13 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             head="ops/spine-adoption-pr-lifecycle-2026-08-08-parser",
         ),
         _pr(
+            8,
+            # Even the exact reserved-looking branch shape is only an
+            # automation signal, not enough authority to close real work.
+            title="feat: implement real spine lifecycle behavior",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1800Z",
+        ),
+        _pr(
             3,
             title="chore(docops): reconcile generated counts",
             head="chore/docops-autorefresh",

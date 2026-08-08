@@ -104,10 +104,10 @@ jobs:
                 and (
                   ($t | test("pr lifecycle \\+ spine adoption ops report"))
                   or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
+                  or ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
                   or ($t | test("refresh spine adoption metric"))
                   or ($h | test("pr-lifecycle-spine"))
                   or ($h | test("spine-adoption-metric"))
-                  or $lifecycle_snapshot
                 );
             [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
             | sort_by(.number) | .[]
