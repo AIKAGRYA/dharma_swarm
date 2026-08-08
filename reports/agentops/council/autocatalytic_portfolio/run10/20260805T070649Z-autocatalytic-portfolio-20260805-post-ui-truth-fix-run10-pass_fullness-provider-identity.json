@@ -1,0 +1,88 @@
+{
+  "schema_version": "dharma.council.provider_identity_audit.v1",
+  "source_summary": "reports/agentops/council/autocatalytic_portfolio/run10/20260805T070649Z-autocatalytic-portfolio-20260805-post-ui-truth-fix-run10-pass_fullness.json",
+  "runner_conviction_gate": "pass_fullness",
+  "required_provider_identity_satisfied": false,
+  "substitutions": [
+    {
+      "lane_id": "qwen3coder",
+      "provider": "ollama",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "actual_model": "deepseek-v4-pro",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": false
+    }
+  ],
+  "effective_gate": "hold_required_provider_substitution",
+  "lanes": [
+    {
+      "lane_id": "glm52",
+      "provider": "ollama",
+      "requested_model": "glm-5.2:cloud",
+      "actual_model": "glm-5.2",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": true
+    },
+    {
+      "lane_id": "kimik3",
+      "provider": "kimi_code",
+      "requested_model": "k3",
+      "actual_model": "k3",
+      "required": true,
+      "ok": true,
+      "verdict": "approve",
+      "score": 100,
+      "family_match": true
+    },
+    {
+      "lane_id": "qwen3coder",
+      "provider": "ollama",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "actual_model": "deepseek-v4-pro",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": false
+    },
+    {
+      "lane_id": "deepseekv4pro",
+      "provider": "ollama",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "actual_model": "deepseek-v4-pro",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": true
+    },
+    {
+      "lane_id": "minimaxm3",
+      "provider": "ollama",
+      "requested_model": "minimax-m3:cloud",
+      "actual_model": "minimax-m3",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": true
+    },
+    {
+      "lane_id": "nemotron3ultra",
+      "provider": "openrouter_free",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true,
+      "ok": true,
+      "verdict": "pass",
+      "score": 100,
+      "family_match": true
+    }
+  ]
+}

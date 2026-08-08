@@ -1,0 +1,118 @@
+{
+  "id": "organism-rewire-WP-AUTOCAT10-P1",
+  "base_ref": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+  "branch": "codex/autocatalytic-organism3-20260805",
+  "worktree": ".",
+  "intent": "Connect the ten load-bearing metabolic mechanisms through one declared portfolio, an exactly-ten-node semantic A2A rehearsal cycle, independently checked completion promotion, causal cross-feeds, and one operator page per node. Decompose the implementation beneath the repository module budget and fail closed on malformed structured evidence while preserving the distinction between transport acknowledgement, local mutable-receipt consistency, and externally authenticated effects.",
+  "allowed_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "dharma_swarm/autocatalytic_*.py",
+    "dharma_swarm/manifest_health.py",
+    "dharma_swarm/manifest_health_autocatalytic.py",
+    "api/routers/manifest.py",
+    "tests/test_autocatalytic_portfolio.py",
+    "tests/test_manifest_health.py",
+    "tests/test_store_inventory_census.py",
+    "dashboard/src/lib/dashboardNav.ts",
+    "dashboard/src/lib/dashboardNav.test.ts",
+    "dashboard/src/lib/autocatalyticPortfolio.ts",
+    "dashboard/src/lib/autocatalyticPortfolio.test.ts",
+    "dashboard/src/app/dashboard/organism/**",
+    "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+    "docs/architecture/autocatalytic_nodes/**",
+    "docs/README.md",
+    "reports/governance/store_inventory_census.json",
+    "reports/agentops/work_packets/organism-rewire-WP-AUTOCAT10-P1.json",
+    "reports/agentops/council/autocatalytic_portfolio/**"
+  ],
+  "forbidden_files": [
+    ".env*",
+    ".github/**",
+    "Makefile",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/organism.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "packages/telos-kernel/**",
+    "docs/docops/**",
+    "scripts/docops/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "autocatalytic-portfolio-tests",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_manifest_health.py tests/test_store_inventory_census.py tests/test_a2a.py tests/test_catalytic_graph.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "nonterminal-a2a-cannot-promote",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py -k input_required_cannot_promote",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(organism): wire ten-node autocatalytic A2A portfolio"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-AUTOCAT10-P1",
+    "packet_digest": "629b55b48912f33a9a43b6fc95eacd7ad5a86d41ed896dd1076dcc2f10ebcbfa",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+      "details": []
+    },
+    "interface_mismatches": [
+      "This P1 packet supersedes the uncommitted P0 implementation envelope because repository Rule 10 requires three admitted submodules; the P0 packet and its preflight binding are historical evidence only and cannot authorize this branch.",
+      "The declared ten-track ceiling is not evidence that those are the ten metabolic nodes; executable producer-consumer evidence and project adapters justify the node boundaries.",
+      "Existing A2A transport and idempotency acknowledgements can overstate nonterminal task completion, so this packet adds stricter independent structural and local-consistency result types without changing the A2A substrate.",
+      "Cross-feed observation alone is not causation, so target adapters must consume typed feed state and perturbation tests must prove the dependency.",
+      "Structured project receipts must parse and replay their declared digest; raw Markdown and JSONL sources remain explicitly content-addressed without being misrepresented as receipt JSON.",
+      "Three required membranes are not production-live and remain projection_only or external_gated until their declared proof obligations pass.",
+      "The PR-level AgentOps checker admits exactly one Session Entry packet for a high-risk range, so post-implementation DocOps and CI hardening remain consolidated under this merge-base-bound packet rather than separate tracked packets.",
+      "The repository-wide quality ratchet counts every modified Python module over 500 lines, so the implementation must be split into behavior-preserving submodules without changing its public facade, fingerprint coverage, or authority semantics.",
+      "Generated DocOps counts belong to post-merge reconciliation and are forbidden in this PR; changed architecture prose must instead pass the strict canonical-claim delta check without claiming a new documentation owner.",
+      "The per-cycle local A2A task log adds one explicit JSONL target name, so this packet owns the generated store-inventory artifact and exact 218-to-219 census ratchet rather than hiding the persistence boundary."
+    ],
+    "closest_existing_implementation": [
+      "ACTIVE_SURFACE_MANIFEST.yaml",
+      "dharma_swarm/catalytic_graph.py",
+      "dharma_swarm/a2a/a2a_server.py",
+      "dharma_swarm/spine/receipt.py",
+      "dharma_swarm/manifest_health.py",
+      "dashboard/src/app/dashboard/ecosystem/page.tsx"
+    ],
+    "honest_blockers": [
+      "No outbound publication or external effect is authorized or claimed by a local rehearsal cycle.",
+      "Independent provider-backed peers, authenticated execution provenance, and JetStream domain completion remain separate future live-contact gates.",
+      "The required qwen3-coder:480b-cloud review lane is retired upstream and any Kimi fallback cannot satisfy Qwen-family decorrelation."
+    ],
+    "rollback": "Revert the packet-scoped commit; runtime witnesses under ~/.dharma remain immutable evidence and are not doctrine."
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "id": "safety-WP-CORRAL-strict-pramana-20260804",
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "safety/corral-strict-pramana-20260804",
+  "worktree": ".",
+  "intent": "Make the existing De Bug Corral verifier fail closed when it is invoked by the medium-tier Pramana conductor: add the verifier's existing --strict flag to the one registry argv, assert that exact wiring, and prove a stale line-reference fixture exits nonzero. This packet does not change finding semantics, schedule a workflow, mutate branch policy, run branch cleanup, touch production, or promote the Pramana projection into truth authority.",
+  "allowed_files": [
+    "scripts/governance/pramana_probe.py",
+    "tests/test_pramana_probe.py",
+    "reports/agentops/work_packets/safety-WP-CORRAL-strict-pramana-20260804.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "docker-compose.yml",
+    "Dockerfile",
+    "Dockerfile.swarm",
+    "dharma_swarm/**",
+    "docs/**",
+    "reports/governance/**",
+    "scripts/runtime/**",
+    "scripts/governance/verify_corral_findings.py",
+    "scripts/governance/hygiene/**",
+    "tests/test_verify_corral_findings.py"
+  ],
+  "gates": [
+    {
+      "name": "pramana-and-corral-contracts",
+      "command": "python3 -m pytest -q tests/test_pramana_probe.py tests/test_verify_corral_findings.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "pramana-strict-wiring-ruff",
+      "command": "python3 -m ruff check scripts/governance/pramana_probe.py tests/test_pramana_probe.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "pramana-strict-wiring-diff-check",
+      "command": "git diff --check f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "unsafe-nonstrict-corral-argv-is-absent",
+      "command": "python3 -c \"import runpy; ns=runpy.run_path('scripts/governance/pramana_probe.py'); gate=next(g for g in ns['default_gates']() if g.name == 'verify-corral'); assert '--strict' not in gate.argv\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(safety): make Corral Pramana gate strict"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-CORRAL",
+    "active_track": "sovereign-safety-tcb-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "verify_corral_findings.py already owns strict stale-reference exit semantics, but pramana_probe.py invokes it without --strict.",
+      "The medium-tier conductor therefore records stale findings as textual output while receiving exit 0, so the Corral evidence gate cannot block the candidate.",
+      "The Pramana receipt is a projection over owner engines; this repair must route the owner's strict verdict without duplicating finding semantics."
+    ],
+    "closest_existing_implementation": [
+      "scripts/governance/verify_corral_findings.py:main",
+      "tests/test_verify_corral_findings.py:test_strict_exit_code",
+      "scripts/governance/pramana_probe.py:default_gates",
+      "tests/test_pramana_probe.py:test_default_registry_has_no_phantom_targets"
+    ],
+    "honest_blockers": [
+      "This repository-only wiring proves the conductor propagates a stale-reference failure; it does not prove semantic bug findings are still true.",
+      "The Corral directory is absent on current main, so a current-main medium probe remains a no-op for that owner until a Corral corpus is present.",
+      "Scheduling branch-janitor.yml against live branch sprawl remains an operator/workflow action outside this packet.",
+      "A nonzero Corral gate makes the Pramana CLI fail, but the gate remains AGAMA evidence rather than the ARTHAPATTI blocking floor.",
+      "Human review and merge remain required; no branch policy, deployment, credential, or production state changes here."
+    ],
+    "rollback": "Revert the single WP-CORRAL-STRICT commit; the prior medium-tier probe resumes advisory Corral rendering while the standalone verifier's --strict behavior remains unchanged.",
+    "packet_digest": "e84ef6589203e9a75426632504f2f3f581d11b9fc819234c1d5ea46febcd0749"
+  }
+}
