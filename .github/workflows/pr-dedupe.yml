@@ -88,11 +88,11 @@ jobs:
           # shapes: chore/ops-report-YYYYMMDD... or
           # ops/spine-adoption-pr-lifecycle-YYYY-MM-DD.... The lifecycle lane
           # is special-cased: its exact branch grammar must be paired with its
-          # anchored report(governance): ops run title, and cannot inherit any
-          # broader legacy title matcher. Never trust a bare prefix, which a
-          # human topic branch could legitimately use. The same-repo-owner
-          # check remains mandatory because this workflow runs with
-          # pull_request_target write credentials.
+          # observed timestamped report(governance): ops run title, and cannot
+          # inherit any broader legacy title matcher. Never trust a bare
+          # prefix, which a human topic branch could legitimately use. The
+          # same-repo-owner check remains mandatory because this workflow runs
+          # with pull_request_target write credentials.
           SNAPSHOT_FILTER="$(cat <<'JQ'
             def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
             def snapshot_intent:
@@ -100,7 +100,7 @@ jobs:
               | ((.headRefName // "") | ascii_downcase) as $h
               | ($h | test("^ops/spine-adoption-pr-lifecycle-[0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{4}z)?$")) as $lifecycle_snapshot
               | if $lifecycle_snapshot then
-                  ($t | test("^report\\(governance\\): ops runs?([^a-z]|$)"))
+                  ($t | test("^report\\(governance\\): ops runs? [0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{2}:[0-9]{2}z)?([^a-z0-9]|$)"))
                 else
                   (
                     ($t | test("\\[automated\\]|\\[auto\\]"))

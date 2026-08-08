@@ -77,12 +77,56 @@ def test_snapshot_filter_closes_live_spine_lifecycle_branch_shape() -> None:
     rows = [
         _pr(
             1173,
-            title="report(governance): ops runs 2026-07-31 through 2026-08-06",
+            title=(
+                "report(governance): ops runs 2026-07-31 through "
+                "2026-08-06T18:00Z — spine adoption saturated at 93.8% "
+                "(21 runs), 57 open, only 6 PRs fail a required check"
+            ),
             head="ops/spine-adoption-pr-lifecycle-2026-07-31",
         ),
         _pr(
+            1283,
+            title=(
+                "report(governance): ops runs 2026-08-07T00:00Z + 06:00Z — "
+                "spine adoption saturated at 93.8%, 58 open, 0 auto-closes, "
+                "95% target blocked by legacy hatch not by code"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07",
+        ),
+        _pr(
+            1292,
+            title=(
+                "report(governance): ops run 2026-08-07T12:00Z — spine "
+                "adoption 93.8% (unmoved), 56→55 open, 1 age-eligible "
+                "auto-close, 0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07T1200Z",
+        ),
+        _pr(
+            1304,
+            title=(
+                "report(governance): ops run 2026-08-07T18:00Z — spine "
+                "adoption 93.8% (unmoved), 53 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07T1800Z",
+        ),
+        _pr(
+            1305,
+            title=(
+                "report(governance): ops run 2026-08-08T00:00Z — spine "
+                "adoption 93.8% (unmoved), 54 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T0000Z",
+        ),
+        _pr(
             1306,
-            title="report(governance): ops run 2026-08-08T12:00Z",
+            title=(
+                "report(governance): ops run 2026-08-08T12:00Z — spine "
+                "adoption 93.8% (unmoved), 55 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
             head="ops/spine-adoption-pr-lifecycle-2026-08-08T1200Z",
         ),
         _pr(
@@ -93,7 +137,7 @@ def test_snapshot_filter_closes_live_spine_lifecycle_branch_shape() -> None:
         ),
     ]
 
-    assert _matching_numbers(rows) == [1173, 1306]
+    assert _matching_numbers(rows) == [1173, 1283, 1292, 1304, 1305, 1306]
 
 
 def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> None:
@@ -149,6 +193,18 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             10,
             title="chore: refresh spine adoption metric docs",
             head="ops/spine-adoption-pr-lifecycle-2026-08-08T2000Z",
+        ),
+        _pr(
+            11,
+            # The intent word alone is not authority: the observed report
+            # title grammar includes a real ISO date immediately after it.
+            title="report(governance): ops run! implement real lifecycle work",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2100Z",
+        ),
+        _pr(
+            12,
+            title="report(governance): ops run fake snapshot renderer",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2200Z",
         ),
         _pr(
             3,
