@@ -11,11 +11,11 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "9d792ceacef32a1698838dc01586ed90ecb93666",
+  "base_ref": "0786ae36fe0f90c872368c714bcd9b7dedc1d290",
   "branch": "claude/graph-of-loops-audit-design-eh3lz5",
   "commit": {
-    "allowed": false,
-    "message": "fix(loop-closure): close 10 post-merge review findings on the hardening lane"
+    "allowed": true,
+    "message": "chore(agentops): refresh PR #1200 exact-base packet"
   },
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -47,7 +47,7 @@
     }
   ],
   "id": "loop-closure-WP-LOOPE3-lane-review-fixes",
-  "intent": "Close 10 findings raised by Greptile and Codex on #1197 AFTER it merged (it landed on mechanical green before the reviewers finished). Two are verified bypasses of the very denylist the PR exists to enforce: git diff --name-only C-quotes non-ASCII paths, so '.github/workflows/e-acute.yml' arrived quoted and denied_paths() returned empty; and with rename detection on, only a rename's destination is reported, so renaming pr_merge_control.py to a benign path deleted the referee gate invisibly. Both reproduced against real git before fixing; both fixed by '--no-renames --name-only -z'. Also: binary blobs score zero against the line cap (byte ceiling added), the delivery job had no kill-switch guard of its own (added), a github.token push does not trigger CI so lane drafts would strand (PAT preferred, verify-only without one), a clean filter could decouple tested bytes from delivered bytes while the tree hashes still matched (refused), make test-fast timeouts escaped as an exception and lost the receipt (now CAP_HIT), mailbox tasks were never consumed so the oldest starved every newer one (attempt history inferred from delivered PR bodies), the agent binary was never provisioned so every real target reported BLOCKED (provisioning step plus honest warnings), and a failed gh pr create left an orphan branch the ceiling could not see (rolled back under a SHA lease).",
+  "intent": "Refresh PR #1200 against current main after the merge train advanced, rerun its focused proof, and preserve the unresolved untrusted-consumption residual for explicit operator decision. No operator risk acceptance is inferred by this packet refresh.",
   "negative_controls": [
     {
       "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/lane_deliver.py'); orig=p.read_text(); mut=orig.replace('\\\"--no-renames\\\", \\\"--name-only\\\", \\\"-z\\\"','\\\"--name-only\\\"',1); assert mut!=orig, 'diff flags not found'; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_lane_deliver.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
@@ -72,25 +72,25 @@
       "docs/ops/loop_control/README.md"
     ],
     "collision": {
-      "checked_at_sha": "9d792ceacef32a1698838dc01586ed90ecb93666",
+      "checked_at_sha": "0786ae36fe0f90c872368c714bcd9b7dedc1d290",
       "details": [],
       "status": "clear"
     },
     "honest_blockers": [
+      "The residual P1 remains open: attempted mailbox-task consumption is inferred from PR bodies populated from an untrusted proposal receipt. An agent-controlled descendant can rewrite that receipt before delivery and cause an unrelated task_id to be suppressed. This packet does not accept, resolve, or downgrade that risk.",
       "The two denylist bypasses were live on main from 9d792cea until this lands. Exposure is nil in practice because the lane is inert without DHARMA_LANE_AGENT_CMD, but the code was wrong and shipped.",
-      "Delivery now degrades to verify-only unless LANE_DELIVERY_PUSH_TOKEN or MERGEMASTERMIKE_PAT proves push authority, because a github.token push does not trigger CI. Configuring that secret is an operator action.",
-      "Only the codex selector is unprovisioned on a stock ubuntu-latest runner. An earlier revision of this packet claimed claude was too — that was false, and Devin Review caught it: npm install -g @anthropic-ai/claude-code is exactly what puts the claude binary on PATH, while claude-npx uses npx -y and needs no install at all. The workflow had the install on the arm that did not need it and refused the arm that did. codex is left unprovisioned deliberately rather than guessed at, since no verified install command for it is recorded here.",
-      "Mailbox consumption is inferred from delivered PR bodies rather than claimed in loop-tasks, because the proposing job holds contents:read by design. A task whose PR body is edited to drop its task_id would be re-selected.",
+      "Delivery degrades to verify-only unless LANE_DELIVERY_PUSH_TOKEN or MERGEMASTERMIKE_PAT proves push authority, because a github.token push does not trigger CI. Configuring that secret is an operator action.",
+      "Only the codex selector is unprovisioned on a stock ubuntu-latest runner. The claude selector installs with npm and claude-npx needs no install; codex is deliberately left unprovisioned because no verified install command is recorded here.",
       "Clean filters are refused rather than accommodated: the lane cannot currently test a materialization of the frozen tree with filters disabled, so it declines the case instead of claiming a guarantee it does not have."
     ],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "7ca736896214d6f3baf5868a6ef659a2c2fe8d841f5b6c83dc30784ce29fa4e2",
-    "rollback": "Revert the single commit; the lane returns to its 9d792cea behaviour, including both denylist bypasses.",
+    "packet_digest": "7a6ab89360f598d55488342ee9f0a45405fcecaabb89260dced3fc3fb6e50c81",
+    "rollback": "Revert the packet-refresh commit; the semantic implementation remains unchanged and the unresolved P1 remains operator-gated.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "git": "2.43.0",
-      "make": "4.3",
+      "git": "2.50.1",
+      "make": "3.81",
       "python": "3.11.15"
     },
     "work_packet": "WP-LOOPE3"

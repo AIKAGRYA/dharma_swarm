@@ -396,17 +396,34 @@ def test_non_utf8_filename_is_refused_not_crashed(lane, tmp_path) -> None:
     real path and the job returns a verdict.
     """
     seed = lane["seed"]
-    _git(seed, "checkout", "-q", "-B", LANE_BRANCH, lane["base"])
-    hostile = os.fsdecode(b".github/workflows/bad-\xff.yml")
-    target = Path(os.fsencode(str(seed)).decode("utf-8", "surrogateescape")) / hostile
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("evil\n", encoding="utf-8")
-    _git(seed, "add", "-A")
-    _git(seed, "commit", "-q", "-m", "harden: odd bytes [hardening-lane]")
+    hostile = b".github/workflows/bad-\xff.yml"
+    index = tmp_path / "hostile.index"
+    git_env = {**os.environ, "GIT_INDEX_FILE": str(index)}
+
+    def object_git(*args: str, input_bytes: bytes | None = None) -> bytes:
+        return subprocess.run(
+            ["git", *args], cwd=seed, env=git_env, input=input_bytes,
+            capture_output=True, check=True,
+        ).stdout.strip()
+
+    # APFS cannot materialize an invalid UTF-8 filename, but Git paths are
+    # bytes. Build the hostile tree in an alternate index so this regression
+    # remains an end-to-end Git test on macOS as well as Linux.
+    object_git("read-tree", lane["base"])
+    blob = object_git("hash-object", "-w", "--stdin", input_bytes=b"evil\n")
+    object_git(
+        "update-index", "-z", "--index-info",
+        input_bytes=b"100644 " + blob + b"\t" + hostile + b"\0",
+    )
+    tree = object_git("write-tree")
+    commit = object_git(
+        "commit-tree", tree.decode("ascii"), "-p", lane["base"],
+        input_bytes=b"harden: odd bytes [hardening-lane]\n",
+    ).decode("ascii")
+    _git(seed, "update-ref", f"refs/heads/{LANE_BRANCH}", commit)
     bundle = lane["tmp"] / "utf8.bundle"
     _git(seed, "bundle", "create", str(bundle),
          f"{lane['base']}..refs/heads/{LANE_BRANCH}")
-    _git(seed, "checkout", "-q", "main")
 
     # The point is that this returns a verdict rather than raising.
     code, stored = _deliver(lane, bundle, tmp_path)

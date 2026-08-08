@@ -8,8 +8,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "runtime"))
 
@@ -81,8 +79,12 @@ def _lane_repo_with_stub_agent(tmp_path: Path, monkeypatch,
     agent.chmod(0o755)
     monkeypatch.setattr(lane_propose, "AGENT_COMMANDS", {"claude": [str(agent)]})
     # `make test-fast` stands in as a green run; the suite itself is not
-    # under test here.
-    monkeypatch.setattr(lane_propose, "MAKE_BIN", "/bin/true")
+    # under test here. Keep the stub inside the fixture instead of assuming
+    # the Linux-only `/bin/true` path exists on every supported host.
+    fake_make = fake_bin / "fake-make"
+    fake_make.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_make.chmod(0o755)
+    monkeypatch.setattr(lane_propose, "MAKE_BIN", str(fake_make))
     return outputs
 
 
