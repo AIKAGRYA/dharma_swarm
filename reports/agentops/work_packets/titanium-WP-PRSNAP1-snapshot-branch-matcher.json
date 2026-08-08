@@ -3,7 +3,7 @@
   "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "codex/pr-flow-recovery-20260808",
   "worktree": ".",
-  "intent": "Repair the live snapshot-PR cleanup without broadening deletion authority: require same-repository ownership, an exact timestamped ops/spine-adoption-pr-lifecycle branch, and an independently anchored report(governance): ops run title for that lane. Preserve closed snapshot branch refs for recovery. Keep legacy snapshot matchers unchanged outside this new branch-specific rule.",
+  "intent": "Repair the live snapshot-PR cleanup without broadening deletion authority: require same-repository ownership and pair each exact reserved timestamped branch with its independently anchored lane-specific title grammar; preserve closed lifecycle snapshot branch refs for recovery; fail closed when jq classification fails; and bind dry-run, comment, close, and branch-cleanup summaries to the operation that actually occurred.",
   "allowed_files": [
     ".github/workflows/pr-dedupe.yml",
     "tests/test_pr_dedupe_workflow.py",
@@ -34,7 +34,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "fix(governance): bind snapshot cleanup to exact intent"
+    "message": "fix(governance): make snapshot cleanup fail closed"
   },
   "approval": {
     "before_commit": false,
@@ -43,7 +43,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
+      "python": "3.11.15",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -65,16 +65,18 @@
     "interface_mismatches": [
       "The cleanup policy declared lifecycle/spine-adoption status snapshots non-mergeable, but the matcher omitted the live ops/spine-adoption-pr-lifecycle timestamp grammar.",
       "The first repair reused broad legacy intent ORs for the new branch grammar, so a human title containing ops report could falsely authorize closure.",
-      "Pass 1 deleted snapshot branch refs immediately even though the recovery claim relied on closed PR history."
+      "Pass 1 deleted snapshot branch refs immediately even though the recovery claim relied on closed PR history.",
+      "The exact legacy chore/ops-report timestamp branch still inherited a broad ops report title matcher, so a human-looking title on that reserved branch could be closed without the lane's anchored governance grammar.",
+      "Both jq classifiers converted parser or input failures into empty-match reports, and both close loops rendered matched PRs as CLOSED before dry-run or API outcomes were known."
     ],
     "closest_existing_implementation": [
       ".github/workflows/pr-dedupe.yml",
       "tests/test_pr_dedupe_workflow.py"
     ],
     "honest_blockers": [
-      "Decorrelated council rounds one and two held earlier heads on false-positive title authority and provider-schema failures. The final consolidated head requires a fresh full council and current-head GitHub checks before merge."
+      "The decorrelated council held exact head 7f8681632034d0c0f98650f9d3a0d62d6e6fc3ae on outcome-reporting defects, jq failure conflation, an overbroad legacy reserved-branch title matcher, a vacuous fork control, and three provider-schema failures caused by an oversized evidence prompt. This repair requires a fresh reduced-evidence full council and current-head GitHub checks before merge."
     ],
     "rollback": "Revert the bounded PR. Snapshot PRs remain in closed history and their branch refs are preserved, so a mistaken closure can be reopened without reconstructing the head.",
-    "packet_digest": "d2d25bab2a5f8ed149bad11d4cede0ee388354ddad2a36b79e89c3e993e74410"
+    "packet_digest": "b7f32cd747758dda953584b034e770ca75c5981c79369db657b6846be0269119"
   }
 }
