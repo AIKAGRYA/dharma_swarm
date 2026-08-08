@@ -326,6 +326,26 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
 
 def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     checks = check_rollup(pr)
+    ci_truth = ci_truth_for_pr(pr)
+    required_blocking = [
+        item
+        for item in ci_truth["required"]
+        if item["status"] not in {"PASS", "PENDING"}
+    ]
+    required_pending = [
+        item for item in ci_truth["required"] if item["status"] == "PENDING"
+    ]
+    required_names = {
+        str(item["matched_name"])
+        for item in ci_truth["required"]
+        if item.get("matched_name")
+    }
+    nonrequired_failing = [
+        name for name in checks["failing"] if name not in required_names
+    ]
+    nonrequired_pending = [
+        name for name in checks["pending"] if name not in required_names
+    ]
     mergeable = str(pr.get("mergeable") or "UNKNOWN").upper()
     review_decision = str(pr.get("reviewDecision") or "").upper()
     reasons: list[str] = []
@@ -336,14 +356,20 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     elif mergeable == "CONFLICTING":
         reasons.append("merge conflict")
         status = "BLOCKED_CONFLICT"
-    elif checks["failing"]:
-        reasons.append(f"{len(checks['failing'])} failing checks")
+    elif required_blocking:
+        states = ", ".join(
+            f"{item['id']}={item['status']}" for item in required_blocking
+        )
+        reasons.append(f"{len(required_blocking)} required CI blockers: {states}")
         status = "BLOCKED_CHECKS"
     elif review_decision == "CHANGES_REQUESTED":
         reasons.append("changes requested")
         status = "BLOCKED_REVIEW"
-    elif checks["pending"]:
-        reasons.append(f"{len(checks['pending'])} pending checks")
+    elif required_pending:
+        states = ", ".join(
+            f"{item['id']}={item['status']}" for item in required_pending
+        )
+        reasons.append(f"{len(required_pending)} required CI checks pending: {states}")
         status = "WAITING_CHECKS"
     elif mergeable != "MERGEABLE":
         reasons.append(f"mergeable={mergeable}")
@@ -353,10 +379,20 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
         status = "NEEDS_AGENT_REVIEW"
     else:
         reasons.append(
-            "GitHub green; packet, dual review, and merge gate still required"
+            "Required CI green; packet, dual review, and merge gate still required"
         )
         status = "GITHUB_GREEN_NEEDS_PACKET"
 
+    if nonrequired_failing:
+        reasons.append(
+            f"{len(nonrequired_failing)} non-required failing checks: "
+            f"{', '.join(nonrequired_failing)}"
+        )
+    if nonrequired_pending:
+        reasons.append(
+            f"{len(nonrequired_pending)} non-required pending checks: "
+            f"{', '.join(nonrequired_pending)}"
+        )
     if checks["unknown"]:
         reasons.append(f"{len(checks['unknown'])} unknown check states")
 

@@ -1,0 +1,83 @@
+{
+  "allowed_files": [
+    "scripts/runtime/pr_merge_control.py",
+    "tests/test_pr_merge_control.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-CITRUTHQ1-queue-classifier.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "agent/mike-ci-truth-queue-classifier-20260808",
+  "commit": {
+    "allowed": true,
+    "message": "fix(mike): classify queue blockers from required CI truth"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_pr_merge_control.py -q",
+      "expected_exit": 0,
+      "name": "mike-queue-classifier-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check scripts/runtime/pr_merge_control.py tests/test_pr_merge_control.py",
+      "expected_exit": 0,
+      "name": "mike-queue-classifier-ruff",
+      "timeout_seconds": 300
+    }
+  ],
+  "id": "merge-master-mike-WP-CITRUTHQ1-queue-classifier",
+  "intent": "Make Merge Master Mike's queue classifier derive BLOCKED_CHECKS and WAITING_CHECKS authority only from the required entries in docs/governance/CI_TRUTH_CONTRACT.json. Preserve observed advisory and uncontracted failures in queue evidence and reasons, while keeping a required-green PR eligible for the existing fanout statuses. This changes queue selection only; the deterministic merge gate continues to consume the full fail-closed CI Truth result.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import sys; from scripts.runtime import pr_merge_control as p; result = None; error = False;\ntry:\n c = p.load_ci_truth_contract(p.DEFAULT_CI_TRUTH_CONTRACT); rollup = [{'name': e['names'][0], 'status': 'COMPLETED', 'conclusion': 'SUCCESS'} for e in c['required']]; rollup.append({'name': 'AgentOps packet scope', 'status': 'COMPLETED', 'conclusion': 'FAILURE'}); result = p.classify_pr({'number': 1, 'title': 'negative control', 'isDraft': False, 'mergeable': 'MERGEABLE', 'reviewDecision': 'APPROVED', 'statusCheckRollup': rollup})\nexcept Exception:\n error = True\nsys.exit(3 if error else (1 if result['status'] == 'GITHUB_GREEN_NEEDS_PACKET' and result['checks']['failing'] == ['AgentOps packet scope'] else 0))\"",
+      "expected_exit": 1,
+      "name": "advisory-failure-cannot-hide-required-green-pr",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/pr_merge_control.py",
+      "scripts/runtime/ci_truth.py",
+      "tests/test_pr_merge_control.py",
+      "docs/governance/CI_TRUTH_CONTRACT.json"
+    ],
+    "collision": {
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Open PR #1185 also changes scripts/runtime/pr_merge_control.py with a large stale hardening bundle. This fresh-main packet is deliberately confined to classify_pr plus narrow tests; it supersedes any queue-classifier behavior bundled in #1185, but does not supersede that PR's distinct risk, review-evidence, or fanout-isolation proposals.",
+      "AgentOps packet scope is not named in CI_TRUTH_CONTRACT.json required or advisory entries at this base. The shared CI Truth evaluator reports it as an uncontracted warning; under the repository contract, only required entries carry merge or queue-blocking authority.",
+      "The packet changes queue and fanout visibility only. build_gate remains fail-closed on missing, pending, failed, cancelled, timed-out, action-required, or unknown required CI states.",
+      "No GitHub state is mutated by this packet; live PR #1290 and #1111 checks are read-only counterexamples used for orientation only."
+    ],
+    "interface_mismatches": [
+      "INTERFACE_MISMATCH_MAP.md has no entry for the pr_merge_control queue-classifier to CI Truth contract boundary; this packet closes the observed authority mismatch without adding a new interface or truth store."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "7cd9dcc52a0833f8f9d85e5984891b7ee829eb13d1bf28f3e302633cac860dc1",
+    "rollback": "Revert the single local commit for this packet; no state migration, workflow mutation, or external side effect is involved.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-CITRUTHQ1"
+  },
+  "worktree": "."
+}

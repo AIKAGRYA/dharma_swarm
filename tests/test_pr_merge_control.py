@@ -25,22 +25,60 @@ def _ci_required_success_rollup():
     ]
 
 
-def test_classify_pr_blocks_failing_checks():
+def test_classify_pr_blocks_failing_required_check():
+    rollup = _ci_required_success_rollup()
+    rollup[-1] = {
+        "name": "pytest (3.12)",
+        "status": "COMPLETED",
+        "conclusion": "FAILURE",
+    }
     pr = {
         "number": 1,
         "title": "bad",
         "isDraft": False,
         "mergeable": "MERGEABLE",
         "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {"name": "tests", "status": "COMPLETED", "conclusion": "FAILURE"},
-        ],
+        "statusCheckRollup": rollup,
     }
 
     result = prc.classify_pr(pr)
 
     assert result["status"] == "BLOCKED_CHECKS"
-    assert result["checks"]["failing"] == ["tests"]
+    assert result["checks"]["failing"] == ["pytest (3.12)"]
+
+
+def test_classify_pr_keeps_nonrequired_failure_visible_and_fanout_eligible():
+    pr = {
+        "number": 1290,
+        "title": "required green, advisory red",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": _ci_required_success_rollup()
+        + [
+            {
+                "name": "AgentOps packet scope",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+            }
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+    selected = prc.select_fanout_items(
+        {"items": [result]},
+        statuses=list(prc.DEFAULT_FANOUT_STATUSES),
+        max_prs=1,
+    )
+
+    assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
+    assert result["checks"]["failing"] == ["AgentOps packet scope"]
+    assert result["reasons"][0].startswith("Required CI green")
+    assert any(
+        "non-required failing checks: AgentOps packet scope" in reason
+        for reason in result["reasons"]
+    )
+    assert [item["number"] for item in selected] == [1290]
 
 
 def test_classify_pr_uses_latest_duplicate_check_run():
@@ -51,6 +89,11 @@ def test_classify_pr_uses_latest_duplicate_check_run():
         "mergeable": "MERGEABLE",
         "reviewDecision": "APPROVED",
         "statusCheckRollup": [
+            *[
+                item
+                for item in _ci_required_success_rollup()
+                if item["name"] != "Coherence Delta PR body"
+            ],
             {
                 "name": "Coherence Delta PR body",
                 "status": "COMPLETED",
@@ -70,9 +113,9 @@ def test_classify_pr_uses_latest_duplicate_check_run():
 
     assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
     assert result["checks"]["failing"] == []
-    assert result["checks"]["passing"] == ["Coherence Delta PR body"]
-    assert result["checks"]["raw_total"] == 2
-    assert result["checks"]["total"] == 1
+    assert result["checks"]["passing"].count("Coherence Delta PR body") == 1
+    assert result["checks"]["raw_total"] == 7
+    assert result["checks"]["total"] == 6
 
 
 def test_classify_pr_newest_run_wins_even_when_older_run_finishes_later():
@@ -116,15 +159,20 @@ def test_classify_pr_requires_packet_when_github_green():
         "isDraft": False,
         "mergeable": "MERGEABLE",
         "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"},
-        ],
+        "statusCheckRollup": _ci_required_success_rollup(),
     }
 
     result = prc.classify_pr(pr)
 
     assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
-    assert result["checks"]["passing"] == ["tests"]
+    assert result["checks"]["passing"] == [
+        "DocOps integrity gate",
+        "Coherence Delta PR body",
+        "Onboarding admission parity",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)",
+    ]
 
 
 def test_coherence_results_rejects_placeholder_field():
@@ -669,6 +717,12 @@ def test_should_skip_current_fanout_only_for_packet_only_off_mode():
 
 
 def test_build_queue_summary_counts_statuses():
+    failing_rollup = _ci_required_success_rollup()
+    failing_rollup[-1] = {
+        "name": "pytest (3.12)",
+        "status": "COMPLETED",
+        "conclusion": "FAILURE",
+    }
     prs = [
         {
             "number": 1,
@@ -676,7 +730,7 @@ def test_build_queue_summary_counts_statuses():
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "statusCheckRollup": _ci_required_success_rollup(),
         },
         {
             "number": 2,
@@ -684,7 +738,7 @@ def test_build_queue_summary_counts_statuses():
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "FAILURE"}],
+            "statusCheckRollup": failing_rollup,
         },
     ]
 
