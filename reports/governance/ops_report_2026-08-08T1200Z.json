@@ -1,0 +1,342 @@
+{
+  "report": "dharma_swarm_ops_run",
+  "run_id": "2026-08-08T12:00Z",
+  "generated_at": "2026-08-08T12:07:04Z",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "main_head_sha": "15452eae3f11985066caa6a7fad5148b12972c53",
+  "authority": {
+    "merge_authority": "operator_only",
+    "agent_actions_taken": [
+      "regenerated spine adoption metric (read-only measurement, working tree reverted)",
+      "posted one status comment to the standing spine thread (#1063)",
+      "added one report artifact under reports/governance/"
+    ],
+    "agent_actions_refused": [
+      "no PR merged",
+      "no PR approved",
+      "no PR closed",
+      "no source code modified",
+      "no governance owner file modified",
+      "no branch deleted",
+      "no workflow modified"
+    ]
+  },
+  "onboarding_gate": {
+    "command": "make onboard",
+    "verdict": "READY",
+    "exit_code": 0,
+    "conditions_pass": 6,
+    "conditions_total": 6,
+    "conditions": [
+      "broken_register_parses",
+      "receipt_persisted",
+      "repo_clean",
+      "repo_unconflicted",
+      "toolchain_git",
+      "toolchain_make"
+    ],
+    "primary_blocker": "none",
+    "authority_reported": "none - no edit, merge, or deploy permission",
+    "nats_substrate": "local observation only; 127.0.0.1:4222 not listening; 0/5 compatibility mirrors; no JetStream ack claimed",
+    "broken_register": {
+      "total": 22,
+      "open_like": 9,
+      "closed_like": 13,
+      "unknown": 0
+    }
+  },
+  "mission_1_spine_adoption": {
+    "command": "python3 tools/spine_adoption_metric.py --repo-root . --output reports/governance/spine_adoption_metric.json --print",
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "target_met": false,
+    "joined_count": 13,
+    "joined_percent": 81.2,
+    "adapter_ready_count": 2,
+    "joined_or_adapter_ready_count": 15,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "total_surfaces": 16,
+    "doc_anchor_status": "ok",
+    "source_status": "clean",
+    "surfaces_that_moved_status": [],
+    "non_joined_surface_ids": [
+      "self_modification_loop",
+      "mcp_tool_access",
+      "legacy_no_identity_escape_hatch"
+    ],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "category": "self-modification",
+        "missing_joined_patterns": [
+          "begin_idempotent (try_begin_idempotent_side_effect) - apply path is idempotency-gated"
+        ],
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ],
+        "open_pr": 1060
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "category": "tool",
+        "missing_joined_patterns": [
+          "identity_import (ExecutionIdentity)",
+          "runtime_store (RuntimeStateStore)",
+          "side_effect_receipt (record_side_effect)"
+        ],
+        "files": [
+          "dharma_swarm/dharma_context_mcp.py",
+          "dharma_swarm/mcp_server.py"
+        ],
+        "open_pr": 1061
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "category": "legacy",
+        "missing_joined_patterns": [],
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ],
+        "open_pr": null
+      }
+    ],
+    "commit_decision": {
+      "committed": false,
+      "reason": "adoption_pct did not change (93.8 -> 93.8); the change-only commit rule was not triggered",
+      "working_tree_reverted": true,
+      "regeneration_diff_was_non_semantic": true,
+      "non_semantic_diff_detail": {
+        "audit_sha": "unchanged in this run (already 15452eae from the prior run's regeneration)",
+        "status_classification_changes": 0
+      },
+      "disclosed_pre_existing_staleness": "the committed spine_adoption_metric.json audit_sha anchor still reflects an older head than the current session's regenerated (uncommitted) copy; disclosed rather than silently repaired"
+    },
+    "comment_posted_to": 1063,
+    "comment_target_rationale": "#1063 is the standing spine-lane status thread used by every ops run since 2026-08-04; posting there keeps the plateau series readable in one place",
+    "celebration_comment_posted": false,
+    "celebration_reason": "93.8% < 95.0% target",
+    "arithmetic_ceiling_finding": {
+      "statement": "adoption_pct counts joined + adapter-ready over total_surfaces = 15/16 = 93.75%. Both adapter-ready surfaces are already inside the numerator, so landing #1060 and #1061 raises joined_percent 81.2% -> 93.8% but leaves adoption_pct at 93.8%.",
+      "granularity": "with 16 surfaces there is no representable value between 93.8% and 100%; the target cannot be approached incrementally",
+      "only_arithmetic_path_above_95": "resolve legacy_no_identity_escape_hatch (16/16 = 100%) by retiring legacy_no_identity_allowed or amending the metric so a deliberately-retained legacy surface is not scored as un-adopted",
+      "blocker_class": "operator_decision_not_implementation",
+      "consecutive_runs_with_this_cause": 7
+    }
+  },
+  "mission_2_pr_lifecycle": {
+    "command": "gh pr list --repo AmitabhainArunachala/dharma_swarm --state open --json number,title,mergeable,createdAt,changedFiles,additions,deletions",
+    "open_before": 55,
+    "open_after": 55,
+    "mergeable_count": 50,
+    "conflicting_count": 5,
+    "merge_state_status_counts": {
+      "CLEAN": 20,
+      "BLOCKED": 17,
+      "UNSTABLE": 13,
+      "DIRTY": 5
+    },
+    "open_count_delta_since_0000z_run": {
+      "prior_run_open_after": 54,
+      "created_since": [1305],
+      "merged_since": [],
+      "closed_since": [],
+      "arithmetic": "54 + 1 created - 0 merged - 0 closed = 55",
+      "reconciles": true,
+      "note": "the only change to the open set since the 00:00Z run was that run's own report PR (#1305); no PR merged, closed, or opened otherwise"
+    },
+    "auto_closed": [],
+    "auto_closed_count": 0,
+    "auto_close_rule": "mergeable=CONFLICTING AND createdAt older than 7 days",
+    "auto_close_finding": "zero PRs were age-eligible. The oldest conflicting PR (#1189) is 6.98 d old and becomes eligible 2026-08-08T12:31:53Z, roughly 25 minutes after this run.",
+    "conflicting_under_threshold": [
+      {
+        "number": 1189,
+        "age_days": 6.98,
+        "created_at": "2026-08-01T12:31:53Z",
+        "eligible_at": "2026-08-08T12:31:53Z",
+        "branch": "codex/humming-v2-a0-portfolio-admission",
+        "conflict_class": "governance_doc",
+        "action_taken": "none - under the 7-day threshold (eligible in ~25 minutes)"
+      },
+      {
+        "number": 1212,
+        "age_days": 4.9,
+        "created_at": "2026-08-03T14:26:56Z",
+        "eligible_at": "2026-08-10T14:26:56Z",
+        "branch": "docops/no-writeback-derived-status-20260803",
+        "conflict_class": "governance_doc",
+        "action_taken": "none - under the 7-day threshold"
+      },
+      {
+        "number": 1214,
+        "age_days": 4.9,
+        "created_at": "2026-08-03T14:34:02Z",
+        "eligible_at": "2026-08-10T14:34:02Z",
+        "branch": "governance/close-arena-track-20260803",
+        "conflict_class": "governance_doc",
+        "action_taken": "none - under the 7-day threshold"
+      },
+      {
+        "number": 1224,
+        "age_days": 4.76,
+        "created_at": "2026-08-03T17:46:50Z",
+        "eligible_at": "2026-08-10T17:46:50Z",
+        "branch": "dependabot/cargo/desktop-shell/src-tauri/time-0.3.55",
+        "conflict_class": "lockfile",
+        "action_taken": "none - under the 7-day threshold"
+      },
+      {
+        "number": 1231,
+        "age_days": 4.51,
+        "created_at": "2026-08-03T23:51:41Z",
+        "eligible_at": "2026-08-10T23:51:41Z",
+        "branch": "agent/canon-effect-convergence-current-20260803",
+        "conflict_class": "governance_doc",
+        "action_taken": "none - under the 7-day threshold"
+      }
+    ],
+    "conflict_trend": {
+      "at_1800z_0807": 5,
+      "at_0000z_0808": 5,
+      "at_1200z_0808": 5,
+      "resolved_since_0000z": [],
+      "new_since_0000z": [],
+      "finding": "the conflicting set (#1189, #1212, #1214, #1224, #1231) is byte-identical across the 18:00Z, 00:00Z, and this 12:00Z run. Conflict decay remains stalled since main has not advanced on the affected surfaces and no author has rebased."
+    },
+    "duplicate_auto_grounding_prs": {
+      "found": 0,
+      "comments_posted": 0,
+      "detection_methods": [
+        "title and head-branch substring match on auto-ground / auto_ground / autogrounding",
+        "changed-file path match on auto-grounded / auto_ground",
+        "PR body text match"
+      ],
+      "false_positives_excluded": [
+        {
+          "numbers": [1173, 1283, 1292, 1304, 1305],
+          "reason": "these are this lane's own ops report PRs; they only contain the literal phrase 'auto-grounding duplicates' in their report text and change no auto-grounded artifact"
+        }
+      ],
+      "conclusion": "there are zero open auto-grounding PRs, so no older-duplicate close suggestions were warranted. Sixth consecutive run with this result - the family remains entirely historical/merged."
+    },
+    "green_and_ready": {
+      "definition": "mergeable=MERGEABLE and all 6 CI_TRUTH_CONTRACT v5 required contexts SUCCESS on the latest run",
+      "required_contexts": [
+        "DocOps integrity gate",
+        "gitleaks",
+        "pytest (3.11)",
+        "pytest (3.12)",
+        "Coherence Delta PR body",
+        "Onboarding admission parity"
+      ],
+      "count": 37,
+      "non_draft_count": 20,
+      "draft_count": 17,
+      "non_draft": [1067, 1145, 1149, 1153, 1182, 1184, 1185, 1200, 1201, 1208, 1211, 1213, 1218, 1222, 1228, 1229, 1284, 1286, 1290, 1292],
+      "draft": [1060, 1061, 1063, 1070, 1080, 1081, 1082, 1086, 1111, 1171, 1173, 1179, 1204, 1206, 1283, 1304, 1305],
+      "delta_since_0000z": "36 -> 37; the only entrant is #1305, the 00:00Z run's own report PR. The 20 non-draft green PRs are unchanged."
+    },
+    "failing_required": [
+      {
+        "number": 1219,
+        "draft": false,
+        "failing": ["pytest (3.11)", "pytest (3.12)"]
+      },
+      {
+        "number": 1129,
+        "draft": false,
+        "failing": ["pytest (3.11)", "pytest (3.12)"]
+      },
+      {
+        "number": 1214,
+        "draft": false,
+        "failing": ["pytest (3.11)", "pytest (3.12)"],
+        "note": "also CONFLICTING"
+      },
+      {
+        "number": 904,
+        "draft": true,
+        "failing": ["pytest (3.11)", "pytest (3.12)"]
+      },
+      {
+        "number": 1115,
+        "draft": true,
+        "failing": ["DocOps integrity gate"]
+      }
+    ],
+    "partially_measured": [
+      {
+        "number": 1013,
+        "draft": true,
+        "present_contexts": ["Coherence Delta PR body"],
+        "missing_contexts": [
+          "DocOps integrity gate",
+          "Onboarding admission parity",
+          "gitleaks",
+          "pytest (3.11)",
+          "pytest (3.12)"
+        ]
+      }
+    ],
+    "unmeasured_zero_required_contexts": {
+      "numbers": [930, 1142, 1271, 1272, 1273, 1274, 1275, 1276],
+      "count": 8,
+      "finding": "these PRs report zero of the six required contexts, so they are invisible to the CI Truth rollup rather than passing it. Absence of a red signal is not evidence of green.",
+      "not_green": true,
+      "consecutive_runs_flagged": 5
+    }
+  },
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "owner": "operator",
+      "action": "Decide the legacy_no_identity_escape_hatch question. Retiring or reclassifying that one surface is the only arithmetic path from 93.8% to >=95%; landing #1060 and #1061 provably cannot move the number.",
+      "evidence": "mission_1_spine_adoption.arithmetic_ceiling_finding"
+    },
+    {
+      "priority": 2,
+      "owner": "author of #1189",
+      "action": "Rebase #1189 before 2026-08-08T12:31:53Z. It becomes auto-close age-eligible in ~25 minutes and its conflict is main-advance drift on shared governance surfaces, not divergent authoring.",
+      "evidence": "mission_2_pr_lifecycle.conflicting_under_threshold[0]"
+    },
+    {
+      "priority": 3,
+      "owner": "operator",
+      "action": "Re-key the auto-close rule to conflict-onset age rather than createdAt age. The conflicting set has been stalled and byte-identical for three consecutive runs, so a quiet main freezes the age clock's target rather than reflecting active staleness.",
+      "evidence": "mission_2_pr_lifecycle.conflict_trend"
+    },
+    {
+      "priority": 4,
+      "owner": "ci",
+      "action": "Investigate why #930, #1142 and #1271-#1276 report zero required contexts. Eight open PRs are unmeasured by the CI Truth rollup; fifth consecutive run flagging this.",
+      "evidence": "mission_2_pr_lifecycle.unmeasured_zero_required_contexts"
+    },
+    {
+      "priority": 5,
+      "owner": "operator",
+      "action": "Land the stacked ops report PRs (#1173, #1283, #1292, #1304, #1305, and this one). The reports/governance/ evidence backlog continues to grow by one PR per run.",
+      "evidence": "mission_2_pr_lifecycle.duplicate_auto_grounding_prs.false_positives_excluded"
+    },
+    {
+      "priority": 6,
+      "owner": "runtime",
+      "action": "Triage the three non-draft red PRs: #1129 and #1219 (pytest 3.11+3.12) and #1214 (pytest plus a governance-doc conflict).",
+      "evidence": "mission_2_pr_lifecycle.failing_required"
+    },
+    {
+      "priority": 7,
+      "owner": "operator",
+      "action": "Triage #904 - oldest open PR, draft, pytest failing on both matrix legs.",
+      "evidence": "mission_2_pr_lifecycle.failing_required"
+    }
+  ]
+}
