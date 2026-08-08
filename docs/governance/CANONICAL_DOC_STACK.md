@@ -81,7 +81,9 @@ is no longer a forced first-read surface.
 | LangGraph parity local acceptance contract | `docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md` | parity benchmark, readiness report, future adapter work |
 | LangGraph parity operator runbook | `docs/langgraph_parity/OPERATOR_RUNBOOK.md` | benchmark/readiness commands and human verification flow |
 | LangGraph parity task graph | `docs/langgraph_parity/TASK_GRAPH.md` | future parity adapter sequencing; defers to the acceptance contract |
+| Spec Forge catalogue | `spec-forge/README.md` | Discovery/index only; owns no runtime, governance, track, merge, or implementation fact. Each listed candidate defers to the established owner for live state and executable truth |
 | Living Agent Kernel build spec (holon lane) | `spec-forge/living-agent-kernel/MASTER_SPEC.md` | Defers to `dharma_swarm/operator_core/living_agent_kernel.py` + its tests for runtime truth |
+| Mandala World Deck product/design candidate | `spec-forge/mandala-world-deck/MASTER_SPEC.md` | Unratified `active_spec`; owns only its proposal and acceptance language. It grants no implementation, runtime, command, track, or merge authority and defers every live fact to the source owner named in the spec |
 | Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
 | Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, operator-coherence report, operator travel/restart triage |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
