@@ -1,9 +1,9 @@
 {
   "id": "organism-rewire-WP-SARATHIROOT-P0",
-  "base_ref": "2711f3123b4c4ec65ace9cae02f315715a18bab1",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "feature/sarathi-composition-root-p0-20260804",
   "worktree": ".",
-  "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, repository provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Add only the generic RuntimeStateStore event-plus-receipt transaction seam needed for truthful atomic completion; do not move or fork shared engines or legacy Sarathi organs.",
+  "intent": "Implement the admitted Sarathi P0 composition root: one lazy, ingress-neutral async handle_turn API with a version-controlled identity, repository provider-backed cognition, shared RuntimeState persistence and receipts, typed fail-closed effects, an import-safe compatibility boundary, and one durable build-lineage/index location. Add only the generic RuntimeStateStore event-plus-receipt transaction seam needed for truthful atomic completion; preserve the canonical DharmaGraph seam ledger byte-identical by routing through the existing record_session_event connection owner; do not move or fork shared engines or legacy Sarathi organs.",
   "allowed_files": [
     "ACTIVE_SURFACE_MANIFEST.yaml",
     "dharma_swarm/runtime_state.py",
@@ -29,6 +29,7 @@
     "api/**",
     "scripts/runtime/**",
     "scripts/governance/**",
+    "reports/governance/dharmagraph_parity/**",
     ".github/**",
     "pyproject.toml",
     "Makefile"
@@ -36,7 +37,7 @@
   "gates": [
     {
       "name": "sarathi-root-contracts",
-      "command": "python3 -m pytest -q tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py tests/test_assurance_boundary.py",
+      "command": "python3 -m pytest -q tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py tests/test_holon_system_imports.py tests/test_assurance_boundary.py tests/test_graph_seam_ledger.py",
       "expected_exit": 0,
       "timeout_seconds": 600
     },
@@ -88,7 +89,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "2711f3123b4c4ec65ace9cae02f315715a18bab1",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
       "details": []
     },
     "interface_mismatches": [
@@ -104,11 +105,12 @@
       "dharma_swarm/holon_system/sarathi/delegate.py:delegate_all"
     ],
     "honest_blockers": [
-      "Governance PR #1215 landed as d5fec94eab54f1b924c1fd659b36240b32ca9b39; this repair packet is rebound to ordinary merge baseline 2711f3123b4c4ec65ace9cae02f315715a18bab1, whose second parent is current main bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4.",
+      "Governance PR #1215 landed as d5fec94eab54f1b924c1fd659b36240b32ca9b39; this repair packet is rebound to the pull-request merge base bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4, which is the current main parent of the branch's ordinary merge commit.",
+      "The sanctioned seam-ledger generator renders SHA-256 103bee4019e923b5f842583fe1d5aba0ccabdff15603d2a08ea05476b18398ec, byte-identical to the merge-base artifact, with bypass_total fixed at 232; no DharmaGraph-owned artifact, detector, or baseline remains in this PR diff.",
       "P0 is one real dialogue-and-receipt path, not a full Hermes/OpenClaw-class shell; tool execution, transport mounts, scheduler, memory retrieval, and self-modification remain follow-on adapters.",
       "No liveness claim is made: importing or calling one turn does not prove a standing service."
     ],
     "rollback": "Revert the additive dharma_swarm/sarathi package, its tests, the generic RuntimeStateStore event-plus-receipt transaction seam and receipt-layer declaration, the persistent-agent index/lineage additions, and this packet. The existing state schema remains unchanged.",
-    "packet_digest": "272e70d3444f1e332e2ed061287f5f561939029464629ba57e1071e1ee3090db"
+    "packet_digest": "cc4005123670855257fb2029b8e1b64e473bdf3fcfaf2c6ff59a160c9f7ba11d"
   }
 }
