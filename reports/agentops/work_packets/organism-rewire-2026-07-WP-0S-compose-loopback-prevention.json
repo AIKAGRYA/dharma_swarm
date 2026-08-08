@@ -1,0 +1,91 @@
+{
+  "allowed_files": [
+    "docker-compose.yml",
+    "tests/test_swarm_health_api.py",
+    "reports/agentops/work_packets/organism-rewire-2026-07-WP-0S-compose-loopback-prevention.json"
+  ],
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "codex/wp0s-compose-loopback-prevention",
+  "commit": {
+    "allowed": false,
+    "message": "fix(compose): bind web ingress to loopback"
+  },
+  "forbidden_files": [
+    ".github/**",
+    ".env*",
+    "Dockerfile",
+    "Dockerfile.swarm",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "tests/test_api_auth.py",
+    "tests/test_verify_api.py",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_swarm_health_api.py",
+      "expected_exit": 0,
+      "name": "compose-loopback-contract"
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check"
+    }
+  ],
+  "id": "organism-rewire-2026-07-WP-0S-compose-loopback-prevention",
+  "intent": "Prevent clean repository redeploys from publishing dharmic-quant-web on every host interface by changing only the web service publication to 127.0.0.1:8080:8080 and locking that boundary with the existing compose YAML contract test. This repository-only packet neither inspects nor changes any live host, secret, deployment, or PR.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; raise SystemExit(0 if '\\\"8080:8080\\\"' in Path('docker-compose.yml').read_text() else 1)\"",
+      "expected_exit": 1,
+      "name": "world-bound-web-port-is-absent"
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "docker-compose.yml swarm service loopback-only port publication",
+      "tests/test_swarm_health_api.py TestBindHost compose boundary assertion"
+    ],
+    "collision": {
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Actual deployment exposure and secret state remain NEEDS_HOST/BLOCKED_OPERATOR; this packet proves repository prevention only."
+    ],
+    "interface_mismatches": [
+      "Titanium WP-0S owns the API containment seam but marks deployment manifests read-only; this stacked packet stays under docker-compose.yml owner organism-rewire-2026-07."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "a9134c258af7ced8b4cb7609c9981bbecadbe2e524c89aa1853ac6ea4eac46a8",
+    "rollback": "Revert the compose publication and its paired structural assertion together; do not redeploy while a world-bound 8080 publication would be restored.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-0S"
+  },
+  "worktree": "."
+}

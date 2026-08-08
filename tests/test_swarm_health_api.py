@@ -96,6 +96,12 @@ class TestBindHost:
             "http://localhost:7433/health",
         ]
 
+    def test_compose_web_publication_is_loopback_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        compose = yaml.safe_load((repo_root / "docker-compose.yml").read_text())
+
+        assert compose["services"]["web"]["ports"] == ["127.0.0.1:8080:8080"]
+
 
 # ---------------------------------------------------------------------------
 # _uptime
