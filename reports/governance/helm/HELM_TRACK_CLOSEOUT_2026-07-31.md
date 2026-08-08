@@ -1,13 +1,18 @@
 # Helm track closeout — 2026-07-31
 
-**Doc role:** `report` (dated descriptive output)  
+**Doc role:** `report` (dated descriptive output)
+
 **Subordinates to:** `docs/governance/ACTIVE_TRACK.yaml` — the canonical track
 owner. This receipt replaces no existing doc; it is the evidence attachment for
 the `helm-worldclass-terminal-2026-06` entry under `closed_tracks` there. If the
-two ever disagree, the YAML wins and this file is history.  
-**Track:** `helm-worldclass-terminal-2026-06`  
-**Closure kind:** `CLOSED_NOT_PROD`  
-**Branch:** `governance/close-helm-track-v2-20260803` (repair lane F6)  
+two ever disagree, the YAML wins and this file is history.
+
+**Track:** `helm-worldclass-terminal-2026-06`
+
+**Closure kind:** `CLOSED_NOT_PROD`
+
+**Branch:** `governance/close-helm-track-v2-20260803` (repair lane F6)
+
 **Closed by:** governance closeout (this receipt)
 
 ## Re-proof on then-current main — 2026-08-03
