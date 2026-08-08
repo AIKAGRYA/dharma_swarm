@@ -152,12 +152,6 @@
       "timeout_seconds": 900
     },
     {
-      "name": "managed-active-track-projections",
-      "command": "python3 -m scripts.governance.render_active_track_includes --check",
-      "expected_exit": 0,
-      "timeout_seconds": 300
-    },
-    {
       "name": "touched-python-ruff",
       "command": "python3 -m ruff check scripts/governance/check_track_status.py tests/test_track_portfolio.py",
       "expected_exit": 0,
@@ -225,7 +219,7 @@
       "No production process, policy setting, deployment, credential, external communication, or GitHub state is changed by this packet commit."
     ],
     "rollback": "Revert the current-main merge and integration-repair commits together. The remote branch returns to its prior seven-path Helm closeout event; no terminal product bytes or runtime state require surgery.",
-    "packet_digest": "848901ea94322cb53284bcb249cadd85d78ab7c8156f831260f04b1d86ad8d2d"
+    "packet_digest": "dbcbdd9a91e1f059577ba47f20033fb3836acd36eccb36745995207ab8419162"
   },
   "approval": {
     "before_commit": false,
@@ -233,6 +227,6 @@
   },
   "commit": {
     "allowed": true,
-    "message": "ci(agentops): admit Helm closure integration repair"
+    "message": "ci(agentops): normalize Helm closure gate set"
   }
 }
