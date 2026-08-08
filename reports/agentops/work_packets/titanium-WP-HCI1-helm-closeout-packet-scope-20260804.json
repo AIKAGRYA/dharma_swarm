@@ -153,7 +153,7 @@
     },
     {
       "name": "managed-active-track-projections",
-      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "command": "python3 -m scripts.governance.render_active_track_includes --check",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -225,7 +225,7 @@
       "No production process, policy setting, deployment, credential, external communication, or GitHub state is changed by this packet commit."
     ],
     "rollback": "Revert the current-main merge and integration-repair commits together. The remote branch returns to its prior seven-path Helm closeout event; no terminal product bytes or runtime state require surgery.",
-    "packet_digest": "b6d9a68f55d8e2947eed79b24f7565132793d5ed1494ada87c4d4066ecbe664f"
+    "packet_digest": "848901ea94322cb53284bcb249cadd85d78ab7c8156f831260f04b1d86ad8d2d"
   },
   "approval": {
     "before_commit": false,
@@ -233,6 +233,6 @@
   },
   "commit": {
     "allowed": true,
-    "message": "fix(governance): reconcile Helm closure projections"
+    "message": "ci(agentops): admit Helm closure integration repair"
   }
 }
