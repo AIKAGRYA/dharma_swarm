@@ -3,6 +3,7 @@
 GET /api/manifest/health   → full health report (all sections)
 GET /api/manifest/summary  → counts only (live / degraded / broken / stub)
 GET /api/manifest/entity/{entity_id} → single entity detail
+GET /api/manifest/autocatalytic → ten-node metabolic topology + latest proof
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/manifest", tags=["manifest"])
 
 def _get_report() -> dict[str, Any]:
     from dharma_swarm.manifest_health import build_health_report
+
     return build_health_report()
 
 
@@ -42,13 +44,34 @@ async def manifest_summary() -> ApiResponse:
     """Lightweight summary: counts by observed status."""
     try:
         report = _get_report()
-        return ApiResponse(data={
-            "manifest_version": report.get("manifest_version"),
-            "last_updated": report.get("last_updated"),
-            "summary": report.get("summary", {}),
-        })
+        return ApiResponse(
+            data={
+                "manifest_version": report.get("manifest_version"),
+                "last_updated": report.get("last_updated"),
+                "summary": report.get("summary", {}),
+            }
+        )
     except Exception as e:
         logger.exception("manifest/summary failed")
+        return ApiResponse(data=None, error=str(e))
+
+
+@router.get("/autocatalytic")
+async def manifest_autocatalytic() -> ApiResponse:
+    """Ten-node portfolio read model and locally receipt-consistent cycle.
+
+    The endpoint is read-only. A local mutable store is not authenticated
+    execution provenance; the witness remains capped at ``local_rehearsal``
+    and cannot claim external effects.
+    """
+    try:
+        from dharma_swarm.autocatalytic_portfolio import (
+            build_autocatalytic_snapshot,
+        )
+
+        return ApiResponse(data=build_autocatalytic_snapshot())
+    except Exception as e:
+        logger.exception("manifest/autocatalytic failed")
         return ApiResponse(data=None, error=str(e))
 
 
@@ -61,7 +84,9 @@ async def manifest_entity(entity_id: str) -> ApiResponse:
             for entity in section.get("entities", []):
                 if entity["id"] == entity_id:
                     return ApiResponse(data=entity)
-        raise HTTPException(status_code=404, detail=f"entity '{entity_id}' not found in manifest")
+        raise HTTPException(
+            status_code=404, detail=f"entity '{entity_id}' not found in manifest"
+        )
     except HTTPException:
         raise
     except Exception as e:

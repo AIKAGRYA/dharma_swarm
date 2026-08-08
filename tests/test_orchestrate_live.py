@@ -43,6 +43,114 @@ def test_log_writes_to_logger(caplog):
 
 
 # ---------------------------------------------------------------------------
+# _log_system_failure helper
+# ---------------------------------------------------------------------------
+
+def test_log_system_failure_records_traceback(caplog, capsys):
+    """A system-loop failure must land in the log WITH its traceback frames.
+
+    Regression guard for the 2026-07-17 dispatch-dropoff outage: the swarm
+    loop died on an import-time IndexError but the log carried only
+    'System swarm failed: tuple index out of range' — zero frame info — and
+    the zombie daemon ran undiagnosed for 91h.
+    """
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    def _boom():
+        return ()[4]
+
+    try:
+        _boom()
+    except IndexError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert error_records, "expected an ERROR record for the failed system"
+    rendered = "\n".join(
+        r.message + (str(r.exc_text) if r.exc_text else "") for r in error_records
+    )
+    assert "swarm" in rendered
+    tb_text = "".join(
+        logging.Formatter().format(r) for r in error_records
+    )
+    assert "_boom" in tb_text, "traceback frames must be preserved in the log"
+    assert "IndexError" in tb_text
+
+    out = capsys.readouterr().out
+    assert "IndexError" in out, "operator-facing line must carry the exception repr"
+
+
+def test_log_system_failure_empty_message_exception_still_identifiable(capsys):
+    """repr() keeps exceptions with empty messages diagnosable (e.g. bare Exception())."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    _log_system_failure("grind", RuntimeError())
+    out = capsys.readouterr().out
+    assert "RuntimeError" in out
+
+
+def test_log_system_failure_falsey_exception_keeps_traceback(caplog):
+    """A falsey exception instance must not disable logging's exc_info path."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class FalseyError(RuntimeError):
+        def __bool__(self):
+            return False
+
+    def _falsey_boom():
+        raise FalseyError("falsey failure")
+
+    try:
+        _falsey_boom()
+    except FalseyError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_falsey_boom" in rendered
+    assert "FalseyError: falsey failure" in rendered
+
+
+def test_log_system_failure_broken_repr_cannot_escape(caplog, capsys):
+    """Failure diagnostics stay non-fatal when an exception's repr is broken."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class BrokenReprError(RuntimeError):
+        def __repr__(self):
+            raise KeyboardInterrupt("repr broke")
+
+    def _broken_repr_boom():
+        raise BrokenReprError("original failure")
+
+    try:
+        _broken_repr_boom()
+    except BrokenReprError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    out = capsys.readouterr().out
+    assert "<BrokenReprError repr failed>" in out
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_broken_repr_boom" in rendered
+    assert "BrokenReprError: original failure" in rendered
+
+
+# ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
 

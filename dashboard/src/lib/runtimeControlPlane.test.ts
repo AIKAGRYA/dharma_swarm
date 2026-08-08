@@ -496,7 +496,7 @@ test("normalizeRuntimeControlPlaneResponses keeps health truth when chat status 
   const normalized = normalizeRuntimeControlPlaneResponses(
     {
       status: "error",
-      data: undefined as ChatStatusOut,
+      data: undefined as unknown as ChatStatusOut,
       error: "chat router unavailable",
       timestamp: "2026-03-20T00:00:00.000Z",
     },
@@ -571,7 +571,7 @@ test("buildRuntimeControlPlaneSnapshot marks health as unavailable when chat is 
     }),
     {
       status: "error",
-      data: undefined as HealthOut,
+      data: undefined as unknown as HealthOut,
       error: "health router unavailable",
       timestamp: "2026-03-20T00:00:00.000Z",
     },
@@ -810,10 +810,14 @@ test("buildRuntimeControlPlaneSnapshot surfaces transport-level query failures i
     health: null,
     runtimeGraph: null,
     runtimeInterrupts: null,
+    runtimeAssistants: null,
+    runtimeBackgroundJobs: null,
     chatError: null,
     healthError: null,
     runtimeGraphError: null,
     runtimeInterruptError: null,
+    runtimeAssistantsError: null,
+    runtimeBackgroundJobsError: null,
     error: "network timeout while loading runtime control plane",
   });
 
@@ -827,13 +831,13 @@ test("buildRuntimeControlPlaneSnapshot treats dual transport failures as runtime
   const normalized = normalizeRuntimeControlPlaneResponses(
     {
       status: "error",
-      data: undefined as ChatStatusOut,
+      data: undefined as unknown as ChatStatusOut,
       error: "fetch failed",
       timestamp: "2026-03-20T00:00:00.000Z",
     },
     {
       status: "error",
-      data: undefined as HealthOut,
+      data: undefined as unknown as HealthOut,
       error: "fetch failed",
       timestamp: "2026-03-20T00:00:00.000Z",
     },
@@ -854,13 +858,13 @@ test("buildRuntimeControlPlaneSnapshot treats mirrored proxy upstream failures a
   const normalized = normalizeRuntimeControlPlaneResponses(
     {
       status: "error",
-      data: undefined as ChatStatusOut,
+      data: undefined as unknown as ChatStatusOut,
       error: "502 Bad Gateway: upstream connect error or disconnect/reset before headers",
       timestamp: "2026-03-20T00:00:00.000Z",
     },
     {
       status: "error",
-      data: undefined as HealthOut,
+      data: undefined as unknown as HealthOut,
       error: "502 Bad Gateway: upstream connect error or disconnect/reset before headers",
       timestamp: "2026-03-20T00:00:00.000Z",
     },

@@ -62,6 +62,41 @@ def test_shell_handler_rejects_non_allowlisted_command(tmp_path):
     mock_run.assert_not_called()
 
 
+def test_documented_sentinel_cron_wiring_is_executable(tmp_path):
+    """The sentinel's docstring publishes a cron job for an operator to paste.
+
+    Review found the published command was rejected by the shell allowlist
+    before launch, so the documented wiring could never have run. Parse the
+    command out of the docstring and put it through the real handler.
+    """
+    import re
+
+    import scripts.runtime.organism_liveness_sentinel as sentinel
+
+    match = re.search(r'"shell_command":\s*"([^"]+)"', sentinel.__doc__ or "")
+    assert match, "sentinel docstring no longer publishes a shell_command"
+    documented = match.group(1)
+
+    class FakeProc:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    with patch("subprocess.run", return_value=FakeProc()) as mock_run:
+        result = execute_cron_job(
+            {
+                "id": "organism_liveness_sentinel",
+                "handler": "shell",
+                "shell_command": documented,
+                "repo_root": str(tmp_path),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED, result.error
+    mock_run.assert_called_once()
+    assert mock_run.call_args.args[0] == documented.split()
+
+
 def test_run_cron_job_dispatches_headless_prompt():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="Mission pulse ok") as mock:
         success, output, error = run_cron_job(

@@ -42,7 +42,10 @@ BASELINE_DB_NAMES = 39
 # manifest (chetana staging boundary, #1140 slice). The manifest IS the
 # admission gate for the trusted wiki projection; it is a signed receipt
 # surface, not a second content store.
-BASELINE_JSONL_NAMES = 218
+# 218 -> 219 (2026-08-05, PR #1235): {cycle_id}.tasks.jsonl — one per-cycle
+# local A2A task-log target for the autocatalytic witness. It records task
+# envelopes for replay/inspection and does not claim an authority upgrade.
+BASELINE_JSONL_NAMES = 219
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12

@@ -14,6 +14,8 @@ the repaired contract:
 - collection alone uses plain assertions to avoid rewriting every collected
   test module, while the behavioral sentinel keeps normal assertion semantics
   and a module-level assertion still proves collection failure propagates.
+- collection and sentinel diagnostics use invocation-private temporary files,
+  so concurrent worktrees cannot overwrite one another's verifier evidence.
 
 Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0B).
 """
@@ -114,6 +116,15 @@ class TestRecipeStructure:
         assert "exit 1" in sentinel_block, (
             "a failing sentinel must fail the target, not be swallowed"
         )
+
+    def test_diagnostic_logs_are_invocation_private_and_cleaned(self):
+        recipe = _recipe("verifier-selfcheck")
+        assert "/tmp/dharma-collect-check.log" not in recipe
+        assert "/tmp/dharma-sentinel-check.log" not in recipe
+        assert recipe.count("mktemp") == 2
+        assert recipe.count("$${TMPDIR:-/tmp}") == 2
+        assert recipe.count("trap 'rm -f") == 2
+        assert recipe.count("tail -120") == 2
 
 
 # ── Behavioral meta-tests (bounded, full target runs) ───────────────

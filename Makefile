@@ -389,15 +389,27 @@ verifier-selfcheck:
 	@echo "[2/5] lint-blockers (F821)"
 	@$(MAKE) -s lint-blockers
 	@echo "[3/5] test collection"
-	@$(VENV_PYTHON) -m pytest tests/ --collect-only --assert=plain -q >/tmp/dharma-collect-check.log 2>&1 \
-		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
-	@tail -1 /tmp/dharma-collect-check.log
+	@set -eu; \
+		collect_log="$$(mktemp "$${TMPDIR:-/tmp}/dharma-collect-check.XXXXXX")"; \
+		trap 'rm -f "$$collect_log"' EXIT HUP INT TERM; \
+		if ! $(VENV_PYTHON) -m pytest tests/ --collect-only --assert=plain -q >"$$collect_log" 2>&1; then \
+			echo "COLLECTION BROKEN:"; \
+			tail -120 "$$collect_log"; \
+			exit 1; \
+		fi; \
+		tail -1 "$$collect_log"
 	@echo "[4/5] session status"
 	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
 	@echo "[5/5] behavioral sentinel ($(VERIFIER_SENTINEL))"
-	@$(VENV_PYTHON) -m pytest -p timeout $(VERIFIER_SENTINEL) -q --timeout=120 >/tmp/dharma-sentinel-check.log 2>&1 \
-		|| (echo "BEHAVIORAL SENTINEL FAILED:"; tail -20 /tmp/dharma-sentinel-check.log; exit 1)
-	@tail -1 /tmp/dharma-sentinel-check.log
+	@set -eu; \
+		sentinel_log="$$(mktemp "$${TMPDIR:-/tmp}/dharma-sentinel-check.XXXXXX")"; \
+		trap 'rm -f "$$sentinel_log"' EXIT HUP INT TERM; \
+		if ! $(VENV_PYTHON) -m pytest -p timeout $(VERIFIER_SENTINEL) -q --timeout=120 >"$$sentinel_log" 2>&1; then \
+			echo "BEHAVIORAL SENTINEL FAILED:"; \
+			tail -120 "$$sentinel_log"; \
+			exit 1; \
+		fi; \
+		tail -1 "$$sentinel_log"
 	@echo "verifier-selfcheck: OK (syntax, F821, collection, onboarding, behavioral sentinel)"
 
 gh-auth:

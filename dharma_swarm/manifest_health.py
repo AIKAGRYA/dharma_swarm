@@ -1,13 +1,6 @@
-"""Manifest Health — declared-vs-observed comparison engine.
+"""Compare ACTIVE_SURFACE_MANIFEST declarations with registered health checks.
 
-Reads ACTIVE_SURFACE_MANIFEST.yaml and runs safe, registered health
-checks against live runtime state.  Returns a structured report of
-every entity with its declared status, observed status, and gap.
-
-Health checks are a hardcoded registry of safe operations — no
-arbitrary shell commands.  The manifest declares *which* check IDs
-to run; this module maps them to Python functions.
-"""
+The fixed registry prevents manifest-defined arbitrary shell execution."""
 
 from __future__ import annotations
 
@@ -18,6 +11,8 @@ from typing import Any
 
 import yaml
 
+from dharma_swarm import manifest_health_autocatalytic
+
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +20,7 @@ _MANIFEST_PATH = _REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
 
 
 # ── Manifest loader ──────────────────────────────────────────────
+
 
 def load_manifest() -> dict[str, Any]:
     """Parse ACTIVE_SURFACE_MANIFEST.yaml and return the full dict."""
@@ -41,6 +37,7 @@ def load_manifest() -> dict[str, Any]:
 # Every check function receives the entity dict and the full manifest,
 # and returns (passed: bool, evidence: str).
 
+
 def _check_dashboard_route_exists(
     entity: dict[str, Any],
     _manifest: dict[str, Any],
@@ -52,7 +49,10 @@ def _check_dashboard_route_exists(
     rel = route.lstrip("/")
     page_dir = _REPO_ROOT / "dashboard" / "src" / "app" / rel
     exists = page_dir.is_dir()
-    return exists, f"{'found' if exists else 'missing'}: {page_dir.relative_to(_REPO_ROOT)}"
+    return (
+        exists,
+        f"{'found' if exists else 'missing'}: {page_dir.relative_to(_REPO_ROOT)}",
+    )
 
 
 def _check_api_router_registered(
@@ -62,9 +62,7 @@ def _check_api_router_registered(
     deps = entity.get("api_dependencies", [])
     if not deps:
         return True, "no API dependencies declared"
-    registered_prefixes = {
-        r["prefix"] for r in manifest.get("api_routers", [])
-    }
+    registered_prefixes = {r["prefix"] for r in manifest.get("api_routers", [])}
     missing = []
     for dep in deps:
         prefix = "/" + "/".join(dep.strip("/").split("/")[:2])
@@ -131,9 +129,7 @@ def _check_api_endpoint_registered(
     deps = entity.get("api_dependencies", [])
     if not deps:
         return True, "no API dependencies declared"
-    registered_prefixes = {
-        r["prefix"] for r in manifest.get("api_routers", [])
-    }
+    registered_prefixes = {r["prefix"] for r in manifest.get("api_routers", [])}
     try:
         route_paths = _mounted_api_route_paths()
     except Exception as exc:
@@ -213,6 +209,20 @@ def _check_api_health_responds(
         return False, f"api.routers.health import failed: {exc}"
 
 
+_AUTOCATALYTIC_HEALTH_CHECKS = manifest_health_autocatalytic.build_health_checks(
+    lambda: _REPO_ROOT
+)
+_check_autocatalytic_contract_complete = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_contract_complete"
+]
+_check_autocatalytic_proof_refs_exist = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_proof_refs_exist"
+]
+_check_autocatalytic_node_page_exists = _AUTOCATALYTIC_HEALTH_CHECKS[
+    "autocatalytic_node_page_exists"
+]
+
+
 # The registry: check_id → function
 _HEALTH_CHECK_REGISTRY: dict[
     str,
@@ -226,10 +236,12 @@ _HEALTH_CHECK_REGISTRY: dict[
     "runtime_db_present": _check_runtime_db_present,
     "ontology_db_present": _check_ontology_db_present,
     "api_health_responds": _check_api_health_responds,
+    **_AUTOCATALYTIC_HEALTH_CHECKS,
 }
 
 
 # ── Check runner ─────────────────────────────────────────────────
+
 
 def run_checks_for_entity(
     entity: dict[str, Any],
@@ -241,21 +253,25 @@ def run_checks_for_entity(
     for check_id in check_ids:
         fn = _HEALTH_CHECK_REGISTRY.get(check_id)
         if fn is None:
-            results.append({
-                "check_id": check_id,
-                "passed": False,
-                "evidence": f"unknown check_id: {check_id}",
-            })
+            results.append(
+                {
+                    "check_id": check_id,
+                    "passed": False,
+                    "evidence": f"unknown check_id: {check_id}",
+                }
+            )
             continue
         try:
             passed, evidence = fn(entity, manifest)
         except Exception as exc:
             passed, evidence = False, f"check raised: {exc}"
-        results.append({
-            "check_id": check_id,
-            "passed": passed,
-            "evidence": evidence,
-        })
+        results.append(
+            {
+                "check_id": check_id,
+                "passed": passed,
+                "evidence": evidence,
+            }
+        )
     return results
 
 
@@ -309,6 +325,7 @@ def _compute_gap(
 
 # ── Full report ──────────────────────────────────────────────────
 
+
 def build_health_report() -> dict[str, Any]:
     """Build the complete manifest health report.
 
@@ -328,25 +345,29 @@ def build_health_report() -> dict[str, Any]:
         checks = run_checks_for_entity(s, manifest)
         declared = s.get("status", "unknown")
         observed = _observed_status(declared, checks)
-        surface_records.append({
-            "id": s["id"],
-            "label": s.get("label", s["id"]),
-            "entity_type": "dashboard_surface",
-            "declared_status": declared,
-            "observed_status": observed,
-            "gap": _compute_gap(declared, observed, s, checks),
-            "priority": s.get("priority", ""),
-            "next_action": s.get("next_action") or "",
-            "health_checks": checks,
-            "route": s.get("route", ""),
-            "api_dependencies": s.get("api_dependencies", []),
-        })
+        surface_records.append(
+            {
+                "id": s["id"],
+                "label": s.get("label", s["id"]),
+                "entity_type": "dashboard_surface",
+                "declared_status": declared,
+                "observed_status": observed,
+                "gap": _compute_gap(declared, observed, s, checks),
+                "priority": s.get("priority", ""),
+                "next_action": s.get("next_action") or "",
+                "health_checks": checks,
+                "route": s.get("route", ""),
+                "api_dependencies": s.get("api_dependencies", []),
+            }
+        )
     if surface_records:
-        sections.append({
-            "section": "Dashboard Surfaces",
-            "entity_type": "dashboard_surface",
-            "entities": surface_records,
-        })
+        sections.append(
+            {
+                "section": "Dashboard Surfaces",
+                "entity_type": "dashboard_surface",
+                "entities": surface_records,
+            }
+        )
 
     # Agents / subsystems
     agents = manifest.get("agents", [])
@@ -355,25 +376,29 @@ def build_health_report() -> dict[str, Any]:
         checks = run_checks_for_entity(a, manifest)
         declared = a.get("status", "unknown")
         observed = _observed_status(declared, checks)
-        agent_records.append({
-            "id": a["id"],
-            "label": a.get("label", a["id"]),
-            "entity_type": "agent",
-            "declared_status": declared,
-            "observed_status": observed,
-            "gap": _compute_gap(declared, observed, a, checks),
-            "priority": a.get("priority", ""),
-            "next_action": a.get("next_action") or "",
-            "health_checks": checks,
-            "module": a.get("module", ""),
-            "wired_to": a.get("wired_to", []),
-        })
+        agent_records.append(
+            {
+                "id": a["id"],
+                "label": a.get("label", a["id"]),
+                "entity_type": "agent",
+                "declared_status": declared,
+                "observed_status": observed,
+                "gap": _compute_gap(declared, observed, a, checks),
+                "priority": a.get("priority", ""),
+                "next_action": a.get("next_action") or "",
+                "health_checks": checks,
+                "module": a.get("module", ""),
+                "wired_to": a.get("wired_to", []),
+            }
+        )
     if agent_records:
-        sections.append({
-            "section": "Agents & Subsystems",
-            "entity_type": "agent",
-            "entities": agent_records,
-        })
+        sections.append(
+            {
+                "section": "Agents & Subsystems",
+                "entity_type": "agent",
+                "entities": agent_records,
+            }
+        )
 
     # Integrations
     integrations = manifest.get("integrations", [])
@@ -382,25 +407,29 @@ def build_health_report() -> dict[str, Any]:
         checks = run_checks_for_entity(i, manifest)
         declared = i.get("status", "unknown")
         observed = _observed_status(declared, checks)
-        integration_records.append({
-            "id": i["id"],
-            "label": i.get("label", i["id"]),
-            "entity_type": "integration",
-            "declared_status": declared,
-            "observed_status": observed,
-            "gap": _compute_gap(declared, observed, i, checks),
-            "priority": "",
-            "next_action": "",
-            "health_checks": checks,
-            "integration_type": i.get("type", ""),
-            "used_by": i.get("used_by", []),
-        })
+        integration_records.append(
+            {
+                "id": i["id"],
+                "label": i.get("label", i["id"]),
+                "entity_type": "integration",
+                "declared_status": declared,
+                "observed_status": observed,
+                "gap": _compute_gap(declared, observed, i, checks),
+                "priority": "",
+                "next_action": "",
+                "health_checks": checks,
+                "integration_type": i.get("type", ""),
+                "used_by": i.get("used_by", []),
+            }
+        )
     if integration_records:
-        sections.append({
-            "section": "Integrations",
-            "entity_type": "integration",
-            "entities": integration_records,
-        })
+        sections.append(
+            {
+                "section": "Integrations",
+                "entity_type": "integration",
+                "entities": integration_records,
+            }
+        )
 
     # Feedback loops
     loops = manifest.get("loops", [])
@@ -409,33 +438,43 @@ def build_health_report() -> dict[str, Any]:
         checks = run_checks_for_entity(loop, manifest)
         declared = loop.get("status", "unknown")
         observed = _observed_status(declared, checks)
-        loop_records.append({
-            "id": loop["id"],
-            "label": loop.get("label", loop["id"]),
-            "entity_type": "loop",
-            "declared_status": declared,
-            "observed_status": observed,
-            "gap": _compute_gap(declared, observed, loop, checks),
-            "priority": loop.get("priority", ""),
-            "next_action": loop.get("next_action") or "",
-            "health_checks": checks,
-            "module": loop.get("module", ""),
-            "sense": loop.get("sense", ""),
-            "act": loop.get("act", ""),
-            "evaluate": loop.get("evaluate", ""),
-            "adapt": loop.get("adapt", ""),
-        })
+        loop_records.append(
+            {
+                "id": loop["id"],
+                "label": loop.get("label", loop["id"]),
+                "entity_type": "loop",
+                "declared_status": declared,
+                "observed_status": observed,
+                "gap": _compute_gap(declared, observed, loop, checks),
+                "priority": loop.get("priority", ""),
+                "next_action": loop.get("next_action") or "",
+                "health_checks": checks,
+                "module": loop.get("module", ""),
+                "sense": loop.get("sense", ""),
+                "act": loop.get("act", ""),
+                "evaluate": loop.get("evaluate", ""),
+                "adapt": loop.get("adapt", ""),
+            }
+        )
     if loop_records:
-        sections.append({
-            "section": "Feedback Loops",
-            "entity_type": "loop",
-            "entities": loop_records,
-        })
+        sections.append(
+            {
+                "section": "Feedback Loops",
+                "entity_type": "loop",
+                "entities": loop_records,
+            }
+        )
+
+    autocatalytic_section = manifest_health_autocatalytic.project_autocatalytic_section(
+        manifest,
+        run_checks=run_checks_for_entity,
+        compute_gap=_compute_gap,
+    )
+    if autocatalytic_section:
+        sections.append(autocatalytic_section)
 
     # Summary counts — all buckets are by observed_status.
-    all_entities = [
-        e for s in sections for e in s["entities"]
-    ]
+    all_entities = [e for s in sections for e in s["entities"]]
     total = len(all_entities)
     live_count = sum(1 for e in all_entities if e["observed_status"] == "live")
     degraded_count = sum(1 for e in all_entities if e["observed_status"] == "degraded")
