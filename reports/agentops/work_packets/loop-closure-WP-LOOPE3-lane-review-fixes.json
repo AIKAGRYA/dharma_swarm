@@ -11,7 +11,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "0786ae36fe0f90c872368c714bcd9b7dedc1d290",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
   "branch": "claude/graph-of-loops-audit-design-eh3lz5",
   "commit": {
     "allowed": true,
@@ -85,7 +85,7 @@
     ],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "7a6ab89360f598d55488342ee9f0a45405fcecaabb89260dced3fc3fb6e50c81",
+    "packet_digest": "553931b7e93618649234c07696e0cf8f2b34aeec2309814947ae5145915f1cc4",
     "rollback": "Revert the packet-refresh commit; the semantic implementation remains unchanged and the unresolved P1 remains operator-gated.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
