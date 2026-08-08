@@ -258,6 +258,7 @@
     "world_zeitgeist_inbox.jsonl",
     "write_receipts.jsonl",
     "zeitgeist.jsonl",
+    "{cycle_id}.tasks.jsonl",
     "{loop_name}_progress.jsonl",
     "{scenario.name}.routing.jsonl"
   ],
@@ -298,7 +299,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 218,
+    "distinct_jsonl_names": 219,
     "ledger_classes": 11,
     "ledger_modules": 12
   }

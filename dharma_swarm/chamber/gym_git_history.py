@@ -28,6 +28,7 @@ import random
 import re
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -273,7 +274,7 @@ def score_candidate(repo_root: Path, task: Task, candidate_diff: str,
             assert_within(scoring_dir, target)
             target.write_text(blob, encoding="utf-8")
         proc = subprocess.run(
-            ["python3", "-m", "pytest", *task.test_files, "-q", "--no-header",
+            [sys.executable, "-m", "pytest", *task.test_files, "-q", "--no-header",
              "-p", "no:cacheprovider"],
             capture_output=True, text=True, cwd=scoring_dir, timeout=timeout,
             env=env,

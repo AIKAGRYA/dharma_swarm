@@ -11,7 +11,44 @@ permissions:
   contents: read
 
 jobs:
+  # Which change classes does this PR touch? The advisory jobs below consult
+  # this to skip work the diff cannot affect. `pytest` never does -- it carries
+  # the two REQUIRED contexts, and a required check that does not run never
+  # reports, which branch protection waits on forever.
+  #
+  # FAIL OPEN by construction. Every consumer tests `!= 'false'`, so an empty or
+  # missing output -- this job failing, timing out, or being skipped -- runs the
+  # job anyway. The only reachable failure is running too much.
+  changes:
+    name: classify changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.classify.outputs.go }}
+      dashboard: ${{ steps.classify.outputs.dashboard }}
+      terminal: ${{ steps.classify.outputs.terminal }}
+      python: ${{ steps.classify.outputs.python }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify
+        id: classify
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci/classify_changed_paths.py
+
   go-adapter-contracts:
+    needs: changes
+    # Runs the Go harness AND tests/test_go_adapter_contracts.py, so a Python
+    # change to the bridge must run it too.
+    if: >-
+      !cancelled() && (needs.changes.outputs.go != 'false'
+      || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -116,6 +153,9 @@ jobs:
           path: pytest_output.txt
 
   guardian-syntax-check:
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.python != 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -160,6 +200,10 @@ jobs:
         run: python3 scripts/governance/guardian_import_smoke.py
 
   go-evidence-ingestor:
+    needs: changes
+    if: >-
+      !cancelled() && (needs.changes.outputs.go != 'false'
+      || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -178,6 +222,9 @@ jobs:
         run: make go-ci
 
   dashboard:
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.dashboard != 'false'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -207,6 +254,14 @@ jobs:
         run: npm run build
 
   terminal:
+    needs: changes
+    # OR-in python: the behavioral tests spawn `python3 -m
+    # dharma_swarm.terminal_bridge` (terminal/src/bridge.ts:54), which is why
+    # this job installs the Python package below. A bridge change is a terminal
+    # change even when nothing under terminal/ moves.
+    if: >-
+      !cancelled() && (needs.changes.outputs.terminal != 'false'
+      || needs.changes.outputs.python != 'false')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -253,6 +308,9 @@ jobs:
         run: bun test
 
   gauntlet-tier1:
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.python != 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
