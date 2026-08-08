@@ -527,8 +527,19 @@ def test_product_test_empty():
     assert result["test_passed"] is False
 
 
+@pytest.mark.timeout(60)
 def test_product_score_real_project():
-    """Product score on dharma_swarm root produces meaningful dimensions."""
+    """Product score on dharma_swarm root produces meaningful dimensions.
+
+    Scores the whole real project tree (~368k LOC and growing), so its cost
+    scales with repo size like the QL-R1 quality ratchet does; standalone
+    it already runs ~8s on this checkout, close enough to test-fast's
+    blanket 10s budget to cross it under full-suite load (WP-0D
+    suite-context timeout). Both required CI contexts and ``make test``
+    filter ``-m "not slow"``, so a ``slow`` marker would drop this from
+    every automated gate instead of fixing its timing — a per-test
+    override keeps it running everywhere with headroom instead.
+    """
     from dharma_swarm.cascade_domains.product import generate, score, test
 
     artifact = generate({"project_path": str(Path(__file__).resolve().parents[1])}, {})

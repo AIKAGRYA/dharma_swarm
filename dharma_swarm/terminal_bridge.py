@@ -14,8 +14,10 @@ from dataclasses import asdict, is_dataclass
 import importlib.util
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -63,6 +65,11 @@ from dharma_swarm.tui_helpers import build_runtime_status_text
 from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
+from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_session_runtime import (
+    TerminalBridgeSessionRuntimeMixin,
+)
+from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.terminal_control import load_terminal_control_state
 from dharma_swarm.tui.engine.events import (
     PermissionDecisionEvent,
@@ -78,7 +85,7 @@ def _json_default(value: object) -> object:
         return sorted(value)
     return str(value)
 
-class TerminalBridge:
+class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin):
     """Minimal stdio protocol server for a terminal frontend."""
 
     def __init__(self) -> None:
@@ -89,10 +96,19 @@ class TerminalBridge:
         self._active_session_id: str | None = None
         self._active_provider_id: str | None = None
         self._active_model_id: str | None = None
+        self._active_run: _ActiveSessionRun | None = None
+        self._completed_session_request_ids: list[str] = []
+        self._selected_provider_id: str | None = None
+        self._selected_model_id: str | None = None
+        self._closing = False
         self._repo_root = Path.cwd().resolve()
         self._package_root = Path(__file__).resolve().parent
         self._state_dir = Path.home() / ".dharma" / "terminal"
+        self._runtime_owner_id = f"terminal-bridge:{uuid.uuid4()}"
+        self._runtime_owner_pid = os.getpid()
+        self._session_recovery_complete = False
         self._session_store = SessionStore()
+        self._chat_history: list[dict[str, str]] = []
         self._ensure_adapters()
 
     def _load_repo_guidance(self, limit_chars: int = 2400) -> str:
@@ -228,11 +244,66 @@ class TerminalBridge:
     def _available_provider_ids(self) -> set[str]:
         return set(self._adapters)
 
+    def _local_cli_attempt_authorized(self, provider_id: str) -> bool:
+        """Whether an unverified local CLI lane may be attempted.
+
+        This is deliberately weaker than model availability. It grants only
+        execution authority while the canonical key oracle is unknown; the
+        route remains ``unverified`` until a real provider event succeeds.
+        Keyed HTTP adapters never receive this exception.
+        """
+
+        adapter = self._adapters.get(provider_id)
+        if adapter is None or provider_id not in {"claude", "codex"}:
+            return False
+        cli_path = str(getattr(adapter, "_cli_path", provider_id) or provider_id)
+        binary = shutil.which(cli_path)
+        if binary is None:
+            return False
+
+        if provider_id == "claude":
+            # Claude auth presence is insufficient: a logged-in Max client can
+            # still fail every headless request. Reuse the smoke-proven oracle.
+            from dharma_swarm import key_oracle
+
+            return key_oracle.is_provider_live("claude_code") is True
+
+        try:
+            result = subprocess.run(
+                [binary, "login", "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                stdin=subprocess.DEVNULL,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        # A successful local OAuth-status command permits an attempt, not a
+        # liveness claim. The first actual completion is still the proof.
+        return result.returncode == 0
+
     async def close(self) -> None:
+        if self._closing:
+            active = self._active_run
+            if active is not None and active.task is not None:
+                await asyncio.gather(active.task, return_exceptions=True)
+            return
+        self._closing = True
+        active = self._active_run
+        if active is not None and active.task is not None:
+            await self._cancel_active_run(active, reason="bridge_closed")
         for adapter in self._adapters.values():
             await adapter.close()
 
     async def run_stdio(self) -> int:
+        if not self._session_recovery_complete:
+            self._session_store.recover_orphaned_sessions(
+                cwd=str(self._repo_root),
+                active_owner_id=self._runtime_owner_id,
+                active_owner_pid=self._runtime_owner_pid,
+            )
+            self._session_recovery_complete = True
         self._emit(
             {
                 "type": "bridge.ready",
@@ -268,7 +339,19 @@ class TerminalBridge:
                     }
                 )
                 continue
-            await self._handle_request(request)
+            try:
+                await self._handle_request(request)
+            except Exception as exc:
+                # A handler crash must never kill the bridge silently: emit an
+                # explicit failure tied to the request and keep serving.
+                self._emit(
+                    {
+                        "type": "bridge.error",
+                        "request_id": str(request.get("id", "") or ""),
+                        "code": "handler_exception",
+                        "message": f"{type(exc).__name__}: {exc}",
+                    }
+                )
         return 0
 
     async def _handle_request(self, request: dict[str, Any]) -> None:
@@ -309,7 +392,7 @@ class TerminalBridge:
             await self._handle_session_bootstrap(request_id, request)
             return
         if request_type == "session.start":
-            await self._handle_session_start(request_id, request)
+            self._launch_session_start(request_id, request)
             return
         if request_type == "session.catalog":
             await self._handle_session_catalog(request_id, request)
@@ -318,7 +401,7 @@ class TerminalBridge:
             await self._handle_session_detail(request_id, request)
             return
         if request_type == "session.cancel":
-            await self._handle_session_cancel(request_id)
+            await self._handle_session_cancel(request_id, request)
             return
         if request_type == "status":
             self._emit(
@@ -327,6 +410,8 @@ class TerminalBridge:
                     "request_id": request_id,
                     "active_session_id": self._active_session_id,
                     "active_provider": self._active_provider_id,
+                    "active_request_id": self._active_run.request_id if self._active_run else None,
+                    "active_phase": self._active_run.phase if self._active_run else None,
                     "providers": sorted(self._adapters),
                 }
             )
@@ -356,6 +441,17 @@ class TerminalBridge:
     async def _handle_handshake(self, request_id: str) -> None:
         providers: list[dict[str, Any]] = []
         adapter_error = self._adapter_boot_error
+        default_target = model_routing.default_target()
+        policy = self._build_model_policy_summary(
+            selected_provider=default_target.provider_id,
+            selected_model=default_target.model_id,
+            strategy="responsive",
+        )
+        selected_provider = str(policy.get("selected_provider", ""))
+        selected_model = str(policy.get("selected_model", ""))
+        policy_targets = [
+            target for target in policy.get("targets", []) if isinstance(target, dict)
+        ]
         if adapter_error is None:
             for provider_id, adapter in self._adapters.items():
                 models = []
@@ -367,23 +463,58 @@ class TerminalBridge:
                             "capabilities": sorted(cap.name.lower() for cap in type(profile.capabilities) if profile.supports(cap)),
                         }
                     )
+                known_model_ids = {str(model.get("id", "")) for model in models}
+                for target in policy_targets:
+                    if str(target.get("provider", "")) != provider_id:
+                        continue
+                    model_id = str(target.get("model", ""))
+                    if not model_id or model_id in known_model_ids:
+                        continue
+                    models.append(
+                        {
+                            "id": model_id,
+                            "display_name": str(target.get("label", model_id)),
+                            "capabilities": [],
+                        }
+                    )
+                    known_model_ids.add(model_id)
+                provider_default = next(
+                    (
+                        str(target.get("model", ""))
+                        for target in policy_targets
+                        if str(target.get("provider", "")) == provider_id
+                        and bool(target.get("selectable"))
+                    ),
+                    str(adapter.get_profile(None).model_id),
+                )
+                if provider_id == selected_provider:
+                    provider_default = selected_model
                 providers.append(
                     {
                         "provider_id": provider_id,
-                        "default_model": adapter.get_profile(None).model_id,
+                        "default_model": provider_default,
                         "models": models,
                     }
                 )
+        self._selected_provider_id = selected_provider or None
+        self._selected_model_id = selected_model or None
         self._emit(
             {
                 "type": "handshake.result",
                 "request_id": request_id,
                 "providers": providers,
-                "default_provider": "codex" if "codex" in self._adapters else (sorted(self._adapters)[0] if self._adapters else ""),
+                "default_provider": selected_provider,
+                "default_model": selected_model,
                 "legacy_terminal": {
                     "stack": "python-textual",
                     "replacement_target": "bun-ink",
                 },
+                # Adapter inventory proves transport shape only. Ship the
+                # independently typed route policy in the same handshake so a
+                # connected bridge can never be rendered as a provider-ready
+                # claim before model.policy refresh completes.
+                "payload": build_routing_decision_payload(policy),
+                "policy": policy,
                 "adapter_boot_error": adapter_error,
             }
         )
@@ -397,12 +528,6 @@ class TerminalBridge:
             git_summary=git_summary,
             topology=topology,
             summary=summary,
-        )
-        content = await asyncio.to_thread(
-            self._build_workspace_snapshot_from_parts,
-            summary,
-            git_summary,
-            topology,
         )
         self._emit_payload_result(
             "workspace.snapshot.result",
@@ -428,7 +553,6 @@ class TerminalBridge:
             bridge_status="connected",
             supervisor_preview=load_terminal_control_state(self._repo_root),
         )
-        content = await asyncio.to_thread(self._build_runtime_snapshot)
         self._emit_payload_result(
             "runtime.snapshot.result",
             request_id=request_id,
@@ -470,6 +594,17 @@ class TerminalBridge:
     async def _handle_action_run(self, request_id: str, request: dict[str, Any]) -> None:
         action_type = str(request.get("action_type", "") or "").strip().lower()
         result = await asyncio.to_thread(self._run_action, action_type, request)
+        if action_type == "model.set" and not bool(result.get("ok")):
+            # A failed route switch must render in the conversation, not just
+            # in the models pane: the assistant wire shape (F-173) lands on
+            # the open chat turn.
+            self._emit(
+                {
+                    "type": "assistant",
+                    "request_id": request_id,
+                    "message": f"✖ {result.get('summary', 'route change failed')}. {result.get('output', '')}".strip(),
+                }
+            )
         if action_type == "approval.resolve" and isinstance(result.get("payload"), dict):
             runtime_enforcement = await self._record_runtime_approval_resolution(result["payload"])
             result["payload"]["enforcement_state"] = runtime_enforcement["enforcement_state"]
@@ -620,8 +755,9 @@ class TerminalBridge:
         )
 
     async def _handle_model_policy(self, request_id: str, request: dict[str, Any]) -> None:
-        selected_provider = str(request.get("provider", "") or "codex").strip().lower()
-        selected_model = str(request.get("model", "") or "").strip() or model_routing.default_target().model_id
+        default_target = model_routing.default_target()
+        selected_provider = str(request.get("provider", "") or default_target.provider_id).strip().lower()
+        selected_model = str(request.get("model", "") or "").strip() or default_target.model_id
         strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
         policy = await asyncio.to_thread(
             self._build_model_policy_summary,
@@ -677,138 +813,27 @@ class TerminalBridge:
         )
         self._emit(payload)
 
-    async def _handle_session_start(self, request_id: str, request: dict[str, Any]) -> None:
-        if self._adapter_boot_error is not None or self._completion_request_cls is None:
-            self._emit(
-                {
-                    "type": "bridge.error",
-                    "request_id": request_id,
-                    "code": "adapter_boot_failed",
-                    "message": self._adapter_boot_error or "adapter runtime unavailable",
-                }
-            )
-            return
-        provider_id = str(request.get("provider", "") or "codex").strip().lower()
-        adapter = self._adapters.get(provider_id)
-        if adapter is None:
-            self._emit(
-                {
-                    "type": "bridge.error",
-                    "request_id": request_id,
-                    "code": "unknown_provider",
-                    "message": provider_id,
-                }
-            )
-            return
-
-        prompt = str(request.get("prompt", "") or "").strip()
-        if not prompt:
-            self._emit(
-                {
-                    "type": "bridge.error",
-                    "request_id": request_id,
-                    "code": "missing_prompt",
-                    "message": "session.start requires a prompt",
-                }
-            )
-            return
-        bootstrap = request.get("bootstrap")
-        if not isinstance(bootstrap, dict):
-            bootstrap = await asyncio.to_thread(self._build_session_bootstrap, request)
-        intent = bootstrap.get("intent") if isinstance(bootstrap, dict) else None
-        if isinstance(intent, dict) and intent.get("kind") == "command" and intent.get("auto_execute"):
-            self._emit(
-                {
-                    "type": "intent.result",
-                    "request_id": request_id,
-                    "intent": intent,
-                }
-            )
-            await self._handle_command(
-                request_id,
-                {
-                    "command": str(intent.get("command", "")),
-                },
-            )
-            self._emit(
-                {
-                    "type": "session_end",
-                    "request_id": request_id,
-                    "success": True,
-                    "session_id": None,
-                }
-            )
-            return
-        if isinstance(intent, dict) and intent.get("kind") == "identity":
-            self._emit(
-                {
-                    "type": "assistant",
-                    "request_id": request_id,
-                    "message": self._render_identity_response(bootstrap if isinstance(bootstrap, dict) else {}),
-                }
-            )
-            self._emit(
-                {
-                    "type": "session_end",
-                    "request_id": request_id,
-                    "success": True,
-                    "session_id": None,
-                }
-            )
-            return
-        if isinstance(intent, dict) and intent.get("kind") == "memory":
-            self._emit(
-                {
-                    "type": "assistant",
-                    "request_id": request_id,
-                    "message": self._render_memory_response(bootstrap if isinstance(bootstrap, dict) else None),
-                }
-            )
-            self._emit(
-                {
-                    "type": "session_end",
-                    "request_id": request_id,
-                    "success": True,
-                    "session_id": None,
-                }
-            )
-            return
-
-        session_id = str(request.get("session_id", "") or uuid.uuid4().hex)
-        self._active_session_id = session_id
-        self._active_provider_id = provider_id
-        self._active_model_id = str(request.get("model", "") or adapter.get_profile(None).model_id)
-        self._emit(
-            {
-                "type": "session.ack",
-                "request_id": request_id,
-                "session_id": session_id,
-                "provider": provider_id,
-                "model": self._active_model_id,
-            }
+    def _navigator_manifest(self) -> str:
+        # The agent drives the Helm by emitting directives in its reply. The TS
+        # parses them, executes the VIEW action, strips the sentinel, narrates.
+        return (
+            "NAVIGATOR — you can DRIVE this cockpit for the operator, who is watching live. "
+            "To act, put a directive on its own at the start of a line: ⟦helm:VERB ARG⟧. "
+            "Verbs: ⟦helm:open PANE⟧ where PANE is one of "
+            "chat|mission|repo|commands|models|ontology|runtime|sessions|approvals|control|agents|evolution; "
+            "⟦helm:zen⟧ ⟦helm:cockpit⟧ ⟦helm:scroll⟧ to change the face; "
+            "⟦helm:dock⟧ / ⟦helm:undock⟧ for the chat rail; "
+            "⟦helm:model ALIAS⟧ to switch the route. "
+            "NARRATE-THEN-ACT: before a directive, say in one plain sentence what you are about to show and why; after, tell them how to undo it. "
+            "Never move two surfaces in one turn without naming both. "
+            "You may NOT resolve approvals or run evolution — narrate a refusal and point at /approval. "
+            "The operator steers in plain language; you are the hands, they are the eyes and the judge."
         )
-
-        completion = self._completion_request_cls(
-            messages=[{"role": "user", "content": prompt}],
-            model=str(request.get("model", "") or adapter.get_profile(None).model_id),
-            system_prompt=str(request.get("system_prompt", "") or bootstrap.get("system_prompt", "") or "") or None,
-            enable_thinking=bool(request.get("enable_thinking", False)),
-            resume_session_id=str(request.get("resume_session_id", "") or "") or None,
-            provider_options=dict(request.get("provider_options", {}) or {}),
-        )
-
-        try:
-            async for event in adapter.stream(completion, session_id=session_id):
-                if isinstance(event, ToolCallComplete):
-                    self._emit_permission_decision(request_id, event)
-                payload = asdict(event)
-                payload["request_id"] = request_id
-                self._emit(payload)
-        finally:
-            self._active_session_id = None
 
     async def _handle_session_catalog(self, request_id: str, request: dict[str, Any]) -> None:
-        cwd = str(request.get("cwd", "") or "").strip() or None
+        # The Helm is a workspace control surface. A missing filter must mean
+        # "this workspace", never the operator's entire global session store.
+        cwd = str(request.get("cwd", "") or "").strip() or str(self._repo_root)
         limit = int(request.get("limit", 20) or 20)
         catalog = await asyncio.to_thread(
             build_session_catalog,
@@ -858,21 +883,213 @@ class TerminalBridge:
             session_id=session_id,
         )
 
-    async def _handle_session_cancel(self, request_id: str) -> None:
-        cancelled = False
-        if self._active_provider_id:
-            adapter = self._adapters.get(self._active_provider_id)
-            if adapter is not None:
-                await adapter.cancel()
-                cancelled = True
-        self._emit(
-            {
-                "type": "session.cancelled",
-                "request_id": request_id,
-                "cancelled": cancelled,
-                "session_id": self._active_session_id,
-            }
+    async def _handle_session_cancel(
+        self,
+        request_id: str,
+        request: dict[str, Any],
+    ) -> None:
+        target_request_id = str(request.get("target_request_id", "") or "").strip()
+        active = self._active_run
+        if not target_request_id:
+            self._emit_cancel_ack(
+                request_id=request_id,
+                target_request_id="",
+                cancelled=False,
+                reason="missing_target_request_id",
+                active=active,
+            )
+            return
+        if active is None:
+            reason = (
+                "stale"
+                if target_request_id in self._completed_session_request_ids
+                else "idle"
+            )
+            self._emit_cancel_ack(
+                request_id=request_id,
+                target_request_id=target_request_id,
+                cancelled=False,
+                reason=reason,
+                active=None,
+            )
+            return
+        if target_request_id != active.request_id:
+            self._emit_cancel_ack(
+                request_id=request_id,
+                target_request_id=target_request_id,
+                cancelled=False,
+                reason="target_mismatch",
+                active=active,
+            )
+            return
+        if active.terminal_emitted or active.phase in {"finalizing", "complete"}:
+            self._emit_cancel_ack(
+                request_id=request_id,
+                target_request_id=target_request_id,
+                cancelled=False,
+                reason="stale",
+                active=active,
+            )
+            return
+        if active.cancel_requested:
+            self._emit_cancel_ack(
+                request_id=request_id,
+                target_request_id=target_request_id,
+                cancelled=False,
+                reason="already_cancelling",
+                active=active,
+            )
+            return
+
+        target_phase = active.phase
+        active.cancel_request_id = request_id
+        cancel_error = await self._cancel_active_run(active, reason="cancelled_by_operator")
+        self._emit_cancel_ack(
+            request_id=request_id,
+            target_request_id=target_request_id,
+            cancelled=True,
+            reason="cancel_requested",
+            active=active,
+            target_phase=target_phase,
+            provider_cancel_error=cancel_error,
         )
+
+    async def _cancel_active_run(
+        self,
+        run: _ActiveSessionRun,
+        *,
+        reason: str,
+    ) -> str | None:
+        run.cancel_requested = True
+        run.cancel_reason = reason
+        run.phase = "cancelling"
+        provider_cancel_error: str | None = None
+        adapter = self._adapters.get(run.provider_id)
+        if adapter is not None:
+            try:
+                await adapter.cancel()
+            except Exception as exc:
+                provider_cancel_error = f"{type(exc).__name__}: {exc}"
+
+        task = run.task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+        if task is not None and task is not asyncio.current_task():
+            await asyncio.gather(task, return_exceptions=True)
+        return provider_cancel_error
+
+    def _set_active_run(self, run: _ActiveSessionRun) -> None:
+        self._active_run = run
+        self._active_session_id = run.session_id
+        self._active_provider_id = run.provider_id
+        self._active_model_id = run.model_id
+        self._selected_provider_id = run.provider_id
+        self._selected_model_id = run.model_id
+
+    def _set_active_provider(
+        self,
+        run: _ActiveSessionRun,
+        provider_id: str,
+        model_id: str,
+    ) -> None:
+        run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
+        run.provider_id = provider_id
+        run.model_id = model_id
+        if self._active_run is run:
+            self._active_provider_id = provider_id
+            self._active_model_id = model_id
+            self._selected_provider_id = provider_id
+            self._selected_model_id = model_id
+
+    def _clear_active_run(self, run: _ActiveSessionRun) -> None:
+        if self._active_run is not run:
+            return
+        self._active_run = None
+        self._active_session_id = None
+        self._active_provider_id = None
+        self._active_model_id = None
+
+    def _mark_terminal_emitted(self, run: _ActiveSessionRun) -> None:
+        run.phase = "finalizing"
+        run.terminal_emitted = True
+
+    def _emit_cancelled_terminal(self, run: _ActiveSessionRun) -> None:
+        if run.terminal_emitted:
+            return
+        run.phase = "finalizing"
+        error_message = (
+            "bridge closed"
+            if run.cancel_reason == "bridge_closed"
+            else "cancelled by operator"
+        )
+        try:
+            terminal = run.lifecycle.cancel(error_message)
+        except Exception as exc:
+            self._emit(
+                {
+                    "type": "bridge.error",
+                    "request_id": run.request_id,
+                    "code": "session_persistence_failed",
+                    "message": f"{type(exc).__name__}: {exc}",
+                }
+            )
+            terminal = run.lifecycle.terminal_event
+        if terminal is not None and not run.terminal_emitted:
+            self._mark_terminal_emitted(run)
+            self._emit(
+                {
+                    "type": "session_end",
+                    "request_id": run.request_id,
+                    "session_id": terminal.session_id,
+                    "provider_id": terminal.provider_id or run.provider_id,
+                    "success": False,
+                    "cancelled": True,
+                    "error_code": "cancelled",
+                    "error_message": terminal.error_message or error_message,
+                }
+            )
+
+    def _emit_cancel_ack(
+        self,
+        *,
+        request_id: str,
+        target_request_id: str,
+        cancelled: bool,
+        reason: str,
+        active: _ActiveSessionRun | None,
+        target_phase: str | None = None,
+        provider_cancel_error: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "type": "session.cancelled",
+            "request_id": request_id,
+            "target_request_id": target_request_id,
+            "cancelled": cancelled,
+            "reason": reason,
+            "session_id": active.session_id if active is not None else None,
+            "provider": active.provider_id if active is not None else None,
+        }
+        if active is not None:
+            payload.update(
+                {
+                    "active_request_id": active.request_id,
+                    "active_phase": active.phase,
+                }
+            )
+        if target_phase is not None:
+            payload["target_phase"] = target_phase
+        if provider_cancel_error is not None:
+            payload["provider_cancel_error"] = provider_cancel_error
+        self._emit(payload)
+
+    def _remember_completed_session_request(self, request_id: str) -> None:
+        if not request_id:
+            return
+        self._completed_session_request_ids = [
+            item for item in self._completed_session_request_ids if item != request_id
+        ]
+        self._completed_session_request_ids.append(request_id)
+        self._completed_session_request_ids = self._completed_session_request_ids[-64:]
 
     def _emit(self, payload: dict[str, Any]) -> None:
         sys.stdout.write(json.dumps(payload, default=_json_default) + "\n")
@@ -914,7 +1131,7 @@ class TerminalBridge:
         created_at = str(payload.get("resolved_at", "") or datetime.now(timezone.utc).isoformat())
         domain = str(payload.get("domain", "") or "")
         if domain == "permission_decision":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionDecisionEvent(
                     session_id=session_id,
@@ -932,7 +1149,7 @@ class TerminalBridge:
             )
             return
         if domain == "permission_resolution":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionResolutionEvent(
                     session_id=session_id,
@@ -949,7 +1166,7 @@ class TerminalBridge:
             )
             return
         if domain == "permission_outcome":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionOutcomeEvent(
                     session_id=session_id,
@@ -962,6 +1179,12 @@ class TerminalBridge:
                     metadata=dict(metadata_record),
                 ),
             )
+            return
+
+    def _append_permission_event(self, session_id: str, event: Any) -> None:
+        try:
+            self._session_store.append_event(session_id, event)
+        except FileNotFoundError:
             return
 
     def _build_workspace_snapshot(self) -> str:
@@ -1245,7 +1468,9 @@ class TerminalBridge:
     def _build_session_bootstrap(self, request: dict[str, Any]) -> dict[str, Any]:
         prompt = str(request.get("prompt", "") or "").strip()
         active_tab = str(request.get("active_tab", "") or "chat")
-        selected_provider = str(request.get("provider", "") or "codex").strip().lower()
+        selected_provider = str(
+            request.get("provider", "") or model_routing.default_target().provider_id
+        ).strip().lower()
         selected_model = str(request.get("model", "") or "").strip()
         intent = self._resolve_prompt_intent(prompt)
         explicit_target = model_routing.resolve_model_target(prompt)
@@ -1274,6 +1499,8 @@ class TerminalBridge:
             selected_model=selected_model,
             strategy=explicit_strategy or "responsive",
         )
+        selected_provider = str(model_policy.get("selected_provider", selected_provider))
+        selected_model = str(model_policy.get("selected_model", selected_model))
         orientation_packet = build_orientation_packet(
             role="operator",
             claims=[],
@@ -1482,6 +1709,7 @@ class TerminalBridge:
                 status_by_model_id[route_status.model_id] = projected
 
         terminal_providers = self._available_provider_ids()
+        local_attempt_cache: dict[str, bool] = {}
         seen_routes: set[tuple[str, str]] = set()
         targets: list[dict[str, Any]] = []
         for target in model_routing.all_targets():
@@ -1506,10 +1734,27 @@ class TerminalBridge:
                 for route_status in route_statuses
             )
             adapter_available = provider_id in terminal_providers
-            selectable = model_available and adapter_available
-            if selectable:
+            oracle_unverified = bool(route_statuses) and all(
+                route_status.status == "unverified"
+                and route_status.reason == "key_status_unknown"
+                for route_status in route_statuses
+            )
+            local_attempt_authorized = False
+            if adapter_available and oracle_unverified:
+                if provider_id not in local_attempt_cache:
+                    local_attempt_cache[provider_id] = (
+                        self._local_cli_attempt_authorized(provider_id)
+                    )
+                local_attempt_authorized = local_attempt_cache[provider_id]
+            selectable = adapter_available and (
+                model_available or local_attempt_authorized
+            )
+            if model_available and adapter_available:
                 route_state = "ready"
                 availability_reason = None
+            elif local_attempt_authorized:
+                route_state = "unverified"
+                availability_reason = "local_cli_auth_unverified"
             elif model_available and not adapter_available:
                 route_state = "unavailable"
                 availability_reason = "terminal_adapter_missing"
@@ -1578,11 +1823,15 @@ class TerminalBridge:
             and bool(target.get("selectable"))
         ][:6]
         provider_counts: dict[str, int] = {}
+        attemptable_provider_counts: dict[str, int] = {}
         for target in targets:
-            if not bool(target.get("selectable")):
-                continue
             provider = str(target["provider"])
-            provider_counts[provider] = provider_counts.get(provider, 0) + 1
+            if bool(target.get("available")):
+                provider_counts[provider] = provider_counts.get(provider, 0) + 1
+            if bool(target.get("selectable")):
+                attemptable_provider_counts[provider] = (
+                    attemptable_provider_counts.get(provider, 0) + 1
+                )
         return {
             "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
             "oracle_state": projection.oracle_state,
@@ -1603,6 +1852,10 @@ class TerminalBridge:
             "available_providers": [
                 {"id": provider, "model_count": count}
                 for provider, count in sorted(provider_counts.items())
+            ],
+            "attemptable_providers": [
+                {"id": provider, "model_count": count}
+                for provider, count in sorted(attemptable_provider_counts.items())
             ],
         }
 
@@ -1906,6 +2159,13 @@ class TerminalBridge:
                 "confidence": "medium",
                 "reason": "agent-orchestration request",
             }
+        if self._looks_like_tool_capable_work(lowered):
+            return {
+                "kind": "agent",
+                "auto_execute": False,
+                "confidence": "high",
+                "reason": "tool-capable repo work request",
+            }
         if any(term in lowered for term in ("evolve", "improve yourself", "refine the shell", "cascade")):
             return {
                 "kind": "evolution",
@@ -1919,6 +2179,20 @@ class TerminalBridge:
             "confidence": "medium",
             "reason": "default conversational turn",
         }
+
+    def _looks_like_tool_capable_work(self, lowered_prompt: str) -> bool:
+        action = re.search(
+            r"\b(add|analyze|build|check|debug|edit|execute|fix|grep|implement|inspect|lint|list|modify|patch|read|refactor|run|scan|search|test|typecheck|update|write)\b",
+            lowered_prompt,
+        )
+        if action is None:
+            return False
+        return bool(
+            re.search(
+                r"(/|\.py\b|\.ts\b|\.tsx\b|\.js\b|\.jsx\b|\.json\b|\.md\b|\bbug\b|\bcode\b|\bcommand\b|\bdashboard\b|\bdiff\b|\berror\b|\bfailing\b|\bfile\b|\bfiles\b|\bgit\b|\bpytest\b|\brepo\b|\brepository\b|\bshell\b|\bterminal\b|\btest\b|\btests\b|\btool\b|\btools\b|\btui\b)",
+                lowered_prompt,
+            )
+        )
 
     def _render_identity_response(self, bootstrap: dict[str, Any]) -> str:
         return render_identity_response(bootstrap, repo_root=self._repo_root)
@@ -1970,7 +2244,12 @@ class TerminalBridge:
                     "Use the Control and Timeline panes for current runtime truth.",
                 ]
             )
-        if command in {"memory", "archive", "truth", "stigmergy", "darwin", "hum"}:
+        if command == "memory":
+            from dharma_swarm.memory_common import render_memory_common_command
+
+            _, _, arg = raw_command.partition(" ")
+            return render_memory_common_command(arg or "status", state_dir=self._state_dir)
+        if command in {"archive", "truth", "stigmergy", "darwin", "hum"}:
             return "\n".join(
                 [
                     "# Memory Surface",
@@ -1986,8 +2265,16 @@ class TerminalBridge:
         mode, _, arg = remainder.partition(" ")
         mode = mode.strip().lower() or "status"
         arg = arg.strip()
-        current_provider = self._active_provider_id or model_routing.default_target().provider_id
-        current_model = self._active_model_id or model_routing.default_target().model_id
+        current_provider = (
+            self._active_provider_id
+            or self._selected_provider_id
+            or model_routing.default_target().provider_id
+        )
+        current_model = (
+            self._active_model_id
+            or self._selected_model_id
+            or model_routing.default_target().model_id
+        )
 
         if mode in {"status", "list", "metrics"}:
             return self._render_model_policy_text(
@@ -2003,14 +2290,11 @@ class TerminalBridge:
                 target = model_routing.target_by_index(int(arg))
             if target is None:
                 return f"Unknown model target: {arg or 'missing'}"
-            # Unroutable (zero live provider keys) => non-selectable. Refuse the
-            # switch instead of flapping onto a dead provider. FAIL-OPEN: a blind
-            # key oracle keeps every target selectable (today's behaviour).
             if not model_routing.is_routable(target):
                 return (
                     f"Model '{target.alias}' is unroutable "
                     f"(no live key for {target.provider_id}). "
-                    f"Run `dkeys test` or pick a live model with /model list."
+                    "Run `dkeys test` or pick a live model with /model list."
                 )
             return self._render_model_policy_text(
                 self._build_model_policy_summary(
@@ -2091,9 +2375,56 @@ class TerminalBridge:
             provider = str(request.get("provider", "") or model_routing.default_target().provider_id).strip().lower()
             model = str(request.get("model", "") or model_routing.default_target().model_id).strip()
             strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
-            self._active_provider_id = provider
-            self._active_model_id = model
-            policy = self._build_model_policy_summary(selected_provider=provider, selected_model=model, strategy=strategy)
+            requested_route = f"{provider}:{model}"
+            target = model_routing.target_for_route(provider, model)
+            if target is None or not model_routing.is_routable(target):
+                self._remember_action(f"model.set REFUSED {requested_route} (unroutable)")
+                return {
+                    "ok": False,
+                    "summary": f"route change failed: {requested_route} is unroutable",
+                    "target_pane": "models",
+                    "output": f"Route {requested_route} has no canonical live route.",
+                    "requested_route": requested_route,
+                }
+            try:
+                policy = self._build_model_policy_summary(selected_provider=provider, selected_model=model, strategy=strategy)
+            except Exception as exc:
+                self._remember_action(f"model.set FAILED {requested_route} ({type(exc).__name__})")
+                return {
+                    "ok": False,
+                    "summary": f"route change failed: {requested_route}",
+                    "target_pane": "models",
+                    "output": f"Route change to {requested_route} failed: {type(exc).__name__}: {exc}",
+                    "requested_route": requested_route,
+                }
+            if str(policy.get("selected_route", "")) != requested_route:
+                # The policy builder silently rewrites unavailable routes to a
+                # fallback; surfacing that as success is the silent
+                # route-switch failure the operator hit. Refuse honestly.
+                active_provider = (
+                    self._active_provider_id
+                    or self._selected_provider_id
+                    or str(policy.get("selected_provider", ""))
+                )
+                active_model = (
+                    self._active_model_id
+                    or self._selected_model_id
+                    or str(policy.get("selected_model", ""))
+                )
+                self._remember_action(f"model.set REFUSED {requested_route} (unavailable)")
+                return {
+                    "ok": False,
+                    "summary": f"route change failed: {requested_route} is not available",
+                    "target_pane": "models",
+                    "output": (
+                        f"Route {requested_route} is not available on this bridge "
+                        f"(providers: {', '.join(sorted(self._adapters)) or 'none'}). "
+                        f"Staying on {active_provider}:{active_model}."
+                    ),
+                    "requested_route": requested_route,
+                }
+            self._selected_provider_id = provider
+            self._selected_model_id = model
             self._remember_action(f"model.set -> {provider}:{model} ({strategy})")
             return {
                 "ok": True,

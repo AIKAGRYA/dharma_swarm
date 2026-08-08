@@ -48,6 +48,7 @@ _TASK_TO_CARD_STATUS: dict[TaskStatus, CardStatus] = {
     TaskStatus.COMPLETED: "done",
     TaskStatus.FAILED: "failed",
     TaskStatus.CANCELLED: "cancelled",
+    TaskStatus.QUARANTINED_FAKE_RESULT: "quarantined",
 }
 
 _CARD_TO_TASK_STATUS: dict[CardStatus, TaskStatus] = {

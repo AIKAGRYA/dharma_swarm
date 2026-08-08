@@ -11,7 +11,9 @@ import tempfile
 import time
 from typing import Any, AsyncIterator
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.models import ProviderType
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
 from ..events import (
     ErrorEvent,
@@ -32,6 +34,18 @@ CODEX_CAPABILITIES = (
     | Capability.SYSTEM_PROMPT
     | Capability.CANCEL
 )
+
+
+def _canonical_codex_model() -> str:
+    entry = _model_pool.get_entry("gpt-5.5")
+    if entry is not None:
+        for route in entry.routes:
+            if route.provider is ProviderType.CODEX:
+                return route.model_id
+    raise AssertionError("model_pool has no Codex route for gpt-5.5")
+
+
+CODEX_DEFAULT_MODEL = _canonical_codex_model()
 
 
 def _capability_names(caps: Capability) -> list[str]:
@@ -57,7 +71,7 @@ class CodexAdapter(ProviderAdapter):
     ) -> None:
         self._config = config or ProviderConfig(
             provider_id=self.provider_id,
-            default_model="gpt-5.4",
+            default_model=CODEX_DEFAULT_MODEL,
         )
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
@@ -65,6 +79,12 @@ class CodexAdapter(ProviderAdapter):
         self._pending_agent_message: str | None = None
         self._tool_started_at: dict[str, float] = {}
         self._profiles: dict[str, ModelProfile] = {
+            CODEX_DEFAULT_MODEL: ModelProfile(
+                provider_id=self.provider_id,
+                model_id=CODEX_DEFAULT_MODEL,
+                display_name="GPT-5.5 (Codex)",
+                capabilities=CODEX_CAPABILITIES,
+            ),
             "gpt-5.4": ModelProfile(
                 provider_id=self.provider_id,
                 model_id="gpt-5.4",
@@ -77,8 +97,16 @@ class CodexAdapter(ProviderAdapter):
         return list(self._profiles.values())
 
     def get_profile(self, model_id: str | None = None) -> ModelProfile:
-        model = model_id or self._config.default_model or "gpt-5.4"
-        return self._profiles.get(model, next(iter(self._profiles.values())))
+        model = model_id or self._config.default_model or CODEX_DEFAULT_MODEL
+        profile = self._profiles.get(model)
+        if profile is not None:
+            return profile
+        return ModelProfile(
+            provider_id=self.provider_id,
+            model_id=model,
+            display_name=model,
+            capabilities=CODEX_CAPABILITIES,
+        )
 
     async def stream(
         self,
@@ -263,10 +291,18 @@ class CodexAdapter(ProviderAdapter):
         *,
         output_path: Path,
     ) -> list[str]:
-        model = request.model or self._config.default_model or "gpt-5.4"
-        cmd = dgc_codex_exec_prefix(cli_path=self._cli_path)
+        model = request.model or self._config.default_model or CODEX_DEFAULT_MODEL
+        cmd = dgc_codex_exec_prefix(
+            cli_path=self._cli_path,
+            dangerous_bypass=False,
+        )
+        sandbox_mode = str(request.provider_options.get("sandbox", "read-only"))
+        if sandbox_mode not in {"read-only", "workspace-write", "danger-full-access"}:
+            sandbox_mode = "read-only"
         cmd.extend(
             [
+                "--sandbox",
+                sandbox_mode,
                 "-m",
                 model,
                 "--json",
@@ -493,6 +529,15 @@ class CodexAdapter(ProviderAdapter):
                     )
                     message = str(item.get("message", "") or "").strip()
                     if message:
+                        if _is_nonfatal_advisory(message):
+                            events.append(
+                                ThinkingComplete(
+                                    **base,
+                                    content=f"Codex advisory: {message}",
+                                    is_redacted=False,
+                                )
+                            )
+                            return events
                         code, retryable = _classify_error(message)
                         events.append(
                             ErrorEvent(
@@ -572,6 +617,13 @@ def _classify_error(message: str) -> tuple[str, bool]:
     if "lookup address" in lower or "timed out" in lower or "disconnected" in lower:
         return ("transport_error", True)
     return ("codex_error", False)
+
+
+def _is_nonfatal_advisory(message: str) -> bool:
+    """Recognize CLI diagnostics that do not make the turn fail."""
+
+    normalized = message.strip().lower()
+    return normalized.startswith("skill descriptions were shortened to fit")
 
 
 def _extract_message_text(item: dict[str, Any]) -> str:

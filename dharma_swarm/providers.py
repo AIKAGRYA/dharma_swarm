@@ -76,6 +76,7 @@ from dharma_swarm.provider_transport import (
     response_indicates_failure,
     route_request_with_transport_provenance,
 )
+from dharma_swarm.receipt_consumption import apply_receipt_consumption_ranking
 from dharma_swarm.router_retrospective import (
     RouteOutcomeRecord,
     build_route_retrospective,
@@ -2262,6 +2263,7 @@ class ModelRouter:
                 )
             else:
                 self._telemetry = None
+        self._boot_id = uuid4().hex
 
     @staticmethod
     def _parse_provider_type(raw: str) -> ProviderType | None:
@@ -2912,6 +2914,23 @@ class ModelRouter:
             decision,
             transport_aliases,
         )
+        chain, receipt_consumption_applied, _ = apply_receipt_consumption_ranking(
+            chain,
+            db_path=Path(
+                os.environ.get(
+                    "DGC_ROUTER_RECEIPT_DB",
+                    str(Path.home() / ".dharma" / "state" / "runtime.db"),
+                )
+            ),
+            boot_id=getattr(self, "_boot_id", uuid4().hex),
+        )
+        if receipt_consumption_applied and chain:
+            decision = replace(
+                decision,
+                selected_provider=chain[0],
+                fallback_providers=chain[1:],
+                reasons=[*decision.reasons, "receipt_consumption_applied"],
+            )
         task_signature = build_task_signature(
             action_name=enriched_request.action_name,
             context=enriched_request.context,

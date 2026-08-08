@@ -17,6 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.sandbox import await_cleanup, terminate_process_group
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.spine.tollbooth import require_execution_tollbooth
 
@@ -34,6 +35,7 @@ class ApplyResult(BaseModel):
     success: bool
     files_changed: list[str] = []
     backup_paths: dict[str, str] = {}  # original -> backup
+    created_files: list[str] = []
     error: str = ""
 
 
@@ -191,8 +193,6 @@ class DiffApplier:
         self._runtime_state = runtime_state
         self._require_identity = require_identity
 
-    # -- public API ---------------------------------------------------------
-
     async def apply(
         self,
         diff_text: str,
@@ -276,6 +276,7 @@ class DiffApplier:
 
         files_changed: list[str] = []
         backup_paths: dict[str, str] = {}
+        created_files: list[str] = []
 
         for patch in patches:
             target = self.workspace / patch.target_path
@@ -327,6 +328,8 @@ class DiffApplier:
                 )
 
             files_changed.append(patch.target_path)
+            if patch.is_new_file and str(target) not in backup_paths:
+                created_files.append(patch.target_path)
 
         if identity is not None and self._runtime_state is not None:
             self._runtime_state.record_self_mod_receipt_sync(
@@ -340,14 +343,11 @@ class DiffApplier:
             success=True,
             files_changed=files_changed,
             backup_paths=backup_paths,
+            created_files=created_files,
         )
 
     async def rollback(self, result: ApplyResult) -> None:
-        """Restore files from backups recorded in *result*.
-
-        Args:
-            result: A previous ``ApplyResult`` whose backups should be restored.
-        """
+        """Restore backups and unlink only paths created by this apply."""
         for original, backup in result.backup_paths.items():
             backup_path = Path(backup)
             original_path = Path(original)
@@ -355,6 +355,13 @@ class DiffApplier:
                 shutil.copy2(str(backup_path), str(original_path))
                 backup_path.unlink()
                 logger.debug("Rolled back %s from %s", original, backup)
+        for relative in result.created_files:
+            candidate = self.workspace / relative
+            parent = candidate.parent.resolve(strict=False)
+            if parent.is_relative_to(self.workspace):
+                # Do not resolve the final component: unlink a replacement
+                # symlink itself, never the file it points at.
+                (parent / candidate.name).unlink(missing_ok=True)
 
     async def apply_and_test(
         self,
@@ -364,18 +371,8 @@ class DiffApplier:
     ) -> ApplyTestResult:
         """Apply a diff, run tests, and rollback on failure.
 
-        1. Apply the diff.
-        2. Run *test_command* via subprocess.
-        3. If tests pass (exit code 0): keep changes, return success.
-        4. If tests fail: rollback and return failure with test output.
-
-        Args:
-            diff_text: Unified diff text.
-            test_command: Shell command to validate the change.
-            timeout: Maximum seconds to wait for the test command.
-
-        Returns:
-            An ``ApplyTestResult`` describing the outcome.
+        Caller cancellation terminates the test process, restores the workspace,
+        and then propagates ``CancelledError`` to the orchestrator.
         """
         apply_result = await self.apply(diff_text)
         if not apply_result.success:
@@ -392,39 +389,41 @@ class DiffApplier:
                 files_changed=[],
             )
 
-        # Run tests
+        proc: asyncio.subprocess.Process | None = None
         try:
             proc = await asyncio.create_subprocess_shell(
                 test_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.workspace),
+                start_new_session=True,
             )
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout
+            )
+        except asyncio.TimeoutError:
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    proc.communicate(), timeout=timeout
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-                # Rollback on timeout
-                await self.rollback(apply_result)
-                return ApplyTestResult(
-                    applied=True,
-                    tests_passed=False,
-                    tests_output="Test command timed out",
-                    files_changed=apply_result.files_changed,
-                    rolled_back=True,
-                    error=f"Test command timed out after {timeout}s",
-                )
-
-            output = stdout_bytes.decode(errors="replace")
-            err_output = stderr_bytes.decode(errors="replace")
-            combined = (output + "\n" + err_output).strip()
-            returncode = proc.returncode if proc.returncode is not None else -1
-
+                if proc is not None:
+                    await terminate_process_group(proc)
+            finally:
+                await await_cleanup(self.rollback(apply_result))
+            return ApplyTestResult(
+                applied=True,
+                tests_passed=False,
+                tests_output="Test command timed out",
+                files_changed=apply_result.files_changed,
+                rolled_back=True,
+                error=f"Test command timed out after {timeout}s",
+            )
+        except asyncio.CancelledError:
+            try:
+                if proc is not None:
+                    await terminate_process_group(proc)
+            finally:
+                await await_cleanup(self.rollback(apply_result))
+            raise
         except OSError as exc:
-            await self.rollback(apply_result)
+            await await_cleanup(self.rollback(apply_result))
             return ApplyTestResult(
                 applied=True,
                 tests_passed=False,
@@ -434,8 +433,12 @@ class DiffApplier:
                 error=f"Failed to run test command: {exc}",
             )
 
+        output = stdout_bytes.decode(errors="replace")
+        err_output = stderr_bytes.decode(errors="replace")
+        combined = (output + "\n" + err_output).strip()
+        returncode = proc.returncode if proc.returncode is not None else -1
+
         if returncode == 0:
-            # Tests passed -- clean up backups
             for backup in apply_result.backup_paths.values():
                 Path(backup).unlink(missing_ok=True)
             return ApplyTestResult(
@@ -445,8 +448,7 @@ class DiffApplier:
                 files_changed=apply_result.files_changed,
             )
 
-        # Tests failed -- rollback
-        await self.rollback(apply_result)
+        await await_cleanup(self.rollback(apply_result))
         return ApplyTestResult(
             applied=True,
             tests_passed=False,
@@ -459,7 +461,7 @@ class DiffApplier:
 
     @staticmethod
     def _apply_patch(target: Path, patch: FilePatch) -> None:
-        """Apply all hunks from *patch* to *target*.
+        """Apply all hunks from *patch* to *target.
 
         For new files, creates the file with added lines.
         For existing files, applies hunks in reverse order to preserve

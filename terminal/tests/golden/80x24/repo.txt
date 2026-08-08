@@ -1,0 +1,24 @@
+ ◆ DHARMA  ·  Repo  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
+Chat Mission [Repo] Commands Models Ontology ▸
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Repo                                                                         │
+│ section focus active | j/k or ↑/↓ move between repo sections                 │
+│                                                                              │
+│  Sections                   Repo Snapshot                                    │
+│  repo posture and live      selected repo card                               │
+│  risk                       Workspace snapshot loading...                    │
+│                             The terminal should know what repo it is         │
+│  ▶ Repo Snapshot            standing in.                                     │
+│    2 rows                                                                    │
+│    Workspace snapshot                                                        │
+│  loading...                                                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ pane section focus  ·  route claude:claude-opus-4.8  ·  ○ offline

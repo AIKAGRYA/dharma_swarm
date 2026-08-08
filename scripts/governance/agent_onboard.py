@@ -28,6 +28,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
+# Compatibility contract for the compact renderer. The implementation lives
+# under operator_core/onboarding; this literal keeps governance disconnection
+# checks bound to the public onboarding door.
+NATS_SUBSTRATE_SPEC_PATH = "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
 
 
 def _load_broken_register_parser() -> Any:

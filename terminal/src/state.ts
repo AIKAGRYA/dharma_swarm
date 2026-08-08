@@ -1,12 +1,20 @@
 import {buildInitialOutline, buildInitialTabs} from "./mockContent";
 import type {ActivityEntry, AppAction, AppState, ApprovalQueueState, TabSpec} from "./types";
 import {mergeExecutionEvents, projectActivityEntries, projectChatTraceLines, projectPaneLines} from "./executionLog";
-import {defaultRoutePolicy, routePolicyWithConfig} from "./routePolicy";
+import {defaultRoutePolicy, routeLabel, routePolicyWithConfig} from "./routePolicy";
+import {
+  nextSessionPaneAfterCatalog,
+  nextSessionPaneAfterDetailFailure,
+  nextSessionPaneAfterDetailRequest,
+  nextSessionPaneAfterDetailResult,
+  nextSessionPaneAfterSelection,
+} from "./sessionPaneState";
 
 const initialTabs = buildInitialTabs();
 const initialRoutePolicy = defaultRoutePolicy();
 const ACTIVITY_ENTRY_RETENTION = 1000;
 const TAB_LINE_RETENTION = 2000;
+const NAVIGATOR_NARRATION_RETENTION = 3;
 
 function activateFallbackTab(tabs: TabSpec[], preferred?: string): string {
   if (preferred && tabs.some((tab) => tab.id === preferred)) {
@@ -72,8 +80,9 @@ function activeTabId(state: AppState): string {
 
 function projectedChatTraceLines(state: AppState, executionEventLog: AppState["executionEventLog"]): AppState["chatTraceLines"] {
   return projectChatTraceLines(executionEventLog, {
-    visibilityMode: state.activityFeed.visibilityMode,
+    expanded: state.chatTraceExpanded,
     showRaw: state.activityFeed.showRaw,
+    routeLabel: routeLabel(state.routePolicy),
   });
 }
 
@@ -81,15 +90,25 @@ export const initialState: AppState = {
   uiMode: {
     activeTabId: "chat",
     activeOverlay: {kind: "none"},
-    sidebarVisible: "collapsed",
+    keyboardFocus: "composer",
+    // FACE-2 command post: sidebar is OFF by default — the data panes carry
+    // the information; the sidebar is an explicit opt-in (^B).
+    sidebarVisible: "hidden",
     sidebarMode: "toc",
     focusedPaneId: "chat",
     compactMode: false,
+    // F-111: zen is the boot default — never persisted, every boot starts here.
+    layoutMode: "zen",
+    // Navigator rail OFF by default — the zen baseline stays pure.
+    railVisible: false,
   },
   bridgeStatus: "booting",
+  activeTurn: {phase: "idle"},
   routePolicy: initialRoutePolicy,
   executionEventLog: [],
   chatTraceLines: [],
+  chatTraceExpanded: false,
+  navigatorNarration: [],
   sessionContinuity: {
     continuityMode: "fresh",
     boundedHistory: [],
@@ -121,7 +140,9 @@ export const initialState: AppState = {
     historyBacked: false,
   },
   sessionPane: {
+    selectionProvenance: "follow_latest",
     detailsBySessionId: {},
+    pendingDetailRequestsBySessionId: {},
   },
   activityFeed: {
     entries: [],
@@ -147,6 +168,53 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
       return {...state, prompt: ""};
     case "bridge.status":
       return {...state, bridgeStatus: action.status};
+    case "turn.start":
+      return state.activeTurn.phase === "idle"
+        ? {...state, activeTurn: {phase: "running", requestId: action.requestId}}
+        : state;
+    case "turn.ack":
+      if (state.activeTurn.phase === "idle" || state.activeTurn.requestId !== action.requestId) {
+        return state;
+      }
+      return {
+        ...state,
+        activeTurn: {...state.activeTurn, sessionId: action.sessionId ?? state.activeTurn.sessionId},
+      };
+    case "turn.cancel.request":
+      if (state.activeTurn.phase !== "running" || state.activeTurn.requestId !== action.requestId) {
+        return state;
+      }
+      return {
+        ...state,
+        activeTurn: {
+          phase: "cancelling",
+          requestId: state.activeTurn.requestId,
+          cancelRequestId: action.cancelRequestId,
+          sessionId: state.activeTurn.sessionId,
+        },
+      };
+    case "turn.cancel.rejected":
+      if (
+        state.activeTurn.phase !== "cancelling" ||
+        state.activeTurn.requestId !== action.requestId ||
+        state.activeTurn.cancelRequestId !== action.cancelRequestId
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        activeTurn: {
+          phase: "running",
+          requestId: state.activeTurn.requestId,
+          sessionId: state.activeTurn.sessionId,
+        },
+      };
+    case "turn.finish":
+      return state.activeTurn.phase !== "idle" && state.activeTurn.requestId === action.requestId
+        ? {...state, activeTurn: {phase: "idle"}}
+        : state;
+    case "turn.reset":
+      return state.activeTurn.phase === "idle" ? state : {...state, activeTurn: {phase: "idle"}};
     case "bridge.config": {
       const nextStrategy = action.strategy ?? state.routePolicy.strategy;
       return {
@@ -194,6 +262,18 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
                 ...state.uiMode,
                 compactMode: action.compact,
               },
+      };
+    case "ui.focus.set":
+      return state.uiMode.keyboardFocus === action.focus
+        ? state
+        : {...state, uiMode: {...state.uiMode, keyboardFocus: action.focus}};
+    case "ui.focus.toggle":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          keyboardFocus: state.uiMode.keyboardFocus === "composer" ? "navigation" : "composer",
+        },
       };
     case "modelPicker.open":
       return {
@@ -280,6 +360,22 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           },
         },
       };
+    case "tour.open":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          activeOverlay: {kind: "tour"},
+        },
+      };
+    case "tour.close":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          activeOverlay: {kind: "none"},
+        },
+      };
     case "tab.replace":
       return {
         ...state,
@@ -298,7 +394,9 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "footer.set":
       return {...state, footerHint: action.value};
     case "sidebar.toggle": {
-      const cycle = {visible: "collapsed", collapsed: "hidden", hidden: "visible"} as const;
+      // F-162: the "collapsed" sliver state is dead — the sidebar is either
+      // visible or zero-width hidden. Legacy "collapsed" resolves to hidden.
+      const cycle = {visible: "hidden", collapsed: "hidden", hidden: "visible"} as const;
       return {
         ...state,
         uiMode: {
@@ -314,6 +412,34 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           ...state.uiMode,
           sidebarMode: action.mode,
           sidebarVisible: "visible",
+        },
+      };
+    case "rail.toggle":
+      return {
+        ...state,
+        uiMode: {...state.uiMode, railVisible: !state.uiMode.railVisible},
+      };
+    case "rail.set":
+      return {
+        ...state,
+        uiMode: {...state.uiMode, railVisible: action.visible},
+      };
+    case "navigator.narrate": {
+      const line = action.line.trim();
+      if (!line) {
+        return state;
+      }
+      return {
+        ...state,
+        navigatorNarration: [...state.navigatorNarration, line].slice(-NAVIGATOR_NARRATION_RETENTION),
+      };
+    }
+    case "layout.mode.set":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          layoutMode: action.mode,
         },
       };
     case "tab.activate":
@@ -572,27 +698,30 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "session.catalog.set":
       return {
         ...state,
-        sessionPane: {
-          ...state.sessionPane,
-          catalog: action.catalog,
-          selectedSessionId:
-            action.selectedSessionId ??
-            state.sessionPane.selectedSessionId ??
-            action.catalog.sessions[0]?.session.session_id,
-        },
+        sessionPane: nextSessionPaneAfterCatalog(state.sessionPane, action.catalog),
       };
-    case "session.detail.set":
+    case "session.detail.requested":
       return {
         ...state,
-        sessionPane: {
-          ...state.sessionPane,
-          selectedSessionId: action.detail.session.session_id,
-          detailsBySessionId: {
-            ...state.sessionPane.detailsBySessionId,
-            [action.detail.session.session_id]: action.detail,
-          },
-        },
+        sessionPane: nextSessionPaneAfterDetailRequest(
+          state.sessionPane,
+          action.requestId,
+          action.sessionId,
+        ),
       };
+    case "session.detail.received": {
+      const sessionPane = nextSessionPaneAfterDetailResult(
+        state.sessionPane,
+        action.requestId,
+        action.sessionId,
+        action.detail,
+      );
+      return sessionPane ? {...state, sessionPane} : state;
+    }
+    case "session.detail.failed": {
+      const sessionPane = nextSessionPaneAfterDetailFailure(state.sessionPane, action.requestId);
+      return sessionPane === state.sessionPane ? state : {...state, sessionPane};
+    }
     case "session.continuity.set":
       return {
         ...state,
@@ -601,10 +730,7 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "session.select":
       return {
         ...state,
-        sessionPane: {
-          ...state.sessionPane,
-          selectedSessionId: action.sessionId,
-        },
+        sessionPane: nextSessionPaneAfterSelection(state.sessionPane, action.sessionId),
       };
     case "activity.ingest":
       return {
@@ -621,14 +747,13 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           ...state.activityFeed,
           visibilityMode: state.activityFeed.visibilityMode === "compact" ? "expanded" : "compact",
         },
+      };
+    case "trace.toggle":
+      return {
+        ...state,
+        chatTraceExpanded: !state.chatTraceExpanded,
         chatTraceLines: projectedChatTraceLines(
-          {
-            ...state,
-            activityFeed: {
-              ...state.activityFeed,
-              visibilityMode: state.activityFeed.visibilityMode === "compact" ? "expanded" : "compact",
-            },
-          },
+          {...state, chatTraceExpanded: !state.chatTraceExpanded},
           state.executionEventLog,
         ),
       };

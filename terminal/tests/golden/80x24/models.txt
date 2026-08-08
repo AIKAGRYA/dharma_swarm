@@ -1,0 +1,24 @@
+ ◆ DHARMA  ·  Models  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
+◂ Repo Commands [Models] Ontology Runtime Sessions ▸
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Models                                                                       │
+│ Structured operator transcript.                                              │
+│                                                                              │
+│ Model policy loading...                                                      │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ navigate · Esc compose  ·  route claude:claude-opus-4.8  ·  ○ offline

@@ -4,21 +4,37 @@ import path from "node:path";
 import {createInterface} from "node:readline";
 import {fileURLToPath} from "node:url";
 
+import {BridgeBackgroundScheduler, type BridgeRequest} from "./bridgeScheduler.ts";
+
 export type BridgeEvent = Record<string, unknown>;
+export type BridgeProcessFactory = () => ChildProcess;
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 
-function resolvePython(): string {
-  const configured = process.env.DHARMA_PYTHON?.trim();
+export function resolvePython(
+  env: NodeJS.ProcessEnv = process.env,
+  repoRoot = REPO_ROOT,
+  pathExists: (candidate: string) => boolean = existsSync,
+): string {
+  const configured = env.DHARMA_PYTHON?.trim();
   if (configured) {
     return configured;
   }
 
-  const venvPython = path.join(REPO_ROOT, ".venv", "bin", "python");
-  if (existsSync(venvPython)) {
-    return venvPython;
+  const candidates = [
+    path.join(repoRoot, ".venv", "bin", "python"),
+    env.VIRTUAL_ENV?.trim() ? path.join(env.VIRTUAL_ENV.trim(), "bin", "python") : "",
+    // Worktrees intentionally do not duplicate the large Python environment.
+    // Fall back to the canonical checkout's venv when Helm runs from a sibling
+    // worktree such as dharma_helm_build.
+    path.join(path.dirname(repoRoot), "dharma_swarm", ".venv", "bin", "python"),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && pathExists(candidate)) {
+      return candidate;
+    }
   }
 
   return "python3";
@@ -28,19 +44,23 @@ export class DharmaBridge {
   private child: ChildProcess;
   private nextId = 1;
   private alive = false;
+  private closed = false;
   private readonly onEvent: (event: BridgeEvent) => void;
+  private readonly processFactory: BridgeProcessFactory;
+  private readonly backgroundScheduler = new BridgeBackgroundScheduler();
 
-  constructor(onEvent: (event: BridgeEvent) => void) {
+  constructor(onEvent: (event: BridgeEvent) => void, processFactory?: BridgeProcessFactory) {
     this.onEvent = onEvent;
+    this.processFactory = processFactory ?? (() => spawn(resolvePython(), ["-m", "dharma_swarm.terminal_bridge", "stdio"], {
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: ["pipe", "pipe", "inherit"],
+    }));
     this.child = this.spawnChild();
   }
 
   private spawnChild(): ChildProcess {
-    const child = spawn(resolvePython(), ["-m", "dharma_swarm.terminal_bridge", "stdio"], {
-      cwd: REPO_ROOT,
-      env: process.env,
-      stdio: ["pipe", "pipe", "inherit"],
-    });
+    const child = this.processFactory();
     this.alive = true;
 
     if (!child.stdout || !child.stdin) {
@@ -54,17 +74,22 @@ export class DharmaBridge {
         return;
       }
       try {
-        this.onEvent(JSON.parse(trimmed) as BridgeEvent);
+        const event = JSON.parse(trimmed) as BridgeEvent;
+        try {
+          this.onEvent(event);
+        } finally {
+          this.releaseBackgroundRequest(event);
+        }
       } catch {
-        this.onEvent({
-          type: "bridge.error",
-          code: "invalid_bridge_json",
-          message: trimmed,
-        });
+        this.failTransport(child, "invalid_bridge_json", trimmed);
       }
     });
     child.on("exit", (code, signal) => {
+      if (this.closed || child !== this.child || !this.alive) {
+        return;
+      }
       this.alive = false;
+      this.backgroundScheduler.reset();
       this.onEvent({
         type: "bridge.error",
         code: "bridge_exit",
@@ -72,51 +97,93 @@ export class DharmaBridge {
       });
     });
     child.on("error", (error) => {
-      this.alive = false;
-      this.onEvent({
-        type: "bridge.error",
-        code: "bridge_spawn_error",
-        message: error.message,
-      });
+      this.failTransport(child, "bridge_spawn_error", error.message);
+    });
+    child.stdin.on("error", (error) => {
+      this.failTransport(child, "bridge_stdin_error", error.message);
     });
     return child;
   }
 
   private ensureChild(): void {
+    if (this.closed) {
+      throw new Error("bridge is closed");
+    }
     if (this.alive && this.child.stdin && !this.child.stdin.destroyed) {
       return;
     }
+    this.backgroundScheduler.reset();
     this.child = this.spawnChild();
   }
 
   send(type: string, payload: Record<string, unknown> = {}): string {
     const id = String(this.nextId++);
-    const request = {id, type, ...payload};
+    const request = {...payload, id, type};
+    this.writeRequest(request);
+    return id;
+  }
+
+  sendBackground(type: string, payload: Record<string, unknown> = {}): string {
     this.ensureChild();
-    if (!this.child.stdin || this.child.stdin.destroyed) {
-      this.onEvent({
-        type: "bridge.error",
-        code: "bridge_stdin_unavailable",
-        message: "bridge stdin is unavailable",
-      });
-      return id;
-    }
-    try {
-      this.child.stdin.write(`${JSON.stringify(request)}\n`);
-    } catch (error) {
-      this.alive = false;
-      const message = error instanceof Error ? error.message : String(error);
-      this.onEvent({
-        type: "bridge.error",
-        code: "bridge_send_failed",
-        message,
-      });
+    const id = String(this.nextId++);
+    const request: BridgeRequest = {...payload, id, type};
+    const admitted = this.backgroundScheduler.enqueue(request);
+    if (admitted) {
+      this.writeRequest(admitted);
     }
     return id;
   }
 
-  close(): void {
+  private writeRequest(request: BridgeRequest): void {
+    this.ensureChild();
+    if (!this.child.stdin || this.child.stdin.destroyed) {
+      this.failTransport(this.child, "bridge_stdin_unavailable", "bridge stdin is unavailable");
+      return;
+    }
+    try {
+      this.child.stdin.write(`${JSON.stringify(request)}\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.failTransport(this.child, "bridge_send_failed", message);
+    }
+  }
+
+  private failTransport(child: ChildProcess, code: string, message: string): void {
+    if (this.closed || child !== this.child || !this.alive) {
+      return;
+    }
     this.alive = false;
-    this.child.kill("SIGTERM");
+    this.backgroundScheduler.reset();
+    if (!child.killed) {
+      child.kill("SIGTERM");
+    }
+    this.onEvent({type: "bridge.error", code, message});
+  }
+
+  private releaseBackgroundRequest(event: BridgeEvent): void {
+    const eventType = String(event.type ?? "");
+    const requestId = String(event.request_id ?? "");
+    if (
+      !requestId ||
+      !(eventType.endsWith(".result") || eventType === "bridge.error" || eventType === "error")
+    ) {
+      return;
+    }
+    const next = this.backgroundScheduler.complete(requestId);
+    if (next) {
+      this.writeRequest(next);
+    }
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    this.alive = false;
+    this.backgroundScheduler.reset();
+    if (!this.child.killed) {
+      this.child.kill("SIGTERM");
+    }
   }
 }

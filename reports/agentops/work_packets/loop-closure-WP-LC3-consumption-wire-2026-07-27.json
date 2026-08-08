@@ -1,0 +1,145 @@
+{
+ "allowed_files": [
+  "reports/agentops/work_packets/loop-closure-WP-LC3-consumption-wire-2026-07-27.json",
+  ".github/CODEOWNERS",
+  "dharma_swarm/providers.py",
+  "dharma_swarm/receipt_consumption.py",
+  "tests/test_loop1_consumption.py"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "base_ref": "62a6dc406a011e7c708aebf67f58bb04c01ae150",
+ "branch": "devin/loop1-consumption-red-first-2026-07-27",
+ "commit": {
+  "allowed": true,
+  "message": "feat(loop1): receipt-grounded provider deprioritization wire [impact-checked] (WP-LC3)"
+ },
+ "forbidden_files": [
+  ".github/workflows/automerge.yml",
+  ".github/workflows/branch-janitor.yml",
+  ".github/workflows/kernel-tests.yml",
+  ".github/workflows/kernel-titanium-verify.yml",
+  ".github/workflows/langgraph-oracle.yml",
+  ".github/workflows/merge-master-mike-backlog.yml",
+  ".github/workflows/pramana-probe.yml",
+  ".github/workflows/pudgala-rigor.yml",
+  "Dockerfile",
+  "Dockerfile.swarm",
+  "Makefile",
+  "api/main.py",
+  "dharma_swarm/archive.py",
+  "dharma_swarm/chamber/**",
+  "dharma_swarm/checkpoint.py",
+  "dharma_swarm/coordination/**",
+  "dharma_swarm/council/**",
+  "dharma_swarm/dharma_kernel.py",
+  "dharma_swarm/diversity_archive.py",
+  "dharma_swarm/evolution_safety.py",
+  "dharma_swarm/graph/**",
+  "dharma_swarm/orchestrator.py",
+  "dharma_swarm/organism.py",
+  "dharma_swarm/runtime_state.py",
+  "dharma_swarm/strange_loop.py",
+  "dharma_swarm/swarm.py",
+  "dharma_swarm/telos_gates.py",
+  "dharma_swarm/telic_seam.py",
+  "dharma_swarm/topology_genome.py",
+  "dharma_swarm/vsm_channels.py",
+  "dharma_swarm/workflow.py",
+  "dharma_swarm/world_radar/**",
+  "docker-compose.yml",
+  "docs/governance/hygiene/patterns/AI-M1.yaml",
+  "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+  "pyproject.toml",
+  "reports/darshan/**",
+  "scripts/governance/arena_truth_report.py",
+  "scripts/governance/branch_janitor.py",
+  "scripts/governance/check_claim_evidence_binding.py",
+  "scripts/governance/dharmagraph_parity_gauntlet.py",
+  "scripts/governance/frontier_ledger.py",
+  "scripts/governance/hygiene/**",
+  "scripts/governance/inward_ascent_baseline.py",
+  "scripts/governance/pramana_probe.py",
+  "scripts/governance/transcendence_ledger.py",
+  "scripts/governance/verify_corral_findings.py",
+  "scripts/runtime/merge_master_mike_daemon.py",
+  "scripts/runtime/pr_merge_control.py",
+  "terminal/**"
+ ],
+ "gates": [
+  {
+   "command": "python3 -m pytest tests/test_loop1_consumption.py -q",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 10000,
+   "name": "wp-lc3-consumption-unit-proof",
+   "timeout_seconds": 120
+  },
+  {
+   "command": "python3 -m ruff check dharma_swarm/receipt_consumption.py tests/test_loop1_consumption.py",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 10000,
+   "name": "wp-lc3-consumption-ruff",
+   "timeout_seconds": 120
+  },
+  {
+   "command": "python3 scripts/governance/codeowners_blast_radius.py --check",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 10000,
+   "name": "wp-lc3-consumption-codeowners",
+   "timeout_seconds": 120
+  }
+ ],
+ "id": "loop-closure-WP-LC3-consumption-wire-2026-07-27",
+ "intent": "WP-LC3 (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md section 6): receipt-grounded provider deprioritization wire. Adds a bounded, fail-open dharma_swarm/receipt_consumption module, wires it into ModelRouter.complete_for_task after transport-provenance deduplication, and supplies tests/test_loop1_consumption.py covering P1-P4. Also updates .github/CODEOWNERS to route the new module by measured blast radius.",
+ "negative_controls": [
+  {
+   "command": "python3 -c \"import subprocess, sys; r=subprocess.run(['git','merge-base','--is-ancestor','62a6dc406a011e7c708aebf67f58bb04c01ae150','HEAD'],capture_output=True); sys.exit(0 if r.returncode==0 else 9)\"",
+   "env": {},
+   "expected_exit": 0,
+   "max_output_chars": 1000,
+   "name": "wp-lc3-base-no-receipt-consumption-module",
+   "timeout_seconds": 60
+  }
+ ],
+ "session_entry": {
+  "active_track": "loop-closure-2026-06",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   "dharma_swarm/providers.py:ModelRouter.complete_for_task",
+   "dharma_swarm/provider_transport.py:provider_chain_with_transport_provenance",
+   "dharma_swarm/provider_policy.py:ProviderRouteDecision",
+   "dharma_swarm/loop_supervisor.py"
+  ],
+  "collision": {
+   "checked_at_sha": "62a6dc406a011e7c708aebf67f58bb04c01ae150",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "WP-LC4 disjoint checker (scripts/governance/loop1_consumption_check.py) is intentionally not included; it needs a separate Session Entry packet because scripts/governance/ is a hot path."
+  ],
+  "interface_mismatches": [],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "8594442470863124f3d09800fe0060e46cb00fd6f8dc58fd7335a43e26e2ea0c",
+  "rollback": "revert the dharma_swarm/receipt_consumption.py addition, the ModelRouter wire, tests/test_loop1_consumption.py, and this packet; remove the .github/CODEOWNERS line for receipt_consumption.py",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "git": "2.43.0",
+   "make": "4.3",
+   "python": "3.11.15"
+  },
+  "work_packet": "WP-LC3"
+ },
+ "worktree": "."
+}

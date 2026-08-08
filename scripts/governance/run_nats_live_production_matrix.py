@@ -28,17 +28,20 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dharma_swarm.a2a.a2a_server import A2AMessage, A2AServer, A2ATask, A2ATaskStatus
-from dharma_swarm.a2a.nats_transport import (
+from dharma_swarm.a2a.a2a_server import A2AMessage, A2AServer, A2ATask, A2ATaskStatus  # noqa: E402
+from dharma_swarm.a2a.nats_transport import (  # noqa: E402
     A2ANatsTransport,
     NatsPublishAck,
     NatsTransportConfig,
     NatsTransportError,
 )
-from dharma_swarm.models import LLMRequest, ProviderType
-from dharma_swarm.runtime_provider import create_runtime_provider, resolve_runtime_provider_config
-from dharma_swarm.runtime_state import RuntimeStateStore
-from dharma_swarm.spine.identity import ExecutionIdentity
+from dharma_swarm.models import LLMRequest, ProviderType  # noqa: E402
+from dharma_swarm.runtime_provider import (  # noqa: E402
+    create_runtime_provider,
+    resolve_runtime_provider_config,
+)
+from dharma_swarm.runtime_state import RuntimeStateStore  # noqa: E402
+from dharma_swarm.spine.identity import ExecutionIdentity  # noqa: E402
 
 
 DEFAULT_EVIDENCE_ROOT = ROOT / "reports" / "governance" / "nats_live_production_matrix"
@@ -50,6 +53,7 @@ TRANSPORT_CLASS = "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
 CONSUMER_CLASS = "dharma_swarm.a2a.a2a_server.A2AServer"
 
 SOURCE_FRESHNESS_PATHS = [
+    "Makefile",
     "dharma_swarm/a2a/nats_transport.py",
     "dharma_swarm/a2a/nats_transport_support.py",
     "dharma_swarm/a2a/a2a_server.py",
@@ -67,7 +71,10 @@ SOURCE_FRESHNESS_PATHS = [
     "scripts/governance/run_nats_live_production_matrix.py",
     "scripts/governance/check_track_status.py",
     "tests/test_nats_transport.py",
+    "tests/test_nats_live_contact.py",
+    "tests/test_nats_live_production_evidence.py",
     "tests/test_nats_substrate_contract.py",
+    "tests/test_nats_verification_split.py",
     "tests/test_a2a_cloud_contact.py",
     "docs/governance/ACTIVE_TRACK.yaml",
     "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
@@ -425,7 +432,11 @@ class MatrixRunner:
         return await transport.publish_task(task, identity=identity)
 
     async def subscribe(self) -> Any:
-        return await self.js.pull_subscribe(f"dharma.a2a.task.>", durable=self.consumer, stream=self.stream)
+        return await self.js.pull_subscribe(
+            "dharma.a2a.task.>",
+            durable=self.consumer,
+            stream=self.stream,
+        )
 
     async def fetch_matching(
         self,
@@ -1147,6 +1158,12 @@ class MatrixRunner:
                 str(tampered_path),
                 "--max-age-hours",
                 "999999",
+                "--host-mode",
+                "live",
+                "--expected-broker-url",
+                self.endpoint,
+                "--expected-broker-profile",
+                self.args.broker_profile,
             ]
             result = run_command(cmd)
         self.commands.append(result)
@@ -1193,6 +1210,7 @@ class MatrixRunner:
         missing = [name for name in required_rows if name not in present]
         return {
             "schema": "dharma.nats.live_production_matrix.v1",
+            "host_mode": "live",
             "run_id": self.run_id,
             "generated_at": utc_now(),
             "status": "pass" if not failed_rows and not missing else "fail",
@@ -1210,7 +1228,11 @@ class MatrixRunner:
             "failed_rows": [row.get("name") for row in failed_rows],
             "rows": self.rows,
             "commands": self.commands,
-            "command": [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]],
+            "command": [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                *self.args.command_argv,
+            ],
             "source_fingerprints": source_fingerprints(),
             "process": {
                 "pid": os.getpid(),
@@ -1250,6 +1272,11 @@ class MatrixRunner:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--host-mode",
+        choices=["non-live", "live"],
+        default=os.environ.get("DHARMA_NATS_HOST_MODE", "non-live"),
+    )
     parser.add_argument("--endpoint", default=os.environ.get("NATS_URL", "nats://127.0.0.1:4222"))
     parser.add_argument("--broker-profile", default=os.environ.get("NATS_PROFILE", "local-live-jetstream"))
     parser.add_argument("--stream", default="DS_TASKS")
@@ -1257,23 +1284,112 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--consumer", default="a2a_task_handler")
     parser.add_argument("--provider", default=os.environ.get("DHARMA_MATRIX_PROVIDER", "ollama"))
     parser.add_argument("--model", default=os.environ.get("DHARMA_MATRIX_MODEL", "glm-5.2:cloud"))
-    parser.add_argument("--model-timeout", type=float, default=float(os.environ.get("DHARMA_MATRIX_MODEL_TIMEOUT", "90")))
+    # Deliberately unconverted here: the value is live-only, and a malformed
+    # environment inheritance must not stop a non-live invocation from
+    # emitting its typed verdict. Converted just before MatrixRunner runs.
+    parser.add_argument("--model-timeout", default=os.environ.get("DHARMA_MATRIX_MODEL_TIMEOUT", "90"))
     parser.add_argument("--bad-endpoint", default="nats://127.0.0.1:1")
     parser.add_argument("--max-deliveries", type=int, default=3)
     parser.add_argument("--idempotency-stale-after-s", type=int, default=300)
     parser.add_argument("--restart-wait-s", type=float, default=65)
     parser.add_argument("--output-dir")
     parser.add_argument("--a2a-output-dir")
-    return parser.parse_args(argv)
+    parser.add_argument("--evidence")
+    parser.add_argument("--max-age-hours", type=float, default=24)
+    parser.add_argument("--source-grace-seconds", type=float, default=2.0)
+    args = parser.parse_args(argv)
+    # argparse validates ``choices`` only for command-line values; an
+    # environment-supplied default bypasses it, and any unrecognized mode
+    # would otherwise fall through to the live branch. Fail closed instead.
+    if args.host_mode not in ("non-live", "live"):
+        parser.error(
+            "DHARMA_NATS_HOST_MODE must be 'non-live' or 'live', got "
+            f"{args.host_mode!r}"
+        )
+    args.command_argv = list(argv)
+    # Record the resolved host mode so evidence generated from an
+    # environment-only live invocation still carries the explicit flag its
+    # own post-run validation requires.
+    if not any(
+        token == "--host-mode" or token.startswith("--host-mode=")
+        for token in args.command_argv
+    ):
+        args.command_argv.extend(["--host-mode", args.host_mode])
+    return args
+
+
+def check_evidence(
+    evidence_path: Path | None,
+    args: argparse.Namespace,
+    *,
+    host_mode: str,
+) -> subprocess.CompletedProcess[str]:
+    command = [
+        sys.executable,
+        str(ROOT / "scripts" / "governance" / "check_nats_live_production_evidence.py"),
+        "--max-age-hours",
+        str(args.max_age_hours),
+        "--source-grace-seconds",
+        str(args.source_grace_seconds),
+        "--host-mode",
+        host_mode,
+        "--expected-broker-url",
+        args.endpoint,
+        "--expected-broker-profile",
+        args.broker_profile,
+    ]
+    if evidence_path is not None:
+        command.extend(["--evidence", str(evidence_path)])
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def render_evidence_check(completed: subprocess.CompletedProcess[str]) -> None:
+    if completed.stdout:
+        print(completed.stdout, end="")
+    if completed.stderr:
+        print(completed.stderr, end="", file=sys.stderr)
 
 
 async def async_main(argv: list[str]) -> int:
     args = parse_args(argv)
+    if args.host_mode == "non-live":
+        explicit_evidence = Path(args.evidence) if args.evidence is not None else None
+        completed = check_evidence(explicit_evidence, args, host_mode="non-live")
+        render_evidence_check(completed)
+        return completed.returncode
+
+    try:
+        args.model_timeout = float(args.model_timeout)
+    except (TypeError, ValueError):
+        print(
+            "NATS_LIVE_PRODUCTION_MATRIX_CONFIG_ERROR "
+            + json.dumps(
+                {
+                    "exit_code": 2,
+                    "reason": (
+                        "DHARMA_MATRIX_MODEL_TIMEOUT is not a number: "
+                        f"{args.model_timeout!r}"
+                    ),
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
     runner = MatrixRunner(args)
     evidence_path: Path | None = None
     try:
         evidence_path = await runner.run()
         payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        completed = check_evidence(evidence_path, args, host_mode="live")
+        render_evidence_check(completed)
+        if completed.returncode != 0:
+            return completed.returncode
         print(json.dumps({"status": payload["status"], "evidence": str(evidence_path)}, sort_keys=True))
         return 0 if payload["status"] == "pass" else 1
     except Exception as exc:

@@ -1,0 +1,227 @@
+{
+  "schema": "dharma.terminal.golden-closeout-receipt/v1",
+  "observed_at_utc": "2026-07-20T20:20:00Z",
+  "subject": "Helm current-main integration: truthful routing, live provider execution, cancellation, resize, continuity, and durable replay",
+  "repository": {
+    "base_commit": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+    "branch": "codex/helm-main-integration-20260721",
+    "head_before_final_closeout": "a9736c56b2a77259608078e6672f10a1ee867a97",
+    "work_packet": "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLIVE-main-integration-2026-07-21.json",
+    "work_packet_digest": "b3bb10fcba319c3ccb3a4e7beb91ee9b2fd5ea672595b745a187059c51471573"
+  },
+  "artifacts": {
+    "terminal/scripts/golden_capture.sh": {
+      "git_blob": "53398ac3d59cb96111ccad49156678c874c8c627"
+    },
+    "terminal/scripts/ratchet.sh": {
+      "git_blob": "43e446f0688dac76392c5dac32d847f8e4ef1e6c"
+    },
+    "terminal/tests/compactShell.test.tsx": {
+      "git_blob": "93590c33b3423dc9226ddcfb01ffa00b9430265e"
+    },
+    "terminal/tests/golden/120x40/chat.txt": {
+      "git_blob": "347df606881982f4cd23c90fa3954098572c3877",
+      "sha256": "c74d518acc944a4b4664230059ef053064b34e8afb5dc172cdc36d670313e139",
+      "line_count": 40
+    }
+  },
+  "fixture_boundary": {
+    "kind": "offline_boot_frames",
+    "transport": "real_tmux_pty",
+    "geometries": [
+      "80x24",
+      "100x30",
+      "120x40"
+    ],
+    "bridge_python": "/nonexistent/dharma-terminal-golden-python",
+    "supervisor_state": "isolated temporary directory",
+    "frame_count": 42
+  },
+  "live_boundary": {
+    "kind": "real_bun_ink_ui_over_real_python_stdio_bridge_and_codex_cli",
+    "tmux_socket": "helm_main_integrated_20260721_socket",
+    "tmux_session": "helm_main_integrated_20260721",
+    "initial_geometry": "80x24",
+    "provider": "codex",
+    "model": "gpt-5.5",
+    "reasoning_effort": "xhigh",
+    "successful_sessions": [
+      {
+        "session_id": "dgc-20260720-201411-ea28",
+        "provider_session_id": "019f812a-2caa-7963-b842-3e2b2b74eaf4",
+        "prompt_claim": "reverse HELMPINE721",
+        "assistant_text": "127ENIPMLEH",
+        "status": "completed",
+        "event_types": [
+          "user_prompt",
+          "session_start",
+          "thinking_complete",
+          "text_complete",
+          "usage",
+          "session_end"
+        ],
+        "session_end_count": 1,
+        "replay_ok": true
+      },
+      {
+        "session_id": "dgc-20260720-201614-7ca7",
+        "provider_session_id": "019f812c-0ee3-70b3-b684-3c524f8ec0f9",
+        "prompt_claim": "recover the prior turn's exact string without restating it",
+        "assistant_text": "HELMPINE721",
+        "status": "completed",
+        "event_types": [
+          "user_prompt",
+          "session_start",
+          "thinking_complete",
+          "text_complete",
+          "usage",
+          "session_end"
+        ],
+        "session_end_count": 1,
+        "replay_ok": true
+      }
+    ],
+    "cancelled_session": {
+      "session_id": "dgc-20260720-201804-73ea",
+      "provider_session_id": "019f812d-b83a-75a1-935a-00130ef95046",
+      "status": "cancelled",
+      "event_types": [
+        "user_prompt",
+        "session_start",
+        "thinking_complete",
+        "session_end"
+      ],
+      "session_end_count": 1,
+      "error_code": "cancelled",
+      "replay_ok": true
+    },
+    "durable_session_counts": {
+      "before_local_open_sessions": 4,
+      "after_local_open_sessions": 4,
+      "after_two_provider_turns": 6,
+      "after_immediate_cancel": 6,
+      "after_running_cancel": 7,
+      "after_restart_and_local_open_sessions": 7
+    }
+  },
+  "claims": [
+    {
+      "id": "bridge_connectivity",
+      "modality": "observed",
+      "authority": "live_80x24_tmux_frame",
+      "value": "bridge connected"
+    },
+    {
+      "id": "boot_route_liveness",
+      "modality": "unverified",
+      "authority": "canonical_model_policy",
+      "value": "codex:gpt-5.5"
+    },
+    {
+      "id": "provider_route_liveness_after_completion",
+      "modality": "observed",
+      "authority": "typed_provider_completion_receipt",
+      "value": "codex:gpt-5.5 ready"
+    },
+    {
+      "id": "route_refresh_monotonicity",
+      "modality": "observed",
+      "authority": "live_model_policy_refresh_after_typed_receipt",
+      "value": "ready remained ready for the exact route"
+    },
+    {
+      "id": "local_sessions_navigation",
+      "modality": "observed",
+      "authority": "durable_session_count_before_and_after",
+      "value": "open sessions created no provider turn or durable session"
+    },
+    {
+      "id": "same_process_conversation_continuity",
+      "modality": "observed",
+      "authority": "second_live_codex_response",
+      "value": "HELMPINE721"
+    },
+    {
+      "id": "restart_session_replay",
+      "modality": "observed",
+      "authority": "typed_session_detail_plus_session_store_verifier",
+      "value": "dgc-20260720-201614-7ca7 completed; replay ok; HELMPINE721 visible"
+    },
+    {
+      "id": "immediate_cancel_boundary",
+      "modality": "observed",
+      "authority": "durable_session_count",
+      "value": "no durable session created"
+    },
+    {
+      "id": "running_cancel_boundary",
+      "modality": "observed",
+      "authority": "canonical_transcript_plus_session_store_verifier",
+      "value": "one cancelled session_end; replay ok"
+    },
+    {
+      "id": "resize_survival",
+      "modality": "observed",
+      "authority": "live_tmux_geometry_and_process_state",
+      "value": "80x24 -> 120x40 -> 80x24; Bun process remained live"
+    },
+    {
+      "id": "claude_route_liveness",
+      "modality": "unavailable",
+      "authority": "direct_claude_headless_smoke",
+      "value": "credit balance too low"
+    },
+    {
+      "id": "openrouter_route_liveness",
+      "modality": "not_tested",
+      "authority": "none",
+      "value": null
+    }
+  ],
+  "verification": {
+    "toolchain": {
+      "bun": "1.3.11",
+      "tmux": "3.6b",
+      "shellcheck": "0.11.0"
+    },
+    "checks": [
+      {
+        "command": "bun test",
+        "result": "pass",
+        "summary": "650 tests across 25 files; 3821 assertions"
+      },
+      {
+        "command": "python -m pytest <WP-HELMLIVE runtime suite>",
+        "result": "pass",
+        "summary": "87 tests"
+      },
+      {
+        "command": "bun run typecheck",
+        "result": "pass"
+      },
+      {
+        "command": "bun run lint",
+        "result": "pass",
+        "summary": "0 errors; 18 warnings within the 19-warning ceiling"
+      },
+      {
+        "command": "terminal/scripts/ratchet.sh",
+        "result": "pass",
+        "summary": "222 focused tests; 42/42 real-tmux golden frames; exact diff"
+      },
+      {
+        "command": "scripts/terminal_guardian_preflight.sh",
+        "result": "pass",
+        "summary": "165 focused tests; typecheck; bridge syntax; 80x24 process-reap smoke"
+      },
+      {
+        "command": "python -m ruff check <packet Python paths>",
+        "result": "pass"
+      },
+      {
+        "command": "git diff --check",
+        "result": "pass"
+      }
+    ]
+  }
+}

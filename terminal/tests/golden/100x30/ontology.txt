@@ -1,0 +1,30 @@
+ ◆ DHARMA COMMAND POST  ·  Ontology  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
+◂ Commands Models [Ontology] Runtime Sessions Approvals ▸
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Ontology                                                                                         │
+│ Shared world model, foundations, and semantic frame updates.                                     │
+│                                                                                                  │
+│ Ontology snapshot loading...                                                                     │
+│ The shell should surface DHARMA concepts, not just provider chat.                                │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ navigate · Esc compose  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting…

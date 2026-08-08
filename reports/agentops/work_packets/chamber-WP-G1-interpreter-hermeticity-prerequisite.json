@@ -1,0 +1,110 @@
+{
+  "id": "chamber-WP-G1-interpreter-hermeticity-prerequisite",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/chamber-scorer-interpreter-hermeticity-20260725",
+  "worktree": ".",
+  "intent": "Repair the deterministic current-main chamber scorer interpreter defect that blocks Titanium WP-0D verification: bind the nested pytest scorer to the already-running Python interpreter instead of ambient PATH, and prove a failing PATH-precedence python3 shim cannot intercept scoring. Preserve the existing scrubbed environment, sandbox policy, timeout, score semantics, and CLOSED_NOT_PROD boundary.",
+  "allowed_files": [
+    "dharma_swarm/chamber/gym_git_history.py",
+    "tests/test_chamber_gym_git_history.py",
+    "reports/agentops/work_packets/chamber-WP-G1-interpreter-hermeticity-prerequisite.json"
+  ],
+  "forbidden_files": [
+    "Makefile",
+    "CLAUDE.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/plans/**",
+    "docs/prompts/**",
+    "reports/governance/**",
+    "dharma_swarm/chamber/sandbox.py",
+    "tests/test_chamber_sandbox.py",
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_agent_work_packet.py",
+    "reports/agentops/work_packets/titanium-WP-0D-fast-suite-isolation-closure.json",
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/sandbox.py",
+    "dharma_swarm/session_ledger.py",
+    "scripts/governance/run_agent_work_packet.py"
+  ],
+  "gates": [
+    {
+      "name": "chamber-scorer-interpreter-focused",
+      "command": "python3 -m pytest -q tests/test_chamber_gym_git_history.py::test_scorer_uses_current_interpreter_not_path_python3 tests/test_chamber_gym_git_history.py::test_scorer_passes_landed_fix_and_fails_empty_diff",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "chamber-scorer-relevant-suite",
+      "command": "python3 -m pytest -q tests/test_chamber_gym_git_history.py tests/test_chamber_sandbox.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "chamber-scorer-diff-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "path-precedence-python3-poison-is-live",
+      "command": "python3 -c \"import os, subprocess, tempfile; from pathlib import Path; root=Path(tempfile.mkdtemp()); poison=root/'python3'; poison.write_text('#!/bin/sh\\nexit 97\\n', encoding='utf-8'); poison.chmod(0o755); env=os.environ.copy(); env['PATH']=str(root)+os.pathsep+env.get('PATH', ''); raise SystemExit(subprocess.run(['python3'], env=env, check=False).returncode)\"",
+      "expected_exit": 97,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(chamber): bind scorer to current interpreter"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-G1",
+    "active_track": "hyperbolic-time-chamber-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "score_candidate launches nested pytest through the literal token python3 while scrubbed_env preserves ambient PATH and disables user site packages.",
+      "On the exact base and ordinary host PATH, python3 resolves to /Library/Developer/CommandLineTools/usr/bin/python3 and nested pytest fails with No module named pytest; the isolated test fails in 0.91 seconds.",
+      "Prepending only the external repository environment to PATH makes the same isolated test pass in 1.36 seconds, while the already-running sys.executable passes pytest under the unchanged scrubbed environment.",
+      "A clean committed Titanium WP-0D make test-fast pass stops at this deterministic chamber failure after 2213 passing tests; WP-0D remains frozen until this prerequisite lands.",
+      "A 2026-07-25 paginated GitHub audit of all 28 open pull requests found zero exact-path collisions for the owned chamber implementation and test surfaces."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/chamber/gym_git_history.py:score_candidate",
+      "dharma_swarm/chamber/sandbox.py:scrubbed_env",
+      "tests/test_chamber_gym_git_history.py:test_scorer_passes_landed_fix_and_fails_empty_diff"
+    ],
+    "honest_blockers": [
+      "Human review and merge remain required; this packet grants no self-merge authority.",
+      "Titanium WP-0D must rebase onto the merged prerequisite and rerun two literal make test-fast passes; this focused repair cannot claim WP-0D closure.",
+      "The chamber scorer remains a Python pre-execution guard rather than a full process, network, or filesystem jail; the track's live-untrusted-solver blocker remains open.",
+      "Any failure requiring sandbox, PATH policy, timeout, governance, receipt, or unrelated test edits stops this packet rather than expanding it."
+    ],
+    "rollback": "Revert the current-interpreter binding and its PATH-poison regression together, restore the deterministic verifier blocker, and keep Titanium WP-0D frozen until an equally narrow owner-approved repair is available.",
+    "packet_digest": "608756dc2a518719b1469be8a2fe4d2b9f6ae91690eb386d8c4c99dbbf9f1a53"
+  }
+}

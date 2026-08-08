@@ -25,8 +25,16 @@ def state_dir(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(60)
 async def test_full_lifecycle_boot(state_dir, monkeypatch: pytest.MonkeyPatch):
-    """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
+    """Boot swarm -> tick -> dispatch tasks -> verify completion pipeline.
+
+    Real SwarmManager init (agent pool, task board, etc.) costs ~16s CPU on
+    this checkout, over test-fast's blanket 10s budget (WP-0D suite-context
+    timeout). A per-test override keeps this E2E boot smoke test running in
+    required CI instead of a `slow` marker silently dropping it there too
+    (.github/workflows/tests.yml and `make test` both filter -m "not slow").
+    """
     from dharma_swarm.swarm import SwarmManager
     from pathlib import Path
 
@@ -148,8 +156,13 @@ async def test_full_lifecycle_boot(state_dir, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(60)
 async def test_custom_task_dispatch(state_dir, monkeypatch: pytest.MonkeyPatch):
-    """Create a custom task and verify it flows through the pipeline."""
+    """Create a custom task and verify it flows through the pipeline.
+
+    Real SwarmManager.init() cost, same WP-0D suite-context timeout as
+    test_full_lifecycle_boot above.
+    """
     from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import TaskPriority
 

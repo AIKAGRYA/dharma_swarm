@@ -336,6 +336,16 @@ async def test_guardian_cycle_writes_state_report_not_repo_root(
     assert not (src_root.parent / "GUARDIAN_REPORT.md").exists()
 
 
+def test_guardian_default_source_root_is_loaded_package() -> None:
+    """A release Guardian must inspect its release, not a fixed checkout path."""
+    assert guardian_crew._default_src_root() == Path(
+        guardian_crew.__file__
+    ).resolve().parent
+    assert guardian_crew._default_src_root() != (
+        Path.home() / "dharma_swarm" / "dharma_swarm"
+    )
+
+
 @pytest.mark.asyncio
 async def test_ledger_watcher_degraded_threshold(tmp_path: Path) -> None:
     state_dir, db_path = _runtime_db(tmp_path)

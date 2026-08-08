@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 
 import pytest
 
@@ -31,6 +32,52 @@ def _j(obj: dict) -> str:
 
 def _adapter() -> ClaudeAdapter:
     return ClaudeAdapter(config=ProviderConfig(provider_id="claude", default_model="claude-sonnet-4-5"))
+
+
+def test_build_command_is_permission_checked_by_default() -> None:
+    cmd = _adapter()._build_command(
+        CompletionRequest(messages=[{"role": "user", "content": "inspect the repo"}])
+    )
+
+    permission_index = cmd.index("--permission-mode")
+    assert cmd[permission_index + 1] == "default"
+    assert "--dangerously-skip-permissions" not in cmd
+    assert "--allowedTools" not in cmd
+
+
+def test_build_env_clears_all_nested_claude_markers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "nested")
+    monkeypatch.setenv("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", "true")
+    monkeypatch.setenv("HELM_ENV_SENTINEL", "preserved")
+
+    env = _adapter()._build_env(
+        CompletionRequest(messages=[{"role": "user", "content": "hello"}])
+    )
+
+    assert "CLAUDECODE" not in env
+    assert "CLAUDE_CODE_ENTRYPOINT" not in env
+    assert "CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES" not in env
+    assert env["HELM_ENV_SENTINEL"] == "preserved"
+
+
+def test_build_prompt_and_command_strip_subprocess_nul_bytes() -> None:
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "before\x00after"}],
+        system_prompt="sys\x00tem",
+        model="claude-sonnet-4-5\x00",
+    )
+    adapter = _adapter()
+
+    prompt = adapter._build_prompt(request)
+    command = adapter._build_command(request)
+
+    assert "\x00" not in prompt
+    assert "beforeafter" in prompt
+    assert all("\x00" not in argument for argument in command)
+    assert "system" in command
 
 
 @pytest.mark.asyncio
@@ -203,7 +250,7 @@ def test_normalize_thinking_and_error_flow() -> None:
 
 class _FakeStdout:
     def __init__(self, lines: list[str]) -> None:
-        self._lines = [l.encode("utf-8") + b"\n" for l in lines]
+        self._lines = [line.encode("utf-8") + b"\n" for line in lines]
 
     async def readline(self) -> bytes:
         if not self._lines:
@@ -218,7 +265,7 @@ class _BrokenStdout:
 
 
 class _FakeStderr:
-    async def read(self) -> bytes:
+    async def read(self, _: int = -1) -> bytes:
         return b""
 
 
@@ -230,8 +277,9 @@ class _FakeProc:
         self._exit_code = exit_code
 
     async def wait(self) -> int:
-        self.returncode = self._exit_code
-        return self._exit_code
+        if self.returncode is None:
+            self.returncode = self._exit_code
+        return self.returncode
 
     def terminate(self) -> None:
         self.returncode = -15
@@ -305,7 +353,65 @@ async def test_stream_handles_stdout_read_exception(monkeypatch: pytest.MonkeyPa
     req = CompletionRequest(messages=[{"role": "user", "content": "hello"}])
     events = [e async for e in a.stream(req, session_id="dgc-test-broken-stdout")]
     assert any(isinstance(e, ErrorEvent) and e.code == "stream_read_error" for e in events)
-    assert any(isinstance(e, SessionEnd) for e in events)
+    terminals = [event for event in events if isinstance(event, SessionEnd)]
+    assert len(terminals) == 1
+    assert terminals[0].success is False
+    assert terminals[0].error_code == "stream_read_error"
+
+
+@pytest.mark.asyncio
+async def test_stream_drains_large_stderr_without_deadlock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter()
+    child = (
+        "import json, sys; "
+        "sys.stderr.write('x' * 300000); sys.stderr.flush(); "
+        "print(json.dumps({'type':'result','subtype':'success','is_error':False,"
+        "'total_cost_usd':0.0,'duration_ms':1,'num_turns':1}))"
+    )
+
+    async def spawn(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        return await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-c",
+            child,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+
+    async def collect() -> list[object]:
+        request = CompletionRequest(messages=[{"role": "user", "content": "hello"}])
+        return [event async for event in adapter.stream(request, session_id="dgc-stderr")]
+
+    events = await asyncio.wait_for(collect(), timeout=5)
+    assert any(isinstance(event, SessionEnd) and event.success for event in events)
+
+
+@pytest.mark.asyncio
+async def test_stream_reaps_child_when_normalization_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter()
+    process = _FakeProc(["{}"], exit_code=0)
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    def fail_normalize(*args: object, **kwargs: object) -> list[object]:
+        raise RuntimeError("normalization exploded")
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    monkeypatch.setattr(adapter, "_normalize_line", fail_normalize)
+    request = CompletionRequest(messages=[{"role": "user", "content": "hello"}])
+
+    with pytest.raises(RuntimeError, match="normalization exploded"):
+        _ = [event async for event in adapter.stream(request, session_id="dgc-reap")]
+
+    assert process.returncode == -15
+    assert adapter._proc is None
 
 
 @pytest.mark.asyncio

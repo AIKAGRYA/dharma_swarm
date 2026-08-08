@@ -1,0 +1,89 @@
+{
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "reports/agentops/work_packets/loop-closure-WP-REBASE-ON-MERGE.json",
+    "tests/test_pr_ci_health.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "e96674d27d90144f22bc55b64ac7ea2baff63b52",
+  "branch": "claude/loop-rebase-on-merge",
+  "commit": {
+    "allowed": false,
+    "message": "fix(ci): rebase behind-main PRs on the merge event, not only hourly"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/tests.yml",
+    ".github/workflows/docops.yml",
+    ".github/workflows/ci-parity.yml",
+    "Makefile",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_pr_ci_health.py -q",
+      "expected_exit": 0,
+      "name": "pr-ci-health-contract",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "python3 -m pytest tests/test_pr_ci_safe_rebase.py -q",
+      "expected_exit": 0,
+      "name": "safe-rebase-regression",
+      "timeout_seconds": 300
+    }
+  ],
+  "id": "loop-closure-WP-REBASE-ON-MERGE",
+  "intent": "Close the merge-flow stall the operator hits on every merge: a merge to main puts every other open PR behind, and with require-up-to-date branch protection those PRs cannot merge until something rebases them. pr-ci-health's rebase sweep ran only on the hourly cron, so the wait was up to 59 minutes and the operator hand-tapped Update branch on each PR, restarting full CI every time. Add a push:[main] trigger running the sweep in rebase mode so the merge event is answered in about a minute and armed auto-merges drain unattended.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('.github/workflows/pr-ci-health.yml'); orig=p.read_text(); mut=orig.replace('  push:\\n    branches: [main]\\n', ''); assert mut!=orig; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_pr_ci_health.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "dropping-push-trigger-breaks-contract-test",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "scripts/governance/pr_ci_health.py"
+    ],
+    "collision": {
+      "checked_at_sha": "e96674d27d90144f22bc55b64ac7ea2baff63b52",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This trigger only helps PRs the safe-rebase tool will actually touch. pr_ci_safe_rebase.py:331-342 skips any PR that changes a Session Entry packet or a .github/workflows file, so hot-path PRs (which carry both) still require a manual branch update. Removing that exclusion is NOT attempted here: the packet guard protects base_ref custody and the workflow guard avoids a push the token may lack scope for.",
+      "The structural fix for the excluded PRs is a merge queue (GitHub updates+tests+merges without rewriting the PR branch, so neither guard applies) or clearing require-branches-up-to-date. Both need an operator settings change; the merge_group triggers would also touch titanium-owned workflow files.",
+      "This PR is itself an excluded PR (workflow + packet), so it will need one manual branch update if main moves before it merges."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "7b6f09b1f3cbaa563755fec0371d83facc937e563dcc767ecfd24ed37faad64e",
+    "rollback": "Revert the single commit; the workflow returns to the hourly-only cron. No state is touched.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-REBASE-ON-MERGE"
+  },
+  "worktree": "."
+}

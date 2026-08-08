@@ -11,7 +11,7 @@ import signal
 import subprocess
 import sys
 
-
+from dharma_swarm.runtime_admission import runtime_admission_or_exit
 from dharma_swarm.terminal_commands._helpers import (
     DGC_CORE,
     DHARMA_STATE,
@@ -20,6 +20,7 @@ from dharma_swarm.terminal_commands._helpers import (
     _pid_alive,
     _tail,
 )
+
 
 def cmd_up(background: bool = False) -> None:
     """Start the dharma_swarm daemon (pulse heartbeat loop)."""
@@ -100,6 +101,8 @@ def cmd_orchestrate_live(background: bool = False) -> None:
         pid, _command = live_process
         print(f"Orchestrator already running (PID {pid})")
         return
+
+    runtime_admission_or_exit()
 
     if background:
         import subprocess as sp

@@ -512,7 +512,30 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ctx.add_argument("domain", nargs="?", default="all")
 
     # -- memory --
-    sub.add_parser("memory", help="Show memory status")
+    p_mem = sub.add_parser("memory", help="Common memory surface")
+    p_mem.add_argument("--top-k", type=int, default=5, help="Maximum retrieval hits for query/common/gate")
+    p_mem.add_argument("--json", action="store_true", help="Emit JSON for supported memory modes")
+    mem_sub = p_mem.add_subparsers(dest="memory_cmd")
+    p_mem_status = mem_sub.add_parser("status", help="Show common memory status")
+    # SUPPRESS keeps the parent-level --json value when the trailing flag is absent
+    p_mem_status.add_argument(
+        "--json", action="store_true", default=argparse.SUPPRESS, help="Emit JSON status"
+    )
+    p_mem_query = mem_sub.add_parser("query", help="Query common governed memory")
+    p_mem_query.add_argument("memory_query", nargs="+")
+    p_mem_common = mem_sub.add_parser("common", help="Build an agent handoff memory pack")
+    p_mem_common.add_argument("memory_task", nargs="+")
+    p_mem_brief = mem_sub.add_parser("brief", help="Alias for memory common")
+    p_mem_brief.add_argument("memory_task", nargs="+")
+    mem_sub.add_parser("ingest", help="Backfill live wiki concepts into common memory")
+    mem_sub.add_parser("gate", help="Run the common memory system gate")
+    mem_sub.add_parser("metabolize", help="Run ingest + gates and write a metabolism receipt")
+    p_mem_schedule = mem_sub.add_parser("schedule", help="Register recurring Memory Common metabolism")
+    p_mem_schedule.add_argument(
+        "--schedule",
+        default="every 24h",
+        help="Recurring cron schedule for Memory Common metabolism",
+    )
 
     # -- witness --
     p_wit = sub.add_parser("witness", help="Record a witness observation")
@@ -1505,7 +1528,19 @@ def main() -> None:
         case "context":
             cmd_context(args.domain)
         case "memory":
-            cmd_memory()
+            memory_text = ""
+            if getattr(args, "memory_cmd", None) in {"query"}:
+                memory_text = " ".join(args.memory_query)
+            elif getattr(args, "memory_cmd", None) in {"common", "brief"}:
+                memory_text = " ".join(args.memory_task)
+            elif getattr(args, "memory_cmd", None) == "schedule":
+                memory_text = getattr(args, "schedule", "every 24h")
+            cmd_memory(
+                args.memory_cmd,
+                text=memory_text,
+                top_k=args.top_k,
+                as_json=args.json,
+            )
         case "witness":
             cmd_witness(" ".join(args.message))
         case "develop":

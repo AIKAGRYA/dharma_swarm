@@ -83,3 +83,194 @@ def test_real_test_failure_and_merge_conflict():
     triage = classify_pr(_pr(400, state="dirty"), runs)
     assert set(triage.categories) == {"real_test_lint", "merge_conflict"}
     assert triage.actionable is True
+
+
+def test_zero_check_runs_is_ci_never_ran_never_green():
+    # Bot-rebase stranding signature: GITHUB_TOKEN pushes never trigger
+    # workflows, so the rebased head has ZERO check runs. This used to fall
+    # through the zero-categories fallback and report as green.
+    triage = classify_pr(_pr(1060), [])
+    assert "ci_never_ran" in triage.categories
+    assert "green" not in triage.categories
+    assert triage.actionable is True
+
+
+def test_zero_check_runs_behind_main_carries_both_categories():
+    triage = classify_pr(_pr(1004, state="behind"), [])
+    assert set(triage.categories) == {"behind_main", "ci_never_ran"}
+    assert triage.actionable is True
+
+
+def test_blocked_merge_state_is_merge_blocked_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(987, state="blocked"), runs)
+    assert triage.categories == ["merge_blocked"]
+    assert triage.actionable is True
+
+
+def test_blocked_state_with_zero_runs_carries_both_fail_closed_categories():
+    triage = classify_pr(_pr(1066, state="blocked"), [])
+    assert set(triage.categories) == {"merge_blocked", "ci_never_ran"}
+    assert triage.actionable is True
+
+
+def test_pending_runs_without_any_success_are_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": None, "status": "in_progress"}]
+    triage = classify_pr(_pr(1024), runs)
+    assert triage.categories == ["ci_pending"]
+    assert triage.actionable is True
+
+
+def test_report_summary_counts_ci_never_ran_separately():
+    rows = [
+        classify_pr(_pr(1060), []),
+        classify_pr(_pr(321), [{"name": "pytest (3.11)", "conclusion": "success"}]),
+    ]
+    md = pr_ci_health.render_markdown(rows)
+    assert "1 green" in md
+    assert "1 actionable" in md
+    assert "1 ci_never_ran" in md
+
+
+def test_startup_failure_and_stale_are_real_failures_even_with_other_success():
+    for conclusion in ("startup_failure", "stale"):
+        runs = [
+            {"name": "pytest (3.11)", "conclusion": "success"},
+            {"name": "required gate", "conclusion": conclusion},
+        ]
+        triage = classify_pr(_pr(1083), runs)
+        assert triage.categories == ["real_test_lint"]
+        assert triage.actionable is True
+
+
+def test_draft_with_passing_checks_is_not_green_or_actionable():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, draft=True), runs)
+    assert triage.categories == ["draft"]
+    assert triage.actionable is False
+
+
+def test_unknown_merge_state_with_passing_checks_is_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, state="unknown"), runs)
+    assert triage.categories == ["merge_unknown"]
+    assert triage.actionable is True
+
+
+def test_workflow_validates_push_authority_before_rebase():
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT || github.token"
+    ) in workflow
+    assert (
+        "PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT }}"
+    ) in workflow
+    assert "Validate trusted rebase push authority" in workflow
+    assert ".permissions.push // false" in workflow
+    assert 'echo "HAS_PUSH_TOKEN=$has_push_token" >> "$GITHUB_ENV"' in workflow
+    assert (
+        "HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
+        "secrets.MERGEMASTERMIKE_PAT != '' }}"
+    ) not in workflow
+
+
+def test_workflow_does_not_rebase_on_every_merge_to_main():
+    """REVERSED 2026-08-07. This test previously asserted the opposite.
+
+    It used to require `push: branches: [main]`, on the reasoning that a merge
+    to main strands every other PR behind it and they would otherwise wait up
+    to 59 minutes for the cron. That reasoning assumed "require branches up to
+    date before merging" was enabled, which made a behind-main PR unmergeable.
+
+    That premise no longer holds — a behind-main PR reports
+    `mergeable_state: unstable` (mergeable), not `behind`. With it gone, the
+    trigger only bought cost: each merge rebased every conflict-free
+    behind-main PR, and each rebase relaunches that PR's full workflow set.
+    Measured 2026-08-07: four merges produced four rebase waves of ~13-20 PRs,
+    a 676-deep queue, a 2-second required job waiting 80 minutes, and PR #1286
+    having a complete 38/38 green sweep discarded four times.
+
+    The hourly cron still rebases, so the capability is retained — it is
+    bounded to once an hour instead of once per merge.
+    """
+    import yaml  # noqa: PLC0415
+
+    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    triggers = doc.get("on", doc.get(True))
+    assert "push" not in triggers, (
+        "the merge-to-main rebase stampede is back: every merge will rebase the "
+        "whole backlog and relaunch a full CI run per open PR"
+    )
+    assert "schedule" in triggers, "the hourly backstop must remain"
+
+    # The rebase capability itself must survive — the cron still uses it.
+    rebase_step = next(
+        step for step in doc["jobs"]["triage-and-heal"]["steps"]
+        if step.get("name", "").startswith("Rebase conflict-free")
+    )
+    assert "rebase" in rebase_step["if"]
+
+
+def test_behind_main_is_detected_when_state_says_blocked():
+    """GitHub's mergeable_state is single-valued and `blocked` outranks
+    `behind`, so a PR that is behind main AND waiting on a required check
+    reports `blocked`. Keying behind-main detection on the state therefore
+    missed nearly every real case — which is exactly the PR the operator
+    ends up rebasing by hand."""
+    triage = classify_pr(_pr(2001, state="blocked"), [], behind_by=7)
+    assert "behind_main" in triage.categories
+    assert "merge_blocked" in triage.categories
+
+
+def test_behind_by_zero_is_not_behind_main():
+    triage = classify_pr(_pr(2002, state="blocked"), [], behind_by=0)
+    assert "behind_main" not in triage.categories
+
+
+def test_measured_zero_beats_a_stale_behind_state():
+    """mergeable_state is computed asynchronously and goes stale. A measured
+    behind_by == 0 must not be overridden by a leftover `behind`, or an
+    up-to-date PR gets a no-op rebase attempt — and, with no trusted push
+    token, a false ci-stranded-rebase-skipped label and comment (Greptile
+    and Codex both, on PR #1178)."""
+    triage = classify_pr(_pr(2005, state="behind"), [], behind_by=0)
+    assert "behind_main" not in triage.categories
+
+
+def test_unmeasured_behind_by_falls_back_to_the_state():
+    """-1 means "not measured" and must never read as up to date; the
+    mergeable_state fallback still catches the plain `behind` case."""
+    assert "behind_main" in classify_pr(_pr(2003, state="behind"), []).categories
+    assert "behind_main" not in classify_pr(_pr(2004, state="blocked"), []).categories
+
+
+def test_compare_behind_by_fails_closed_on_a_read_error(monkeypatch):
+    def boom(_args):
+        raise OSError("network down")
+
+    monkeypatch.setattr(pr_ci_health, "_gh_json", boom)
+    assert pr_ci_health.compare_behind_by("o/r", "main", "deadbeef") == -1
+
+
+def test_compare_behind_by_reads_the_count(monkeypatch):
+    monkeypatch.setattr(pr_ci_health, "_gh_json", lambda args: {"behind_by": 12})
+    assert pr_ci_health.compare_behind_by("o/r", "main", "deadbeef") == 12
+
+
+def test_rebase_selection_uses_behind_by_not_mergeable_state():
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+    assert 'select(.mergeable_state == "behind")' not in workflow, (
+        "state-keyed selection hides every behind-main PR that is also blocked"
+    )
+    assert 'select(.categories | index("behind_main"))' in workflow
+    assert 'select(.categories | index("merge_conflict") | not)' in workflow, (
+        "a rebase cannot resolve a conflicted branch"
+    )

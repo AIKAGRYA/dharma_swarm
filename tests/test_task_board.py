@@ -17,6 +17,25 @@ async def board(tmp_path):
     return b
 
 
+@pytest.fixture
+async def persisted_quarantined_task(board):
+    task = await board.create("Audited fake result")
+    async with board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET status = ?, metadata = ? WHERE id = ?",
+            (
+                "quarantined_fake_result",
+                (
+                    '{"original_status":"completed",'
+                    '"quarantine_reason":"fake_tool_call_xml_result_pre_fix"}'
+                ),
+                task.id,
+            ),
+        )
+        await db.commit()
+    return task.id
+
+
 @pytest.mark.asyncio
 async def test_create_task(board):
     task = await board.create("Build feature", description="Do the thing")
@@ -49,6 +68,59 @@ async def test_get_task(board):
 @pytest.mark.asyncio
 async def test_get_nonexistent(board):
     assert await board.get("nonexistent") is None
+
+
+@pytest.mark.asyncio
+async def test_persisted_quarantined_fake_result_is_readable_and_terminal(
+    board,
+    persisted_quarantined_task,
+):
+    task_id = persisted_quarantined_task
+
+    loaded = await board.get(task_id)
+    assert loaded is not None
+    assert loaded.status == TaskStatus.QUARANTINED_FAKE_RESULT
+    assert loaded.metadata["original_status"] == "completed"
+
+    assert task_id in {task.id for task in await board.list_tasks()}
+    quarantined = await board.list_tasks(
+        status=TaskStatus.QUARANTINED_FAKE_RESULT
+    )
+    assert [task.id for task in quarantined] == [task_id]
+
+    stats = await board.stats()
+    assert stats["quarantined_fake_result"] == 1
+    assert stats["total"] == 1
+    assert task_id not in {task.id for task in await board.get_ready_tasks()}
+    assert task_board_mod._TRANSITIONS[TaskStatus.QUARANTINED_FAKE_RESULT] == set()
+
+    with pytest.raises(
+        TaskBoardError,
+        match="Invalid transition: quarantined_fake_result -> pending",
+    ):
+        await board._set_status(task_id, TaskStatus.PENDING)
+    for status in (
+        TaskStatus.QUARANTINED_FAKE_RESULT,
+        TaskStatus.QUARANTINED_FAKE_RESULT.value,
+    ):
+        with pytest.raises(TaskBoardError, match="audit-only terminal status"):
+            await board.update_task(task_id, status=status)
+
+    unchanged = await board.get(task_id)
+    assert unchanged is not None
+    assert unchanged.status == TaskStatus.QUARANTINED_FAKE_RESULT
+
+
+@pytest.mark.asyncio
+async def test_update_task_rejects_unknown_raw_status_without_mutating(board):
+    task = await board.create("Reject unknown status")
+
+    with pytest.raises(TaskBoardError, match="Invalid task status"):
+        await board.update_task(task.id, status="not_a_real_status")
+
+    unchanged = await board.get(task.id)
+    assert unchanged is not None
+    assert unchanged.status == TaskStatus.PENDING
 
 
 @pytest.mark.asyncio

@@ -44,6 +44,7 @@
   "jsonl_targets": [
     "JIKOKU_LOG.20260322_pre_rotation.jsonl",
     "JIKOKU_LOG.jsonl",
+    "MANIFEST.jsonl",
     "THINKODYNAMIC_DIRECTOR_LOG.jsonl",
     "action_log.jsonl",
     "actions.jsonl",
@@ -107,6 +108,7 @@
     "embodiments.jsonl",
     "entities.jsonl",
     "entries.jsonl",
+    "episode_ledger.jsonl",
     "equity_curve.jsonl",
     "evaluations.jsonl",
     "evolution_log.jsonl",
@@ -177,6 +179,7 @@
     "predictions.jsonl",
     "predictor.jsonl",
     "predictor_data.jsonl",
+    "processed_deliveries.jsonl",
     "progress_ledger.jsonl",
     "promises.jsonl",
     "promotion_decisions.jsonl",
@@ -255,6 +258,7 @@
     "world_zeitgeist_inbox.jsonl",
     "write_receipts.jsonl",
     "zeitgeist.jsonl",
+    "{cycle_id}.tasks.jsonl",
     "{loop_name}_progress.jsonl",
     "{scenario.name}.routing.jsonl"
   ],
@@ -273,6 +277,7 @@
   ],
   "ledger_modules": [
     "dharma_swarm/ai_reciprocity_ledger.py",
+    "dharma_swarm/episode_ledger.py",
     "dharma_swarm/forge_v1/forge_v2/taskbed_ledger.py",
     "dharma_swarm/gaia_ledger.py",
     "dharma_swarm/human_yds_ledger.py",
@@ -294,8 +299,8 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 215,
+    "distinct_jsonl_names": 219,
     "ledger_classes": 11,
-    "ledger_modules": 11
+    "ledger_modules": 12
   }
 }

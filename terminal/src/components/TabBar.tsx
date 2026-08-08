@@ -10,41 +10,27 @@ type Props = {
   compact?: boolean;
 };
 
+// F-021: one-line tab bar at ALL widths — the bordered-pill rows cost 6+ rows
+// of chrome and scrolled the header off every graded size. The windowed
+// single-row widget is the only renderer; `compact` now only tightens titles.
 export function TabBar({tabs, activeTabId, compact = false}: Props): React.ReactElement {
-  const limit = compact ? 6 : tabs.length;
+  const limit = 6;
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
-  const startIndex = compact ? Math.max(0, Math.min(activeIndex - 2, Math.max(tabs.length - limit, 0))) : 0;
+  const startIndex = Math.max(0, Math.min(activeIndex - 2, Math.max(tabs.length - limit, 0)));
   const visibleTabs = tabs.slice(startIndex, startIndex + limit);
   const hasOverflowLeft = startIndex > 0;
   const hasOverflowRight = startIndex + limit < tabs.length;
 
   return (
-    <Box marginTop={1} flexWrap={compact ? "nowrap" : "wrap"}>
+    <Box flexWrap="nowrap">
       {hasOverflowLeft ? <Text color={THEME.stone}>◂ </Text> : null}
       {visibleTabs.map((tab) => {
         const active = tab.id === activeTabId;
-        const compactTitle = tab.title.length > 8 ? `${tab.title.slice(0, 7)}…` : tab.title;
-        if (compact) {
-          return (
-            <Box key={tab.id} marginRight={1}>
-              <Text color={active ? THEME.wave : THEME.stone} bold={active}>
-                {active ? `[${compactTitle}]` : compactTitle}
-              </Text>
-            </Box>
-          );
-        }
+        const title = compact && tab.title.length > 8 ? `${tab.title.slice(0, 7)}…` : tab.title;
         return (
-          <Box
-            key={tab.id}
-            marginRight={1}
-            marginBottom={1}
-            borderStyle="round"
-            borderColor={active ? THEME.wave : THEME.ink}
-            paddingX={1}
-          >
+          <Box key={tab.id} marginRight={1}>
             <Text color={active ? THEME.wave : THEME.stone} bold={active}>
-              {active ? "◆ " : ""}
-              {tab.title}
+              {active ? `[${title}]` : title}
             </Text>
           </Box>
         );

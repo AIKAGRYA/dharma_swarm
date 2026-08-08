@@ -12,6 +12,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = ("dharma_swarm", "scripts", "api")
@@ -121,9 +123,9 @@ KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-haiku-4-5"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-opus-4"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-opus-4-6"): 1,
-        ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-5"): 2,
+        ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-5"): 1,
         ("dharma_swarm/tui/engine/adapters/claude.py", "claude-sonnet-4-6"): 1,
-        ("dharma_swarm/tui/engine/adapters/codex.py", "gpt-5.4"): 2,
+        ("dharma_swarm/tui/engine/adapters/codex.py", "gpt-5.4"): 1,
         ("dharma_swarm/tui/engine/adapters/openrouter.py", "openai/gpt-5-codex"): 1,
         ("scripts/demos/demo_jikoku.py", "claude-opus-4"): 1,
         ("scripts/full_stack_smoke.py", "deepseek/deepseek-chat-v3-0324"): 1,
@@ -347,6 +349,7 @@ def _counter_delta(actual: Counter, expected: Counter) -> str:
     return "\n".join(lines)
 
 
+@pytest.mark.timeout(60)
 def test_model_literals_do_not_escape_canonical_registries() -> None:
     actual = _model_literal_debt()
     assert actual == KNOWN_MODEL_LITERAL_DEBT, _counter_delta(

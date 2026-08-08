@@ -7,8 +7,8 @@ round-trip against a live server is exercised in the operator demo, not here.
 
 from __future__ import annotations
 
-import pytest
-
+from dharma_swarm.operator_core import nats_live_contact
+from dharma_swarm.operator_core import nats_substrate_status
 from dharma_swarm.operator_core.nats_live_contact import (
     resolve_endpoint,
     verify_jetstream_contact,
@@ -26,16 +26,24 @@ def test_resolve_endpoint_falls_back_to_default(monkeypatch) -> None:
     assert resolve_endpoint() == "nats://127.0.0.1:4222"
 
 
-def test_verify_jetstream_contact_unreachable_is_honest() -> None:
+def test_verify_jetstream_contact_unreachable_is_honest(monkeypatch) -> None:
+    monkeypatch.setattr(nats_live_contact.importlib.util, "find_spec", lambda _name: object())
+
+    def _unreachable(*_args, **_kwargs):
+        raise OSError("fixture endpoint unavailable")
+
+    monkeypatch.setattr(nats_live_contact.socket, "create_connection", _unreachable)
     result = verify_jetstream_contact(endpoint="nats://127.0.0.1:1", timeout=0.5)
     assert result["ack_verified"] is False
-    assert result["code"] in {"NATS_UNAVAILABLE", "NATS_ACK_FAILED", "NATS_CLIENT_MISSING"}
+    assert result["code"] == "NATS_UNAVAILABLE"
 
 
-def test_probe_verify_ack_blocks_when_unreachable() -> None:
+def test_probe_verify_ack_blocks_when_unreachable(monkeypatch) -> None:
+    monkeypatch.setattr(nats_substrate_status, "_tcp_listening", lambda *_args, **_kwargs: False)
     status = probe_nats_substrate(endpoint="nats://127.0.0.1:1", verify_ack=True).to_dict()
     assert status["available"] is False
     assert status["ack_verified"] is False
+    assert status["spec_path"] == "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
 
 
 def _fresh_receipt(path, *, ack=True, age_s=0):
@@ -67,24 +75,14 @@ def test_read_live_receipt_rejects_stale(tmp_path) -> None:
 
 
 def test_probe_reports_live_from_fresh_receipt_when_port_open(tmp_path, monkeypatch) -> None:
-    import socket
-
-    srv = socket.socket()
-    try:
-        srv.bind(("127.0.0.1", 0))
-    except PermissionError:
-        srv.close()
-        pytest.skip("local socket bind blocked in this sandbox")
-    srv.listen(1)
-    port = srv.getsockname()[1]
     receipt = tmp_path / "r.json"
     _fresh_receipt(receipt, ack=True, age_s=0)
     monkeypatch.setenv("DHARMA_NATS_VERIFY", "1")
     monkeypatch.setenv("DHARMA_NATS_RECEIPT", str(receipt))
-    try:
-        status = probe_nats_substrate(endpoint=f"nats://127.0.0.1:{port}").to_dict()
-    finally:
-        srv.close()
+    monkeypatch.setattr(nats_substrate_status, "_tcp_listening", lambda *_args, **_kwargs: True)
+
+    status = probe_nats_substrate(endpoint="nats://fixture.invalid:4222").to_dict()
+
     assert status["ack_verified"] is True
     assert status["code"] == "NATS_LIVE"
 

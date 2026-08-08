@@ -1,0 +1,377 @@
+#!/usr/bin/env python3
+"""Hardening lane, phase 2 of 2: DELIVER (trusted).
+
+Runs as a separate job, on a separate runner, in a checkout the agent has
+never touched. It receives one artifact — a `git bundle` written by
+`scripts/runtime/lane_propose.py` — verifies it against facts it fetches
+itself, then pushes the branch and opens a draft PR.
+
+The trust rule, stated once and enforced throughout
+---------------------------------------------------
+**Nothing the propose phase says is evidence.** Its receipt is copied into
+the PR body as narrative and is otherwise ignored. Every gate below is
+re-derived here from (a) the bytes inside the bundle and (b) `origin`:
+
+- branch name          -> from the bundle's own ref, matched against a strict pattern
+- base commit          -> `git rev-parse origin/<base>`, fetched by this job
+- one commit only      -> `git rev-list --count`
+- parent legitimacy    -> `git merge-base --is-ancestor` against origin/<base>
+- diff size            -> `git diff --numstat`, recomputed, capped
+- touched paths        -> `git diff --name-only`, checked against the referee denylist
+- open-draft ceiling   -> `gh pr list`, queried now
+
+What the split buys, precisely
+------------------------------
+Every residual that made PR #1162 unmergeable was an instance of one fact:
+the agent and the delivery step shared a machine. Each is answered here by
+construction, not by a guard:
+
+| residual (PR #1162)                          | why it cannot occur here            |
+|----------------------------------------------|-------------------------------------|
+| descendant races the `.git/config` restore    | descendants died with the other VM  |
+| agent overwrites the resolved `git` binary    | this runner's git is a fresh image  |
+| `url.<base>.insteadOf` redirects the push     | this `.git/config` never met an agent |
+| `credential.helper` executes on push          | same — and `-c` could not fix it     |
+| `filter.*.clean` runs during a privileged add | this job never runs `git add`       |
+| test process inherits the write token         | tests ran in the other job, tokenless |
+
+This job never runs agent code, never runs the test suite, never checks the
+candidate tree out into a working tree, and never stages anything. It moves
+objects and pushes a SHA.
+
+Residual risk that remains, honestly
+------------------------------------
+The agent still authors the CONTENT. A hostile change set can be proposed —
+it just cannot be delivered as anything other than a **draft PR**, under the
+diff cap, outside the referee paths, with CI and human review ahead of it.
+That is the same exposure as any external contributor, which is the correct
+level for this lane and the level review exists to handle.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+MAX_DIFF_LINES = int(os.environ.get("LANE_MAX_DIFF_LINES", "600"))
+MAX_CHANGED_FILES = int(os.environ.get("LANE_MAX_CHANGED_FILES", "40"))
+MAX_BUNDLE_BYTES = int(os.environ.get("LANE_MAX_BUNDLE_BYTES", str(8 * 1024 * 1024)))
+MAX_OPEN_LANE_DRAFTS = int(os.environ.get("LANE_MAX_OPEN_DRAFTS", "1"))
+LANE_BRANCH_PREFIX = "lane/hardening-"
+LANE_LABELS = ("mike-watch", "walk-ready", "lane-output")
+
+# The bundle's ref must look exactly like a lane branch this repo minted.
+# Anchored, so no path traversal, no ref-name trickery, no second segment.
+BRANCH_RE = re.compile(r"^lane/hardening-\d{8}T\d{6}Z$")
+BUNDLE_HEAD_RE = re.compile(r"^([0-9a-f]{40})\s+refs/heads/(\S+)$")
+
+# Referee / Tier-2 surfaces. A lane change touching any of these is refused
+# outright: the lane may not edit the machinery that judges the lane. This is
+# the delivery-side copy — propose has its own author-side exclusions, and
+# neither is trusted to be the other's enforcement.
+DENY_PREFIXES = (
+    ".github/workflows/",
+    ".github/actions/",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/lane_propose.py",
+    "scripts/runtime/lane_deliver.py",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/loop_watcher.py",
+    "docs/ops/loop_control/",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "scripts/governance/ci_parity_manifest.json",
+    "reports/",
+    "roaming_mailbox/",
+    ".git/",
+)
+DENY_SUFFIXES = (".env", ".pem", ".key")
+DENY_NAMES = {".env", "secrets.json", "CODEOWNERS"}
+
+GIT_BIN = shutil.which("git") or "git"
+GH_BIN = shutil.which("gh") or "gh"
+
+CANDIDATE_REF = "refs/lane/candidate"
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _run(cmd: list[str], *, timeout: int = 300) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=timeout, check=False)
+    except FileNotFoundError as exc:
+        return subprocess.CompletedProcess(cmd, 127, "", str(exc))
+
+
+def _git(args: list[str], **kwargs) -> subprocess.CompletedProcess:
+    # `-c` hardening here is belt-and-braces, not the boundary: this
+    # checkout's config was written by actions/checkout on a clean runner and
+    # no agent has ever run in this process tree. It is kept so that the
+    # command set stays safe if this module is ever reused somewhere less
+    # pristine — and it is honest about not being what makes the lane safe.
+    flags = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+             "-c", "diff.external=", "-c", "core.pager=cat"]
+    return _run([GIT_BIN, *flags, *args], **kwargs)
+
+
+def receipt(payload: dict, out: Path) -> None:
+    payload.setdefault("schema", "dharma.lane_deliver_receipt.v1")
+    payload.setdefault("generated_at", _utc_stamp())
+    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                   encoding="utf-8")
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def bundle_heads(bundle: Path) -> list[tuple[str, str]] | None:
+    """(sha, branch) for every head the bundle carries, or None if unreadable."""
+    listed = _git(["bundle", "list-heads", str(bundle)])
+    if listed.returncode != 0:
+        return None
+    heads: list[tuple[str, str]] = []
+    for line in listed.stdout.splitlines():
+        match = BUNDLE_HEAD_RE.match(line.strip())
+        if match:
+            heads.append((match.group(1), match.group(2)))
+        elif line.strip():
+            # A ref that is not a plain branch (a tag, a note, a raw sha) is
+            # not something this lane delivers. Surface it as unparseable
+            # rather than silently ignoring the extra ref.
+            return None
+    return heads
+
+
+def denied_paths(paths: list[str]) -> list[str]:
+    bad = []
+    for path in paths:
+        name = Path(path).name
+        if (path.startswith(DENY_PREFIXES) or path.endswith(DENY_SUFFIXES)
+                or name in DENY_NAMES):
+            bad.append(path)
+    return sorted(bad)
+
+
+def numstat_lines(base: str, head: str) -> int:
+    result = _git(["diff", "--numstat", f"{base}..{head}"])
+    total = 0
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            for cell in parts[:2]:
+                if cell.isdigit():
+                    total += int(cell)
+    return total
+
+
+def changed_paths(base: str, head: str) -> list[str]:
+    result = _git(["diff", "--name-only", f"{base}..{head}"])
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def open_lane_drafts(repo: str) -> list[int] | None:
+    result = _run([
+        GH_BIN, "pr", "list", "--repo", repo, "--state", "open",
+        "--label", "lane-output", "--json", "number,isDraft,headRefName",
+        "--limit", "50",
+    ])
+    if result.returncode != 0:
+        return None
+    try:
+        rows = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [
+        int(row["number"]) for row in rows
+        if row.get("isDraft") and str(row.get("headRefName", "")).startswith(
+            LANE_BRANCH_PREFIX
+        )
+    ]
+
+
+def commit_subject(sha: str) -> str:
+    result = _git(["log", "-1", "--format=%s", sha])
+    collapsed = re.sub(r"\s+", " ", result.stdout).strip()
+    printable = "".join(ch for ch in collapsed if ch.isprintable())
+    return printable[:72] or "hardening lane output"
+
+
+def load_propose_receipt(path: Path | None) -> dict:
+    """The other phase's receipt, for narration only. Never a gate input."""
+    if path is None or not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Hardening lane — deliver")
+    parser.add_argument("--repo", required=True)
+    parser.add_argument("--bundle", required=True)
+    parser.add_argument("--receipt", required=True)
+    parser.add_argument("--propose-receipt", default=None,
+                        help="untrusted receipt from phase 1 (narrative only)")
+    parser.add_argument("--base", default="main")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="verify everything, push nothing")
+    args = parser.parse_args(argv)
+    out = Path(args.receipt)
+
+    def refuse(reason: str, **extra) -> int:
+        receipt({"status": "REFUSED", "reason": reason, **extra}, out)
+        return 1
+
+    bundle = Path(args.bundle)
+    if not bundle.is_file():
+        return refuse("no delivery bundle was produced")
+    size = bundle.stat().st_size
+    if size > MAX_BUNDLE_BYTES:
+        return refuse("delivery bundle exceeds the size ceiling",
+                      bytes=size, limit=MAX_BUNDLE_BYTES)
+
+    # `bundle verify` also proves the prerequisite commits exist locally,
+    # which is why this job checks out with full history.
+    verified = _git(["bundle", "verify", str(bundle)])
+    if verified.returncode != 0:
+        return refuse("git bundle verify failed",
+                      stderr=verified.stderr[-1000:])
+
+    heads = bundle_heads(bundle)
+    if heads is None:
+        return refuse("bundle head list was unreadable or carried a "
+                      "non-branch ref")
+    if len(heads) != 1:
+        return refuse("bundle must carry exactly one branch",
+                      heads=[name for _, name in heads])
+    claimed_sha, branch = heads[0]
+    if not BRANCH_RE.match(branch):
+        return refuse("bundle branch name is not a lane branch",
+                      branch=branch)
+
+    fetched = _git(["fetch", str(bundle),
+                    f"refs/heads/{branch}:{CANDIDATE_REF}"])
+    if fetched.returncode != 0:
+        return refuse("could not fetch the candidate commit out of the bundle",
+                      stderr=fetched.stderr[-1000:])
+    head_sha = _git(["rev-parse", CANDIDATE_REF]).stdout.strip()
+    if not head_sha or head_sha != claimed_sha:
+        return refuse("candidate ref did not resolve to the bundled sha",
+                      listed=claimed_sha, resolved=head_sha)
+
+    # Base is fetched by THIS job. The propose phase's claim about its base
+    # is not consulted.
+    _git(["fetch", "origin", args.base])
+    base_sha = _git(["rev-parse", "FETCH_HEAD"]).stdout.strip()
+    if not base_sha:
+        return refuse(f"could not resolve origin/{args.base}")
+
+    count = _git(["rev-list", "--count", f"{base_sha}..{head_sha}"]).stdout.strip()
+    if count != "1":
+        return refuse("lane delivery must be exactly one commit",
+                      commits=count, base=base_sha, head=head_sha)
+
+    parent = _git(["rev-parse", f"{head_sha}^"]).stdout.strip()
+    if not parent:
+        return refuse("candidate commit has no parent")
+    # Redundant backstop, stated as such: given the one-commit rule above,
+    # nothing but `head` itself is absent from base, which already implies
+    # `head^` is reachable from base. This check therefore cannot fire on its
+    # own today. It is kept because it becomes load-bearing the moment the
+    # one-commit rule is relaxed, and it costs one process.
+    ancestry = _git(["merge-base", "--is-ancestor", parent, base_sha])
+    if ancestry.returncode != 0:
+        return refuse("candidate's parent is not an ancestor of "
+                      f"origin/{args.base} — refusing to deliver a commit "
+                      "built on unknown history",
+                      parent=parent, base=base_sha)
+
+    paths = changed_paths(parent, head_sha)
+    if not paths:
+        return refuse("candidate commit changes nothing")
+    if len(paths) > MAX_CHANGED_FILES:
+        return refuse("candidate touches too many files",
+                      files=len(paths), limit=MAX_CHANGED_FILES)
+    forbidden = denied_paths(paths)
+    if forbidden:
+        return refuse("candidate touches referee or excluded paths — the lane "
+                      "may not edit the machinery that judges the lane",
+                      paths=forbidden)
+
+    lines = numstat_lines(parent, head_sha)
+    if lines > MAX_DIFF_LINES:
+        return refuse("candidate exceeds the diff cap as measured here",
+                      observed=lines, limit=MAX_DIFF_LINES)
+
+    # Authoritative ceiling: propose checked this early to avoid wasting an
+    # agent run, but only the value read at delivery time governs.
+    open_drafts = open_lane_drafts(args.repo)
+    if open_drafts is None:
+        return refuse("could not enumerate open lane drafts at delivery time")
+    if len(open_drafts) >= MAX_OPEN_LANE_DRAFTS:
+        receipt({"status": "CAP_HIT", "cap": "open_lane_drafts",
+                 "observed": len(open_drafts), "limit": MAX_OPEN_LANE_DRAFTS,
+                 "open": open_drafts, "branch": branch}, out)
+        return 0
+
+    verified_facts = {
+        "branch": branch, "commit": head_sha, "parent": parent,
+        "base": base_sha, "diff_lines": lines, "changed_files": len(paths),
+        "paths": paths[:50], "bundle_bytes": size,
+    }
+
+    if args.dry_run:
+        receipt({"status": "VERIFIED_DRY_RUN", **verified_facts}, out)
+        return 0
+
+    push = _git(["push", "origin", f"{head_sha}:refs/heads/{branch}"])
+    if push.returncode != 0:
+        receipt({"status": "PUSH_FAILED", **verified_facts,
+                 "stderr": push.stderr[-1000:]}, out)
+        return 1
+
+    proposed = load_propose_receipt(
+        Path(args.propose_receipt) if args.propose_receipt else None)
+    target = proposed.get("target", {})
+    body = (
+        "Hardening-lane output — **draft only**, produced by an agent that "
+        "held no repository credential.\n\n"
+        f"- Target: `{json.dumps(target)[:400]}`\n"
+        f"- Verified at delivery: {lines} changed lines across "
+        f"{len(paths)} file(s), one commit on `{base_sha[:12]}`, no referee "
+        "paths touched.\n"
+        "- The proposing job ran with `contents: read` and "
+        "`persist-credentials: false`; this PR was pushed by a separate job "
+        "on a separate runner that never executed agent code.\n"
+        "- Every figure above was re-derived from the delivered commit and "
+        "from `origin` — the proposing phase's receipt is narrative, not "
+        "evidence.\n\n"
+        "Enters the review pipeline; the operator flips it ready."
+    )
+    pr = _run([
+        GH_BIN, "pr", "create", "--repo", args.repo, "--draft",
+        "--head", branch, "--base", args.base,
+        "--title", commit_subject(head_sha),
+        "--body", body,
+        "--label", ",".join(LANE_LABELS),
+    ])
+    receipt({"status": "DRAFT_PR_OPENED" if pr.returncode == 0
+             else "PR_CREATE_FAILED",
+             **verified_facts,
+             "pr_output": (pr.stdout + pr.stderr)[-500:]}, out)
+    return 0 if pr.returncode == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

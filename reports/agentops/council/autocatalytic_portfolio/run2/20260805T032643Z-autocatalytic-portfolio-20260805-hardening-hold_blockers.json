@@ -1,0 +1,229 @@
+{
+  "blockers": [
+    "glm52: score=94 < 100",
+    "glm52: disagreement=The prompt states 'Python work-packet gate: 171 passed' but the concrete evidence file local_gate_receipt.json states '172 passed, 1 deprecation warning'. The evidence file is dated 2026-08-05T03:19:09Z and is the more recent and authoritat",
+    "kimik3: CriticResponseError invalid critic JSON from kimi_code:k3; actual_model=k3; content_len=11224; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me review this carefully as a skeptical external reviewer. The task: review the ten-node autocatalytic portfolio hardening pass. Evidence is extensive: manifest, ACTIVE_TRACK, the main module, tests, API router, dashboard lib + pages, docs, evide ... r minor items in blockers? The spec says \"If verdict is not pass/approve or score < 100, include concrete blockers and required_changes.\" Since score < 100, include blockers).\\n\\nBlockers: I'll include the digest-scope overstatement and the weak test",
+    "kimik3: disagreement=invalid critic JSON from kimi_code:k3; actual_model=k3; content_len=11224; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me review this carefully as a skeptical external reviewer. The task: review the t",
+    "qwen3coder: CriticResponseError invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=11595; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer lane: qwen3coder. I need to return JSON only, no markdown fences, no prose outside JSON.\\n\\nI need to review the target: autocatalytic-portfolio-20260805-hardening\\nRequested provider/model ... rn chains fail closed:\\n- The verifier fingerprint captures source bytes once: _VERIFIER_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest(). This is computed at import time. The test test_stale_verifier_and_turn_chain_cannot_prom",
+    "qwen3coder: disagreement=invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=11595; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer ",
+    "minimaxm3: CriticResponseError invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=10577; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully analyze this review request. I need to act as a strict, independent external reviewer for a production integration of an \"autocatalytic portfolio\" implementation. The claim ceiling is explicitly `local_rehearsal` - so the question is ... isk bytes as its own\". This is correctly implemented.\\n\\nb) The cross-feed bus is keyed by signal, which means if two cross_outputs from different sources emit the same signal, the second overwrites the first. Looking at the manifest, the three cross",
+    "minimaxm3: disagreement=invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=10577; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully analyze this review request. I need to act as a s",
+    "nemotron3ultra: score=95 < 100"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 39058,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml autocatalytic_portfolio section: 10 nodes, 13 edges, promotion_rule with transport_ack_promotes=false and four forbidden_promotions",
+          "docs/governance/ACTIVE_TRACK.yaml: 10 ACTIVE tracks confirmed; active_track_projection.json shows sets_equal=true with exact 10-track closure",
+          "dharma_swarm/autocatalytic_portfolio.py: validate_portfolio enforces node count, ordinal sequence, ring edges, cross-feed producer/consumer agreement, active-track binding closure, and catalytic graph SCC at runtime",
+          "dharma_swarm/autocatalytic_portfolio.py: TransportAck is a frozen dataclass with no conversion method to StructuralHop; build_structural_hop raises SemanticPromotionError on non-A2ATask input",
+          "dharma_swarm/autocatalytic_portfolio.py: StructuralCycleCheck and LocalReceiptConsistencyCheck are frozen dataclasses with init=False modality/independently_authenticated fields; __bool__ raises TypeError",
+          "dharma_swarm/autocatalytic_portfolio.py: _VERIFIER_SOURCE_SHA256 captured at module load; _implementation_fingerprint binds portfolio digest + verifier version + verifier source hash",
+          "dharma_swarm/autocatalytic_portfolio.py: load_latest_cycle never trusts stored booleans; always calls _check_structural_cycle_witness and verify_cycle_witness",
+          "dharma_swarm/autocatalytic_portfolio.py: _write_json_atomic uses temp file + os.replace for safe atomic writes",
+          "dharma_swarm/autocatalytic_portfolio.py: 10 project adapters each call real project functions and emit non-promoting signal states (historical_grounded_fixture, planned_not_accepted, rehearsal_intent_no_domain_execution, closure_gaps_observed, candidate_only_not_selected, blocked_no_proposal, not_verified, authorization_not_observed, external_gate_closed, promotion_blocked)",
+          "dharma_swarm/autocatalytic_portfolio.py: _validate_project_semantics independently recomputes adapter evidence, cross-feed consumption/emission, and project-evidence ledger on every hop verification",
+          "tests/test_autocatalytic_portfolio.py: 21+ tests covering topology validation, two-turn cycle closure, receipt persistence, non-terminal rejection, transport-ack non-promotion, tampered artifact invalidation, missing runtime DB, stale verifier fingerprint, broken turn chain, self-authored hash promotion rejection, distinct modality invariance, truthiness forbidden, authenticated-execution claim rejection, latest-witness reverification, fingerprint immutability after import",
+          "api/routers/manifest.py: /api/manifest/autocatalytic endpoint returns build_autocatalytic_snapshot with fail-closed topology contract",
+          "dashboard/src/lib/autocatalyticPortfolio.ts: cycleWitnessPresentation requires structural_proof_valid, local_receipt_consistency_valid, cycle_closed, completed_hops===10, required_hops===10, runtime_receipts_recorded, execution_evidence_scope===local_mutable_runtime_receipt_consistency, and execution_provenance_authenticated===false",
+          "dashboard/src/app/dashboard/organism/page.tsx: fails closed on data.topology.contract_valid !== true with ErrorSurface",
+          "dashboard/src/app/dashboard/organism/[nodeId]/page.tsx: fails closed on invalid topology and missing node; renders adapter evidence only from receipt-consistent witness",
+          "dashboard/src/app/dashboard/organism/_components.tsx: TruthBoundaryNotice explicitly states 'not authenticated execution provenance'",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md: claim ceiling is local_rehearsal; 41-row receipt join explained; forgeability of local SQLite explicitly stated",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md: confirms imports from canonical A2AServer, AgentCard, RuntimeStateStore, correlation_context, CatalyticGraph with SHA-256 hashes; no rival substrate",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/proof_ref_inventory.json: 20/20 proof refs present with content hashes",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json: two-turn witness with structural_proof_valid=true, local_receipt_consistency_valid=true, 20 a2a_task + 20 hop_proof + 1 cycle_proof receipts, execution_provenance_authenticated=false",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json: 172 passed (vs prompt's 171), ruff clean, eslint clean, Next build compiled, FastAPI TestClient contract passes"
+        ],
+        "explicit_disagreement": "The prompt states 'Python work-packet gate: 171 passed' but the concrete evidence file local_gate_receipt.json states '172 passed, 1 deprecation warning'. The evidence file is dated 2026-08-05T03:19:09Z and is the more recent and authoritative artifact; the discrepancy is likely an additional test added during final hardening. This does not affect the verdict.",
+        "required_changes": [
+          "Reconcile the test count discrepancy: the prompt states 171 passed while local_gate_receipt.json states 172 passed, 1 deprecation warning. The evidence file is more recent and concrete; update the prompt or evidence to agree.",
+          "Attach a concrete palantir-pilot heartbeat artifact younger than the council threshold as evidence, or explicitly scope it out of this code-level review gate."
+        ],
+        "score": 94,
+        "summary": "The ten-node autocatalytic portfolio hardening pass is production-grade for its deliberately narrow claim ceiling of local_rehearsal. Each node has a substantive project-specific read-only adapter that calls real project code (build_plan, sarathi_pulse, derive_graph_side_effect_key, read_corpus, ci_truth contract evaluation, terminal_control_state loading) and content-addresses evidence sources. TransportAck is structurally incapable of inhabiting StructuralHop. Structure-only and local-receipt-consistency are distinct frozen result types with immutable modality fields and forbidden truthiness. The verifier fingerprint is captured once at import time and is immune to on-disk replacement. All fail-closed paths are tested adversarially: tampered artifacts, missing runtime DB, stale verifier, broken turn chains, self-authored promotion attempts, and authenticated-execution claim forgery. The dashboard and API fail closed on invalid topology contracts and never present mutable local receipts as authenticated provenance. The implementation composes the canonical A2AServer, RuntimeStateStore, correlation spine, Agent Cards, and CatalyticGraph without creating a rival substrate. No concrete code blocker remains.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "```json\n{\n  \"verdict\": \"approve\",\n  \"score\": 94,\n  \"summary\": \"The ten-node autocatalytic portfolio hardening pass is production-grade for its deliberately narrow claim ceiling of local_rehearsal. Each node has a substantive project-specific read-only adapter that calls real project code (build_plan, sarathi_pulse, derive_graph_side_effect_key, read_corpus, ci_truth contract evaluation, terminal_control_state loading) and content-addresses evidence sources. TransportAck is structurally incapable of inhabiting StructuralHop. Structure-only and local-receipt-consistency are distinct frozen result types with immutable modality fields and forbidden truthiness. The verifier fingerprint is captured once at import time and is immune to on-disk replacement. All fail-closed paths are tested adversarially: tampered artifacts, missing runtime DB, stale verifier, broken turn chains, self-authored promotion attempts, and authenticated-execution claim forgery. The dashboard and API fail closed on invalid topology contracts and never present mutable local receipts as authenticated provenance. The implementation composes the canonical A2AServer, RuntimeStateStore, correlation spine, Agent Cards, and CatalyticGraph without creating a rival substrate. No concrete code blocker remains.\",\n  \"blockers\": [],\n  \"required_changes\": [\n    \"Reconcile the test count discrepancy: the prompt states 171 passed while local_gate_receipt.json states 172 passed, 1 deprecation warning. The evidence file is more recent and concrete; update the prompt or evidence to agree.\",\n    \"Attach a concrete palantir-pilot heartbeat artifact younger than the council threshold as evidence, or explicitly scope it out of this code-level review gate.\"\n  ],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml autocatalytic_portfolio section: 10 nodes, 13 edges, promotion_rule with transport_ack_promotes=false and four forbidden_promotions\",\n    \"docs/governance/ACTIVE_TRACK.yaml: 10 ACTIVE tracks confirmed; active_track_projection.json shows sets_equal=true with exact 10-track closure\",\n    \"dharma_swarm/autocatalytic_portfolio.py: validate_portfolio enforces node count, ordinal sequence, ring edges, cross-feed producer/consumer agreement, active-track binding closure, and catalytic graph SCC at runtime\",\n    \"dharma_swarm/autocatalytic_portfolio.py: TransportAck is a frozen dataclass with no conversion method to StructuralHop; build_structural_hop raises SemanticPromotionError on non-A2ATask input\",\n    \"dharma_swarm/autocatalytic_portfolio.py: StructuralCycleCheck and LocalReceiptConsistencyCheck are frozen dataclasses with init=False modality/independently_authenticated fields; __bool__ raises TypeError\",\n    \"dharma_swarm/autocatalytic_portfolio.py: _VERIFIER_SOURCE_SHA256 captured at module load; _implementation_fingerprint binds portfolio digest + verifier version + verifier source hash\",\n    \"dharma_swarm/autocatalytic_portfolio.py: load_latest_cycle never trusts stored booleans; always calls _check_structural_cycle_witness and verify_cycle_witness\",\n    \"dharma_swarm/autocatalytic_portfolio.py: _write_json_atomic uses temp file + os.replace for safe atomic writes\",\n    \"dharma_swarm/autocatalytic_portfolio.py: 10 project adapters each call real project functions and emit non-promoting signal states (historical_grounded_fixture, planned_not_accepted, rehearsal_intent_no_domain_execution, closure_gaps_observed, candidate_only_not_selected, blocked_no_proposal, not_verified, authorization_not_observed, external_gate_closed, promotion_blocked)\",\n    \"dharma_swarm/autocatalytic_portfolio.py: _validate_project_semantics independently recomputes adapter evidence, cross-feed consumption/emission, and project-evidence ledger on every hop verification\",\n    \"tests/test_autocatalytic_portfolio.py: 21+ tests covering topology validation, two-turn cycle closure, receipt persistence, non-terminal rejection, transport-ack non-promotion, tampered artifact invalidation, missing runtime DB, stale verifier fingerprint, broken turn chain, self-authored hash promotion rejection, distinct modality invariance, truthiness forbidden, authenticated-execution claim rejection, latest-witness reverification, fingerprint immutability after import\",\n    \"api/routers/manifest.py: /api/manifest/autocatalytic endpoint returns build_autocatalytic_snapshot with fail-closed topology contract\",\n    \"dashboard/src/lib/autocatalyticPortfolio.ts: cycleWitnessPresentation requires structural_proof_valid, local_receipt_consistency_valid, cycle_closed, completed_hops===10, required_hops===10, runtime_receipts_recorded, execution_evidence_scope===local_mutable_runtime_receipt_consistency, and execution_provenance_authenticated===false\",\n    \"dashboard/src/app/dashboard/organism/page.tsx: fails closed on data.topology.contract_valid !== true with ErrorSurface\",\n    \"dashboard/src/app/dashboard/organism/[nodeId]/page.tsx: fails closed on invalid topology and missing node; renders adapter evidence only from receipt-consistent witness\",\n    \"dashboard/src/app/dashboard/organism/_components.tsx: TruthBoundaryNotice explicitly states 'not authenticated execution provenance'\",\n    \"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md: claim ceiling is local_rehearsal; 41-row receipt join explained; forgeability of local SQLite explicitly stated\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/composition_evidence.md: confirms imports from canonical A2AServer, AgentCard, RuntimeStateStore, correlation_context, CatalyticGraph with SHA-256 hashes; no rival substrate\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/proof_ref_inventory.json: 20/20 proof refs present with content hashes\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json: two-turn witness with structural_proof_valid=true, local_receipt_consistency_valid=true, 20 a2a_task + 20 hop_proof + 1 cycle_proof receipts, execution_provenance_authenticated=false\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json: 172 passed (vs prompt's 171), ruff clean, eslint clean, Next build compiled, FastAPI TestClient contract passes\"\n  ],\n  \"explicit_disagreement\": \"The prompt states 'Python work-packet gate: 171 passed' but the concrete evidence file local_gate_receipt.json states '172 passed, 1 deprecation warning'. The evidence file is dated 2026-08-05T03:19:09Z and is the more recent and authoritative artifact; the discrepancy is likely an additional test added during final hardening. This does not affect the verdict.\"\n}\n```",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "k3",
+      "failure_reason": "invalid critic JSON from kimi_code:k3; actual_model=k3; content_len=11224; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me review this carefully as a skeptical external reviewer. The task: review the ten-node autocatalytic portfolio hardening pass. Evidence is extensive: manifest, ACTIVE_TRACK, the main module, tests, API router, dashboard lib + pages, docs, evide ... r minor items in blockers? The spec says \"If verdict is not pass/approve or score < 100, include concrete blockers and required_changes.\" Since score < 100, include blockers).\\n\\nBlockers: I'll include the digest-scope overstatement and the weak test",
+      "failure_type": "CriticResponseError",
+      "lane_id": "kimik3",
+      "latency_ms": 209975,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from kimi_code:k3; actual_model=k3; content_len=11224; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me review this carefully as a skeptical external reviewer. The task: review the ten-node autocatalytic portfolio hardening pass. Evidence is extensive: manifest, ACTIVE_TRACK, the main module, tests, API router, dashboard lib + pages, docs, evide ... r minor items in blockers? The spec says \"If verdict is not pass/approve or score < 100, include concrete blockers and required_changes.\" Since score < 100, include blockers).\\n\\nBlockers: I'll include the digest-scope overstatement and the weak test"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from kimi_code:k3; actual_model=k3; content_len=11224; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me review this carefully as a skeptical external reviewer. The task: review the ten-node autocatalytic portfolio hardening pass. Evidence is extensive: manifest, ACTIVE_TRACK, the main module, tests, API router, dashboard lib + pages, docs, evide ... r minor items in blockers? The spec says \"If verdict is not pass/approve or score < 100, include concrete blockers and required_changes.\" Since score < 100, include blockers).\\n\\nBlockers: I'll include the digest-scope overstatement and the weak test",
+        "required_changes": [
+          "Make kimi_code:k3 reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimik3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "kimi_code",
+      "raw_response_preview": "Let me review this carefully as a skeptical external reviewer. The task: review the ten-node autocatalytic portfolio hardening pass. Evidence is extensive: manifest, ACTIVE_TRACK, the main module, tests, API router, dashboard lib + pages, docs, evide ... r minor items in blockers? The spec says \"If verdict is not pass/approve or score < 100, include concrete blockers and required_changes.\" Since score < 100, include blockers).\\n\\nBlockers: I'll include the digest-scope overstatement and the weak test",
+      "requested_model": "k3",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.6",
+      "failure_reason": "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=11595; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer lane: qwen3coder. I need to return JSON only, no markdown fences, no prose outside JSON.\\n\\nI need to review the target: autocatalytic-portfolio-20260805-hardening\\nRequested provider/model ... rn chains fail closed:\\n- The verifier fingerprint captures source bytes once: _VERIFIER_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest(). This is computed at import time. The test test_stale_verifier_and_turn_chain_cannot_prom",
+      "failure_type": "CriticResponseError",
+      "lane_id": "qwen3coder",
+      "latency_ms": 35815,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=11595; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer lane: qwen3coder. I need to return JSON only, no markdown fences, no prose outside JSON.\\n\\nI need to review the target: autocatalytic-portfolio-20260805-hardening\\nRequested provider/model ... rn chains fail closed:\\n- The verifier fingerprint captures source bytes once: _VERIFIER_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest(). This is computed at import time. The test test_stale_verifier_and_turn_chain_cannot_prom"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:qwen3-coder:480b-cloud; actual_model=kimi-k2.6; content_len=11595; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer lane: qwen3coder. I need to return JSON only, no markdown fences, no prose outside JSON.\\n\\nI need to review the target: autocatalytic-portfolio-20260805-hardening\\nRequested provider/model ... rn chains fail closed:\\n- The verifier fingerprint captures source bytes once: _VERIFIER_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest(). This is computed at import time. The test test_stale_verifier_and_turn_chain_cannot_prom",
+        "required_changes": [
+          "Make ollama:qwen3-coder:480b-cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "qwen3coder could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "The user wants me to act as an independent external reviewer lane: qwen3coder. I need to return JSON only, no markdown fences, no prose outside JSON.\\n\\nI need to review the target: autocatalytic-portfolio-20260805-hardening\\nRequested provider/model ... rn chains fail closed:\\n- The verifier fingerprint captures source bytes once: _VERIFIER_SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest(). This is computed at import time. The test test_stale_verifier_and_turn_chain_cannot_prom",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 23607,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml (portfolio declaration, promotion rules, node contracts)",
+          "dharma_swarm/autocatalytic_portfolio.py (implementation of structural checks, adapters, runtime receipt consistency)",
+          "tests/test_autocatalytic_portfolio.py (171 tests covering promotion prevention, structural integrity, receipt consistency, stale evidence, etc.)",
+          "api/routers/manifest.py (API endpoint returning fail-closed topology and witness)",
+          "tests/test_manifest_health.py (API contract tests, endpoint registration, node page validation)",
+          "dashboard/src/lib/autocatalyticPortfolio.ts (frontend presentation logic, authority normalization, cycle witness state machine)",
+          "dashboard/src/lib/autocatalyticPortfolio.test.ts (frontend unit tests for topology, witness, promotion rules)",
+          "dashboard/src/app/dashboard/organism/page.tsx (overview page rendering with truth boundary notice)",
+          "dashboard/src/app/dashboard/organism/[nodeId]/page.tsx (dynamic node page with adapter evidence and blockers)",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md (architecture documentation consistent with code and UI)",
+          "docs/architecture/autocatalytic_nodes/*.md (per-node documentation with authority ceilings and proof obligations)",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/* (composition evidence, proof ref inventory, runtime witness, local gate receipt)",
+          "dashboard/src/lib/dashboardNav.ts and test (organism route in navigation)",
+          "Next production build compiled with organism routes",
+          "Ruff and ESLint clean on relevant files",
+          "Adversarial semantic audit passed with 21 focused tests"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The ten-node autocatalytic portfolio hardening is production-grade for its declared local_rehearsal ceiling. All audit points are satisfied with concrete evidence, no overclaims, and robust fail-closed design.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"The ten-node autocatalytic portfolio hardening is production-grade for its declared local_rehearsal ceiling. All audit points are satisfied with concrete evidence, no overclaims, and robust fail-closed design.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml (portfolio declaration, promotion rules, node contracts)\",\n    \"dharma_swarm/autocatalytic_portfolio.py (implementation of structural checks, adapters, runtime receipt consistency)\",\n    \"tests/test_autocatalytic_portfolio.py (171 tests covering promotion prevention, structural integrity, receipt consistency, stale evidence, etc.)\",\n    \"api/routers/manifest.py (API endpoint returning fail-closed topology and witness)\",\n    \"tests/test_manifest_health.py (API contract tests, endpoint registration, node page validation)\",\n    \"dashboard/src/lib/autocatalyticPortfolio.ts (frontend presentation logic, authority normalization, cycle witness state machine)\",\n    \"dashboard/src/lib/autocatalyticPortfolio.test.ts (frontend unit tests for topology, witness, promotion rules)\",\n    \"dashboard/src/app/dashboard/organism/page.tsx (overview page rendering with truth boundary notice)\",\n    \"dashboard/src/app/dashboard/organism/[nodeId]/page.tsx (dynamic node page with adapter evidence and blockers)\",\n    \"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md (architecture documentation consistent with code and UI)\",\n    \"docs/architecture/autocatalytic_nodes/*.md (per-node documentation with authority ceilings and proof obligations)\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/* (composition evidence, proof ref inventory, runtime witness, local gate receipt)\",\n    \"dashboard/src/lib/dashboardNav.ts and test (organism route in navigation)\",\n    \"Next production build compiled with organism routes\",\n    \"Ruff and ESLint clean on relevant files\",\n    \"Adversarial semantic audit passed with 21 focused tests\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "failure_reason": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=10577; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully analyze this review request. I need to act as a strict, independent external reviewer for a production integration of an \"autocatalytic portfolio\" implementation. The claim ceiling is explicitly `local_rehearsal` - so the question is ... isk bytes as its own\". This is correctly implemented.\\n\\nb) The cross-feed bus is keyed by signal, which means if two cross_outputs from different sources emit the same signal, the second overwrites the first. Looking at the manifest, the three cross",
+      "failure_type": "CriticResponseError",
+      "lane_id": "minimaxm3",
+      "latency_ms": 27221,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=10577; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully analyze this review request. I need to act as a strict, independent external reviewer for a production integration of an \"autocatalytic portfolio\" implementation. The claim ceiling is explicitly `local_rehearsal` - so the question is ... isk bytes as its own\". This is correctly implemented.\\n\\nb) The cross-feed bus is keyed by signal, which means if two cross_outputs from different sources emit the same signal, the second overwrites the first. Looking at the manifest, the three cross"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=10577; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully analyze this review request. I need to act as a strict, independent external reviewer for a production integration of an \"autocatalytic portfolio\" implementation. The claim ceiling is explicitly `local_rehearsal` - so the question is ... isk bytes as its own\". This is correctly implemented.\\n\\nb) The cross-feed bus is keyed by signal, which means if two cross_outputs from different sources emit the same signal, the second overwrites the first. Looking at the manifest, the three cross",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "Let me carefully analyze this review request. I need to act as a strict, independent external reviewer for a production integration of an \"autocatalytic portfolio\" implementation. The claim ceiling is explicitly `local_rehearsal` - so the question is ... isk bytes as its own\". This is correctly implemented.\\n\\nb) The cross-feed bus is keyed by signal, which means if two cross_outputs from different sources emit the same signal, the second overwrites the first. Looking at the manifest, the three cross",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 57207,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml: autocatalytic_portfolio declaration with 10 nodes, 13 edges, promotion_rule, cross-feeds",
+          "docs/governance/ACTIVE_TRACK.yaml: 10 active tracks matching portfolio project_bindings closure",
+          "dharma_swarm/autocatalytic_portfolio.py: validate_portfolio, _PROJECT_ADAPTERS, StructuralHop/StructuralCycleProof, StructuralCycleCheck, LocalReceiptConsistencyCheck, run_local_cycle, verify_cycle_witness, load_latest_cycle",
+          "tests/test_autocatalytic_portfolio.py: 21 tests covering promotion rejection, transport ack non-promotion, tampering detection, missing runtime DB, verifier fingerprint immutability, cross-feeds, negative modality preservation",
+          "api/routers/manifest.py: /api/manifest/autocatalytic endpoint calling build_autocatalytic_snapshot",
+          "tests/test_manifest_health.py: autocatalytic_endpoint_returns_fail_closed_topology_contract, autocatalytic_node_page_is_locked_to_node_identity",
+          "dashboard/src/lib/autocatalyticPortfolio.ts: cycleWitnessPresentation requiring structural_proof_valid, local_receipt_consistency_valid, cycle_closed, completed_hops=10, required_hops=10, runtime_receipts_recorded, execution_evidence_scope=local_mutable_runtime_receipt_consistency, execution_provenance_authenticated=false",
+          "dashboard/src/app/dashboard/organism/page.tsx: TruthBoundaryNotice, AuthorityBadge, CycleWitnessBadge, promotionRuleLines",
+          "dashboard/src/app/dashboard/organism/[nodeId]/page.tsx: project adapter projection with signal state and blockers",
+          "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md: executable promotion rule, replay/evidence drift, promotion boundary",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json: fresh two-turn witness with 20 a2a_task, 20 autocatalytic_hop_proof, 1 autocatalytic_cycle_proof receipts",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json: 172 passed, Ruff/ESLint clean, Next build compiled, adversarial audit PASS-with-boundary"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [
+          "Document the palantir-pilot witness heartbeat freshness check as a runtime operational requirement (currently claimed but not evidenced in attached files)",
+          "Add a test verifying that load_latest_cycle correctly handles corrupted witness files (partial JSON, missing fields) without crashing the dashboard"
+        ],
+        "score": 95,
+        "summary": "The ten-node autocatalytic portfolio implementation meets its declared contract: a closed metabolic ring of ten project-specific read-only adapters emitting typed signal envelopes with non-promoting states, validated by independent structural and local-receipt-consistency checks that fail closed on stale verifier fingerprints, tampered artifacts, missing receipts, or broken turn chains. The code composes the canonical A2A server, RuntimeStateStore, correlation spine, Agent Cards, and CatalyticGraph without introducing a rival substrate. The dashboard renders adapter evidence only after full topology validation and local receipt consistency re-verification. The strongest claim remains 'local_rehearsal' with explicit forbidden promotions and an honest ceiling. No code-level blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 95,\n  \"summary\": \"The ten-node autocatalytic portfolio implementation meets its declared contract: a closed metabolic ring of ten project-specific read-only adapters emitting typed signal envelopes with non-promoting states, validated by independent structural and local-receipt-consistency checks that fail closed on stale verifier fingerprints, tampered artifacts, missing receipts, or broken turn chains. The code composes the canonical A2A server, RuntimeStateStore, correlation spine, Agent Cards, and CatalyticGraph without introducing a rival substrate. The dashboard renders adapter evidence only after full topology validation and local receipt consistency re-verification. The strongest claim remains 'local_rehearsal' with explicit forbidden promotions and an honest ceiling. No code-level blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [\n    \"Document the palantir-pilot witness heartbeat freshness check as a runtime operational requirement (currently claimed but not evidenced in attached files)\",\n    \"Add a test verifying that load_latest_cycle correctly handles corrupted witness files (partial JSON, missing fields) without crashing the dashboard\"\n  ],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml: autocatalytic_portfolio declaration with 10 nodes, 13 edges, promotion_rule, cross-feeds\",\n    \"docs/governance/ACTIVE_TRACK.yaml: 10 active tracks matching portfolio project_bindings closure\",\n    \"dharma_swarm/autocatalytic_portfolio.py: validate_portfolio, _PROJECT_ADAPTERS, StructuralHop/StructuralCycleProof, StructuralCycleCheck, LocalReceiptConsistencyCheck, run_local_cycle, verify_cycle_witness, load_latest_cycle\",\n    \"tests/test_autocatalytic_portfolio.py: 21 tests covering promotion rejection, transport ack non-promotion, tampering detection, missing runtime DB, verifier fingerprint immutability, cross-feeds, negative modality preservation\",\n    \"api/routers/manifest.py: /api/manifest/autocatalytic endpoint calling build_autocatalytic_snapshot\",\n    \"tests/test_manifest_health.py: autocatalytic_endpoint_returns_fail_closed_topology_contract, autocatalytic_node_page_is_locked_to_node_identity\",\n    \"dashboard/src/lib/autocatalyticPortfolio.ts: cycleWitnessPresentation requiring structural_proof_valid, local_receipt_consistency_valid, cycle_closed, completed_hops=10, required_hops=10, runtime_receipts_recorded, execution_evidence_scope=local_mutable_runtime_receipt_consistency, execution_provenance_authenticated=false\",\n    \"dashboard/src/app/dashboard/organism/page.tsx: TruthBoundaryNotice, AuthorityBadge, CycleWitnessBadge, promotionRuleLines\",\n    \"dashboard/src/app/dashboard/organism/[nodeId]/page.tsx: project adapter projection with signal state and blockers\",\n    \"docs/architecture/AUTOCATALYTIC_PORTFOLIO.md: executable promotion rule, replay/evidence drift, promotion boundary\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json: fresh two-turn witness with 20 a2a_task, 20 autocatalytic_hop_proof, 1 autocatalytic_cycle_proof receipts\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json: 172 passed, Ruff/ESLint clean, Next build compiled, adversarial audit PASS-with-boundary\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260805T032643Z",
+  "max_evidence_chars": 150000,
+  "max_output_tokens": 2400,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 9,
+    "heartbeat_timestamp": "2026-08-05T03:26:34Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 28,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-08-05T03:26:34Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-08-05T03:26:43.110512Z\"\n}\n--- pane tail ---\nUsing CPython 3.13.12\nCreating virtual environment at: .venv\n   Building dharma-swarm @ file:///Users/dhyana/ds_autocatalytic_organism2_20260\n805\n      Built dharma-swarm @ file:///Users/dhyana/ds_autocatalytic_organism2_20260\n805\nInstalled 48 packages in 89ms\nInstalled 1 package in 1ms\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 440514,
+  "prompt_file": "/Users/dhyana/ds_autocatalytic_organism2_20260805/reports/agentops/council/autocatalytic_portfolio/review_prompt.md",
+  "prompt_words_estimate": 38023,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 48.17,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 300
+}
