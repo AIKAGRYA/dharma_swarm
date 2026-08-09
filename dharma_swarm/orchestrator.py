@@ -2686,17 +2686,12 @@ class Orchestrator:
                     success_meta["honors_checkpoint_accepted"] = honors_checkpoint.judge_pack.accepted
             except Exception:
                 logger.debug("Honors checkpoint summary extraction failed", exc_info=True)
-            # claim_id proves this run's ownership so a completion arriving
-            # after a timeout/reconciler requeue (task now PENDING) is
-            # re-adopted by the board instead of discarded as an invalid
-            # pending -> completed transition.
             await self._safe_update_task(
                 td.task_id,
                 status=TaskStatus.COMPLETED,
                 result=result,
                 metadata=success_meta,
-                claim_id=str(td.metadata.get("claim_id") or "") or None,
-            )
+                claim_id=str(td.metadata.get("claim_id") or "") or None)
             if self._pool is not None:
                 await self._pool.release(td.agent_id)
             self._active_dispatches.pop(td.task_id, None)
