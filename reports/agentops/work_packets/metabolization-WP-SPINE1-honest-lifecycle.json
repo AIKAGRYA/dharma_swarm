@@ -14,6 +14,7 @@
     "dharma_swarm/gnani_lodestone.py",
     "scripts/governance/agent_onboard.py",
     "scripts/governance/darshan_pack.py",
+    "tests/test_config.py",
     "tests/test_task_board_late_completion.py",
     "tests/test_orchestrator.py",
     "tests/test_orchestrator_user_priority.py",

@@ -24,7 +24,7 @@ from dharma_swarm.config import (
 class TestOrchestratorConfig:
     def test_defaults(self) -> None:
         cfg = OrchestratorConfig()
-        assert cfg.task_timeout_seconds == 300.0
+        assert cfg.task_timeout_seconds == 1800.0
         assert cfg.claim_timeout_seconds == 420.0
         assert cfg.max_retries == 0
         assert cfg.transient_failure_retry_limit == 2
@@ -89,10 +89,10 @@ class TestTUIConfig:
 class TestSwarmConfig:
     def test_unified_access(self) -> None:
         cfg = SwarmConfig()
-        assert cfg.orchestrator.task_timeout_seconds == 300.0
+        assert cfg.orchestrator.task_timeout_seconds == 1800.0
         assert cfg.agent.heartbeat_threshold_seconds == 60.0
         assert cfg.tui.log_buffer_size == 500
 
     def test_singleton_matches(self) -> None:
-        assert DEFAULT_CONFIG.orchestrator.task_timeout_seconds == 300.0
+        assert DEFAULT_CONFIG.orchestrator.task_timeout_seconds == 1800.0
         assert isinstance(DEFAULT_CONFIG, SwarmConfig)

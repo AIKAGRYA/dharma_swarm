@@ -26,8 +26,11 @@ class OrchestratorConfig(BaseModel):
         description="Seconds between orchestrator ticks",
     )
     task_timeout_seconds: float = Field(
-        default=300.0, ge=10.0, le=7200.0,
-        description="Default timeout for a dispatched task",
+        # default_factory (not default=) so DGC_TASK_TIMEOUT is re-read at
+        # construction time, not frozen at import.
+        default_factory=lambda: float(os.environ.get("DGC_TASK_TIMEOUT", "1800")),
+        ge=10.0, le=7200.0,
+        description="Default timeout for a dispatched task (env: DGC_TASK_TIMEOUT)",
     )
     claim_timeout_seconds: float = Field(
         default=420.0, ge=30.0, le=7200.0,

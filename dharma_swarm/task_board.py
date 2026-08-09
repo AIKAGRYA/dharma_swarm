@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
     FOREIGN KEY (task_id) REFERENCES tasks(id),
     FOREIGN KEY (depends_on_id) REFERENCES tasks(id))"""
 
+# At equal priority, operator/API-submitted work dispatches before system
+# self-spawned work. Origin is derived from what the create paths already
+# store: the API/operator path (api/routers/commands.py -> Swarm.create_task)
+# stamps metadata.created_via='swarm.create_task', startup_crew sets
+# created_by='operator', and self-spawns stamp metadata.source
+# ('swarm.latent_gold' / 'swarm.coordination_synthesis' in swarm.py).
 _READY_QUERY = """
 SELECT t.* FROM tasks t
 WHERE t.status = ?
@@ -65,6 +71,15 @@ WHERE t.status = ?
 ORDER BY CASE t.priority
     WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
     WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
+  CASE
+    WHEN t.created_by = 'operator'
+      OR json_extract(t.metadata, '$.created_via')
+        IN ('manual_seed', 'swarm.create_task')
+    THEN 0
+    WHEN json_extract(t.metadata, '$.source')
+      IN ('swarm.latent_gold', 'swarm.coordination_synthesis')
+    THEN 2
+    ELSE 1 END,
   t.created_at ASC"""
 
 
@@ -201,6 +216,33 @@ class TaskBoard:
             updated = await cur.fetchone()
             deps = await self._fetch_deps(db, task_id)
             return self._row_to_task(updated, deps)  # type: ignore[arg-type]
+
+    async def _late_result_owner(
+        self, task_id: str, claim_id: str | None
+    ) -> Task | None:
+        """Return the task when *claim_id* proves a requeued run still owns it.
+
+        A timeout handler or graph-reconciler requeue can flip a task
+        RUNNING -> PENDING while its execution coroutine is still finishing;
+        without proof of ownership that late result would be discarded by the
+        FSM. The dispatch claim (``last_claim`` stamped into metadata by the
+        orchestrator's ``_prepare_claim`` at assign time) is the ownership
+        token: only a task that was actually dispatched carries one, and a
+        re-dispatch overwrites it — so a never-run task has nothing to match
+        and a stale run can never clobber a newer claim.
+        """
+        if not claim_id:
+            return None
+        task = await self.get(task_id)
+        if task is None or task.status != TaskStatus.PENDING:
+            return None
+        last_claim = (task.metadata or {}).get("last_claim")
+        if not isinstance(last_claim, dict):
+            return None
+        stored = str(last_claim.get("claim_id") or "")
+        if stored and stored == str(claim_id):
+            return task
+        return None
 
     async def _load_rows(self, db: aiosqlite.Connection, rows: list[Any]) -> list[Task]:
         tasks: list[Task] = []
@@ -570,6 +612,7 @@ class TaskBoard:
                     task_id,
                     fields.get("result", ""),
                     metadata=fields.get("metadata"),
+                    claim_id=fields.get("claim_id"),
                 )
             elif status == TaskStatus.FAILED:
                 await self.fail(
@@ -635,8 +678,19 @@ class TaskBoard:
         task_id: str,
         result: str = "",
         metadata: dict[str, Any] | None = None,
+        *,
+        claim_id: str | None = None,
     ) -> Task:
-        """Mark completed (RUNNING -> COMPLETED)."""
+        """Mark completed (RUNNING -> COMPLETED).
+
+        ``claim_id`` lets a run whose task was requeued out from under it
+        (RUNNING -> PENDING via timeout handler or graph reconciler) land its
+        late result instead of having the finished work discarded. When the
+        claim matches the task's stored dispatch claim, the task is
+        re-adopted through the legal FSM (PENDING -> ASSIGNED -> RUNNING)
+        rather than widening ``_TRANSITIONS`` — an unverified writer still
+        hits the strict transition table and is rejected.
+        """
         await self._witness_transition(
             task_id=task_id,
             action=f"complete task {task_id}",
@@ -646,6 +700,14 @@ class TaskBoard:
                 f"{len((result or '').strip())} chars. Verify requirement coverage."
             ),
         )
+        late_owner = await self._late_result_owner(task_id, claim_id)
+        if late_owner is not None:
+            last_claim = (late_owner.metadata or {}).get("last_claim") or {}
+            owner_agent = str(last_claim.get("agent_id") or "") or None
+            await self._set_status(
+                task_id, TaskStatus.ASSIGNED, assigned_to=owner_agent,
+            )
+            await self._set_status(task_id, TaskStatus.RUNNING)
         fields: dict[str, Any] = {"result": result}
         if metadata is not None:
             fields["metadata"] = metadata
