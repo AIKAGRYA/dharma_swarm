@@ -1,0 +1,100 @@
+{
+  "id": "titanium-WP-STAMPEDE2-pr-ci-health-bounded-rebase",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "agent/pr-ci-health-report-only-20260809",
+  "worktree": ".",
+  "intent": "Make every scheduled pr-ci-health invocation report-only, retain healing only behind explicit workflow_dispatch authority, bind rebase to one positive-integer PR number, and keep the operator-facing mechanical-backstop contract synchronized with those executable boundaries.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "docs/governance/PR_QUALITY_GATES.md",
+    "reports/agentops/work_packets/titanium-WP-STAMPEDE2-pr-ci-health-bounded-rebase.json",
+    "tests/test_pr_ci_health.py",
+    "tests/test_pr_ci_health_triggers.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/tests.yml",
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    "scripts/governance/pr_ci_health.py",
+    "scripts/governance/pr_ci_safe_rebase.py",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "pr-ci-health-bounded-trigger-contract",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py tests/test_pr_ci_health_triggers.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "pr-ci-health-test-ruff",
+      "command": "python3 -m ruff check tests/test_pr_ci_health.py tests/test_pr_ci_health_triggers.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "weakening-manual-rebase-event-guards-is-caught",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); old=\\\"if: github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'\\\"; assert old in t; p.write_text(t.replace(old,\\\"if: env.MODE == 'rebase'\\\")); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_health_triggers.py::test_cron_cannot_reach_any_rebase_mutation_step'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "removing-the-single-pr-selector-is-caught",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); old=' | select(.number == $target_pr)'; assert old in t; p.write_text(t.replace(old,'')); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_health_triggers.py::test_manual_rebase_is_bound_to_one_explicit_pr_number'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): make scheduled PR health report-only"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-STAMPEDE2",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The workflow's scheduled event currently resolves MODE to all, and both the push-authority step and backlog-wide rebase step accept MODE=all; removing the push-to-main trigger reduced wave frequency but left cron with mutation authority.",
+      "docs/governance/PR_QUALITY_GATES.md describes hourly rerun and rebase healing, so its operator contract would remain stale after the executable workflow becomes report-only."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "docs/governance/PR_QUALITY_GATES.md",
+      "tests/test_pr_ci_health.py",
+      "tests/test_pr_ci_health_triggers.py",
+      "reports/agentops/work_packets/titanium-WP-STAMPEDE-pr-ci-health-push-trigger.json"
+    ],
+    "honest_blockers": [
+      "The local proof parses and adversarially mutates the workflow and binds the operator guide to that executable contract; it does not claim a hosted schedule or workflow_dispatch run occurred.",
+      "The workflow is manually disabled as temporary containment outside this packet. This packet does not re-enable it or mutate GitHub state.",
+      "A targeted rebase still requires a configured credential that passes the existing repository push-authority probe; this packet neither provisions nor exposes that secret.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the workflow, operator-guide update, both trigger-contract test files, and this packet together. Reverting restores scheduled MODE=all, backlog-wide cron rebase authority, and the former hourly-healing documentation.",
+    "packet_digest": "b39a3c2e806feb411a506a83da30caf0aceedf5a3ba4603d14e353a648fc64f2"
+  }
+}

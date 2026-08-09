@@ -1,0 +1,98 @@
+{
+  "id": "titanium-WP-PRCI5-review-thread-visibility",
+  "base_ref": "b862eb040e50ad0e1c90769dc8d3031238031736",
+  "branch": "agent/pr-ci-health-thread-visibility-20260809",
+  "worktree": ".",
+  "intent": "Expose exact review-decision and unresolved-conversation blockers in the read-only PR CI health report so green checks plus branch-policy blocks are distinguishable from runner or queue failures, without changing branch protection, review authority, or thread resolution state.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-PRCI5-review-thread-visibility.json",
+    "scripts/governance/pr_ci_health.py",
+    "tests/test_pr_ci_health.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/pr-ci-health.yml",
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "name": "pr-ci-health-review-blocker-tests",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "pr-ci-health-review-blocker-ruff",
+      "command": "python3 -m ruff check scripts/governance/pr_ci_health.py tests/test_pr_ci_health.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "dropping-unresolved-thread-classification-is-caught",
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGltcG9ydGxpYi51dGlsCmltcG9ydCBwYXRobGliCmltcG9ydCBzeXMKClNFVFVQX0ZBSUwgPSAzCnRyeToKICAgIHBhdGggPSBwYXRobGliLlBhdGgoInNjcmlwdHMvZ292ZXJuYW5jZS9wcl9jaV9oZWFsdGgucHkiKQogICAgc291cmNlID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKICAgIGFuY2hvciA9ICcgICAgICAgICAgICAgICAgY2F0ZWdvcmllcy5hcHBlbmQoInVucmVzb2x2ZWRfdGhyZWFkcyIpJwogICAgaWYgc291cmNlLmNvdW50KGFuY2hvcikgIT0gMToKICAgICAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQogICAgcGF0aC53cml0ZV90ZXh0KHNvdXJjZS5yZXBsYWNlKGFuY2hvciwgIiAgICAgICAgICAgICAgICBwYXNzIiwgMSksIGVuY29kaW5nPSJ1dGYtOCIpCiAgICBzcGVjID0gaW1wb3J0bGliLnV0aWwuc3BlY19mcm9tX2ZpbGVfbG9jYXRpb24oInByX2NpX2hlYWx0aF9tdXRhbnQiLCBwYXRoKQogICAgaWYgc3BlYyBpcyBOb25lIG9yIHNwZWMubG9hZGVyIGlzIE5vbmU6CiAgICAgICAgc3lzLmV4aXQoU0VUVVBfRkFJTCkKICAgIG1vZHVsZSA9IGltcG9ydGxpYi51dGlsLm1vZHVsZV9mcm9tX3NwZWMoc3BlYykKICAgIHN5cy5tb2R1bGVzW3NwZWMubmFtZV0gPSBtb2R1bGUKICAgIHNwZWMubG9hZGVyLmV4ZWNfbW9kdWxlKG1vZHVsZSkKICAgIGdhdGUgPSBtb2R1bGUuUmV2aWV3R2F0ZVN0YXRlKAogICAgICAgIHJldmlld19kZWNpc2lvbj0iTk9ORSIsCiAgICAgICAgdW5yZXNvbHZlZF90aHJlYWRzPTIsCiAgICAgICAgb3V0ZGF0ZWRfdW5yZXNvbHZlZF90aHJlYWRzPTIsCiAgICApCiAgICBwciA9IHsKICAgICAgICAibnVtYmVyIjogMTI4NiwKICAgICAgICAidGl0bGUiOiAicHJvYmUiLAogICAgICAgICJiYXNlIjogeyJyZWYiOiAibWFpbiJ9LAogICAgICAgICJoZWFkIjogeyJyZWYiOiAicHJvYmUifSwKICAgICAgICAiZHJhZnQiOiBGYWxzZSwKICAgICAgICAidXNlciI6IHsibG9naW4iOiAicHJvYmUifSwKICAgICAgICAibWVyZ2VhYmxlX3N0YXRlIjogImJsb2NrZWQiLAogICAgfQogICAgdHJpYWdlID0gbW9kdWxlLmNsYXNzaWZ5X3ByKAogICAgICAgIHByLAogICAgICAgIFt7Im5hbWUiOiAidGVzdHMiLCAiY29uY2x1c2lvbiI6ICJzdWNjZXNzIn1dLAogICAgICAgIGJlaGluZF9ieT0wLAogICAgICAgIHJldmlld19nYXRlPWdhdGUsCiAgICApCiAgICBzeXMuZXhpdCgxIGlmICJ1bnJlc29sdmVkX3RocmVhZHMiIG5vdCBpbiB0cmlhZ2UuY2F0ZWdvcmllcyBlbHNlIDApCmV4Y2VwdCBTeXN0ZW1FeGl0OgogICAgcmFpc2UKZXhjZXB0IEJhc2VFeGNlcHRpb246CiAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQo=').decode())\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "dropping-thread-details-from-report-is-caught",
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGltcG9ydGxpYi51dGlsCmltcG9ydCBwYXRobGliCmltcG9ydCBzeXMKClNFVFVQX0ZBSUwgPSAzCnRyeToKICAgIHBhdGggPSBwYXRobGliLlBhdGgoInNjcmlwdHMvZ292ZXJuYW5jZS9wcl9jaV9oZWFsdGgucHkiKQogICAgc291cmNlID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKICAgIGFuY2hvciA9ICIgICAgICAgIGNvbnZlcnNhdGlvbl9zdW1tYXJ5ID0gX2NvbnZlcnNhdGlvbl9zdW1tYXJ5KGl0ZW0pIgogICAgaWYgc291cmNlLmNvdW50KGFuY2hvcikgIT0gMToKICAgICAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQogICAgcGF0aC53cml0ZV90ZXh0KAogICAgICAgIHNvdXJjZS5yZXBsYWNlKGFuY2hvciwgJyAgICAgICAgY29udmVyc2F0aW9uX3N1bW1hcnkgPSAiFCInLCAxKSwKICAgICAgICBlbmNvZGluZz0idXRmLTgiLAogICAgKQogICAgc3BlYyA9IGltcG9ydGxpYi51dGlsLnNwZWNfZnJvbV9maWxlX2xvY2F0aW9uKCJwcl9jaV9oZWFsdGhfcmVuZGVyX211dGFudCIsIHBhdGgpCiAgICBpZiBzcGVjIGlzIE5vbmUgb3Igc3BlYy5sb2FkZXIgaXMgTm9uZToKICAgICAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQogICAgbW9kdWxlID0gaW1wb3J0bGliLnV0aWwubW9kdWxlX2Zyb21fc3BlYyhzcGVjKQogICAgc3lzLm1vZHVsZXNbc3BlYy5uYW1lXSA9IG1vZHVsZQogICAgc3BlYy5sb2FkZXIuZXhlY19tb2R1bGUobW9kdWxlKQogICAgZ2F0ZSA9IG1vZHVsZS5SZXZpZXdHYXRlU3RhdGUoCiAgICAgICAgcmV2aWV3X2RlY2lzaW9uPSJOT05FIiwKICAgICAgICB1bnJlc29sdmVkX3RocmVhZHM9MiwKICAgICAgICBvdXRkYXRlZF91bnJlc29sdmVkX3RocmVhZHM9MiwKICAgICAgICB1bnJlc29sdmVkX3RocmVhZF9wYXRocz1bImRvY3MvZG9jb3BzL2Fzc2VydGlvbnMueWFtbCJdLAogICAgICAgIHVucmVzb2x2ZWRfdGhyZWFkX2F1dGhvcnM9WyJkZXZpbi1haS1pbnRlZ3JhdGlvbiJdLAogICAgKQogICAgcHIgPSB7CiAgICAgICAgIm51bWJlciI6IDEyODYsCiAgICAgICAgInRpdGxlIjogInByb2JlIiwKICAgICAgICAiYmFzZSI6IHsicmVmIjogIm1haW4ifSwKICAgICAgICAiaGVhZCI6IHsicmVmIjogInByb2JlIn0sCiAgICAgICAgImRyYWZ0IjogRmFsc2UsCiAgICAgICAgInVzZXIiOiB7ImxvZ2luIjogInByb2JlIn0sCiAgICAgICAgIm1lcmdlYWJsZV9zdGF0ZSI6ICJibG9ja2VkIiwKICAgIH0KICAgIHRyaWFnZSA9IG1vZHVsZS5jbGFzc2lmeV9wcigKICAgICAgICBwciwKICAgICAgICBbeyJuYW1lIjogInRlc3RzIiwgImNvbmNsdXNpb24iOiAic3VjY2VzcyJ9XSwKICAgICAgICBiZWhpbmRfYnk9MCwKICAgICAgICByZXZpZXdfZ2F0ZT1nYXRlLAogICAgKQogICAgcmVwb3J0ID0gbW9kdWxlLnJlbmRlcl9tYXJrZG93bihbdHJpYWdlXSkKICAgIG1hcmtlcnMgPSB7CiAgICAgICAgIjIgKDIgb3V0ZGF0ZWQpIiwKICAgICAgICAiZG9jcy9kb2NvcHMvYXNzZXJ0aW9ucy55YW1sIiwKICAgICAgICAiZGV2aW4tYWktaW50ZWdyYXRpb24iLAogICAgfQogICAgc3lzLmV4aXQoMSBpZiBub3QgYWxsKG1hcmtlciBpbiByZXBvcnQgZm9yIG1hcmtlciBpbiBtYXJrZXJzKSBlbHNlIDApCmV4Y2VwdCBTeXN0ZW1FeGl0OgogICAgcmFpc2UKZXhjZXB0IEJhc2VFeGNlcHRpb246CiAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQo=').decode())\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci-health): expose unresolved review blockers"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRCI5",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "b862eb040e50ad0e1c90769dc8d3031238031736",
+      "details": []
+    },
+    "interface_mismatches": [
+      "scripts/governance/pr_ci_health.py collapses GitHub's blocked merge state into generic merge_blocked and does not query review threads or reviewDecision. PR #1286 therefore appeared queue-stalled after all 19 exact-head workflows were green, although two unresolved outdated conversations were the enforceable blocker; it merged immediately after those conversations were resolved.",
+      "The repository's conversation-resolution policy treats outdated and current unresolved threads as unresolved, but the hourly health report currently emits neither count nor path and cannot distinguish missing review authority from a runner failure."
+    ],
+    "closest_existing_implementation": [
+      "scripts/governance/pr_ci_health.py",
+      "tests/test_pr_ci_health.py",
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/runtime/pr_merge_control.py",
+      "docs/plans/GRAPH_OF_LOOPS_PROGRESS_2026-07.md",
+      "reports/agentops/work_packets/titanium-WP-STAMPEDE2-pr-ci-health-bounded-rebase.json"
+    ],
+    "honest_blockers": [
+      "Local tests mock the GitHub GraphQL response; a hosted read-only pr-ci-health run must prove the installed token can read reviewDecision and paginated reviewThreads.",
+      "This packet does not change branch protection, approval thresholds, auto-merge policy, or any review-thread resolution state.",
+      "Outdated does not mean fixed: the report will expose outdated unresolved counts but will not classify their substance or resolve them automatically.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the health reporter, its focused tests, and this packet together. The hourly report will return to generic merge_blocked output; branch protection and existing PR review-thread state are unaffected either way.",
+    "packet_digest": "818719c6e74c43593c8bbd509956596a70fc26bca305c896ca1ea8cf97e6955e"
+  }
+}

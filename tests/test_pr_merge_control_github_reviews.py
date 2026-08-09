@@ -67,10 +67,21 @@ def test_cloud_lanes_never_require_copilot_receipts():
     # (TRUSTED_REVIEW_LOGINS) but never REQUIRED — copilot posted zero reviews
     # repo-wide and kept the receipt gate permanently unclearable.
     repo_root = Path(__file__).resolve().parents[1]
-    for name in (
-        ".github/workflows/codex-mention-router.yml",
-        ".github/workflows/merge-master-mike-backlog.yml",
-    ):
+    # Bind each workflow to its own fallback contract so no assertion can
+    # accidentally observe only the final value assigned inside this loop.
+    expected_fallbacks = {
+        ".github/workflows/codex-mention-router.yml": (
+            "REQUIRED_REVIEWERS: codex",
+        ),
+        ".github/workflows/merge-master-mike-backlog.yml": (
+            "inputs.required_reviewers || 'codex'",
+            "inputs.mode || 'packet-only'",
+            "inputs.max_prs || '5'",
+            "inputs.limit || '100'",
+            "inputs.merge_mode || 'off'",
+        ),
+    }
+    for name, fallbacks in expected_fallbacks.items():
         workflow = (repo_root / name).read_text(encoding="utf-8")
         offending = [
             line
@@ -79,13 +90,9 @@ def test_cloud_lanes_never_require_copilot_receipts():
             and "copilot" in line
         ]
         assert not offending, f"{name} requires copilot receipts: {offending}"
-    for fallback in (
-        "inputs.mode || 'packet-only'",
-        "inputs.max_prs || '5'",
-        "inputs.limit || '100'",
-        "inputs.merge_mode || 'off'",
-    ):
-        assert fallback in workflow
+        assert 'DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"' in workflow
+        for fallback in fallbacks:
+            assert fallback in workflow, f"{name} is missing fallback: {fallback}"
 
 
 def test_codex_commented_review_counts_as_clean_receipt():
