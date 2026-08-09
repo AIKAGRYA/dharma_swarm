@@ -17,5 +17,5 @@ Do not hand-edit the generated block.
 | Adapter files | 33 |
 | Orchestrator files | 7 |
 | Router files | 19 |
-| Authority candidate docs | 689 |
+| Authority candidate docs | 686 |
 <!-- DOCOPS:END -->

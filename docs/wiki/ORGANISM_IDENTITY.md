@@ -13,7 +13,7 @@ updated: 2026-08-09
 > action against the world's brokenness (Arjuna) flows from — and is only
 > valid when rooted in — its inward coherence.**
 
-— `foundations/THE_ORGANISM.md:8` (canonical, operator-grilled, 2026-06-06).
+— `foundations/THE_ORGANISM.md:8` (canon-status doc, operator-grilled, 2026-06-06).
 
 ## Telos
 

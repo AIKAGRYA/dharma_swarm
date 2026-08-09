@@ -33,8 +33,12 @@ MAX_BOARD_KINDS = 8
 
 
 def dharma_home() -> Path:
-    """Runtime state root (~/.dharma), honoring HOME for test isolation."""
-    return Path.home() / ".dharma"
+    """Runtime state root, resolved by its canonical owner (daemon_config)."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from dharma_swarm.daemon_config import dharma_state_dir
+
+    return dharma_state_dir()
 
 
 def read_identity() -> str:

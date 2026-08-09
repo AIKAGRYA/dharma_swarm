@@ -1,5 +1,5 @@
 ---
-title: dharma_swarm wiki — canonical-knowledge layer
+title: dharma_swarm wiki — reviewed-knowledge layer (canon seed)
 status: seed
 provenance: docs/specs/HYBRID_MEMORY_SUBSTRATE_V01_MASTER_BUILD.md; docs/vision_maps/NORTH_STAR.md §9; reports/operator_debrief_2026-08-09/OPERATOR_DEBRIEF.md
 updated: 2026-08-09
@@ -7,7 +7,7 @@ updated: 2026-08-09
 
 # The dharma_swarm wiki
 
-This directory is the **canonical-knowledge layer of the hybrid memory
+This directory is the **reviewed-knowledge layer of the hybrid memory
 substrate, metabolized to git as reviewed text**. It is the "Karpathy LLM
 Wiki" layer of the three-layer hybrid defined in
 `docs/specs/HYBRID_MEMORY_SUBSTRATE_V01_MASTER_BUILD.md` §2: the
@@ -18,10 +18,10 @@ perception.
 
 Why text in git and not a database: the canon-metabolism rule.
 `docs/vision_maps/NORTH_STAR.md` §9 — canon may be *seeded* anywhere, but
-"nothing is canonical until it is **metabolized to main**", and "`git` main
+"nothing counts as canon until it is **metabolized to main**", and "`git` main
 is the single ordering authority". A wiki page in this directory is a claim
 that has been written down, cited, and pushed through review like any other
-change; that is what makes it canonical rather than split-brain.
+change; that is what keeps it canon rather than split-brain.
 
 ## The three-class state doctrine
 
@@ -30,8 +30,8 @@ Every piece of organism state belongs to exactly one class:
 | Class | Lives | Rule |
 |---|---|---|
 | **Runtime receipts** | `~/.dharma/` | Never enter git (CLAUDE.md "Runtime receipts never enter git"); loop-generated, machine-owned, append-only. |
-| **Canonical knowledge** | `docs/wiki/` (here) | Reviewed TEXT in git; every claim cited (`file:line` or runnable command); metabolized to main per NORTH_STAR §9. |
-| **Derived indexes** | untracked / `generated/status` | Rebuilt on demand, never hand-edited, never authoritative (e.g. `reports/governance/active_track_evidence.md` is untracked and CI-published — CLAUDE.md "For machine-readable status"). |
+| **Reviewed knowledge (canon seed)** | `docs/wiki/` (here) | Reviewed TEXT in git; every claim cited (`file:line` or runnable command); metabolized to main per NORTH_STAR §9. |
+| **Derived indexes** | untracked / `generated/status` | Rebuilt on demand, never hand-edited, carries no authority (e.g. `reports/governance/active_track_evidence.md` is untracked and CI-published — CLAUDE.md "For machine-readable status"). |
 
 If a page here disagrees with code or with a runtime receipt, the page is
 wrong: "when prose and code disagree — including this file — the code is the

@@ -28,7 +28,7 @@ the cited module (CLAUDE.md §"State directory (~/.dharma/)"):
 | Evolution archive | `~/.dharma/evolution/archive.jsonl` | `archaeology_ingestion.py` |
 | Strange-loop mutations | `~/.dharma/organism_memory/mutations.jsonl` | `strange_loop.py` |
 | Traces | `~/.dharma/traces/` | `traces.py` |
-| Canonical wiki | `docs/wiki/*.md` (this directory, in git) | reviewed text — see `README.md` |
+| Reviewed wiki | `docs/wiki/*.md` (this directory, in git) | reviewed text — see `README.md` |
 
 ## What was found empty on 2026-08-09
 
