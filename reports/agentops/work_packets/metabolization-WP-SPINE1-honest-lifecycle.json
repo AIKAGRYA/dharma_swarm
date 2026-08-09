@@ -1,0 +1,41 @@
+{
+  "id": "metabolization-WP-SPINE1-honest-lifecycle",
+  "base_ref": "62dffbaa0bdc1f86f072161b422c4a88dd6c4cda",
+  "branch": "claude/dharma-swarm-operator-debrief-xh8jin",
+  "worktree": ".",
+  "intent": "Metabolization spine fixes: accept late task completions instead of discarding finished work, dispatch operator-submitted tasks before system-spawned ones, raise the agentic task timeout default, deprioritize connection-dead providers in-session, route the evolve daemon through the shared provider chain instead of a hardwired OpenRouter handle, fix the two boot-seeding crashes, and surface knowledge-store fullness in onboard.",
+  "allowed_files": [
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/config.py",
+    "dharma_swarm/providers.py",
+    "dharma_swarm/runtime_provider.py",
+    "dharma_swarm/terminal_commands/evolution.py",
+    "dharma_swarm/gnani_lodestone.py",
+    "scripts/governance/agent_onboard.py",
+    "scripts/governance/darshan_pack.py",
+    "tests/test_task_board_late_completion.py",
+    "tests/test_orchestrator.py",
+    "tests/test_orchestrator_user_priority.py",
+    "tests/test_provider_reachability.py",
+    "tests/test_evolve_daemon_provider.py",
+    "tests/test_darshan_pack.py",
+    "reports/agentops/work_packets/metabolization-WP-SPINE1-honest-lifecycle.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "metabolization-spine-tests",
+      "command": "python3 -m pytest tests/test_task_board_late_completion.py tests/test_orchestrator_user_priority.py tests/test_provider_reachability.py tests/test_evolve_daemon_provider.py tests/test_darshan_pack.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "metabolization-spine-ruff",
+      "command": "python3 -m ruff check dharma_swarm/task_board.py dharma_swarm/orchestrator.py dharma_swarm/config.py dharma_swarm/providers.py dharma_swarm/runtime_provider.py dharma_swarm/terminal_commands/evolution.py dharma_swarm/gnani_lodestone.py scripts/governance/agent_onboard.py scripts/governance/darshan_pack.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": []
+}
