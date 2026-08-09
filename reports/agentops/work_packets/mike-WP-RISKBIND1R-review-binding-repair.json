@@ -1,0 +1,163 @@
+{
+  "id": "mike-WP-RISKBIND1R-review-binding-repair",
+  "base_ref": "726a54472fa163c179465033ba2577d5f65a3d96",
+  "branch": "agent/mike-riskbind-20260801",
+  "worktree": ".",
+  "intent": "Re-cut the complete high-risk PR #1185 change onto exact current main and close the remaining live review-packet publication finding without weakening merge admission. Preserve exact-head and immutable-evidence binding; fail closed when receipt binding context is incomplete; make fanout status use the exact packet bindings; reduce review-thread GraphQL to complete paginated resolution/outdated state while excluding comment payloads from merge truth; enforce the existing deterministic embedded-evidence byte ceiling before any reviewer subprocess; persist compare metadata without duplicating the complete diff inside FACTS.json; publish a packet directory only after all bounded evidence and both prompts are complete; retain current-base/current-head risk recomputation and a short gate-to-merge base/head revalidation while allowing an unchanged reviewed three-dot range to survive base changes; and keep every per-PR fanout stage isolated so one unreadable pull request cannot suppress later queue receipts. This remains the sole final PR-range packet because canonical policy permits exactly one changed Session Entry packet for a high-risk pull request.",
+  "allowed_files": [
+    "reports/agentops/work_packets/mike-WP-RISKBIND1R-review-binding-repair.json",
+    "scripts/runtime/pr_merge_control.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_stdlib.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/**",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "tests/test_pr_merge_control_github_reviews.py",
+    "tests/test_merge_master_mike_daemon.py",
+    "Makefile",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py"
+  ],
+  "gates": [
+    {
+      "name": "mike-review-binding-regressions",
+      "command": "python3 -m pytest -q tests/test_pr_merge_control.py tests/test_pr_merge_control_stdlib.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "mike-sibling-surfaces",
+      "command": "python3 -m pytest -q tests/test_pr_merge_control_github_reviews.py tests/test_merge_master_mike_daemon.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "stale-packet-head-remains-blocked",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_stale_packet_head_remains_blocked",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "incomplete-thread-state-remains-blocked",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_incomplete_thread_state_remains_blocked",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "review-evidence-tamper-remains-blocked",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_review_evidence_mutation_remains_blocked",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "renamed-hot-path-remains-high-risk",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_renamed_hot_source_path_remains_high_risk",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "pre-merge-binding-drift-remains-blocked",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_live_base_or_head_drift_remains_blocked",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "review-evidence-aba-cannot-change-review-input",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_review_input_is_immune_to_evidence_aba",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "merge-execution-requires-proven-base-cas",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_merge_execution_requires_proven_base_cas",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "missing-review-binding-context-remains-invalid",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_missing_review_binding_context_remains_invalid",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "oversized-review-evidence-remains-blocked",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_oversized_review_evidence_remains_blocked",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "failed-packet-build-never-publishes-partial-latest",
+      "command": "python3 -m unittest -q tests.test_pr_merge_control_stdlib.FailClosedStdlibTests.test_failed_packet_build_never_publishes_partial_latest",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(mike): publish bounded review packets atomically [impact-checked]"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RISKBIND1R",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+        "checked_at_sha": "726a54472fa163c179465033ba2577d5f65a3d96",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Canonical PR-range policy permits exactly one changed Session Entry packet for a high-risk pull request; the earlier packet and this follow-up packet were both absent at the merge base, so the earlier packet is removed from the final tree and this packet declares the cumulative committed range without claiming retroactive pre-edit admission.",
+        "The final repair is re-cut from exact current main 726a54472fa163c179465033ba2577d5f65a3d96; the published predecessor ef0466de165535eca718cad0ad9edd54d8b4fa6f remains preserved in Git history and local backup custody.",
+        "Review evidence retains the complete immutable diff exactly once in DIFF.patch; compare-file metadata in FACTS.json excludes only GitHub's duplicate per-file patch payload, while rename provenance and risk fields remain intact.",
+        "Packet construction stages outside the selectable pr-N namespace and performs a no-clobber final-directory rename only after the bounded evidence snapshot and both reviewer prompts are complete; failed builds cannot become the newest packet.",
+      "Long-lived reviewer authority remains bound to the immutable head, three-dot review range, and evidence digest, while live base/head risk and the short gate-to-merge compare-and-swap are re-read immediately before authority so review-range-preserving base changes do not create permanent queue churn.",
+      "Legacy unbound local review receipts become invalid and must be regenerated; this intentionally removes stale local authority rather than adding a compatibility bypass.",
+      "Canonical owner policy deliberately counts a trusted Codex COMMENTED review while complete review threads carry substantive findings; a body-only blocking comment with no thread remains an owner-policy residual and is not silently redefined by this repair.",
+      "GitHub exposes a head-OID guard but no base-OID CAS for direct or deferred PR merge; merge execution remains disabled unless canonical live policy proves strict and up-to-date base enforcement.",
+        "AgentOps negative-control jails resolve the base interpreter without virtualenv site-packages, so the ten fail-closed controls use a stdlib-only unittest module while the positive focused gate also collects that module under pytest."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/pr_merge_control.py",
+      "tests/test_pr_merge_control.py",
+      "tests/test_pr_merge_control_stdlib.py"
+    ],
+    "honest_blockers": [
+        "The remaining exact-head review thread stays unresolved until its reviewer validates the final pushed repair; this session does not resolve it on the author's behalf.",
+        "The 524288-byte embedded-evidence ceiling remains fail closed after duplicate patch removal; genuinely larger immutable review ranges must be split or handled through explicit human review rather than silently truncated.",
+      "Receipt reuse after base movement remains contingent on an identical immutable three-dot review range; a changed range or failed exact comparison remains blocked and requires packet and review regeneration.",
+      "WP-0F2 cannot retire until WP-0F1 operator policy is ratified and all required consumers are reverified on merged main.",
+      "Human merge approval remains required; this packet grants no merge, approval, deploy, or gate-bypass authority.",
+      "Merge execution remains mechanically disabled until WP-0F1 proves and wires canonical strict and up-to-date base enforcement."
+    ],
+    "rollback": "Revert the complete PR repair range and its consolidated packet together; the earlier packet and all repair commits remain recoverable in branch history.",
+      "packet_digest": "769f41506a85eeb15d2cac64fde56580b08bf88bc1040e0a07d27b57a9ddc60c"
+  }
+}
