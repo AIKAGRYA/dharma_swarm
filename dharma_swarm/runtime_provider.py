@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import os
 import shutil
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -874,6 +875,13 @@ def preferred_runtime_provider_configs(
     return deduplicate_runtime_provider_configs(configs)
 
 
+# In-session deadpool for the direct cheap-first walk below: a provider that
+# failed at the connection level (refused/unreachable) is skipped until the
+# TTL expires so every request stops re-walking the corpse. Mirrors the
+# ModelRouter deadpool (providers.py); auth/4xx errors never land here.
+_PREFERRED_CHAIN_DEADPOOL: dict[ProviderType, float] = {}
+
+
 async def complete_via_preferred_runtime_providers(
     *,
     messages: list[dict[str, str]],
@@ -911,6 +919,22 @@ async def complete_via_preferred_runtime_providers(
             "keys only to widen the roster."
         )
 
+    from dharma_swarm.providers import (
+        PROVIDER_DEADPOOL_TTL_SECONDS,
+        is_connection_dead_error,
+    )
+
+    now = time.monotonic()
+    active_configs = [
+        config
+        for config in configs
+        if _PREFERRED_CHAIN_DEADPOOL.get(config.provider, 0.0) <= now
+    ]
+    if active_configs:
+        # Fail open when every lane is deadpooled: re-probe instead of
+        # refusing outright (a success clears the entry below).
+        configs = active_configs
+
     last_exc: Exception | None = None
     for config in configs:
         provider = create_runtime_provider(config)
@@ -929,9 +953,14 @@ async def complete_via_preferred_runtime_providers(
                 )
             else:
                 response = await provider.complete(request)
+            _PREFERRED_CHAIN_DEADPOOL.pop(config.provider, None)
             return response, config
         except Exception as exc:
             last_exc = exc
+            if is_connection_dead_error(exc):
+                _PREFERRED_CHAIN_DEADPOOL[config.provider] = (
+                    time.monotonic() + PROVIDER_DEADPOOL_TTL_SECONDS
+                )
         finally:
             close = getattr(provider, "close", None)
             if callable(close):
