@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import datetime, timezone
-import errno
 import inspect
 import json
 import logging
@@ -50,6 +49,7 @@ from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.jikoku_instrumentation import jikoku_traced_provider  # type: ignore
+from dharma_swarm.provider_deadpool import ProviderDeadpool, is_connection_dead_error
 from dharma_swarm.ollama_config import (
     OLLAMA_DEFAULT_CLOUD_MODEL,
     OLLAMA_DEFAULT_LOCAL_MODEL,
@@ -2116,75 +2116,6 @@ class ZhipuProvider(LLMProvider):
                 yield delta.content
 
 
-# How long a connection-dead provider stays skipped by the chain walk.
-# In-session only (router-instance cache) — a provider that comes back up is
-# retried after expiry. Override with DGC_ROUTER_DEADPOOL_TTL_SECONDS.
-PROVIDER_DEADPOOL_TTL_SECONDS = 300.0
-
-_CONNECTION_DEAD_EXCEPTION_NAMES = frozenset(
-    {
-        # httpx / requests / aiohttp transport-level connect failures
-        "ConnectError",
-        "ConnectTimeout",
-        "ClientConnectorError",
-        "ClientConnectionError",
-        "NewConnectionError",
-    }
-)
-
-_CONNECTION_DEAD_ERRNOS = frozenset(
-    {
-        errno.ECONNREFUSED,
-        errno.ECONNRESET,
-        errno.ECONNABORTED,
-        errno.EHOSTUNREACH,
-        errno.EHOSTDOWN,
-        errno.ENETUNREACH,
-        errno.ENETDOWN,
-    }
-)
-
-_CONNECTION_DEAD_MESSAGE_TOKENS = (
-    "connection refused",
-    "connection reset",
-    "cannot connect to host",
-    "all connection attempts failed",
-    "failed to establish a new connection",
-    "name or service not known",
-    "nodename nor servname provided",
-    "temporary failure in name resolution",
-    "network is unreachable",
-    "no route to host",
-)
-
-
-def is_connection_dead_error(exc: BaseException) -> bool:
-    """Classify a connection-level transport failure (refused/unreachable/DNS).
-
-    Deliberately narrow: auth failures, 4xx responses, and rate limits must
-    return False — those can be fixed mid-session and never justify skipping
-    a provider. Walks the exception chain because HTTP clients wrap the raw
-    OSError in their own transport exception types.
-    """
-    seen: set[int] = set()
-    current: BaseException | None = exc
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, ConnectionError):
-            return True
-        if isinstance(current, httpx.ConnectError | httpx.ConnectTimeout):
-            return True
-        if type(current).__name__ in _CONNECTION_DEAD_EXCEPTION_NAMES:
-            return True
-        if isinstance(current, OSError) and current.errno in _CONNECTION_DEAD_ERRNOS:
-            return True
-        message = str(current).lower()
-        if any(token in message for token in _CONNECTION_DEAD_MESSAGE_TOKENS):
-            return True
-        current = current.__cause__ or current.__context__
-    return False
-
-
 class ModelRouter:
     """Routes LLM requests to the appropriate provider."""
 
@@ -2229,15 +2160,7 @@ class ModelRouter:
         )
         self._sticky_session_seconds = max(0.0, effective_sticky_seconds)
         self._sticky_min_tokens = max(0, effective_sticky_min_tokens)
-        deadpool_ttl_env = os.environ.get("DGC_ROUTER_DEADPOOL_TTL_SECONDS")
-        self._deadpool_ttl_seconds = max(
-            0.0,
-            float(deadpool_ttl_env)
-            if deadpool_ttl_env not in (None, "")
-            else PROVIDER_DEADPOOL_TTL_SECONDS,
-        )
-        # provider -> monotonic expiry; connection-dead lanes skipped until then
-        self._provider_deadpool: dict[ProviderType, float] = {}
+        self._provider_deadpool: ProviderDeadpool[ProviderType] = ProviderDeadpool()
         self._session_affinity: dict[str, dict[str, Any]] = {}
         self._provider_rewards: dict[str, float] = {}
         self._provider_reward_counts: dict[str, int] = {}
@@ -2753,45 +2676,6 @@ class ModelRouter:
         }
         return (ranked, ranked != chain, snapshot)
 
-    def _deadpool_provider(self, provider: ProviderType, *, error: str = "") -> None:
-        """Mark a provider connection-dead for the TTL so walks skip the corpse."""
-        if self._deadpool_ttl_seconds <= 0.0:
-            return
-        self._provider_deadpool[provider] = (
-            time.monotonic() + self._deadpool_ttl_seconds
-        )
-        logger.warning(
-            "Provider %s deadpooled for %.0fs after connection failure: %s",
-            provider.value,
-            self._deadpool_ttl_seconds,
-            error,
-        )
-
-    def _deadpool_active(self, provider: ProviderType) -> bool:
-        expiry = self._provider_deadpool.get(provider)
-        if expiry is None:
-            return False
-        if time.monotonic() >= expiry:
-            self._provider_deadpool.pop(provider, None)
-            return False
-        return True
-
-    def _apply_provider_deadpool(
-        self, chain: list[ProviderType],
-    ) -> tuple[list[ProviderType], bool]:
-        """Filter connection-dead providers; fail open if the whole chain is dead.
-
-        Failing open keeps the walk honest: if every lane is deadpooled we
-        still attempt them (a re-probe either succeeds and clears the entry
-        or refreshes the TTL with a receipted failure).
-        """
-        if not self._provider_deadpool:
-            return (chain, False)
-        active = [item for item in chain if not self._deadpool_active(item)]
-        if not active or len(active) == len(chain):
-            return (chain, False)
-        return (active, True)
-
     def _update_reward(self, provider: ProviderType, model: str, reward: float) -> None:
         if not self._learning_enabled:
             return
@@ -3049,7 +2933,7 @@ class ModelRouter:
                 fallback_providers=chain[1:],
                 reasons=[*decision.reasons, "receipt_consumption_applied"],
             )
-        chain, deadpool_applied = self._apply_provider_deadpool(chain)
+        chain, deadpool_applied = self._provider_deadpool.filter(chain)
         if deadpool_applied and chain:
             decision = replace(
                 decision,
@@ -3285,7 +3169,7 @@ class ModelRouter:
                     )
                     continue
                 breaker.record_success()
-                self._provider_deadpool.pop(provider_type, None)
+                self._provider_deadpool.clear(provider_type)
                 prompt_tokens, completion_tokens, total_tokens = self._token_usage(response)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
@@ -3392,9 +3276,9 @@ class ModelRouter:
                     else 0.0
                 )
                 if is_connection_dead_error(exc):
-                    # Connection-level corpse: skip this lane on subsequent
-                    # walks until the TTL expires. Auth/4xx never lands here.
-                    self._deadpool_provider(provider_type, error=str(exc)[:120])
+                    self._provider_deadpool.record(
+                        provider_type, error=str(exc)[:120]
+                    )
                 self._update_reward(provider_type, reward_model, -1.0)
                 self._record_routing_memory_outcome(
                     provider=provider_type,

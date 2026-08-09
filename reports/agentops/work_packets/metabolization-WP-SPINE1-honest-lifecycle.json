@@ -8,6 +8,7 @@
   "dharma_swarm/config.py",
   "dharma_swarm/gnani_lodestone.py",
   "dharma_swarm/orchestrator.py",
+  "dharma_swarm/provider_deadpool.py",
   "dharma_swarm/providers.py",
   "dharma_swarm/runtime_provider.py",
   "dharma_swarm/task_board.py",
@@ -53,7 +54,7 @@
   },
   {
    "name": "metabolization-spine-ruff",
-   "command": "python3 -m ruff check dharma_swarm/task_board.py dharma_swarm/orchestrator.py dharma_swarm/config.py dharma_swarm/providers.py dharma_swarm/runtime_provider.py dharma_swarm/terminal_commands/evolution.py dharma_swarm/gnani_lodestone.py scripts/governance/agent_onboard.py scripts/governance/darshan_pack.py",
+   "command": "python3 -m ruff check dharma_swarm/task_board.py dharma_swarm/orchestrator.py dharma_swarm/config.py dharma_swarm/provider_deadpool.py dharma_swarm/providers.py dharma_swarm/runtime_provider.py dharma_swarm/terminal_commands/evolution.py dharma_swarm/gnani_lodestone.py scripts/governance/agent_onboard.py scripts/governance/darshan_pack.py",
    "expected_exit": 0,
    "timeout_seconds": 300
   }

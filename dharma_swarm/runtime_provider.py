@@ -10,7 +10,6 @@ import asyncio
 import hashlib
 import os
 import shutil
-import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -55,6 +54,7 @@ from dharma_swarm.model_hierarchy import (
     default_model,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
+from dharma_swarm.provider_deadpool import ProviderDeadpool, is_connection_dead_error
 from dharma_swarm.ollama_config import (
     build_ollama_headers,
     ollama_transport_mode,
@@ -875,11 +875,7 @@ def preferred_runtime_provider_configs(
     return deduplicate_runtime_provider_configs(configs)
 
 
-# In-session deadpool for the direct cheap-first walk below: a provider that
-# failed at the connection level (refused/unreachable) is skipped until the
-# TTL expires so every request stops re-walking the corpse. Mirrors the
-# ModelRouter deadpool (providers.py); auth/4xx errors never land here.
-_PREFERRED_CHAIN_DEADPOOL: dict[ProviderType, float] = {}
+_PREFERRED_CHAIN_DEADPOOL: ProviderDeadpool[ProviderType] = ProviderDeadpool()
 
 
 async def complete_via_preferred_runtime_providers(
@@ -919,20 +915,12 @@ async def complete_via_preferred_runtime_providers(
             "keys only to widen the roster."
         )
 
-    from dharma_swarm.providers import (
-        PROVIDER_DEADPOOL_TTL_SECONDS,
-        is_connection_dead_error,
-    )
-
-    now = time.monotonic()
     active_configs = [
-        config
-        for config in configs
-        if _PREFERRED_CHAIN_DEADPOOL.get(config.provider, 0.0) <= now
+        config for config in configs
+        if not _PREFERRED_CHAIN_DEADPOOL.active(config.provider)
     ]
     if active_configs:
-        # Fail open when every lane is deadpooled: re-probe instead of
-        # refusing outright (a success clears the entry below).
+        # Fail open when every lane is deadpooled: re-probe rather than refuse.
         configs = active_configs
 
     last_exc: Exception | None = None
@@ -953,14 +941,12 @@ async def complete_via_preferred_runtime_providers(
                 )
             else:
                 response = await provider.complete(request)
-            _PREFERRED_CHAIN_DEADPOOL.pop(config.provider, None)
+            _PREFERRED_CHAIN_DEADPOOL.clear(config.provider)
             return response, config
         except Exception as exc:
             last_exc = exc
             if is_connection_dead_error(exc):
-                _PREFERRED_CHAIN_DEADPOOL[config.provider] = (
-                    time.monotonic() + PROVIDER_DEADPOOL_TTL_SECONDS
-                )
+                _PREFERRED_CHAIN_DEADPOOL.record(config.provider, error=str(exc)[:120])
         finally:
             close = getattr(provider, "close", None)
             if callable(close):

@@ -3,7 +3,7 @@
 Session-verified failure: with no Ollama server every task re-walked the same
 connection-refused lane, burning instant-fail LLM calls on each request.
 The router now classifies connection-level failures
-(providers.py:is_connection_dead_error), deadpools the lane for
+(provider_deadpool.py:is_connection_dead_error), deadpools the lane for
 PROVIDER_DEADPOOL_TTL_SECONDS, and retries only after expiry. Auth/4xx
 failures never deadpool — a key can be fixed mid-session.
 """
@@ -22,7 +22,8 @@ from dharma_swarm.provider_policy import (
     ProviderRouteRequest,
     RoutePath,
 )
-from dharma_swarm.providers import ModelRouter, is_connection_dead_error
+from dharma_swarm.provider_deadpool import ProviderDeadpool, is_connection_dead_error
+from dharma_swarm.providers import ModelRouter
 from dharma_swarm.resilience import RetryPolicy
 
 
@@ -164,7 +165,7 @@ async def test_deadpool_skips_connection_dead_provider_within_ttl(
     )
     assert response.content == "a fine answer"
     assert dead.calls == 1
-    assert router._deadpool_active(ProviderType.OLLAMA)
+    assert router._provider_deadpool.active(ProviderType.OLLAMA)
 
     # Walk 2 (within TTL): the corpse is skipped — no new instant-fail call.
     decision, response = await router.complete_for_task(
@@ -176,7 +177,7 @@ async def test_deadpool_skips_connection_dead_provider_within_ttl(
     assert decision.selected_provider == ProviderType.OPENROUTER
 
     # After TTL expiry the lane is probed again.
-    router._provider_deadpool[ProviderType.OLLAMA] = time.monotonic() - 1.0
+    router._provider_deadpool._entries[ProviderType.OLLAMA] = time.monotonic() - 1.0
     _, response = await router.complete_for_task(
         _route_request("task-dp-3"), _llm_request(), available_provider_types=available,
     )
@@ -194,7 +195,7 @@ async def test_deadpool_clears_when_provider_recovers(tmp_path, monkeypatch) -> 
     )
     _pin_chain(router, ProviderType.OLLAMA, ProviderType.OPENROUTER)
     # Simulate an expired deadpool entry left over from an earlier outage.
-    router._provider_deadpool[ProviderType.OLLAMA] = time.monotonic() - 1.0
+    router._provider_deadpool._entries[ProviderType.OLLAMA] = time.monotonic() - 1.0
 
     _, response = await router.complete_for_task(
         _route_request("task-dp-recover"),
@@ -222,7 +223,7 @@ async def test_fully_deadpooled_chain_fails_open(tmp_path, monkeypatch) -> None:
             available_provider_types=available,
         )
     assert dead.calls == 1
-    assert router._deadpool_active(ProviderType.OLLAMA)
+    assert router._provider_deadpool.active(ProviderType.OLLAMA)
 
     # The only lane is deadpooled — the walk fails open and re-probes it
     # rather than raising without any attempt.
@@ -254,7 +255,7 @@ async def test_auth_failure_does_not_deadpool(tmp_path, monkeypatch) -> None:
     )
     assert response.content == "a fine answer"
     assert unauthorized.calls == 1
-    assert not router._deadpool_active(ProviderType.OPENAI)
+    assert not router._provider_deadpool.active(ProviderType.OPENAI)
     assert ProviderType.OPENAI not in router._provider_deadpool
 
     # The auth-broken lane stays in the walk — a fixed key works mid-session.
@@ -307,7 +308,7 @@ async def test_preferred_runtime_chain_deadpools_connection_dead_lane(
         else _HealthyLane(),
     )
     monkeypatch.setattr(
-        runtime_provider, "_PREFERRED_CHAIN_DEADPOOL", {},
+        runtime_provider, "_PREFERRED_CHAIN_DEADPOOL", ProviderDeadpool(),
     )
     messages = [{"role": "user", "content": "hello"}]
 
@@ -328,7 +329,7 @@ async def test_preferred_runtime_chain_deadpools_connection_dead_lane(
     assert calls["healthy"] == 2
 
     # Expired entry: the lane is probed again.
-    runtime_provider._PREFERRED_CHAIN_DEADPOOL[ProviderType.OLLAMA] = (
+    runtime_provider._PREFERRED_CHAIN_DEADPOOL._entries[ProviderType.OLLAMA] = (
         time.monotonic() - 1.0
     )
     await runtime_provider.complete_via_preferred_runtime_providers(messages=messages)
