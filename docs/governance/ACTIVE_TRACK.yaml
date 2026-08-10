@@ -77,11 +77,11 @@ spine_objectives:
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 11            # hard ceiling — focus protection; CI ERROR above this.
+  max_active: 12            # temporary operator-authorized RSI harness admission.
                             # Raised 10->11 by operator DECREE (GOLDEN SEAL, 2026-07-12
                             # 00:36 JST, custody grade DECREE: "I want this as an ACTIVE
                             # TRACK, instantiated now, even if that means breaking WIP").
-                            # Restore to 10 at the next track closure.
+                            # Restore toward the normal ceiling at the next track closure.
   warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
@@ -2209,6 +2209,132 @@ active_tracks:
       - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
       - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
+
+  - id: rsi-worldclass-harness-2026-08
+    name: RSI World-Class Harness — isolated, paired, budget-bound agent evolution
+    status: ACTIVE
+    opened_at: "2026-08-10"
+    verified_at: "2026-08-10"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: research-depth
+    complements:
+      - orchestration-arena-v1-2026-06
+      - sovereign-safety-tcb-2026-07
+      - hyperbolic-time-chamber-2026-07
+      - organism-rewire-2026-07
+    owned_surfaces:
+      - dharma_swarm/forge_lab/**
+      - dharma_swarm/forge_v1/forge_v2/pr_suite_execution.py
+      - dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
+      - dharma_swarm/forge_v1/forge_v2/pr_suite_validator.py
+      - dharma_swarm/forge_v1/forge_v2/pr_suite_validator_runtime.py
+      - dharma_swarm/forge_v1/forge_v2/taskbed_allocation.py
+      - dharma_swarm/forge_v1/forge_v2/taskbed_ledger.py
+      - dharma_swarm/forge_v1/forge_v2/taskbed_store.py
+      - dharma_swarm/forge_v1/providers.py
+      - dharma_swarm/dgm_loop.py
+      - scripts/forge_lab/**
+      - scripts/ops/systemd/rsi-lab-*
+      - tests/forge_lab_v1/**
+      - tests/test_forge_lab_*.py
+      - tests/test_forge_pr_suite_*.py
+      - tests/test_forge_taskbed_ledger.py
+      - tests/test_dgm_loop.py
+      - docs/ops/FORGE_LAB_V0_1_RUNBOOK.md
+      - docs/ops/RSI_LAB_SYNC.md
+      - specs/FORGE_LAB_V0_1_0_SPEC.md
+      - reports/agentops/work_packets/rsi-worldclass-harness-*.json
+    moves_vital_signs:
+      - eval_coverage
+      - security_guardrails
+      - cost_efficiency
+      - quality_gates
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Completion proves a bounded, shadow-only research harness with real
+      evaluator isolation, frozen paired evaluation, hard campaign fuses,
+      canonical routing, and an installable disabled-by-default scheduler.
+      It does not prove positive capability lift, production promotion, safe
+      live mutation, provider availability, or permission to enable the timer.
+
+    description: |
+      Operator-authorized 2026-08-10 continuation of the Forge Lab and
+      orchestration-arena work. The deployed August experiment produced a
+      useful but low-power signal on a repeated three-task panel, stopped at
+      its token fuse, and could not support a lift claim. This track turns the
+      existing fail-closed campaign controller into a serious multi-agent
+      research instrument: untrusted repositories execute outside the host
+      trust boundary; incumbent and challenger are evaluated on identical,
+      frozen cells; mutation and evaluation spend share one hard ledger;
+      champions persist with CAS provenance; provider identity is freshly
+      attested; and unattended execution is systemd-gated, single-flight,
+      resource-bounded, observable, and disabled until supervised canaries pass.
+
+    prerequisites:
+      - id: governed_campaign_controller_exists
+        kind: file_exists
+        file: dharma_swarm/forge_lab/campaign_control.py
+      - id: canonical_rsi_launcher_exists
+        kind: file_exists
+        file: scripts/forge_lab/rsi
+
+    completion_criteria:
+      - id: campaign_controller_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_campaign_lifecycle.py
+      - id: evaluator_isolation_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_pr_suite_execution.py
+      - id: frozen_paired_evaluation_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_paired_evaluation.py
+      - id: campaign_budget_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_campaign_budget.py
+      - id: champion_store_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_champion_store.py
+      - id: canonical_launcher_retirement_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_code_sync.py
+      - id: systemd_contract_tests_pass
+        kind: test_passes
+        test: tests/forge_lab_v1/test_systemd_contract.py
+
+    next_items:
+      - id: 1
+        what: "P0: jail model-patched repositories and arbitrary setup/test commands behind one fail-closed execution profile; prove secret, network, filesystem, process, output, and deadline containment."
+        kind: code
+        blocker: true
+      - id: 2
+        what: "P0: freeze campaign train/explore/confirm/holdout identities and evaluate incumbent/challenger on paired task-repeat cells with clustered uncertainty and one-use holdout."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "P0: enforce a reservation/settlement budget across mutation and every evaluation phase, and persist shadow champions with atomic CAS provenance."
+        kind: code
+        blocker: true
+      - id: 4
+        what: "P1: retire split-brain legacy launchers through the atomic sync path and require fresh exact-route provider evidence before execution."
+        kind: code
+        blocker: true
+      - id: 5
+        what: "P1: ship a hardened systemd oneshot/timer contract with global single-flight, wall/resource caps, failure propagation, cleanup, alerts, and log retention; keep the timer disabled until supervised canaries and independent routes are green."
+        kind: ops
+        blocker: true
+      - id: 6
+        what: "P2: run supervised smoke and powered canaries on a clean immutable release, then independently review receipts before any scheduling or capability claim."
+        kind: ops
+        blocker: true
+
+    non_goals:
+      - No live mutation or production promotion; the track remains shadow-only.
+      - No positive-lift claim from legacy, unpaired, underpowered, or adaptively reused tasks.
+      - No unattended run while evaluator isolation, provider independence, host resources, or canary evidence is red.
+      - No new provider/key reader or hardcoded runtime model string; use the canonical routing contract.
+      - No edit to dirty current-main, immutable current release, or user-owned unrelated worktrees.
+      - No new archive, receipt, or routing substrate where an existing Forge campaign owner can be extended.
 
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06
