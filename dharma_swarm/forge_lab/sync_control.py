@@ -1,9 +1,4 @@
-"""Content-addressed synchronization for the Forge RSI Lab.
-
-GitHub owns code identity. Mac and Meghadharma consume immutable code releases;
-mutable state, archives, credentials, and SQLite/WAL files remain host-owned.
-The remote bootstrap streams this facade with its exact helper modules.
-"""
+"""Content-addressed, immutable code synchronization for the Forge RSI Lab."""
 
 from __future__ import annotations
 
@@ -21,68 +16,42 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 from dharma_swarm.forge_lab.sync_identity import (
-    CANONICAL_REF as CANONICAL_REF,
-    CANONICAL_REPOSITORY as CANONICAL_REPOSITORY,
-    CRITICAL_FILES as CRITICAL_FILES,
-    DEFAULT_REMOTE as DEFAULT_REMOTE,
-    DEFAULT_REMOTE_ROOT as DEFAULT_REMOTE_ROOT,
-    PLAN_SCHEMA as PLAN_SCHEMA,
-    RECEIPT_SCHEMA as RECEIPT_SCHEMA,
-    RELEASE_SCHEMA as RELEASE_SCHEMA,
-    SSH_OPTIONS as SSH_OPTIONS,
-    STATUS_SCHEMA as STATUS_SCHEMA,
-    VERIFICATION_TESTS as VERIFICATION_TESTS,
-    SyncError as SyncError,
-    _DIGEST_RE as _DIGEST_RE,
-    _atomic_json as _atomic_json,
-    _cache_path as _cache_path,
-    _canonical_json as _canonical_json,
+    CANONICAL_REF as CANONICAL_REF, CANONICAL_REPOSITORY as CANONICAL_REPOSITORY,
+    CRITICAL_FILES as CRITICAL_FILES, DEFAULT_REMOTE as DEFAULT_REMOTE,
+    DEFAULT_REMOTE_ROOT as DEFAULT_REMOTE_ROOT, PLAN_SCHEMA as PLAN_SCHEMA,
+    RECEIPT_SCHEMA as RECEIPT_SCHEMA, RELEASE_SCHEMA as RELEASE_SCHEMA,
+    SSH_OPTIONS as SSH_OPTIONS, STATUS_SCHEMA as STATUS_SCHEMA,
+    VERIFICATION_TESTS as VERIFICATION_TESTS, SyncError as SyncError,
+    _DIGEST_RE as _DIGEST_RE, _atomic_json as _atomic_json,
+    _cache_path as _cache_path, _canonical_json as _canonical_json,
     _checkout_identity as _checkout_identity,
     _fetch_canonical as _fetch_canonical_impl,
-    _identity_mismatches as _identity_mismatches,
-    _now as _now,
-    _object_identity as _object_identity,
-    _remote_head as _remote_head,
-    _run as _run,
-    _run_bytes as _run_bytes,
-    _sha256_bytes as _sha256_bytes,
-    _sha256_file as _sha256_file,
-    _validate_remote as _validate_remote,
-    _validate_request_id as _validate_request_id,
-    _validate_sha as _validate_sha,
-    default_local_root as default_local_root,
-    plan_digest as plan_digest,
+    _identity_mismatches as _identity_mismatches, _now as _now,
+    _object_identity as _object_identity, _remote_head as _remote_head,
+    _run as _run, _run_bytes as _run_bytes, _sha256_bytes as _sha256_bytes,
+    _sha256_file as _sha256_file, _validate_remote as _validate_remote,
+    _validate_request_id as _validate_request_id, _validate_sha as _validate_sha,
+    default_local_root as default_local_root, plan_digest as plan_digest,
     validate_plan as _validate_plan_impl,
 )
 from dharma_swarm.forge_lab.sync_node import (
-    _current_commit as _current_commit,
-    _current_target as _current_target,
-    _ensure_release_links as _ensure_release_links,
-    _path_present as _path_present,
+    _current_commit as _current_commit, _current_target as _current_target,
+    _ensure_release_links as _ensure_release_links, _path_present as _path_present,
     _run_offline_verification as _run_offline_verification,
-    _runtime_fingerprint as _runtime_fingerprint,
-    _safe_symlink as _safe_symlink,
-    _stabilize_anchors as _stabilize_anchors,
-    _verify_release as _verify_release,
-    node_status as node_status,
+    _runtime_fingerprint as _runtime_fingerprint, _safe_symlink as _safe_symlink,
+    _stabilize_anchors as _stabilize_anchors, _verify_release as _verify_release,
+    legacy_mutating_launchers as legacy_mutating_launchers, node_status as node_status,
 )
 
 
 def _fetch_canonical(root: Path, expected_commit: str | None = None) -> Path:
-    return _fetch_canonical_impl(
-        root,
-        expected_commit,
-        repository=CANONICAL_REPOSITORY,
-    )
+    return _fetch_canonical_impl(root, expected_commit, repository=CANONICAL_REPOSITORY)
 
 
 def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     return _validate_plan_impl(
-        plan,
-        repository=CANONICAL_REPOSITORY,
-        ref=CANONICAL_REF,
-        critical_files=CRITICAL_FILES,
-        verification_tests=VERIFICATION_TESTS,
+        plan, repository=CANONICAL_REPOSITORY, ref=CANONICAL_REF,
+        critical_files=CRITICAL_FILES, verification_tests=VERIFICATION_TESTS,
     )
 
 
@@ -96,9 +65,7 @@ def prepare_release(
     plan = validate_plan(plan)
     root = root.expanduser().resolve()
     if _remote_head() != plan["commit"]:
-        raise SyncError(
-            "STALE_PLAN", "canonical branch moved after this plan was created"
-        )
+        raise SyncError("STALE_PLAN", "canonical branch moved after this plan was created")
     cache = _fetch_canonical(root, plan["commit"])
     _stabilize_anchors(root, node=node, local_venv=local_venv)
     release = root / "releases" / plan["commit"]
@@ -165,9 +132,7 @@ def prepare_release(
         "release": str(release),
         "commit": plan["commit"],
         "previous_commit": _current_commit(root),
-        "previous_target": str(_current_target(root))
-        if _current_target(root)
-        else None,
+        "previous_target": str(_current_target(root)) if _current_target(root) else None,
         "reused": reused,
         "verification": manifest["verification"],
     }
@@ -220,9 +185,7 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
                 for row in rows
             ]
             if rows:
-                reasons.append(
-                    f"authoritative campaign lease count: {len(rows)}"
-                )
+                reasons.append(f"authoritative campaign lease count: {len(rows)}")
         except (OSError, sqlite3.Error) as exc:
             reasons.append(f"authoritative campaign store is unreadable: {exc}")
 
@@ -277,9 +240,7 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
 
 def _atomic_symlink(target: Path, link: Path) -> None:
     if _path_present(link) and not link.is_symlink():
-        raise SyncError(
-            "CURRENT_NOT_ATOMIC", f"refusing to replace non-symlink path: {link}"
-        )
+        raise SyncError("CURRENT_NOT_ATOMIC", f"refusing to replace non-symlink path: {link}")
     link.parent.mkdir(parents=True, exist_ok=True)
     temp = link.with_name(f".{link.name}.tmp-{os.getpid()}-{uuid4().hex[:8]}")
     try:
@@ -302,34 +263,51 @@ def _install_wrappers(root: Path, release: Path, *, node: str) -> dict[str, str]
         "rsi": release / "repo" / "scripts" / "forge_lab" / "rsi",
         "RSILAB": release / "repo" / "scripts" / "forge_lab" / "rsi",
         "rsi-lab-env": release / "repo" / "scripts" / "forge_lab" / "rsi-env",
-        "rsi-operator-history": release
-        / "repo"
-        / "scripts"
-        / "forge_lab"
-        / "operator-history",
+        "rsi-operator-history": release / "repo" / "scripts" / "forge_lab" / "operator-history",
     }
     if node != "meghadharma":
         targets["rsi-env"] = targets["rsi-lab-env"]
-    if node == "meghadharma":
-        targets["rsi-update-main"] = (
-            release / "repo" / "scripts" / "forge_lab" / "rsi-sync-retired"
+    retired = release / "repo" / "scripts" / "forge_lab" / "rsi-legacy-retired"
+    for name in legacy_mutating_launchers(node):
+        targets[name] = retired
+    missing = [str(target) for target in targets.values() if not target.is_file()]
+    if missing:
+        raise SyncError(
+            "WRAPPER_MISSING",
+            f"release wrapper is missing: {', '.join(sorted(set(missing)))}",
         )
     installed: dict[str, str] = {}
-    for name, target in targets.items():
-        if not target.is_file():
-            raise SyncError("WRAPPER_MISSING", f"release wrapper is missing: {target}")
-        link = bin_dir / name
-        if _path_present(link):
-            correct = link.is_symlink() and link.resolve(
-                strict=False
-            ) == target.resolve(strict=False)
-            if not correct:
+    changes: list[tuple[Path, Path | None]] = []
+    try:
+        for name, target in targets.items():
+            link = bin_dir / name
+            if _path_present(link):
+                correct = link.is_symlink() and link.resolve(strict=False) == target.resolve(strict=False)
+                if correct:
+                    installed[name] = str(link)
+                    continue
                 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                 backup = bin_dir / f"{name}.legacy-{stamp}-{uuid4().hex[:8]}"
                 os.replace(link, backup)
                 installed[f"{name}_backup"] = str(backup)
-        _atomic_symlink(target, link)
-        installed[name] = str(link)
+            else:
+                backup = None
+            changes.append((link, backup))
+            _atomic_symlink(target, link)
+            installed[name] = str(link)
+    except Exception as exc:
+        rollback_errors: list[str] = []
+        for link, backup in reversed(changes):
+            try:
+                link.unlink(missing_ok=True)
+                if backup is not None:
+                    os.replace(backup, link)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"{link}:{type(rollback_exc).__name__}")
+        if rollback_errors:
+            detail = "wrapper installation failed and rollback was incomplete: "
+            raise SyncError("WRAPPER_ROLLBACK_FAILED", detail + ", ".join(rollback_errors)) from exc
+        raise
     return installed
 
 

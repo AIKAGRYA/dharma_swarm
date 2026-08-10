@@ -15,7 +15,20 @@ from dharma_swarm.forge_lab.sync_identity import (
     _identity_mismatches,
     _now,
     _run,
+    default_local_root,
     validate_plan,
+)
+
+
+LEGACY_MUTATING_LAUNCHERS = (
+    "rsi-run",
+    "rsi-loop",
+    "rsi-fix-substrate",
+    "rsi-keys-refresh",
+)
+MEGHADHARMA_LEGACY_MUTATING_LAUNCHERS = (
+    "rsi-env",
+    "rsi-update-main",
 )
 
 
@@ -41,6 +54,66 @@ def _current_commit(root: Path) -> str | None:
         return _checkout_identity(target / "repo")["commit"]
     except SyncError:
         return None
+
+
+def _entrypoint_dir(root: Path, node: str) -> Path:
+    if node == "mac" and root == default_local_root().expanduser().resolve():
+        return Path.home() / ".dharma" / "bin"
+    return root / "bin"
+
+
+def legacy_mutating_launchers(node: str) -> tuple[str, ...]:
+    """Return only launchers that can mutate source/state or spend budget."""
+
+    if node == "meghadharma":
+        return (*LEGACY_MUTATING_LAUNCHERS, *MEGHADHARMA_LEGACY_MUTATING_LAUNCHERS)
+    return LEGACY_MUTATING_LAUNCHERS
+
+
+def _launcher_hygiene(
+    root: Path,
+    target: Path | None,
+    *,
+    node: str,
+) -> dict[str, Any]:
+    entrypoints = _entrypoint_dir(root, node)
+    if target is None:
+        return {
+            "ok": False,
+            "entrypoint_dir": str(entrypoints),
+            "retired_target": None,
+            "launchers": {},
+            "errors": ["legacy launcher hygiene cannot be verified without current release"],
+        }
+    retired = target / "repo" / "scripts" / "forge_lab" / "rsi-legacy-retired"
+    errors: list[str] = []
+    launchers: dict[str, dict[str, Any]] = {}
+    if not retired.is_file():
+        errors.append(f"canonical legacy retirement stub is absent: {retired}")
+    for name in legacy_mutating_launchers(node):
+        path = entrypoints / name
+        is_symlink = path.is_symlink()
+        resolved = str(path.resolve(strict=False)) if is_symlink else None
+        correct = bool(
+            retired.is_file()
+            and is_symlink
+            and path.resolve(strict=False) == retired.resolve(strict=False)
+        )
+        launchers[name] = {
+            "path": str(path),
+            "is_symlink": is_symlink,
+            "resolved": resolved,
+            "retired": correct,
+        }
+        if not correct:
+            errors.append(f"legacy mutating launcher is not retired: {path}")
+    return {
+        "ok": not errors,
+        "entrypoint_dir": str(entrypoints),
+        "retired_target": str(retired),
+        "launchers": launchers,
+        "errors": errors,
+    }
 
 
 def _runtime_fingerprint(release: Path | None) -> dict[str, Any]:
@@ -126,6 +199,8 @@ def node_status(root: Path, *, node: str) -> dict[str, Any]:
         "runtime_pydeps": _path_present(root / "runtime" / "pydeps"),
         "secrets": _path_present(root / "secrets"),
     }
+    launcher_hygiene = _launcher_hygiene(root, target, node=node)
+    errors.extend(launcher_hygiene["errors"])
     return {
         "schema": "rsi_lab.node_status.v1",
         "node": node,
@@ -136,6 +211,7 @@ def node_status(root: Path, *, node: str) -> dict[str, Any]:
             release_manifest.get("plan_digest") if release_manifest else None
         ),
         "anchors": anchors,
+        "launcher_hygiene": launcher_hygiene,
         "runtime": _runtime_fingerprint(target),
         "ready": bool(
             target
@@ -145,6 +221,7 @@ def node_status(root: Path, *, node: str) -> dict[str, Any]:
             and anchors["state"]
             and anchors["runtime_venv"]
             and anchors["runtime_pydeps"]
+            and launcher_hygiene["ok"]
         ),
         "errors": errors,
     }

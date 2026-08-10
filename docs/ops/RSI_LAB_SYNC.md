@@ -104,6 +104,9 @@ Meghadharma:
   receipts/
   bin/rsi -> .../current/repo/scripts/forge_lab/rsi
   bin/rsi-lab-env -> .../current/repo/scripts/forge_lab/rsi-env
+  bin/rsi-run -> .../current/repo/scripts/forge_lab/rsi-legacy-retired
+  bin/rsi-loop -> .../current/repo/scripts/forge_lab/rsi-legacy-retired
+  bin/rsi-env -> .../current/repo/scripts/forge_lab/rsi-legacy-retired
 ```
 
 The original chassis and `current-main` recovery worktree are retained. The
@@ -130,15 +133,19 @@ the plan digest, previous/target releases, runtime fingerprint, guard evidence,
 wrapper paths, and readback identity. They explicitly state that mutable state
 and provider calls were not part of synchronization.
 
-`/root/rsi-lab/bin/rsi-update-main` is retired because it edited a live
-checkout and could continue after a failed fetch. Its original file is retained
-under a timestamped `rsi-update-main.legacy-*` name on first activation.
+Every mutating legacy entry point is transactionally retired on managed
+activation: `rsi-run`, `rsi-loop`, `rsi-fix-substrate`, `rsi-keys-refresh`, and,
+on Meghadharma, `rsi-env` and `rsi-update-main`. The prior file is first moved
+to a unique timestamped `*.legacy-*` backup, then the public name is atomically
+linked to the sourceable/executable `rsi-legacy-retired` stub. If any link fails,
+the wrapper transaction restores the prior names. Node readiness fails when an
+alias drifts from the retirement stub.
 
-The pre-existing `/root/rsi-lab/bin/rsi-env` remains solely for the preserved
-legacy-v0 wrapper set; replacing it would silently change those historical
-launchers. The managed environment entry point is `rsi-lab-env`. Legacy-v0
-launchers are noncanonical custody surfaces and must not be used to claim or
-repair synchronization.
+The managed environment entry point is `rsi-lab-env`; it is intentionally not
+retired. Before activation, remove or replace any crontab line that invokes a
+newly retired name—especially the historical ten-minute `rsi-keys-refresh`
+probe. Sync does not silently edit operator crontabs, and leaving that line in
+place would create repeated exit-64 noise rather than provider evidence.
 
 Do not repair drift with `rsync`, `scp` of a working tree, a force-push, or by
 copying state directories. Preserve evidence, fix the canonical branch, create

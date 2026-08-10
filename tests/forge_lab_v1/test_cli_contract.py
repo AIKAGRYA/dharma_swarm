@@ -175,6 +175,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
 
     root = _subcommands(build_parser())
     assert set(root) == {
+        "run",
         "version",
         "newrun",
         "doctor",
@@ -192,6 +193,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
     assert set(_subcommands(root["taskpack"])) == {"build"}
     assert set(_subcommands(root["campaign"])) == {
         "plan",
+        "prepare",
         "run",
         "list",
         "status",
@@ -213,6 +215,39 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
         "apply",
         "converge",
         "rollback",
+    }
+
+
+def test_paired_plan_cli_collects_exact_limits_atomically() -> None:
+    from dharma_swarm.forge_lab import campaign_control
+    from dharma_swarm.forge_lab.campaign_cli import _plan_limits
+    from dharma_swarm.forge_lab.rsi_cli import build_parser
+
+    args = build_parser().parse_args(
+        [
+            "campaign",
+            "plan",
+            "--profile",
+            "forge-lab-paired-frozen-v1",
+            "--total-tokens",
+            "1000000",
+            "--total-usd-micros",
+            "25000000",
+            "--total-requests",
+            "120",
+            "--deadline-utc",
+            "2099-01-01T00:00:00Z",
+            "--host-caps-json",
+            '{"host":"meghadharma","max_parallel_requests":3}',
+        ]
+    )
+
+    assert _plan_limits(args, campaign_control) == {
+        "total_tokens": 1_000_000,
+        "total_usd_micros": 25_000_000,
+        "total_requests": 120,
+        "deadline_utc": "2099-01-01T00:00:00Z",
+        "host_caps": {"host": "meghadharma", "max_parallel_requests": 3},
     }
 
 
@@ -251,7 +286,7 @@ def test_newrun_menu_projects_bleeding_edge_options_without_live_imports() -> No
     assert current["mutator_model"] == "glm-5.2"
     assert current["verifier_model"] == "kimi-code"
     assert current["command"] == (
-        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+        "rsi campaign plan --profile forge-lab-paired-frozen-v1"
     )
 
 
@@ -265,7 +300,7 @@ def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
     assert selected["verifier_model"] == "minimax-m3:cloud"
     assert selected["mutator_model"] == "kimi-k2.7-code:cloud"
     assert selected["command"] == (
-        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+        "rsi campaign plan --profile forge-lab-paired-frozen-v1"
     )
 
 
@@ -298,7 +333,7 @@ def test_newrun_selected_preset_can_be_overridden_without_execute() -> None:
     assert selected["solver_model"] == "qwen3-coder:480b-cloud"
     assert selected["generations"] == 2
     assert selected["command"] == (
-        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+        "rsi campaign plan --profile forge-lab-paired-frozen-v1"
     )
 
 
@@ -466,7 +501,7 @@ def test_newrun_recommend_selects_fast_without_provider_health(tmp_path: Path) -
     payload = json.loads(result.stdout)
     assert payload["recommendation"]["selected_preset"] == "fast"
     assert payload["selected"]["name"] == "fast"
-    assert "provider health" in payload["recommendation"]["reasons"][0]
+    assert "manifest-bound provider attestation" in payload["recommendation"]["reasons"][0]
 
 
 def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(tmp_path: Path) -> None:
@@ -521,5 +556,6 @@ def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(t
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["recommendation"]["selected_preset"] == "soak"
-    assert payload["selected"]["name"] == "soak"
+    assert payload["recommendation"]["selected_preset"] == "fast"
+    assert payload["selected"]["name"] == "fast"
+    assert "manifest-bound provider attestation" in payload["recommendation"]["reasons"][0]

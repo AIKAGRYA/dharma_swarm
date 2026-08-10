@@ -19,7 +19,13 @@ from dharma_swarm.forge_lab.campaign_contract import (
     validate_manifest,
 )
 from dharma_swarm.forge_lab.campaign_gates import evaluate_preflight
-from dharma_swarm.forge_lab.campaign_profile import PROFILE, campaign_definition
+from dharma_swarm.forge_lab.campaign_profile import (
+    PAIRED_PROFILE,
+    SUPPORTED_PROFILES,
+    ReleaseIdentityError,
+    campaign_definition,
+    with_exact_limits,
+)
 from dharma_swarm.forge_lab.campaign_receipts import (
     BlockedReceiptError,
     build_blocked_receipt as _blocked_receipt,
@@ -29,7 +35,6 @@ from dharma_swarm.forge_lab.campaign_receipts import (
 
 
 _DIGEST_RE = re.compile(r"^sha256:([0-9a-f]{64})$")
-_PROJECTION_CATEGORIES = ("control", "receipts", "events", "checkpoints")
 
 
 class CampaignControlError(RuntimeError):
@@ -74,16 +79,28 @@ def _manifest_path(state_root: Path, digest: str) -> Path:
     return _control_root(state_root) / "manifests" / f"{match.group(1)}.json"
 
 
-def plan_campaign(profile: str, *, state_root: Path | None = None) -> dict[str, Any]:
+def plan_campaign(
+    profile: str,
+    *,
+    state_root: Path | None = None,
+    limits: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build and store a deterministic manifest without provider imports/calls."""
 
-    if profile != PROFILE:
+    if profile not in SUPPORTED_PROFILES:
         raise CampaignControlError(
             "UNSUPPORTED_GOVERNED_PROFILE",
-            f"implemented governed profile is {PROFILE!r}, not {profile!r}",
+            "implemented governed profiles are "
+            f"{', '.join(repr(item) for item in SUPPORTED_PROFILES)}, not {profile!r}",
         )
     root = state_root or resolve_state_root()
-    manifest = build_manifest(campaign_definition(profile))
+    try:
+        definition = with_exact_limits(campaign_definition(profile), limits)
+    except ReleaseIdentityError as exc:
+        raise CampaignControlError(exc.code, str(exc)) from exc
+    except ValueError as exc:
+        raise CampaignControlError("INVALID_PLAN_LIMITS", str(exc)) from exc
+    manifest = build_manifest(definition)
     digest = manifest["manifest_digest"]
     path = _manifest_path(root, digest)
     if path.exists():
@@ -105,6 +122,16 @@ def plan_campaign(profile: str, *, state_root: Path | None = None) -> dict[str, 
         "manifest_digest": digest,
         "manifest_path": str(path),
         "powered": all(value is not None for value in manifest["limits"].values()),
+        "operator_authority_bound": False,
+        "activation_code": (
+            "HISTORICAL_PROFILE_IMMUTABLE_BLOCKED"
+            if profile != PAIRED_PROFILE
+            else (
+                "SIGNED_OPERATOR_ENVELOPE_REQUIRED"
+                if limits is not None
+                else "EXACT_LIMITS_REQUIRED"
+            )
+        ),
         "provider_calls": 0,
         "manifest": manifest,
     }
@@ -149,18 +176,6 @@ def _receipt_path(state_root: Path, campaign_id: str, request_id: str) -> Path:
     )
 
 
-def _ensure_campaign_projection(state_root: Path, campaign_id: str) -> None:
-    campaign_root = _control_root(state_root) / "campaigns" / campaign_id
-    try:
-        for category in _PROJECTION_CATEGORIES:
-            (campaign_root / category).mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        raise CampaignControlError(
-            "CAMPAIGN_PROJECTION_FAILURE",
-            f"cannot create canonical campaign projection: {exc}",
-        ) from exc
-
-
 def _validate_blocked_receipt(
     receipt: Any,
     *,
@@ -186,6 +201,42 @@ def _store_error(exc: Exception) -> CampaignControlError:
         getattr(exc, "code", "CAMPAIGN_STORE_FAILURE"),
         str(exc),
     )
+
+
+def prepare_campaign(
+    digest: str,
+    *,
+    request_id: str | None = None,
+    actor: str = "codex-rsi-lab-manager",
+    state_root: Path | None = None,
+) -> dict[str, Any]:
+    """Open the paired campaign's fenced provider-probe challenge."""
+
+    from dharma_swarm.forge_lab.campaign_challenge import (
+        CampaignChallengeError,
+        prepare_paired_campaign,
+    )
+    from dharma_swarm.forge_lab.campaign_store import CampaignStore
+    from dharma_swarm.forge_lab.campaign_store_schema import StoreError
+
+    root = state_root or resolve_state_root()
+    manifest = load_manifest(digest, state_root=root)
+    if manifest["campaign_name"] != PAIRED_PROFILE:
+        raise CampaignControlError(
+            "PROVIDER_CHALLENGE_NOT_APPLICABLE",
+            "the historical n30 profile retains its one-phase blocked lifecycle",
+        )
+    stable_request = request_id or f"campaign-run-{digest[-16:]}"
+    try:
+        return prepare_paired_campaign(
+            CampaignStore(root),
+            manifest,
+            state_root=root,
+            request_id=stable_request,
+            actor=actor,
+        )
+    except (CampaignChallengeError, StoreError) as exc:
+        raise _store_error(exc) from exc
 
 
 def run_campaign(
@@ -250,42 +301,31 @@ def run_campaign(
             raise CampaignControlError("BLOCKED_RECEIPT_INVALID", problem)
         return {**prior, "receipt_path": str(receipt_path), "replayed": True}
 
-    try:
-        existing = store.get_campaign(campaign_id)
-    except StoreError as exc:
-        if exc.code != "CAMPAIGN_NOT_FOUND":
-            raise _store_error(exc) from exc
-    else:
-        raise CampaignControlError(
-            "CAMPAIGN_RUN_INCOMPLETE",
-            "canonical campaign state exists without a replayable blocked receipt "
-            f"(state={existing.get('state')!r}); reconciliation is required",
-        )
+    from dharma_swarm.forge_lab.campaign_challenge import (
+        CampaignChallengeError,
+        resume_prepared_campaign,
+        start_historical_preflight,
+    )
 
     try:
-        store.create_campaign(
-            manifest,
-            request_id=f"{stable_request}.create",
-            actor=actor,
-        )
-        _ensure_campaign_projection(root, campaign_id)
-        lease = store.acquire_lease(
-            campaign_id,
-            request_id=f"{stable_request}.lease",
-            holder=actor,
-            mode="active",
-            ttl_seconds=90,
-        )
-        fence = lease["fencing_token"]
-        store.apply_action(
-            campaign_id,
-            request_id=f"{stable_request}.preflight",
-            action="begin-preflight",
-            actor=actor,
-            target_state="PREFLIGHTING",
-            fencing_token=fence,
-        )
-    except StoreError as exc:
+        if campaign_id == PAIRED_PROFILE:
+            challenge = resume_prepared_campaign(
+                store,
+                manifest,
+                state_root=root,
+                request_id=stable_request,
+                actor=actor,
+            )
+            fence = challenge["fencing_token"]
+        else:
+            fence = start_historical_preflight(
+                store,
+                manifest,
+                state_root=root,
+                request_id=stable_request,
+                actor=actor,
+            )
+    except (CampaignChallengeError, StoreError) as exc:
         raise _store_error(exc) from exc
 
     gates = evaluate_preflight(

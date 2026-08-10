@@ -1,0 +1,67 @@
+[Unit]
+Description=Governed RSI Lab unattended scheduler run
+Documentation=file:/root/rsi-lab/current/repo/docs/ops/FORGE_LAB_V0_1_RUNBOOK.md
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/root/rsi-lab/current/repo/scripts/forge_lab/rsi
+ConditionPathIsDirectory=/root/rsi-lab/current/state
+
+[Service]
+Type=exec
+User=rsi-lab
+Group=rsi-lab
+WorkingDirectory=/root/rsi-lab/current/repo
+ExecCondition=/usr/bin/test -x /root/rsi-lab/current/repo/scripts/forge_lab/rsi
+ExecStart=/root/rsi-lab/current/repo/scripts/forge_lab/rsi run --unattended
+Restart=no
+RuntimeMaxSec=6h
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+
+Environment=RSI_LAB_BASE=/root/rsi-lab/current
+Environment=RSI_LAB_REPO=/root/rsi-lab/current/repo
+Environment=RSI_LAB_STATE=/root/rsi-lab/current/state
+Environment=PYTHONDONTWRITEBYTECODE=1
+UnsetEnvironment=RSI_LAB_PYTHON RSI_LAB_PYDEPS FORGE_ALLOW_LEGACY_HIGH_SLOT
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+RemoveIPC=yes
+ReadOnlyPaths=/root/rsi-lab/current/repo
+ReadWritePaths=/root/rsi-lab/current/state
+
+MemoryHigh=3G
+MemoryMax=3500M
+CPUQuota=150%
+TasksMax=256
+LimitNOFILE=1024
+LimitNPROC=256
+LimitCORE=0
+LimitFSIZE=4G
+OOMPolicy=stop
+
+StandardOutput=journal
+StandardError=journal
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=1000

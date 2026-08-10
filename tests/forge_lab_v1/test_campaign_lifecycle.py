@@ -50,6 +50,7 @@ def test_plan_is_content_addressed_exact_unpowered_and_non_live(
     assert Path(second["manifest_path"]).read_bytes() == first_bytes
     assert first["provider_calls"] == 0
     assert first["powered"] is False
+    assert first["activation_code"] == "HISTORICAL_PROFILE_IMMUTABLE_BLOCKED"
     manifest = first["manifest"]
     assert manifest["source"]["release_commit"] == (
         "309650d5604768a8c90d987170fccf50af6a0536"

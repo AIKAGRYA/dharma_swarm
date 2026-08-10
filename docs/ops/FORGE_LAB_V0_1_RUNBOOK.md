@@ -100,7 +100,7 @@ Run accepts only the printed digest:
 ```bash
 rsi campaign run --manifest sha256:DIGEST \
   --identity-receipt /canonical/evidence/sync-status.json \
-  --provider-receipt /canonical/evidence/moonshot-selftest.json \
+  --provider-receipt /canonical/evidence/provider-attestation.json \
   --operator-envelope /canonical/evidence/operator-envelope.json \
   --host meghadharma --json
 ```
@@ -142,3 +142,75 @@ cannot mutate a newer fence.
 The legacy `rsi newrun --execute` and
 `python -m dharma_swarm.forge_lab.cli run` launch paths are retired and return
 `GOVERNED_CAMPAIGN_REQUIRED`.
+
+## Paired harness and unattended schedule candidate
+
+The world-class harness amendment is backward compatible at its scientific
+boundary: `legacy_v0` remains readable, while new scientific work must use
+`paired_frozen_v1`. A paired campaign freezes, before the first provider call:
+
+1. disjoint logical `train`, `explore`, `confirm`, and `holdout` task IDs and
+   their content/provenance hashes;
+2. baseline candidate and executed-phenotype identities;
+3. evaluator/source identity and repeat seeds; and
+4. hard token/USD ceilings covering mutation, baseline evaluation, candidate
+   evaluation, confirmation, and the one-use holdout.
+
+Baseline and challenger run on the same task/repeat cells with counterbalanced
+arm order. Selection sees only complete, budget-valid EXPLORE pairs. A single
+challenger is frozen before CONFIRM, and HOLDOUT is read only after that freeze.
+Any persistent champion is research-only, atomically CAS-updated, and cannot
+authorize promotion or a positive-lift claim.
+
+PR-suite setup, Git operations, patched repositories, and tests require the
+digest-bound execution profile named by `FORGE_PR_SUITE_EXECUTION_PROFILE`.
+Production has no host-process fallback. The profile requires a non-root
+container user, image digest, no network, read-only root filesystem, all
+capabilities dropped, no-new-privileges, and explicit CPU, memory, PID, file,
+output, and wall limits. Missing runtime, pinned image, or profile is a graded
+failure—not permission to execute locally.
+
+The repository contains source-only systemd candidates:
+
+```text
+scripts/ops/systemd/rsi-lab-run.service
+scripts/ops/systemd/rsi-lab-run.timer
+```
+
+They intentionally have no `[Install]` section and must not be copied, started,
+or enabled merely because tests pass. The foreground entrypoint is
+`rsi run --unattended`; it reads only
+`$RSI_LAB_STATE/.dharma/forge_lab/schedule/active.json`, obtains a global
+single-flight lock, checks memory/swap/load, and writes a private attempt
+receipt for every success or refusal. It accepts no command-line evidence path.
+
+This amendment does **not** make the candidate a recurring paid runner. The
+controller still appends `GOVERNED_EXECUTOR_NOT_IMPLEMENTED`, and a stored
+campaign name/request is single-use rather than a cadence-safe campaign
+instance. `rsi campaign prepare` now opens the fenced, short-lived provider
+probe challenge needed to create a nonce-bound attestation, and paired planning
+accepts all-or-nothing proposed ceilings, but neither surface grants spend
+authority or opens dispatch. A recurring instance identity, transactional
+request accounting, and an implemented scientific-executor handoff are release
+blockers before the timer can be considered cron-ready.
+
+Unattended activation remains forbidden until all of these are true at the
+same immutable release:
+
+- a root-owned, private, exact-ceiling operator envelope is valid;
+- the paired manifest contains explicit cumulative token, USD, request,
+  deadline, and host ceilings, with a matching signed envelope;
+- three-host code identity and a fresh manifest-bound provider attestation are
+  valid, including at least two independent physical transports;
+- a governed provider-probe broker consumes the active fenced challenge within
+  its TTL and signs the resulting receipt with a deployed trust root;
+- the digest-pinned evaluator image/profile passes a supervised isolation
+  canary;
+- available memory and swap exceed the configured floors;
+- the `rsi-lab` service account has only the narrow traversal/state access it
+  needs; and
+- a supervised paired canary closes cleanly with no residual process,
+  container, scratch checkout, reservation, or open receipt.
+
+Until those facts are simultaneously green, the correct scheduled state is
+absent/inert and `rsi run --unattended` must fail closed.

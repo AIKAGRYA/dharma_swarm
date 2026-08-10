@@ -23,6 +23,7 @@ ENVELOPE_SCHEMA = "forge_lab.operator_envelope.v1"
 CANONICAL_REPOSITORY = "https://github.com/AmitabhainArunachala/dharma_swarm.git"
 N30_CAMPAIGN = "forge-lab-n30-to-1000-v1"
 N30_RELEASE = "309650d5604768a8c90d987170fccf50af6a0536"
+PAIRED_CAMPAIGN = "forge-lab-paired-frozen-v1"
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,95}$")
 _HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -132,13 +133,14 @@ def build_manifest(definition: Mapping[str, Any]) -> dict[str, Any]:
         _bad("INVALID_SCHEMA", f"definition.schema must be {DEFINITION_SCHEMA}")
     name = _safe_name(value["campaign_name"], "campaign_name")
     _validate_source(value["source"])
-    _validate_bootstrap(value["bootstrap"])
+    _validate_bootstrap(value["bootstrap"], campaign_name=name)
     _validate_stages(value["stages"])
     _validate_limits(value["limits"])
     _validate_claims(value["claims"])
-    _validate_gates(value["gates"])
-    if name == N30_CAMPAIGN:
-        _validate_n30_exact(value)
+    _validate_gates(value["gates"], campaign_name=name)
+    from dharma_swarm.forge_lab.campaign_profile_contract import validate_profile_exact
+
+    validate_profile_exact(name, value, _bad)
 
     manifest = dict(value)
     manifest["schema"] = MANIFEST_SCHEMA
@@ -216,21 +218,26 @@ def _validate_source(value: Any) -> None:
     )
 
 
-def _validate_bootstrap(value: Any) -> None:
-    _exact_keys(
-        value,
-        {
-            "children",
-            "tasks_per_generation",
-            "novelty_pressure",
-            "solver_model",
-            "verifier_model",
-            "mutator_model",
-            "per_candidate_token_ceiling",
-            "rng_seed",
-        },
-        "bootstrap",
-    )
+def _validate_bootstrap(value: Any, *, campaign_name: str) -> None:
+    common = {
+        "children",
+        "tasks_per_generation",
+        "novelty_pressure",
+        "per_candidate_token_ceiling",
+        "rng_seed",
+    }
+    if campaign_name == N30_CAMPAIGN:
+        _exact_keys(
+            value,
+            common | {"solver_model", "verifier_model", "mutator_model"},
+            "bootstrap",
+        )
+    else:
+        _exact_keys(
+            value,
+            common | {"role_routes", "evaluation_protocol", "paired_design"},
+            "bootstrap",
+        )
     for field in ("children", "tasks_per_generation", "per_candidate_token_ceiling"):
         _positive_int(value[field], f"bootstrap.{field}")
     if not isinstance(value["novelty_pressure"], (int, float)) or isinstance(
@@ -241,9 +248,54 @@ def _validate_bootstrap(value: Any) -> None:
         _bad("INVALID_BOOTSTRAP", "novelty_pressure must be finite")
     if not isinstance(value["rng_seed"], int) or isinstance(value["rng_seed"], bool):
         _bad("INVALID_BOOTSTRAP", "rng_seed must be an integer")
-    for role in ("solver_model", "verifier_model", "mutator_model"):
-        if not isinstance(value[role], str) or not value[role]:
-            _bad("INVALID_BOOTSTRAP", f"{role} must be a model route string")
+    if campaign_name == N30_CAMPAIGN:
+        for role in ("solver_model", "verifier_model", "mutator_model"):
+            if not isinstance(value[role], str) or not value[role]:
+                _bad("INVALID_BOOTSTRAP", f"{role} must be a model route string")
+        return
+
+    routes = value["role_routes"]
+    _exact_keys(routes, {"solver", "verifier", "mutator"}, "bootstrap.role_routes")
+    for role, route in routes.items():
+        if not isinstance(route, str) or not re.fullmatch(r"forge\.[a-z0-9_.-]+", route):
+            _bad(
+                "INVALID_BOOTSTRAP",
+                f"bootstrap.role_routes.{role} must be a governed semantic route",
+            )
+    if value["evaluation_protocol"] != "paired_frozen_v1":
+        _bad("INVALID_BOOTSTRAP", "paired campaign protocol must be paired_frozen_v1")
+    design = value["paired_design"]
+    _exact_keys(
+        design,
+        {
+            "logical_splits",
+            "tasks_per_split",
+            "repeat_seeds",
+            "bootstrap_samples",
+            "min_decision_tasks",
+            "baseline_policy",
+            "winner_policy",
+        },
+        "bootstrap.paired_design",
+    )
+    if design["logical_splits"] != ["train", "explore", "confirm", "holdout"]:
+        _bad("INVALID_BOOTSTRAP", "paired logical splits must remain four-way and frozen")
+    for field in ("tasks_per_split", "bootstrap_samples", "min_decision_tasks"):
+        _positive_int(design[field], f"bootstrap.paired_design.{field}")
+    seeds = design["repeat_seeds"]
+    if (
+        not isinstance(seeds, list)
+        or not seeds
+        or any(not isinstance(seed, int) or isinstance(seed, bool) for seed in seeds)
+        or len(set(seeds)) != len(seeds)
+    ):
+        _bad("INVALID_BOOTSTRAP", "paired repeat seeds must be unique integers")
+    if design["min_decision_tasks"] > design["tasks_per_split"]:
+        _bad("INVALID_BOOTSTRAP", "paired decision minimum exceeds tasks per split")
+    if design["baseline_policy"] != "frozen_before_dispatch":
+        _bad("INVALID_BOOTSTRAP", "paired baseline must freeze before dispatch")
+    if design["winner_policy"] != "explore_select_confirm_holdout_once":
+        _bad("INVALID_BOOTSTRAP", "paired winner policy is not confirm/holdout safe")
 
 
 def _validate_stages(value: Any) -> None:
@@ -321,71 +373,58 @@ def _validate_claims(value: Any) -> None:
         _bad("INVALID_CLAIM_BOUNDARY", "forbidden claims are incomplete")
 
 
-def _validate_gates(value: Any) -> None:
-    _exact_keys(
-        value,
-        {
-            "operator_envelope_required",
-            "exact_route",
-            "canonical_state_required",
-            "code_identity_hosts",
-            "lifecycle_required",
-        },
-        "gates",
-    )
+def _validate_gates(value: Any, *, campaign_name: str) -> None:
+    common = {
+        "operator_envelope_required",
+        "canonical_state_required",
+        "code_identity_hosts",
+        "lifecycle_required",
+    }
+    if campaign_name == N30_CAMPAIGN:
+        _exact_keys(value, common | {"exact_route"}, "gates")
+    else:
+        _exact_keys(value, common | {"provider_attestation"}, "gates")
     if value["operator_envelope_required"] is not True:
         _bad("INVALID_GATE", "operator envelope must be required")
+    if campaign_name == N30_CAMPAIGN:
+        if not isinstance(value["exact_route"], str) or not value["exact_route"]:
+            _bad("INVALID_GATE", "historical campaign requires an exact route")
+    else:
+        attestation = value["provider_attestation"]
+        _exact_keys(
+            attestation,
+            {
+                "required_roles",
+                "min_independent_transports",
+                "max_age_seconds",
+                "required_probe_authority",
+            },
+            "gates.provider_attestation",
+        )
+        if attestation["required_roles"] != ["solver", "verifier", "mutator"]:
+            _bad("INVALID_GATE", "provider attestation must cover every execution role")
+        if _positive_int(
+            attestation["min_independent_transports"],
+            "gates.provider_attestation.min_independent_transports",
+        ) < 2:
+            _bad(
+                "INVALID_GATE",
+                "unattended campaigns require two independent transports",
+            )
+        max_age = _positive_int(
+            attestation["max_age_seconds"],
+            "gates.provider_attestation.max_age_seconds",
+        )
+        if max_age > 3600:
+            _bad("INVALID_GATE", "provider attestation cannot be older than one hour")
+        if attestation["required_probe_authority"] != "rsi-lab-provider-probe-v1":
+            _bad("INVALID_GATE", "provider probe authority is not the governed broker")
     if value["canonical_state_required"] is not True:
         _bad("INVALID_GATE", "canonical state must be required")
     if value["code_identity_hosts"] != ["github", "mac", "meghadharma"]:
         _bad("INVALID_GATE", "three-way code identity is required")
     if value["lifecycle_required"] != _LIFECYCLE:
         _bad("INVALID_GATE", "complete governed lifecycle proof is required")
-
-
-def _validate_n30_exact(value: Mapping[str, Any]) -> None:
-    source, bootstrap, stages, gates = (
-        value["source"],
-        value["bootstrap"],
-        value["stages"],
-        value["gates"],
-    )
-    if source["release_commit"] != N30_RELEASE:
-        _bad("INVALID_N30_PROFILE", "campaign release commit is not canonical")
-    expected_prior = {
-        "run_id": "rsi-n30-20260718T131907Z",
-        "type": "MostEvolvedBy",
-        "metric": "maximum_generation",
-        "generation": 30,
-        "budget_valid_rows": 31,
-        "budget_total_rows": 31,
-        "complete_receipts": True,
-        "evidence_scope": "bootstrap_prior_only",
-    }
-    if source["bootstrap_prior"] != expected_prior:
-        _bad("INVALID_N30_PROFILE", "historical prior is not typed or properly bounded")
-    exact_bootstrap = {
-        "children": 1,
-        "tasks_per_generation": 3,
-        "novelty_pressure": 0.7,
-        "solver_model": "moonshot:kimi-k2.7-code",
-        "verifier_model": "moonshot:kimi-k2.7-code",
-        "mutator_model": "moonshot:kimi-k2.7-code",
-        "per_candidate_token_ceiling": 300000,
-        "rng_seed": 20260706,
-    }
-    if bootstrap != exact_bootstrap:
-        _bad("INVALID_N30_PROFILE", "bootstrap reproducibility inputs drifted")
-    if stages["canary"]["primary_attempts"] != 1:
-        _bad("INVALID_N30_PROFILE", "canary must contain one primary attempt")
-    if stages["n30_reproduction"]["primary_attempts"] != 30:
-        _bad("INVALID_N30_PROFILE", "n30 reproduction must contain 30 attempts")
-    if stages["primary"]["primary_attempts"] != 1000:
-        _bad("INVALID_N30_PROFILE", "primary campaign must contain 1000 attempts")
-    if stages["primary"]["seed_counts_as_attempt"] is not False:
-        _bad("INVALID_N30_PROFILE", "seed baseline cannot count as an attempt")
-    if gates["exact_route"] != "moonshot:kimi-k2.7-code":
-        _bad("INVALID_N30_PROFILE", "exact Moonshot route gate is required")
 
 
 def _validate_json_value(value: Any, path: str) -> None:

@@ -32,6 +32,8 @@ def test_provider_selftest_config_mode_resolves_without_live_probe(monkeypatch):
     assert payload["schema"] == "rsi_lab.provider_selftest.v1"
     assert payload["ok"] is True
     assert payload["live"] is False
+    assert payload["status"] == "configured"
+    assert payload["operational"] is False
     assert [row["slot_resolved"] for row in payload["rows"]] == [True, True]
     assert [row["outcome"] for row in payload["rows"]] == ["not_probed", "not_probed"]
 
@@ -98,3 +100,23 @@ def test_provider_selftest_live_requires_governed_probe_authority(
         )
 
     assert not list(tmp_path.iterdir())
+
+
+def test_config_rows_emit_only_secret_free_transport_digests(monkeypatch):
+    from dharma_swarm.forge_v1.forge_v2 import runner_slots
+
+    monkeypatch.setattr(
+        runner_slots,
+        "_slot_for_id",
+        lambda model_id: _slot(model_id, ProviderType.OPENAI),
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "KEY_SENTINEL_MUST_NOT_PERSIST")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.example.test/v1?key=SECRET")
+
+    row = provider_selftest._config_row("gpt-test")
+
+    rendered = str(row)
+    assert row["physical_transport_digest"].startswith("sha256:")
+    assert "physical_transport_identity" not in row
+    assert "KEY_SENTINEL" not in rendered
+    assert "key=SECRET" not in rendered

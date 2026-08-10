@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+printf '%s\n' \
+  "retired legacy RSI control surface" \
+  "Use /root/rsi-lab/current/repo/scripts/forge_lab/rsi and its governed run/campaign commands." \
+  "No legacy tmux, mutable-checkout, environment-loader, key-refresh, or substrate mutation was executed." >&2
+
+# Remain safe both when executed and when an old operator habit sources rsi-env.
+return 64 2>/dev/null || exit 64

@@ -1,11 +1,120 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Sequence
 
-from dharma_swarm.forge_v1.forge_v2 import fresh_task_oracle, pr_suite_validator
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from dharma_swarm.forge_v1.forge_v2 import fresh_task_oracle, pr_suite_execution, pr_suite_validator
+
+
+_VALIDATOR_KEY = Ed25519PrivateKey.generate()
+_VALIDATOR_KEY_ID = "pytest-validator"
+
+
+def _test_profile(setup_template: str = "") -> pr_suite_execution.ExecutionProfile:
+    return pr_suite_execution.ExecutionProfile(
+        profile_id="pytest-local-explicit",
+        backend="docker",
+        runtime="/bin/false",
+        image=f"example.invalid/forge-tests@sha256:{'0' * 64}",
+        user="65534:65534",
+        python=sys.executable,
+        setup_command=pr_suite_execution.normalized_template_tokens(
+            setup_template, python=sys.executable
+        ),
+    )
+
+
+class _ExplicitTestExecutor:
+    """Test-only dependency injection; production has no local fallback."""
+
+    def __init__(self, workspace_root: Path, total_timeout_seconds: int, setup_template: str = "") -> None:
+        self.workspace_root = workspace_root
+        self.profile = _test_profile(setup_template)
+        self._deadline = time.monotonic() + total_timeout_seconds
+
+    def _render(self, tokens: Sequence[str], cwd: Path, targets: Sequence[str]) -> list[str]:
+        rendered: list[str] = []
+        for token in tokens:
+            if token == "{targets}":
+                rendered.extend(targets)
+            else:
+                rendered.append(
+                    token.format(
+                        python=sys.executable,
+                        checkout=str(cwd),
+                        target=targets[0] if targets else "",
+                        targets=" ".join(targets),
+                    )
+                )
+        return rendered
+
+    def test_argv(self, *, cwd: Path, targets: Sequence[str]) -> list[str]:
+        return self._render(self.profile.test_command, cwd, targets)
+
+    def setup_argv(self, *, cwd: Path) -> list[str] | None:
+        return self._render(self.profile.setup_command, cwd, ()) if self.profile.setup_command else None
+
+    def run(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path,
+        timeout_seconds: int,
+        stdin: str | None = None,
+    ) -> pr_suite_execution.CommandResult:
+        remaining = max(0.01, self._deadline - time.monotonic())
+        try:
+            proc = subprocess.run(
+                argv,
+                cwd=str(cwd),
+                input=stdin,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=min(timeout_seconds, remaining),
+                check=False,
+                env={
+                    "PATH": os.defpath,
+                    "HOME": str(cwd),
+                    "PYTHONPATH": os.pathsep.join(
+                        part for part in (str(cwd), os.environ.get("PYTHONPATH", "")) if part
+                    ),
+                },
+                start_new_session=True,
+            )
+            return pr_suite_execution.CommandResult(
+                list(argv), str(cwd), proc.returncode, proc.stdout, proc.stderr,
+                profile_sha256=self.profile.sha256,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return pr_suite_execution.CommandResult(
+                list(argv), str(cwd), 124, str(exc.stdout or ""), str(exc.stderr or ""), True,
+                profile_sha256=self.profile.sha256,
+            )
+
+
+def _executor_factory(setup_template: str = ""):
+    def factory(*, workspace_root: Path, total_timeout_seconds: int, **_kwargs: object) -> _ExplicitTestExecutor:
+        return _ExplicitTestExecutor(workspace_root, total_timeout_seconds, setup_template)
+
+    return factory
+
+
+def _install_executor(monkeypatch, setup_template: str = "") -> None:
+    monkeypatch.setattr(pr_suite_execution, "build_executor", _executor_factory(setup_template))
+    monkeypatch.setattr(
+        pr_suite_execution,
+        "resolve_validator_signer",
+        lambda _key, _key_id: (_VALIDATOR_KEY, _VALIDATOR_KEY_ID),
+    )
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -71,7 +180,9 @@ def _non_regression_repo(tmp_path: Path) -> dict[str, str]:
     return {"repo": str(repo), "base_sha": base_sha, "head_sha": head_sha}
 
 
-def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(tmp_path: Path) -> None:
+def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(
+    tmp_path: Path, monkeypatch
+) -> None:
     refs = _merge_fixing_pr_repo(tmp_path)
     row = {
         "repo": "fake/calculator",
@@ -88,6 +199,7 @@ def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(
         "validation_state": "needs_fail_to_pass_validation",
         "contamination_state": "fresh_post_cutoff",
     }
+    _install_executor(monkeypatch)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -95,6 +207,7 @@ def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(
         receipt_root=tmp_path / "receipts",
         python=sys.executable,
         timeout_seconds=30,
+        execution_profile=_test_profile(),
     )
 
     assert summary["validated_count"] == 1
@@ -107,9 +220,20 @@ def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(
     assert out["validated_base_sha"] != row["base_sha"]
 
     receipt = json.loads(Path(out["validation_receipt"]).read_text(encoding="utf-8"))
+    trusted_public = _VALIDATOR_KEY.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    assert pr_suite_execution.verify_validator_receipt_signature(
+        receipt,
+        trusted_public_keys={_VALIDATOR_KEY_ID: trusted_public},
+    )["key_id"] == _VALIDATOR_KEY_ID
     assert receipt["status"] == "fail_to_pass_validated"
     assert receipt["contamination_state_trusted"] is False
     assert receipt["validated_fail_to_pass"] == ["tests/test_calculator.py"]
+    assert len(receipt["execution_profile_sha256"]) == 64
+    assert out["validation_execution_profile_sha256"] == receipt["execution_profile_sha256"]
+    assert Path(out["validation_receipt"]).stat().st_mode & 0o777 == 0o600
     assert [target["validated_fail_to_pass"] for target in receipt["target_results"]] == [True]
     assert "materialize_fixed_test_on_base" in {command["phase"] for command in receipt["commands"]}
 
@@ -122,7 +246,33 @@ def test_validator_proves_new_pr_test_fails_on_merge_parent_and_passes_on_merge(
     assert imported["derived_state_counts"] == {"fresh_post_cutoff": 1}
 
 
-def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path) -> None:
+def test_validator_refuses_missing_isolation_profile(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv(pr_suite_execution.PROFILE_ENV, raising=False)
+    refs = _merge_fixing_pr_repo(tmp_path)
+    row = {
+        "repo_path": refs["repo"],
+        "pr_number": 70,
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "test_files": ["tests/test_calculator.py"],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+    )
+
+    result = summary["results"][0]
+    assert result["validated"] is False
+    assert "isolation_unavailable" in result["blockers"]
+    receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+    assert receipt["commands"] == []
+
+
+def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path, monkeypatch) -> None:
     refs = _non_regression_repo(tmp_path)
     row = {
         "repo": "fake/calculator",
@@ -134,6 +284,7 @@ def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path) -> No
         "test_files": ["tests/test_calculator.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -141,6 +292,7 @@ def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path) -> No
         receipt_root=tmp_path / "receipts",
         python=sys.executable,
         timeout_seconds=30,
+        execution_profile=_test_profile(),
     )
 
     assert summary["validated_count"] == 0
@@ -163,7 +315,7 @@ def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path) -> No
     ]
 
 
-def test_validator_can_write_jsonl_for_oracle(tmp_path: Path) -> None:
+def test_validator_can_write_jsonl_for_oracle(tmp_path: Path, monkeypatch) -> None:
     refs = _merge_fixing_pr_repo(tmp_path)
     manifest = tmp_path / "candidates.jsonl"
     output = tmp_path / "validated.jsonl"
@@ -180,6 +332,7 @@ def test_validator_can_write_jsonl_for_oracle(tmp_path: Path) -> None:
         "fail_to_pass": [],
     }
     manifest.write_text(json.dumps(row, sort_keys=True) + "\n", encoding="utf-8")
+    _install_executor(monkeypatch)
 
     rc = pr_suite_validator.main(
         [
@@ -196,7 +349,7 @@ def test_validator_can_write_jsonl_for_oracle(tmp_path: Path) -> None:
             "--timeout-seconds",
             "30",
             "--json",
-        ]
+        ],
     )
 
     assert rc == 0
@@ -265,7 +418,7 @@ def test_classify_base_outcome_covers_pytest_exit_codes() -> None:
     assert pr_suite_validator.classify_base_outcome(_cr(124, timed_out=True)) == "inconclusive_timeout_on_base"
 
 
-def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path) -> None:
+def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path, monkeypatch) -> None:
     refs = _import_error_regression_repo(tmp_path)
     row = {
         "repo": "fake/calculator",
@@ -277,6 +430,7 @@ def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path)
         "test_files": ["tests/test_doubled.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -284,6 +438,7 @@ def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path)
         receipt_root=tmp_path / "receipts",
         python=sys.executable,
         timeout_seconds=30,
+        execution_profile=_test_profile(),
     )
 
     assert summary["validated_count"] == 1
@@ -296,7 +451,7 @@ def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path)
     assert target["validated_fail_to_pass"] is True
 
 
-def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) -> None:
+def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path, monkeypatch) -> None:
     refs = _empty_test_file_repo(tmp_path)
     row = {
         "repo": "fake/calculator",
@@ -308,6 +463,7 @@ def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) 
         "test_files": ["tests/test_empty.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -315,6 +471,7 @@ def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) 
         receipt_root=tmp_path / "receipts",
         python=sys.executable,
         timeout_seconds=30,
+        execution_profile=_test_profile(),
     )
 
     assert summary["validated_count"] == 0
@@ -329,7 +486,7 @@ def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) 
     assert any(b.startswith("base_test_inconclusive:") for b in result["blockers"])
 
 
-def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path) -> None:
+def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path, monkeypatch) -> None:
     refs = _merge_fixing_pr_repo(tmp_path)
     sentinel = tmp_path / "setup_hits.log"
     # A portable setup command: append a line to a sentinel file. Proves the
@@ -347,6 +504,7 @@ def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path
         "test_files": ["tests/test_calculator.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch, setup_template)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -355,6 +513,7 @@ def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path
         python=sys.executable,
         timeout_seconds=30,
         setup_command_template=setup_template,
+        execution_profile=_test_profile(setup_template),
     )
 
     result = summary["results"][0]
@@ -369,7 +528,7 @@ def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path
     assert sentinel.read_text(encoding="utf-8").count("hit") == 2
 
 
-def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path) -> None:
+def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path, monkeypatch) -> None:
     refs = _merge_fixing_pr_repo(tmp_path)
     # A setup command that always fails must block validation, never validate.
     setup_template = f"{sys.executable} -c " + repr("import sys; sys.exit(7)")
@@ -383,6 +542,7 @@ def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path) -> None
         "test_files": ["tests/test_calculator.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch, setup_template)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -391,6 +551,7 @@ def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path) -> None
         python=sys.executable,
         timeout_seconds=30,
         setup_command_template=setup_template,
+        execution_profile=_test_profile(setup_template),
     )
 
     result = summary["results"][0]
@@ -404,7 +565,7 @@ def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path) -> None
     assert "test_base" not in phases
 
 
-def test_empty_setup_template_preserves_bare_clone_behaviour(tmp_path: Path) -> None:
+def test_empty_setup_template_preserves_bare_clone_behaviour(tmp_path: Path, monkeypatch) -> None:
     refs = _merge_fixing_pr_repo(tmp_path)
     row = {
         "repo": "fake/calculator",
@@ -416,6 +577,7 @@ def test_empty_setup_template_preserves_bare_clone_behaviour(tmp_path: Path) -> 
         "test_files": ["tests/test_calculator.py"],
         "fail_to_pass": [],
     }
+    _install_executor(monkeypatch)
 
     summary = pr_suite_validator.validate_rows(
         [row],
@@ -423,6 +585,7 @@ def test_empty_setup_template_preserves_bare_clone_behaviour(tmp_path: Path) -> 
         receipt_root=tmp_path / "receipts",
         python=sys.executable,
         timeout_seconds=30,
+        execution_profile=_test_profile(),
     )
 
     result = summary["results"][0]

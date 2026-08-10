@@ -15,6 +15,14 @@ from dharma_swarm.forge_lab import sync_control as sync
 from dharma_swarm.forge_lab import sync_orchestrator as orchestrator
 
 
+RETIRED_STUB = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "forge_lab"
+    / "rsi-legacy-retired"
+)
+
+
 @pytest.fixture(autouse=True)
 def _isolate_host_campaign_process_probes(
     monkeypatch: pytest.MonkeyPatch,
@@ -59,6 +67,10 @@ def _make_release(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
         else:
             content = f"fixture:{relative}\n"
         path.write_text(content, encoding="utf-8")
+    retired = repo / "scripts" / "forge_lab" / "rsi-legacy-retired"
+    retired.parent.mkdir(parents=True, exist_ok=True)
+    retired.write_text("#!/usr/bin/env bash\nexit 64\n", encoding="utf-8")
+    retired.chmod(0o755)
     _git(repo, "init")
     _git(repo, "add", ".")
     _git(
@@ -130,12 +142,53 @@ def test_plan_digest_detects_any_manifest_tampering(tmp_path: Path) -> None:
     assert error.value.code == "PLAN_TAMPERED"
 
 
+def test_legacy_retirement_stub_fails_without_mutating_sourcing_shell() -> None:
+    executed = subprocess.run(
+        ["bash", str(RETIRED_STUB)],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert executed.returncode == 64
+    assert "retired legacy RSI control surface" in executed.stderr
+
+    sourced = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'before="$-"; . "$1"; code=$?; after="$-"; printf "%s:%s:%s" "$code" "$before" "$after"',
+            "retirement-stub-test",
+            str(RETIRED_STUB),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    code, before, after = sourced.stdout.split(":")
+    assert sourced.returncode == 0
+    assert code == "64"
+    assert after == before
+
+
 def test_activation_is_atomic_idempotent_and_preserves_host_state(
     tmp_path: Path,
 ) -> None:
     root, release, plan = _make_release(tmp_path)
     (root / "bin").mkdir()
     (root / "bin" / "rsi-env").write_text("legacy env\n", encoding="utf-8")
+    mutating = {
+        "rsi-run": "legacy run\n",
+        "rsi-loop": "legacy loop\n",
+        "rsi-fix-substrate": "legacy mutation\n",
+        "rsi-keys-refresh": "legacy live probe\n",
+        "rsi-update-main": "legacy git mutation\n",
+    }
+    for name, content in mutating.items():
+        path = root / "bin" / name
+        path.write_text(content, encoding="utf-8")
+        path.chmod(0o755)
+    (root / "bin" / "rsi-status").write_text("unrelated observer\n", encoding="utf-8")
+    (root / "bin" / "operator-custom").write_text("unrelated\n", encoding="utf-8")
 
     first = sync.activate_release(
         plan,
@@ -155,8 +208,12 @@ def test_activation_is_atomic_idempotent_and_preserves_host_state(
     assert (root / "bin" / "RSILAB").resolve() == (
         release / "repo" / "scripts" / "forge_lab" / "rsi"
     )
-    assert (root / "bin" / "rsi-env").read_text(encoding="utf-8") == "legacy env\n"
-    assert not (root / "bin" / "rsi-env").is_symlink()
+    retired_target = release / "repo" / "scripts" / "forge_lab" / "rsi-legacy-retired"
+    for name in (*mutating, "rsi-env"):
+        assert (root / "bin" / name).is_symlink()
+        assert (root / "bin" / name).resolve() == retired_target
+    assert (root / "bin" / "rsi-status").read_text(encoding="utf-8") == "unrelated observer\n"
+    assert (root / "bin" / "operator-custom").read_text(encoding="utf-8") == "unrelated\n"
     assert (root / "bin" / "rsi-lab-env").is_symlink()
 
     second = sync.activate_release(
@@ -169,6 +226,29 @@ def test_activation_is_atomic_idempotent_and_preserves_host_state(
     )
     assert second["previous_commit"] == plan["commit"]
     assert (root / "state" / "do-not-copy.txt").read_text() == "host-owned"
+    assert (root / "bin" / "rsi-status").read_text(encoding="utf-8") == "unrelated observer\n"
+
+
+def test_node_status_rejects_live_legacy_mutating_launcher(tmp_path: Path) -> None:
+    root, _, plan = _make_release(tmp_path)
+    sync.activate_release(
+        plan,
+        root,
+        node="meghadharma",
+        request_id="test-launcher-hygiene",
+        expected_current=None,
+        require_canonical_head=False,
+    )
+    legacy = root / "bin" / "rsi-run"
+    legacy.unlink()
+    legacy.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    legacy.chmod(0o755)
+
+    status = sync.node_status(root, node="meghadharma")
+
+    assert status["ready"] is False
+    assert status["launcher_hygiene"]["ok"] is False
+    assert any("rsi-run" in message for message in status["errors"])
 
 
 def test_dirty_or_changed_release_is_never_activated(tmp_path: Path) -> None:
@@ -302,6 +382,9 @@ def test_status_proves_github_mac_and_remote_identity_match(
         expected_current=None,
         require_canonical_head=False,
     )
+    # This fixture stands in for both hosts; materialize the Meghadharma-only
+    # retirement aliases before asking its status contract to inspect the root.
+    sync._install_wrappers(root, (root / "current").resolve(), node="meghadharma")
     monkeypatch.setattr(sync, "_remote_head", lambda: plan["commit"])
     monkeypatch.setattr(
         orchestrator,

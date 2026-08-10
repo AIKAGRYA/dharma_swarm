@@ -52,6 +52,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
+    unattended = _leaf(
+        commands,
+        "run",
+        command_path="run",
+        help_text="execute the fixed canonical unattended schedule",
+    )
+    unattended.add_argument(
+        "--unattended",
+        action="store_true",
+        required=True,
+        help="confirm the fixed-state systemd execution route",
+    )
+    _json_flag(unattended)
+
     version = _leaf(
         commands,
         "version",
@@ -409,6 +423,38 @@ def main(argv: list[str] | None = None) -> int:
     command_path = args._command_path
     if command_path == "version":
         return _emit_version(args.json)
+    if command_path == "run":
+        from dharma_swarm.forge_lab.scheduled_run import ScheduledRunError, run_unattended
+
+        try:
+            result = run_unattended()
+        except ScheduledRunError as exc:
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "schema": CLI_RESULT_SCHEMA,
+                            "ok": False,
+                            "command": "run",
+                            "error": {"code": exc.code, "message": str(exc)},
+                            "result": exc.result,
+                        },
+                        sort_keys=True,
+                    )
+                )
+            print(f"rsi run failed [{exc.code}]: {exc}", file=sys.stderr)
+            return 7
+        if args.json:
+            print(
+                json.dumps(
+                    {"schema": CLI_RESULT_SCHEMA, "ok": True, "command": "run", "result": result},
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(f"status: {result['status']}")
+            print(f"receipt: {result['receipt_path']}")
+        return 0
     if command_path == "newrun":
         from dharma_swarm.forge_lab.newrun import run_newrun
 

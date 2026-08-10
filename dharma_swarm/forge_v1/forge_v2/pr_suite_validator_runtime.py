@@ -3,13 +3,20 @@ from __future__ import annotations
 
 import json
 import shlex
-import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
+
+from .pr_suite_execution import (
+    CommandExecutor,
+    CommandResult,
+    atomic_write_json,
+    atomic_write_text,
+    materialize_text,
+    validated_target_path,
+)
 
 
 SCHEMA_VERSION = "forge_v2.pr_suite_fail_to_pass_validator.v1"
@@ -38,31 +45,6 @@ BASE_OUTCOME_INCONCLUSIVE_TIMEOUT = "inconclusive_timeout_on_base"
 BASE_OUTCOME_INCONCLUSIVE_NO_RUN = "inconclusive_no_real_run_on_base"
 
 
-@dataclass(frozen=True)
-class CommandResult:
-    argv: list[str]
-    cwd: str
-    returncode: int
-    stdout: str
-    stderr: str
-    timed_out: bool = False
-
-    @property
-    def passed(self) -> bool:
-        return self.returncode == 0 and not self.timed_out
-
-    def to_receipt(self, *, max_output_chars: int = 4000) -> dict[str, Any]:
-        return {
-            "argv": self.argv,
-            "cwd": self.cwd,
-            "returncode": self.returncode,
-            "passed": self.passed,
-            "timed_out": self.timed_out,
-            "stdout_tail": self.stdout[-max_output_chars:],
-            "stderr_tail": self.stderr[-max_output_chars:],
-        }
-
-
 def now_stamp() -> str:
     return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
@@ -85,47 +67,44 @@ def classify_base_outcome(result: "CommandResult") -> str:
     return BASE_OUTCOME_INCONCLUSIVE_NO_RUN
 
 
-def _run(argv: list[str], *, cwd: Path, timeout_seconds: int) -> CommandResult:
-    try:
-        proc = subprocess.run(  # noqa: S603 - argv is constructed without shell=True.
-            argv,
-            cwd=str(cwd),
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout_seconds,
-            check=False,
-        )
-        return CommandResult(
-            argv=list(argv),
-            cwd=str(cwd),
-            returncode=int(proc.returncode),
-            stdout=proc.stdout or "",
-            stderr=proc.stderr or "",
-        )
-    except subprocess.TimeoutExpired as exc:
-        return CommandResult(
-            argv=list(argv),
-            cwd=str(cwd),
-            returncode=124,
-            stdout=(exc.stdout or "") if isinstance(exc.stdout, str) else "",
-            stderr=(exc.stderr or "") if isinstance(exc.stderr, str) else "",
-            timed_out=True,
-        )
+def _run(
+    argv: list[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int,
+    executor: CommandExecutor,
+    stdin: str | None = None,
+) -> CommandResult:
+    """Run only through the explicit evaluator isolation boundary."""
+
+    return executor.run(argv, cwd=cwd, timeout_seconds=timeout_seconds, stdin=stdin)
 
 
-def _git(checkout: Path, *args: str, timeout_seconds: int = 120) -> CommandResult:
-    return _run(["git", *args], cwd=checkout, timeout_seconds=timeout_seconds)
+def _git(
+    checkout: Path,
+    *args: str,
+    timeout_seconds: int = 120,
+    executor: CommandExecutor,
+    stdin: str | None = None,
+) -> CommandResult:
+    return _run(
+        ["git", *args],
+        cwd=checkout,
+        timeout_seconds=timeout_seconds,
+        executor=executor,
+        stdin=stdin,
+    )
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    atomic_write_json(path, payload)
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in rows), encoding="utf-8")
+    atomic_write_text(
+        path,
+        "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in rows),
+    )
 
 
 def _list_field(row: dict[str, Any], *names: str) -> list[str]:
@@ -205,21 +184,56 @@ def _setup_command(template: str, *, python: str, checkout: Path) -> list[str] |
     return argv
 
 
-def _clean_checkout(checkout: Path, *, timeout_seconds: int) -> list[CommandResult]:
+def _clean_checkout(
+    checkout: Path,
+    *,
+    timeout_seconds: int,
+    executor: CommandExecutor,
+) -> list[CommandResult]:
     return [
-        _git(checkout, "reset", "--hard", timeout_seconds=timeout_seconds),
-        _git(checkout, "clean", "-ffdx", timeout_seconds=timeout_seconds),
+        _git(checkout, "reset", "--hard", timeout_seconds=timeout_seconds, executor=executor),
+        _git(checkout, "clean", "-ffdx", timeout_seconds=timeout_seconds, executor=executor),
     ]
 
 
-def _checkout_ref(checkout: Path, ref: str, *, timeout_seconds: int) -> list[CommandResult]:
-    commands = _clean_checkout(checkout, timeout_seconds=timeout_seconds)
-    commands.append(_git(checkout, "checkout", "--force", ref, timeout_seconds=timeout_seconds))
+def _checkout_ref(
+    checkout: Path,
+    ref: str,
+    *,
+    timeout_seconds: int,
+    executor: CommandExecutor,
+) -> list[CommandResult]:
+    commands = _clean_checkout(checkout, timeout_seconds=timeout_seconds, executor=executor)
+    commands.append(
+        _git(
+            checkout,
+            "checkout",
+            "--force",
+            "--detach",
+            ref,
+            timeout_seconds=timeout_seconds,
+            executor=executor,
+        )
+    )
     return commands
 
 
-def _rev_parse(checkout: Path, ref: str, *, timeout_seconds: int) -> str:
-    result = _git(checkout, "rev-parse", "--verify", ref, timeout_seconds=timeout_seconds)
+def _rev_parse(
+    checkout: Path,
+    ref: str,
+    *,
+    timeout_seconds: int,
+    executor: CommandExecutor,
+) -> str:
+    result = _git(
+        checkout,
+        "rev-parse",
+        "--verify",
+        "--end-of-options",
+        ref,
+        timeout_seconds=timeout_seconds,
+        executor=executor,
+    )
     if not result.passed:
         raise RuntimeError(f"could not resolve git ref {ref!r}: {result.stderr or result.stdout}")
     return result.stdout.strip()
@@ -237,6 +251,7 @@ def _materialize_fixed_test(
     fixed_ref: str,
     target: str,
     timeout_seconds: int,
+    executor: CommandExecutor,
 ) -> CommandResult:
     """Copy the fixed revision's changed test file into the current checkout.
 
@@ -246,12 +261,16 @@ def _materialize_fixed_test(
     fixed code.
     """
 
-    test_path = _test_path_from_target(target)
-    result = _git(checkout, "show", f"{fixed_ref}:{test_path}", timeout_seconds=timeout_seconds)
+    test_path = validated_target_path(target, checkout)
+    result = _git(
+        checkout,
+        "show",
+        f"{fixed_ref}:{test_path}",
+        timeout_seconds=timeout_seconds,
+        executor=executor,
+    )
     if result.passed:
-        destination = checkout / test_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(result.stdout, encoding="utf-8")
+        materialize_text(checkout, test_path, result.stdout)
     return result
 
 
@@ -261,6 +280,7 @@ def _resolve_base_and_fixed(
     *,
     use_merge_parent_base: bool,
     timeout_seconds: int,
+    executor: CommandExecutor,
 ) -> tuple[str, str, dict[str, str]]:
     merge_ref = str(row.get("merge_commit_sha") or row.get("merge_sha") or "").strip()
     head_ref = str(row.get("head_sha") or row.get("fixed_sha") or row.get("head_ref") or "").strip()
@@ -274,7 +294,7 @@ def _resolve_base_and_fixed(
         # For GitHub merged PRs, the API's base.sha can drift.  The first parent
         # of the merge commit is the exact pre-fix base for merge commits.
         try:
-            base_ref = f"{_rev_parse(checkout, merge_ref, timeout_seconds=timeout_seconds)}^1"
+            base_ref = f"{_rev_parse(checkout, merge_ref, timeout_seconds=timeout_seconds, executor=executor)}^1"
         except RuntimeError:
             # Fall back to explicit base_sha/head pair.  The receipt will expose
             # the chosen refs and command evidence.
@@ -286,16 +306,23 @@ def _resolve_base_and_fixed(
     resolved = {
         "base_ref": base_ref,
         "fixed_ref": fixed_ref,
-        "base_sha": _rev_parse(checkout, base_ref, timeout_seconds=timeout_seconds),
-        "fixed_sha": _rev_parse(checkout, fixed_ref, timeout_seconds=timeout_seconds),
+        "base_sha": _rev_parse(checkout, base_ref, timeout_seconds=timeout_seconds, executor=executor),
+        "fixed_sha": _rev_parse(checkout, fixed_ref, timeout_seconds=timeout_seconds, executor=executor),
     }
     return base_ref, fixed_ref, resolved
 
 
-def _clone_repo(repo_url: str, checkout: Path, *, timeout_seconds: int) -> CommandResult:
+def _clone_repo(
+    repo_url: str,
+    checkout: Path,
+    *,
+    timeout_seconds: int,
+    executor: CommandExecutor,
+) -> CommandResult:
     checkout.parent.mkdir(parents=True, exist_ok=True)
     return _run(
-        ["git", "clone", "--quiet", "--no-hardlinks", repo_url, str(checkout)],
+        ["git", "clone", "--quiet", "--no-hardlinks", "--", repo_url, str(checkout)],
         cwd=checkout.parent,
         timeout_seconds=timeout_seconds,
+        executor=executor,
     )

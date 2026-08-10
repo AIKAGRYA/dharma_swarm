@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.forge_lab import grade_explore
+from dharma_swarm.forge_lab import mutation as mutation_mod
 from dharma_swarm.forge_lab.experiment import (
     AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
@@ -132,6 +133,11 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     assert manifest["git_identity"]["branch"] == "dryrun"
     assert manifest["git_identity"]["dirty"] is False
     assert manifest["archive_fitness_authority"] == "one_wire_disabled_explicit_lab_shadow"
+    assert manifest["execution_boundary"] == {
+        "mode": "dry_run_injected",
+        "execution_profile_sha256": None,
+    }
+    assert all("host-pytest" not in caveat for caveat in manifest["caveats"])
     assert all(manifest["membrane"].values()), "membrane must be fully recorded"
     assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2
 
@@ -285,3 +291,241 @@ def test_experiment_config_defaults_seed_preflight_and_soft_token_cap() -> None:
 
     assert cfg.soft_token_cap is True
     assert cfg.require_valid_seed is True
+    assert cfg.evaluation_protocol == "legacy_v0"
+
+
+def test_paired_production_requires_and_uses_exact_campaign_usd_ceiling() -> None:
+    from dharma_swarm.forge_lab.experiment_entrypoint import _run_limits
+
+    missing = ExperimentConfig(evaluation_protocol="paired_frozen_v1", dry_run=False)
+    with pytest.raises(ValueError, match="explicit positive max_experiment_usd"):
+        _run_limits(missing)
+
+    configured = ExperimentConfig(
+        evaluation_protocol="paired_frozen_v1",
+        dry_run=False,
+        max_experiment_usd=12.345678,
+    )
+    assert _run_limits(configured).total_usd_micros == 12_345_678
+
+
+def test_production_mutator_receives_ledger_token_ceiling(tmp_path, monkeypatch) -> None:
+    from dharma_swarm import api_keys
+    from dharma_swarm.forge_v1 import providers
+    from dharma_swarm.forge_v1.forge_v2 import pr_suite_execution
+
+    calls: list[tuple[str, int | None]] = []
+
+    class Completion:
+        def __init__(self, model_id: str):
+            self.model_id = model_id
+
+        def complete(self, prompt: str, *, max_total_tokens: int | None = None):
+            calls.append((prompt, max_total_tokens))
+            return "{}", 1
+
+    monkeypatch.setattr(api_keys, "bootstrap_runtime_env", lambda: None)
+    monkeypatch.setattr(pr_suite_execution, "resolve_execution_profile", lambda profile: profile)
+    monkeypatch.setattr(providers, "PoolCompletion", Completion)
+    base = _seams(tmp_path)
+    profile = object()
+    resolved = Seams(
+        grade=base.grade,
+        pull_task_context=base.pull_task_context,
+        allocate_explore=base.allocate_explore,
+        allocate_campaign_pools=lambda **kwargs: {},
+        load_task_record=lambda task_id: {},
+        make_worktree=base.make_worktree,
+        remove_worktree=base.remove_worktree,
+        execution_profile=profile,
+    ).resolved(
+        ExperimentConfig(
+            evaluation_protocol="paired_frozen_v1",
+            dry_run=False,
+            mutator_model="fake-mutator",
+            mutation_reservation_tokens=7_777,
+            execution_profile="ignored-by-test-resolver",
+        )
+    )
+
+    assert resolved.mutate_complete("mutation prompt") == ("{}", 1)
+    assert calls == [("mutation prompt", 7_777)]
+
+
+async def test_paired_setup_failure_closes_with_cleanup_evidence(tmp_path) -> None:
+    cfg = ExperimentConfig(
+        evaluation_protocol="paired_frozen_v1",
+        generations=1,
+        children=1,
+        paired_min_decision_tasks=1,
+        solver_model="fake-model",
+        seed_genome={"generator_model": "fake-model"},
+        dry_run=True,
+        state_root=tmp_path / "paired_setup_failure",
+    )
+    seams = _seams(tmp_path)  # intentionally has no four-way allocator/record loader
+
+    closeout = await run_experiment(cfg, seams=seams)
+
+    assert closeout["closeout_state"] == "blocked_with_evidence"
+    assert closeout["stats"]["setup_failed_before_protocol_closeout"] is True
+    assert closeout["scratch_worktree"]["state"] == "not_created"
+    assert any("paired_setup_failure:ValueError" in reason for reason in closeout["reasons"])
+
+
+async def test_paired_frozen_v1_freezes_plan_pairs_budget_winner_and_champion(
+    tmp_path, monkeypatch
+):
+    state_root = tmp_path / "paired_state"
+    task_ids = {
+        "train": ["task-train"],
+        "explore": ["task-explore"],
+        "confirm": ["task-confirm"],
+        "holdout": ["task-holdout"],
+    }
+    model_calls: list[tuple[str, str]] = []
+
+    def propose(_slot, inst, _ctx, **kwargs):
+        plans = list((state_root / "agent_evolution").glob("exp_*/evaluation_plan.json"))
+        assert plans, "the evaluation plan must be durable before the first model call"
+        task_id = inst["instance_id"]
+        if task_id in {"task-confirm", "task-holdout"}:
+            assert list((state_root / "agent_evolution").glob("exp_*/winner_freeze.json"))
+        instruction = str(kwargs.get("extra_instruction") or "baseline")
+        model_calls.append((task_id, instruction))
+        return {"patch": f"diff --git a/x b/x\n+{instruction}", "tokens": 10}
+
+    grade = grade_explore.GradeSeams(
+        slot_for_id=lambda mid: object() if mid else None,
+        propose_slot=propose,
+        self_moa_arm=lambda *a, **kw: {"final_patch": ""},
+        verify_chain_arm=lambda *a, **kw: {"final_patch": ""},
+        mixed_moa_arm=lambda *a, **kw: {"final_patch": ""},
+        grade_task=lambda _inst, patch, timeout: ("challenger" in patch, 0.1, None),
+        budget_factory=_FakeBudget,
+    )
+
+    def allocate_campaign(**kwargs):
+        assert kwargs["train_count"] == kwargs["explore_count"] == 1
+        assert kwargs["confirm_count"] == kwargs["holdout_count"] == 1
+        receipt = {
+            "schema": "forge_v2.campaign_task_overlay.v1",
+            "campaign_id": kwargs["campaign_id"],
+            "epoch_id": kwargs["epoch_id"],
+            "lane_id": kwargs["lane_id"],
+            "campaign_seed": kwargs["campaign_seed"],
+            "logical_to_physical": {
+                "train": "explore",
+                "explore": "explore",
+                "confirm": "confirm",
+                "holdout": "confirm",
+            },
+            "logical_splits": task_ids,
+            "task_ids": [task for split in task_ids.values() for task in split],
+            "all_splits_disjoint": True,
+            "confirm_pool_contamination_clean": True,
+            "frozen": True,
+            "positive_lift_claimed": False,
+            "claim_scope": "research_only",
+        }
+        from dharma_swarm.forge_lab.ids import content_digest
+
+        receipt["overlay_sha256"] = content_digest(receipt)
+        return receipt
+
+    def load_task(task_id: str):
+        return {
+            "task_id": task_id,
+            "task": {"task_id": task_id, "problem_statement": f"repair {task_id}"},
+            "source": "unit",
+            "taskbed": "paired",
+            "contamination_state": "fresh_post_cutoff",
+            "provenance": {"unit": True},
+            "created_at": "2026-08-10T00:00:00Z",
+            "active": 1,
+            "max_uses_per_epoch": 1,
+        }
+
+    original = mutation_mod.parametric_mutation
+
+    def fixed_mutation(parent, *, rng):
+        child = dict(parent)
+        child["extra_instruction"] = "challenger"
+        child["notes"] = "fixed paired challenger"
+        return mutation_mod.MutationResult(child, "parametric", notes="fixed")
+
+    monkeypatch.setattr(mutation_mod, "parametric_mutation", fixed_mutation)
+    cfg = ExperimentConfig(
+        evaluation_protocol="paired_frozen_v1",
+        generations=1,
+        children=1,
+        paired_train_tasks=1,
+        paired_explore_tasks=1,
+        paired_confirm_tasks=1,
+        paired_holdout_tasks=1,
+        paired_repeat_seeds=(11, 29),
+        paired_bootstrap_samples=40,
+        paired_min_decision_tasks=1,
+        solver_model="fake-model",
+        seed_genome={"generator_model": "fake-model", "extra_instruction": "baseline"},
+        budget_cap_tokens=100,
+        budget_cap_usd=1.0,
+        max_experiment_tokens=1_000,
+        dry_run=True,
+        state_root=state_root,
+        rng_seed=7,
+    )
+    seams = Seams(
+        grade=grade,
+        pull_task_context=lambda task_id: (
+            {"instance_id": task_id},
+            {"f.py": "code"},
+        ),
+        allocate_explore=lambda **kwargs: {"task_ids": []},
+        allocate_campaign_pools=allocate_campaign,
+        load_task_record=load_task,
+        mutate_complete=lambda prompt: ("{}", 0),
+        make_worktree=lambda **kwargs: tmp_path / "unused",
+        remove_worktree=lambda **kwargs: None,
+    )
+
+    closeout = await run_experiment(cfg, seams=seams)
+    monkeypatch.setattr(mutation_mod, "parametric_mutation", original)
+
+    assert closeout["closeout_state"] == "inconclusive_low_power"
+    stats = closeout["stats"]
+    assert stats["evaluation_protocol"] == "paired_frozen_v1"
+    assert stats["winner_frozen_before_confirm"] is True
+    assert stats["holdout_touched"] is True
+    assert stats["champion_revision_before"] == 0
+    assert stats["champion_revision_after"] == 1
+    assert stats["positive_lift_claimed"] is False
+
+    exp_dir = state_root / cfg.category / closeout["experiment_id"]
+    plan = json.loads((exp_dir / "evaluation_plan.json").read_text())
+    assert plan["repeat_seeds"] == [11, 29]
+    assert plan["splits"]["explore"][0]["task_id"] == "task-explore"
+    winner = json.loads((exp_dir / "winner_freeze.json").read_text())
+    assert winner["selection_split"] == "explore"
+    assert winner["positive_lift_claimed"] is False
+
+    budget = json.loads((exp_dir / "campaign_budget.json").read_text())
+    assert budget["valid"] is True and budget["closeout_ready"] is True
+    assert budget["component_totals"]["mutation"]["spent_tokens"] == 0
+    assert budget["component_totals"]["baseline_eval"]["spent_tokens"] == 40
+    assert budget["component_totals"]["candidate_eval"]["spent_tokens"] == 40
+    assert budget["component_totals"]["confirm_eval"]["spent_tokens"] == 40
+    assert budget["component_totals"]["holdout_eval"]["spent_tokens"] == 40
+
+    paired_rows = [
+        json.loads(line) for line in (exp_dir / "paired_observations.jsonl").read_text().splitlines()
+    ]
+    assert len(paired_rows) == 16
+    assert {(row["task_id"], row["repeat_seed"]) for row in paired_rows} >= {
+        ("task-explore", 11),
+        ("task-explore", 29),
+    }
+    champion = json.loads((state_root / cfg.category / "champion.json").read_text())
+    assert champion["revision"] == 1
+    assert champion["champion"]["genome"]["extra_instruction"] == "challenger"
+    assert model_calls

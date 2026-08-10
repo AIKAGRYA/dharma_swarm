@@ -183,17 +183,44 @@ class PoolCompletion:
         self.model_id = model_id
         self._provider, self._wire_model = _provider_for_model(model_id)
 
-    def complete(self, prompt: str) -> tuple[str, int]:
+    def complete(
+        self,
+        prompt: str,
+        *,
+        max_total_tokens: int | None = None,
+    ) -> tuple[str, int]:
         from dharma_swarm.models import LLMRequest
 
+        max_output_tokens = 2048
+        if max_total_tokens is not None:
+            if (
+                not isinstance(max_total_tokens, int)
+                or isinstance(max_total_tokens, bool)
+                or max_total_tokens < 1
+            ):
+                raise ValueError("max_total_tokens must be a positive integer")
+            # UTF-8 bytes are a conservative upper bound for ordinary BPE input
+            # tokenization. Reserve an additional fixed allowance for chat framing
+            # so a mutation is refused *before* dispatch when its declared total
+            # ceiling cannot contain both prompt and completion.
+            input_upper_bound = len(prompt.encode("utf-8")) + 512
+            remaining = max_total_tokens - input_upper_bound
+            if remaining < 1:
+                raise RuntimeError(
+                    "mutation prompt cannot fit inside the declared total-token ceiling"
+                )
+            max_output_tokens = min(max_output_tokens, remaining)
         request = LLMRequest(
             model=self._wire_model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=2048,
+            max_tokens=max_output_tokens,
             temperature=0.2,
         )
         response = asyncio.run(_complete_and_close(self._provider, request))
-        return response.content or "", _usage_tokens(response.usage)
+        tokens = _usage_tokens(response.usage)
+        if max_total_tokens is not None and tokens > max_total_tokens:
+            raise RuntimeError("provider usage exceeded the declared total-token ceiling")
+        return response.content or "", tokens
 
 
 @dataclass

@@ -33,7 +33,7 @@ def test_newrun_preview_points_only_to_governed_campaign(capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
 
     assert payload["selected"]["command"] == (
-        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+        "rsi campaign plan --profile forge-lab-paired-frozen-v1"
     )
     assert payload["safety_boundary"]["newrun_execute_supported"] is False
     assert payload["safety_boundary"]["signed_operator_envelope_required"] is True
@@ -47,7 +47,7 @@ def test_newrun_human_menu_does_not_suggest_legacy_execution(capsys) -> None:
     output = capsys.readouterr().out
 
     assert "governed campaign preview" in output
-    assert "rsi campaign plan --profile forge-lab-n30-to-1000-v1" in output
+    assert "rsi campaign plan --profile forge-lab-paired-frozen-v1" in output
     assert "dharma_swarm.forge_lab.cli" not in output
     assert "newrun --preset fast --execute" not in output
 
@@ -99,7 +99,7 @@ def test_newrun_execute_rejects_budget_authority_without_legacy_import(
     assert payload["ok"] is False
     assert payload["error"]["code"] == "GOVERNED_CAMPAIGN_REQUIRED"
     assert payload["result"]["governed_entrypoint"] == (
-        "rsi campaign plan --profile forge-lab-n30-to-1000-v1"
+        "rsi campaign plan --profile forge-lab-paired-frozen-v1"
     )
     assert "GOVERNED_CAMPAIGN_REQUIRED" in captured.err
     assert attempted_imports == []

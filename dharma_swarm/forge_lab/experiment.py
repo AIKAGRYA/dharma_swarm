@@ -14,16 +14,13 @@ append (immediately durable) → generation receipt → honest closeout.
 
 from __future__ import annotations
 
-import asyncio
 import random
-import subprocess
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from dharma_swarm.evolution_safety import evaluate_mutation, model_spend_allowed, safety_summary
-from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection, worktree
+from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection
 from dharma_swarm.forge_lab.candidate_store import CandidateStore
 from dharma_swarm.forge_lab.freeform_explore import (
     MEMBRANE_REQUIREMENTS,
@@ -31,6 +28,15 @@ from dharma_swarm.forge_lab.freeform_explore import (
     validate_freeform_explore_envelope,
 )
 from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_defaults
+from dharma_swarm.forge_lab.experiment_entrypoint import run_guarded
+from dharma_swarm.forge_lab.experiment_identity import _git_identity
+from dharma_swarm.forge_lab.experiment_runtime import (
+    ExperimentConfig,
+    Seams,
+    _cost_estimate,
+    _offload,
+)
+from dharma_swarm.forge_lab.run_guard import RunGuard
 from dharma_swarm.forge_lab.run_receipts import (
     AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
@@ -46,92 +52,36 @@ from dharma_swarm.forge_lab.run_receipts import (
 
 RUN_MANIFEST_SCHEMA = "forge_lab.run_manifest.v0"
 
-
-@dataclass
-class ExperimentConfig:
-    generations: int = 2
-    children: int = 3  # TOTAL per generation
-    tasks_per_generation: int = 3
-    novelty_pressure: float = 0.7
-    solver_model: str = ""
-    verifier_model: str = ""
-    mutator_model: str = ""
-    seed_genome: dict[str, Any] | None = None
-    budget_cap_tokens: int = 120_000  # per candidate-grade
-    budget_cap_usd: float = 2.0
-    soft_token_cap: bool = True
-    require_valid_seed: bool = True
-    max_experiment_tokens: int = 600_000
-    propose_timeout_s: int = 240
-    grade_timeout_s: int = 600
-    rng_seed: int = 20260706
-    lane_id: str = "forge_lab_chassis_v0"
-    category: str = "agent_evolution"
-    benchmark: str = "taskbed-explore-fresh-pr-suite"
-    dry_run: bool = False
-    keep_worktree: bool = False
-    source_repo: Path = field(default_factory=lambda: Path.home() / "dharma_swarm")
-    state_root: Path = field(default_factory=lambda: Path.home() / ".dharma" / "evolution_archive")
-
-
-@dataclass
-class Seams:
-    """Every external effect, injectable. Production defaults built lazily."""
-
-    grade: grade_explore.GradeSeams | None = None
-    pull_task_context: Callable[[str], tuple[dict, dict]] | None = None
-    allocate_explore: Callable[..., dict[str, Any]] | None = None
-    mutate_complete: Callable[[str], tuple[str, int]] | None = None
-    make_worktree: Callable[..., Path] | None = None
-    remove_worktree: Callable[..., None] | None = None
-
-    def resolved(self, cfg: ExperimentConfig) -> "Seams":
-        if cfg.dry_run:
-            return self
-        from dharma_swarm.api_keys import bootstrap_runtime_env
-
-        bootstrap_runtime_env()
-        grade = self.grade or grade_explore.production_seams()
-        if self.pull_task_context is None or self.allocate_explore is None:
-            from dharma_swarm.forge_v1.forge_v2.runner import _pull_task_context
-            from dharma_swarm.forge_v1.forge_v2.taskbed_ledger import allocate_explore
-
-            pull = self.pull_task_context or _pull_task_context
-            alloc = self.allocate_explore or allocate_explore
-        else:
-            pull, alloc = self.pull_task_context, self.allocate_explore
-        mutate = self.mutate_complete
-        if mutate is None:
-            from dharma_swarm.forge_v1.providers import PoolCompletion
-
-            completion = PoolCompletion(cfg.mutator_model)
-            mutate = completion.complete
-        return Seams(
-            grade=grade,
-            pull_task_context=pull,
-            allocate_explore=alloc,
-            mutate_complete=mutate,
-            make_worktree=self.make_worktree or worktree.create_marked_scratch_worktree,
-            remove_worktree=self.remove_worktree or worktree.remove_scratch_worktree,
-        )
-
-
-def _cost_estimate(cfg: ExperimentConfig) -> dict[str, Any]:
-    observations = (1 + cfg.children * cfg.generations) * cfg.tasks_per_generation
-    return {
-        "planned_candidate_grades": 1 + cfg.children * cfg.generations,
-        "planned_observations": observations,
-        "est_llm_calls_min": observations + cfg.children * cfg.generations,
-        "est_wall_minutes_rough": round(observations * 1.5, 1),
-        "token_ceiling": cfg.max_experiment_tokens,
-    }
-
-
 async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> dict[str, Any]:
+    """Run one foreground experiment behind hard shape, host, wall, and single-flight gates."""
+    return await run_guarded(cfg, seams, _run_experiment)
+
+
+async def _run_experiment(
+    cfg: ExperimentConfig,
+    seams: Seams | None = None,
+    *,
+    run_guard: RunGuard | None = None,
+) -> dict[str, Any]:
+    return await _run_experiment_body(cfg, seams, run_guard=run_guard)
+
+
+async def _run_experiment_body(
+    cfg: ExperimentConfig,
+    seams: Seams | None = None,
+    *,
+    run_guard: RunGuard | None = None,
+) -> dict[str, Any]:
     started_at = _now()
     started_mono = time.monotonic()
     rng = random.Random(cfg.rng_seed)
     seams = (seams or Seams()).resolved(cfg)
+
+    async def invoke(function: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
+        if cfg.dry_run:
+            return function(*args, **kwargs)
+        return await _offload(function, *args, **kwargs)
+
     git_identity = _git_identity(cfg.source_repo, dry_run=cfg.dry_run)
     base_sha = git_identity["head_sha"]
     exp_id = ids.experiment_id(
@@ -153,6 +103,9 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     scratch: Path | None = None
     if cfg.dry_run:
         membrane["marked_scratch_worktree"] = True  # recorded as dry_run below
+        # No untrusted repository command is dispatched in injected dry-run
+        # mode; the explicit marker below prevents this from being mistaken
+        # for production container evidence.
         membrane["container_or_equivalent_sandbox"] = True
     else:
         spend_ok, spend_reason = model_spend_allowed()
@@ -176,8 +129,8 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         if not (decision.allowed and decision.effective_shadow):
             raise RuntimeError(f"membrane refused scratch worktree: {decision.denial_reason}")
         membrane["marked_scratch_worktree"] = True
-        # host-pytest grading runs in isolated temp checkouts of PINNED repos;
-        # recorded honestly as the sandbox-equivalence claim (U2's posture).
+        if seams.execution_profile is None:
+            raise RuntimeError("production grading has no validated execution profile")
         membrane["container_or_equivalent_sandbox"] = True
 
     estimate = _cost_estimate(cfg)
@@ -200,15 +153,46 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         "membrane": membrane,
         "safety": {} if cfg.dry_run else safety_summary(repo_path=scratch),
         "archive_fitness_authority": "one_wire_disabled_explicit_lab_shadow",
+        "execution_boundary": (
+            {"mode": "dry_run_injected", "execution_profile_sha256": None}
+            if cfg.dry_run
+            else {
+                "mode": "container_only",
+                "execution_profile": seams.execution_profile.to_mapping(),
+                "execution_profile_sha256": seams.execution_profile.sha256,
+            }
+        ),
         "cost_estimate": estimate,
         "caveats": [
-            "explore-fast tier: host-pytest on pinned repos (no Docker)",
+            "production grading requires an explicit digest-bound container execution profile",
+            "dry-run grading uses injected seams and is not production container evidence",
             "fuel is single-repo (pallets/click) until harvest scales — fitness is click-domain",
             "explore closeouts can never be positive_lift_candidate",
         ],
     }
     _write_json(exp_dir / "run_manifest.json", manifest)
     print(f"[forge_lab] {exp_id}: estimate={estimate}")
+
+    if cfg.evaluation_protocol == "paired_frozen_v1":
+        from dharma_swarm.forge_lab.paired_experiment import run_paired_frozen_v1
+
+        return await run_paired_frozen_v1(
+            cfg=cfg,
+            seams=seams,
+            run_guard=run_guard,
+            started_at=started_at,
+            started_mono=started_mono,
+            rng=rng,
+            base_sha=base_sha,
+            exp_id=exp_id,
+            exp_dir=exp_dir,
+            archive_path=archive_path,
+            results_path=results_path,
+            scratch=scratch,
+            membrane=membrane,
+            manifest=manifest,
+            offload=invoke,
+        )
 
     store = CandidateStore(archive_path, experiment_id=exp_id, category=cfg.category)
     await store.load()
@@ -218,7 +202,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     stopped_early = ""
 
     async def _tasks_for_generation(gen: int) -> dict[str, tuple[dict, dict]]:
-        receipt = await asyncio.to_thread(
+        receipt = await invoke(
             seams.allocate_explore,
             count=cfg.tasks_per_generation,
             epoch_id=f"{exp_id}_gen{gen}",
@@ -226,7 +210,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         )
         contexts: dict[str, tuple[dict, dict]] = {}
         for task_id in receipt.get("task_ids", []):
-            contexts[task_id] = await asyncio.to_thread(seams.pull_task_context, task_id)
+            contexts[task_id] = await invoke(seams.pull_task_context, task_id)
         return contexts
 
     async def _grade_and_archive(
@@ -255,7 +239,9 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                     reasons=checked.reasons,
                 ),
             )
-        outcome = await asyncio.to_thread(
+        if run_guard is not None:
+            run_guard.checkpoint()
+        outcome = await invoke(
             grade_explore.grade_genome_explore,
             genome, contexts,
             seams=seams.grade,
@@ -336,6 +322,11 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         counts = store.n_children_map()
         gen_children: list[dict[str, Any]] = []
         for slot in range(cfg.children):
+            if run_guard is not None:
+                run_guard.checkpoint()
+            if tokens_spent_total >= cfg.max_experiment_tokens:
+                stopped_early = f"token_ceiling_reached:{tokens_spent_total}"
+                break
             parent = selection.sample_parent(
                 graded, counts, novelty_pressure=cfg.novelty_pressure, rng=rng
             )
@@ -355,18 +346,22 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                 result = mutation.parametric_mutation(parent_genome, rng=rng)
             elif roll < 0.4 and len(graded) >= 2:
                 other = rng.choice([e for e in graded if e.id != parent.id] or graded)
-                result = await asyncio.to_thread(
+                result = await invoke(
                     mutation.llm_propose_genome, parent_genome,
                     complete_fn=seams.mutate_complete, failures=failures,
                     archive_context=archive_context,
                     second_parent=dict(CandidateStore._row(other).get("genome") or {}),
                 )
             else:
-                result = await asyncio.to_thread(
+                result = await invoke(
                     mutation.llm_propose_genome, parent_genome,
                     complete_fn=seams.mutate_complete, failures=failures,
                     archive_context=archive_context,
                 )
+            tokens_spent_total += max(0, int(result.tokens_used or 0))
+            if tokens_spent_total >= cfg.max_experiment_tokens:
+                stopped_early = f"token_ceiling_reached_after_mutation:{tokens_spent_total}"
+                break
             if result.genome is None:
                 blocked_id = ids.candidate_id(
                     {"blocked_raw": result.raw_output[:2000], "op": result.operator, "gen": gen, "slot": slot}
@@ -443,7 +438,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         state = "measured_negative"
     else:
         state = "inconclusive_low_power"  # explore can never claim positive lift
-    chain_ok, chain_info = store.archive.merkle_log.verify_chain()
+    chain_ok, chain_info = store.verify_evidence_merkle()
     scratch_worktree = {
         "path": str(scratch) if scratch is not None else None,
         "keep_worktree": cfg.keep_worktree,
@@ -482,51 +477,6 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         scratch_worktree=scratch_worktree,
     )
     return closeout
-
-
-def _git(repo: Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(repo), *args],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return proc.stdout.strip() if proc.returncode == 0 else ""
-
-
-def _git_identity(repo: Path, *, dry_run: bool = False) -> dict[str, Any]:
-    """Source-code identity for run receipts.
-
-    This is evidence metadata, not promotion authority.  Earlier forge_lab runs
-    recorded ``origin/main`` as ``git_base_sha`` even when the operator was
-    executing branch code via PYTHONPATH.  That made later receipts ambiguous.
-    Record the actual source HEAD first, plus origin/main only as comparison.
-    """
-
-    if dry_run:
-        return {
-            "repo": str(repo),
-            "head_sha": "dryrun",
-            "branch": "dryrun",
-            "dirty": False,
-            "dirty_short": "",
-            "origin_main_sha": "",
-        }
-    dirty_short = _git(repo, "status", "--short")
-    return {
-        "repo": str(repo),
-        "head_sha": _git(repo, "rev-parse", "HEAD") or "unknown",
-        "branch": _git(repo, "branch", "--show-current") or "detached",
-        "dirty": bool(dirty_short.strip()),
-        "dirty_short": dirty_short,
-        "origin_main_sha": _git(repo, "rev-parse", "origin/main"),
-    }
-
-
-def _git_sha(repo: Path) -> str:
-    """Compatibility wrapper: return the actual source HEAD used for the run."""
-
-    return str(_git_identity(repo).get("head_sha") or "unknown")
 
 
 __all__ = [

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -104,41 +105,117 @@ def _source_gate(manifest: dict[str, Any]) -> dict[str, Any]:
 def _provider_gate(
     manifest: dict[str, Any],
     receipt_path: str | None,
+    *,
+    now: datetime | None = None,
+    trusted_public_keys: dict[str, str | bytes] | None = None,
+    signature_verifier: Any = None,
+    expected_probe_request_nonce: str | None = None,
+    expected_probe_fencing_token: int | None = None,
 ) -> dict[str, Any]:
-    requested = (_definition(manifest).get("gates") or {}).get("exact_route")
-    provider = requested.split(":", 1)[0] if isinstance(requested, str) else None
     receipt, error = _read_json(receipt_path, label="provider")
     if error:
-        return _gate("exact_provider_route", False, "PROVIDER_RECEIPT_MISSING", error)
+        gate_name = (
+            "exact_provider_route"
+            if "exact_route" in (_definition(manifest).get("gates") or {})
+            else "provider_attestation"
+        )
+        return _gate(gate_name, False, "PROVIDER_RECEIPT_MISSING", error)
 
-    exact_rows = []
-    for row in receipt.get("rows") or []:
-        if not isinstance(row, dict):
-            continue
-        if (
-            row.get("requested_model") == requested
+    gates = _definition(manifest).get("gates") or {}
+    if "exact_route" in gates:
+        requested = gates.get("exact_route")
+        provider = requested.split(":", 1)[0] if isinstance(requested, str) else None
+        exact_rows = [
+            row
+            for row in receipt.get("rows") or []
+            if isinstance(row, dict)
+            and row.get("requested_model") == requested
             and row.get("provider") == provider
             and row.get("live") is True
             and row.get("callable") is True
             and row.get("stage") == "complete"
             and not row.get("fallback")
-        ):
-            exact_rows.append(row)
-    passed = receipt.get("live") is True and len(exact_rows) == 1
-    # A callable row alone is not authority: the receipt format is not yet
-    # signed, fresh, nonce-bound, and content-addressed to this manifest.
-    passed = False
-    return _gate(
-        "exact_provider_route",
-        passed,
-        "EXACT_PROVIDER_ROUTE_UNPROVEN",
-        {
-            "requested_model": requested,
-            "provider": provider,
-            "matching_rows": len(exact_rows),
-            "signed_route_attestation": "unimplemented",
-        },
+        ]
+        # Preserve the historical fail-closed semantics: its old unsigned row
+        # format can describe exact Moonshot routing but can never authorize it.
+        return _gate(
+            "exact_provider_route",
+            False,
+            "EXACT_PROVIDER_ROUTE_UNPROVEN",
+            {
+                "requested_model": requested,
+                "provider": provider,
+                "matching_rows": len(exact_rows),
+                "signed_route_attestation": "unimplemented_for_historical_profile",
+            },
+        )
+
+    from dharma_swarm.forge_lab.provider_selftest import (
+        ProviderAttestationError,
+        load_trusted_provider_probe_keys,
+        verify_provider_attestation,
     )
+
+    trust = trusted_public_keys
+    if trust is None and signature_verifier is None:
+        trust_path = os.environ.get("RSI_LAB_TRUSTED_PROVIDER_PROBE_KEYS", "").strip()
+        if not trust_path:
+            return _gate(
+                "provider_attestation",
+                False,
+                "PROVIDER_TRUST_ROOT_MISSING",
+                "RSI_LAB_TRUSTED_PROVIDER_PROBE_KEYS is not configured",
+            )
+        try:
+            trust = load_trusted_provider_probe_keys(trust_path)
+        except ProviderAttestationError as exc:
+            return _gate("provider_attestation", False, exc.code, str(exc))
+
+    try:
+        verified = verify_provider_attestation(
+            manifest,
+            receipt,
+            now=now,
+            unattended=True,
+            trusted_public_keys=trust,
+            signature_verifier=signature_verifier,
+            expected_probe_request_nonce=expected_probe_request_nonce,
+            expected_probe_fencing_token=expected_probe_fencing_token,
+        )
+    except ProviderAttestationError as exc:
+        return _gate("provider_attestation", False, exc.code, str(exc))
+    return _gate("provider_attestation", True, "PROVIDER_ATTESTATION_INVALID", verified)
+
+
+def _active_provider_probe_binding(
+    manifest: dict[str, Any], state_root: Path
+) -> tuple[str | None, int | None]:
+    """Bind a probe receipt to the campaign's live, non-reusable lease fence."""
+
+    from dharma_swarm.forge_lab.campaign_store import CampaignStore
+    from dharma_swarm.forge_lab.provider_selftest import provider_probe_request_nonce
+
+    definition = _definition(manifest)
+    campaign = str(definition.get("campaign_name") or "")
+    manifest_id = str(manifest.get("manifest_digest") or "")
+    try:
+        active = [
+            lease
+            for lease in CampaignStore(state_root).active_leases()
+            if lease.get("campaign_id") == campaign
+            and lease.get("manifest_digest") == manifest_id
+        ]
+    except Exception:
+        return None, None
+    if len(active) != 1:
+        return None, None
+    fence = active[0].get("active_fence")
+    if not isinstance(fence, int) or isinstance(fence, bool) or fence <= 0:
+        return None, None
+    try:
+        return provider_probe_request_nonce(manifest_id, fence), fence
+    except ValueError:
+        return None, None
 
 
 def _state_gate(state_root: Path, expected_host: str) -> dict[str, Any]:
@@ -282,11 +359,17 @@ def evaluate_preflight(
 ) -> list[dict[str, Any]]:
     """Evaluate every non-live gate; this function never imports provider code."""
 
+    probe_nonce, probe_fence = _active_provider_probe_binding(manifest, state_root)
     return [
         _state_gate(state_root, expected_host),
         _source_gate(manifest),
         _identity_gate(manifest, identity_receipt_path),
-        _provider_gate(manifest, provider_receipt_path),
+        _provider_gate(
+            manifest,
+            provider_receipt_path,
+            expected_probe_request_nonce=probe_nonce,
+            expected_probe_fencing_token=probe_fence,
+        ),
         _acceptance_gate(),
         _prerequisite_gate("canary"),
         _prerequisite_gate("n30"),

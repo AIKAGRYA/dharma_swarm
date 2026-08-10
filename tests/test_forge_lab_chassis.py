@@ -12,6 +12,7 @@ from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection
 from dharma_swarm.forge_lab.candidate_store import BLOCKED, GRADED, CandidateStore
 from dharma_swarm.forge_lab.freeform_explore import FreeformExploreEnvelope, MEMBRANE_REQUIREMENTS
 from dharma_swarm.forge_lab.genome_spec import DEFAULT_GENOME, check_genome, merged_with_defaults
+from dharma_swarm.merkle_log import MerkleLog
 
 # ---------------------------------------------------------------- ids
 
@@ -92,6 +93,21 @@ def test_novelty_pressure_penalizes_overused_parents():
     assert w_fresh > w_used > 0
 
 
+def test_mixed_archive_zero_fitness_step_stone_has_epsilon_but_p0_stays_pure():
+    assert selection.parent_weight(0.0, 0, 0.7) == selection.MIN_STEPPING_STONE_WEIGHT
+    assert selection.parent_weight(0.0, 0, 0.0) == 0.0
+    assert selection.parent_weight(1.0, 0, 0.7) > selection.MIN_STEPPING_STONE_WEIGHT
+
+
+def test_phenotype_id_ignores_notes_and_unexecuted_compost():
+    base = merged_with_defaults({"generator_model": "m", "notes": "first"})
+    composted = {**base, "notes": "second", "unexecuted_idea": {"k": 99}}
+
+    assert ids.candidate_id(base) != ids.candidate_id(composted)
+    assert ids.phenotype_id(base) == ids.phenotype_id(composted)
+    assert ids.phenotype_digest(base) == ids.phenotype_digest(composted)
+
+
 # ---------------------------------------------------------------- mutation
 
 
@@ -162,9 +178,10 @@ def _envelope(cid: str) -> FreeformExploreEnvelope:
 
 async def test_store_graded_rows_are_fitness_bearing_and_deduped(store):
     await store.load()
-    cid = ids.candidate_id({"g": 1})
+    genome = {"g": 1, "arm_kind": "freeform_single"}
+    cid = ids.candidate_id(genome)
     await store.append_graded(
-        candidate_id=cid, genome={"g": 1, "arm_kind": "freeform_single"}, parent_id=None,
+        candidate_id=cid, genome=genome, parent_id=None,
         generation=0, loop_iteration=0, role="seed_baseline", pass_rate=0.5,
         per_task=[{"task_id": "t1", "resolved": True}], budget={}, tier="explore-fast-host-pytest",
         executed_fields=("arm_kind",), ignored_fields=(), envelope=_envelope(cid),
@@ -174,6 +191,128 @@ async def test_store_graded_rows_are_fitness_bearing_and_deduped(store):
     assert len(graded) == 1 and graded[0].fitness.correctness == 0.5
     row = CandidateStore._row(graded[0])
     assert row["state"] == GRADED and row["behavior"]["solved_task_ids"] == ["t1"]
+    assert store.verify_evidence_merkle() == (True, "verified_full_forge_evidence:1")
+
+
+async def test_store_merkle_detects_budget_evidence_tampering(store):
+    await store.load()
+    genome = {"g": 1, "arm_kind": "freeform_single"}
+    cid = ids.candidate_id(genome)
+    await store.append_graded(
+        candidate_id=cid, genome=genome, parent_id=None,
+        generation=0, loop_iteration=0, role="seed_baseline", pass_rate=0.5,
+        per_task=[{"task_id": "t1", "resolved": True}], budget={"spent_tokens": 4}, tier="t",
+        executed_fields=("arm_kind",), ignored_fields=(), envelope=_envelope(cid),
+    )
+    row = json.loads(store.archive_path.read_text(encoding="utf-8"))
+    row["test_results"]["forge_lab"]["budget"]["spent_tokens"] = 4000
+    store.archive_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    # Verification must re-read the durable row even on the same object.  The
+    # in-memory ArchiveEntry still contains the original value here.
+    verified, reason = store.verify_evidence_merkle()
+
+    assert verified is False
+    assert reason.startswith("forge_evidence_digest_mismatch:0:")
+
+
+async def _append_identity_row(store: CandidateStore) -> str:
+    await store.load()
+    genome = {"g": 1, "arm_kind": "freeform_single"}
+    cid = ids.candidate_id(genome)
+    await store.append_graded(
+        candidate_id=cid,
+        genome=genome,
+        parent_id=None,
+        generation=0,
+        loop_iteration=0,
+        role="seed_baseline",
+        pass_rate=0.5,
+        per_task=[{"task_id": "t1", "resolved": True}],
+        budget={"spent_tokens": 4},
+        tier="t",
+        executed_fields=("arm_kind",),
+        ignored_fields=("g",),
+        envelope=_envelope(cid),
+    )
+    return cid
+
+
+def _rewrite_row_and_valid_chain(store: CandidateStore, row: dict) -> None:
+    """Re-anchor one hostile row so semantic verification is exercised."""
+
+    leaf = dict(store.archive.merkle_log.leaf_at(0))
+    leaf["forge_entry_digest"] = CandidateStore._evidence_digest(row)
+    merkle_path = store.archive_path.parent / "merkle_log.json"
+    merkle_path.unlink()
+    durable = MerkleLog(merkle_path)
+    row["merkle_root"] = durable.append(leaf)
+    store.archive_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("mutate", "reason"),
+    (
+        (
+            lambda row: row["test_results"]["forge_lab"]["genome"].__setitem__("g", 2),
+            "candidate_id_mismatch:0:",
+        ),
+        (
+            lambda row: row["test_results"]["forge_lab"].__setitem__(
+                "genome_sha256", "0" * 64
+            ),
+            "genome_digest_mismatch:0:",
+        ),
+        (
+            lambda row: row["test_results"]["forge_lab"].__setitem__(
+                "phenotype_id", "pheno_0000000000000000"
+            ),
+            "phenotype_id_mismatch:0:",
+        ),
+        (
+            lambda row: row["test_results"]["forge_lab"].__setitem__(
+                "phenotype_sha256", "0" * 64
+            ),
+            "phenotype_digest_mismatch:0:",
+        ),
+        (
+            lambda row: row["test_results"]["forge_lab"].__setitem__("state", "blocked"),
+            "forge_row_fitness_state_mismatch:0:",
+        ),
+    ),
+)
+async def test_store_rejects_semantically_forged_graded_identity(store, mutate, reason):
+    await _append_identity_row(store)
+    row = json.loads(store.archive_path.read_text(encoding="utf-8"))
+    mutate(row)
+    _rewrite_row_and_valid_chain(store, row)
+
+    assert store.verify_evidence_merkle()[1].startswith(reason)
+
+
+async def test_store_rejects_per_row_merkle_root_mismatch(store):
+    await _append_identity_row(store)
+    row = json.loads(store.archive_path.read_text(encoding="utf-8"))
+    row["merkle_root"] = "0" * 64
+    store.archive_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    verified, reason = store.verify_evidence_merkle()
+
+    assert verified is False
+    assert reason.startswith("entry_merkle_root_mismatch:0:")
+
+
+@pytest.mark.parametrize("extra", ("not-json\n", "duplicate"))
+async def test_store_rejects_malformed_or_extra_durable_rows(store, extra):
+    await _append_identity_row(store)
+    original = store.archive_path.read_text(encoding="utf-8")
+    suffix = original if extra == "duplicate" else extra
+    store.archive_path.write_text(original + suffix, encoding="utf-8")
+
+    verified, reason = store.verify_evidence_merkle()
+
+    assert verified is False
+    assert reason.startswith(("malformed_archive_row:1:", "duplicate_archive_candidate_id:1:"))
 
 
 async def test_store_blocked_rows_are_invisible_to_selection_but_persist(store):
@@ -190,17 +329,21 @@ async def test_store_blocked_rows_are_invisible_to_selection_but_persist(store):
 
 async def test_store_lineage_and_children_counts(store):
     await store.load()
-    parent_cid = ids.candidate_id({"p": 1})
+    parent_genome = {"p": 1, "arm_kind": "freeform_single"}
+    parent_cid = ids.candidate_id(parent_genome)
     await store.append_graded(
-        candidate_id=parent_cid, genome={"p": 1}, parent_id=None, generation=0,
+        candidate_id=parent_cid, genome=parent_genome, parent_id=None, generation=0,
         loop_iteration=0, role="seed_baseline", pass_rate=0.0, per_task=[], budget={},
-        tier="t", executed_fields=(), ignored_fields=(), envelope=_envelope(parent_cid),
+        tier="t", executed_fields=("arm_kind",), ignored_fields=("p",),
+        envelope=_envelope(parent_cid),
     )
-    child_cid = ids.candidate_id({"c": 1})
+    child_genome = {"c": 1, "arm_kind": "freeform_single"}
+    child_cid = ids.candidate_id(child_genome)
     await store.append_graded(
-        candidate_id=child_cid, genome={"c": 1}, parent_id=parent_cid, generation=1,
+        candidate_id=child_cid, genome=child_genome, parent_id=parent_cid, generation=1,
         loop_iteration=1, role="candidate", pass_rate=0.0, per_task=[], budget={},
-        tier="t", executed_fields=(), ignored_fields=(), envelope=_envelope(child_cid),
+        tier="t", executed_fields=("arm_kind",), ignored_fields=("c",),
+        envelope=_envelope(child_cid),
     )
     assert store.n_children_map() == {parent_cid: 1}
     lineage = await store.archive.get_lineage(child_cid)

@@ -10,7 +10,11 @@ import time
 from pathlib import Path
 from typing import Any, Iterable
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from . import pr_suite_execution as execution
 from .fresh_task_oracle import read_manifest
+from .pr_suite_execution import CommandExecutor, ExecutionProfile
 from .signals import canonical_sha256
 from .pr_suite_validator_runtime import (
     BASE_OUTCOME_FAILED,
@@ -22,12 +26,10 @@ from .pr_suite_validator_runtime import (
     CommandResult as _CommandResult,
     _checkout_ref,
     _clone_repo,
-    _command_for_target,
     _materialize_fixed_test,
     _repo_url_for_row,
     _resolve_base_and_fixed,
     _run,
-    _setup_command,
     _write_json,
     candidate_targets,
     classify_base_outcome,
@@ -50,6 +52,9 @@ def validate_candidate(
     use_merge_parent_base: bool = True,
     setup_command_template: str = "",
     setup_timeout_seconds: int | None = None,
+    execution_profile: ExecutionProfile | Path | str | None = None,
+    receipt_signing_key: Ed25519PrivateKey | None = None,
+    receipt_signer_key_id: str | None = None,
 ) -> dict[str, Any]:
     """Validate one harvested PR-suite row and write a receipt."""
 
@@ -69,74 +74,133 @@ def validate_candidate(
     status = "fail_to_pass_validation_failed"
     repo_url = ""
     started_at = now_stamp()
+    executor: CommandExecutor | None = None
+    signer: Ed25519PrivateKey | None = None
+    signer_key_id = ""
 
     try:
+        signer, signer_key_id = execution.resolve_validator_signer(
+            receipt_signing_key,
+            receipt_signer_key_id,
+        )
         targets = candidate_targets(raw)
         if not targets:
             blockers.append("missing_candidate_test_targets")
             raise ValueError("candidate row has no validator_targets/test_targets/test_files")
+        for target in targets:
+            execution.validated_target_path(target, checkout)
 
         repo_url = _repo_url_for_row(raw, local_repo_root=local_repo_root)
-        clone_result = _clone_repo(repo_url, checkout, timeout_seconds=timeout_seconds)
+        source_roots = [Path(repo_url)] if Path(repo_url).expanduser().exists() else []
+        executor = execution.build_executor(
+            profile=execution_profile,
+            workspace_root=row_work_root,
+            source_roots=source_roots,
+            total_timeout_seconds=timeout_seconds,
+        )
+        execution.require_command_contract(
+            executor.profile,
+            test_command_template=test_command_template,
+            setup_command_template=setup_command_template,
+            python=python,
+        )
+        clone_result = _clone_repo(
+            repo_url,
+            checkout,
+            timeout_seconds=timeout_seconds,
+            executor=executor,
+        )
         commands.append({"phase": "clone", **clone_result.to_receipt()})
         if not clone_result.passed:
             blockers.append("clone_failed")
             raise RuntimeError("git clone failed")
 
-        base_ref, fixed_ref, resolved_refs = _resolve_base_and_fixed(
+        _, _, resolved_refs = _resolve_base_and_fixed(
             checkout,
             raw,
             use_merge_parent_base=use_merge_parent_base,
             timeout_seconds=timeout_seconds,
+            executor=executor,
         )
 
         for target in targets:
-            setup_argv = _setup_command(setup_command_template, python=python, checkout=checkout)
+            setup_argv = executor.setup_argv(cwd=checkout)
             effective_setup_timeout = (
                 int(setup_timeout_seconds) if setup_timeout_seconds is not None else max(timeout_seconds, 600)
             )
-            base_checkout_commands = _checkout_ref(checkout, base_ref, timeout_seconds=timeout_seconds)
+            base_checkout_commands = _checkout_ref(
+                checkout,
+                resolved_refs["base_sha"],
+                timeout_seconds=timeout_seconds,
+                executor=executor,
+            )
             commands.extend({"phase": "checkout_base", **result.to_receipt()} for result in base_checkout_commands)
             if not all(result.passed for result in base_checkout_commands):
                 blockers.append("base_checkout_failed")
                 break
             materialize_result = _materialize_fixed_test(
                 checkout,
-                fixed_ref=fixed_ref,
+                fixed_ref=resolved_refs["fixed_sha"],
                 target=target,
                 timeout_seconds=timeout_seconds,
+                executor=executor,
             )
             commands.append({"phase": "materialize_fixed_test_on_base", "target": target, **materialize_result.to_receipt()})
             if not materialize_result.passed:
                 blockers.append("fixed_test_materialization_failed")
                 break
             if setup_argv is not None:
-                base_setup = _run(setup_argv, cwd=checkout, timeout_seconds=effective_setup_timeout)
+                base_setup = _run(
+                    setup_argv,
+                    cwd=checkout,
+                    timeout_seconds=effective_setup_timeout,
+                    executor=executor,
+                )
                 commands.append({"phase": "setup_base", "target": target, **base_setup.to_receipt()})
                 if not base_setup.passed:
                     blocker = f"base_setup_failed:{target}"
                     if blocker not in blockers:
                         blockers.append(blocker)
                     break
-            base_command = _command_for_target(test_command_template, python=python, target=target, checkout=checkout)
-            base_result = _run(base_command, cwd=checkout, timeout_seconds=timeout_seconds)
+            base_command = executor.test_argv(cwd=checkout, targets=[target])
+            base_result = _run(
+                base_command,
+                cwd=checkout,
+                timeout_seconds=timeout_seconds,
+                executor=executor,
+            )
             commands.append({"phase": "test_base", "target": target, **base_result.to_receipt()})
 
-            fixed_checkout_commands = _checkout_ref(checkout, fixed_ref, timeout_seconds=timeout_seconds)
+            fixed_checkout_commands = _checkout_ref(
+                checkout,
+                resolved_refs["fixed_sha"],
+                timeout_seconds=timeout_seconds,
+                executor=executor,
+            )
             commands.extend({"phase": "checkout_fixed", **result.to_receipt()} for result in fixed_checkout_commands)
             if not all(result.passed for result in fixed_checkout_commands):
                 blockers.append("fixed_checkout_failed")
                 break
             if setup_argv is not None:
-                fixed_setup = _run(setup_argv, cwd=checkout, timeout_seconds=effective_setup_timeout)
+                fixed_setup = _run(
+                    setup_argv,
+                    cwd=checkout,
+                    timeout_seconds=effective_setup_timeout,
+                    executor=executor,
+                )
                 commands.append({"phase": "setup_fixed", "target": target, **fixed_setup.to_receipt()})
                 if not fixed_setup.passed:
                     blocker = f"fixed_setup_failed:{target}"
                     if blocker not in blockers:
                         blockers.append(blocker)
                     break
-            fixed_command = _command_for_target(test_command_template, python=python, target=target, checkout=checkout)
-            fixed_result = _run(fixed_command, cwd=checkout, timeout_seconds=timeout_seconds)
+            fixed_command = executor.test_argv(cwd=checkout, targets=[target])
+            fixed_result = _run(
+                fixed_command,
+                cwd=checkout,
+                timeout_seconds=timeout_seconds,
+                executor=executor,
+            )
             commands.append({"phase": "test_fixed", "target": target, **fixed_result.to_receipt()})
 
             base_outcome = classify_base_outcome(base_result)
@@ -168,9 +232,28 @@ def validate_candidate(
         elif "base_checkout_failed" not in blockers and "fixed_checkout_failed" not in blockers:
             blockers.append("no_targets_failed_on_base_and_passed_on_fixed")
     except Exception as exc:  # noqa: BLE001 - receipt-first validator; failures become evidence.
+        if isinstance(exc, execution.IsolationUnavailable):
+            blockers.append("isolation_unavailable")
+        elif isinstance(exc, execution.ProfileTampered):
+            blockers.append("execution_profile_tampered")
+        elif isinstance(exc, execution.UnsafeTargetPath):
+            blockers.append("unsafe_test_target")
         if not blockers:
             blockers.append(f"{type(exc).__name__}: {exc}")
 
+    source_binding = {
+        "source_row_sha256": row_sha,
+        "task_hint": task_hint,
+        "repo": raw.get("repo") or raw.get("repository") or "",
+        "repository_locators": {
+            key: raw.get(key)
+            for key in ("repo_path", "clone_url", "repo_url", "local_repo")
+            if raw.get(key) is not None
+        },
+        "pr_number": raw.get("pr_number"),
+        "candidate_targets": candidate_targets(raw),
+        "resolved_refs": resolved_refs,
+    }
     receipt = {
         "schema": SCHEMA_VERSION,
         "run_id": run_id,
@@ -179,8 +262,9 @@ def validate_candidate(
         "status": status,
         "task_hint": task_hint,
         "row_sha256": row_sha,
+        "source_binding": source_binding,
         "repo": raw.get("repo") or raw.get("repository") or "",
-        "repo_url": repo_url,
+        "repo_url": execution.redact_secret_text(repo_url),
         "checkout_path": str(checkout) if keep_workdir else "",
         "kept_workdir": keep_workdir,
         "candidate_targets": candidate_targets(raw),
@@ -191,9 +275,25 @@ def validate_candidate(
         "contamination_state_trusted": False,
         "test_command_template": test_command_template,
         "setup_command_template": str(setup_command_template or ""),
+        "execution_profile": executor.profile.to_mapping() if executor is not None else {},
+        "execution_profile_sha256": executor.profile.sha256 if executor is not None else "",
         "commands": commands,
         "blockers": blockers,
     }
+    if signer is not None:
+        receipt = execution.sign_validator_receipt(
+            receipt,
+            signing_key=signer,
+            key_id=signer_key_id,
+            nonce=run_id,
+        )
+    else:
+        if "validator_receipt_auth_unavailable" not in receipt["blockers"]:
+            receipt["blockers"].append("validator_receipt_auth_unavailable")
+        receipt["status"] = "fail_to_pass_validation_failed"
+        status = receipt["status"]
+        validated_targets = []
+        receipt["validated_fail_to_pass"] = []
     receipt["receipt_sha256"] = canonical_sha256(receipt)
     _write_json(receipt_path, receipt)
 
@@ -204,6 +304,11 @@ def validate_candidate(
     output_row["fail_to_pass"] = list(validated_targets)
     output_row["validation_receipt"] = str(receipt_path)
     output_row["validation_receipt_sha256"] = receipt["receipt_sha256"]
+    output_row["validation_source_row_sha256"] = row_sha
+    output_row["validation_task_hint"] = task_hint
+    output_row["validation_execution_profile_sha256"] = (
+        executor.profile.sha256 if executor is not None else ""
+    )
     output_row["validated_base_sha"] = resolved_refs.get("base_sha", "")
     output_row["validated_fixed_sha"] = resolved_refs.get("fixed_sha", "")
     output_row["validator_blockers"] = list(blockers)
@@ -239,6 +344,9 @@ def validate_rows(
     use_merge_parent_base: bool = True,
     setup_command_template: str = "",
     setup_timeout_seconds: int | None = None,
+    execution_profile: ExecutionProfile | Path | str | None = None,
+    receipt_signing_key: Ed25519PrivateKey | None = None,
+    receipt_signer_key_id: str | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     output_rows: list[dict[str, Any]] = []
@@ -255,6 +363,9 @@ def validate_rows(
             use_merge_parent_base=use_merge_parent_base,
             setup_command_template=setup_command_template,
             setup_timeout_seconds=setup_timeout_seconds,
+            execution_profile=execution_profile,
+            receipt_signing_key=receipt_signing_key,
+            receipt_signer_key_id=receipt_signer_key_id,
         )
         results.append({key: value for key, value in result.items() if key != "row"})
         if result["validated"] or include_failed:
@@ -296,6 +407,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Timeout for the setup command; 0 uses max(timeout_seconds, 600).",
     )
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument(
+        "--execution-profile",
+        default="",
+        help="Digest-bound Docker/Podman execution profile; required for execution.",
+    )
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--keep-workdir", action="store_true")
     parser.add_argument("--include-failed", action="store_true", help="Also write failed validation rows to --out")
@@ -310,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
     receipt_root = Path(args.receipt_root).expanduser()
     local_repo_root = Path(args.local_repo_root).expanduser() if args.local_repo_root else None
     setup_timeout = args.setup_timeout_seconds or None
+    profile = args.execution_profile or None
 
     if args.work_root or args.keep_workdir:
         work_root = Path(args.work_root).expanduser() if args.work_root else receipt_root / "workdirs"
@@ -327,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
             use_merge_parent_base=not args.no_merge_parent_base,
             setup_command_template=args.setup_command_template,
             setup_timeout_seconds=setup_timeout,
+            execution_profile=profile,
         )
     else:
         with tempfile.TemporaryDirectory(prefix="forge-pr-suite-validator-") as temp:
@@ -343,6 +461,7 @@ def main(argv: list[str] | None = None) -> int:
                 use_merge_parent_base=not args.no_merge_parent_base,
                 setup_command_template=args.setup_command_template,
                 setup_timeout_seconds=setup_timeout,
+                execution_profile=profile,
             )
 
     write_jsonl(Path(args.out).expanduser(), list(summary["output_rows"]))

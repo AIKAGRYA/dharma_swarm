@@ -202,6 +202,166 @@ def test_allocate_task_ids_fails_closed_for_ineligible_id(tmp_path: Path) -> Non
     assert taskbed_ledger.allocation_rows("confirm-exact", db_path=db) == []
 
 
+def test_campaign_overlay_is_four_way_disjoint_persistent_and_idempotent(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks(
+        [_task(f"fresh-{idx}") for idx in range(8)],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+    )
+
+    first = taskbed_ledger.allocate_campaign_pools(
+        campaign_id="campaign-one",
+        train_count=2,
+        explore_count=2,
+        confirm_count=2,
+        holdout_count=2,
+        campaign_seed=17,
+        min_decision_count=1,
+        epoch_id="epoch-campaign",
+        lane_id="forge-lab",
+        db_path=db,
+    )
+    second = taskbed_ledger.allocate_campaign_pools(
+        campaign_id="campaign-one",
+        train_count=2,
+        explore_count=2,
+        confirm_count=2,
+        holdout_count=2,
+        campaign_seed=17,
+        min_decision_count=1,
+        epoch_id="epoch-campaign",
+        lane_id="forge-lab",
+        db_path=db,
+    )
+
+    assert first == second == taskbed_ledger.campaign_overlay_receipt("campaign-one", db_path=db)
+    assert first["frozen"] is True
+    assert first["all_splits_disjoint"] is True
+    assert first["confirm_pool_contamination_clean"] is True
+    assert {name: len(ids) for name, ids in first["logical_splits"].items()} == {
+        "train": 2,
+        "explore": 2,
+        "confirm": 2,
+        "holdout": 2,
+    }
+    assert first["logical_to_physical"] == {
+        "train": "explore",
+        "explore": "explore",
+        "confirm": "confirm",
+        "holdout": "confirm",
+    }
+
+
+def test_campaign_overlay_changed_resume_terms_fail_closed(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks([_task(f"fresh-{idx}") for idx in range(9)], db_path=db)
+    taskbed_ledger.allocate_campaign_pools(
+        campaign_id="campaign-one",
+        train_count=1,
+        explore_count=1,
+        confirm_count=1,
+        holdout_count=1,
+        campaign_seed=5,
+        min_decision_count=1,
+        epoch_id="epoch-campaign",
+        lane_id="forge-lab",
+        db_path=db,
+    )
+
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="different frozen terms"):
+        taskbed_ledger.allocate_campaign_pools(
+            campaign_id="campaign-one",
+            train_count=1,
+            explore_count=2,
+            confirm_count=1,
+            holdout_count=1,
+            campaign_seed=5,
+            min_decision_count=1,
+            epoch_id="epoch-campaign",
+            lane_id="forge-lab",
+            db_path=db,
+        )
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="physical allocation integrity"):
+        taskbed_ledger.allocate_campaign_pools(
+            campaign_id="campaign-one",
+            train_count=1,
+            explore_count=1,
+            confirm_count=1,
+            holdout_count=1,
+            campaign_seed=5,
+            min_decision_count=1,
+            epoch_id="epoch-campaign",
+            lane_id="forge-lab",
+            candidate_id="different-candidate",
+            db_path=db,
+        )
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="different frozen terms"):
+        taskbed_ledger.allocate_campaign_pools(
+            campaign_id="campaign-one",
+            train_count=1,
+            explore_count=1,
+            confirm_count=1,
+            holdout_count=1,
+            campaign_seed=6,
+            min_decision_count=1,
+            epoch_id="epoch-campaign",
+            lane_id="forge-lab",
+            db_path=db,
+        )
+
+
+def test_campaign_overlay_rolls_back_both_physical_pools_on_shortage(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks([_task(f"fresh-{idx}") for idx in range(3)], db_path=db)
+
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="insufficient_campaign_confirm_tasks"):
+        taskbed_ledger.allocate_campaign_pools(
+            campaign_id="campaign-short",
+            train_count=1,
+            explore_count=1,
+            confirm_count=1,
+            holdout_count=1,
+            epoch_id="epoch-short",
+            min_decision_count=1,
+            lane_id="forge-lab",
+            db_path=db,
+        )
+
+    with taskbed_ledger.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM taskbed_allocations").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM taskbed_campaign_overlays").fetchone()[0] == 0
+
+
+def test_campaign_overlay_never_reuses_prior_holdout_across_campaigns(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks([_task(f"fresh-{idx}") for idx in range(4)], db_path=db)
+    taskbed_ledger.allocate_campaign_pools(
+        campaign_id="first",
+        train_count=1,
+        explore_count=1,
+        confirm_count=1,
+        holdout_count=1,
+        min_decision_count=1,
+        epoch_id="epoch-one",
+        lane_id="forge-lab",
+        db_path=db,
+    )
+
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="insufficient_campaign_explore"):
+        taskbed_ledger.allocate_campaign_pools(
+            campaign_id="second",
+            train_count=1,
+            explore_count=1,
+            confirm_count=1,
+            holdout_count=1,
+            min_decision_count=1,
+            epoch_id="epoch-two",
+            lane_id="forge-lab",
+            db_path=db,
+        )
+
+
 def test_task_counts_group_by_contamination_state(tmp_path: Path) -> None:
     db = tmp_path / "taskbed.db"
     taskbed_ledger.register_tasks(

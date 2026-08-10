@@ -18,6 +18,14 @@ from .taskbed_store import (
     utc_seconds,
 )
 
+CAMPAIGN_LOGICAL_SPLITS = ("train", "explore", "confirm", "holdout")
+CAMPAIGN_LOGICAL_TO_PHYSICAL = {
+    "train": "explore",
+    "explore": "explore",
+    "confirm": "confirm",
+    "holdout": "confirm",
+}
+
 
 def _eligible_rows(
     conn: sqlite3.Connection,
@@ -25,6 +33,7 @@ def _eligible_rows(
     split: SplitName,
     epoch_id: str,
     limit: int,
+    exclude_campaign_overlays: bool = False,
 ) -> list[sqlite3.Row]:
     opposite = "confirm" if split == "explore" else "explore"
     clean_filter = ""
@@ -36,11 +45,18 @@ def _eligible_rows(
         params.extend(sorted(CLEAN_CONFIRM_STATES))
     params.extend([opposite, epoch_id])
     params.append(limit)
+    overlay_filter = (
+        "AND NOT EXISTS (SELECT 1 FROM taskbed_campaign_overlays overlay "
+        "WHERE overlay.task_id=t.task_id)"
+        if exclude_campaign_overlays
+        else ""
+    )
     return conn.execute(
         f"""
         SELECT t.* FROM taskbed_tasks t
          WHERE t.active=1
            {clean_filter}
+           {overlay_filter}
            AND NOT EXISTS (
              SELECT 1 FROM taskbed_allocations prior
               WHERE prior.task_id=t.task_id AND prior.split=?
@@ -213,6 +229,30 @@ def allocate_confirm(*, count: int = MIN_CONFIRM_TASKS, epoch_id: str, lane_id: 
     return allocate_tasks(split="confirm", count=count, epoch_id=epoch_id, lane_id=lane_id,
                           db_path=db_path, allocation_id=allocation_id, candidate_id=candidate_id,
                           min_count=min_count)
+
+
+def allocate_campaign_pools(
+    *, campaign_id: str, train_count: int, explore_count: int,
+    confirm_count: int, holdout_count: int, epoch_id: str, lane_id: str,
+    db_path: Path | str = DEFAULT_DB, campaign_seed: int = 0,
+    candidate_id: str = "", min_decision_count: int = MIN_CONFIRM_TASKS,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Compatibility facade for the focused campaign-overlay module."""
+    from .taskbed_campaign_overlay import allocate_campaign_pools as implementation
+
+    return implementation(
+        campaign_id=campaign_id, train_count=train_count, explore_count=explore_count,
+        confirm_count=confirm_count, holdout_count=holdout_count, epoch_id=epoch_id,
+        lane_id=lane_id, db_path=db_path, campaign_seed=campaign_seed,
+        candidate_id=candidate_id, min_decision_count=min_decision_count, now=now,
+    )
+
+
+def campaign_overlay_receipt(campaign_id: str, *, db_path: Path | str = DEFAULT_DB) -> dict[str, Any]:
+    from .taskbed_campaign_overlay import campaign_overlay_receipt as implementation
+
+    return implementation(campaign_id, db_path=db_path)
 
 
 def allocation_rows(allocation_id: str, *, db_path: Path | str = DEFAULT_DB) -> list[dict[str, Any]]:

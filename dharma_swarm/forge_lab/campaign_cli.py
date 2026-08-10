@@ -37,9 +37,31 @@ def add_campaign_commands(
     plan.add_argument(
         "--profile",
         required=True,
-        choices=("explore-open", "forge-lab-n30-to-1000-v1"),
+        choices=(
+            "explore-open",
+            "forge-lab-n30-to-1000-v1",
+            "forge-lab-paired-frozen-v1",
+        ),
+    )
+    plan.add_argument("--total-tokens", type=int)
+    plan.add_argument("--total-usd-micros", type=int)
+    plan.add_argument("--total-requests", type=int)
+    plan.add_argument("--deadline-utc")
+    plan.add_argument(
+        "--host-caps-json",
+        help="exact nonempty host-cap object; all five limit flags are atomic",
     )
     json_flag(plan)
+
+    prepare = leaf(
+        subcommands,
+        "prepare",
+        command_path="campaign prepare",
+        help_text="open a fenced provider-probe challenge",
+    )
+    prepare.add_argument("--manifest", required=True)
+    prepare.add_argument("--request-id")
+    json_flag(prepare)
 
     run = leaf(
         subcommands,
@@ -204,6 +226,36 @@ def _failure(command: str, exc: Exception, *, as_json: bool) -> int:
     return CAMPAIGN_FAILURE_EXIT
 
 
+def _plan_limits(args: argparse.Namespace, control: Any) -> dict[str, Any] | None:
+    values = (
+        args.total_tokens,
+        args.total_usd_micros,
+        args.total_requests,
+        args.deadline_utc,
+        args.host_caps_json,
+    )
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise control.CampaignControlError(
+            "INVALID_PLAN_LIMITS",
+            "exact planning requires all five limit flags together",
+        )
+    try:
+        host_caps = json.loads(args.host_caps_json)
+    except json.JSONDecodeError as exc:
+        raise control.CampaignControlError(
+            "INVALID_PLAN_LIMITS", "--host-caps-json is not valid JSON"
+        ) from exc
+    return {
+        "total_tokens": args.total_tokens,
+        "total_usd_micros": args.total_usd_micros,
+        "total_requests": args.total_requests,
+        "deadline_utc": args.deadline_utc,
+        "host_caps": host_caps,
+    }
+
+
 def dispatch(args: argparse.Namespace) -> int:
     """Dispatch only governed, non-legacy campaign operations."""
 
@@ -218,7 +270,15 @@ def dispatch(args: argparse.Namespace) -> int:
     command = args._command_path
     try:
         if command == "campaign plan":
-            result = control.plan_campaign(args.profile)
+            result = control.plan_campaign(
+                args.profile,
+                limits=_plan_limits(args, control),
+            )
+        elif command == "campaign prepare":
+            result = control.prepare_campaign(
+                args.manifest,
+                request_id=args.request_id,
+            )
         elif command == "campaign run":
             result = control.run_campaign(
                 args.manifest,
