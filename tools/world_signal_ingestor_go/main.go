@@ -160,243 +160,151 @@ func SignalFromObservation(obs Observation) Signal {
 	if title == "" {
 		title = "Untitled world signal"
 	}
+
+	// Generate deterministic ID from observation ID or content hash
+	sigID := obs.ID
+	if sigID == "" {
+		h := sha256.Sum256([]byte(obs.Title + obs.Description + obs.URL))
+		sigID = hex.EncodeToString(h[:8])
+	}
+
+	observedAt := time.Now().UTC().Format(time.RFC3339)
+
+	iterationSteps := []string{
+		"ingest", "parse", "score", "categorize",
+		"enrich", "dedupe", "validate", "emit",
+		"receipt", "archive",
+	}
+
 	return Signal{
-		ID:             "sig-" + stableID(obs.ID+obs.URL+title),
+		ID:             "sig-" + sigID,
 		Source:         "world_scout",
-		RawSource:      first(obs.Source, obs.SourceType, "unknown"),
+		RawSource:      first(obs.Source, obs.SourceType),
 		SourceType:     obs.SourceType,
 		Category:       category,
-		Title:          trim(title, 180),
-		Description:    trim(obs.Description, 1400),
+		Title:          title,
+		Description:    obs.Description,
 		RelevanceScore: score,
 		URL:            obs.URL,
-		Keywords:       mergeKeywords(obs.Keywords, text),
-		ObservedAt:     time.Now().UTC().Format(time.RFC3339),
+		Keywords:       obs.Keywords,
+		ObservedAt:     observedAt,
 		Metadata: map[string]any{
-			"raw_source":                   first(obs.Source, obs.SourceType, "unknown"),
-			"source_type":                  obs.SourceType,
-			"url":                          obs.URL,
-			"cascade_for":                  obs.CascadeFor,
-			"first_principles_questions":   firstPrinciples(title),
-			"iteration_steps":              iterationSteps(),
-			"adjacent_searches":            adjacentSearches(title),
-			"strategic_moves":              []string{"verify", "map_pattern", "prototype", "feed_shakti"},
-			"uncertainty":                  "requires independent corroboration before promotion",
-			"reverse_engineering_boundary": "use only public facts and patterns",
+			"raw_source":      first(obs.Source, obs.SourceType),
+			"iteration_steps": iterationSteps,
 		},
 	}
 }
 
-func readObservations(path string) ([]Observation, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), maxObservationLineBytes)
-	observations := []Observation{}
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var obs Observation
-		if err := json.Unmarshal([]byte(line), &obs); err == nil && obs.Title != "" {
-			observations = append(observations, obs)
-			continue
-		}
-		var row map[string]any
-		if err := json.Unmarshal([]byte(line), &row); err != nil {
-			continue
-		}
-		observations = append(observations, observationFromMap(row))
-	}
-	return observations, scanner.Err()
-}
-
-func observationFromMap(row map[string]any) Observation {
-	return Observation{
-		ID:          str(row["id"]),
-		Source:      first(str(row["source"]), str(row["raw_source"]), "unknown"),
-		SourceType:  str(row["source_type"]),
-		Title:       first(str(row["title"]), str(row["headline"]), "Untitled world signal"),
-		Description: first(str(row["description"]), str(row["summary"]), ""),
-		URL:         first(str(row["url"]), str(row["source_url"]), ""),
-		Keywords:    stringSlice(row["keywords"]),
-		CascadeFor:  str(row["cascade_for"]),
-	}
-}
-
-func writeSignals(path string, signals []Signal) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := file.Name()
-	defer os.Remove(tmpName)
-	enc := json.NewEncoder(file)
-	for _, signal := range signals {
-		if err := enc.Encode(signal); err != nil {
-			file.Close()
-			return err
-		}
-	}
-	if err := file.Sync(); err != nil {
-		file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, path)
-}
-
+// categoryFor returns a category string based on text content.
 func categoryFor(text string) string {
-	switch {
-	case containsAny(text, "benchmark", "eval", "swe-bench"):
-		return "benchmark"
-	case containsAny(text, "github", "repo", "open source", "tool"):
-		return "tool_release"
-	case containsAny(text, "startup", "company", "funding", "seed round"):
-		return "company"
-	case containsAny(text, "arxiv", "paper", "research", "preprint"):
-		return "research"
-	case containsAny(text, "governance", "safety", "policy"):
-		return "governance"
-	default:
-		return "opportunity"
-	}
-}
-
-func scoreFor(text, itemURL, source, sourceType string) float64 {
-	score := 0.35
-	for _, word := range []string{"agent", "agentic", "autonomous", "coding", "benchmark", "github", "startup", "research", "governance", "runtime"} {
-		if strings.Contains(text, word) {
-			score += 0.07
+	benchmarkKeywords := []string{"benchmark", "eval", "evaluation", "leaderboard", "performance", "metric"}
+	for _, kw := range benchmarkKeywords {
+		if strings.Contains(text, kw) {
+			return "benchmark"
 		}
 	}
-	if itemURL != "" {
-		score += 0.08
+	agentKeywords := []string{"agent", "agentic", "autonomous", "automation"}
+	for _, kw := range agentKeywords {
+		if strings.Contains(text, kw) {
+			return "agent"
+		}
 	}
-	if strings.Contains(source, "operator") {
-		score += 0.12
+	infraKeywords := []string{"infrastructure", "platform", "runtime", "sdk", "api", "cloud"}
+	for _, kw := range infraKeywords {
+		if strings.Contains(text, kw) {
+			return "infrastructure"
+		}
 	}
-	if sourceType == "github_repos" || sourceType == "arxiv" {
-		score += 0.04
+	return "general"
+}
+
+// scoreFor returns a relevance score based on text content and source signals.
+func scoreFor(text, url, source, sourceType string) float64 {
+	score := 0.5
+
+	highValueKeywords := []string{
+		"agentic", "agent", "benchmark", "startup", "github",
+		"coding", "runtime", "ecosystem", "infrastructure",
 	}
+	for _, kw := range highValueKeywords {
+		if strings.Contains(text, kw) {
+			score += 0.05
+		}
+	}
+
+	// Boost for trusted sources
+	trustedSources := []string{"operator_drop", "github", "arxiv", "techcrunch"}
+	for _, s := range trustedSources {
+		if strings.Contains(strings.ToLower(source), s) ||
+			strings.Contains(strings.ToLower(sourceType), s) {
+			score += 0.1
+			break
+		}
+	}
+
+	// URL signals
+	if strings.Contains(url, "github.com") || strings.Contains(url, "arxiv.org") {
+		score += 0.05
+	}
+
 	if score > 1.0 {
-		return 1.0
+		score = 1.0
 	}
 	return score
 }
 
-func firstPrinciples(title string) []string {
-	return []string{
-		"What capability boundary does " + title + " reveal?",
-		"What primitive pattern is reusable without copying the surface?",
-		"What is the smallest governed Dharma proof that would test this?",
+// readObservations reads a JSONL file of Observation records.
+func readObservations(path string) ([]Observation, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, maxObservationLineBytes), maxObservationLineBytes)
+
+	var observations []Observation
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var obs Observation
+		if err := json.Unmarshal(line, &obs); err != nil {
+			return nil, fmt.Errorf("failed to parse observation: %w", err)
+		}
+		observations = append(observations, obs)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error: %w", err)
+	}
+	return observations, nil
 }
 
-func iterationSteps() []string {
-	return []string{
-		"Verify primary public source.",
-		"Find independent corroboration.",
-		"List adjacent companies, repos, papers, and discussions.",
-		"Extract user pain and capability primitive.",
-		"Map to existing Dharma organs.",
-		"Draft smallest prototype.",
-		"Define evidence of success.",
-		"Define governance and safety constraints.",
-		"Feed Shakti as a draft opportunity.",
-		"Re-score after next scan.",
+// writeSignals writes signals to a JSONL file.
+func writeSignals(path string, signals []Signal) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
 	}
-}
+	defer f.Close()
 
-func adjacentSearches(title string) []string {
-	return []string{
-		"\"" + title + "\" company launch",
-		"\"" + title + "\" GitHub",
-		"\"" + title + "\" arxiv",
-		"\"" + title + "\" alternatives competitors",
-	}
-}
-
-func mergeKeywords(existing []string, text string) []string {
-	seen := map[string]bool{}
-	out := []string{}
-	for _, keyword := range existing {
-		addKeyword(&out, seen, keyword)
-	}
-	for _, keyword := range []string{"agent", "agentic", "benchmark", "github", "startup", "research", "governance", "runtime", "coding"} {
-		if strings.Contains(text, keyword) {
-			addKeyword(&out, seen, keyword)
+	enc := json.NewEncoder(f)
+	for _, sig := range signals {
+		if err := enc.Encode(sig); err != nil {
+			return err
 		}
 	}
-	return out
+	return nil
 }
 
-func addKeyword(out *[]string, seen map[string]bool, keyword string) {
-	keyword = strings.TrimSpace(strings.ToLower(keyword))
-	if keyword == "" || seen[keyword] {
-		return
-	}
-	seen[keyword] = true
-	*out = append(*out, keyword)
-}
-
-func containsAny(text string, values ...string) bool {
-	for _, value := range values {
-		if strings.Contains(text, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func stringSlice(value any) []string {
-	items, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	out := []string{}
-	for _, item := range items {
-		if s := strings.TrimSpace(str(item)); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func str(value any) string {
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprint(value))
-}
-
-func first(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
+// first returns the first non-empty string from the arguments.
+func first(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
 		}
 	}
 	return ""
-}
-
-func trim(value string, limit int) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= limit {
-		return value
-	}
-	return value[:limit]
-}
-
-func stableID(seed string) string {
-	sum := sha256.Sum256([]byte(seed))
-	return hex.EncodeToString(sum[:])[:16]
 }
