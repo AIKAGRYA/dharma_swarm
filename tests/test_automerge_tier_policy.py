@@ -394,6 +394,11 @@ def test_agent_instruction_and_nested_control_paths_are_operator_only():
         "service/.env.production",
         "service/infra/prod.tf",
         "service/deploy/prod.yml",
+        "credentials/token.txt",
+        "secrets/key.txt",
+        "SKILL.md",
+        "SOUL.md",
+        "LIVE_FIRE_PROMPT.md",
     ):
         report = _evaluate(changed_paths=[path])
         assert report["authority_class"] == "operator_only", path

@@ -74,9 +74,10 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       # Unattended-merge ceiling: above this many changed files, or touching a
-      # hot path (single oracle: dharma_swarm.shakti_warrant._HOT_PATHS), the
-      # lane remains gate-and-status. Authority is evaluated by Mike from
-      # evidence bound to the exact head, never inferred here from labels.
+      # hot path from this narrow dispatcher list, the lane remains
+      # gate-and-status. The downstream v3 tier policy is the authoritative
+      # classifier for workflow/governance/security and other operator-only
+      # surfaces; this inline list is only an early demotion optimization.
       MAX_UNATTENDED_FILES: "25"
       HOT_PATHS: ".pre-commit-config.yaml,api/main.py,api/routers/chat.py,api/ws.py,dharma_swarm/agent_runner.py,dharma_swarm/dgc_cli.py,dharma_swarm/orchestrator.py,dharma_swarm/runtime_state.py,dharma_swarm/swarm.py,dharma_swarm/telic_seam.py"
       OPT_OUT_LABEL: "mike-disabled"
