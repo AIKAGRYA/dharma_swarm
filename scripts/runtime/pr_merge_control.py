@@ -2473,6 +2473,16 @@ def run_mike_merge_authority(
         receipt["reason"] = "candidate gate still records blockers"
         receipt["blockers"] = list(gate.get("blockers") or [])
         return receipt
+    # BaseCasProven<repo, base, ruleset> is deliberately uninhabited in safe
+    # P0.  Check this independent proof obligation before reducing authority
+    # evidence so the actuator's hard containment remains explicit and stable.
+    if gate.get("base_cas_enforced") is not True:
+        receipt["reason"] = "strict base-CAS enforcement is not proven"
+        receipt["blockers"] = [
+            "merge execution is prohibited until canonical policy proves "
+            "strict/up-to-date base enforcement"
+        ]
+        return receipt
     try:
         current_policy_identity = policy_identity_fetcher()
     except Exception as exc:
@@ -2514,13 +2524,6 @@ def run_mike_merge_authority(
         receipt["reason"] = "gate risk snapshot is missing or mismatched"
         receipt["blockers"] = [
             "merge authority requires risk computed for the exact base/head pair"
-        ]
-        return receipt
-    if gate.get("base_cas_enforced") is not True:
-        receipt["reason"] = "strict base-CAS enforcement is not proven"
-        receipt["blockers"] = [
-            "merge execution is prohibited until canonical policy proves "
-            "strict/up-to-date base enforcement"
         ]
         return receipt
     try:
