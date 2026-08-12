@@ -62,7 +62,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 
-DEFAULT_REPO = "AmitabhainArunachala/dharma_swarm"
+DEFAULT_REPO = "AIKAGRYA/dharma_swarm"
 
 # Failing check name -> governance category.
 GATE_MAP = {

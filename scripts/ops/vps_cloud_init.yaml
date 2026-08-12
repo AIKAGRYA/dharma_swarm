@@ -35,7 +35,7 @@ write_files:
       cd /opt
       if [ ! -d dharma_swarm ]; then
         GIT_SSH_COMMAND="ssh -i /root/.ssh/dharma_deploy -o IdentitiesOnly=yes" \
-          git clone git@github.com:AmitabhainArunachala/dharma_swarm.git
+          git clone git@github.com:AIKAGRYA/dharma_swarm.git
       fi
       cd dharma_swarm
       if [ ! -f .env ]; then
@@ -68,7 +68,7 @@ write_files:
       DHARMA ORGANISM HOST — two operator acts remain (no secrets ever in git):
 
       1. DEPLOY KEY — add this READ-ONLY deploy key to the repo
-         (github.com/AmitabhainArunachala/dharma_swarm
+         (github.com/AIKAGRYA/dharma_swarm
           -> Settings -> Deploy keys -> Add; leave write access OFF):
 
          ${PUB}

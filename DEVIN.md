@@ -2,7 +2,7 @@
 
 **Identity:** `devin-roaming-2987d222` | Serial: `AGT-DEVIN_ROAMING_2987D222`
 **Authority:** `external_worker_evidence_only`
-**Repo:** `AmitabhainArunachala/dharma_swarm`
+**Repo:** `AIKAGRYA/dharma_swarm`
 
 This file governs Devin sessions working on dharma_swarm. It complements
 CLAUDE.md (which owns behavioral rules and architecture) with Devin-specific

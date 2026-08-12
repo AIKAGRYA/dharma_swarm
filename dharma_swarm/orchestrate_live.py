@@ -1972,7 +1972,7 @@ async def _run_guardian_loop(
         from dharma_swarm.guardian_crew import start_guardian_loop
         crew_task = asyncio.ensure_future(start_guardian_loop(
             state_dir=STATE_DIR,
-            github_repo="AmitabhainArunachala/dharma_swarm",
+            github_repo="AIKAGRYA/dharma_swarm",
             shutdown_event=shutdown_event,
             room_registry=room_registry,
         ))

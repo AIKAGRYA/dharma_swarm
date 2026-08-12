@@ -41,6 +41,10 @@ def _manifest() -> dict:
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 
+def test_manifest_targets_canonical_repository() -> None:
+    assert _manifest()["repo"] == "AIKAGRYA/dharma_swarm"
+
+
 def _run_cli(tmp_path: Path, manifest: dict, protection: dict,
              workflows_dir: Path = WORKFLOWS) -> int:
     manifest_path = tmp_path / "manifest.json"
