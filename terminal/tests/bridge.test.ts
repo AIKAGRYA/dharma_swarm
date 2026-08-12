@@ -108,6 +108,20 @@ describe("DharmaBridge transport scheduling", () => {
     bridge.close();
   });
 
+  test("a correlated Helm projection completes its non-result background request", async () => {
+    const child = new FakeBridgeProcess();
+    const requests = captureRequests(child);
+    const bridge = new DharmaBridge(() => {}, () => child.asChildProcess());
+
+    const activeId = bridge.sendBackground("helm.on_call.request");
+    bridge.sendBackground("runtime.snapshot");
+    child.stdout.write(`${JSON.stringify({type: "helm.on_call_projection", request_id: activeId, projection: {}})}\n`);
+    await flushBridgeEvents();
+
+    expect(requests.map((request) => request.type)).toEqual(["helm.on_call.request", "runtime.snapshot"]);
+    bridge.close();
+  });
+
   test("transport failure drops stale background work and restarts cleanly", async () => {
     const children: FakeBridgeProcess[] = [];
     const requestLogs: Record<string, unknown>[][] = [];

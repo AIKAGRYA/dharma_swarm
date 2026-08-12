@@ -7,12 +7,15 @@ values, constructs providers, or makes model calls.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from collections import Counter
+from dataclasses import InitVar, asdict, dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
 import json
 import os
 from pathlib import Path
-from typing import Any, Iterable
+import re
+from typing import AbstractSet, Any, Iterable, Mapping
 
 from dharma_swarm import key_oracle
 from dharma_swarm.model_live_results import (
@@ -25,6 +28,11 @@ from dharma_swarm.model_pool import ModelEntry, Route
 from dharma_swarm.models import ProviderType
 
 MODEL_STATUS_SCHEMA_VERSION = "dharma.model_status.v1"
+ROUTE_VERIFICATION_SCHEMA_VERSION = "dharma.helm.route_verification.v1"
+HELM_ON_CALL_PROJECTION_SCHEMA_VERSION = "dharma.helm.on_call_projection.v1"
+ACCEPTED_ROUTE_VERIFIER_ID = "dharma.route_verifier"
+ACCEPTED_ROUTE_VERIFIER_VERSION = "1.0.0"
+MAX_ROUTE_VERIFICATION_TTL = timedelta(hours=24)
 LIVE_MODEL_E2E_ENV = "DHARMA_LIVE_MODEL_E2E"
 PROFILE_PATH_ENV = "DHARMA_MODEL_PROFILE_PATH"
 LIVE_CALL_MATRIX_PATH_ENV = "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH"
@@ -77,6 +85,764 @@ _SAFE_DKEYS_FIELDS = (
     "status",
     "env_var",
 )
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_RFC3339_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
+_POSITIVE_VERDICT_AUTHORITY = object()
+
+
+class RouteVerdict(str, Enum):
+    """Python-owned verdict for one fixed Helm seat."""
+
+    ON_CALL = "ON_CALL"
+    UNKNOWN = "UNKNOWN"
+    REJECTED = "REJECTED"
+    CLOCK_SKEW = "CLOCK_SKEW"
+
+
+class HelmOnCallState(str, Enum):
+    """Aggregate state for the fixed seven-seat census."""
+
+    ON_CALL = "ON_CALL"
+    LIVE_DEGRADED = "LIVE_DEGRADED"
+    CLOCK_SKEW = "CLOCK_SKEW"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True, slots=True)
+class HelmSeat:
+    seat_id: str
+    display_label: str
+    logical_lineage: str
+    admissible_served_identities: tuple[tuple[str, str], ...]
+
+
+HELM_SLICE1_SEATS: tuple[HelmSeat, ...] = (
+    HelmSeat(
+        "fable-5",
+        "Fable 5",
+        "fable-5",
+        (("claude_code", "claude-fable-5"), ("fable", "fable-5")),
+    ),
+    HelmSeat(
+        "gpt-5.6",
+        "GPT 5.6",
+        "openai-gpt-5.6",
+        (("codex", "gpt-5.6"), ("openai", "gpt-5.6")),
+    ),
+    HelmSeat(
+        "grok-4.5-4.6-lineage",
+        "Grok 4.5/4.6",
+        "xai-grok-4.5-4.6",
+        (
+            ("openrouter", "x-ai/grok-4.5"),
+            ("openrouter", "x-ai/grok-4.6"),
+            ("xai", "grok-4.5"),
+            ("xai", "grok-4.6"),
+        ),
+    ),
+    HelmSeat(
+        "fugu-ultra",
+        "Fugu Ultra",
+        "sakana-fugu-ultra",
+        (("sakana", "fugu-ultra"),),
+    ),
+    HelmSeat(
+        "kimi-k3",
+        "Kimi K3",
+        "moonshot-kimi-k3",
+        (
+            ("kimi_code", "k3"),
+            ("moonshot", "kimi-k3"),
+            ("openrouter", "moonshotai/kimi-k3"),
+        ),
+    ),
+    HelmSeat(
+        "opus-5.0",
+        "Opus 5.0",
+        "anthropic-opus-5.0",
+        (
+            ("claude_code", "claude-opus-5.0"),
+            ("anthropic", "claude-opus-5-0"),
+        ),
+    ),
+    HelmSeat(
+        "opus-4.8",
+        "Opus 4.8",
+        "anthropic-opus-4.8",
+        (
+            ("claude_code", "claude-opus-4.8"),
+            ("anthropic", "claude-opus-4-8"),
+        ),
+    ),
+)
+
+_HELM_SEAT_BY_ID = {seat.seat_id: seat for seat in HELM_SLICE1_SEATS}
+_HELM_SEAT_INDEX = {seat.seat_id: index for index, seat in enumerate(HELM_SLICE1_SEATS)}
+
+
+@dataclass(frozen=True, slots=True)
+class RouteEvidence:
+    """Untrusted evidence input. A successful value is not itself authority."""
+
+    seat_id: str | None
+    logical_lineage: str | None
+    requested_provider: str | None
+    requested_model: str | None
+    served_provider: str | None
+    served_model: str | None
+    success: bool | None
+    synthetic: bool | None
+    observed_at: datetime | None
+    expires_at: datetime | None
+    verifier_id: str | None
+    verifier_version: str | None
+    verifier_accepted: bool | None
+    receipt_ref: str | None
+    receipt_sha256: str | None
+    runtime_epoch: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SanitizedRouteEvidence:
+    """Safe evidence identity carried on the terminal wire."""
+
+    seat_id: str | None
+    logical_lineage: str | None
+    requested_provider: str | None
+    requested_model: str | None
+    served_provider: str | None
+    served_model: str | None
+    observed_at: datetime | None
+    expires_at: datetime | None
+    age_seconds: int | None
+    verifier_id: str | None
+    verifier_version: str | None
+    receipt_ref: str | None
+    receipt_sha256: str | None
+    runtime_epoch: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RouteVerification:
+    schema_version: str
+    seat_id: str
+    display_label: str
+    logical_lineage: str
+    verdict: RouteVerdict
+    reason: str
+    evaluated_at: datetime
+    runtime_epoch: str
+    evidence: SanitizedRouteEvidence | None
+    _positive_authority: InitVar[object | None] = None
+
+    def __post_init__(self, _positive_authority: object | None) -> None:
+        if self.verdict is RouteVerdict.ON_CALL and _positive_authority is not _POSITIVE_VERDICT_AUTHORITY:
+            raise ValueError("ON_CALL may only be constructed by evaluate_route_verification")
+        if self.schema_version != ROUTE_VERIFICATION_SCHEMA_VERSION:
+            raise ValueError("invalid route-verification schema")
+        seat = _HELM_SEAT_BY_ID.get(self.seat_id)
+        if (
+            seat is None
+            or self.display_label != seat.display_label
+            or self.logical_lineage != seat.logical_lineage
+        ):
+            raise ValueError("route verification does not identify a fixed Helm seat")
+        _require_aware_datetime(self.evaluated_at, "evaluated_at")
+        _require_non_empty_string(self.runtime_epoch, "runtime_epoch")
+        if not isinstance(self.reason, str) or not self.reason:
+            raise ValueError("reason must be a non-empty string")
+
+
+@dataclass(frozen=True, slots=True)
+class HelmOnCallProjection:
+    schema_version: str
+    state: HelmOnCallState
+    on_call_count: int | None
+    total: int
+    seats: tuple[RouteVerification, ...]
+    evaluated_at: datetime
+    runtime_epoch: str
+
+    def __post_init__(self) -> None:
+        if self.schema_version != HELM_ON_CALL_PROJECTION_SCHEMA_VERSION:
+            raise ValueError("invalid Helm projection schema")
+        if self.total != len(HELM_SLICE1_SEATS):
+            raise ValueError("Helm projection total must be seven")
+        expected_ids = tuple(seat.seat_id for seat in HELM_SLICE1_SEATS)
+        if tuple(row.seat_id for row in self.seats) != expected_ids:
+            raise ValueError("Helm projection seats must be complete and ordered")
+        _require_aware_datetime(self.evaluated_at, "evaluated_at")
+        _require_non_empty_string(self.runtime_epoch, "runtime_epoch")
+        if any(row.runtime_epoch != self.runtime_epoch for row in self.seats):
+            raise ValueError("seat runtime epoch disagrees with projection")
+        if any(row.evaluated_at != self.evaluated_at for row in self.seats):
+            raise ValueError("seat evaluation time disagrees with projection")
+        positive_count = sum(row.verdict is RouteVerdict.ON_CALL for row in self.seats)
+        if self.state is HelmOnCallState.UNKNOWN:
+            if self.on_call_count is not None:
+                raise ValueError("UNKNOWN projections must report ?/7")
+            if any(row.verdict is not RouteVerdict.UNKNOWN for row in self.seats):
+                raise ValueError("UNKNOWN projections cannot carry seat verdicts")
+            return
+        if isinstance(self.on_call_count, bool) or self.on_call_count != positive_count:
+            raise ValueError("projection count disagrees with seat verdicts")
+        if self.state is HelmOnCallState.ON_CALL and positive_count != self.total:
+            raise ValueError("ON_CALL requires exactly 7/7")
+        if self.state is HelmOnCallState.LIVE_DEGRADED:
+            if positive_count >= self.total:
+                raise ValueError("LIVE_DEGRADED requires fewer than 7/7")
+            if any(row.verdict is RouteVerdict.CLOCK_SKEW for row in self.seats):
+                raise ValueError("clock-skew evidence requires CLOCK_SKEW state")
+        if self.state is HelmOnCallState.CLOCK_SKEW and not any(
+            row.verdict is RouteVerdict.CLOCK_SKEW for row in self.seats
+        ):
+            raise ValueError("CLOCK_SKEW requires future-dated seat evidence")
+
+
+def _require_non_empty_string(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value
+
+
+def _is_aware_datetime(value: Any) -> bool:
+    return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+
+
+def _require_aware_datetime(value: Any, field_name: str) -> datetime:
+    if not _is_aware_datetime(value):
+        raise ValueError(f"{field_name} must be timezone-aware")
+    return value
+
+
+def _format_rfc3339(value: datetime) -> str:
+    _require_aware_datetime(value, "timestamp")
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_rfc3339(value: Any, field_name: str) -> datetime:
+    if not isinstance(value, str) or _RFC3339_RE.fullmatch(value) is None:
+        raise ValueError(f"{field_name} must be an RFC 3339 timestamp")
+    candidate = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be an RFC 3339 timestamp") from exc
+    return _require_aware_datetime(parsed, field_name)
+
+
+def _parse_optional_rfc3339(value: Any, field_name: str) -> datetime | None:
+    return None if value is None else _parse_rfc3339(value, field_name)
+
+
+def _strict_keys(data: Any, expected: set[str], label: str) -> Mapping[str, Any]:
+    if not isinstance(data, Mapping) or set(data) != expected:
+        raise ValueError(f"{label} must contain exactly {sorted(expected)}")
+    return data
+
+
+def _optional_string(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string or null")
+    return value
+
+
+def _optional_bool(value: Any, field_name: str) -> bool | None:
+    if value is None or isinstance(value, bool):
+        return value
+    raise ValueError(f"{field_name} must be a boolean or null")
+
+
+_ROUTE_EVIDENCE_KEYS = {
+    "seat_id",
+    "logical_lineage",
+    "requested_provider",
+    "requested_model",
+    "served_provider",
+    "served_model",
+    "success",
+    "synthetic",
+    "observed_at",
+    "expires_at",
+    "verifier_id",
+    "verifier_version",
+    "verifier_accepted",
+    "receipt_ref",
+    "receipt_sha256",
+    "runtime_epoch",
+}
+
+
+def route_evidence_from_dict(data: Mapping[str, Any]) -> RouteEvidence:
+    """Strictly parse untrusted raw evidence; no verdict is accepted."""
+
+    row = _strict_keys(data, _ROUTE_EVIDENCE_KEYS, "route evidence")
+    return RouteEvidence(
+        seat_id=_optional_string(row["seat_id"], "seat_id"),
+        logical_lineage=_optional_string(row["logical_lineage"], "logical_lineage"),
+        requested_provider=_optional_string(row["requested_provider"], "requested_provider"),
+        requested_model=_optional_string(row["requested_model"], "requested_model"),
+        served_provider=_optional_string(row["served_provider"], "served_provider"),
+        served_model=_optional_string(row["served_model"], "served_model"),
+        success=_optional_bool(row["success"], "success"),
+        synthetic=_optional_bool(row["synthetic"], "synthetic"),
+        observed_at=_parse_optional_rfc3339(row["observed_at"], "observed_at"),
+        expires_at=_parse_optional_rfc3339(row["expires_at"], "expires_at"),
+        verifier_id=_optional_string(row["verifier_id"], "verifier_id"),
+        verifier_version=_optional_string(row["verifier_version"], "verifier_version"),
+        verifier_accepted=_optional_bool(row["verifier_accepted"], "verifier_accepted"),
+        receipt_ref=_optional_string(row["receipt_ref"], "receipt_ref"),
+        receipt_sha256=_optional_string(row["receipt_sha256"], "receipt_sha256"),
+        runtime_epoch=_optional_string(row["runtime_epoch"], "runtime_epoch"),
+    )
+
+
+def _sanitized_evidence(evidence: RouteEvidence, now: datetime) -> SanitizedRouteEvidence:
+    observed_at = evidence.observed_at if isinstance(evidence.observed_at, datetime) else None
+    expires_at = evidence.expires_at if isinstance(evidence.expires_at, datetime) else None
+    age_seconds: int | None = None
+    if _is_aware_datetime(observed_at) and observed_at <= now:
+        age_seconds = int((now - observed_at).total_seconds())
+    return SanitizedRouteEvidence(
+        seat_id=evidence.seat_id,
+        logical_lineage=evidence.logical_lineage,
+        requested_provider=evidence.requested_provider,
+        requested_model=evidence.requested_model,
+        served_provider=evidence.served_provider,
+        served_model=evidence.served_model,
+        observed_at=observed_at,
+        expires_at=expires_at,
+        age_seconds=age_seconds,
+        verifier_id=evidence.verifier_id,
+        verifier_version=evidence.verifier_version,
+        receipt_ref=evidence.receipt_ref,
+        receipt_sha256=evidence.receipt_sha256,
+        runtime_epoch=evidence.runtime_epoch,
+    )
+
+
+def _negative_verification(
+    seat: HelmSeat,
+    verdict: RouteVerdict,
+    reason: str,
+    now: datetime,
+    current_runtime_epoch: str,
+    evidence: SanitizedRouteEvidence | None,
+) -> RouteVerification:
+    if verdict is RouteVerdict.ON_CALL:
+        raise ValueError("positive verdicts require the evaluator")
+    return RouteVerification(
+        schema_version=ROUTE_VERIFICATION_SCHEMA_VERSION,
+        seat_id=seat.seat_id,
+        display_label=seat.display_label,
+        logical_lineage=seat.logical_lineage,
+        verdict=verdict,
+        reason=reason,
+        evaluated_at=now,
+        runtime_epoch=current_runtime_epoch,
+        evidence=evidence,
+    )
+
+
+def evaluate_route_verification(
+    *,
+    seat: HelmSeat,
+    evidence: RouteEvidence | None,
+    now: datetime,
+    current_runtime_epoch: str,
+    replayed_receipts: AbstractSet[str] = frozenset(),
+    receipt_duplicated: bool = False,
+) -> RouteVerification:
+    """Construct one verdict, with the sole guarded path to ``ON_CALL``."""
+
+    _require_aware_datetime(now, "now")
+    _require_non_empty_string(current_runtime_epoch, "current_runtime_epoch")
+    if _HELM_SEAT_BY_ID.get(seat.seat_id) != seat:
+        raise ValueError("seat must be one of HELM_SLICE1_SEATS")
+    if evidence is None:
+        return _negative_verification(
+            seat,
+            RouteVerdict.UNKNOWN,
+            "missing_evidence",
+            now,
+            current_runtime_epoch,
+            None,
+        )
+
+    sanitized = _sanitized_evidence(evidence, now)
+
+    def reject(verdict: RouteVerdict, reason: str) -> RouteVerification:
+        return _negative_verification(
+            seat,
+            verdict,
+            reason,
+            now,
+            current_runtime_epoch,
+            sanitized,
+        )
+
+    if evidence.seat_id != seat.seat_id:
+        return reject(RouteVerdict.REJECTED, "seat_mismatch")
+    if evidence.logical_lineage != seat.logical_lineage:
+        return reject(RouteVerdict.REJECTED, "lineage_mismatch")
+    if evidence.runtime_epoch != current_runtime_epoch:
+        return reject(RouteVerdict.UNKNOWN, "runtime_epoch_mismatch")
+    if evidence.success is not True:
+        return reject(RouteVerdict.REJECTED, "provider_completion_failed")
+    if evidence.synthetic is not False:
+        return reject(RouteVerdict.REJECTED, "synthetic_evidence")
+    if not all(
+        isinstance(value, str) and bool(value.strip())
+        for value in (evidence.requested_provider, evidence.requested_model)
+    ):
+        return reject(RouteVerdict.REJECTED, "requested_identity_missing")
+    if not all(
+        isinstance(value, str) and bool(value.strip())
+        for value in (evidence.served_provider, evidence.served_model)
+    ):
+        return reject(RouteVerdict.REJECTED, "served_identity_missing")
+    served_identity = (evidence.served_provider, evidence.served_model)
+    if served_identity not in seat.admissible_served_identities:
+        return reject(RouteVerdict.REJECTED, "served_identity_mismatch")
+    if not _is_aware_datetime(evidence.observed_at) or not _is_aware_datetime(evidence.expires_at):
+        return reject(RouteVerdict.REJECTED, "timestamp_not_timezone_aware")
+    observed_at = evidence.observed_at
+    expires_at = evidence.expires_at
+    if observed_at > now:
+        return reject(RouteVerdict.CLOCK_SKEW, "timestamp_in_future")
+    if expires_at <= observed_at:
+        return reject(RouteVerdict.REJECTED, "expiry_not_after_observation")
+    if expires_at - observed_at > MAX_ROUTE_VERIFICATION_TTL:
+        return reject(RouteVerdict.REJECTED, "ttl_exceeds_24_hours")
+    if now >= expires_at:
+        return reject(RouteVerdict.REJECTED, "evidence_expired")
+    if (
+        evidence.verifier_id != ACCEPTED_ROUTE_VERIFIER_ID
+        or evidence.verifier_version != ACCEPTED_ROUTE_VERIFIER_VERSION
+    ):
+        return reject(RouteVerdict.REJECTED, "verifier_identity_rejected")
+    if evidence.verifier_accepted is not True:
+        return reject(RouteVerdict.REJECTED, "verifier_decision_rejected")
+    if not isinstance(evidence.receipt_ref, str) or not evidence.receipt_ref.strip():
+        return reject(RouteVerdict.REJECTED, "receipt_reference_missing")
+    if not isinstance(evidence.receipt_sha256, str) or _SHA256_RE.fullmatch(evidence.receipt_sha256) is None:
+        return reject(RouteVerdict.REJECTED, "receipt_hash_invalid")
+    if receipt_duplicated:
+        return reject(RouteVerdict.REJECTED, "receipt_duplicated")
+    if evidence.receipt_ref in replayed_receipts or evidence.receipt_sha256 in replayed_receipts:
+        return reject(RouteVerdict.REJECTED, "receipt_replayed")
+
+    return RouteVerification(
+        schema_version=ROUTE_VERIFICATION_SCHEMA_VERSION,
+        seat_id=seat.seat_id,
+        display_label=seat.display_label,
+        logical_lineage=seat.logical_lineage,
+        verdict=RouteVerdict.ON_CALL,
+        reason="verified",
+        evaluated_at=now,
+        runtime_epoch=current_runtime_epoch,
+        evidence=sanitized,
+        _positive_authority=_POSITIVE_VERDICT_AUTHORITY,
+    )
+
+
+def _unknown_helm_projection(
+    *,
+    now: datetime,
+    current_runtime_epoch: str,
+    reason: str,
+) -> HelmOnCallProjection:
+    seats = tuple(
+        _negative_verification(
+            seat,
+            RouteVerdict.UNKNOWN,
+            reason,
+            now,
+            current_runtime_epoch,
+            None,
+        )
+        for seat in HELM_SLICE1_SEATS
+    )
+    return HelmOnCallProjection(
+        schema_version=HELM_ON_CALL_PROJECTION_SCHEMA_VERSION,
+        state=HelmOnCallState.UNKNOWN,
+        on_call_count=None,
+        total=len(HELM_SLICE1_SEATS),
+        seats=seats,
+        evaluated_at=now,
+        runtime_epoch=current_runtime_epoch,
+    )
+
+
+def unknown_helm_on_call_projection(
+    *,
+    now: datetime,
+    current_runtime_epoch: str,
+) -> HelmOnCallProjection:
+    """Return the mandatory connect/reconnect/epoch-change ``?/7`` state."""
+
+    _require_aware_datetime(now, "now")
+    _require_non_empty_string(current_runtime_epoch, "current_runtime_epoch")
+    return _unknown_helm_projection(
+        now=now,
+        current_runtime_epoch=current_runtime_epoch,
+        reason="awaiting_authoritative_projection",
+    )
+
+
+def project_helm_on_call(
+    evidences: Iterable[RouteEvidence],
+    *,
+    now: datetime,
+    current_runtime_epoch: str,
+    replayed_receipts: AbstractSet[str] = frozenset(),
+) -> HelmOnCallProjection:
+    """Evaluate a complete ordered seven-seat census from raw evidence."""
+
+    _require_aware_datetime(now, "now")
+    _require_non_empty_string(current_runtime_epoch, "current_runtime_epoch")
+    rows = list(evidences)
+    positions = [_HELM_SEAT_INDEX.get(row.seat_id) for row in rows]
+    known_positions = [position for position in positions if position is not None]
+    seat_counts = Counter(row.seat_id for row in rows)
+    if (
+        len(known_positions) != len(rows)
+        or known_positions != sorted(known_positions)
+        or any(count > 1 for count in seat_counts.values())
+    ):
+        return _unknown_helm_projection(
+            now=now,
+            current_runtime_epoch=current_runtime_epoch,
+            reason="malformed_evidence_batch",
+        )
+
+    by_seat = {row.seat_id: row for row in rows}
+    ref_counts = Counter(
+        row.receipt_ref for row in rows if isinstance(row.receipt_ref, str) and row.receipt_ref.strip()
+    )
+    hash_counts = Counter(
+        row.receipt_sha256
+        for row in rows
+        if isinstance(row.receipt_sha256, str) and row.receipt_sha256
+    )
+    verifications = tuple(
+        evaluate_route_verification(
+            seat=seat,
+            evidence=by_seat.get(seat.seat_id),
+            now=now,
+            current_runtime_epoch=current_runtime_epoch,
+            replayed_receipts=replayed_receipts,
+            receipt_duplicated=(
+                by_seat.get(seat.seat_id) is not None
+                and (
+                    ref_counts[by_seat[seat.seat_id].receipt_ref] > 1
+                    or hash_counts[by_seat[seat.seat_id].receipt_sha256] > 1
+                )
+            ),
+        )
+        for seat in HELM_SLICE1_SEATS
+    )
+    if any(row.reason == "runtime_epoch_mismatch" for row in verifications):
+        return _unknown_helm_projection(
+            now=now,
+            current_runtime_epoch=current_runtime_epoch,
+            reason="runtime_epoch_mismatch",
+        )
+    on_call_count = sum(row.verdict is RouteVerdict.ON_CALL for row in verifications)
+    if any(row.verdict is RouteVerdict.CLOCK_SKEW for row in verifications):
+        state = HelmOnCallState.CLOCK_SKEW
+    elif on_call_count == len(HELM_SLICE1_SEATS):
+        state = HelmOnCallState.ON_CALL
+    else:
+        state = HelmOnCallState.LIVE_DEGRADED
+    return HelmOnCallProjection(
+        schema_version=HELM_ON_CALL_PROJECTION_SCHEMA_VERSION,
+        state=state,
+        on_call_count=on_call_count,
+        total=len(HELM_SLICE1_SEATS),
+        seats=verifications,
+        evaluated_at=now,
+        runtime_epoch=current_runtime_epoch,
+    )
+
+
+_SANITIZED_EVIDENCE_KEYS = {
+    "seat_id",
+    "logical_lineage",
+    "requested_provider",
+    "requested_model",
+    "served_provider",
+    "served_model",
+    "observed_at",
+    "expires_at",
+    "age_seconds",
+    "verifier_id",
+    "verifier_version",
+    "receipt_ref",
+    "receipt_sha256",
+    "runtime_epoch",
+}
+_ROUTE_VERIFICATION_KEYS = {
+    "schema_version",
+    "seat_id",
+    "display_label",
+    "logical_lineage",
+    "verdict",
+    "reason",
+    "evaluated_at",
+    "runtime_epoch",
+    "evidence",
+}
+_HELM_PROJECTION_KEYS = {
+    "schema_version",
+    "state",
+    "on_call_count",
+    "total",
+    "seats",
+    "evaluated_at",
+    "runtime_epoch",
+}
+
+
+def _sanitized_evidence_to_dict(evidence: SanitizedRouteEvidence) -> dict[str, Any]:
+    return {
+        "seat_id": evidence.seat_id,
+        "logical_lineage": evidence.logical_lineage,
+        "requested_provider": evidence.requested_provider,
+        "requested_model": evidence.requested_model,
+        "served_provider": evidence.served_provider,
+        "served_model": evidence.served_model,
+        "observed_at": _format_rfc3339(evidence.observed_at) if _is_aware_datetime(evidence.observed_at) else None,
+        "expires_at": _format_rfc3339(evidence.expires_at) if _is_aware_datetime(evidence.expires_at) else None,
+        "age_seconds": evidence.age_seconds,
+        "verifier_id": evidence.verifier_id,
+        "verifier_version": evidence.verifier_version,
+        "receipt_ref": evidence.receipt_ref,
+        "receipt_sha256": evidence.receipt_sha256,
+        "runtime_epoch": evidence.runtime_epoch,
+    }
+
+
+def route_verification_to_dict(verification: RouteVerification) -> dict[str, Any]:
+    return {
+        "schema_version": verification.schema_version,
+        "seat_id": verification.seat_id,
+        "display_label": verification.display_label,
+        "logical_lineage": verification.logical_lineage,
+        "verdict": verification.verdict.value,
+        "reason": verification.reason,
+        "evaluated_at": _format_rfc3339(verification.evaluated_at),
+        "runtime_epoch": verification.runtime_epoch,
+        "evidence": (
+            _sanitized_evidence_to_dict(verification.evidence)
+            if verification.evidence is not None
+            else None
+        ),
+    }
+
+
+def _sanitized_evidence_from_dict(data: Mapping[str, Any]) -> SanitizedRouteEvidence:
+    row = _strict_keys(data, _SANITIZED_EVIDENCE_KEYS, "sanitized route evidence")
+    age_seconds = row["age_seconds"]
+    if age_seconds is not None and (
+        isinstance(age_seconds, bool) or not isinstance(age_seconds, int) or age_seconds < 0
+    ):
+        raise ValueError("age_seconds must be a nonnegative integer or null")
+    return SanitizedRouteEvidence(
+        seat_id=_optional_string(row["seat_id"], "seat_id"),
+        logical_lineage=_optional_string(row["logical_lineage"], "logical_lineage"),
+        requested_provider=_optional_string(row["requested_provider"], "requested_provider"),
+        requested_model=_optional_string(row["requested_model"], "requested_model"),
+        served_provider=_optional_string(row["served_provider"], "served_provider"),
+        served_model=_optional_string(row["served_model"], "served_model"),
+        observed_at=_parse_optional_rfc3339(row["observed_at"], "observed_at"),
+        expires_at=_parse_optional_rfc3339(row["expires_at"], "expires_at"),
+        age_seconds=age_seconds,
+        verifier_id=_optional_string(row["verifier_id"], "verifier_id"),
+        verifier_version=_optional_string(row["verifier_version"], "verifier_version"),
+        receipt_ref=_optional_string(row["receipt_ref"], "receipt_ref"),
+        receipt_sha256=_optional_string(row["receipt_sha256"], "receipt_sha256"),
+        runtime_epoch=_optional_string(row["runtime_epoch"], "runtime_epoch"),
+    )
+
+
+def route_verification_from_dict(data: Mapping[str, Any]) -> RouteVerification:
+    """Strict untrusted decoder which categorically rejects positive authority."""
+
+    row = _strict_keys(data, _ROUTE_VERIFICATION_KEYS, "route verification")
+    try:
+        verdict = RouteVerdict(row["verdict"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unknown route verdict") from exc
+    if verdict is RouteVerdict.ON_CALL:
+        raise ValueError("serialized ON_CALL is not evaluation authority")
+    seat_id = _require_non_empty_string(row["seat_id"], "seat_id")
+    seat = _HELM_SEAT_BY_ID.get(seat_id)
+    if seat is None:
+        raise ValueError("unknown Helm seat")
+    evidence_value = row["evidence"]
+    evidence = None if evidence_value is None else _sanitized_evidence_from_dict(evidence_value)
+    return RouteVerification(
+        schema_version=_require_non_empty_string(row["schema_version"], "schema_version"),
+        seat_id=seat_id,
+        display_label=_require_non_empty_string(row["display_label"], "display_label"),
+        logical_lineage=_require_non_empty_string(row["logical_lineage"], "logical_lineage"),
+        verdict=verdict,
+        reason=_require_non_empty_string(row["reason"], "reason"),
+        evaluated_at=_parse_rfc3339(row["evaluated_at"], "evaluated_at"),
+        runtime_epoch=_require_non_empty_string(row["runtime_epoch"], "runtime_epoch"),
+        evidence=evidence,
+    )
+
+
+def helm_on_call_projection_to_dict(projection: HelmOnCallProjection) -> dict[str, Any]:
+    return {
+        "schema_version": projection.schema_version,
+        "state": projection.state.value,
+        "on_call_count": projection.on_call_count,
+        "total": projection.total,
+        "seats": [route_verification_to_dict(row) for row in projection.seats],
+        "evaluated_at": _format_rfc3339(projection.evaluated_at),
+        "runtime_epoch": projection.runtime_epoch,
+    }
+
+
+def helm_on_call_projection_from_dict(data: Mapping[str, Any]) -> HelmOnCallProjection:
+    """Decode negative state only; serialized positive truth is never authority."""
+
+    row = _strict_keys(data, _HELM_PROJECTION_KEYS, "Helm projection")
+    try:
+        state = HelmOnCallState(row["state"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unknown Helm projection state") from exc
+    if state is HelmOnCallState.ON_CALL:
+        raise ValueError("serialized ON_CALL projection is not evaluation authority")
+    seats_value = row["seats"]
+    if not isinstance(seats_value, list):
+        raise ValueError("seats must be a list")
+    seats = tuple(route_verification_from_dict(item) for item in seats_value)
+    on_call_count = row["on_call_count"]
+    if on_call_count is not None and (
+        isinstance(on_call_count, bool) or not isinstance(on_call_count, int)
+    ):
+        raise ValueError("on_call_count must be an integer or null")
+    total = row["total"]
+    if isinstance(total, bool) or not isinstance(total, int):
+        raise ValueError("total must be an integer")
+    return HelmOnCallProjection(
+        schema_version=_require_non_empty_string(row["schema_version"], "schema_version"),
+        state=state,
+        on_call_count=on_call_count,
+        total=total,
+        seats=seats,
+        evaluated_at=_parse_rfc3339(row["evaluated_at"], "evaluated_at"),
+        runtime_epoch=_require_non_empty_string(row["runtime_epoch"], "runtime_epoch"),
+    )
 
 @dataclass(frozen=True, slots=True)
 class RouteStatus:
@@ -582,17 +1348,38 @@ def verify_floor_models(*, profiles_path: Path | None = None) -> dict[str, Any]:
 
 
 __all__ = [
+    "ACCEPTED_ROUTE_VERIFIER_ID",
+    "ACCEPTED_ROUTE_VERIFIER_VERSION",
+    "HELM_ON_CALL_PROJECTION_SCHEMA_VERSION",
+    "HELM_SLICE1_SEATS",
     "LIVE_MODEL_E2E_ENV",
+    "MAX_ROUTE_VERIFICATION_TTL",
     "MODEL_STATUS_SCHEMA_VERSION",
+    "ROUTE_VERIFICATION_SCHEMA_VERSION",
+    "HelmOnCallProjection",
+    "HelmOnCallState",
+    "HelmSeat",
     "ModelStatus",
     "ModelStatusProjection",
     "ModelVerification",
+    "RouteEvidence",
     "RouteStatus",
+    "RouteVerdict",
+    "RouteVerification",
+    "SanitizedRouteEvidence",
     "all_model_status",
+    "evaluate_route_verification",
     "floor_model_status",
+    "helm_on_call_projection_from_dict",
+    "helm_on_call_projection_to_dict",
     "load_profiles",
+    "project_helm_on_call",
     "projection_to_dict",
+    "route_evidence_from_dict",
+    "route_verification_from_dict",
+    "route_verification_to_dict",
     "save_profile",
     "top_floor_models_for_dashboard",
+    "unknown_helm_on_call_projection",
     "verify_floor_models",
 ]

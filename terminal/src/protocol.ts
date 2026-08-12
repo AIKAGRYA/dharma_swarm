@@ -1,5 +1,7 @@
 import {COMMAND_TAB_REGISTRY} from "./commandRegistry";
 import {freshnessToken, parseControlPulsePreview, parseRuntimeFreshness} from "./freshness";
+import {normalizeCommandOutcome} from "./commandOutcome";
+import {stripHelmDirectives} from "./uiIntents";
 export {
   agentRoutesPayloadFromEvent,
   agentRoutesToLines,
@@ -7,7 +9,6 @@ export {
   modelPolicyToLines,
   modelPolicyToPreview,
   handshakeRouteConfigFromEvent,
-  providerRouteReceiptFromEvent,
   routingDecisionPayloadFromEvent,
 } from "./protocol/routing";
 import type {
@@ -2070,14 +2071,15 @@ export function activityEntriesFromEvent(event: Record<string, unknown>): Activi
     const command = resolveEventCommand(event);
     const summary = String(event.summary ?? "").trim();
     const output = resolveEventOutput(event);
-    if (!command && !summary) {
+    const outcome = normalizeCommandOutcome(event);
+    if (!command && !summary && !output) {
       return [];
     }
     return [
       makeActivityEntry("pivot", command ? `intent ${command}` : "command result", {
-        phase: "complete",
-        summary: compactText(summary || output || "completed"),
-        detail: command ? [`Command: ${command}`] : [],
+        phase: outcome.phase,
+        summary: compactText(summary || output || outcome.outcome),
+        detail: [...(command ? [`Command: ${command}`] : []), `Outcome: ${outcome.outcome}`],
         raw: prettyRaw(event),
         correlationId: stringField(event, "id", "") || undefined,
       }),
@@ -3622,7 +3624,8 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ];
   }
   if (type === "command.result" || (type === "action.result" && resolveEventActionType(event) === "command.run")) {
-    const output = resolveEventOutput(event).trim();
+    const outcome = normalizeCommandOutcome(event);
+    const output = resolveEventOutput(event).trim() || (outcome.rendersCompletion ? "" : outcome.outcome);
     const targetPane = resolveCommandTargetPane(event, "control");
     const command = resolveEventCommand(event);
     const workspacePayload = workspaceSnapshotPayloadFromEvent(event);
@@ -3642,7 +3645,7 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ) {
       return [];
     }
-    return [{tabId: targetPane, lines: [makeLine("system", output)]}];
+    return [{tabId: targetPane, lines: [makeLine(outcome.phase === "failed" ? "error" : "system", output)]}];
   }
   if (type === "workspace.snapshot.result") {
     return [];
@@ -3681,7 +3684,8 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ];
   }
   if (type === "text_delta" || type === "text_complete") {
-    return [{tabId: "chat", lines: [makeLine("assistant", String(event.content ?? ""))]}];
+    const narration = stripHelmDirectives(String(event.content ?? ""));
+    return narration ? [{tabId: "chat", lines: [makeLine("assistant", narration)]}] : [];
   }
   if (type === "thinking_delta") {
     return [{tabId: "thinking", lines: [makeLine("thinking", String(event.content ?? ""))]}];

@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useReducer, useRef, useState} from "react";
 import {Box, Text, useApp, useInput, useStdin} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
+import {normalizeCommandOutcome} from "./commandOutcome.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
 import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
@@ -20,6 +21,7 @@ import {AgentsPane} from "./components/AgentsPane.tsx";
 import {ControlPane, buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
 import {ModelPicker} from "./components/ModelPicker.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
+import {OnCallTruthBand} from "./components/OnCallTruthBand.tsx";
 import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
 import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {NavigatorRail} from "./components/NavigatorRail.tsx";
@@ -31,10 +33,10 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {closestCommand, helmDirectiveToIntent, matchUiIntent, parseHelmDirectives, tourLines, type HelmDirective, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
-import {routeLabel, routePolicyFromValue, routePolicyWithSuccessfulReceipt, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
@@ -81,7 +83,6 @@ import {
   modelPolicyToLines,
   modelPolicyToPreview,
   handshakeRouteConfigFromEvent,
-  providerRouteReceiptFromEvent,
   permissionDecisionFromEvent,
   permissionHistoryFromEvent,
   permissionOutcomeFromEvent,
@@ -96,7 +97,6 @@ import {
   runtimePayloadHasAuthoritativeControlSignal,
   runtimePayloadToPreview,
   runtimeSnapshotPayloadFromEvent,
-  runtimeSnapshotToLines,
   runtimeSnapshotToPreview,
   sessionCatalogFromEvent,
   sessionDetailResultFromEvent,
@@ -114,7 +114,9 @@ import {
   nextSessionPaneAfterDetailResult,
 } from "./sessionPaneState.ts";
 import {initialState, reduceApp} from "./state.ts";
-import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+import {unknownOnCallTruthState} from "./onCallTruth.ts";
+import {helmOnCallProjectionFromEvent} from "./protocol/onCallTruth.ts";
+import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
 
 export {continuityStateFromSession} from "./sessionContinuity.ts";
 export {
@@ -125,13 +127,11 @@ export {
   requestMissingAuthoritativeSurfaces,
 } from "./surfaceAuthority.ts";
 
-const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
+export const SNAPSHOT_REFRESH_INTERVAL_MS = 15_000;
 const SESSION_TRANSCRIPT_LIMIT = 40;
 // F-021: floor lowered 8 -> 5 so the 80x24 budget (24 - 17 chrome rows = 7)
 // is not forced past the terminal height by the old floor.
 const MIN_SCROLL_WINDOW_SIZE = 5;
-
-type ModelChoice = RouteTarget;
 
 type PendingCommandStream = {
   command: string;
@@ -1362,7 +1362,6 @@ function resolveSlashCommandResultTabId(
   fallbackTabId?: string,
 ): string {
   const eventCommand = resolveEventCommand(event);
-  const command = eventCommand || fallbackCommand || "";
   const resolvedTabId = resolveCommandTargetPane(event, "");
   const fallbackCommandTabId = fallbackCommand ? commandTargetTab(fallbackCommand) : "";
   const preferredFallbackTabId =
@@ -1387,7 +1386,18 @@ function slashCommandResultActions(
   const command = resolveEventCommand(event) || fallbackCommand || "";
   const normalized = normalizeCommandName(command);
   const tabId = resolveSlashCommandResultTabId(event, fallbackCommand, fallbackTabId);
-  const statusValue = normalized ? `/${normalized} -> ${tabId}` : fallbackStatus;
+  const outcome = normalizeCommandOutcome(event);
+  const subject = normalized ? `/${normalized}` : "command";
+  const failureReason = outcome.outcome === "unsupported"
+    ? "unsupported"
+    : outcome.reason === "explicit_failed"
+      ? ""
+      : outcome.reason.replaceAll("_", " ");
+  const statusValue = outcome.phase === "complete"
+    ? (normalized ? `${subject} -> ${tabId}` : fallbackStatus)
+    : outcome.phase === "running"
+      ? `${subject} accepted -> ${tabId}`
+      : `${subject} failed${failureReason ? `: ${failureReason}` : ""} -> ${tabId}`;
   return [
     {type: "tab.activate", tabId},
     {type: "status.set", value: statusValue},
@@ -1425,58 +1435,6 @@ function enrichSparseCommandResultEvent(
   };
 }
 
-// Execute an agent-emitted ⟦helm:…⟧ directive: the same reducer dispatches as
-// the operator's own plain language, but narration goes to the rail head-band
-// (the agent already narrated in its reply text) — never a duplicate respond.
-// The agent REQUESTS; this is the single point where the TS reducer EXECUTES.
-// Only VIEW/toggle verbs resolve; operator-gated actions never reach here.
-function executeAgentDirective(
-  directive: HelmDirective,
-  state: AppState,
-  dispatch: React.Dispatch<AppAction>,
-  bridge: DharmaBridge,
-): void {
-  const panes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
-  const intent = helmDirectiveToIntent(directive, panes, selectableRouteTargets(state.routePolicy));
-  if (!intent) {
-    dispatch({type: "navigator.narrate", line: `couldn't act on "${directive.verb} ${directive.arg}".`});
-    return;
-  }
-  if (intent.kind === "layout") {
-    dispatch({type: "layout.mode.set", mode: intent.mode});
-    dispatch({type: "navigator.narrate", line: `switched to the ${intent.mode} view`});
-    dispatch({type: "status.set", value: `navigator -> ${intent.mode}`});
-    return;
-  }
-  if (intent.kind === "pane") {
-    dispatch({type: "tab.activate", tabId: intent.tabId});
-    dispatch({type: "navigator.narrate", line: `opened ${intent.title}`});
-    dispatch({type: "status.set", value: `navigator -> ${intent.title}`});
-    return;
-  }
-  if (intent.kind === "rail") {
-    const on = intent.on === "toggle" ? !state.uiMode.railVisible : intent.on;
-    if (on && state.uiMode.layoutMode !== "cockpit") {
-      dispatch({type: "layout.mode.set", mode: "cockpit"});
-    }
-    dispatch({type: "rail.set", visible: on});
-    dispatch({type: "navigator.narrate", line: on ? "docked the chat rail" : "undocked the rail"});
-    return;
-  }
-  if (intent.kind === "model") {
-    if (state.bridgeStatus === "connected") {
-      bridge.send("action.run", {
-        action_type: "model.set",
-        provider: intent.target.provider,
-        model: intent.target.model,
-        strategy: state.routePolicy.strategy,
-      });
-    }
-    dispatch({type: "navigator.narrate", line: `switching route to ${intent.target.provider}:${intent.target.model}`});
-    return;
-  }
-}
-
 export function createBridgeEventHandler({
   dispatch,
   getState,
@@ -1502,6 +1460,7 @@ export function createBridgeEventHandler({
     awaitingAuthoritativeResync = true;
     resyncPending = false;
     apply([
+      {type: "onCall.truth.reset", runtimeEpoch: null},
       {type: "surface.truth.reset"},
       {type: "turn.reset"},
       {type: "bridge.status", status: offline ? "offline" : "degraded"},
@@ -1532,6 +1491,10 @@ export function createBridgeEventHandler({
     const pendingCommand = streamedPendingCommand;
     const typed = enrichSparseCommandResultEvent(event as Record<string, unknown>, pendingCommand);
     const eventType = String(typed.type ?? "");
+    if (eventType === "helm.on_call_projection") {
+      const projection = helmOnCallProjectionFromEvent(typed);
+      apply([projection ? {type: "onCall.projection.set", projection} : {type: "onCall.truth.reset"}]);
+    }
     const canonicalEvents = canonicalEventsFromBridgeEvent(typed);
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
@@ -1568,34 +1531,18 @@ export function createBridgeEventHandler({
       const requestId = String(typed.request_id ?? "");
       if (requestId) apply([{type: "turn.finish", requestId}]);
     }
-    if (eventType === "route.receipt") {
-      const receipt = providerRouteReceiptFromEvent(typed), routePolicy = getState().routePolicy;
-      if (receipt) apply([{type: "route.policy.set", policy: routePolicyWithSuccessfulReceipt(routePolicy, receipt)}]);
-    }
-    // Agent-action channel: the chat agent drives the Helm by emitting
-    // ⟦helm:…⟧ directives in its reply. Parse them off the completed assistant
-    // text and execute each (the sentinel itself is stripped from the display).
-    const assistantText =
-      eventType === "text_complete"
-        ? String(typed.content ?? "")
-        : eventType === "assistant"
-          ? String(typed.message ?? "")
-          : "";
-    if (assistantText.includes("⟦")) {
-      for (const directive of parseHelmDirectives(assistantText)) {
-        executeAgentDirective(directive, state, dispatch, bridge);
-      }
-    }
     if (eventType !== "bridge.error" && eventType !== "error") {
       malformedBridgeEvents = 0;
     }
     if (eventType === "bridge.ready") {
       apply([
+        {type: "onCall.truth.reset", runtimeEpoch: null},
         {type: "bridge.status", status: "connected"},
         {type: "status.set", value: "bridge ready"},
       ]);
     }
     if (eventType === "bridge.error") {
+      apply([{type: "onCall.truth.reset", runtimeEpoch: null}]);
       const code = String(typed.code ?? "");
       const message = String(typed.message ?? typed.code ?? "bridge error");
       if (code === "session_detail_failed") {
@@ -1656,7 +1603,6 @@ export function createBridgeEventHandler({
     }
     if (eventType === "command.result") {
       const command = resolveEventCommand(typed);
-      const commandName = normalizeCommandName(command);
       apply(commandResultActionsForBridgeEvent(
         typed,
         pendingCommand?.command,
@@ -2523,17 +2469,6 @@ export function App(): React.ReactElement {
   const bridgeRef = useRef<DharmaBridge | null>(null);
   const handshakeBackoffRef = useRef({attempt: 0, nextAllowedAt: 0});
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const liveSnapshotRequestRef = useRef(0);
-
-  function requestLiveSnapshotsIfStale(provider: string, model: string, strategy: string, minIntervalMs = 900): void {
-    const now = Date.now();
-    if (now - liveSnapshotRequestRef.current < minIntervalMs) {
-      return;
-    }
-    liveSnapshotRequestRef.current = now;
-    requestLiveSnapshots(bridge, provider, model, strategy);
-  }
-
   function requestHandshake(reason: "initial" | "reconnect" | "probe"): void {
     const bridgeInstance = bridgeRef.current;
     if (!bridgeInstance) {
@@ -3595,16 +3530,16 @@ export function App(): React.ReactElement {
     );
   }
 
-  // F-111: zen is the boot default and contains exactly the transcript, the
-  // composer, and ONE thin status line (F-110) — the Claude Code-grade main
-  // stage. Tab/^K still navigate: any non-chat pane or overlay falls through
-  // to the full cockpit chrome below; returning to chat restores zen.
+  // F-111: zen is the boot default and contains the transcript, persistent
+  // Python-owned OnCall truth, the composer, and one thin status line — the
+  // Claude Code-grade main stage. Tab/^K still navigate: any non-chat pane or
+  // overlay falls through to full cockpit chrome; returning to chat restores zen.
   if (
     state.uiMode.layoutMode === "zen" &&
     activeTab?.kind === "chat" &&
     state.uiMode.activeOverlay.kind === "none"
   ) {
-    const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // FACE-1 zen-pure: the status line carries only durable state (route +
     // bridge liveness) — transient statusLine spam ("route confirmed",
     // "sidebar ->") must never churn the zen frame.
@@ -3641,6 +3576,7 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3656,16 +3592,16 @@ export function App(): React.ReactElement {
   }
 
   // FACE-3 the scroll: a reading-first manuscript — the conversation as a
-  // clean centered column (~80 cols), one thin wave rule between turns, all
-  // telemetry folded behind a single toggleable drawer row (^D). The composer
-  // carries the frame's only border; Tab/^K still fall through to the cockpit
-  // chrome below, and returning to chat restores the manuscript.
+  // clean centered column (~80 cols), one thin wave rule between turns, and
+  // persistent Python-owned OnCall truth. Other telemetry remains folded behind
+  // a single toggleable drawer row (^D). The composer carries the frame's only
+  // border; Tab/^K still fall through to cockpit chrome below.
   if (
     state.uiMode.layoutMode === "scroll" &&
     activeTab?.kind === "chat" &&
     state.uiMode.activeOverlay.kind === "none"
   ) {
-    const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // Manuscript measure: a touch under the zen clamp — the column is the
     // identity of this face, so it earns gutters at wide terminals.
     const scrollMeasure = Math.min(terminalWidth, 84);
@@ -3688,6 +3624,7 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3720,6 +3657,7 @@ export function App(): React.ReactElement {
           compact={compactShell}
         />
         <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
+        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
         <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
         {/* F-021: the 8-row wave renders only when the height budget affords it
             (>= 40 rows) and the chat is still quiet — once real turns arrive the
@@ -3918,6 +3856,7 @@ export function createInitialAppState(baseState: AppState): AppState {
 
   return {
     ...baseState,
+    onCallTruth: unknownOnCallTruthState(),
     uiMode: {
       ...baseState.uiMode,
       sidebarVisible: restored?.sidebarVisible ?? baseState.uiMode.sidebarVisible,

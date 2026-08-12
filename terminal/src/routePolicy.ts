@@ -1,4 +1,4 @@
-import type {ProviderRouteReceipt, RoutePolicyState, RouteTarget, RouteState} from "./types";
+import type {RoutePolicyState, RouteTarget, RouteState} from "./types";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -120,35 +120,7 @@ export function routePolicyWithConfig(
     availabilityReason: identityChanged
       ? matchingTarget ? matchingTarget.availabilityReason : "awaiting_route_authority"
       : current.availabilityReason,
-    lastConfirmedRouteId: identityChanged ? undefined : current.lastConfirmedRouteId,
     activeLabel: matchingTarget?.label ?? (identityChanged ? undefined : current.activeLabel),
-  };
-}
-
-export function routePolicyWithSuccessfulReceipt(
-  current: RoutePolicyState,
-  receipt: ProviderRouteReceipt,
-): RoutePolicyState {
-  if (
-    receipt.evidenceKind !== "provider_completion"
-    || receipt.routeId !== current.routeId
-    || receipt.provider !== current.provider
-    || receipt.model !== current.model
-  ) {
-    return current;
-  }
-  const targets = current.targets.map((target) =>
-    target.routeId === receipt.routeId
-      ? {...target, routeState: "ready" as const, availabilityReason: undefined, selectable: true}
-      : target,
-  );
-  return {
-    ...current,
-    routeState: "ready",
-    selectable: true,
-    availabilityReason: undefined,
-    lastConfirmedRouteId: current.routeId,
-    targets,
   };
 }
 
@@ -198,42 +170,21 @@ export function routePolicyFromValue(value: unknown, current: RoutePolicyState =
     ? "unavailable"
     : incomingRouteState;
   const routeExplicitlyDead = effectiveIncomingRouteState === "invalid" || effectiveIncomingRouteState === "unavailable";
-  const sameIdentity = current.routeId === routeId
-    && current.provider === provider
-    && current.model === model;
-  const preserveSuccessfulReceipt =
-    sameIdentity
-    && current.lastConfirmedRouteId === routeId
-    && current.routeState === "ready"
-    && effectiveIncomingRouteState === "unverified";
-  const effectiveTargets = preserveSuccessfulReceipt
-    ? targets.map((target) => target.routeId === routeId
-      ? {...target, routeState: "ready" as const, availabilityReason: undefined, selectable: true}
-      : target)
-    : targets;
-
   return {
     routeId,
     provider,
     model,
     strategy,
-    routeState: preserveSuccessfulReceipt ? "ready" : effectiveIncomingRouteState,
-    selectable: preserveSuccessfulReceipt || (!routeExplicitlyDead && selectable),
-    availabilityReason: preserveSuccessfulReceipt
-      ? undefined
-      : routeExplicitlyDead
-        ? asString(policy.availability_reason ?? metadata.availability_reason) || matchingTarget?.availabilityReason
-        : matchingTarget?.availabilityReason
-          ?? (asString(policy.availability_reason ?? metadata.availability_reason) || undefined),
+    routeState: effectiveIncomingRouteState,
+    selectable: !routeExplicitlyDead && selectable,
+    availabilityReason: routeExplicitlyDead
+      ? asString(policy.availability_reason ?? metadata.availability_reason) || matchingTarget?.availabilityReason
+      : matchingTarget?.availabilityReason
+        ?? (asString(policy.availability_reason ?? metadata.availability_reason) || undefined),
     defaultRouteId: asString(metadata.default_route ?? policy.default_route) || undefined,
     fallbackChain,
-    lastConfirmedRouteId: sameIdentity
-      && effectiveIncomingRouteState !== "invalid"
-      && effectiveIncomingRouteState !== "unavailable"
-      ? current.lastConfirmedRouteId
-      : undefined,
     activeLabel: asString(metadata.active_label ?? policy.active_label) || matchingTarget?.label || undefined,
-    targets: effectiveTargets,
+    targets,
   };
 }
 

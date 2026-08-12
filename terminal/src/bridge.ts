@@ -165,7 +165,12 @@ export class DharmaBridge {
     const requestId = String(event.request_id ?? "");
     if (
       !requestId ||
-      !(eventType.endsWith(".result") || eventType === "bridge.error" || eventType === "error")
+      !(
+        eventType.endsWith(".result")
+        || eventType === "helm.on_call_projection"
+        || eventType === "bridge.error"
+        || eventType === "error"
+      )
     ) {
       return;
     }

@@ -1,5 +1,6 @@
 import type {ActivityEntry, ActivityPhase, CanonicalExecutionEvent, PaneKind, TranscriptLine} from "./types";
 import {stripHelmDirectives} from "./uiIntents";
+import {normalizeCommandOutcome} from "./commandOutcome";
 import {
   cancellationAckFromEvent,
   permissionDecisionFromEvent,
@@ -356,6 +357,7 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     const command = resolveEventCommand(event);
     const output = resolveEventOutput(event).trim();
     const summary = String(event.summary ?? "").trim();
+    const outcome = normalizeCommandOutcome(event);
     if (!command && !summary && !output) {
       return [];
     }
@@ -363,13 +365,13 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
       canonicalEvent(event, {
         sourceEventType: type,
         kind: "command",
-        phase: "complete",
+        phase: outcome.phase,
         title: command ? `intent ${command}` : "command result",
-        summary: compactText(summary || output || "completed"),
-        content: output || undefined,
-        detail: command ? [`Command: ${command}`] : [],
+        summary: compactText(summary || output || outcome.outcome),
+        content: output || outcome.outcome,
+        detail: [...(command ? [`Command: ${command}`] : []), `Outcome: ${outcome.outcome}`],
         timestamp: timestampFromEvent(event),
-        correlationId: String(event.id ?? "").trim() || undefined,
+        correlationId: String(event.request_id ?? event.id ?? "").trim() || undefined,
       }),
     ];
   }
@@ -689,7 +691,11 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         activeTurn.steps.push(nextStep);
       }
     }
-    if (event.kind === "error" || event.phase === "failed") {
+    const isMismatchedSlashCommand = event.kind === "command"
+      && activeTurn.prompt.trim().startsWith("/")
+      && Boolean(slashCommandNameFromText(String(event.raw?.command ?? "")))
+      && slashCommandNameFromText(String(event.raw?.command ?? "")) !== slashCommandNameFromText(activeTurn.prompt);
+    if ((event.kind === "error" || event.phase === "failed") && !isMismatchedSlashCommand) {
       activeTurn.phase = "failed";
     }
     // F-158: a slash-command turn completes on its command result — commands have no
@@ -699,16 +705,16 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       const turnCommand = slashCommandNameFromText(activeTurn.prompt);
       const eventCommand = slashCommandNameFromText(String(event.raw?.command ?? ""));
       if (!eventCommand || eventCommand === turnCommand) {
-        if (!activeTurn.assistant) {
-          const responseText = (event.content ?? event.summary ?? "").trim();
-          if (responseText) {
-            activeTurn.assistant = scrubRawIdentifiers(responseText);
-            activeTurn.assistantTimestamp = event.timestamp;
-          }
+        const responseText = (event.content ?? event.summary ?? "").trim();
+        if (responseText) {
+          activeTurn.assistant = scrubRawIdentifiers(responseText);
+          activeTurn.assistantTimestamp = event.timestamp;
         }
-        if (activeTurn.phase !== "failed") {
-          activeTurn.phase = "complete";
+        if (event.phase === "running") {
+          activeTurn.phase = "running";
+          continue;
         }
+        activeTurn.phase = event.phase === "complete" ? "complete" : "failed";
         activeTurn = undefined;
         continue;
       }
@@ -783,8 +789,8 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
     projected.push(line("user", `> ${turn.prompt}`));
 
     if (turn.assistant) {
-      // Strip any ⟦helm:…⟧ agent-directives so they never reach the operator's
-      // transcript — the directive is executed + narrated separately in app.tsx.
+      // Provider-emitted Helm syntax has no authority. Strip it from narration;
+      // app.tsx never executes provider directives.
       const visible = stripHelmDirectives(turn.assistant);
       if (visible) {
         for (const responseLine of visible.split("\n")) {

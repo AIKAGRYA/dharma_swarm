@@ -6,23 +6,9 @@ import {
   routeLabel,
   routePolicyFromValue,
   routePolicyWithConfig,
-  routePolicyWithSuccessfulReceipt,
   routeSummary,
   selectableRouteTargets,
 } from "../src/routePolicy";
-import type {ProviderRouteReceipt} from "../src/types";
-
-function providerReceipt(overrides: Partial<ProviderRouteReceipt> = {}): ProviderRouteReceipt {
-  return {
-    requestId: "request-1",
-    sessionId: "session-1",
-    provider: "codex",
-    model: "gpt-5.5",
-    routeId: "codex:gpt-5.5",
-    evidenceKind: "provider_completion",
-    ...overrides,
-  };
-}
 
 describe("routePolicyFromValue", () => {
   test("normalizes a ready codex route with a truthful fallback chain", () => {
@@ -208,45 +194,22 @@ describe("routePolicyFromValue", () => {
     expect(policy.targets).toEqual([]);
   });
 
-  test("promotes only the selected target after a successful provider receipt", () => {
-    const current = routePolicyFromValue({
+  test("does not preserve a prior ready claim across an unverified refresh", () => {
+    const ready = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
-      targets: [
-        {alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true},
-        {alias: "opus", label: "Opus", provider: "claude", model: "claude-opus-4.8", route_state: "unverified", picker_visible: true},
-      ],
+      targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "ready", picker_visible: true}],
     });
 
-    const promoted = routePolicyWithSuccessfulReceipt(current, providerReceipt());
-
-    expect(promoted.routeState).toBe("ready");
-    expect(promoted.lastConfirmedRouteId).toBe("codex:gpt-5.5");
-    expect(promoted.targets.find((target) => target.provider === "codex")?.routeState).toBe("ready");
-    expect(promoted.targets.find((target) => target.provider === "claude")?.routeState).toBe("unverified");
-  });
-
-  test("keeps newer success proof across unknown refreshes but yields to explicit unavailability", () => {
-    const selected = routePolicyFromValue({
+    const refreshed = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
       targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
-    });
-    const proven = routePolicyWithSuccessfulReceipt(selected, providerReceipt());
+    }, ready);
 
-    const unknownRefresh = routePolicyFromValue({
-      selected_provider: "codex",
-      selected_model: "gpt-5.5",
-      targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
-    }, proven);
-    expect(unknownRefresh.routeState).toBe("ready");
-
-    const deadRefresh = routePolicyFromValue({
-      selected_provider: "codex",
-      selected_model: "gpt-5.5",
-      targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "unavailable", picker_visible: false}],
-    }, unknownRefresh);
-    expect(deadRefresh.routeState).toBe("unavailable");
+    expect(ready.routeState).toBe("ready");
+    expect(refreshed.routeState).toBe("unverified");
+    expect(refreshed.targets[0]?.routeState).toBe("unverified");
   });
 
   test("configuration alone never fabricates a confirmed route", () => {
@@ -254,55 +217,48 @@ describe("routePolicyFromValue", () => {
     expect(configured.routeId).toBe("codex:gpt-5.5");
     expect(configured.routeState).toBe("unverified");
     expect(configured.selectable).toBe(false);
-    expect(configured.lastConfirmedRouteId).toBeUndefined();
   });
 
-  test("configuration changes cannot carry readiness or proof across model identity", () => {
+  test("configuration changes cannot carry readiness across model identity", () => {
     const selected = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
-      targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
+      targets: [{alias: "gpt-5.5", label: "GPT-5.5", provider: "codex", model: "gpt-5.5", route_state: "ready", picker_visible: true}],
     });
-    const proven = routePolicyWithSuccessfulReceipt(selected, providerReceipt());
-    const switched = routePolicyWithConfig(proven, "codex", "gpt-5.4", "responsive");
+    const switched = routePolicyWithConfig(selected, "codex", "gpt-5.4", "responsive");
 
     expect(switched.routeId).toBe("codex:gpt-5.4");
     expect(switched.model).toBe("gpt-5.4");
     expect(switched.routeState).toBe("unverified");
     expect(switched.selectable).toBe(false);
-    expect(switched.lastConfirmedRouteId).toBeUndefined();
   });
 
-  test("a proven A route cannot be resurrected after A to B to A transitions", () => {
+  test("an old ready route cannot be resurrected after A to B to A transitions", () => {
     const routeA = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
-      targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
+      targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "ready", picker_visible: true}],
     });
-    const provenA = routePolicyWithSuccessfulReceipt(routeA, providerReceipt());
     const routeB = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.4",
       targets: [{alias: "b", label: "B", provider: "codex", model: "gpt-5.4", route_state: "ready", picker_visible: true}],
-    }, provenA);
+    }, routeA);
     const returnedA = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
       targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
     }, routeB);
 
-    expect(routeB.lastConfirmedRouteId).toBeUndefined();
     expect(returnedA.routeState).toBe("unverified");
-    expect(returnedA.lastConfirmedRouteId).toBeUndefined();
   });
 
   test("explicit unavailability dominates contradictory unverified targets", () => {
-    const selected = routePolicyFromValue({
+    const current = routePolicyFromValue({
       selected_provider: "codex",
       selected_model: "gpt-5.5",
-      targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true}],
+      targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "ready", picker_visible: true}],
     });
-    const proven = routePolicyWithSuccessfulReceipt(selected, providerReceipt());
     const contradicted = routePolicyFromValue({
       version: "v1",
       domain: "routing_decision",
@@ -314,12 +270,11 @@ describe("routePolicyFromValue", () => {
         metadata: {route_state: "unavailable", availability_reason: "explicit route revocation"},
       },
       targets: [{alias: "a", label: "A", provider: "codex", model: "gpt-5.5", route_state: "unverified", picker_visible: true, availability_reason: "stale unknown"}],
-    }, proven);
+    }, current);
 
     expect(contradicted.routeState).toBe("unavailable");
     expect(contradicted.selectable).toBe(false);
     expect(contradicted.availabilityReason).toBe("explicit route revocation");
-    expect(contradicted.lastConfirmedRouteId).toBeUndefined();
   });
 
   test("dead targets cannot remain picker-selectable through contradictory flags", () => {
@@ -342,22 +297,4 @@ describe("routePolicyFromValue", () => {
     expect(selectableRouteTargets(dead)).toHaveLength(0);
   });
 
-  test("provider receipts bind to the exact route id, not provider and model alone", () => {
-    const current = routePolicyFromValue({
-      selected_provider: "codex",
-      selected_model: "gpt-5.5",
-      selected_route: "codex:gpt-5.5:primary",
-      targets: [
-        {alias: "primary", label: "Primary", provider: "codex", model: "gpt-5.5", route_id: "codex:gpt-5.5:primary", route_state: "unverified", picker_visible: true},
-        {alias: "shadow", label: "Shadow", provider: "codex", model: "gpt-5.5", route_id: "codex:gpt-5.5:shadow", route_state: "unverified", picker_visible: true},
-      ],
-    });
-
-    const mismatched = routePolicyWithSuccessfulReceipt(current, providerReceipt({routeId: "codex:gpt-5.5:shadow"}));
-    expect(mismatched).toBe(current);
-
-    const promoted = routePolicyWithSuccessfulReceipt(current, providerReceipt({routeId: "codex:gpt-5.5:primary"}));
-    expect(promoted.targets.find((target) => target.routeId.endsWith(":primary"))?.routeState).toBe("ready");
-    expect(promoted.targets.find((target) => target.routeId.endsWith(":shadow"))?.routeState).toBe("unverified");
-  });
 });

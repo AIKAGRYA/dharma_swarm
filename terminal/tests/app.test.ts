@@ -9,6 +9,7 @@ import {render} from "ink";
 
 import {
   App,
+  SNAPSHOT_REFRESH_INTERVAL_MS,
   actionResultActionsForBridgeEvent,
   commandRunSnapshotActionsForBridgeEvent,
   commandResultActionsForBridgeEvent,
@@ -52,6 +53,7 @@ import {
 } from "../src/protocol";
 import {initialState, reduceApp as baseReduceApp} from "../src/state";
 import type {AppAction, AppState, TabPreview, TranscriptLine} from "../src/types";
+import {buildOnCallProjection, buildOnCallProjectionEvent} from "./fixtures/onCallProjection";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 const REPO_ROOT_COMPACT = REPO_ROOT.length <= 24 ? REPO_ROOT : `${REPO_ROOT.slice(0, 23).trimEnd()}…`;
@@ -170,6 +172,10 @@ test("handshakeBackoffDelayMs scales to a capped retry window", () => {
   expect(handshakeBackoffDelayMs(3)).toBe(30000);
   expect(handshakeBackoffDelayMs(4)).toBe(60000);
   expect(handshakeBackoffDelayMs(9)).toBe(60000);
+});
+
+test("authoritative snapshots resync on the fixed 15 second cadence", () => {
+  expect(SNAPSHOT_REFRESH_INTERVAL_MS).toBe(15_000);
 });
 
 test("authoritative recovery helpers identify missing surfaces and target only those requests", () => {
@@ -370,6 +376,38 @@ test("bridge handler suppresses duplicate completed assistant text after streame
 
   const assistantLines = (state.tabs.find((tab) => tab.id === "chat")?.lines ?? []).filter((line) => line.kind === "assistant");
   expect(assistantLines.filter((line) => line.text === "Same assistant output")).toHaveLength(1);
+});
+
+test("provider Helm directives are inert narration and cannot mutate UI, route, or effects", () => {
+  let state: AppState = createInitialAppState(initialState);
+  const initialRoute = state.routePolicy;
+  const sent: Array<{type: string; payload?: Record<string, unknown>}> = [];
+  const bridge = {
+    send(type: string, payload?: Record<string, unknown>) {
+      sent.push({type, payload});
+      return String(sent.length);
+    },
+  } as unknown as DharmaBridge;
+  const handler = createBridgeEventHandler({
+    dispatch: (action) => { state = reduceApp(state, action); },
+    getState: () => state,
+    bridge,
+    pendingBootstraps: {current: {}},
+  });
+
+  handler({
+    type: "text_complete",
+    content: "Narration stays narration. ⟦helm:cockpit⟧ ⟦helm:model codex gpt-5.4⟧",
+    authority: "NONE",
+    state_promotion_allowed: false,
+  });
+
+  expect(state.routePolicy).toEqual(initialRoute);
+  expect(state.uiMode.layoutMode).toBe("zen");
+  expect(state.uiMode.activeTabId).toBe("chat");
+  expect(state.uiMode.railVisible).toBe(false);
+  expect(sent).toEqual([]);
+  expect(state.tabs.find((tab) => tab.id === "chat")?.lines.at(-1)?.text).toBe("Narration stays narration.");
 });
 
 test("active-turn cancellation decisions are explicit and deduplicate repeat requests", () => {
@@ -1264,8 +1302,10 @@ Workflows: 1
       staleState,
       commandRunSnapshotActionsForBridgeEvent(
         {
-          type: "command.result",
-          command: "/git status",
+      type: "command.result",
+      outcome: "completed",
+      ok: true,
+      command: "/git status",
           output: cleanWorkspaceSnapshot,
         },
         staleState.liveRepoPreview,
@@ -1312,8 +1352,10 @@ Artifacts=1  PromotedFacts=0  ContextBundles=0  OperatorActions=1`;
       staleState,
       commandRunSnapshotActionsForBridgeEvent(
         {
-          type: "command.result",
-          command: "/runtime",
+      type: "command.result",
+      outcome: "completed",
+      ok: true,
+      command: "/runtime",
           output: runtimeSnapshot,
         },
         staleState.liveRepoPreview,
@@ -1794,11 +1836,27 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
 });
 
 describe("commandResultActionsForBridgeEvent", () => {
+  test("projects command outcome status without false completion", () => {
+    const statusFor = (event: Record<string, unknown>): string | undefined => (
+      commandResultActionsForBridgeEvent({type: "command.result", command: "/runtime", ...event})
+        .find((action) => action.type === "status.set")?.value
+    );
+
+    expect(statusFor({outcome: "completed", ok: true})).toBe("/runtime -> runtime");
+    expect(statusFor({outcome: "accepted", ok: true})).toBe("/runtime accepted -> runtime");
+    expect(statusFor({outcome: "unsupported", ok: false})).toBe("/runtime failed: unsupported -> runtime");
+    expect(statusFor({outcome: "failed", ok: false})).toBe("/runtime failed -> runtime");
+    expect(statusFor({})).toBe("/runtime failed: missing outcome -> runtime");
+    expect(statusFor({outcome: "completed", ok: false})).toBe("/runtime failed: contradictory ok -> runtime");
+  });
+
   test("uses pending command fallbacks for sparse slash command results", () => {
     expect(commandResultActionsForBridgeEvent(
       {
-        type: "command.result",
-        summary: "executed command.run",
+      type: "command.result",
+      outcome: "completed",
+      ok: true,
+      summary: "executed command.run",
       },
       "/runtime status",
       "runtime",
@@ -2018,8 +2076,10 @@ describe("commandResultActionsForBridgeEvent", () => {
   test("prefers pending operator pane fallbacks over stale chat targets for sparse slash command results", () => {
     expect(commandResultActionsForBridgeEvent(
       {
-        type: "command.result",
-        target_pane: "chat",
+      type: "command.result",
+      outcome: "completed",
+      ok: true,
+      target_pane: "chat",
         summary: "executed command.run",
       },
       "/git status",
@@ -2033,8 +2093,10 @@ describe("commandResultActionsForBridgeEvent", () => {
   test("quarantines launcher-pane fallbacks for sparse slash command results", () => {
     expect(commandResultActionsForBridgeEvent(
       {
-        type: "command.result",
-        summary: "executed command.run",
+      type: "command.result",
+      outcome: "completed",
+      ok: true,
+      summary: "executed command.run",
       },
       undefined,
       "commands",
@@ -2059,6 +2121,8 @@ describe("commandResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -2081,6 +2145,8 @@ describe("commandResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/model set codex gpt-5.4",
       output: "Active route: codex:gpt-5.4",
     });
@@ -2374,6 +2440,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/models",
       output: "Available routes: codex:gpt-5.4",
     });
@@ -2420,6 +2488,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/models",
       output: "Available routes: codex:gpt-5.4",
     });
@@ -2437,6 +2507,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "existing conversation",
     ]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -2499,6 +2570,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "existing conversation",
     ]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -2539,6 +2611,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/model set codex gpt-5.4",
       output: "Active route: codex:gpt-5.4",
     });
@@ -2552,6 +2626,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "existing conversation",
     ]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -2575,6 +2650,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/runtime",
       output: "Loop state: cycle 6 running",
     });
@@ -2607,6 +2684,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/dashboard",
       output: "Verification summary: tsc=ok | cycle_acceptance=ok",
     });
@@ -2639,6 +2718,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/trishula inbox",
       output: "Unread trishula notes: 3",
     });
@@ -2668,6 +2749,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/hum",
       target_pane: "agents",
       output: "Hum lane: 2 pending dispatches",
@@ -2701,6 +2784,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "control",
       output: "Command override landed in control",
@@ -2734,6 +2819,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "chat",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -2763,6 +2850,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/reset",
       target_pane: "repo",
       output: "Conversation memory reset.",
@@ -2789,6 +2878,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "help",
       output: "Available commands: /status /help",
     });
@@ -2816,6 +2907,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "workspace",
       output: "Command override landed in repo",
@@ -2845,6 +2938,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/memory",
       target_pane: "notes",
       output: "Session memory lane",
@@ -2875,6 +2970,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "approvals",
       output: "Approval review: repo write pending",
@@ -2905,6 +3002,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "commands",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -2938,6 +3037,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       target_pane: "commands",
       output: "Operator summary refreshed",
     });
@@ -2970,6 +3071,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/runtime",
       target_pane: "not-a-real-pane",
       output: "Loop state: cycle 6 running",
@@ -3003,6 +3106,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/runtime",
       target_pane: "runtime",
       output: "Loop state: cycle 6 running",
@@ -3036,6 +3141,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       summary: "executed /git status",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -3065,6 +3172,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       summary: "executed /git status",
     });
 
@@ -3091,6 +3200,8 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       summary: `wrote snapshot to ${REPO_ROOT}/state and then executed /git status`,
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -3158,6 +3269,8 @@ Workflows: 1
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git",
       output: gitOutput,
     });
@@ -3179,6 +3292,8 @@ describe("actionResultActionsForBridgeEvent", () => {
   test("returns pane activation and status updates for wrapped slash command action results", () => {
     expect(actionResultActionsForBridgeEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       result: {
         payload: {
           action_type: "command.run",
@@ -3197,8 +3312,10 @@ describe("actionResultActionsForBridgeEvent", () => {
   test("uses pending command fallbacks for sparse slash command action results", () => {
     expect(actionResultActionsForBridgeEvent(
       {
-        type: "action.result",
-        action_type: "command.run",
+      type: "action.result",
+      outcome: "completed",
+      ok: true,
+      action_type: "command.run",
         summary: "executed command.run",
       },
       "/runtime status",
@@ -3212,8 +3329,10 @@ describe("actionResultActionsForBridgeEvent", () => {
   test("prefers pending operator pane fallbacks over stale chat targets for sparse slash command action results", () => {
     expect(actionResultActionsForBridgeEvent(
       {
-        type: "action.result",
-        action_type: "command.run",
+      type: "action.result",
+      outcome: "completed",
+      ok: true,
+      action_type: "command.run",
         target_pane: "chat",
         summary: "executed command.run",
       },
@@ -3228,8 +3347,10 @@ describe("actionResultActionsForBridgeEvent", () => {
   test("quarantines launcher-pane fallbacks for sparse slash command action results", () => {
     expect(actionResultActionsForBridgeEvent(
       {
-        type: "action.result",
-        action_type: "command.run",
+      type: "action.result",
+      outcome: "completed",
+      ok: true,
+      action_type: "command.run",
         summary: "executed command.run",
       },
       undefined,
@@ -3255,6 +3376,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/reset",
       target_pane: "repo",
@@ -3285,6 +3408,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       target_pane: "repo",
       summary: "executed /git",
@@ -3315,6 +3440,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/git status",
       summary: "executed /git status",
@@ -3345,6 +3472,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/git status",
       target_pane: "workspace",
@@ -3376,6 +3505,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       target_pane: "permissions",
@@ -3408,6 +3539,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       target_pane: "registry",
@@ -3442,6 +3575,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       target_pane: "chat",
@@ -3473,6 +3608,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       target_pane: "chat",
       request: {
@@ -3509,6 +3646,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       target_pane: "workspace",
       payload: {
         action_type: "command.run",
@@ -3546,6 +3685,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       summary: "executed /runtime",
@@ -3579,6 +3720,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/dashboard",
       summary: "executed /dashboard",
@@ -3612,6 +3755,8 @@ describe("actionResultActionsForBridgeEvent", () => {
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/trishula inbox",
       target_pane: "agents",
@@ -3655,6 +3800,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/runtime",
       summary: "executed /runtime",
       output: runtimeContent,
@@ -3688,6 +3835,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       summary: "executed /git status",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -3758,6 +3907,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       request: {command: "/runtime", target_pane: "runtime"},
       output: "raw runtime fallback should stay out of the transcript",
@@ -3795,6 +3946,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       request: {
         command: "/runtime status",
@@ -3831,6 +3984,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       summary: "executed `/git status`",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -3863,6 +4018,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -3897,6 +4054,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -3955,6 +4114,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       target_pane: "repo",
       output: "raw repo fallback should stay out of the transcript",
@@ -3989,6 +4150,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4024,6 +4187,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: {
         arguments: {
@@ -4058,6 +4223,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: {
         arguments: {
@@ -4096,6 +4263,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4131,6 +4300,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4166,6 +4337,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4201,6 +4374,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/session recent",
       target_pane: "sessions",
@@ -4232,6 +4407,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4267,6 +4444,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       payload: {
         action_type: "command.run",
         request: {
@@ -4300,6 +4479,8 @@ Toolchain
 
     const paneState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4318,6 +4499,8 @@ Toolchain
 
     const tabState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4350,6 +4533,8 @@ Toolchain
 
     const targetTabState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4368,6 +4553,8 @@ Toolchain
 
     const targetTabIdState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4400,6 +4587,8 @@ Toolchain
 
     const camelCaseState = applyBridgeEvent(baseState, {
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       targetPaneId: "approval",
       output: "Review pending: repo write requires approval",
@@ -4415,6 +4604,8 @@ Toolchain
 
     const snakeCaseState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       payload: {
         request: {
@@ -4445,6 +4636,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       result: {
         request: {
@@ -4478,6 +4671,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       result: {
         payload: {
           action_type: "command.run",
@@ -4513,6 +4708,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       result: {
         request: {
           result: {
@@ -4552,6 +4749,8 @@ Toolchain
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       summary: "executed /git status",
     });
@@ -4621,6 +4820,8 @@ Workflows: 1
 
     const nextState = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/git",
       summary: "executed /git",
@@ -4690,6 +4891,8 @@ Workflows: 1
 
     const afterGit = applyBridgeEvent(baseState, {
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/git",
       summary: "executed /git",
@@ -4852,6 +5055,8 @@ Workflows: 1
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/git",
       summary: "executed /git",
@@ -4865,8 +5070,9 @@ Workflows: 1
       workspacePreviewToLines(state.liveRepoPreview ?? workspaceSnapshotToPreview(gitOutput)).map((line) => line.text),
     );
     expect(repoAfterGit?.lines.map((line) => line.text)).not.toContain("stale transcript that should disappear");
-      expect(sent.map((entry) => entry.type)).toEqual([
-        "workspace.snapshot",
+    expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
+      "workspace.snapshot",
         "runtime.snapshot",
         "model.policy",
         "agent.routes",
@@ -5016,6 +5222,8 @@ Workflows: 1
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/dashboard",
       summary: "executed /dashboard",
@@ -5026,6 +5234,7 @@ Workflows: 1
     expect(state.statusLine).toBe("/dashboard -> control");
     expect(state.tabs.find((tab) => tab.id === "control")?.lines.map((line) => line.text)).toContain("Loop state: cycle 6 running");
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -5429,6 +5638,8 @@ Toolchain
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/dashboard",
       summary: "executed /dashboard",
       output: runtimeContent,
@@ -5446,6 +5657,7 @@ Toolchain
     expect(state.tabs.find((tab) => tab.id === "control")?.lines.map((line) => line.text)).not.toContain("stale runtime output");
     expect(state.tabs.find((tab) => tab.id === "chat")?.lines.map((line) => line.text)).toEqual(["existing conversation"]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -5533,6 +5745,8 @@ Toolchain
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       target_pane: "chat",
@@ -5553,6 +5767,7 @@ Toolchain
     expect(state.tabs.find((tab) => tab.id === "runtime")?.lines.map((line) => line.text)).not.toContain("stale runtime output");
     expect(state.tabs.find((tab) => tab.id === "chat")?.lines.map((line) => line.text)).toEqual(["existing conversation"]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -5630,6 +5845,8 @@ Toolchain
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       payload: {
         request: {
           command: "/runtime status",
@@ -5653,6 +5870,7 @@ Toolchain
     expect(runtimeLines).not.toContain(runtimeContent);
     expect(state.tabs.find((tab) => tab.id === "chat")?.lines.map((line) => line.text)).toEqual(["existing conversation"]);
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -5774,6 +5992,8 @@ Toolchain
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/git status",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -5838,6 +6058,8 @@ Toolchain
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/reset",
       output: "Conversation memory reset.",
     });
@@ -6236,6 +6458,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       output: "Loop state: cycle 6 running",
@@ -6293,6 +6517,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       command: "/dashboard",
       target_pane: "runtime",
       output: "Loop state: cycle 6 running",
@@ -6350,6 +6576,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/dashboard",
       target_pane: "runtime",
@@ -6403,6 +6631,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
 
@@ -6451,6 +6681,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       target_pane: "chat",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -6503,6 +6735,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       target_pane: "commands",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -6556,6 +6790,8 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       target_pane: "runtime",
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
@@ -6623,6 +6859,8 @@ Workflows: 1`;
 
     onEvent({
       type: "command.result",
+      outcome: "completed",
+      ok: true,
       output: gitOutput,
     });
 
@@ -6674,6 +6912,8 @@ Workflows: 1`;
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       output: "Loop state: cycle 6 running",
     });
@@ -6725,6 +6965,8 @@ Workflows: 1`;
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       target_pane: "chat",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -6783,6 +7025,8 @@ Workflows: 1`;
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       target_pane: "commands",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -6842,6 +7086,8 @@ Workflows: 1`;
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       target_pane: "runtime",
       output: "Repo dirty: 517 unstaged, 47 untracked",
@@ -6925,6 +7171,8 @@ Workflows: 1`;
 
     onEvent({
       type: "action.result",
+      outcome: "completed",
+      ok: true,
       action_type: "command.run",
       command: "/runtime",
       output: "Loop state: cycle 6 running",
@@ -6949,6 +7197,7 @@ Workflows: 1`;
         type: "command.run",
         payload: {command: "/runtime"},
       },
+      {type: "helm.on_call.request", payload: undefined},
       {type: "workspace.snapshot", payload: undefined},
       {type: "runtime.snapshot", payload: undefined},
       {
@@ -7545,6 +7794,7 @@ Workflows: 1`;
     expect(state.routePolicy.model).toBe("claude-opus-4-6");
     expect(state.routePolicy.strategy).toBe("genius");
     expect(sent).toEqual([
+      {type: "helm.on_call.request", payload: {}},
       {type: "workspace.snapshot", payload: {}},
       {type: "runtime.snapshot", payload: {}},
       {
@@ -7778,6 +8028,7 @@ Toolchain
     expect(persisted.preview_Verification_bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Runtime_activity).toContain("Sessions=22");
     expect(sent.map((entry) => entry.type)).toEqual([
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -9504,6 +9755,81 @@ describe("model picker state", () => {
   });
 });
 
+describe("Helm OnCall bridge handling", () => {
+  test("accepts only the exact projection envelope and fails malformed events to UNKNOWN", () => {
+    let state: AppState = createInitialAppState(initialState);
+    const bridge = {send: () => "1"} as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => { state = reduceApp(state, action); },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler(buildOnCallProjectionEvent());
+    expect(state.onCallTruth.kind).toBe("authoritative");
+    if (state.onCallTruth.kind === "authoritative") {
+      expect(state.onCallTruth.projection.state).toBe("ON_CALL");
+      expect(state.onCallTruth.projection.on_call_count).toBe(7);
+    }
+
+    handler({...buildOnCallProjectionEvent(), extra: "forged"});
+    expect(state.onCallTruth).toEqual({kind: "unknown", runtimeEpoch: "terminal-bridge:epoch-a"});
+  });
+
+  test("requires a same-epoch resync after a runtime epoch changes", () => {
+    let state: AppState = createInitialAppState(initialState);
+    const bridge = {send: () => "1"} as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => { state = reduceApp(state, action); },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+    const epochB = buildOnCallProjection({runtimeEpoch: "terminal-bridge:epoch-b"});
+
+    handler(buildOnCallProjectionEvent());
+    handler(buildOnCallProjectionEvent(epochB));
+    expect(state.onCallTruth).toEqual({kind: "unknown", runtimeEpoch: "terminal-bridge:epoch-b"});
+
+    handler(buildOnCallProjectionEvent(epochB));
+    expect(state.onCallTruth.kind).toBe("authoritative");
+    expect(state.onCallTruth.runtimeEpoch).toBe("terminal-bridge:epoch-b");
+  });
+
+  test("resets truth before reconnect handshake while preserving transcript continuity", () => {
+    let state: AppState = {
+      ...createInitialAppState(initialState),
+      tabs: initialState.tabs.map((tab) => tab.id === "chat"
+        ? {...tab, lines: [{id: "continuity", kind: "assistant", text: "keep this transcript"}]}
+        : tab),
+    };
+    let truthAtHandshake = "not-sent";
+    const bridge = {
+      send(type: string) {
+        if (type === "handshake") {
+          truthAtHandshake = state.onCallTruth.kind;
+        }
+        return "1";
+      },
+    } as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => { state = reduceApp(state, action); },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler(buildOnCallProjectionEvent());
+    expect(state.onCallTruth.kind).toBe("authoritative");
+    handler({type: "bridge.error", code: "bridge_exit", message: "bridge exited (1)"});
+
+    expect(truthAtHandshake).toBe("unknown");
+    expect(state.onCallTruth).toEqual({kind: "unknown", runtimeEpoch: null});
+    expect(state.tabs.find((tab) => tab.id === "chat")?.lines.map((line) => line.text)).toContain("keep this transcript");
+  });
+});
+
 describe("typed session bridge handling", () => {
   test("applies handshake route authority without equating adapter inventory with readiness", () => {
     let state: AppState = createInitialAppState(initialState);
@@ -9594,7 +9920,7 @@ describe("typed session bridge handling", () => {
     expect(state.statusLine).toContain("usage_exhausted");
   });
 
-  test("only an exact typed provider-completion receipt promotes route readiness", () => {
+  test("provider-completion receipts never promote route readiness", () => {
     let state: AppState = {
       ...createInitialAppState(initialState),
       bridgeStatus: "connected",
@@ -9652,8 +9978,7 @@ describe("typed session bridge handling", () => {
       evidence_kind: "provider_completion",
       success: true,
     });
-    expect(state.routePolicy.routeState).toBe("ready");
-    expect(state.routePolicy.lastConfirmedRouteId).toBe("codex:gpt-5.5");
+    expect(state.routePolicy.routeState).toBe("unverified");
   });
 
   test("keeps prose-only Control and Repo refreshes display-only until typed authority arrives", () => {
@@ -9804,6 +10129,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -9846,6 +10172,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -9909,6 +10236,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -9971,6 +10299,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -10007,6 +10336,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -10048,6 +10378,7 @@ Loop decision: ready to stop`,
       "ontology.snapshot",
       "session.catalog",
       "permission.history",
+      "helm.on_call.request",
       "workspace.snapshot",
       "runtime.snapshot",
       "model.policy",
@@ -10919,8 +11250,9 @@ Workflows: 1
         "command.registry",
         "ontology.snapshot",
         "session.catalog",
-        "permission.history",
-        "workspace.snapshot",
+      "permission.history",
+      "helm.on_call.request",
+      "workspace.snapshot",
         "runtime.snapshot",
         "model.policy",
         "agent.routes",
@@ -11109,8 +11441,9 @@ Workflows: 1
         "command.registry",
         "ontology.snapshot",
         "session.catalog",
-        "permission.history",
-        "workspace.snapshot",
+      "permission.history",
+      "helm.on_call.request",
+      "workspace.snapshot",
         "runtime.snapshot",
         "model.policy",
         "agent.routes",

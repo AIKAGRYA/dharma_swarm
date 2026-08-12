@@ -10,10 +10,13 @@ import pytest
 
 from dharma_swarm import key_oracle, model_pool
 from dharma_swarm.model_status import (
+    HELM_ON_CALL_PROJECTION_SCHEMA_VERSION,
     LIVE_CALL_MATRIX_DIR_ENV,
     LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV,
     LIVE_CALL_MATRIX_PATH_ENV,
     floor_model_status,
+    helm_on_call_projection_from_dict,
+    projection_to_dict,
     save_profile,
     top_floor_models_for_dashboard,
 )
@@ -615,3 +618,16 @@ def test_dashboard_projection_applies_profile_labels(
     assert saved == {"custom_label": "Kimi Floor", "short_name": "Kimi"}
     assert kimi["ui_label"] == "Kimi Floor"
     assert kimi["short_name"] == "Kimi"
+
+
+def test_legacy_model_status_projection_cannot_be_deserialized_as_helm_truth(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    payload = projection_to_dict(projection)
+
+    assert payload["schema_version"] != HELM_ON_CALL_PROJECTION_SCHEMA_VERSION
+    with pytest.raises(ValueError, match="exactly"):
+        helm_on_call_projection_from_dict(payload)

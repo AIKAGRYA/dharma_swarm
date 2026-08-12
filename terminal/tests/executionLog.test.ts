@@ -12,6 +12,31 @@ import {
 } from "../src/executionLog";
 
 describe("canonicalEventsFromBridgeEvent", () => {
+  test("renders only explicit completed command outcomes as complete", () => {
+    const projected = (event: Record<string, unknown>) => projectChatTraceLines([
+      userPromptExecutionEvent("/status", "2026-08-09T00:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "command.result",
+        command: "/status",
+        output: "status result",
+        created_at: "2026-08-09T00:00:01Z",
+        ...event,
+      }),
+    ]).map((line) => line.text);
+
+    expect(projected({outcome: "completed", ok: true}).some((line) => line.startsWith("✓"))).toBe(true);
+    expect(projected({outcome: "accepted", ok: true}).some((line) => line.startsWith("… thinking"))).toBe(true);
+    for (const event of [
+      {outcome: "unsupported", ok: false},
+      {outcome: "failed", ok: false},
+      {},
+      {outcome: "completed", ok: false},
+    ]) {
+      expect(projected(event).some((line) => line.startsWith("✖ failed"))).toBe(true);
+      expect(projected(event).some((line) => line.startsWith("✓"))).toBe(false);
+    }
+  });
+
   test("projects the core session trace into chat, tools, thinking, timeline, and activity views", () => {
     const events = [
       userPromptExecutionEvent("Second prompt", "2026-04-04T11:59:59Z"),
@@ -334,6 +359,8 @@ describe("canonicalEventsFromBridgeEvent", () => {
       ...canonicalEventsFromBridgeEvent({
         type: "command.result",
         command: {command: "/status"},
+        outcome: "completed",
+        ok: true,
         output: "bridge connected",
         created_at: "2026-06-12T11:02:01Z",
       }),

@@ -103,6 +103,22 @@ describe("activityEntriesFromEvent", () => {
     expect(entries[0]?.correlationId).toBe("tool-2");
   });
 
+  test("projects every command outcome explicitly and fails closed on malformed results", () => {
+    const phaseFor = (event: Record<string, unknown>) => activityEntriesFromEvent({
+      type: "command.result",
+      command: "/status",
+      output: "status result",
+      ...event,
+    })[0]?.phase;
+
+    expect(phaseFor({outcome: "completed", ok: true})).toBe("complete");
+    expect(phaseFor({outcome: "accepted", ok: true})).toBe("running");
+    expect(phaseFor({outcome: "unsupported", ok: false})).toBe("failed");
+    expect(phaseFor({outcome: "failed", ok: false})).toBe("failed");
+    expect(phaseFor({})).toBe("failed");
+    expect(phaseFor({outcome: "completed", ok: false})).toBe("failed");
+  });
+
   test("builds structured approval outcome entries", () => {
     const entries = activityEntriesFromEvent({
       type: "permission.outcome",
@@ -1838,13 +1854,15 @@ describe("eventToTabPatch", () => {
     expect(patches[0]?.lines[0]?.text).toBe("Hum lane: 2 pending dispatches");
   });
 
-  test("does not synthesize transcript rows for summary-only operational command results", () => {
+  test("fails closed visibly when an operational command result omits its outcome", () => {
     const patches = eventToTabPatch({
       type: "command.result",
       summary: "executed /git status",
     });
 
-    expect(patches).toEqual([]);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]?.tabId).toBe("repo");
+    expect(patches[0]?.lines).toMatchObject([{kind: "error", text: "failed"}]);
   });
 
   test("suppresses raw repo transcript patches for workspace snapshot command results", () => {
