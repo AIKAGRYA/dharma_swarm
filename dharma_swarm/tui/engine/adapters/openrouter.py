@@ -91,15 +91,6 @@ class OpenRouterAdapter(ProviderAdapter):
         model = request.model or profile.model_id
         self._cancelled = False
 
-        yield SessionStart(
-            provider_id=self.provider_id,
-            session_id=session_id,
-            model=model,
-            capabilities=[c.name.lower() for c in Capability if profile.capabilities & c],
-            tools_available=[],
-            system_info={"base_url": self._config.base_url or "https://openrouter.ai/api/v1"},
-        )
-
         api_key = (
             self._config.api_key
             or request.provider_options.get("openrouter_api_key")
@@ -130,6 +121,12 @@ class OpenRouterAdapter(ProviderAdapter):
             "messages": messages,
             "stream": False,
         }
+        if request.tools:
+            payload["tools"] = request.tools
+            if request.tool_choice is not None:
+                payload["tool_choice"] = request.tool_choice
+        else:
+            payload["tool_choice"] = "none"
         if request.system_prompt:
             payload["messages"] = [
                 {"role": "system", "content": request.system_prompt},
@@ -195,6 +192,51 @@ class OpenRouterAdapter(ProviderAdapter):
                 return
 
             data = resp.json()
+            rejection = _response_rejection(data)
+            if rejection is not None:
+                code, message = rejection
+                for event in _failure_events(
+                    self.provider_id, session_id, code, message
+                ):
+                    yield event
+                return
+
+            assert isinstance(data, dict)
+            response_model = data.get("model")
+            served_model = (
+                response_model.strip()
+                if isinstance(response_model, str) and response_model.strip()
+                else None
+            )
+            require_served_identity = (
+                request.provider_options.get("require_served_identity") is True
+            )
+            if require_served_identity and served_model is None:
+                code = "missing_served_identity"
+                message = "OpenRouter response.model is required and must be a nonblank string"
+                for event in _failure_events(
+                    self.provider_id, session_id, code, message
+                ):
+                    yield event
+                return
+
+            identity_source = (
+                "response.model" if served_model is not None else "request.model"
+            )
+            yield SessionStart(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                model=served_model or model,
+                capabilities=[
+                    c.name.lower() for c in Capability if profile.capabilities & c
+                ],
+                tools_available=[],
+                system_info={
+                    "base_url": self._config.base_url or "https://openrouter.ai/api/v1",
+                    "requested_model": model,
+                    "served_identity_source": identity_source,
+                },
+            )
             content = _extract_content(data)
             yield TextComplete(
                 provider_id=self.provider_id,
@@ -285,6 +327,30 @@ class OpenRouterAdapter(ProviderAdapter):
         )
 
 
+def _failure_events(
+    provider_id: str,
+    session_id: str,
+    code: str,
+    message: str,
+) -> tuple[ErrorEvent, SessionEnd]:
+    return (
+        ErrorEvent(
+            provider_id=provider_id,
+            session_id=session_id,
+            code=code,
+            message=message,
+            retryable=False,
+        ),
+        SessionEnd(
+            provider_id=provider_id,
+            session_id=session_id,
+            success=False,
+            error_code=code,
+            error_message=message,
+        ),
+    )
+
+
 def _extract_content(data: Any) -> str:
     if not isinstance(data, dict):
         return ""
@@ -323,6 +389,84 @@ def _extract_content(data: Any) -> str:
             if chunks:
                 return "\n".join(chunks)
     return ""
+
+
+def _response_rejection(data: Any) -> tuple[str, str] | None:
+    if not isinstance(data, dict):
+        return "malformed_response", "OpenRouter response must be an object"
+    if _error_is_present(data.get("error")):
+        return "provider_response_error", _embedded_error_message(data["error"])
+
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return "malformed_response", "OpenRouter response choices[0] is required"
+    choice = choices[0]
+    if _error_is_present(choice.get("error")):
+        return "provider_response_error", _embedded_error_message(choice["error"])
+
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        return (
+            "malformed_response",
+            "OpenRouter response choices[0].message is required",
+        )
+    if _error_is_present(message.get("error")):
+        return "provider_response_error", _embedded_error_message(message["error"])
+    if bool(message.get("tool_calls")):
+        return "provider_tool_use_rejected", "OpenRouter response contained tool calls"
+    finish_reason = str(choice.get("finish_reason", "")).strip().lower()
+    if finish_reason == "tool_calls":
+        return (
+            "provider_tool_use_rejected",
+            "OpenRouter response finished for tool calls",
+        )
+    if finish_reason == "error":
+        return "provider_response_error", "OpenRouter response finished with an error"
+
+    usage = data.get("usage")
+    if isinstance(usage, dict):
+        server_tool_usage = (
+            usage.get("server_tool_use_details"),
+            usage.get("server_tool_use"),
+        )
+        if any(_indicates_server_tool_calls(value) for value in server_tool_usage):
+            return (
+                "provider_tool_use_rejected",
+                "OpenRouter usage reported server tool calls",
+            )
+    if not _extract_content(data).strip():
+        return "empty_response", "OpenRouter response contained no assistant content"
+    return None
+
+
+def _error_is_present(value: Any) -> bool:
+    return value is not None and value != "" and value != {} and value != []
+
+
+def _embedded_error_message(value: Any) -> str:
+    if isinstance(value, dict):
+        message = value.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()[:1000]
+    if isinstance(value, str) and value.strip():
+        return value.strip()[:1000]
+    return "OpenRouter returned an embedded provider error"
+
+
+def _indicates_server_tool_calls(value: Any) -> bool:
+    if value is None or value is False:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "none", "null"}
+    if isinstance(value, dict):
+        return any(_indicates_server_tool_calls(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_indicates_server_tool_calls(item) for item in value)
+    return bool(value)
 
 
 def _extract_cost(data: Any) -> float | None:

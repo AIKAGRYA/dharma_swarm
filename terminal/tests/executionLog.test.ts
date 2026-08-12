@@ -3,6 +3,7 @@ import {describe, expect, test} from "bun:test";
 import {
   canonicalEventsFromBridgeEvent,
   latestChatTurnRoute,
+  localCommandResultExecutionEvent,
   mergeExecutionEvents,
   projectActivityEntries,
   projectChatTraceLines,
@@ -12,6 +13,66 @@ import {
 } from "../src/executionLog";
 
 describe("canonicalEventsFromBridgeEvent", () => {
+  test("renders only explicit completed command outcomes as complete", () => {
+    const projected = (event: Record<string, unknown>) => projectChatTraceLines([
+      userPromptExecutionEvent("/status", "2026-08-09T00:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "command.result",
+        command: "/status",
+        output: "status result",
+        created_at: "2026-08-09T00:00:01Z",
+        ...event,
+      }),
+    ]).map((line) => line.text);
+
+    expect(projected({outcome: "completed", ok: true}).some((line) => line.startsWith("✓"))).toBe(true);
+    expect(projected({outcome: "accepted", ok: true}).some((line) => line.startsWith("… thinking"))).toBe(true);
+    for (const event of [
+      {outcome: "unsupported", ok: false},
+      {outcome: "failed", ok: false},
+      {},
+      {outcome: "completed", ok: false},
+    ]) {
+      expect(projected(event).some((line) => line.startsWith("✖ failed"))).toBe(true);
+      expect(projected(event).some((line) => line.startsWith("✓"))).toBe(false);
+    }
+
+    const acceptedEvents = [
+      userPromptExecutionEvent("/status", "2026-08-09T00:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "command.result",
+        request_id: "command-accepted",
+        command: "/status",
+        output: "accepted for background processing",
+        outcome: "accepted",
+        ok: true,
+        created_at: "2026-08-09T00:00:01Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session_end",
+        request_id: "command-accepted",
+        session_id: "session-command-accepted",
+        success: true,
+        created_at: "2026-08-09T00:00:02Z",
+      }),
+    ];
+    const acceptedThenEnded = projectChatTraceLines(acceptedEvents).map((line) => line.text);
+    const acceptedExpanded = projectChatTraceLines(acceptedEvents, {expanded: true}).map((line) => line.text);
+    const acceptedActivity = projectActivityEntries(acceptedEvents);
+    expect(acceptedThenEnded.some((line) => line.startsWith("… thinking"))).toBe(true);
+    expect(acceptedThenEnded.some((line) => line.startsWith("✓"))).toBe(false);
+    expect(acceptedExpanded.some((line) => line.includes("✓ status | session ended"))).toBe(false);
+    expect(acceptedActivity.some((entry) => entry.title === "session ended" && entry.phase === "complete")).toBe(false);
+
+    const unknownLocal = [
+      userPromptExecutionEvent("/hlep", "2026-08-09T00:00:03Z"),
+      localCommandResultExecutionEvent("/hlep", "unknown command /hlep", "2026-08-09T00:00:04Z", "unsupported"),
+    ];
+    const unknownLines = projectChatTraceLines(unknownLocal, {expanded: true}).map((line) => line.text);
+    expect(unknownLines.some((line) => line.startsWith("✖ failed"))).toBe(true);
+    expect(unknownLines.some((line) => line.startsWith("✓"))).toBe(false);
+  });
+
   test("projects the core session trace into chat, tools, thinking, timeline, and activity views", () => {
     const events = [
       userPromptExecutionEvent("Second prompt", "2026-04-04T11:59:59Z"),
@@ -166,7 +227,7 @@ describe("canonicalEventsFromBridgeEvent", () => {
 
     expect(cancelledEnd[0]).toMatchObject({
       kind: "status",
-      phase: "complete",
+      phase: "failed",
       title: "session cancelled",
       detail: ["Request run-17", "Turn cancelled"],
     });
@@ -334,6 +395,8 @@ describe("canonicalEventsFromBridgeEvent", () => {
       ...canonicalEventsFromBridgeEvent({
         type: "command.result",
         command: {command: "/status"},
+        outcome: "completed",
+        ok: true,
         output: "bridge connected",
         created_at: "2026-06-12T11:02:01Z",
       }),

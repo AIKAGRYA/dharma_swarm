@@ -170,8 +170,11 @@ class SystemCommandHandler:
         elif cmd == "clear":
             return "", "clear"
         elif cmd == "reset":
-            self._conversation = []
-            return "[dim]Conversation memory reset.[/dim]", None
+            return (
+                f"[{BENGARA}]Unsupported in Helm Slice 1: /reset is not bound "
+                f"to the durable bridge conversation.[/{BENGARA}]",
+                None,
+            )
         elif cmd == "cancel":
             return "", "cancel"
         elif cmd == "chat":
@@ -298,13 +301,13 @@ class SystemCommandHandler:
             f"  [{INDIGO}]/telos[/{INDIGO}] <name>      Preview a specific research doc\n"
             f"\n[bold {INDIGO}]--- Chat & Control ---[/bold {INDIGO}]\n"
             f"  [{INDIGO}]/thread[/{INDIGO}] [name]   Show/set research thread\n"
-            f"  [{INDIGO}]/net[/{INDIGO}] [on|off]    Internet access for the active route\n"
+            f"  [{INDIGO}]/net[/{INDIGO}] [status]    Route internet policy (on/off unavailable in Slice 1)\n"
             f"  [{INDIGO}]/plan[/{INDIGO}] [on|off]   Enforce plan-first mode policy\n"
             f"  [{INDIGO}]/model[/{INDIGO}] [op]      Model routing: status | list | set <alias|index> | auto on|off|responsive|cost|genius | metrics | cooldown status|clear\n"
             f"  [{INDIGO}]/chat[/{INDIGO}] [continue] Launch native Claude Code UI\n"
             f"  [{INDIGO}]/btw[/{INDIGO}] [topic]     Open a parallel side-thread window with merge-back\n"
             f"  [{INDIGO}]/cancel[/{INDIGO}]          Cancel active provider run\n"
-            f"  [{INDIGO}]/reset[/{INDIGO}]           Reset conversation memory\n"
+            f"  [{INDIGO}]/reset[/{INDIGO}]           Unavailable in Bun Helm Slice 1\n"
             f"  [{INDIGO}]/clear[/{INDIGO}]           Clear screen\n"
             f"  [{INDIGO}]/help[/{INDIGO}]            This help\n\n"
             f"[bold {INDIGO}]--- Keyboard ---[/bold {INDIGO}]\n"
@@ -315,7 +318,7 @@ class SystemCommandHandler:
             f"  [{INDIGO}]Ctrl+P[/{INDIGO}]          Command palette\n"
             f"  [{INDIGO}]Ctrl+Y[/{INDIGO}]          Copy last reply\n"
             f"  [{INDIGO}]Shift+click[/{INDIGO}]     Select text for copy (terminal native)\n\n"
-            "[dim]Plain text (no /) sends to the active route with live tools, usage, and cost telemetry.[/dim]"
+            "[dim]Plain text (no /) sends to the active Slice 1 physical no-tools route, with usage and cost telemetry.[/dim]"
         )
 
     def _handle_plan(self, arg: str) -> tuple[str, str | None]:
@@ -346,15 +349,15 @@ class SystemCommandHandler:
     def _handle_net(self, arg: str) -> str:
         mode = arg.strip().lower()
         if not mode or mode == "status":
-            status = "ON" if self.internet_enabled else "OFF"
-            color = VERDIGRIS if self.internet_enabled else OCHRE
-            return f"Internet mode: [{color}]{status}[/{color}]"
-        if mode in {"on", "enable", "1", "true"}:
-            self.internet_enabled = True
-            return f"[{VERDIGRIS}]Internet mode enabled.[/{VERDIGRIS}]"
-        if mode in {"off", "disable", "0", "false"}:
-            self.internet_enabled = False
-            return f"[{OCHRE}]Internet mode disabled.[/{OCHRE}]"
+            return (
+                f"Internet policy: [{OCHRE}]UNBOUND[/{OCHRE}] in Helm Slice 1; "
+                "/net on|off cannot change the active provider route."
+            )
+        if mode in {"on", "enable", "1", "true", "off", "disable", "0", "false"}:
+            return (
+                f"[{BENGARA}]Unsupported in Helm Slice 1: /net {mode} cannot "
+                f"change the active provider route.[/{BENGARA}]"
+            )
         return f"[{BENGARA}]Usage: /net [on|off|status][/{BENGARA}]"
 
     def _handle_model(self, arg: str) -> tuple[str, str | None]:
@@ -566,7 +569,7 @@ class SystemCommandHandler:
             try:
                 lines = target.read_text().split("\n")[:40]
                 header = f"[bold {INDIGO}]{target.name}[/bold {INDIGO}]"
-                body = "\n".join(f"  {l}" for l in lines)
+                body = "\n".join(f"  {line}" for line in lines)
                 return f"{header}\n{body}\n  [dim]... ({len(target.read_text().split(chr(10)))} lines total)[/dim]"
             except Exception as exc:
                 return f"[{BENGARA}]Read error: {exc}[/{BENGARA}]"
@@ -588,7 +591,10 @@ class SystemCommandHandler:
         if arch.exists():
             size = len(arch.read_text().split("\n"))
             lines.append(f"\n  [{INDIGO}]PRINCIPLES.md[/{INDIGO}]  Architecture bridge ({size} lines)")
-        lines.append(f"\n[dim]Usage: /foundations <name> to preview (e.g. /foundations hofstadter)[/dim]")
+        lines.append(
+            "\n[dim]Usage: /foundations <name> to preview "
+            "(e.g. /foundations hofstadter)[/dim]"
+        )
         return "\n".join(lines)
 
     def _handle_telos(self, arg: str) -> str:
@@ -609,7 +615,7 @@ class SystemCommandHandler:
             try:
                 lines = target.read_text().split("\n")[:40]
                 header = f"[bold {INDIGO}]{target.name}[/bold {INDIGO}]"
-                body = "\n".join(f"  {l}" for l in lines)
+                body = "\n".join(f"  {line}" for line in lines)
                 return f"{header}\n{body}\n  [dim]... ({len(target.read_text().split(chr(10)))} lines total)[/dim]"
             except Exception as exc:
                 return f"[{BENGARA}]Read error: {exc}[/{BENGARA}]"
@@ -622,5 +628,7 @@ class SystemCommandHandler:
             display = name.lstrip("0123456789_").replace("_", " ")
             size = len(d.read_text().split("\n"))
             lines.append(f"  [{INDIGO}]{d.name}[/{INDIGO}]  {display}  ({size} lines)")
-        lines.append(f"\n[dim]Usage: /telos <name> to preview (e.g. /telos competitive)[/dim]")
+        lines.append(
+            "\n[dim]Usage: /telos <name> to preview (e.g. /telos competitive)[/dim]"
+        )
         return "\n".join(lines)

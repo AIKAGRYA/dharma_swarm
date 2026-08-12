@@ -163,13 +163,9 @@ export function matchUiIntent(
   return null;
 }
 
-// ── Agent-action channel (Navigator "aliveness") ──────────────────────────
-// The chat agent (Opus) drives the Helm by emitting directives in its reply:
-//   ⟦helm:VERB ARG⟧
-// The TS parses them, executes the mapped UI action (the agent REQUESTS, the
-// reducer EXECUTES — authority never leaves the TS), strips the sentinel from
-// the displayed text, and narrates. Only VIEW/toggle verbs are honored;
-// operator-gated actions (approvals, evolution) are never driveable here.
+// Legacy Helm directive syntax is retained only for deterministic stripping and
+// compatibility parsing. Provider narration has no execution or state-promotion
+// authority; app.tsx intentionally never maps these tokens into intents.
 const HELM_DIRECTIVE_RE = /⟦\s*helm:\s*([a-zA-Z]+)(?:\s+([^⟧]*?))?\s*⟧/g;
 
 export type HelmDirective = {verb: string; arg: string; raw: string};

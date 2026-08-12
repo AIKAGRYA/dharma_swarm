@@ -1,3 +1,5 @@
+import type {HelmOnCallProjection, OnCallTruthState} from "./onCallTruth";
+
 export type PaneKind =
   | "chat"
   | "commands"
@@ -74,15 +76,6 @@ export type ActiveTurnState =
   | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string};
 
 export type RouteState = "ready" | "unverified" | "degraded" | "slow" | "unavailable" | "invalid";
-
-export type ProviderRouteReceipt = {
-  requestId: string;
-  sessionId: string;
-  provider: string;
-  model: string;
-  routeId: string;
-  evidenceKind: "provider_completion";
-};
 
 export type SupervisorControlState = {
   stateDir: string;
@@ -507,7 +500,6 @@ export type RoutePolicyState = {
   availabilityReason?: string;
   defaultRouteId?: string;
   fallbackChain: string[];
-  lastConfirmedRouteId?: string;
   activeLabel?: string;
   targets: RouteTarget[];
 };
@@ -543,6 +535,7 @@ export type AppState = {
   bridgeStatus: BridgeStatus;
   activeTurn: ActiveTurnState;
   routePolicy: RoutePolicyState;
+  onCallTruth: OnCallTruthState;
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
   chatTraceExpanded: boolean;
@@ -580,6 +573,8 @@ export type AppAction =
   | {type: "turn.reset"}
   | {type: "bridge.config"; provider: string; model: string; strategy?: string}
   | {type: "route.policy.set"; policy: RoutePolicyState}
+  | {type: "onCall.projection.set"; projection: HelmOnCallProjection}
+  | {type: "onCall.truth.reset"; runtimeEpoch?: string | null}
   | {type: "execution.events.ingest"; events: CanonicalExecutionEvent[]}
   | {type: "ui.compact.set"; compact: boolean}
   | {type: "ui.focus.set"; focus: KeyboardFocus}

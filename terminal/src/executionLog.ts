@@ -1,5 +1,6 @@
 import type {ActivityEntry, ActivityPhase, CanonicalExecutionEvent, PaneKind, TranscriptLine} from "./types";
 import {stripHelmDirectives} from "./uiIntents";
+import {normalizeCommandOutcome, type CommandOutcome} from "./commandOutcome";
 import {
   cancellationAckFromEvent,
   permissionDecisionFromEvent,
@@ -94,13 +95,13 @@ function canonicalEvent(
 }
 
 export function userPromptExecutionEvent(prompt: string, timestamp = new Date().toISOString()): CanonicalExecutionEvent {
-  const content = prompt.trim();
+  const content = prompt;
   return {
-    id: `user_prompt:${timestamp}:${content.slice(0, 24)}`,
+    id: `user_prompt:${timestamp}:${content.trim().slice(0, 24)}`,
     sourceEventType: "user_prompt",
     kind: "user_prompt",
     phase: "complete",
-    title: compactText(content || "prompt"),
+    title: compactText(content.trim() || "prompt"),
     content,
     timestamp,
     raw: {prompt: content, created_at: timestamp},
@@ -161,18 +162,34 @@ export function localCommandResultExecutionEvent(
   command: string,
   summary: string,
   timestamp = new Date().toISOString(),
+  outcome: CommandOutcome = "completed",
 ): CanonicalExecutionEvent {
+  const normalized = normalizeCommandOutcome({
+    outcome,
+    ok: outcome === "completed" || outcome === "accepted",
+    supported: outcome === "completed" || outcome === "accepted",
+    completed: outcome === "completed",
+  });
   return {
     id: `command:local:${timestamp}:${command.slice(0, 24)}`,
     sourceEventType: "local_command_result",
     kind: "command",
-    phase: "complete",
+    phase: normalized.phase,
     title: `intent ${command}`,
     summary,
     content: summary,
     detail: [`Command: ${command}`],
     timestamp,
-    raw: {command, summary, created_at: timestamp, source: "local"},
+    raw: {
+      command,
+      summary,
+      outcome,
+      ok: outcome === "completed" || outcome === "accepted",
+      supported: outcome === "completed" || outcome === "accepted",
+      completed: outcome === "completed",
+      created_at: timestamp,
+      source: "local",
+    },
   };
 }
 
@@ -356,6 +373,7 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     const command = resolveEventCommand(event);
     const output = resolveEventOutput(event).trim();
     const summary = String(event.summary ?? "").trim();
+    const outcome = normalizeCommandOutcome(event);
     if (!command && !summary && !output) {
       return [];
     }
@@ -363,13 +381,13 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
       canonicalEvent(event, {
         sourceEventType: type,
         kind: "command",
-        phase: "complete",
+        phase: outcome.phase,
         title: command ? `intent ${command}` : "command result",
-        summary: compactText(summary || output || "completed"),
-        content: output || undefined,
-        detail: command ? [`Command: ${command}`] : [],
+        summary: compactText(summary || output || outcome.outcome),
+        content: output || outcome.outcome,
+        detail: [...(command ? [`Command: ${command}`] : []), `Outcome: ${outcome.outcome}`],
         timestamp: timestampFromEvent(event),
-        correlationId: String(event.id ?? "").trim() || undefined,
+        correlationId: String(event.request_id ?? event.id ?? "").trim() || undefined,
       }),
     ];
   }
@@ -395,11 +413,12 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
 
   if (type === "bridge.ready" || type === "handshake.result" || type === "session_end") {
     const cancelled = isCancelledSessionEnd(event);
+    const failedSessionEnd = type === "session_end" && (cancelled || event.success !== true);
     return [
       canonicalEvent(event, {
         sourceEventType: type,
         kind: "status",
-        phase: "complete",
+        phase: failedSessionEnd ? "failed" : "complete",
         title:
           type === "bridge.ready"
             ? "bridge process ready"
@@ -417,6 +436,7 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
               ]
             : undefined,
         timestamp: timestampFromEvent(event),
+        correlationId: type === "session_end" ? String(event.request_id ?? "").trim() || undefined : undefined,
       }),
     ];
   }
@@ -551,6 +571,7 @@ type ChatTurn = {
   assistantTimestamp?: string;
   route?: string;
   endedWithoutResponse?: boolean;
+  acceptedCommandPending?: boolean;
   promptMs?: number;
   lastEventMs?: number;
 };
@@ -676,7 +697,11 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         activeTurn.phase = "running";
       }
     }
-    const nextStep = traceStepFromEvent(event);
+    // A transport session ending does not upgrade accepted-but-unperformed
+    // command work into a completed trace step.
+    const nextStep = event.sourceEventType === "session_end" && activeTurn.acceptedCommandPending
+      ? undefined
+      : traceStepFromEvent(event);
     if (nextStep) {
       const existing = activeTurn.steps.find((step) => step.key === nextStep.key);
       if (existing) {
@@ -689,7 +714,11 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         activeTurn.steps.push(nextStep);
       }
     }
-    if (event.kind === "error" || event.phase === "failed") {
+    const isMismatchedSlashCommand = event.kind === "command"
+      && activeTurn.prompt.trim().startsWith("/")
+      && Boolean(slashCommandNameFromText(String(event.raw?.command ?? "")))
+      && slashCommandNameFromText(String(event.raw?.command ?? "")) !== slashCommandNameFromText(activeTurn.prompt);
+    if ((event.kind === "error" || event.phase === "failed") && !isMismatchedSlashCommand) {
       activeTurn.phase = "failed";
     }
     // F-158: a slash-command turn completes on its command result — commands have no
@@ -699,16 +728,18 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       const turnCommand = slashCommandNameFromText(activeTurn.prompt);
       const eventCommand = slashCommandNameFromText(String(event.raw?.command ?? ""));
       if (!eventCommand || eventCommand === turnCommand) {
-        if (!activeTurn.assistant) {
-          const responseText = (event.content ?? event.summary ?? "").trim();
-          if (responseText) {
-            activeTurn.assistant = scrubRawIdentifiers(responseText);
-            activeTurn.assistantTimestamp = event.timestamp;
-          }
+        const responseText = (event.content ?? event.summary ?? "").trim();
+        if (responseText) {
+          activeTurn.assistant = scrubRawIdentifiers(responseText);
+          activeTurn.assistantTimestamp = event.timestamp;
         }
-        if (activeTurn.phase !== "failed") {
-          activeTurn.phase = "complete";
+        if (event.phase === "running") {
+          activeTurn.phase = "running";
+          activeTurn.acceptedCommandPending = normalizeCommandOutcome(event.raw).reason === "explicit_accepted";
+          continue;
         }
+        activeTurn.acceptedCommandPending = false;
+        activeTurn.phase = event.phase === "complete" ? "complete" : "failed";
         activeTurn = undefined;
         continue;
       }
@@ -721,7 +752,9 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
           ? "failed"
           : activeTurn.phase === "failed"
             ? "failed"
-            : "complete";
+            : activeTurn.acceptedCommandPending
+              ? "running"
+              : "complete";
       // F-173: a turn that ends without any response-bearing content (assistant text
       // or a command/intent answer) never renders as a bare complete — it carries an
       // explicit no-response marker and the failed glyph instead.
@@ -783,8 +816,8 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
     projected.push(line("user", `> ${turn.prompt}`));
 
     if (turn.assistant) {
-      // Strip any ⟦helm:…⟧ agent-directives so they never reach the operator's
-      // transcript — the directive is executed + narrated separately in app.tsx.
+      // Provider-emitted Helm syntax has no authority. Strip it from narration;
+      // app.tsx never executes provider directives.
       const visible = stripHelmDirectives(turn.assistant);
       if (visible) {
         for (const responseLine of visible.split("\n")) {
@@ -863,7 +896,19 @@ export function projectPaneLines(paneKind: Extract<PaneKind, "thinking" | "tools
 }
 
 export function projectActivityEntries(events: CanonicalExecutionEvent[]): ActivityEntry[] {
+  const acceptedRequestIds = new Set(
+    events
+      .filter((event) => event.kind === "command" && normalizeCommandOutcome(event.raw).reason === "explicit_accepted")
+      .map((event) => event.correlationId ?? String(event.raw?.request_id ?? "").trim())
+      .filter(Boolean),
+  );
   return events.flatMap((event) => {
+    if (
+      event.sourceEventType === "session_end"
+      && acceptedRequestIds.has(event.correlationId ?? String(event.raw?.request_id ?? "").trim())
+    ) {
+      return [];
+    }
     switch (event.kind) {
       case "thinking":
         return [activity("thinking", event)];

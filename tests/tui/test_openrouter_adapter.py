@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import pytest
 
@@ -11,16 +12,22 @@ from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui.engine.adapters.base import CompletionRequest, ProviderConfig
 from dharma_swarm.tui.engine.adapters.openrouter import OpenRouterAdapter
-from dharma_swarm.tui.engine.events import ErrorEvent, SessionEnd, TextComplete, UsageReport
+from dharma_swarm.tui.engine.events import (
+    ErrorEvent,
+    SessionEnd,
+    SessionStart,
+    TextComplete,
+    UsageReport,
+)
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, payload: dict, text: str = "") -> None:
+    def __init__(self, status_code: int, payload: Any, text: str = "") -> None:
         self.status_code = status_code
         self._payload = payload
         self.text = text
 
-    def json(self) -> dict:
+    def json(self) -> Any:
         return self._payload
 
 
@@ -28,6 +35,7 @@ class _FakeClient:
     def __init__(self, response: _FakeResponse) -> None:
         self._response = response
         self.exit_count = 0
+        self.posts: list[dict[str, Any]] = []
 
     async def __aenter__(self) -> "_FakeClient":
         return self
@@ -37,6 +45,7 @@ class _FakeClient:
         return None
 
     async def post(self, url: str, headers: dict, json: dict) -> _FakeResponse:
+        self.posts.append({"url": url, "headers": headers, "json": json})
         return self._response
 
 
@@ -64,15 +73,47 @@ class _BlockingClient:
             raise
 
 
-async def _collect_events(adapter: OpenRouterAdapter) -> list[object]:
-    request = CompletionRequest(
-        messages=[{"role": "user", "content": "hello"}],
-        model="openai/gpt-5-codex",
+class _GatedClient(_FakeClient):
+    def __init__(self, response: _FakeResponse) -> None:
+        super().__init__(response)
+        self.post_started = asyncio.Event()
+        self.release_response = asyncio.Event()
+
+    async def post(self, url: str, headers: dict, json: dict) -> _FakeResponse:
+        self.posts.append({"url": url, "headers": headers, "json": json})
+        self.post_started.set()
+        await self.release_response.wait()
+        return self._response
+
+
+async def _collect_events(
+    adapter: OpenRouterAdapter,
+    request: CompletionRequest | None = None,
+) -> list[object]:
+    request = request or CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}], model="openai/gpt-5-codex"
     )
     events: list[object] = []
     async for ev in adapter.stream(request, session_id="sid-1"):
         events.append(ev)
     return events
+
+
+def _assert_failed_without_route_evidence(
+    events: list[object],
+    expected_code: str,
+) -> None:
+    errors = [event for event in events if isinstance(event, ErrorEvent)]
+    ends = [event for event in events if isinstance(event, SessionEnd)]
+    assert len(errors) == 1
+    assert len(ends) == 1
+    assert errors[0].session_id == ends[0].session_id == "sid-1"
+    assert errors[0].code == expected_code
+    assert ends[0].success is False
+    assert ends[0].error_code == expected_code
+    assert not any(isinstance(event, SessionStart) for event in events)
+    assert not any(isinstance(event, TextComplete) for event in events)
+    assert not any(isinstance(event, UsageReport) for event in events)
 
 
 def test_openrouter_adapter_defaults_to_canonical_runtime_model() -> None:
@@ -141,6 +182,171 @@ async def test_openrouter_success_emits_text_and_usage(monkeypatch: pytest.Monke
         isinstance(ev, UsageReport) and ev.total_cost_usd == 0.02 for ev in events
     )
     assert any(isinstance(ev, SessionEnd) and ev.success for ev in events)
+
+
+@pytest.mark.asyncio
+async def test_openrouter_no_tools_payload_and_served_identity_are_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = _FakeResponse(
+        200,
+        {
+            "model": "moonshotai/kimi-k2",
+            "choices": [{"message": {"content": "verified reply"}}],
+            "usage": {},
+        },
+    )
+    client = _FakeClient(response)
+    monkeypatch.setattr(
+        "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",
+        lambda timeout: client,
+    )
+    adapter = OpenRouterAdapter(
+        ProviderConfig(provider_id="openrouter", api_key="test-key")
+    )
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "raw prompt"}],
+        model="openai/gpt-5-codex",
+        tools=[],
+        tool_choice="none",
+        provider_options={"require_served_identity": True},
+    )
+
+    events = await _collect_events(adapter, request)
+
+    assert client.posts[0]["json"] == {
+        "model": "openai/gpt-5-codex",
+        "messages": [{"role": "user", "content": "raw prompt"}],
+        "stream": False,
+        "tool_choice": "none",
+    }
+    start = next(event for event in events if isinstance(event, SessionStart))
+    assert events.index(start) < next(
+        index for index, event in enumerate(events) if isinstance(event, TextComplete)
+    )
+    assert start.model == "moonshotai/kimi-k2"
+    assert start.system_info["served_identity_source"] == "response.model"
+    assert start.system_info["requested_model"] == "openai/gpt-5-codex"
+    assert start.tools_available == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response_model", [None, "", "   ", 42, {"id": "model"}])
+async def test_openrouter_sealed_identity_rejects_missing_or_invalid_model(
+    monkeypatch: pytest.MonkeyPatch,
+    response_model: object,
+) -> None:
+    response = _FakeResponse(
+        200,
+        {
+            "model": response_model,
+            "choices": [{"message": {"content": "must not escape"}}],
+        },
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",
+        lambda timeout: _FakeClient(response),
+    )
+    adapter = OpenRouterAdapter(
+        ProviderConfig(provider_id="openrouter", api_key="test-key")
+    )
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="openai/gpt-5-codex",
+        provider_options={"require_served_identity": True},
+    )
+
+    events = await _collect_events(adapter, request)
+
+    _assert_failed_without_route_evidence(events, "missing_served_identity")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected_code"),
+    [
+        (
+            {
+                "model": "served/model",
+                "choices": [
+                    {
+                        "message": {
+                            "content": "must not escape",
+                            "tool_calls": [{"id": "call-1"}],
+                        }
+                    }
+                ],
+            },
+            "provider_tool_use_rejected",
+        ),
+        (
+            {
+                "model": "served/model",
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {"content": "must not escape"},
+                    }
+                ],
+            },
+            "provider_tool_use_rejected",
+        ),
+        (
+            {
+                "model": "served/model",
+                "choices": [{"message": {"content": "must not escape"}}],
+                "usage": {"server_tool_use_details": {"web_search_requests": 1}},
+            },
+            "provider_tool_use_rejected",
+        ),
+        (
+            {
+                "model": "served/model",
+                "error": {"message": "provider rejected completion"},
+                "choices": [{"message": {"content": "must not escape"}}],
+            },
+            "provider_response_error",
+        ),
+        (
+            {
+                "model": "served/model",
+                "choices": [
+                    {
+                        "error": {"message": "choice failed"},
+                        "message": {"content": "must not escape"},
+                    }
+                ],
+            },
+            "provider_response_error",
+        ),
+        ({"model": "served/model", "choices": []}, "malformed_response"),
+        (
+            {"model": "served/model", "choices": [{"message": "not-an-object"}]},
+            "malformed_response",
+        ),
+        (
+            {"model": "served/model", "choices": [{"message": {"content": "  "}}]},
+            "empty_response",
+        ),
+    ],
+)
+async def test_openrouter_adversarial_response_fails_before_route_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    payload: dict[str, Any],
+    expected_code: str,
+) -> None:
+    response = _FakeResponse(200, payload)
+    monkeypatch.setattr(
+        "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",
+        lambda timeout: _FakeClient(response),
+    )
+    adapter = OpenRouterAdapter(
+        ProviderConfig(provider_id="openrouter", api_key="test-key")
+    )
+
+    events = await _collect_events(adapter)
+
+    _assert_failed_without_route_evidence(events, expected_code)
 
 
 @pytest.mark.asyncio
@@ -241,19 +447,20 @@ async def test_openrouter_cancel_interrupts_http_and_cleans_up(
 
 
 @pytest.mark.asyncio
-async def test_openrouter_cancel_before_http_start_skips_request(
+async def test_openrouter_session_start_waits_for_http_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client_created = False
-
-    def make_client(timeout: float) -> _BlockingClient:
-        nonlocal client_created
-        client_created = True
-        return _BlockingClient()
-
+    response = _FakeResponse(
+        200,
+        {
+            "model": "served/model",
+            "choices": [{"message": {"content": "reply"}}],
+        },
+    )
+    client = _GatedClient(response)
     monkeypatch.setattr(
         "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",
-        make_client,
+        lambda timeout: client,
     )
     adapter = OpenRouterAdapter(
         ProviderConfig(provider_id="openrouter", api_key="test-key")
@@ -264,12 +471,15 @@ async def test_openrouter_cancel_before_http_start_skips_request(
     )
     stream = adapter.stream(request, session_id="sid-before-http")
 
-    await anext(stream)
-    await adapter.cancel()
+    first_event = asyncio.create_task(anext(stream))
+    await asyncio.wait_for(client.post_started.wait(), timeout=1)
+    assert first_event.done() is False
+
+    client.release_response.set()
+    start = await asyncio.wait_for(first_event, timeout=1)
     remaining = [event async for event in stream]
 
-    assert client_created is False
-    assert len(remaining) == 1
-    assert isinstance(remaining[0], SessionEnd)
-    assert remaining[0].error_code == "cancelled"
+    assert isinstance(start, SessionStart)
+    assert start.model == "served/model"
+    assert any(isinstance(event, SessionEnd) and event.success for event in remaining)
     assert adapter._active_request_task is None

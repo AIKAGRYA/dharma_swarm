@@ -80,6 +80,42 @@ def test_build_prompt_and_command_strip_subprocess_nul_bytes() -> None:
     assert "system" in command
 
 
+def test_raw_single_user_prompt_is_exact_in_command_argv() -> None:
+    raw_prompt = "  read café/端末.md exactly  \n"
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": raw_prompt}],
+        provider_options={"raw_single_user_prompt": True},
+    )
+
+    command = _adapter()._build_command(request)
+
+    prompt_index = command.index("-p") + 1
+    assert command[prompt_index].encode("utf-8") == raw_prompt.encode("utf-8")
+    assert not command[prompt_index].startswith("User:")
+
+
+def test_raw_single_user_prompt_rejects_nul_instead_of_rewriting() -> None:
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "before\x00after"}],
+        provider_options={"raw_single_user_prompt": True},
+    )
+
+    with pytest.raises(ValueError, match="NUL"):
+        _adapter()._build_command(request)
+
+
+def test_raw_prompt_option_preserves_normal_serializer_for_other_shapes() -> None:
+    request = CompletionRequest(
+        messages=[
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "second"},
+        ],
+        provider_options={"raw_single_user_prompt": True},
+    )
+
+    assert _adapter()._build_prompt(request) == "User: first\n\nAssistant: second"
+
+
 @pytest.mark.asyncio
 async def test_list_models_and_profile() -> None:
     a = _adapter()
