@@ -80,7 +80,7 @@ if [ "$ndrift" -gt 0 ]; then
   for f in "$@"; do
     echo "golden_diff:   drifted: tests/golden/$f" >&2
   done
-  firstpath=${first%%(*}
+  firstpath=${first%%\(*}
   if [ -f "$GOLDEN_ROOT/$firstpath" ] && [ -f "$FRESH/$firstpath" ]; then
     echo "golden_diff: unified diff excerpt (committed vs fresh) for tests/golden/$firstpath:" >&2
     diff -u "$GOLDEN_ROOT/$firstpath" "$FRESH/$firstpath" | head -40 >&2
