@@ -11,10 +11,8 @@ from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
-    from dharma_swarm.tui.commands.system_commands import SystemCommandHandler
 except ImportError:
     system_commands_module = None  # type: ignore[assignment]
-    SystemCommandHandler = None  # type: ignore[assignment,misc]
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
     SessionEnd,
