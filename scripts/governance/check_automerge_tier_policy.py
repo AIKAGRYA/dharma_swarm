@@ -1,59 +1,30 @@
 #!/usr/bin/env python3
-"""Automerge tier-policy guard — the door's required CI check (PR-A, PR-S0).
+"""Fail-closed unattended-merge authority guard.
 
-Implements §§5-8 of the operator ruling of 2026-07-29
-(DOOR = AUTO_WITH_DECORRELATED_REVIEW) as amended by the operator ruling of
-2026-07-30 (TIER2 REPEAL = DECORRELATED_REVIEW_PLUS_REVERSIBILITY; record:
-docs/ops/OPERATOR_RULING_2026-07-30_SARATHI_AUTONOMY_CEILING.md).
+The safe-P0 boundary is deliberately asymmetric:
 
-One proposition, checked fail-closed on every pull request:
+* strict docs-low needs deterministic gates and current-head trusted AI
+  evidence;
+* code additionally needs an exact current-head allowlisted-operator warrant;
+* referee/high-risk changes are operator-only and never receive a Mike permit.
 
-    A PR labeled for unattended merge (`automerge` / `bot-pr`) satisfies the
-    tier policy in scripts/governance/automerge_tier_policy.json — or this
-    check is red and the manifest-driven automerge lane cannot dispatch it.
+AI review is evidence, not operator identity.  Safe P0 emits only a canonical
+``AuthorizationEvidence<repo, pr, head, base, policy, intent, authority>``
+snapshot.  It deliberately cannot construct ``MergeAuthorized``: authenticated
+provenance and server-side base-CAS proofs are not live yet.  A label, aggregate
+review decision, caller boolean, or predictable confirmation string cannot
+promote this evidence into merge authority.
 
-Enforced here:
-- Reversibility floor (every tier, 2026-07-30): the declared merge intent —
-  the PR title — is classified by the deterministic reversibility gate
-  (dharma_swarm/operator_core/reversibility_gate.py) with
-  operator_reachable=False, CI being by definition the unattended context.
-  An OPERATOR_ONLY verdict (a NEVER_AUTO denylist hit or CRITICAL-risk
-  vocabulary) bars the unattended lane; the decorrelated review quorum
-  stands in for the execution lease on everything milder. The denylist is
-  the hard irreversible/illegal floor and does not move.
-- Tier 2 door (2026-07-30 repeal of "operator hand-merge forever"): a PR
-  touching referee paths is tier2 — admissible unattended only with the
-  tier2 quorum (2 decorrelated APPROVED reviews), the tier2 diff ceiling,
-  the reversibility floor above, AND every hit referee path clear of
-  NEVER_AUTO substrings. Anything on the floor stays operator hand-merge.
-- Diff ceilings: tier 0 <= 300 changed lines, tier 1 <= 600, tier 2 <= 400;
-  larger fails (split it or drop the label and go the operator route).
-- Decorrelated review count: tier 0 needs 1 APPROVED review, tiers 1-2 need
-  2, from reviewer identities in the policy's reviewer_families whose family
-  differs from the author's family (and from each other where possible).
-  Native GitHub reviews are the machine-checkable verdict artifact of v1.
-  Reviews come from the REST endpoint (the same source pr_merge_control.py
-  trusts): logins are matched EXACTLY against the policy's trusted
-  "<app>[bot]" identities, and only a review whose commit_id equals the
-  current head SHA counts — an approval of an earlier revision has not seen
-  the current changes.
-- Test-deletion sign-off (tiers 1-2): a diff deleting test functions passes
-  only if a QUALIFYING (trusted, decorrelated) APPROVED review body names
-  every deleted test — an approval from an untrusted account never
-  authorizes a deletion.
-- Rate limit: at or above 20 automerge-lane merges in the last 24h, every
-  further labeled PR fails this check until the window drains.
-- Unlabeled PRs and drafts always pass (the check must be green context
-  noise for the operator's own hand-merge lane).
-
-This check going red never blocks the OPERATOR: hand-merge ignores it by
-authority; it is required context only for the unattended lane's green-set.
+Unlabeled PRs stay outside the unattended lane so the operator's manual route
+is not wedged by this required context. Removing a label does not grant Mike
+authority; it only selects the separate operator route.
 """
 
 from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import re
 import subprocess
@@ -70,7 +41,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 from dharma_swarm.operator_core.reversibility_gate import (  # noqa: E402
     ActionClass,
-    _never_auto_match,
     classify_action,
 )
 POLICY_PATH = REPO_ROOT / "scripts" / "governance" / "automerge_tier_policy.json"
@@ -84,13 +54,26 @@ TEST_DELETION_RE = re.compile(
 
 def load_policy(path: Path = POLICY_PATH) -> dict:
     policy = json.loads(path.read_text(encoding="utf-8"))
-    if policy.get("schema") != "dharma.automerge_tier_policy.v2":
+    if policy.get("schema") != "dharma.automerge_tier_policy.v3":
         raise SystemExit(f"unrecognized tier policy schema in {path}")
     return policy
 
 
+def canonical_digest(payload: object) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def policy_digest(policy: dict) -> str:
+    return canonical_digest(policy)
+
+
 def _matches(path: str, pattern: str) -> bool:
-    if pattern.endswith("/**"):
+    if pattern.endswith("/**") and not any(
+        marker in pattern[:-3] for marker in ("*", "?", "[")
+    ):
         return path.startswith(pattern[:-2])
     if pattern.endswith("/"):
         return path.startswith(pattern)
@@ -104,17 +87,100 @@ def tier2_hits(changed_paths: list[str], policy: dict) -> list[str]:
     )
 
 
+def operator_only_hits(changed_paths: list[str], policy: dict) -> list[str]:
+    patterns = policy["authority_policy"]["operator_only_paths"]
+    return sorted(
+        set(tier2_hits(changed_paths, policy))
+        | {p for p in changed_paths for pattern in patterns if _matches(p, pattern)}
+    )
+
+
+def is_docs_low_path(path: str, policy: dict) -> bool:
+    authority = policy["authority_policy"]
+    allowed = any(_matches(path, pattern) for pattern in authority["docs_low_allow"])
+    denied = any(_matches(path, pattern) for pattern in authority["docs_low_deny"])
+    return allowed and not denied
+
+
 def classify_tier(changed_paths: list[str], policy: dict) -> str:
-    doc_only = policy["tiers"]["tier0"]["doc_only_paths"]
-    if changed_paths and all(
-        any(_matches(p, pattern) for pattern in doc_only) for p in changed_paths
-    ):
+    if operator_only_hits(changed_paths, policy):
+        return "tier2"
+    if changed_paths and all(is_docs_low_path(path, policy) for path in changed_paths):
         return "tier0"
     return "tier1"
 
 
 def deleted_tests(diff_text: str) -> list[str]:
     return sorted(set(TEST_DELETION_RE.findall(diff_text)))
+
+
+def unsafe_diff_modes(diff_text: str) -> list[str]:
+    findings = []
+    for line in diff_text.splitlines():
+        stripped = line.strip()
+        if stripped in {
+            "new file mode 100755",
+            "new file mode 120000",
+            "new file mode 160000",
+            "new mode 100755",
+            "new mode 120000",
+            "new mode 160000",
+        }:
+            findings.append(stripped)
+    return sorted(set(findings))
+
+
+_TEST_PATH_RE = re.compile(
+    r"(^|/)(tests?|testdata|fixtures?|goldens?)(/|$)|"
+    r"(^|/)[^/]+\.(test|spec)\.[^/]+$",
+    re.IGNORECASE,
+)
+
+
+def removed_or_renamed_test_paths(file_changes: list[dict] | None) -> list[str]:
+    findings: set[str] = set()
+    for row in file_changes or []:
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("status") or "").lower()
+        if status not in {"removed", "renamed"}:
+            continue
+        for key in ("filename", "previous_filename"):
+            path = str(row.get(key) or "")
+            if path and _TEST_PATH_RE.search(path):
+                findings.add(path)
+    return sorted(findings)
+
+
+def authority_class_for(
+    *,
+    changed_paths: list[str],
+    diff_text: str,
+    title: str,
+    policy: dict,
+    file_changes: list[dict] | None = None,
+) -> tuple[str, list[str]]:
+    reasons: list[str] = []
+    hits = operator_only_hits(changed_paths, policy)
+    if hits:
+        reasons.append(f"operator-only paths: {hits}")
+    removed = deleted_tests(diff_text)
+    if removed:
+        reasons.append(f"test deletions: {removed}")
+    removed_paths = removed_or_renamed_test_paths(file_changes)
+    if removed_paths:
+        reasons.append(f"removed or renamed test paths: {removed_paths}")
+    unsafe_modes = unsafe_diff_modes(diff_text)
+    if unsafe_modes:
+        reasons.append(f"unsafe file modes: {unsafe_modes}")
+    decision = classify_action(title, operator_reachable=False)
+    if decision.action_class is ActionClass.OPERATOR_ONLY:
+        reasons.append("reversibility floor classifies intent OPERATOR_ONLY")
+    if reasons:
+        return "operator_only", reasons
+    if changed_paths and all(is_docs_low_path(path, policy) for path in changed_paths):
+        return "docs_low", []
+    return "code", []
 
 
 def _normalize_login(login: str) -> str:
@@ -131,6 +197,7 @@ def _normalize_login(login: str) -> str:
 # dismissal ever surfaces as a separate later row it must still clear the
 # login's standing approval (Greptile review on PR #1160).
 _STATE_BEARING = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
+_AI_EVIDENCE_STATES = {"APPROVED", "COMMENTED", "CHANGES_REQUESTED", "DISMISSED"}
 
 
 def latest_approvals(reviews: list[dict], head_sha: str) -> list[dict]:
@@ -162,6 +229,90 @@ def latest_approvals(reviews: list[dict], head_sha: str) -> list[dict]:
     ]
 
 
+def latest_ai_evidence(
+    reviews: list[dict], head_sha: str, policy: dict
+) -> list[dict]:
+    """Return current-head review evidence from exact trusted App identities.
+
+    COMMENTED proves that a review ran but does not become a GitHub approval.
+    A later CHANGES_REQUESTED or DISMISSED row clears the login's evidence.
+    """
+    trusted = {_normalize_login(login) for login in policy["reviewer_families"]}
+    latest: dict[str, dict] = {}
+    for review in sorted(
+        reviews,
+        key=lambda row: (
+            str(row.get("submitted_at") or ""),
+            int(row.get("id") or 0),
+        ),
+    ):
+        login = _normalize_login(str((review.get("user") or {}).get("login") or ""))
+        state = str(review.get("state") or "").upper()
+        if login in trusted and state in _AI_EVIDENCE_STATES:
+            latest[login] = review
+    evidence: list[dict] = []
+    for login, review in sorted(latest.items()):
+        state = str(review.get("state") or "").upper()
+        if state not in {"APPROVED", "COMMENTED"}:
+            continue
+        if not head_sha or str(review.get("commit_id") or "") != head_sha:
+            continue
+        evidence.append(
+            {
+                "id": int(review.get("id") or 0),
+                "login": login,
+                "state": state,
+                "body": str(review.get("body") or ""),
+                "head_sha": head_sha,
+            }
+        )
+    return evidence
+
+
+def qualifying_operator_warrants(
+    reviews: list[dict], head_sha: str, policy: dict
+) -> list[dict]:
+    """Reduce native GitHub approvals to exact-head operator warrants.
+
+    Mutable issue comments are intentionally not accepted in safe P0: they are
+    editable/deletable and the required policy check has no authenticated
+    comment-to-check bridge.  Self-authored operator PRs therefore stay on the
+    manual merge route.
+    """
+    operators = {
+        _normalize_login(login)
+        for login in policy["authority_policy"]["operator_identities"]
+    }
+    latest_reviews: dict[str, dict] = {}
+    for review in sorted(
+        reviews,
+        key=lambda row: (
+            str(row.get("submitted_at") or ""),
+            int(row.get("id") or 0),
+        ),
+    ):
+        login = _normalize_login(str((review.get("user") or {}).get("login") or ""))
+        if login in operators and str(review.get("state") or "").upper() in _STATE_BEARING:
+            latest_reviews[login] = review
+    warrants: list[dict] = []
+    for login, review in sorted(latest_reviews.items()):
+        if (
+            str(review.get("state") or "").upper() == "APPROVED"
+            and head_sha
+            and str(review.get("commit_id") or "") == head_sha
+        ):
+            warrants.append(
+                {
+                    "kind": "github_review",
+                    "id": int(review.get("id") or 0),
+                    "actor": login,
+                    "head_sha": head_sha,
+                }
+            )
+
+    return warrants
+
+
 def count_unique_merged(row_lists: list[object]) -> int:
     """Distinct merged-PR count across the per-label queries — a PR carrying
     both unattended labels is one merge, not two (Devin + Codex + Greptile
@@ -184,12 +335,20 @@ def evaluate(
     diff_lines: int,
     diff_text: str,
     approved_reviews: list[dict],
+    ai_evidence: list[dict] | None = None,
+    operator_warrants: list[dict] | None = None,
+    repo: str = "",
+    pr: int = 0,
+    head_sha: str = "",
+    base_sha: str = "",
+    base_ref: str = "",
+    file_changes: list[dict] | None = None,
     author: str,
     merged_last_24h: int,
     policy: dict,
     assume_unattended: bool = False,
 ) -> dict:
-    """Pure policy evaluation. approved_reviews rows: {login, state, body}.
+    """Pure authority evaluation over already authenticated GitHub evidence.
 
     assume_unattended binds the policy regardless of labels and draft state —
     the mode for any caller about to ARM an unattended merge (the mention
@@ -197,13 +356,15 @@ def evaluate(
     bind" would be a bypass (Codex review on PR #1160).
     """
     report: dict = {
-        "schema": "dharma.automerge_tier_policy_report.v1",
+        "schema": "dharma.automerge_tier_policy_report.v2",
         "labeled_for_unattended": (
             bool(UNATTENDED_LABELS & set(labels)) or assume_unattended
         ),
         "is_draft": is_draft,
         "tier": None,
         "tier2_hits": [],
+        "authority_class": None,
+        "authorization_evidence": None,
         "violations": [],
         "passed": True,
     }
@@ -223,10 +384,21 @@ def evaluate(
 
     violations: list[str] = []
 
-    hits = tier2_hits(changed_paths, policy)
+    hits = operator_only_hits(changed_paths, policy)
     report["tier2_hits"] = hits
-    tier = "tier2" if hits else classify_tier(changed_paths, policy)
+    authority_class, authority_reasons = authority_class_for(
+        changed_paths=changed_paths,
+        diff_text=diff_text,
+        title=title,
+        policy=policy,
+        file_changes=file_changes,
+    )
+    tier = {"docs_low": "tier0", "code": "tier1", "operator_only": "tier2"}[
+        authority_class
+    ]
     report["tier"] = tier
+    report["authority_class"] = authority_class
+    report["authority_reasons"] = authority_reasons
 
     # Reversibility floor (operator ruling 2026-07-30): the gate's verdict on
     # the declared merge intent, evaluated with operator_reachable=False — CI
@@ -251,13 +423,11 @@ def evaluate(
             f"reversibility floor: title classifies OPERATOR_ONLY ({detail}) — "
             "the irreversible/illegal floor stays operator hand-merge"
         )
-    if hits:
-        floor_paths = sorted({p for p in hits if _never_auto_match(p.lower())})
-        if floor_paths:
-            violations.append(
-                f"reversibility floor: referee paths on the NEVER_AUTO floor: "
-                f"{floor_paths} — operator hand-merge"
-            )
+    if authority_class == "operator_only":
+        violations.append(
+            "operator-only authority class: Mike may report evidence but never "
+            f"actuate this PR ({'; '.join(authority_reasons)})"
+        )
 
     ceiling = policy["tiers"][tier]["max_diff_lines"]
     if diff_lines > ceiling:
@@ -266,11 +436,9 @@ def evaluate(
             "split the PR or take the operator route"
         )
 
-    # Exact-login trust boundary, mirroring TRUSTED_REVIEW_LOGINS in
-    # scripts/runtime/pr_merge_control.py: prefix matching would both miss
-    # the real "<app>[bot]" logins ('chatgpt-codex-connector[bot]' does not
-    # start with 'codex') and admit lookalike accounts (Devin + Codex
-    # reviews on PR #1160).
+    # Exact-login trust boundary. AI authority evidence must be the richer,
+    # current-head rows produced by latest_ai_evidence; an APPROVED summary row
+    # without its head/evidence identity is not promotable.
     families = {
         _normalize_login(login): family
         for login, family in policy["reviewer_families"].items()
@@ -295,41 +463,82 @@ def evaluate(
             continue
         seen_families.add(family)
         qualifying.append(login)
-    needed = policy["tiers"][tier]["required_decorrelated_reviews"]
+    evidence_rows = list(ai_evidence or [])
+    trusted_evidence = [
+        row
+        for row in evidence_rows
+        if _normalize_login(str(row.get("login") or "")) in families
+        and str(row.get("state") or "").upper() in {"APPROVED", "COMMENTED"}
+        and head_sha
+        and str(row.get("head_sha") or "") == head_sha
+        and isinstance(row.get("id"), int)
+        and row["id"] > 0
+    ]
+    needed = policy["authority_policy"]["classes"][authority_class][
+        "required_ai_evidence"
+    ]
     report["qualifying_reviews"] = qualifying
-    if len(qualifying) < needed:
+    report["ai_evidence"] = trusted_evidence
+    if len(trusted_evidence) < needed:
         violations.append(
-            f"{tier} needs {needed} decorrelated APPROVED review(s) "
-            f"(family != author family '{author_family}'); have {len(qualifying)}: {qualifying}"
+            f"{authority_class} needs {needed} current-head trusted AI review "
+            f"evidence row(s); have {len(trusted_evidence)}"
         )
 
-    if policy["tiers"][tier].get("test_deletion_needs_named_signoff"):
-        removed = deleted_tests(diff_text)
-        if removed:
-            # Only a TRUSTED reviewer's approval can authorize a deletion —
-            # an APPROVED review from an arbitrary account naming the tests
-            # is not a sign-off (Codex review on PR #1160).
-            named_everywhere = [
-                r for r in trusted_reviews
-                if all(name in (r.get("body") or "") for name in removed)
-            ]
-            if not named_everywhere:
-                violations.append(
-                    f"test deletions {removed} lack a trusted APPROVED review "
-                    "naming every deleted test"
-                )
-            report["deleted_tests"] = removed
+    operator_logins = {
+        _normalize_login(login)
+        for login in policy["authority_policy"]["operator_identities"]
+    }
+    warrants = [
+        row
+        for row in (operator_warrants or [])
+        if isinstance(row, dict)
+        and _normalize_login(str(row.get("actor") or "")) in operator_logins
+        and head_sha
+        and str(row.get("head_sha") or "") == head_sha
+        and row.get("kind") == "github_review"
+        and isinstance(row.get("id"), int)
+        and row["id"] > 0
+    ]
+    report["operator_warrants"] = warrants
+    needs_warrant = policy["authority_policy"]["classes"][authority_class][
+        "operator_warrant"
+    ]
+    if needs_warrant and authority_class != "operator_only" and not warrants:
+        violations.append(
+            "code authority requires an exact current-head allowlisted-operator warrant"
+        )
 
-    limit = policy["rate_limit_automerges_per_day"]
+    limit = policy["rate_observation_advisory_per_day"]
     report["merged_last_24h"] = merged_last_24h
-    if merged_last_24h >= limit:
-        violations.append(
-            f"automerge rate limit reached: {merged_last_24h} >= {limit} in 24h — "
-            "window must drain before further unattended merges"
-        )
+    report["rate_limit"] = limit
+    report["rate_limit_advisory"] = (
+        "retained-label counts are mutable and non-atomic; enforce any future "
+        "actuation ceiling with a serialized append-only admission lease"
+    )
 
     report["violations"] = violations
     report["passed"] = not violations
+    if report["passed"]:
+        evidence = {
+            "schema": policy["authority_policy"]["authorization_evidence_schema"],
+            "repo": repo,
+            "pr": pr,
+            "head_sha": head_sha,
+            "base_sha": base_sha,
+            "base_ref": base_ref,
+            "policy_sha256": policy_digest(policy),
+            "intent_sha256": canonical_digest(title),
+            "authority_class": authority_class,
+            "ai_evidence_ids": sorted(
+                int(row.get("id") or 0) for row in trusted_evidence
+            ),
+            "operator_warrant": warrants[0] if warrants else None,
+            "provenance": "unsigned-github-snapshot",
+            "actuation_eligible": False,
+        }
+        evidence["digest"] = canonical_digest(evidence)
+        report["authorization_evidence"] = evidence
     return report
 
 
@@ -368,15 +577,16 @@ def _fetch_all_pages(resource: str) -> list | None:
         page += 1
 
 
-def gather_pr(repo: str, pr: int) -> dict | None:
+def gather_pr(repo: str, pr: int, policy: dict | None = None) -> dict | None:
     """Gather the evaluation inputs, failing closed (None) on ANY partial
     read: an unavailable diff is not an empty diff (it would waive the
     deleted-test sign-off), and an unavailable review/rate-limit query is
     not an empty one (Codex + Greptile reviews on PR #1160)."""
+    effective_policy = policy or load_policy()
     view = _gh_json(
         [
             "pr", "view", str(pr), "--repo", repo, "--json",
-            "labels,isDraft,title,additions,deletions,author,headRefOid",
+            "labels,isDraft,title,additions,deletions,author,baseRefName,baseRefOid,headRefOid",
         ]
     )
     if not isinstance(view, dict):
@@ -413,15 +623,44 @@ def gather_pr(repo: str, pr: int) -> dict | None:
         if not isinstance(rows, list):
             return None
         label_rows.append(rows)
+    head_sha = str(view.get("headRefOid") or "")
+    base_sha = str(view.get("baseRefOid") or "")
+    base_ref = str(view.get("baseRefName") or "")
+    file_changes = [
+        {
+            "filename": str(row.get("filename") or ""),
+            "previous_filename": str(row.get("previous_filename") or ""),
+            "status": str(row.get("status") or ""),
+        }
+        for row in files
+    ]
+    changed_paths = sorted(
+        {
+            path
+            for row in file_changes
+            for path in (row["filename"], row["previous_filename"])
+            if path
+        }
+    )
     return {
+        "repo": repo,
+        "pr": pr,
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "base_ref": base_ref,
         "labels": [row["name"] for row in view.get("labels", [])],
         "is_draft": bool(view.get("isDraft")),
         "title": str(view.get("title") or ""),
-        "changed_paths": [str(row.get("filename") or "") for row in files],
+        "changed_paths": changed_paths,
+        "file_changes": file_changes,
         "diff_lines": int(view.get("additions", 0)) + int(view.get("deletions", 0)),
         "diff_text": diff.stdout,
         "approved_reviews": latest_approvals(
-            reviews, str(view.get("headRefOid") or "")
+            reviews, head_sha
+        ),
+        "ai_evidence": latest_ai_evidence(reviews, head_sha, effective_policy),
+        "operator_warrants": qualifying_operator_warrants(
+            reviews, head_sha, effective_policy
         ),
         "author": view.get("author", {}).get("login", ""),
         "merged_last_24h": count_unique_merged(label_rows),
@@ -437,10 +676,15 @@ def main(argv: list[str] | None = None) -> int:
         help="bind the policy regardless of labels/draft state — required "
         "for any caller about to arm an unattended merge",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="write the exact evaluated report/permit for the next gate invocation",
+    )
     args = parser.parse_args(argv)
 
     policy = load_policy()
-    gathered = gather_pr(args.repo, args.pr)
+    gathered = gather_pr(args.repo, args.pr, policy)
     if gathered is None:
         print("TIER_POLICY_UNKNOWN: could not gather PR state — failing closed",
               file=sys.stderr)
@@ -448,6 +692,11 @@ def main(argv: list[str] | None = None) -> int:
     report = evaluate(
         policy=policy, assume_unattended=args.assume_unattended, **gathered
     )
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     print(json.dumps(report, indent=2, sort_keys=True))
     if report["passed"]:
         print("TIER_POLICY_OK")

@@ -46,6 +46,9 @@ DEFAULT_NATS_CA_PEM_PATH = (
     REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
 )
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
+AUTOMERGE_POLICY_PATH = (
+    REPO_ROOT / "scripts" / "governance" / "automerge_tier_policy.json"
+)
 REQUIRED_COHERENCE_FIELDS = (
     "Organ touched",
     "Declared-vs-actual gap closed",
@@ -66,6 +69,7 @@ REVIEW_EVIDENCE_FILES = (
 MAX_REVIEW_EVIDENCE_BYTES = 512 * 1024
 DEFAULT_AGENT_TIMEOUT_S = 600.0
 DEFAULT_AGENT_KILL_GRACE_S = 5.0
+DEFAULT_BLOCKED_RETRY_S = 3600.0
 DEFAULT_FANOUT_STATUSES = ("GITHUB_GREEN_NEEDS_PACKET", "NEEDS_AGENT_REVIEW")
 DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.fleet",
@@ -78,12 +82,8 @@ DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.perplexity",
 )
 DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
-# PRs carrying this label are produced by trusted automation (automerge.yml
-# enrolls bot/automated PRs). For these, Merge Master Mike waives the human/
-# agent reviewer-receipt requirement. Review conversations remain native
-# branch-protection blockers even when they are outdated or bot-authored.
-# Every other gate (mergeable, failing/pending checks, CHANGES_REQUESTED,
-# Coherence Delta, CI truth, HIGH/CRITICAL risk) still applies unchanged.
+# This label selects routing only. It never waives review evidence or creates
+# merge authority; author-controlled metadata cannot inhabit MergeAuthorized.
 BOT_PR_LABEL = "bot-pr"
 # Review bots whose threads are advisory in substance. They are identified for
 # diagnostics, but native conversation-resolution policy still blocks every
@@ -253,6 +253,119 @@ def review_prompt_path(out_dir: Path, agent: str) -> Path:
 
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def canonical_json_sha256(payload: object) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return sha256_bytes(encoded)
+
+
+def automerge_policy_identity(path: Path = AUTOMERGE_POLICY_PATH) -> dict[str, str]:
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PRControlError(f"cannot load automerge authority policy: {exc}") from exc
+    if policy.get("schema") != "dharma.automerge_tier_policy.v3":
+        raise PRControlError("automerge authority policy schema is not v3")
+    return {
+        "schema": str(policy["schema"]),
+        "sha256": canonical_json_sha256(policy),
+    }
+
+
+def validate_merge_authorization(
+    report: object,
+    *,
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+    base_ref: str,
+    title: str,
+    policy_identity: dict[str, str] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Validate policy evidence without promoting its hash into authority.
+
+    This validates integrity and exact bindings only.  The report is an
+    unsigned GitHub snapshot and therefore cannot inhabit MergeAuthorized.
+    The production actuator separately requires an authenticated authority
+    proof, which is deliberately unavailable in safe P0.
+    """
+    blockers: list[str] = []
+    if not isinstance(report, dict):
+        return None, ["merge authorization report is missing or malformed"]
+    if report.get("schema") != "dharma.automerge_tier_policy_report.v2":
+        blockers.append("merge authorization report schema is not v2")
+    if report.get("passed") is not True or report.get("violations"):
+        blockers.append("merge authorization policy did not pass")
+    evidence_raw = report.get("authorization_evidence")
+    evidence = evidence_raw if isinstance(evidence_raw, dict) else None
+    if evidence is None:
+        blockers.append("merge authorization evidence is absent")
+        return None, blockers
+    if evidence.get("schema") != "dharma.merge_authorization_evidence.v1":
+        blockers.append("merge authorization evidence schema is not v1")
+    expected = {
+        "repo": repo,
+        "pr": pr_number,
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "base_ref": base_ref,
+        "intent_sha256": canonical_json_sha256(title),
+    }
+    for field, value in expected.items():
+        if evidence.get(field) != value:
+            blockers.append(f"merge authorization {field} binding is mismatched")
+    identity = policy_identity or automerge_policy_identity()
+    if evidence.get("policy_sha256") != identity.get("sha256"):
+        blockers.append("merge authorization policy binding is stale or mismatched")
+    authority_class = str(evidence.get("authority_class") or "")
+    if authority_class not in {"docs_low", "code"}:
+        blockers.append("merge authorization class is not actuator-eligible")
+    evidence_ids = evidence.get("ai_evidence_ids")
+    if (
+        not isinstance(evidence_ids, list)
+        or not evidence_ids
+        or any(not isinstance(value, int) or value <= 0 for value in evidence_ids)
+        or len(evidence_ids) != len(set(evidence_ids))
+    ):
+        blockers.append("merge authorization lacks current-head AI evidence")
+    if authority_class == "code":
+        warrant = evidence.get("operator_warrant")
+        if (
+            not isinstance(warrant, dict)
+            or warrant.get("head_sha") != head_sha
+            or warrant.get("kind") != "github_review"
+            or not isinstance(warrant.get("id"), int)
+            or warrant["id"] <= 0
+            or not str(warrant.get("actor") or "")
+        ):
+            blockers.append("code merge authorization lacks a current-head operator warrant")
+    if evidence.get("provenance") != "unsigned-github-snapshot":
+        blockers.append("merge authorization evidence provenance is invalid")
+    if evidence.get("actuation_eligible") is not False:
+        blockers.append("merge authorization evidence must not claim actuation authority")
+    claimed_digest = str(evidence.get("digest") or "")
+    digest_payload = {key: value for key, value in evidence.items() if key != "digest"}
+    if claimed_digest != canonical_json_sha256(digest_payload):
+        blockers.append("merge authorization permit digest is invalid")
+    return (evidence if not blockers else None), blockers
+
+
+def validate_trusted_merge_authority_proof(_proof: object) -> list[str]:
+    """Keep MergeAuthorized uninhabited until a trusted proof issuer exists.
+
+    A future implementation must authenticate issuer/provenance and bind the
+    repo, PR, target ref, base/head, policy, live evidence reduction, merge
+    method, and server-side base-CAS/ruleset proof.  An unkeyed digest or local
+    receipt is not such a proof.
+    """
+    return [
+        "authenticated MergeAuthorized proof is unavailable in safe P0; "
+        "authorization evidence cannot grant actuation"
+    ]
 
 
 def read_review_evidence_snapshot(out_dir: Path) -> dict[str, bytes]:
@@ -1191,6 +1304,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
     coherence = coherence_results(pr.get("body") or "")
     ci_truth = ci_truth_for_pr(pr, args)
     risk = risk_from_files(files)
+    policy_identity = automerge_policy_identity()
     packet_id = stamp()
     out_dir = root / f"pr-{args.pr}" / packet_id
     if out_dir.exists():
@@ -1208,6 +1322,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
         "coherence": coherence,
         "ci_truth": ci_truth,
         "risk": risk,
+        "authority_policy": policy_identity,
         "files": packet_files,
         "review_threads": threads,
     }
@@ -1770,6 +1885,13 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     packet_review_merge_base = ""
     live_review_merge_base = ""
     reused_review_range = False
+    try:
+        current_policy_identity = automerge_policy_identity()
+    except PRControlError as exc:
+        current_policy_identity = {"schema": "UNKNOWN", "sha256": ""}
+        blockers.append(str(exc))
+    packet_policy_raw = original.get("authority_policy")
+    packet_policy = packet_policy_raw if isinstance(packet_policy_raw, dict) else {}
 
     if current_pr.get("number") != args.pr:
         blockers.append("current PR number is missing or mismatched")
@@ -1777,6 +1899,10 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("packet repository is missing or mismatched")
     if packet_pr_number != args.pr:
         blockers.append("packet PR number is missing or mismatched")
+    if packet_policy != current_policy_identity:
+        blockers.append(
+            "packet authority policy is missing, stale, or mismatched; rebuild the packet"
+        )
     if not head_sha:
         blockers.append("current PR does not expose its head SHA")
     elif not valid_commit_oid(head_sha):
@@ -1880,12 +2006,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append(f"{blocking_unresolved_count} unresolved review threads")
 
     required_reviewers = required_reviewer_agents(args)
-    if is_bot_pr and required_reviewers:
-        bot_pr_waivers.append(
-            "bot-pr: waived required reviewer receipts "
-            f"({', '.join(required_reviewers)}) — trusted automation merges when green"
-        )
-        required_reviewers = []
+    if is_bot_pr:
+        warnings.append("bot-pr is routing metadata only; it grants no review waiver")
     accept_github_reviews = getattr(args, "accept_github_reviews", False)
     pr_reviews = (
         fetch_pr_reviews(args.pr)
@@ -1901,7 +2023,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             base_sha=packet_base,
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
-            human_approved=args.human_approved,
+            human_approved=False,
             head_sha=head_sha,
         )
         for agent in required_reviewers
@@ -1915,7 +2037,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             base_sha=packet_base,
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
-            human_approved=args.human_approved,
+            human_approved=False,
             head_sha=head_sha,
         )
         for agent in backup_reviewer_agents(args)
@@ -1923,7 +2045,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     claude_blockers: list[str] = []
     for agent, status in review_statuses.items():
         agent_blockers = agent_review_blockers(
-            status, human_approved=args.human_approved
+            status, human_approved=False
         )
         if agent == "claude":
             claude_blockers = agent_blockers
@@ -1948,7 +2070,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     else:
         accepted_backup = ""
         for agent, status in backup_statuses.items():
-            if not agent_review_blockers(status, human_approved=args.human_approved):
+            if not agent_review_blockers(status, human_approved=False):
                 accepted_backup = agent
                 break
         if not accepted_backup:
@@ -1981,8 +2103,29 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
                 f"({exc}) — fail closed"
             )
     if current_files is not None:
-        if current_risk["level"] in {"HIGH", "CRITICAL"} and not args.human_approved:
-            blockers.append(f"{current_risk['level']} risk requires --human-approved")
+        if current_risk["level"] in {"HIGH", "CRITICAL"}:
+            blockers.append(
+                f"{current_risk['level']} risk is operator-only; Mike cannot actuate"
+            )
+
+    authorization_report: object = None
+    authorization_path = str(getattr(args, "merge_authorization", "") or "")
+    if authorization_path:
+        try:
+            authorization_report = load_json(expand(authorization_path))
+        except (OSError, json.JSONDecodeError) as exc:
+            blockers.append(f"cannot load merge authorization report ({exc})")
+    permit, authorization_blockers = validate_merge_authorization(
+        authorization_report,
+        repo=repo,
+        pr_number=args.pr,
+        head_sha=head_sha,
+        base_sha=base_sha,
+        base_ref=str(current_pr.get("baseRefName") or ""),
+        title=str(current_pr.get("title") or ""),
+        policy_identity=current_policy_identity,
+    )
+    blockers.extend(authorization_blockers)
 
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk != current_risk["level"]:
@@ -2017,6 +2160,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         },
         "head_sha": head_sha,
         "base_sha": base_sha,
+        "base_ref": str(current_pr.get("baseRefName") or ""),
+        "merge_intent": str(current_pr.get("title") or ""),
         "review_threads": {
             "ok": current_threads.get("ok"),
             "unresolved_count": unresolved_count,
@@ -2036,6 +2181,9 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "backup_review_policy": backup_policy,
         "risk": current_risk,
         "risk_snapshot": {"base_sha": base_sha, "head_sha": head_sha},
+        "authority_policy": current_policy_identity,
+        "merge_authorization_evidence": permit,
+        "merge_authority_proof": None,
         "review_snapshot": {"base_sha": packet_base, "head_sha": packet_head},
         "review_range": {
             "packet_base_sha": packet_base,
@@ -2172,7 +2320,7 @@ def render_github_comment(
         ),
         f"- CI Truth: `{ci_truth.get('verdict', 'UNKNOWN')}`",
         f"- Coherence Delta: `{'pass' if coherence['ok'] else 'fail'}`",
-        "- Authority: `conditional_merge_after_clean_gate`",
+        "- Authority: `evidence_only_safe_p0`",
         "",
         "### Blockers",
         "",
@@ -2208,7 +2356,8 @@ def render_github_comment(
             "",
             "### Authority Boundary",
             "",
-            "- GitHub Action Mike may create packets, run deterministic gates, post this status comment, and run `gh pr merge --auto` only when explicitly asked to `merge when clean`.",
+            "- GitHub Action Mike may create packets, run deterministic gates, and post this status comment.",
+            "- Safe P0 emits authorization evidence only. It cannot construct authenticated `MergeAuthorized`, and merge actuation remains disabled until trusted provenance plus server-side base-CAS proofs are live.",
             "- Mike may not approve PRs, push code, mark human approval, resolve review threads, or bypass branch protection.",
             "- Branch protection and GitHub auto-merge remain enforcement layers after Mike's gate.",
             "",
@@ -2259,6 +2408,8 @@ def run_mike_merge_authority(
     auto: bool,
     runner: Callable[..., CommandResult] = run,
     pr_fetcher: Callable[[int], dict[str, Any]] = fetch_pr_view,
+    policy_identity_fetcher: Callable[[], dict[str, str]] = automerge_policy_identity,
+    authority_proof_validator: Callable[[object], list[str]] = validate_trusted_merge_authority_proof,
 ) -> dict[str, Any]:
     match_head_commit = str(gate.get("head_sha") or "")
     gate_base_commit = str(gate.get("base_sha") or "")
@@ -2289,6 +2440,9 @@ def run_mike_merge_authority(
         "base_cas_enforced": gate.get("base_cas_enforced") is True,
         "required_reviewers": gate.get("required_reviewers", []),
         "risk": gate.get("risk", {}),
+        "merge_authorization_evidence": gate.get("merge_authorization_evidence"),
+        "merge_authority_proof": gate.get("merge_authority_proof"),
+        "authority_policy": gate.get("authority_policy"),
         "command": command,
         "status": "SKIPPED",
         "reason": "gate decision is not MERGE_CANDIDATE",
@@ -2319,6 +2473,39 @@ def run_mike_merge_authority(
         receipt["reason"] = "candidate gate still records blockers"
         receipt["blockers"] = list(gate.get("blockers") or [])
         return receipt
+    try:
+        current_policy_identity = policy_identity_fetcher()
+    except Exception as exc:
+        receipt["reason"] = "cannot refresh authority policy before merge"
+        receipt["blockers"] = [f"authority policy refresh failed: {exc}"]
+        return receipt
+    live_title = ""
+    authorization, authorization_blockers = validate_merge_authorization(
+        {
+            "schema": "dharma.automerge_tier_policy_report.v2",
+            "passed": True,
+            "violations": [],
+            "authorization_evidence": gate.get("merge_authorization_evidence"),
+        },
+        repo=gate_repo,
+        pr_number=pr_number,
+        head_sha=match_head_commit,
+        base_sha=gate_base_commit,
+        base_ref=str(gate.get("base_ref") or ""),
+        title=str(gate.get("merge_intent") or ""),
+        policy_identity=current_policy_identity,
+    )
+    if authorization is None:
+        receipt["reason"] = "merge authorization evidence is absent, stale, or mismatched"
+        receipt["blockers"] = authorization_blockers
+        return receipt
+    authority_proof_blockers = authority_proof_validator(
+        gate.get("merge_authority_proof")
+    )
+    if authority_proof_blockers:
+        receipt["reason"] = "authenticated merge authority is unavailable"
+        receipt["blockers"] = authority_proof_blockers
+        return receipt
     risk_snapshot = gate.get("risk_snapshot")
     if not isinstance(risk_snapshot, dict) or (
         risk_snapshot.get("base_sha") != gate_base_commit
@@ -2343,16 +2530,25 @@ def run_mike_merge_authority(
         receipt["blockers"] = [f"live PR refresh failed: {exc}"]
         return receipt
     live_base = str(live_pr.get("baseRefOid") or "")
+    live_base_ref = str(live_pr.get("baseRefName") or "")
     live_head = str(live_pr.get("headRefOid") or "")
     live_number = live_pr.get("number")
+    live_title = str(live_pr.get("title") or "")
     if (
         live_number != pr_number
         or live_base != gate_base_commit
+        or live_base_ref != str(gate.get("base_ref") or "")
         or live_head != match_head_commit
     ):
         receipt["reason"] = "live PR binding changed after gate evaluation"
         receipt["blockers"] = [
             "merge authority requires a fresh gate for the current PR/base/head"
+        ]
+        return receipt
+    if canonical_json_sha256(live_title) != authorization.get("intent_sha256"):
+        receipt["reason"] = "live merge intent changed after authorization"
+        receipt["blockers"] = [
+            "merge authority requires a fresh permit for the current PR title"
         ]
         return receipt
 
@@ -3199,15 +3395,50 @@ def _packet_gate_summary(packet_dir_path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(gate, dict):
         return None
-    blockers = gate.get("blockers") if isinstance(gate.get("blockers"), list) else []
+
+    decision = gate.get("decision")
+    blockers = gate.get("blockers")
+    generated_at = gate.get("generated_at")
+    if decision not in {"MERGE_CANDIDATE", "BLOCKED"}:
+        return None
+    if not isinstance(blockers, list) or any(
+        not isinstance(blocker, str) or not blocker.strip() for blocker in blockers
+    ):
+        return None
+    if decision == "MERGE_CANDIDATE" and blockers:
+        return None
+    if decision == "BLOCKED" and not blockers:
+        return None
+    if _parse_utc_timestamp(generated_at) is None:
+        return None
     return {
-        "decision": str(gate.get("decision") or ""),
-        "blockers": [str(blocker) for blocker in blockers],
+        "decision": decision,
+        "blockers": blockers,
+        "generated_at": generated_at,
     }
 
 
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
 def current_fanout_receipt_for_item(
-    state_root: Path, item: dict[str, Any]
+    state_root: Path,
+    item: dict[str, Any],
+    *,
+    blocked_retry_s: float = DEFAULT_BLOCKED_RETRY_S,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     pr_number = int(item.get("number") or 0)
     packet_path = latest_packet_dir_or_none(state_root, pr_number)
@@ -3228,15 +3459,9 @@ def current_fanout_receipt_for_item(
         return result
     gate = _packet_gate_summary(packet_path)
     if gate is None:
-        result["reason"] = "latest packet merge gate unreadable"
+        result["reason"] = "latest packet merge gate unreadable or malformed"
         return result
     result["gate"] = gate
-    if gate["decision"] != "MERGE_CANDIDATE":
-        result["reason"] = f"latest merge gate is {gate['decision'] or 'UNKNOWN'}"
-        return result
-    if gate["blockers"]:
-        result["reason"] = "latest merge gate still has blockers"
-        return result
     observed = _packet_fingerprint(packet_path)
     if observed is None:
         result["reason"] = "latest packet facts unreadable"
@@ -3246,15 +3471,45 @@ def current_fanout_receipt_for_item(
         result["reason"] = "queue item has no head SHA"
         return result
     stable_keys = ("head_sha", "base_sha", "updated_at", "status", "review_decision")
-    if all(observed.get(key) == expected.get(key) for key in stable_keys):
+    if not all(observed.get(key) == expected.get(key) for key in stable_keys):
+        result["reason"] = (
+            "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
+        )
+        return result
+
+    generated_at = _parse_utc_timestamp(gate["generated_at"])
+    if generated_at is None:
+        result["reason"] = "latest packet merge gate timestamp is malformed"
+        return result
+    effective_now = now or datetime.now(timezone.utc)
+    if effective_now.tzinfo is None or effective_now.utcoffset() is None:
+        raise ValueError("fanout comparison time must include a timezone")
+    effective_now = effective_now.astimezone(timezone.utc)
+    age_s = (effective_now - generated_at).total_seconds()
+    result["gate_age_s"] = age_s
+    if age_s < 0:
+        result["reason"] = "latest packet merge gate timestamp is in the future"
+        return result
+
+    if gate["decision"] == "MERGE_CANDIDATE":
         result["current"] = True
         result["reason"] = (
             "latest clean packet/gate already matches PR head, base, update time, queue status, and review decision"
         )
         return result
-    result["reason"] = (
-        "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
-    )
+
+    retry_s = float(blocked_retry_s)
+    if not 0.0 < retry_s < float("inf"):
+        retry_s = 0.0
+    if age_s < retry_s:
+        result["current"] = True
+        result["deferred"] = True
+        result["retry_in_s"] = retry_s - age_s
+        result["reason"] = (
+            "latest unchanged BLOCKED packet/gate is inside the bounded retry cooldown"
+        )
+        return result
+    result["reason"] = "latest unchanged BLOCKED packet/gate retry cooldown expired"
     return result
 
 
@@ -3265,6 +3520,9 @@ def select_fanout_plan(
     max_prs: int,
     state_root: Path,
     skip_current: bool,
+    blocked_retry_s: float = DEFAULT_BLOCKED_RETRY_S,
+    fanout_offset: int = 0,
+    now: datetime | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     if max_prs <= 0:
         return {"selected": [], "skipped_current": []}
@@ -3280,12 +3538,20 @@ def select_fanout_plan(
             int(item.get("number") or 0),
         )
     )
+    if candidates:
+        offset = max(0, int(fanout_offset)) % len(candidates)
+        candidates = candidates[offset:] + candidates[:offset]
 
     selected: list[dict[str, Any]] = []
     skipped_current: list[dict[str, Any]] = []
     for item in candidates:
         if skip_current:
-            current = current_fanout_receipt_for_item(state_root, item)
+            current = current_fanout_receipt_for_item(
+                state_root,
+                item,
+                blocked_retry_s=blocked_retry_s,
+                now=now,
+            )
             if current["current"]:
                 skipped_current.append(
                     {
@@ -3296,6 +3562,8 @@ def select_fanout_plan(
                         "head_sha": current.get("head_sha", ""),
                         "updatedAt": current.get("updatedAt", ""),
                         "reason": current.get("reason", ""),
+                        "deferred": current.get("deferred", False),
+                        "retry_in_s": current.get("retry_in_s"),
                     }
                 )
                 continue
@@ -3370,14 +3638,14 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
             "## Authority",
             "",
             "- GitHub comment text is rendered locally only; posting remains a separate explicit action.",
-            "- Merge is allowed only when `merge_mode=auto-when-clean` and the deterministic gate is clean.",
+            "- Safe P0 is evidence-only: a clean deterministic gate does not grant merge authority.",
             "",
         ]
     )
     if receipt.get("merge_mode") == "auto-when-clean":
         lines.insert(
             -1,
-            "- This fanout may run Mike's conditional merge command after a clean gate.",
+            "- This fanout may evaluate the merge actuator, but authenticated authority and base-CAS proofs remain required and unavailable in safe P0.",
         )
     else:
         lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
@@ -3513,6 +3781,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         max_prs=args.max_prs,
         state_root=root,
         skip_current=should_skip_current_fanout(args),
+        blocked_retry_s=getattr(args, "blocked_retry_s", DEFAULT_BLOCKED_RETRY_S),
+        fanout_offset=getattr(args, "fanout_offset", 0),
     )
     selected = plan["selected"]
     skipped_current = plan["skipped_current"]
@@ -3657,6 +3927,7 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             required_reviewers=args.required_reviewers,
             accept_github_reviews=getattr(args, "accept_github_reviews", False),
             ci_truth_contract=args.ci_truth_contract,
+            merge_authorization=getattr(args, "merge_authorization", ""),
         )
         gate_result, failure = capture_fanout_stage(
             "gate", lambda: build_gate(gate_args)
@@ -3708,6 +3979,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         "packet_only": args.packet_only,
         "limit": args.limit,
         "max_prs": args.max_prs,
+        "blocked_retry_s": getattr(args, "blocked_retry_s", DEFAULT_BLOCKED_RETRY_S),
+        "fanout_offset": getattr(args, "fanout_offset", 0),
         "statuses": statuses,
         "agents": agents,
         "required_reviewers": required_reviewers,
@@ -3848,6 +4121,16 @@ def build_parser() -> argparse.ArgumentParser:
             help="Path to the CI truth contract consumed by packet and merge-gate evaluation.",
         )
 
+    def add_merge_authorization_flag(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--merge-authorization",
+            default="",
+            help=(
+                "Path to a trusted-default-branch policy report containing an "
+                "exact repo/PR/head/base/policy-bound MergeAuthorized permit"
+            ),
+        )
+
     def add_legacy_pending_flag(command: argparse.ArgumentParser) -> None:
         command.add_argument(
             "--allow-pending",
@@ -3892,6 +4175,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(fanout)
     add_backup_reviewer_flags(fanout)
     add_ci_truth_flags(fanout)
+    add_merge_authorization_flag(fanout)
     fanout.add_argument(
         "--packet-only",
         action="store_true",
@@ -3906,6 +4190,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--reprocess-current",
         action="store_true",
         help="Process PRs even when the latest packet/gate already matches the current PR head and status",
+    )
+    fanout.add_argument(
+        "--blocked-retry-s",
+        type=float,
+        default=DEFAULT_BLOCKED_RETRY_S,
+        help=(
+            "Seconds to defer an unchanged BLOCKED packet/gate before retrying "
+            f"(default: {int(DEFAULT_BLOCKED_RETRY_S)})"
+        ),
+    )
+    fanout.add_argument(
+        "--fanout-offset",
+        type=int,
+        default=0,
+        help="Rotate the ordered eligible queue by this offset before bounded selection",
     )
     fanout.add_argument(
         "--merge-mode",
@@ -3954,6 +4253,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(gate)
     add_backup_reviewer_flags(gate)
     add_ci_truth_flags(gate)
+    add_merge_authorization_flag(gate)
     gate.set_defaults(func=cmd_gate)
 
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
@@ -3964,6 +4264,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(merge)
     add_backup_reviewer_flags(merge)
     add_ci_truth_flags(merge)
+    add_merge_authorization_flag(merge)
     merge.add_argument(
         "--method", choices=("squash", "merge", "rebase"), default="squash"
     )

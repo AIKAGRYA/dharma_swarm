@@ -1,6 +1,6 @@
 name: automerge
 
-# Fully automated merge lane for clean bot PRs and simple human PRs.
+# Evidence-dispatch lane for clean bot PRs and simple human PRs.
 #
 # When a PR carries the `automerge` or `bot-pr` label, this workflow watches
 # for the moment ALL status checks are green and no review requests changes,
@@ -8,15 +8,18 @@ name: automerge
 # (codex-mention-router.yml) with merge_when_clean=true.
 #
 # Guard rails:
-#   - Mike's deterministic gate still runs required CI, fourfold-warrant,
-#     unresolved review threads, and reviewer receipts before auto-merge is armed.
+#   - Mike's deterministic gate still runs required CI, typed policy evidence,
+#     unresolved review threads, and reviewer receipts.
+#   - Safe P0 cannot construct authenticated MergeAuthorized or a server-side
+#     base-CAS proof, so this lane does not currently actuate merges.
 #   - The green filter loads the expected branch-protection required set from
 #     scripts/governance/ci_parity_manifest.json. A missing, malformed, empty,
 #     or duplicate required set fails the job closed.
 #   - A required check that has not reported on the head SHA is NOT green, and
 #     no other reporting check is exempted as advisory.
-#   - Large or hot-path PRs are demoted to gate-and-status (mike-watch
-#     behavior) unless a human approved or the operator labeled the PR.
+#   - Large or hot-path PRs are always demoted to gate-and-status (mike-watch
+#     behavior). This dispatcher cannot construct operator authority from a
+#     mutable label or aggregate review state.
 #   - This workflow never merges directly; it only asks Mike.
 #   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
 #   - One dispatch per readiness fingerprint, so later reviews/receipt comments
@@ -29,21 +32,20 @@ name: automerge
 # Auto-enrollment (no manual labeling needed):
 #   PRs authored by real bot accounts (login ends in `[bot]`, is_bot, or
 #   `Copilot`) are automatically given the `bot-pr` label by the enroll step
-#   below. Title markers (`[automated]` / `[auto]`) no longer grant `bot-pr`:
-#   that label waives Mike's reviewer receipts, and a self-authored title must
-#   not be able to grant its own review waiver. Title-marked agent PRs still
-#   get `mike-watch` coverage from the D4 step. Remove the label to opt a PR
-#   out.
+#   below. Title markers (`[automated]` / `[auto]`) do not grant `bot-pr`, and
+#   no lane label grants reviewer or merge authority. Title-marked agent PRs
+#   still get `mike-watch` coverage from the D4 step. Apply `mike-disabled` for
+#   a durable operator opt-out.
 
 on:
   pull_request:
-    types: [opened, reopened, labeled, ready_for_review]
-  check_suite:
-    types: [completed]
+    types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review, converted_to_draft, edited]
   pull_request_review:
-    types: [submitted, dismissed]
+    types: [submitted, edited, dismissed]
   schedule:
-    - cron: "45 * * * *"  # hourly sweep: catches anything the events missed
+    # Required checks have no safe generic completion event here. A bounded
+    # de-stamped sweep keeps CI-green latency under ten minutes.
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
     inputs:
       pr:
@@ -51,8 +53,11 @@ on:
         required: false
 
 concurrency:
-  group: automerge
-  cancel-in-progress: false
+  # PR/review events serialize only against the same PR. A targeted manual
+  # dispatch shares that shard; untargeted sweeps share an event-name shard.
+  # Superseded evaluations cancel instead of building an unbounded queue.
+  group: automerge-${{ github.event.pull_request.number || github.event.inputs.pr || github.event_name }}
+  cancel-in-progress: true
 
 permissions:
   actions: write
@@ -70,11 +75,11 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       # Unattended-merge ceiling: above this many changed files, or touching a
       # hot path (single oracle: dharma_swarm.shakti_warrant._HOT_PATHS), the
-      # lane demotes to mike-watch unless a human approved or the operator
-      # labeled the PR.
+      # lane remains gate-and-status. Authority is evaluated by Mike from
+      # evidence bound to the exact head, never inferred here from labels.
       MAX_UNATTENDED_FILES: "25"
       HOT_PATHS: ".pre-commit-config.yaml,api/main.py,api/routers/chat.py,api/ws.py,dharma_swarm/agent_runner.py,dharma_swarm/dgc_cli.py,dharma_swarm/orchestrator.py,dharma_swarm/runtime_state.py,dharma_swarm/swarm.py,dharma_swarm/telic_seam.py"
-      OPERATOR_LABEL: "operator-approved"
+      OPT_OUT_LABEL: "mike-disabled"
       # PAT (contents+PR+actions write) used ONLY to dispatch the router
       # workflow. A run triggered by the built-in GITHUB_TOKEN cannot create
       # a new workflow run, so the router dispatch below silently no-ops and
@@ -86,7 +91,6 @@ jobs:
       GH_REPO: ${{ github.repository }}
       EVENT_NAME: ${{ github.event_name }}
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
-      CHECK_SUITE_SHA: ${{ github.event.check_suite.head_sha || '' }}
     steps:
       - name: Halt on loop kill-switch
         run: |
@@ -141,18 +145,17 @@ jobs:
           echo "required_checks=${required_checks}" >> "$GITHUB_OUTPUT"
 
       - name: Auto-enroll bot and automated PRs
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           # Apply `bot-pr` to every open PR that is bot-authored but has no
-          # opt-in label yet, so the lane engages without manual labeling.
-          # Title markers deliberately do NOT enroll: `bot-pr` waives Mike's
-          # reviewer receipts, and a self-authored `[auto]` title must not
-          # grant that waiver. Drafts are still never dispatched (step below),
-          # and removing the label opts a PR out for that evaluation pass.
+          # lane label yet. `bot-pr` is routing metadata only and grants no
+          # review or merge authority. `mike-disabled` is a durable operator
+          # opt-out and is never auto-removed.
           gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,labels,author \
             --jq '.[]
-              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr") | not)
+              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-disabled") | not)
               | select(
                   (.author.is_bot == true)
                   or (.author.login | test("\\[bot\\]$"))
@@ -167,10 +170,9 @@ jobs:
 
           # D4 (track merge-master-mike-d4): engage Mike on EVERY open non-draft
           # PR that has no lane label yet, via `mike-watch`. Unlike `bot-pr`,
-          # mike-watch does NOT waive the reviewer quorum — it only makes Mike
-          # run the deterministic gate and post status (arm-don't-merge). This is
-          # the proactive-coverage half of always-on Mike; remove the label to
-          # opt a PR out.
+          # mike-watch only selects deterministic gate/status evaluation. It
+          # grants no reviewer waiver or merge authority. Apply mike-disabled
+          # for an explicit durable opt-out.
           gh label create mike-watch --repo "$GH_REPO" \
             --color BFD4F2 \
             --description "Mike evaluates + gates this PR (no auto-merge, no reviewer waiver)" \
@@ -179,7 +181,7 @@ jobs:
             --json number,isDraft,labels \
             --jq '.[]
               | select(.isDraft | not)
-              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch") | not)
+              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch" or . == "mike-disabled") | not)
               | .number' > /tmp/watch.txt || true
           while IFS= read -r pr; do
             [ -z "$pr" ] && continue
@@ -193,19 +195,12 @@ jobs:
           set -euo pipefail
           if [ -n "${EVENT_PR}" ]; then
             echo "${EVENT_PR}" > /tmp/candidates.txt
-          elif [ -n "${CHECK_SUITE_SHA}" ]; then
-            # check_suite carries no PR context when the suite belongs to a
-            # branch; resolve open PRs by head SHA.
-            gh pr list --repo "$GH_REPO" --state open --limit 200 \
-              --json number,headRefOid \
-              --jq ".[] | select(.headRefOid == \"${CHECK_SUITE_SHA}\") | .number" \
-              > /tmp/candidates.txt
           else
             # Scheduled sweep: every open PR carrying a lane label
             # (automerge / bot-pr = unattended; mike-watch = gate+status only).
             gh pr list --repo "$GH_REPO" --state open --limit 200 \
               --json number,labels \
-              --jq '.[] | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch")) | .number' \
+              --jq '.[] | select(.labels | map(.name) | any(. == "mike-disabled") | not) | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch")) | .number' \
               > /tmp/candidates.txt
           fi
           echo "Candidates:"
@@ -223,12 +218,17 @@ jobs:
           while IFS= read -r pr; do
             [ -z "$pr" ] && continue
             view="$(gh pr view "$pr" --repo "$GH_REPO" \
-              --json number,isDraft,labels,reviewDecision,headRefOid,mergeable,statusCheckRollup,comments,latestReviews)"
+              --json number,title,body,isDraft,labels,reviewDecision,baseRefName,baseRefOid,headRefOid,mergeable,statusCheckRollup,latestReviews)"
 
             # 1. Lane label required. automerge/bot-pr => unattended auto-merge;
             #    mike-watch => Mike gates and posts status but never auto-merges
             #    (the operator arms it by adding `automerge` or commenting @mike).
+            opted_out="$(echo "$view" | jq -r --arg label "$OPT_OUT_LABEL" '.labels | map(.name) | any(. == $label)')"
             labeled="$(echo "$view" | jq -r '.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch")')"
+            if [ "$opted_out" = "true" ]; then
+              summary+="- #${pr}: skipped (explicit ${OPT_OUT_LABEL} operator opt-out)\n"
+              skipped=$((skipped + 1)); continue
+            fi
             if [ "$labeled" != "true" ]; then
               skipped=$((skipped + 1)); continue
             fi
@@ -242,19 +242,17 @@ jobs:
               skipped=$((skipped + 1)); continue
             fi
 
-            # 2b. Size / hot-path demotion: large or hot-path PRs never get
-            #     unattended merge without a human approval or operator label.
+            # 2b. Size / hot-path demotion: large or hot-path PRs always stay
+            #     gate-and-status. This workflow has no authority constructor;
+            #     exact-head operator warrants are verified inside Mike.
             demotion=""
             if [ "${merge_when_clean}" = "true" ]; then
               changed="$(gh pr view "$pr" --repo "$GH_REPO" --json changedFiles --jq '.changedFiles')"
               gh api "repos/${GH_REPO}/pulls/${pr}/files" --paginate --jq '.[].filename' > /tmp/files.txt
               hot="$(grep -Fx -f <(tr ',' '\n' <<< "$HOT_PATHS") /tmp/files.txt | paste -sd, - || true)"
-              approved="$(echo "$view" | jq -r '.reviewDecision == "APPROVED"')"
-              operator_ok="$(echo "$view" | jq -r --arg l "$OPERATOR_LABEL" '.labels | map(.name) | any(. == $l)')"
-              if { [ "${changed}" -gt "${MAX_UNATTENDED_FILES}" ] || [ -n "${hot}" ]; } \
-                 && [ "${approved}" != "true" ] && [ "${operator_ok}" != "true" ]; then
+              if [ "${changed}" -gt "${MAX_UNATTENDED_FILES}" ] || [ -n "${hot}" ]; then
                 merge_when_clean=false
-                demotion="demoted to gate-and-status: ${changed} files (ceiling ${MAX_UNATTENDED_FILES}), hot paths [${hot:-none}]; add an approving review or the \`${OPERATOR_LABEL}\` label to arm unattended merge"
+                demotion="demoted to gate-and-status: ${changed} files (ceiling ${MAX_UNATTENDED_FILES}), hot paths [${hot:-none}]; this dispatcher cannot arm unattended merge for this risk class"
               fi
             fi
 
@@ -291,26 +289,87 @@ jobs:
             fi
             evaluated="$(jq -r '[.[] | "`\(.name)`=\(.state)"] | join(", ")' /tmp/checks.json)"
 
-            # 4. One dispatch per readiness fingerprint. Mike may block on
-            #    reviewer receipts or unresolved threads that arrive after
-            #    checks first turn green; include review/comment/check counts
-            #    so those later state changes can re-dispatch this head SHA.
+            # 4. One dispatch per exact gate-input fingerprint. Counts are not
+            #    sufficient: fail->success, dismissed->approved, or
+            #    unresolved->resolved can preserve a count and used to strand
+            #    the PR behind a durable marker. Gather complete thread state
+            #    (fail closed on pagination) and hash canonical semantic rows.
             sha="$(echo "$view" | jq -r '.headRefOid')"
-            ready_key="$(echo "$view" | jq -r '
-              [
-                .headRefOid,
-                (.reviewDecision // ""),
-                ([.statusCheckRollup[]?] | length | tostring),
-                ([.comments[]? | select(.body | test("automerge-dispatch|dharma-pr-review-control") | not)]
-                  | length | tostring),
-                ([.latestReviews[]?] | length | tostring)
-              ] | join(":")')"
-            # Include the merge intent so flipping mike-watch -> automerge (or
-            # back) re-dispatches instead of being deduped on an unchanged SHA.
-            ready_key="${ready_key}:mwc=${merge_when_clean}"
+            owner="${GH_REPO%%/*}"
+            name="${GH_REPO#*/}"
+            if ! thread_payload="$(gh api graphql --paginate \
+              -f query='query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){nodes{id isResolved isOutdated} pageInfo{hasNextPage endCursor}}}}}' \
+              -F owner="$owner" -F name="$name" -F number="$pr")"; then
+              summary+="- #${pr}: skipped (review-thread query failed)\n"
+              skipped=$((skipped + 1)); continue
+            fi
+            thread_state="$(echo "$thread_payload" | jq -sce \
+              'if any(.[]; .data.repository.pullRequest.reviewThreads == null) then
+                 error("review-thread state unavailable")
+               else [.[].data.repository.pullRequest.reviewThreads.nodes[]
+                 | {id,isResolved,isOutdated}] | unique_by(.id) | sort_by(.id) end' \
+              2>/dev/null || true)"
+            if [ -z "$thread_state" ]; then
+              summary+="- #${pr}: skipped (complete review-thread state unavailable)\n"
+              skipped=$((skipped + 1)); continue
+            fi
+            if ! comment_payload="$(gh api \
+              "repos/${GH_REPO}/issues/${pr}/comments?per_page=100" \
+              --paginate --slurp)"; then
+              summary+="- #${pr}: skipped (complete comment state unavailable)\n"
+              skipped=$((skipped + 1)); continue
+            fi
+            comment_state="$(echo "$comment_payload" | jq -ce '
+              [ .[][] | {
+                id, login:(.user.login // ""), body:(.body // ""),
+                created_at:(.created_at // ""), updated_at:(.updated_at // "")
+              }] | sort_by(.id)' 2>/dev/null || true)"
+            if [ -z "$comment_state" ]; then
+              summary+="- #${pr}: skipped (complete comment state malformed)\n"
+              skipped=$((skipped + 1)); continue
+            fi
+            controller_sha="$(git rev-parse HEAD)"
+            policy_sha="$(sha256sum scripts/governance/automerge_tier_policy.json | awk '{print $1}')"
+            ci_manifest_sha="$(sha256sum scripts/governance/ci_parity_manifest.json | awk '{print $1}')"
+            gate_input="$(jq -cn \
+              --argjson view "$view" \
+              --slurpfile checks /tmp/checks.json \
+              --argjson threads "$thread_state" \
+              --argjson comments "$comment_state" \
+              --arg controller_sha "$controller_sha" \
+              --arg policy_sha "$policy_sha" \
+              --arg ci_manifest_sha "$ci_manifest_sha" \
+              --argjson merge_when_clean "$merge_when_clean" '
+              {
+                schema: "dharma.automerge_dispatch_input.v2",
+                controller_sha: $controller_sha,
+                policy_sha256: $policy_sha,
+                ci_manifest_sha256: $ci_manifest_sha,
+                head_sha: $view.headRefOid,
+                base_sha: $view.baseRefOid,
+                base_ref: $view.baseRefName,
+                title: ($view.title // ""),
+                body: ($view.body // ""),
+                draft: $view.isDraft,
+                mergeable: ($view.mergeable // "UNKNOWN"),
+                review_decision: ($view.reviewDecision // ""),
+                labels: ([$view.labels[]?.name] | sort),
+                checks: ($checks[0] | sort_by(.name,.state)),
+                reviews: ([$view.latestReviews[]? | {
+                  login: (.author.login // ""),
+                  state: (.state // ""),
+                  body: (.body // ""),
+                  submitted_at: (.submittedAt // "")
+                }] | sort_by(.login,.submitted_at,.state,.body)),
+                comments: ([$comments[]
+                  | select(.body | test("automerge-dispatch|dharma-pr-review-control") | not)]),
+                threads: $threads,
+                merge_when_clean: $merge_when_clean
+              }')"
+            ready_key="$(printf '%s' "$gate_input" | sha256sum | awk '{print $1}')"
             marker="<!-- automerge-dispatch:${ready_key} -->"
-            already="$(echo "$view" | jq -r --arg m "$marker" \
-              '[.comments[]? | select(.body | startswith($m))] | length')"
+            already="$(echo "$comment_state" | jq -r --arg m "$marker" \
+              '[.[] | select(.login == "github-actions[bot]") | select(.body | startswith($m))] | length')"
             if [ "$already" != "0" ]; then
               summary+="- #${pr}: already dispatched for readiness key ${ready_key}\n"
               skipped=$((skipped + 1)); continue
@@ -323,9 +382,9 @@ jobs:
             GH_TOKEN="${MIKE_PAT:-$GH_TOKEN}" gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
               -f pr="$pr" -f merge_when_clean="${merge_when_clean}"
             if [ "${merge_when_clean}" = "true" ]; then
-              mode_line="dispatched **Merge Master Mike** with \`merge_when_clean: true\` (will auto-merge once the gate is clean)"
+              mode_line="dispatched **Merge Master Mike** with \`merge_when_clean: true\` to gather typed current-head authorization evidence; safe-P0 actuation remains disabled until authenticated authority and server-side base-CAS proofs are live"
             else
-              mode_line="dispatched **Merge Master Mike** in \`mike-watch\` mode (\`merge_when_clean: false\`): Mike runs the full gate and posts status but will NOT auto-merge — add the \`automerge\` label or comment \`@mike merge\` to arm it"
+              mode_line="dispatched **Merge Master Mike** in \`mike-watch\` mode (\`merge_when_clean: false\`): Mike runs the full gate and posts status but will NOT auto-merge"
             fi
             gh pr comment "$pr" --repo "$GH_REPO" --body "${marker}
           ## 🟢 Automerge lane engaged
@@ -339,12 +398,12 @@ jobs:
           ${demotion:+**Note:** ${demotion}}
           The automerge lane ${mode_line}.
 
-          Mike still runs the full deterministic gate (fourfold-warrant,
-          reviewer receipts, unresolved threads, and required CI before any
-          merge is armed. This dispatch marker is keyed to readiness state
+          Mike still runs the full deterministic gate (typed policy evidence,
+          reviewer receipts, unresolved threads, and required CI). This
+          dispatch marker is keyed to exact gate-input state
           \`${ready_key}\`; later review/comment/check changes can dispatch
-          again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`/\`mike-watch\`
-          label to leave this lane." || true
+          again for the same head SHA. Apply \`mike-disabled\` for a durable
+          operator opt-out." || true
             summary+="- #${pr}: **dispatched** Mike (merge_when_clean=${merge_when_clean}) for readiness key ${ready_key}\n"
             dispatched=$((dispatched + 1))
           done < /tmp/candidates.txt
