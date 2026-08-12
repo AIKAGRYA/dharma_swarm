@@ -330,6 +330,7 @@ def test_commented_ai_review_is_evidence_not_operator_authority():
     assert [(row["login"], row["state"]) for row in rows] == [
         (CODEX, "COMMENTED")
     ]
+    assert "body" not in rows[0]
     report = _evaluate(
         approved_reviews=[],
         ai_evidence=rows,

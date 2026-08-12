@@ -262,7 +262,6 @@ def latest_ai_evidence(
                 "id": int(review.get("id") or 0),
                 "login": login,
                 "state": state,
-                "body": str(review.get("body") or ""),
                 "head_sha": head_sha,
             }
         )
@@ -464,7 +463,7 @@ def evaluate(
         seen_families.add(family)
         qualifying.append(login)
     evidence_rows = list(ai_evidence or [])
-    trusted_evidence = [
+    qualified_evidence = [
         row
         for row in evidence_rows
         if _normalize_login(str(row.get("login") or "")) in families
@@ -478,11 +477,11 @@ def evaluate(
         "required_ai_evidence"
     ]
     report["qualifying_reviews"] = qualifying
-    report["ai_evidence"] = trusted_evidence
-    if len(trusted_evidence) < needed:
+    report["ai_evidence"] = qualified_evidence
+    if len(qualified_evidence) < needed:
         violations.append(
             f"{authority_class} needs {needed} current-head trusted AI review "
-            f"evidence row(s); have {len(trusted_evidence)}"
+            f"evidence row(s); have {len(qualified_evidence)}"
         )
 
     operator_logins = {
@@ -531,7 +530,7 @@ def evaluate(
             "intent_sha256": canonical_digest(title),
             "authority_class": authority_class,
             "ai_evidence_ids": sorted(
-                int(row.get("id") or 0) for row in trusted_evidence
+                int(row.get("id") or 0) for row in qualified_evidence
             ),
             "operator_warrant": warrants[0] if warrants else None,
             "provenance": "unsigned-github-snapshot",

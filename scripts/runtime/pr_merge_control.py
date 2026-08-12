@@ -354,7 +354,7 @@ def validate_merge_authorization(
     return (evidence if not blockers else None), blockers
 
 
-def validate_trusted_merge_authority_proof(_proof: object) -> list[str]:
+def validate_merge_authority_proof(_proof: object) -> list[str]:
     """Keep MergeAuthorized uninhabited until a trusted proof issuer exists.
 
     A future implementation must authenticate issuer/provenance and bind the
@@ -2409,7 +2409,7 @@ def run_mike_merge_authority(
     runner: Callable[..., CommandResult] = run,
     pr_fetcher: Callable[[int], dict[str, Any]] = fetch_pr_view,
     policy_identity_fetcher: Callable[[], dict[str, str]] = automerge_policy_identity,
-    authority_proof_validator: Callable[[object], list[str]] = validate_trusted_merge_authority_proof,
+    authority_proof_validator: Callable[[object], list[str]] = validate_merge_authority_proof,
 ) -> dict[str, Any]:
     match_head_commit = str(gate.get("head_sha") or "")
     gate_base_commit = str(gate.get("base_sha") or "")
