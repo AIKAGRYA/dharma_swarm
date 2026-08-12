@@ -58,7 +58,7 @@
     {
       "gate": "pr-ci-policy-followup-local",
       "result": "passed",
-      "detail": "the touched-file hygiene regression was removed with a sanitized, test-covered cancellation failure; terminal_bridge.py was reduced to 2770 lines against the immutable 2792-line Rule 10 ceiling without changing behavior"
+      "detail": "the touched-file hygiene regression was removed with a sanitized, test-covered cancellation failure; terminal_bridge.py was reduced to 2774 lines against the immutable 2792-line Rule 10 ceiling without changing behavior"
     }
   ],
   "live_observation": {
@@ -100,7 +100,7 @@
     "contracts": "22 passed",
     "nats_substrate": "115 passed",
     "uplift_guards": "passed after deriving the Kimi OpenRouter identity from the canonical model-pool export",
-    "module_budget": "passed after behavior-preserving command and prompt admission helper extraction; terminal_bridge.py is 2770 lines against the 2792-line ceiling",
+    "module_budget": "passed after behavior-preserving command and prompt admission helper extraction; terminal_bridge.py is 2774 lines against the 2792-line ceiling",
     "docops_pr_mode": "passed with generated-count drift advisory, matching the pull-request workflow",
     "claim_evidence": "passed in the track's current advisory enforcement mode",
     "strict_local_wrapper": "stopped only on generated DocOps count drift; the repository PR workflow intentionally uses --counts-advisory and the post-merge reconciler owns those files"

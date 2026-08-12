@@ -49,7 +49,7 @@
     "isolated_harness_timeout_test": "1 passed in 47.98 seconds",
     "diff_check": "passed",
     "hygiene_delta_ratchet": "passed locally after recording a sanitized provider-cancellation failure instead of swallowing it",
-    "module_budget": "passed locally after behavior-preserving admission-helper extraction; terminal_bridge.py is 2770 lines against the 2792-line ceiling"
+    "module_budget": "passed locally after behavior-preserving admission-helper extraction; terminal_bridge.py is 2774 lines against the 2792-line ceiling"
   },
   "live_truth": {
     "pre_authoritative_projection_state": "UNKNOWN",

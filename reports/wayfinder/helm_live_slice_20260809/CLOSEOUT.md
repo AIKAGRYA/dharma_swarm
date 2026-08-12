@@ -42,7 +42,7 @@ The small language-design result is concrete: positive epistemic modality is enf
 | DocOps pull-request mode | Passed; generated counts are advisory and owned by the post-merge reconciler |
 | Claim/evidence | Passed in the track's current advisory enforcement mode |
 | PR touched-file hygiene ratchet | Passed locally after replacing a swallowed cancellation error with a sanitized, test-covered failure |
-| Rule 10 module budget | Passed locally: `terminal_bridge.py` is 2,770 lines against the immutable 2,792-line ceiling |
+| Rule 10 module budget | Passed locally: `terminal_bridge.py` is 2,774 lines against the immutable 2,792-line ceiling |
 | Broad `test-fast` | 6,826 passed before `-x` stopped on one timing-sensitive audit exceeding its 10-second suite timeout |
 | Isolated timed-out audit | Passed in 47.98 seconds |
 

@@ -55,6 +55,12 @@ from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummar
 from dharma_swarm import model_status
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
 from dharma_swarm.tui import model_routing
+try:
+    from dharma_swarm.tui.commands import system_commands as system_commands_module
+    from dharma_swarm.tui.commands.system_commands import SystemCommandHandler
+except ImportError:
+    system_commands_module = None  # type: ignore[assignment]
+    SystemCommandHandler = None  # type: ignore[assignment,misc]
 from dharma_swarm.tui_helpers import build_runtime_status_text
 from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
@@ -62,14 +68,12 @@ from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
 from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
-    SystemCommandHandler,
     TerminalBridgeSessionRuntimeMixin,
     _UNSUPPORTED_BRIDGE_COMMANDS,
     _command_name,
     _is_registered_command,
     _is_unconsumed_command_action,
     _validated_command_envelope,
-    system_commands_module,
 )
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.terminal_control import load_terminal_control_state
