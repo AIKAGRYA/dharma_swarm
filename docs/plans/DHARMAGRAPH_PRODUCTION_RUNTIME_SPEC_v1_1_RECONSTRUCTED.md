@@ -168,7 +168,7 @@ The first qualified profile need not:
 
 ### 2.3 Named deployment profiles
 
-#### Profile A — durable single-store authority
+#### Profile A / DG-P1 — durable single-tenant authority
 
 - one canonical SQL store with transactions and store-authoritative time;
 - one active coordinator lease per branch/run;
@@ -177,7 +177,7 @@ The first qualified profile need not:
 - disaster RPO/RTO only as explicitly measured for the storage deployment;
 - consequential effects admitted only through qualified provider adapters.
 
-#### Profile B — distributed authority
+#### Profile B / DG-P2 — single-region high availability
 
 - replicated strongly consistent metadata store;
 - cross-host quota and lease arbitration;
@@ -186,9 +186,11 @@ The first qualified profile need not:
 - partition and healed-old-primary tests;
 - no claim of multi-region availability until the exact topology is qualified.
 
-Profile A SHALL be qualified before Profile B unless an operator signs an
-exception with evidence that the Profile B substrate already satisfies every
-Profile A invariant.
+The detailed release names in §10.2 are authoritative: DG-P0 is lab-only,
+DG-P1 corresponds to Profile A, DG-P2 corresponds to Profile B, and DG-P3 adds
+the regulated multi-tenant controls. DG-P1 SHALL be qualified before DG-P2,
+and DG-P2 before DG-P3, unless an operator signs an evidence-bearing exception
+showing that the higher-profile substrate satisfies every lower-profile gate.
 
 ## 3. Normative language and trust boundaries
 
@@ -957,7 +959,8 @@ The state meanings are:
 - `WAITING`: durable wake condition exists; no user task is considered active.
 - `SUSPENDED`: operator/policy pause, distinct from a graph-authored wait.
 - `CANCELLING`: cancellation is durable; active attempts are draining/reconciling.
-- `SUCCEEDED`: explicit valid `HALT` or permitted quiescence committed with final checkpoint.
+- `SUCCEEDED`: an explicit valid normalized `HALT` committed with a verified
+  termination proof and final checkpoint. Mere quiescence is never success.
 - `FAILED`: typed unrecoverable execution failure or exhausted policy.
 - `QUARANTINED`: integrity, authority, ambiguity, corruption, nondeterminism, or DLQ condition requiring inspection.
 
@@ -1331,7 +1334,1476 @@ If any answer is “no,” the runtime remains a candidate graph engine, not a p
 
 <!-- DURABILITY_SECTION -->
 
-<!-- QUALIFICATION_SECTION -->
+## 10. Production qualification, security, and rollout
+
+This part is normative for release qualification. It does not assert that any
+named profile is currently implemented or qualified.
+
+### 10.0 Non-negotiable claim boundary
+
+Acceptance or hostile review of this document changes **no implementation score**.
+
+The following claims are distinct and MUST NOT be collapsed:
+
+1. **DESIGN_DRAFTED** — requirements exist in prose.
+2. **DESIGN_REVIEWED** — independent reviewers found the design internally coherent.
+3. **IMPLEMENTED** — source implementing a requirement exists at a named commit.
+4. **CONFORMANCE_PROVEN** — executable tests prove the implementation against a frozen contract.
+5. **SHADOW_PROVEN** — production-shaped traffic ran with effects suppressed and acceptable divergence.
+6. **CANARY_PROVEN** — bounded live traffic ran inside SLOs and invariants.
+7. **PROFILE_PRODUCTION_READY** — all mandatory gates for one named production profile passed and were independently ratified.
+
+No earlier state implies a later state. In particular:
+
+- DESIGN_REVIEWED is not IMPLEMENTED.
+- A LangGraph parity score is not a production-readiness score.
+- Passing unit tests is not crash-safety evidence.
+- A valid checkpoint file is not exact-resume evidence.
+- An async function is not a non-blocking end-to-end runtime.
+- A digest is not authentication unless its signer and trust root are authenticated.
+- A single-host lock is not a distributed ownership protocol.
+- “Exactly once” is invalid for an external effect unless the provider participates in an idempotency or transactional protocol; otherwise DharmaGraph MUST describe the guarantee as effectively-once plus reconciliation.
+
+Normative words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, and MAY are used in their RFC 2119 sense.
+
+---
+
+### 10.1 Verified baseline and the 58/100 truth
+
+#### 10.1.1 Repository baseline inspected
+
+This reconstruction section was checked on 2026-08-12 against:
+
+| Item | Verified value |
+|---|---|
+| Canonical repository | AIKAGRYA/dharma_swarm |
+| Default branch | main |
+| main head at inspection | 12212397be1dbe0a9b0cc29be4311f930140e751 |
+| Head commit | fix(mike): publish bounded review packets atomically [impact-checked] (#1185) |
+| Active-track file | docs/governance/ACTIVE_TRACK.yaml |
+| Active-track blob | f52986ff7cfb8645df7e60dac679aad341958cbb |
+| Builder receipt blob | 95609cef5355fdc7f19b7506fd28fc7892ae3a50 |
+| Judge receipt blob | e2704ecffc4ba5887680b0960c947757654af5e7 |
+| Parity matrix blob | 94fe296fb1c2dd1e4bd7a7a263bbd5c60a374622 |
+| V3 rubric overlay blob | ae6ccb1a204063325e0ead57d23c388d8d684c25 |
+| Gauntlet script blob | 6ad3705fba5264b8975648eaebab9f3c95e52e98 |
+
+Line references in this section are valid for those inspected blobs. Agents MUST re-resolve them after source drift.
+
+#### 10.1.2 Governing status
+
+The active track declares:
+
+- dharmagraph-engine-2026-07 as ACTIVE at docs/governance/ACTIVE_TRACK.yaml:940-945.
+- target_closure_kind: CLOSED_NOT_PROD at docs/governance/ACTIVE_TRACK.yaml:990.
+- a no-production-capability claim boundary at docs/governance/ACTIVE_TRACK.yaml:991.
+- closeout blocked below judge-signed 100/100 unless the operator ratifies an explicit non-goal set at docs/governance/ACTIVE_TRACK.yaml:1101.
+
+The current sealed evidence says:
+
+- score: **58.00/100**;
+- verdict: **NOT_FINISHED**;
+- closeout_blocked: true;
+- receipt claim boundary: **CLOSED_NOT_PROD; this receipt grades engine parity only**;
+- frozen comparison target: LangGraph 1.2.4;
+- measured Dharma source SHA: c83df531c32ce7c775f27ddfbc7512e1cc952db7;
+- observed_at: 2026-07-17;
+- builder and judge stable digest: 59a6a08e226be3f699d11c8af20b5409881ed0e60a6b36b407dfe1bcd0a932a0;
+- judge reconciliation: MATCH;
+- 28 capability rows remain gaps.
+
+The matrix headline and verdict are at reports/governance/dharmagraph_parity/PARITY_MATRIX.md:1-3. The gauntlet itself stamps the CLOSED_NOT_PROD boundary at scripts/governance/dharmagraph_parity_gauntlet.py:960-976.
+
+The receipt also records non-gating drift against LangGraph 1.2.8 while preserving 1.2.4 as the frozen grade. That is evidence discipline, not evidence of parity with whatever LangGraph release is current when this specification lands.
+
+#### 10.1.3 What 58/100 proves
+
+The current matrix assigns full credit to the following rows:
+
+- LG01 state/input/output/context schemas;
+- LG04 static topology and barriers;
+- LG05 conditional routing;
+- LG06 BSP supersteps and step atomicity;
+- LG07 dynamic Send and map-reduce;
+- LG08 Command update/goto/parent/resume;
+- LG09 cycles and recursion bounds;
+- LG14 checkpoint protocol;
+- LG15 thread continuity and resume;
+- LG16 state inspection/history/replay;
+- LG17 update/fork/time travel;
+- LG18 durability ordering and process-restart recovery;
+- PERF01 bounded comparison workloads.
+
+This list reflects the current signed matrix, not a fresh rerun on current main. The active-track summary specifically highlights the six core cards completed by PR #1002: LG01, LG04, LG06, LG07, LG08, and LG09.
+
+The highest-risk remaining matrix gaps include:
+
+| Row | Current result | Production consequence |
+|---|---:|---|
+| LG10 reducers/channels | 1/2 | concurrent state semantics remain incomplete |
+| LG12 invocation | 1/2 | public sync/async/stream contract incomplete |
+| LG13 batch/concurrency | 0/2 | no qualified batch or max-concurrency surface |
+| LG19-LG20 interrupts | 0/2 | human-in-loop pause/resume incomplete |
+| LG21-LG22 streaming | 0/2 | durable typed streaming incomplete |
+| LG23 subgraphs | 0/2 | nested execution semantics incomplete |
+| LG24 retries | 0/2 | retry selection, backoff, jitter, and write clearing unproven |
+| LG25 timeout | 0/2 | hard/idle/heartbeat interaction unproven |
+| LG26 error semantics | 1/2 | cancellation and handlers incomplete |
+| LG30 runtime/config | 0/2 | propagation and runtime injection incomplete |
+| LG31 lifecycle callbacks | 0/2 | operational event surface incomplete |
+| LG35 drain | 0/2 | checkpointed shutdown/continuation absent |
+| APP01-APP04 | 1/2 each | application oracle does not exercise the neutral engine |
+| PB01 | 0/2 | prebuilt agent/tool layer is not parity-qualified |
+
+See reports/governance/dharmagraph_parity/PARITY_MATRIX.md:5-36 and :42-82.
+
+#### 10.1.4 Evidence inconsistency that MUST be reconciled first
+
+The intent record and measurement record disagree at the per-card level:
+
+- ACTIVE_TRACK describes LG14 as 1/2, LG15 as 0/2, and LG18 as 1/2 at lines 1153, 1157, and 1169.
+- The current derived PARITY_MATRIX describes LG14, LG15, and LG18 as 2/2 at lines 55, 56, and 59.
+
+This does not make 58/100 disappear. It means the portfolio intent projection is stale relative to the sealed measurement detail.
+
+The first production packet MUST:
+
+1. run the committed gauntlet check on a clean current-main checkout;
+2. confirm that the relevant-source manifest still reproduces the stable digest;
+3. emit a new builder receipt if relevant source or dependencies changed;
+4. obtain an independent judge rerun and ratification;
+5. regenerate the parity matrix mechanically;
+6. reconcile ACTIVE_TRACK card text to the newly sealed evidence without changing its intent authority.
+
+For score facts, a fresh mechanically generated and independently signed receipt is the measurement authority. ACTIVE_TRACK remains the authority for campaign scope and closure policy. A conflict is a release blocker; agents MUST NOT silently choose the more flattering record.
+
+#### 10.1.5 Current source facts relevant to production qualification
+
+The current graph package contains explicit modules for compiler, executor, scheduler, state, channels, persistence, checkpoints, routing, interrupts, effects, receipts, reconciliation, and subgraphs.
+
+Verified implementation anchors include:
+
+- concurrent asyncio superstep task execution: dharma_swarm/graph/executor.py:124-182;
+- conditional sync-call isolation through `asyncio.to_thread` only when the
+  caller requests `sync_in_thread=True`: executor.py:360-380;
+- one state write application point: dharma_swarm/graph/state.py:88-155;
+- channel validation and commit contracts: dharma_swarm/graph/channels.py:99-131;
+- reducer folding/commit: channels.py:213-275;
+- async invocation with thread_id and checkpoint_id: dharma_swarm/graph/scheduler.py:104-157;
+- checkpoint records and pending writes: dharma_swarm/graph/persistence.py:72-146;
+- per-thread file locking: persistence.py:148-225 and _persistence_lock.py:22-35;
+- checkpoint resolution and resume: dharma_swarm/graph/persistence_runtime.py:65-162;
+- idempotent dispatch claims and CAS reclaim: dharma_swarm/graph/durable_invoker.py:416-638;
+- single-host reconciliation doctrine: dharma_swarm/graph/reconciler.py:1-15;
+- heartbeat lease inference without a distributed fencing token: reconciler.py:375-397;
+- a simulated clock/random/dispatch-order provider whose own module says the full fault menu is later work: dharma_swarm/graph/effects.py:1-7 and :69-103.
+
+A bounded scan of all Python files under dharma_swarm/graph at main head found:
+
+- zero tenant or tenant_id occurrences;
+- zero explicit authentication/authorization/principal/ACL occurrences;
+- zero HMAC/KMS/encryption occurrences;
+- zero OpenTelemetry or Prometheus instrumentation occurrences;
+- lease wording only in the single-host reconciler, with no persisted fence token.
+
+This negative scan does not prove that upstream services provide no security. It proves that security, multitenancy, cryptographic checkpoint authenticity, and production telemetry are not self-contained or qualified properties of the graph package. DG-P3 below therefore starts as **NOT_IMPLEMENTED**.
+
+---
+
+### 10.2 Named production profiles
+
+A production claim MUST name one exact profile. The bare statement “DharmaGraph is production-grade” is prohibited.
+
+#### 10.2.1 DG-P0 — LAB
+
+Purpose: local development, hermetic oracle runs, deterministic simulation, and benchmark work.
+
+Allowed:
+
+- in-memory or local-file persistence;
+- single process;
+- synthetic data;
+- mocked or sandboxed effects;
+- manual recovery.
+
+Prohibited:
+
+- live consequential side effects;
+- customer data;
+- production availability claims;
+- multitenant claims.
+
+DG-P0 is never production-ready, even if every parity test passes.
+
+#### 10.2.2 DG-P1 — SINGLE_TENANT_DURABLE
+
+Purpose: one tenant, one authoritative writer domain, one region, bounded low-risk workloads.
+
+Mandatory properties:
+
+- immutable node input and delta-return contract;
+- deterministic reducer barrier;
+- durable atomic superstep commit;
+- exact checkpoint resume;
+- stable effect identity and effect reconciliation;
+- bounded retry, timeout, cancellation, and cycle policies;
+- durable event stream with cursor resume;
+- authenticated service identity;
+- encryption in transit and at rest;
+- documented backup/restore;
+- operator-visible quarantine and dead-letter queues;
+- SLO dashboards and paging.
+
+DG-P1 MAY use one active runtime leader, but leadership MUST be explicit and fenced. A process-local or file lock alone is insufficient once two hosts or containers can reach the same state.
+
+#### 10.2.3 DG-P2 — SINGLE_REGION_HA
+
+Purpose: one tenant or a set of administratively isolated single-tenant deployments, multiple runtime workers, one authoritative region.
+
+DG-P2 adds:
+
+- durable external database or log with transactional compare-and-swap;
+- lease epoch or monotonic fencing token on every commit;
+- automatic worker failover;
+- admission backpressure and fair scheduling;
+- zero-downtime schema migration;
+- cooperative drain and checkpointed continuation;
+- tested process, host, network, and database failover;
+- regional backup with rehearsed restoration;
+- canary and rollback automation.
+
+No active-active ownership of one thread is allowed. Multiple workers MAY execute disjoint tasks, but only a current fenced owner may commit a thread superstep.
+
+#### 10.2.4 DG-P3 — MULTI_TENANT_REGULATED
+
+Purpose: shared infrastructure serving mutually untrusted tenants or regulated workloads.
+
+DG-P3 adds:
+
+- tenant identity as a mandatory storage and authorization dimension;
+- row/key namespace isolation and deny-by-default policy;
+- workload identity, short-lived credentials, and audited operator elevation;
+- per-tenant encryption context and key rotation;
+- secret reference resolution outside graph state;
+- retention, deletion, legal-hold, and export controls;
+- per-tenant quotas and noisy-neighbor isolation;
+- redaction and data-classification enforcement;
+- authenticated and tamper-evident checkpoints and receipts;
+- security incident response and tenant-scoped forensics;
+- disaster recovery requirements for the declared failure domains.
+
+Cross-tenant state, stream, cache, checkpoint, receipt, or effect visibility is a severity-zero invariant violation and an automatic rollback trigger.
+
+#### 10.2.5 Explicit non-goals
+
+Unless separately ratified, this version does not promise:
+
+1. a byte-for-byte LangGraph API clone;
+2. every LangGraph prebuilt or experimental API;
+3. distributed transactions with arbitrary external providers;
+4. exactly-once effects when a provider offers neither idempotency keys nor reconciliation;
+5. arbitrary untrusted Python execution without a sandbox;
+6. multi-region active-active execution of the same thread;
+7. autonomous topology evolution;
+8. automatic bypass of telos, capability, or human-approval gates;
+9. deterministic equivalence of nondeterministic LLM text;
+10. unlimited graph size, fan-out, state size, event retention, or run duration.
+
+LangGraph exclusions MUST follow the existing active-track rule: each exclusion names exact rubric rows/facets and requires operator ratification. Exclusions remove claimed scope; they do not award implementation credit.
+
+---
+
+### 10.3 Security and multitenancy contract
+
+#### 10.3.1 Mandatory execution identity
+
+Every admitted run MUST carry an immutable ExecutionEnvelope:
+
+| Field | Rule |
+|---|---|
+| tenant_id | server-derived, never accepted from an untrusted payload without authentication |
+| principal_id | authenticated human, service, or delegated agent |
+| principal_type | human, service, agent, operator |
+| authority_chain | signed delegation lineage and expiry |
+| graph_id | logical graph identity |
+| graph_version | immutable compiled artifact digest |
+| thread_id | tenant-scoped continuity key |
+| run_id | unique execution attempt group |
+| trace_id | observability correlation key, not an authority token |
+| policy_version | immutable policy snapshot used for admission |
+| capability_set | least-privilege node/tool/effect scopes |
+| data_classification | maximum permitted state/stream classification |
+| deadline | absolute execution deadline |
+| budget | steps, wall time, tokens, cost, fan-out, state bytes |
+
+The envelope MUST be copied into commit, checkpoint, effect-intent, receipt, and audit metadata. A derived record missing tenant_id, graph_version, run_id, or policy_version MUST fail closed.
+
+Identifiers MUST be server-minted or cryptographically unguessable. Human-readable identifiers MAY be labels but MUST NOT be authorization boundaries.
+
+#### 10.3.2 Authorization points
+
+Authorization MUST be evaluated:
+
+1. at graph admission;
+2. before checkpoint read, resume, fork, export, or deletion;
+3. before each tool or external effect;
+4. before dynamic route targets outside the node’s declared destination set;
+5. before cross-graph or parent/subgraph commands;
+6. before operator override;
+7. again when a paused run resumes if policy or authority changed.
+
+The policy decision MUST include principal, tenant, graph version, node, effect type, data classification, and requested action. A boolean “is_admin” is insufficient.
+
+Revocation MUST be defined:
+
+- queued tasks are denied at dispatch;
+- running pure computation MAY reach the next commit boundary;
+- effects not yet dispatched are cancelled;
+- in-flight external effects transition to CONFIRMED, FAILED, or UNKNOWN through reconciliation;
+- a revoked run MUST NOT silently continue under a cached decision.
+
+#### 10.3.3 Tenant isolation
+
+Every durable primary key and unique constraint MUST begin with tenant_id or reference a parent that is itself tenant-bound. This includes:
+
+- graph definitions and versions;
+- threads and run heads;
+- checkpoints and pending writes;
+- node/task attempts;
+- effect intents and provider idempotency keys;
+- outbox events and stream cursors;
+- cache keys;
+- receipts and audit events;
+- quarantine/dead-letter records;
+- leases and fence epochs.
+
+Storage APIs MUST accept an authenticated TenantContext object rather than a raw tenant string. Repository methods that omit TenantContext MUST not be callable from production paths.
+
+Database row-level security SHOULD be used as defense in depth. Application predicates alone are not enough. Tests MUST attempt confused-deputy and identifier-substitution attacks through every read/write API.
+
+#### 10.3.4 Secrets and sensitive data
+
+Secrets MUST be represented in graph state only as opaque secret references. Resolution happens immediately before an authorized effect in a dedicated secret provider.
+
+The runtime MUST:
+
+- redact secret values from logs, traces, errors, checkpoints, streams, and receipts;
+- prevent model-visible state from receiving credentials by default;
+- rotate provider credentials without checkpoint rewriting;
+- classify fields and enforce stream projection by audience;
+- reject state exceeding the envelope’s data-classification authority.
+
+#### 10.3.5 Cryptographic and transport controls
+
+DG-P1 and above require:
+
+- TLS for all network hops;
+- authenticated workload identity between workers and stores;
+- encrypted storage volumes and backups;
+- checkpoint and event integrity verification;
+- key rotation with key-version metadata;
+- constant-time verification where secret material is compared;
+- protection against replay of operator approvals and resume commands.
+
+DG-P3 requires tenant-specific encryption context or tenant-dedicated keys according to the deployment’s threat model.
+
+A plain SHA-256 content digest detects accidental or adversarial modification only when the expected digest comes from an authenticated trust root. It MUST NOT be presented as a signature.
+
+#### 10.3.6 Untrusted code and tool isolation
+
+Node functions and tools are trusted application code unless a sandbox profile explicitly says otherwise.
+
+If untrusted or tenant-authored code is admitted, it MUST run outside the scheduler process with:
+
+- OS/container isolation;
+- read-only base filesystem;
+- explicit egress allowlist;
+- resource quotas;
+- short-lived credentials;
+- no direct persistence access;
+- signed result envelope;
+- hard termination independent of cooperative cancellation.
+
+asyncio timeout around blocking native code is not a hard sandbox timeout.
+
+#### 10.3.7 Abuse, quota, and denial-of-service controls
+
+Budgets MUST be checked both before admission and at every superstep:
+
+- recursion and superstep count;
+- fan-out width and total spawned tasks;
+- concurrent tasks per tenant and globally;
+- state bytes and checkpoint bytes;
+- event bytes and retained cursor age;
+- external-effect count and cost;
+- token and wall-clock budget;
+- retry count and cumulative backoff.
+
+Exhaustion produces a typed terminal or waiting state. It MUST NOT leave a run indefinitely RUNNING.
+
+#### 10.3.8 Security qualification tests
+
+DG-P3 cannot promote until all are green:
+
+- tenant A cannot list/get/resume/fork/delete tenant B’s thread;
+- a forged tenant_id in state or config is ignored or rejected;
+- cache and idempotency keys cannot collide across tenants;
+- stream cursors cannot cross tenants;
+- checkpoint object-store paths cannot be guessed to bypass policy;
+- operator elevation is time-bounded, reasoned, and audited;
+- policy revocation stops new effects;
+- secret canaries never appear in telemetry or artifacts;
+- corrupted or replayed approvals fail closed;
+- backup restore preserves isolation and audit lineage.
+
+---
+
+### 10.4 Observability, SLOs, and operability
+
+#### 10.4.1 Event model
+
+Every runtime transition MUST emit a structured GraphRuntimeEvent with:
+
+- schema_version;
+- observed_at and monotonic duration where available;
+- tenant_id in protected telemetry only, plus a low-cardinality tenant class for shared metrics;
+- graph_id and graph_version;
+- thread_id, run_id, superstep, node_id, task_id, attempt;
+- checkpoint_id and parent_checkpoint_id;
+- lease_epoch/fence_token;
+- transition and outcome;
+- error_class and retry disposition;
+- effect_id and effect state when applicable;
+- trace_id and span_id;
+- state_digest, delta_digest, and event_digest;
+- policy_version;
+- runtime build SHA and store incarnation.
+
+Payload bodies and raw model content MUST be excluded by default. Debug capture requires explicit policy, retention, and access controls.
+
+#### 10.4.2 Required metrics
+
+At minimum:
+
+- dg_run_admitted_total;
+- dg_run_terminal_total by typed outcome;
+- dg_run_active;
+- dg_queue_depth and dg_queue_age_seconds;
+- dg_superstep_duration_seconds;
+- dg_superstep_commit_duration_seconds;
+- dg_node_duration_seconds;
+- dg_checkpoint_bytes and dg_checkpoint_commit_seconds;
+- dg_resume_seconds;
+- dg_commit_cas_conflict_total;
+- dg_fence_rejection_total;
+- dg_lease_expiry_total;
+- dg_effect_total by state;
+- dg_effect_unknown_total;
+- dg_effect_duplicate_prevented_total;
+- dg_reconcile_age_seconds;
+- dg_outbox_lag_seconds;
+- dg_stream_subscriber_lag_seconds;
+- dg_retry_total;
+- dg_timeout_total;
+- dg_quarantine_total;
+- dg_invalid_route_total;
+- dg_budget_exhaustion_total;
+- dg_tenant_authorization_denied_total;
+- dg_invariant_violation_total.
+
+High-cardinality identifiers MUST be trace/log attributes, not unbounded metric labels.
+
+#### 10.4.3 Tracing
+
+The root span is one graph run. Child spans include admission, superstep, node attempt, persistence commit, effect dispatch, reconciliation, stream publication, checkpoint resume, and operator interaction.
+
+Trace context MUST propagate through queued tasks and effect adapters. Trace IDs MUST NOT be used as idempotency or authority keys.
+
+#### 10.4.4 SLOs
+
+Targets exclude time spent inside a declared external provider unless stated otherwise. Provider latency is measured separately.
+
+| SLI | DG-P1 | DG-P2 | DG-P3 |
+|---|---:|---:|---:|
+| Runtime admission availability, 30-day | 99.9% | 99.95% | 99.95% |
+| Admission latency p99 | 500 ms | 250 ms | 250 ms |
+| Commit latency p99 for checkpoint <=256 KiB | 1 s | 500 ms | 500 ms |
+| Durable stream publication lag p99 | 5 s | 2 s | 2 s |
+| Resume readiness after worker loss, p99 after lease expiry | 60 s | 30 s | 30 s |
+| Queue age p99 for admitted normal-priority work | 60 s | 30 s | 30 s |
+| Lost acknowledged superstep commits under process/host failure | 0 | 0 | 0 |
+| Silent externally duplicated consequential effects | 0 | 0 | 0 |
+| Unquarantined UNKNOWN consequential effects | 0 | 0 | 0 |
+| Cross-tenant disclosure or mutation | n/a | n/a or 0 | 0 |
+| Corrupt checkpoint accepted | 0 | 0 | 0 |
+
+The workload and storage envelope for every latency SLO MUST be published. Percentiles without payload size, concurrency, region, and observation window are invalid.
+
+Disaster-recovery objectives are separate:
+
+- DG-P1: documented backup RPO <=24 h and operator recovery RTO <=4 h unless a stricter service contract applies.
+- DG-P2: region backup RPO <=15 min and RTO <=60 min.
+- DG-P3: profile-specific RPO/RTO, tested at least quarterly; a claimed RPO 0 across region loss requires synchronous replication and proof.
+
+#### 10.4.5 Error-budget and paging policy
+
+Page immediately on:
+
+- invariant violation;
+- cross-tenant access;
+- accepted corrupt checkpoint;
+- duplicate consequential effect;
+- stuck COMMITTING state;
+- UNKNOWN effect older than policy threshold;
+- inability to fence a stale owner;
+- receipt/checkpoint chain verification failure.
+
+Freeze rollout when:
+
+- 1-hour burn exceeds 14.4 times budget;
+- 6-hour burn exceeds 6 times budget;
+- any zero-tolerance event occurs;
+- checkpoint/resume or effect-reconciliation SLO fails in two consecutive windows.
+
+Telemetry outage is a release blocker for canary promotion. “No alerts” is meaningless if event ingestion is broken.
+
+#### 10.4.6 Operational endpoints and runbooks
+
+DG-P1 and above require:
+
+- liveness endpoint: process can make progress;
+- readiness endpoint: dependencies available and writer authority valid;
+- drain endpoint: stop admission, checkpoint, and relinquish leases;
+- per-thread diagnostic projection;
+- safe retry/reconcile/quarantine controls;
+- capacity and queue dashboard;
+- incident runbooks for store outage, lease split-brain, corrupted checkpoint, duplicate/unknown effect, stream backlog, and tenant breach.
+
+Admin operations MUST be authenticated, authorized, idempotent, and receipted.
+
+---
+
+### 10.5 Formal execution model
+
+#### 10.5.1 State variables
+
+For each tenant-scoped thread, model:
+
+- H = current durable head: checkpoint_id, version, superstep, fence_epoch, state_digest;
+- S = immutable state snapshot at H;
+- R = ready task multiset for the next superstep;
+- W = pending task writes keyed by full task identity;
+- E = effect records keyed by stable effect_id;
+- O = committed outbox records;
+- L = current lease owner, epoch, and expiry;
+- P = policy snapshot;
+- Q = run phase;
+- B = remaining budget.
+
+The model SHALL use the closed run, step, and task machines in §8.9. It MAY
+introduce abstract labels only through this total projection:
+
+- `ADMITTED` maps to `CREATED | VALIDATING | READY`;
+- `RUNNABLE | EXECUTING(k) | COMMITTING(k) | RECOVERING` map to `RUNNING`
+  plus the persisted Step state;
+- `WAITING_FOR_INPUT` maps to `WAITING`;
+- operator pause maps to `SUSPENDED`;
+- `CANCELLING` maps to `CANCELLING`;
+- terminal labels map exactly to `SUCCEEDED | FAILED | CANCELLED | QUARANTINED`.
+
+The abstraction SHALL NOT create new legal transitions. Completion requires
+the explicit HALT/termination proof of I-10 and §8.6.2; no-ready work is not a
+finish condition. Terminal states are monotonic. Reopening requires a new run
+or an explicitly authorized same-operation repair with the ownership transfer
+defined in the durability part.
+
+#### 10.5.2 Commit bundle
+
+A node never commits shared state directly. It returns a NodeOutcome:
+
+- delta writes;
+- route decisions;
+- new task intents;
+- external effect intents;
+- custom stream events;
+- interrupt or wait intent;
+- typed error.
+
+The scheduler constructs one CommitBundle for a superstep:
+
+- tenant/thread/run identity;
+- expected parent head and expected fence epoch;
+- canonical ordered task outcomes;
+- validated reducer results;
+- next ready-task set;
+- checkpoint snapshot/delta and integrity metadata;
+- effect intents;
+- outbox events;
+- budget decrement;
+- terminal/waiting transition.
+
+The persistence layer accepts a CommitBundle only through one fenced compare-and-swap transaction.
+
+#### 10.5.3 Safety invariants
+
+The formal model and executable tests MUST prove:
+
+**Q-I01 — Single head.** At most one child checkpoint is accepted as the canonical successor of a given head/version.
+
+**Q-I02 — Fenced ownership.** A commit from lease epoch e is rejected after any lease epoch greater than e has been issued.
+
+**Q-I03 — Step atomicity.** A superstep’s state, task frontier, checkpoint metadata, effect intents, outbox records, and budget transition become visible together or not at all.
+
+**Q-I04 — Immutable observation.** All tasks in superstep k observe the same snapshot S(k). No task can observe a sibling’s uncommitted mutation.
+
+**Q-I05 — Deterministic reduction.** Given graph version, parent snapshot, canonical task identities, and deltas, the next snapshot digest is deterministic. Noncommutative reducers require a declared canonical order.
+
+**Q-I06 — Stable effect identity.** Retries and recovery derive the same effect_id for the same logical effect. A new logical attempt receives a new attempt identity without losing lineage.
+
+**Q-I07 — Effect honesty.** A run cannot claim effect success unless the effect is CONFIRMED. Ambiguous non-idempotent effects become UNKNOWN and quarantine; they are never blindly retried.
+
+**Q-I08 — Route closure.** Every route target belongs to the compiled destination set or a typed dead-letter policy. An invalid target cannot silently become a node name.
+
+**Q-I09 — Exact resume.** Resume from checkpoint c begins from the committed state/frontier after c, without re-executing completed ancestors except where the contract explicitly declares node re-execution.
+
+**Q-I10 — Checkpoint authenticity.** Corrupt, cross-tenant, wrong-version, or untrusted-store-incarnation checkpoints fail closed.
+
+**Q-I11 — Tenant noninterference.** Operations for tenant A cannot change observations for tenant B except through explicitly shared, separately authorized resources.
+
+**Q-I12 — Terminal monotonicity.** SUCCEEDED, FAILED, CANCELLED, and QUARANTINED_UNKNOWN cannot transition back to RUNNING under the same run_id.
+
+**Q-I13 — Stream truth.** Durable public events correspond to accepted commits or are explicitly marked speculative. Cursor replay never reorders events within a thread.
+
+**Q-I14 — Budget monotonicity.** Consumed steps, time, effects, and cost never decrease during a run.
+
+#### 10.5.4 Liveness properties
+
+Under an available store and fair scheduling:
+
+- an expired owner cannot block a thread forever;
+- every admitted task eventually starts, expires, is cancelled, or is rejected by budget/policy;
+- every run eventually reaches terminal, waiting, or quarantined state;
+- every effect intent eventually reaches CONFIRMED, FAILED, or UNKNOWN;
+- every committed outbox event is eventually published or alarms;
+- drain eventually produces a resumable checkpoint or a typed failure.
+
+Liveness MUST be bounded by explicit timers. “Eventually” without a timeout, alert, or operator state is not an operational guarantee.
+
+#### 10.5.5 Model-checking deliverable
+
+A TLA+, PlusCal, Alloy, or equivalent state-machine model MUST cover at least:
+
+- two workers;
+- two concurrent sibling tasks;
+- two tenants;
+- two fence epochs;
+- one crash at every commit/effect boundary;
+- retry and cancellation;
+- one invalid route;
+- one noncommutative reducer;
+- one process/store failover.
+
+The model checker MUST search all states within the declared bound and produce:
+
+- invariant list and results;
+- counterexample traces;
+- tool/version/config;
+- model digest;
+- source commit;
+- a regression test derived from each discovered counterexample.
+
+The model is not a substitute for implementation fault tests; both are required.
+
+---
+
+### 10.6 Fault-injection and conformance qualification
+
+#### 10.6.1 Deterministic fault matrix
+
+Every row requires a replayable seed, exact injection point, expected durable state, expected recovery action, and receipt.
+
+| ID | Injected fault | Required outcome |
+|---|---|---|
+| F01 | crash before node starts | task remains ready; no write/effect recorded |
+| F02 | crash during pure node computation | no partial state; retry follows policy |
+| F03 | crash after NodeOutcome, before pending journal | task safely re-executes |
+| F04 | crash after pending journal, before commit CAS | recovered outcome replays once by full task identity |
+| F05 | crash during commit transaction | old or new bundle is wholly visible, never mixed |
+| F06 | crash after commit, before worker acknowledgement | head prevents duplicate commit; next worker resumes from new head |
+| F07 | old worker resumes after lease transfer | stale fence is rejected |
+| F08 | network partition isolates current worker from store | worker cannot commit or dispatch new effects after authority loss |
+| F09 | database primary failover during CAS | one canonical head; retry is safe |
+| F10 | checkpoint bytes truncated or digest altered | restore fails closed and alarms |
+| F11 | checkpoint from another tenant/version/incarnation | restore denied |
+| F12 | crash after effect intent commit, before dispatch | dispatcher eventually sends one logical effect |
+| F13 | crash after provider applies effect, before confirmation | provider lookup/idempotency reconciles; otherwise UNKNOWN quarantine |
+| F14 | duplicate delivery of effect intent | provider sees same idempotency key; no silent duplicate |
+| F15 | outbox publisher crash after publish, before ack | subscriber deduplicates by event_id and cursor remains monotonic |
+| F16 | invalid/hallucinated route | typed INVALID_ROUTE failure or declared dead-letter; no hang |
+| F17 | cycle never reaches finish | recursion/budget terminal with checkpoint and diagnostic |
+| F18 | sibling task fails while another runs | sibling cancellation and write policy match contract; no partial commit |
+| F19 | cancellation during node/effect/commit | cancellation is phase-aware; commit/effect truth remains honest |
+| F20 | timeout races with successful completion | one deterministic disposition and no double apply |
+| F21 | clock jumps forward/backward | leases use server/monotonic semantics; DST seed replays |
+| F22 | reducer receives reordered sibling writes | commutative result stable or canonical sequence enforced |
+| F23 | tenant quota exhaustion mid-run | typed budget state; other tenants continue |
+| F24 | auth revoked while paused | resume reauthorizes and rejects unauthorized effects |
+| F25 | telemetry/outbox unavailable | commits follow declared policy; loss is bounded, durable, and alarmed |
+| F26 | rolling upgrade changes checkpoint schema | dual reader/migration succeeds or new worker refuses safely |
+
+Zero fault rows may be waived by a builder. A waiver requires operator ratification, a named production profile exclusion, and a documented residual risk.
+
+#### 10.6.2 Semantic conformance matrix
+
+| Contract | Minimum executable proof |
+|---|---|
+| fan-out state integrity | N sibling deltas with randomized completion orders yield deterministic committed state |
+| conflicting last-value writes | compile-time rejection or typed runtime conflict before commit |
+| noncommutative reducer | canonical task order proves byte-identical snapshot digest |
+| conditional route | all declared targets plus invalid/unhashable/empty/multi-target returns |
+| cycle bounds | finite loop, exact-limit completion, over-limit terminal |
+| checkpoint resume | kill process at every node/superstep boundary and resume without ancestor replay |
+| pending writes | repeated Send targets distinguished by full task identity and multiplicity |
+| retries | selection, attempt count, backoff, jitter seed, write clearing |
+| timeouts | async, sync-to-thread, uncooperative blocking code, cancellation race |
+| streaming | values, deltas, tasks, checkpoints, custom events, cursor reconnect, slow consumer |
+| effect idempotency | same logical attempt derives same effect_id across crash and worker takeover |
+| UNKNOWN reconciliation | non-idempotent ambiguous result quarantines and requires adjudication |
+| tenant isolation | cross-tenant CRUD, cursor, cache, effect, and backup/restore attacks |
+| schema migration | old checkpoint to new reader, mixed-version workers, rollback compatibility |
+| drain | stop admission, finish/abort bounded work, checkpoint continuation |
+| observability | every state transition has trace/event; injected telemetry outage alarms |
+
+#### 10.6.3 Oracle policy
+
+Use LangGraph as an oracle only where the product intentionally claims LangGraph semantics. Dharma-specific guarantees use a frozen Dharma contract.
+
+For nondeterministic LLM nodes, compare:
+
+- transition sequence;
+- visible state schema;
+- route class;
+- effect intents;
+- checkpoint lineage;
+- termination class;
+- declared semantic projections.
+
+Do not require byte-identical model prose unless the model and seed are controlled.
+
+Every oracle workload MUST include:
+
+- a positive arm;
+- a broken control that must fail;
+- executed behavior rather than import/getattr presence;
+- pinned dependency and environment;
+- source and rubric digest;
+- independent judge replay.
+
+The active track already records a harness weakness: import/getattr-only facets can preserve points for a broken engine, and APP rows can grade the clone rather than the neutral engine. Those findings at ACTIVE_TRACK.yaml:1265-1269 remain production-qualification blockers even if the headline stays 58.
+
+#### 10.6.4 Load, soak, and chaos thresholds
+
+Before DG-P2 canary:
+
+- at least 100,000 deterministic supersteps across property workloads;
+- at least 10,000 injected crash schedules;
+- no safety-invariant violation;
+- 24-hour soak at expected peak concurrency;
+- 2 times expected burst for 30 minutes without unbounded queue growth;
+- checkpoint store filled to expected retention envelope;
+- slow stream consumer and reconnect storms;
+- database failover and worker rolling restart;
+- restore drill from backup into a new store incarnation.
+
+Counts MAY be adjusted after an explicit workload power analysis. Time alone never substitutes for event count, and event count alone never substitutes for soak duration.
+
+---
+
+### 10.7 Rollout and canary gates
+
+#### 10.7.1 Stage R0 — offline qualification
+
+Required:
+
+- work packets Q0-Q10 complete for the target profile;
+- formal model green;
+- fault and conformance matrices green;
+- parity receipt freshly replayed and sealed;
+- zero unresolved severity-0/1 defects;
+- runbooks exercised in staging;
+- checkpoint migration/rollback rehearsal;
+- security threat model and review.
+
+Exit artifact: OFFLINE_QUALIFIED receipt. It is not a live-production claim.
+
+#### 10.7.2 Stage R1 — shadow, effects suppressed
+
+Run legacy and DharmaGraph on the same production-shaped inputs. DharmaGraph MUST use a physically or logically isolated effect adapter that cannot call live providers.
+
+Minimum gate:
+
+- seven days and at least 1,000 representative runs;
+- 100% normalized transition/terminal-state agreement for deterministic workloads;
+- every nondeterministic divergence classified;
+- zero state-integrity, tenant, or checkpoint violations;
+- SLO telemetry complete;
+- recovery drills during the shadow window.
+
+The current ascent plan already proposes a default-off workflow.py shadow seam; that plan is directionally compatible but is not proof it landed.
+
+#### 10.7.3 Stage R2 — internal canary
+
+Scope:
+
+- one internal tenant;
+- reversible, low-consequence effects;
+- strict allowlisted graphs;
+- 72 hours and at least 100 completed runs.
+
+Promotion requires zero zero-tolerance events and SLO compliance.
+
+#### 10.7.4 Stage R3 — one-percent canary
+
+Scope:
+
+- <=1% eligible runs;
+- no high-consequence non-idempotent effects;
+- automatic rollback switch;
+- on-call coverage.
+
+Minimum duration: seven days and 10,000 supersteps, unless traffic is lower and the operator ratifies an evidence-equivalent window.
+
+#### 10.7.5 Stages R4-R6 — 10%, 50%, 100%
+
+Each stage requires:
+
+- at least one full error-budget window;
+- no unresolved upward trend in queue age, commit latency, UNKNOWN effects, or recovery time;
+- successful worker restart and database-failover exercise;
+- checkpoint compatibility with both current and rollback binary;
+- independent promotion approval.
+
+Recommended minimum dwell:
+
+- R4 10%: seven days;
+- R5 50%: fourteen days;
+- R6 100%: fourteen additional days before legacy retirement.
+
+Legacy retirement is a separate operator decision. Successful 100% routing does not authorize immediate deletion of rollback paths.
+
+#### 10.7.6 Automatic abort conditions
+
+Any stage automatically stops new DharmaGraph admission on:
+
+- invariant violation;
+- cross-tenant event;
+- duplicate consequential effect;
+- accepted corrupt checkpoint;
+- two canonical heads for one thread;
+- stale owner commit accepted;
+- UNKNOWN consequential effect not quarantined;
+- loss of required telemetry;
+- recovery time above hard limit;
+- schema incompatibility with rollback binary.
+
+The response sequence is:
+
+1. stop admission;
+2. preserve evidence;
+3. drain/checkpoint where safe;
+4. fence compromised workers;
+5. route eligible new work to legacy;
+6. reconcile in-flight effects;
+7. incident review and new regression seed;
+8. independent approval before re-entry.
+
+#### 10.7.7 Upgrade and rollback law
+
+Every checkpoint and event has schema_version, graph_version, runtime_build, and store_incarnation.
+
+Before rollout:
+
+- new binary reads N and N-1 checkpoint versions;
+- rollback binary reads checkpoints written during the canary, or the rollout is one-way and explicitly operator-gated;
+- migrations are idempotent and restartable;
+- dual-write periods have one declared read authority;
+- mixed-version workers cannot bypass fencing;
+- destructive migrations occur only after legacy retirement and backup verification.
+
+---
+
+### 10.8 Implementation work packets and dependency DAG
+
+The work is deliberately packetized so disconnected agents can operate without inventing their own architecture.
+
+#### 10.8.Q0 — Re-baseline evidence truth
+
+Dependencies: none.
+
+Owned surfaces:
+
+- docs/governance/ACTIVE_TRACK.yaml;
+- scripts/governance/dharmagraph_parity_gauntlet.py;
+- docs/langgraph_parity;
+- reports/governance/dharmagraph_parity;
+- tests/test_dharmagraph_parity_gauntlet.py.
+
+Deliver:
+
+- clean-main gauntlet replay;
+- reconciliation of ACTIVE_TRACK versus PARITY_MATRIX card detail;
+- current dependency drift audit;
+- execute-or-zero broken-engine control;
+- application scenarios routed through the neutral engine or operator-ratified exclusion;
+- new builder receipt and independent judge receipt.
+
+Exit: one internally consistent baseline with immutable commit and receipt digests.
+
+#### 10.8.Q1 — Runtime contract and identity spine
+
+Dependencies: Q0.
+
+Primary surfaces:
+
+- dharma_swarm/graph/types.py;
+- dharma_swarm/graph/schema.py;
+- dharma_swarm/graph/compiler.py;
+- new versioned contract modules as needed.
+
+Deliver:
+
+- ExecutionEnvelope;
+- NodeOutcome and CommitBundle;
+- typed run/effect/route/error states;
+- graph and schema versioning;
+- compatibility policy;
+- budget contract;
+- serialization schemas.
+
+Exit: contract tests and schema golden files; no executor behavior change required yet.
+
+#### 10.8.Q2 — Immutable reducer and commit preparation
+
+Dependencies: Q1.
+
+Primary surfaces:
+
+- dharma_swarm/graph/state.py;
+- dharma_swarm/graph/channels.py;
+- dharma_swarm/graph/executor.py;
+- dharma_swarm/graph/scheduler.py.
+
+Deliver:
+
+- deep immutable snapshot or persistent data contract;
+- delta-only node output;
+- canonical task identity/order;
+- validate-all-then-apply-once reducer barrier;
+- conflict policy per channel;
+- deterministic state/delta digests.
+
+Exit:
+
+- randomized fan-out tests;
+- mutation escape tests;
+- noncommutative reducer tests;
+- failure leaves parent state byte-identical.
+
+#### 10.8.Q3 — Fenced durable commit kernel
+
+Dependencies: Q1 and Q2.
+
+Primary surfaces:
+
+- dharma_swarm/graph/persistence.py;
+- persistence_adapter.py;
+- persistence_runtime.py;
+- _persistence_io.py;
+- _persistence_lock.py;
+- store-specific migration modules.
+
+Deliver:
+
+- authoritative head row;
+- transactional compare-and-swap;
+- monotonic fence epoch;
+- lease acquire/renew/release;
+- atomic CommitBundle storage;
+- outbox in same transaction;
+- store incarnation;
+- durable database backend for DG-P2/P3.
+
+Exit:
+
+- two-worker linearizability tests;
+- stale-writer rejection;
+- database failover test;
+- no split head in 10,000 race schedules.
+
+#### 10.8.Q4 — Effect journal, idempotency, and reconciliation
+
+Dependencies: Q1 and Q3.
+
+Primary surfaces:
+
+- dharma_swarm/graph/durable_invoker.py;
+- effects.py;
+- receipt_authority.py;
+- receipt_chain.py;
+- reconciler.py;
+- provider adapters.
+
+Deliver:
+
+- stable effect_id vocabulary;
+- provider idempotency adapter;
+- effect state machine;
+- confirmation lookup;
+- UNKNOWN quarantine;
+- saga/compensation hooks;
+- durable reconciler with fenced ownership.
+
+Exit:
+
+- F12-F14 green for every provider class;
+- no blind retry for ambiguous non-idempotent effects;
+- reconciliation SLO dashboard.
+
+#### 10.8.Q5 — Authenticated checkpoints and exact resume
+
+Dependencies: Q2 and Q3.
+
+Primary surfaces:
+
+- dharma_swarm/graph/checkpoint.py;
+- persistence.py;
+- persistence_runtime.py;
+- serializer and migration modules.
+
+Deliver:
+
+- versioned authenticated checkpoint envelope;
+- parent lineage and state/frontier digests;
+- pending-write identity/multiplicity;
+- exact checkpoint-ID resume;
+- fork/time-travel authority checks;
+- schema migration and rollback readers;
+- corruption and cross-incarnation rejection.
+
+Exit:
+
+- process kill at every commit boundary;
+- no re-execution of completed ancestors;
+- corrupted/cross-tenant checkpoint tests;
+- backup/restore drill.
+
+#### 10.8.Q6 — Async API, streaming, cancellation, and backpressure
+
+Dependencies: Q1, Q3, Q5.
+
+Primary surfaces:
+
+- dharma_swarm/graph/scheduler.py;
+- executor.py;
+- types.py;
+- new streaming/outbox projection module;
+- public workflow adapter.
+
+Deliver:
+
+- ainvoke and typed invoke policy;
+- durable astream with cursor resume;
+- bounded queues;
+- slow-consumer policy;
+- batch/as-completed/max-concurrency interfaces if in scope;
+- structured cancellation;
+- cooperative drain.
+
+Exit:
+
+- LG12, LG13, LG21, LG22, LG31, and LG35 target facets either proven or ratified out;
+- no event-loop blocking in instrumented workloads;
+- reconnect and cancellation race matrix green.
+
+#### 10.8.Q7 — Routing, cycles, interrupts, retry, timeout, and errors
+
+Dependencies: Q1 and Q2. Q7 retry persistence also depends on Q3.
+
+Primary surfaces:
+
+- dharma_swarm/graph/routing.py;
+- compiler.py;
+- interrupts.py;
+- executor.py;
+- scheduler.py.
+
+Deliver:
+
+- closed destination sets;
+- invalid-route dead-letter/failure policy;
+- recursion and total-budget guards;
+- retry policy with deterministic jitter;
+- hard/idle/heartbeat timeout semantics;
+- sibling/user cancellation;
+- static and dynamic interrupt/resume.
+
+Exit:
+
+- F16-F22 green;
+- relevant LG02, LG03, LG19, LG20, LG24, LG25, and LG26 facets proven.
+
+#### 10.8.Q8 — Security and multitenancy
+
+Dependencies: Q1 and Q3; effect authorization integrates Q4.
+
+Primary surfaces:
+
+- new graph identity/policy/security modules;
+- every persistence schema and repository;
+- every stream/cache/effect key;
+- operator API and secret provider.
+
+Deliver:
+
+- TenantContext and authority chain;
+- deny-by-default policy enforcement;
+- row/key isolation;
+- encryption and integrity key management;
+- secret references and redaction;
+- quotas;
+- audited operator elevation;
+- retention/deletion/hold controls.
+
+Exit:
+
+- threat model reviewed;
+- security test list in 3.8 green;
+- penetration test findings closed;
+- zero direct production repository APIs without TenantContext.
+
+#### 10.8.Q9 — Telemetry and operational control plane
+
+Dependencies: Q1; integrates continuously with Q2-Q8.
+
+Primary surfaces:
+
+- new telemetry and health modules;
+- GraphRuntimeEvent;
+- dashboards, alerts, and runbooks;
+- admin control API.
+
+Deliver:
+
+- metrics/traces/events in section 4;
+- readiness/liveness/drain;
+- per-thread diagnostic read model;
+- SLO and burn-rate alerts;
+- evidence-preserving incident controls.
+
+Exit:
+
+- telemetry completeness tests;
+- outage injection pages correctly;
+- all zero-tolerance events produce a durable incident artifact.
+
+#### 10.8.Q10 — Formal model and deterministic chaos
+
+Dependencies: Q2-Q9 contracts stable.
+
+Primary surfaces:
+
+- formal model directory;
+- dharma_swarm/graph/effects.py or extracted simulated-effects modules;
+- tests/test_graph_pregel_properties.py;
+- tests/test_graph_chaos_receipt.py;
+- new fault-matrix tests and reports.
+
+Deliver:
+
+- model in section 5;
+- replayable fault scheduler;
+- F01-F26;
+- semantic matrix;
+- load/soak harness;
+- regression seed corpus.
+
+Exit: all mandatory invariants and target-profile thresholds green.
+
+#### 10.8.Q11 — Application shadow seam
+
+Dependencies: Q4-Q10.
+
+Primary surfaces:
+
+- dharma_swarm/workflow.py;
+- tests/oracle_support/scenarios.py;
+- tests/oracle_support/outcomes.py;
+- bounded integration adapters.
+
+Deliver:
+
+- default-off neutral-engine adapter;
+- effect-suppressed shadow;
+- normalized comparator;
+- divergence receipts;
+- per-graph allowlist and kill switch.
+
+Exit: R1 gates pass. APP01-APP04 must exercise the neutral engine before receiving full integration credit.
+
+#### 10.8.Q12 — Canary, disaster recovery, and ratification
+
+Dependencies: Q11.
+
+Primary surfaces:
+
+- deployment configuration;
+- migrations;
+- rollout automation;
+- dashboards/runbooks;
+- immutable promotion receipts.
+
+Deliver:
+
+- R2-R6 automation;
+- backup/restore and regional recovery drill;
+- rollback compatibility;
+- on-call ownership;
+- final profile qualification.
+
+Exit: independently signed PROFILE_PRODUCTION_READY receipt for exactly one named profile.
+
+#### 10.8.1 Dependency graph
+
+Critical path:
+
+Q0 → Q1 → Q2 → Q3 → Q4/Q5 → Q6/Q7/Q8 → Q9/Q10 → Q11 → Q12
+
+Safe parallelism:
+
+- Q4 and Q5 after Q3;
+- early Q7 routing/compiler work after Q2, with retry persistence after Q3;
+- Q8 policy model after Q1, with storage enforcement after Q3;
+- Q9 schema after Q1, instrumentation alongside each packet;
+- formal-model skeleton after Q1, final Q10 only after contracts stabilize.
+
+No packet may bypass Q0 by assuming the remembered 58/100 card distribution is current.
+
+---
+
+### 10.9 Evidence, independent judgment, and ratification
+
+#### 10.9.1 Evidence bundle
+
+Every packet and promotion stage produces an immutable evidence manifest containing:
+
+- repository and exact source commit;
+- clean/dirty status;
+- graph/runtime schema versions;
+- dependency lock and relevant package versions;
+- compiler/platform/store versions;
+- test and workload manifests;
+- exact commands and exit codes;
+- raw artifact paths and SHA-256 digests;
+- fault seeds and injection points;
+- SLO observation window and sample counts;
+- known deviations and exclusions;
+- builder identity;
+- independent judge identity and attestation;
+- operator ratifications;
+- expiry/revalidation conditions.
+
+Screenshots and prose summaries MAY aid review but are not primary evidence.
+
+#### 10.9.2 Separation of duties
+
+- Builder emits implementation evidence.
+- Independent judge reruns from a clean checkout and signs the stable measurement digest.
+- Security reviewer signs the threat model and security test result for DG-P3.
+- Operator alone ratifies scope exclusions, consequential-effect policy, risk acceptance, and production promotion.
+- The author of a code change MUST NOT be its sole judge.
+
+An agent name in JSON is not authentication. Judge authority MUST bind to a repository-controlled trust root or an external authenticated signing system.
+
+#### 10.9.3 Revalidation triggers
+
+Evidence expires and MUST be re-emitted when any of these change:
+
+- relevant source roots;
+- rubric or conformance contract;
+- runtime/compiler/provider dependency;
+- persistence schema or serializer;
+- graph compiler output;
+- effect identity algorithm;
+- authorization policy;
+- checkpoint format;
+- deployment topology;
+- fault-injection harness;
+- target production profile;
+- latest-reference drift that changes a claimed semantic.
+
+Time-based TTLs:
+
+- parity/conformance: 30 days maximum while active development continues;
+- security scan: 30 days and after dependency/policy change;
+- restore drill: quarterly;
+- regional failover drill: quarterly for DG-P3, semiannual for DG-P2;
+- production SLO evidence: rolling 30-day window.
+
+#### 10.9.4 Production admission gate
+
+LangGraph parity is one input, not the final gate.
+
+PROFILE_PRODUCTION_READY requires:
+
+1. parity closeout at 100/100 or an operator-ratified exact non-goal set, preserving the active-track rule;
+2. 100% of applicable safety invariants;
+3. 100% of applicable security isolation tests;
+4. all F-matrix rows applicable to the named profile;
+5. no unresolved severity-0/1 defect;
+6. shadow and canary gates;
+7. SLO/error-budget compliance;
+8. backup/restore and rollback proof;
+9. independent judge and operator signatures;
+10. an explicit production profile and deployment topology.
+
+A reviewed production specification satisfies none of these ten gates by itself.
+
+---
+
+### 10.10 Disconnected-agent handoff protocol
+
+Conversation context is not an artifact store. The authoritative handoff MUST be a remote Git commit.
+
+#### 10.10.1 Minimum handoff coordinates
+
+Send every agent:
+
+- repository: AIKAGRYA/dharma_swarm;
+- branch or PR URL;
+- exact commit SHA;
+- specification path;
+- specification file digest;
+- baseline main SHA used by the document;
+- packet ID;
+- declared owned surfaces;
+- dependency status;
+- verification commands;
+- evidence paths;
+- explicit claim state.
+
+Agents MUST fetch the exact commit before reading. “Use the latest” is not reproducible.
+
+#### 10.10.2 Machine-readable handoff template
+
+    schema: dharmagraph.production_handoff.v1
+    repository: AIKAGRYA/dharma_swarm
+    base_sha: <immutable-main-sha>
+    artifact:
+      path: docs/plans/DHARMAGRAPH_PRODUCTION_RUNTIME_SPEC_v1_1_RECONSTRUCTED.md
+      commit_sha: <commit-containing-artifact>
+      sha256: <file-digest>
+      status: PROPOSED_NOT_IMPLEMENTED
+    current_measurement:
+      langgraph_parity: 58.00/100
+      receipt_source_sha: c83df531c32ce7c775f27ddfbc7512e1cc952db7
+      verdict: NOT_FINISHED
+      production_claim: CLOSED_NOT_PROD
+    packet:
+      id: Q<n>
+      depends_on: [<packet-ids>]
+      owned_surfaces: [<paths>]
+      forbidden_surfaces: [<paths>]
+    invariants: [I<n>, ...]
+    verify:
+      - <exact-command>
+    evidence_outputs:
+      - <path>
+    blockers:
+      - <typed-blocker-or-empty>
+    next_action: <one-bounded-action>
+
+#### 10.10.3 Agent start procedure
+
+Every new agent SHALL:
+
+1. fetch the immutable handoff commit;
+2. run repository onboarding and inspect current git status;
+3. compare current main with base_sha;
+4. read ACTIVE_TRACK, the production spec, PARITY_MATRIX, judge receipt, and the packet’s source modules;
+5. run the packet’s done-block before editing;
+6. stop if dependencies are not merged or surfaces conflict;
+7. implement one bounded slice;
+8. run verification;
+9. commit code and evidence together where custody permits;
+10. push a dedicated branch and update a draft PR;
+11. never claim a later evidence state than it earned;
+12. never merge its own qualification evidence.
+
+Recommended initial commands:
+
+    make onboard
+    bash scripts/governance/run_python_with_repo_env.sh \
+      scripts/governance/dharmagraph_parity_gauntlet.py --check
+    git status --short
+    git rev-parse HEAD
+
+#### 10.10.4 Copy-paste human handoff
+
+    Work in AIKAGRYA/dharma_swarm at commit <sha>.
+    Read docs/plans/DHARMAGRAPH_PRODUCTION_RUNTIME_SPEC_v1_1_RECONSTRUCTED.md in full.
+    The current judge-signed LangGraph-parity baseline is 58.00/100 with
+    verdict NOT_FINISHED and claim boundary CLOSED_NOT_PROD. The production
+    specification is a proposed contract, not evidence that implementation
+    moved above 58 or became production-ready.
+
+    Execute packet <Qn> only. Respect its dependency and surface boundaries.
+    Re-run its done-block from a clean checkout, preserve all failing evidence,
+    emit a builder receipt, and request an independent judge. Do not merge and
+    do not weaken a gate to obtain a green result.
+
+#### 10.10.5 Publication safety rule
+
+Before any long review session:
+
+1. create the artifact;
+2. compute its digest;
+3. commit it on a dedicated branch;
+4. push;
+5. open a draft PR;
+6. only then begin iterative review.
+
+An untracked local file is not delivered work.
+
+---
+
+### 10.11 Final release checklist
+
+The release authority MUST answer every item with evidence:
+
+- [ ] Exact production profile named.
+- [ ] Spec committed, pushed, and digest-pinned.
+- [ ] Q0 current-main evidence reconciliation complete.
+- [ ] Fresh builder and independent judge receipts MATCH.
+- [ ] ACTIVE_TRACK and derived matrix no longer disagree.
+- [ ] Applicable parity rows full or exact non-goals operator-ratified.
+- [ ] Q-I01 through Q-I14 proven by model and executable tests.
+- [ ] F01-F26 applicable rows green.
+- [ ] Tenant/security gates green for DG-P3.
+- [ ] No secret or customer payload leakage in telemetry.
+- [ ] SLO dashboards and burn alerts live.
+- [ ] Readiness, drain, quarantine, and reconcile controls exercised.
+- [ ] Backup restore completed into a fresh store incarnation.
+- [ ] Rollback binary reads canary checkpoints or rollout marked one-way.
+- [ ] Shadow gate passed.
+- [ ] Canary dwell/count gates passed.
+- [ ] Zero unresolved severity-0/1 findings.
+- [ ] Operator approved consequential-effect policy.
+- [ ] Operator and independent judge signed profile promotion.
+- [ ] Legacy rollback retained through the post-100% observation window.
+
+Until every applicable item is checked, the only honest conclusion is:
+
+**DharmaGraph has promising, judge-measured execution and durability foundations. It remains CLOSED_NOT_PROD. This specification defines the work and evidence required to change that fact; it does not change the fact itself.**
 
 ## 20. Current-source reality map
 
