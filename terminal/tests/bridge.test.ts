@@ -108,6 +108,20 @@ describe("DharmaBridge transport scheduling", () => {
     bridge.close();
   });
 
+  test("a correlated Helm projection completes its non-result background request", async () => {
+    const child = new FakeBridgeProcess();
+    const requests = captureRequests(child);
+    const bridge = new DharmaBridge(() => {}, () => child.asChildProcess());
+
+    const activeId = bridge.sendBackground("helm.on_call.request");
+    bridge.sendBackground("runtime.snapshot");
+    child.stdout.write(`${JSON.stringify({type: "helm.on_call_projection", request_id: activeId, projection: {}})}\n`);
+    await flushBridgeEvents();
+
+    expect(requests.map((request) => request.type)).toEqual(["helm.on_call.request", "runtime.snapshot"]);
+    bridge.close();
+  });
+
   test("transport failure drops stale background work and restarts cleanly", async () => {
     const children: FakeBridgeProcess[] = [];
     const requestLogs: Record<string, unknown>[][] = [];
@@ -129,6 +143,39 @@ describe("DharmaBridge transport scheduling", () => {
     bridge.sendBackground("status");
     expect(children).toHaveLength(2);
     expect(requestLogs[1]?.map((request) => request.type)).toEqual(["status"]);
+    bridge.close();
+  });
+
+  test("a retired child cannot project stale truth or release the successor scheduler", async () => {
+    const children: FakeBridgeProcess[] = [];
+    const requestLogs: Record<string, unknown>[][] = [];
+    const events: Record<string, unknown>[] = [];
+    const bridge = new DharmaBridge((event) => events.push(event), () => {
+      const child = new FakeBridgeProcess();
+      children.push(child);
+      requestLogs.push(captureRequests(child));
+      return child.asChildProcess();
+    });
+
+    bridge.sendBackground("helm.on_call.request");
+    children[0]?.stdin.emit("error", new Error("broken pipe"));
+    await flushBridgeEvents();
+
+    const successorId = bridge.sendBackground("status");
+    bridge.sendBackground("runtime.snapshot");
+    children[0]?.stdout.write(`${JSON.stringify({
+      type: "helm.on_call_projection",
+      request_id: successorId,
+      projection: {runtime_epoch: "retired-child"},
+    })}\n`);
+    await flushBridgeEvents();
+
+    expect(events.filter((event) => event.type === "helm.on_call_projection")).toEqual([]);
+    expect(requestLogs[1]?.map((request) => request.type)).toEqual(["status"]);
+
+    children[1]?.stdout.write(`${JSON.stringify({type: "status.result", request_id: successorId})}\n`);
+    await flushBridgeEvents();
+    expect(requestLogs[1]?.map((request) => request.type)).toEqual(["status", "runtime.snapshot"]);
     bridge.close();
   });
 

@@ -1,12 +1,16 @@
-import type {ProviderRouteReceipt, RoutePolicyState, RouteTarget, RouteState} from "./types";
+import type {RoutePolicyState, RouteTarget, RouteState} from "./types";
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function asRecordList(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
-    ? value.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    ? value.filter((entry): entry is Record<string, unknown> => (
+        typeof entry === "object" && entry !== null && !Array.isArray(entry)
+      ))
     : [];
 }
 
@@ -115,45 +119,43 @@ export function routePolicyWithConfig(
     provider,
     model,
     strategy,
-    routeState: identityChanged ? matchingTarget?.routeState ?? "unverified" : current.routeState,
-    selectable: identityChanged ? matchingTarget?.selectable ?? false : current.selectable,
+    // Configuration identifies the requested route; it is not liveness or
+    // selection authority. A subsequent typed policy must confirm readiness.
+    routeState: identityChanged ? "unverified" : current.routeState,
+    selectable: identityChanged ? false : current.selectable,
     availabilityReason: identityChanged
-      ? matchingTarget ? matchingTarget.availabilityReason : "awaiting_route_authority"
+      ? "awaiting_route_authority"
       : current.availabilityReason,
-    lastConfirmedRouteId: identityChanged ? undefined : current.lastConfirmedRouteId,
     activeLabel: matchingTarget?.label ?? (identityChanged ? undefined : current.activeLabel),
   };
 }
 
-export function routePolicyWithSuccessfulReceipt(
-  current: RoutePolicyState,
-  receipt: ProviderRouteReceipt,
-): RoutePolicyState {
-  if (
-    receipt.evidenceKind !== "provider_completion"
-    || receipt.routeId !== current.routeId
-    || receipt.provider !== current.provider
-    || receipt.model !== current.model
-  ) {
-    return current;
-  }
-  const targets = current.targets.map((target) =>
-    target.routeId === receipt.routeId
-      ? {...target, routeState: "ready" as const, availabilityReason: undefined, selectable: true}
-      : target,
-  );
+function failClosedRoutePolicy(current: RoutePolicyState, reason: string): RoutePolicyState {
+  const retainTerminalNegative = current.routeState === "invalid" || current.routeState === "unavailable";
   return {
     ...current,
-    routeState: "ready",
-    selectable: true,
-    availabilityReason: undefined,
-    lastConfirmedRouteId: current.routeId,
-    targets,
+    routeState: retainTerminalNegative ? current.routeState : "unverified",
+    selectable: false,
+    availabilityReason: retainTerminalNegative ? current.availabilityReason ?? reason : reason,
+    targets: current.targets.map((target) => {
+      const targetIsTerminalNegative = target.routeState === "invalid" || target.routeState === "unavailable";
+      return {
+        ...target,
+        routeState: targetIsTerminalNegative ? target.routeState : "unverified",
+        selectable: false,
+        availabilityReason: targetIsTerminalNegative
+          ? target.availabilityReason
+          : reason,
+      };
+    }),
   };
 }
 
 export function routePolicyFromValue(value: unknown, current: RoutePolicyState = defaultRoutePolicy()): RoutePolicyState {
   const record = asRecord(value);
+  if (Object.keys(record).length === 0) {
+    return failClosedRoutePolicy(current, "malformed_route_policy");
+  }
   const payload =
     asString(record.domain) === "routing_decision" && Object.keys(asRecord(record.decision)).length > 0
       ? record
@@ -166,13 +168,21 @@ export function routePolicyFromValue(value: unknown, current: RoutePolicyState =
   const payloadPolicy = asRecord(payload.policy);
   const policy = Object.keys(decisionRecord).length > 0 ? decisionRecord : Object.keys(payloadPolicy).length > 0 ? payloadPolicy : payload;
 
-  const provider = asString(policy.provider_id ?? policy.selected_provider, current.provider);
-  const model = asString(policy.model_id ?? policy.selected_model, current.model);
-  const strategy = asString(policy.strategy, current.strategy);
   const targets = asRecordList(payload.targets ?? policy.targets)
     .map(normalizeRouteTarget)
     .filter((target): target is RouteTarget => Boolean(target));
-  const routeId = routeIdFor(provider, model, asString(policy.route_id ?? policy.selected_route));
+  const explicitRouteId = asString(policy.route_id ?? policy.selected_route);
+  const routeIdentityTargets = explicitRouteId
+    ? targets.filter((target) => target.routeId === explicitRouteId)
+    : [];
+  const routeIdentityTarget = routeIdentityTargets.length === 1 ? routeIdentityTargets[0] : undefined;
+  const provider = asString(policy.provider_id ?? policy.selected_provider, routeIdentityTarget?.provider ?? "");
+  const model = asString(policy.model_id ?? policy.selected_model, routeIdentityTarget?.model ?? "");
+  if (!provider || !model) {
+    return failClosedRoutePolicy(current, "malformed_route_identity");
+  }
+  const strategy = asString(policy.strategy, current.strategy);
+  const routeId = routeIdFor(provider, model, explicitRouteId);
   const identityTargets = targets.filter((target) => target.provider === provider && target.model === model);
   const matchingTarget = targets.find((target) => target.routeId === routeId)
     ?? (identityTargets.length === 1 ? identityTargets[0] : undefined);
@@ -181,7 +191,7 @@ export function routePolicyFromValue(value: unknown, current: RoutePolicyState =
     || metadata.selectable === false;
   const selectable = explicitNonSelectable
     ? false
-    : matchingTarget?.selectable ?? asBoolean(policy.selectable ?? metadata.selectable, true);
+    : matchingTarget?.selectable ?? asBoolean(policy.selectable ?? metadata.selectable, false);
   const fallbackTargets = asRecordList(payload.fallback_targets ?? policy.fallback_chain);
   const fallbackChain = fallbackTargets
     .map((entry) => routeIdFor(asString(entry.provider), asString(entry.model), asString(entry.route_id ?? entry.alias)))
@@ -198,42 +208,21 @@ export function routePolicyFromValue(value: unknown, current: RoutePolicyState =
     ? "unavailable"
     : incomingRouteState;
   const routeExplicitlyDead = effectiveIncomingRouteState === "invalid" || effectiveIncomingRouteState === "unavailable";
-  const sameIdentity = current.routeId === routeId
-    && current.provider === provider
-    && current.model === model;
-  const preserveSuccessfulReceipt =
-    sameIdentity
-    && current.lastConfirmedRouteId === routeId
-    && current.routeState === "ready"
-    && effectiveIncomingRouteState === "unverified";
-  const effectiveTargets = preserveSuccessfulReceipt
-    ? targets.map((target) => target.routeId === routeId
-      ? {...target, routeState: "ready" as const, availabilityReason: undefined, selectable: true}
-      : target)
-    : targets;
-
   return {
     routeId,
     provider,
     model,
     strategy,
-    routeState: preserveSuccessfulReceipt ? "ready" : effectiveIncomingRouteState,
-    selectable: preserveSuccessfulReceipt || (!routeExplicitlyDead && selectable),
-    availabilityReason: preserveSuccessfulReceipt
-      ? undefined
-      : routeExplicitlyDead
-        ? asString(policy.availability_reason ?? metadata.availability_reason) || matchingTarget?.availabilityReason
-        : matchingTarget?.availabilityReason
-          ?? (asString(policy.availability_reason ?? metadata.availability_reason) || undefined),
+    routeState: effectiveIncomingRouteState,
+    selectable: !routeExplicitlyDead && selectable,
+    availabilityReason: routeExplicitlyDead
+      ? asString(policy.availability_reason ?? metadata.availability_reason) || matchingTarget?.availabilityReason
+      : matchingTarget?.availabilityReason
+        ?? (asString(policy.availability_reason ?? metadata.availability_reason) || undefined),
     defaultRouteId: asString(metadata.default_route ?? policy.default_route) || undefined,
     fallbackChain,
-    lastConfirmedRouteId: sameIdentity
-      && effectiveIncomingRouteState !== "invalid"
-      && effectiveIncomingRouteState !== "unavailable"
-      ? current.lastConfirmedRouteId
-      : undefined,
     activeLabel: asString(metadata.active_label ?? policy.active_label) || matchingTarget?.label || undefined,
-    targets: effectiveTargets,
+    targets,
   };
 }
 

@@ -1,17 +1,27 @@
 {
   "id": "helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2",
-  "base_ref": "12212397be1dbe0a9b0cc29be4311f930140e751",
-  "branch": "agent/helm-live-slice-recovery-20260812",
+  "base_ref": "43e93f6de62f787789ca4be28cfcd848e7aeec29",
+  "branch": "agent/helm-live-slice-recovery-v4-20260812",
   "worktree": ".",
   "intent": "Ship the first truthful live Dharma Helm slice from current main: one safe no-tools primary-agent turn, a fixed seven-seat read-only OnCall projection produced only by Python RouteVerification evidence, a persistent terminal N/7 truth band, and fail-closed command outcomes and compound-intent handling. Preserve raw input, admit no mutation or evolution effects, and keep unavailable or unverifiable routes UNKNOWN or LIVE_DEGRADED.",
   "allowed_files": [
     "dharma_swarm/model_status.py",
+    "dharma_swarm/helm_route_truth_codec.py",
+    "dharma_swarm/helm_route_truth_evaluator.py",
+    "dharma_swarm/helm_route_truth_types.py",
     "dharma_swarm/terminal_bridge.py",
     "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_route_truth.py",
     "dharma_swarm/terminal_bridge_session_runtime.py",
+    "dharma_swarm/tui/commands/system_commands.py",
+    "dharma_swarm/tui/engine/adapters/claude_cli.py",
+    "dharma_swarm/tui/engine/adapters/openrouter.py",
     "tests/test_route_verification.py",
     "tests/test_model_status_projection.py",
     "tests/test_terminal_bridge.py",
+    "tests/tui/test_system_commands.py",
+    "tests/tui/test_claude_adapter_v11.py",
+    "tests/tui/test_openrouter_adapter.py",
     "tests/fixtures/terminal_bridge/helm_slice1_compound_adversarial.json",
     "terminal/**",
     "docs/plans/HELM_LIVE_SLICE_1_SPEC_2026-08-09.md",
@@ -35,13 +45,13 @@
   "gates": [
     {
       "name": "helm-slice1-python-regression",
-      "command": "python3 -m pytest -q tests/test_route_verification.py tests/test_model_status_projection.py tests/test_terminal_bridge.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_adapter.py tests/tui/test_openrouter_adapter.py",
+      "command": "python3 -m pytest -q tests/test_route_verification.py tests/test_model_status_projection.py tests/test_terminal_bridge.py tests/tui/test_system_commands.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_adapter.py tests/tui/test_openrouter_adapter.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
       "name": "helm-slice1-python-ruff",
-      "command": "python3 -m ruff check dharma_swarm/model_status.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_session_runtime.py tests/test_route_verification.py tests/test_model_status_projection.py tests/test_terminal_bridge.py",
+      "command": "python3 -m ruff check dharma_swarm/model_status.py dharma_swarm/helm_route_truth_codec.py dharma_swarm/helm_route_truth_evaluator.py dharma_swarm/helm_route_truth_types.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_route_truth.py dharma_swarm/terminal_bridge_session_runtime.py dharma_swarm/tui/commands/system_commands.py dharma_swarm/tui/engine/adapters/claude_cli.py dharma_swarm/tui/engine/adapters/openrouter.py tests/test_route_verification.py tests/test_model_status_projection.py tests/test_terminal_bridge.py tests/tui/test_system_commands.py tests/tui/test_claude_adapter_v11.py tests/tui/test_openrouter_adapter.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -55,7 +65,7 @@
   "negative_controls": [
     {
       "name": "route-verification-ttl-regression-detected",
-      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/model_status.py'); t=p.read_text(); old='MAX_ROUTE_VERIFICATION_TTL = timedelta(hours=24)'; new='MAX_ROUTE_VERIFICATION_TTL = timedelta(hours=48)'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_route_verification.py::test_route_verification_rejects_ttl_over_24_hours','-q']).returncode)\"",
+      "command": "python3 -c \"import pathlib,sys; from datetime import datetime,timedelta,timezone; p=pathlib.Path('dharma_swarm/helm_route_truth_types.py'); t=p.read_text(); old='MAX_ROUTE_VERIFICATION_TTL = timedelta(hours=24)'; new='MAX_ROUTE_VERIFICATION_TTL = timedelta(hours=48)'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); from dharma_swarm.helm_route_truth_types import ACCEPTED_ROUTE_VERIFIER_ID,ACCEPTED_ROUTE_VERIFIER_VERSION,HELM_SLICE1_SEATS,RouteEvidence,RouteVerdict; from dharma_swarm.helm_route_truth_evaluator import evaluate_route_verification; now=datetime(2026,8,9,12,tzinfo=timezone.utc); seat=HELM_SLICE1_SEATS[0]; provider,model=seat.admissible_served_identities[0]; evidence=RouteEvidence(seat.seat_id,seat.logical_lineage,provider,model,provider,model,True,False,now,now+timedelta(hours=25),ACCEPTED_ROUTE_VERIFIER_ID,ACCEPTED_ROUTE_VERIFIER_VERSION,True,'receipt://negative/ttl','1'*64,'negative-epoch'); result=evaluate_route_verification(seat=seat,evidence=evidence,now=now,current_runtime_epoch='negative-epoch'); sys.exit(1 if result.verdict is RouteVerdict.ON_CALL else 0)\"",
       "expected_exit": 1,
       "timeout_seconds": 120
     }
@@ -86,7 +96,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "12212397be1dbe0a9b0cc29be4311f930140e751",
+      "checked_at_sha": "43e93f6de62f787789ca4be28cfcd848e7aeec29",
       "details": []
     },
     "interface_mismatches": [
@@ -96,9 +106,16 @@
     ],
     "closest_existing_implementation": [
       "dharma_swarm/model_status.py",
+      "dharma_swarm/helm_route_truth_codec.py",
+      "dharma_swarm/helm_route_truth_evaluator.py",
+      "dharma_swarm/helm_route_truth_types.py",
       "dharma_swarm/terminal_bridge.py",
       "dharma_swarm/terminal_bridge_chat.py",
+      "dharma_swarm/terminal_bridge_route_truth.py",
       "dharma_swarm/terminal_bridge_session_runtime.py",
+      "dharma_swarm/tui/commands/system_commands.py",
+      "dharma_swarm/tui/engine/adapters/claude_cli.py",
+      "dharma_swarm/tui/engine/adapters/openrouter.py",
       "terminal/src/app.tsx",
       "terminal/src/routePolicy.ts",
       "terminal/src/protocol/routing.ts"
@@ -110,6 +127,6 @@
       "Full seven-of-seven live proof depends on provider availability and credentials and must remain LIVE_DEGRADED or LIVE_PROOF_BLOCKED if any seat cannot produce fresh identity evidence."
     ],
     "rollback": "Revert the packet-scoped commit. The slice introduces no migration and no durable positive route-truth store; reconnect or runtime-epoch change resets the terminal projection to UNKNOWN.",
-    "packet_digest": "aa3e4804bd511da2d89c53b6f21ca4f991cecfba65cbf3c652307f51806b7c5f"
+    "packet_digest": "cdaf62ab32e1c9a0dd9458270a96ed2e09cf1547a6d2eee289bba40ea08ccb28"
   }
 }

@@ -132,7 +132,39 @@ def test_help_text_is_provider_neutral_and_transparent() -> None:
     out, action = handler.handle("help")
 
     assert action is None
-    assert "Internet access for the active route" in out
+    assert "Route internet policy" in out
     assert "Cancel active provider run" in out
     assert "Ctrl+Y" in out
-    assert "live tools, usage, and cost telemetry" in out
+    assert "physical no-tools route" in out
+    assert "live tools" not in out
+
+
+def test_reset_is_explicitly_unavailable_and_does_not_mutate_local_memory() -> None:
+    handler = SystemCommandHandler()
+    handler._conversation = [{"role": "user", "content": "durable elsewhere"}]
+
+    out, action = handler.handle("reset")
+
+    assert action is None
+    assert "Unsupported in Helm Slice 1" in out
+    assert handler._conversation == [{"role": "user", "content": "durable elsewhere"}]
+
+
+def test_net_on_and_off_are_unavailable_and_do_not_mutate_local_state() -> None:
+    handler = SystemCommandHandler()
+    handler.internet_enabled = False
+
+    out, action = handler.handle("net on")
+    assert action is None
+    assert "Unsupported in Helm Slice 1" in out
+    assert handler.internet_enabled is False
+
+    handler.internet_enabled = True
+    out, action = handler.handle("net off")
+    assert action is None
+    assert "Unsupported in Helm Slice 1" in out
+    assert handler.internet_enabled is True
+
+    out, action = handler.handle("net status")
+    assert action is None
+    assert "UNBOUND" in out

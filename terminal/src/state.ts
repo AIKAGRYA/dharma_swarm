@@ -2,6 +2,7 @@ import {buildInitialOutline, buildInitialTabs} from "./mockContent";
 import type {ActivityEntry, AppAction, AppState, ApprovalQueueState, TabSpec} from "./types";
 import {mergeExecutionEvents, projectActivityEntries, projectChatTraceLines, projectPaneLines} from "./executionLog";
 import {defaultRoutePolicy, routeLabel, routePolicyWithConfig} from "./routePolicy";
+import {onCallTruthStateWithProjection, unknownOnCallTruthState} from "./onCallTruth";
 import {
   nextSessionPaneAfterCatalog,
   nextSessionPaneAfterDetailFailure,
@@ -105,6 +106,7 @@ export const initialState: AppState = {
   bridgeStatus: "booting",
   activeTurn: {phase: "idle"},
   routePolicy: initialRoutePolicy,
+  onCallTruth: unknownOnCallTruthState(),
   executionEventLog: [],
   chatTraceLines: [],
   chatTraceExpanded: false,
@@ -224,6 +226,18 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     }
     case "route.policy.set":
       return {...state, routePolicy: action.policy};
+    case "onCall.projection.set":
+      return {
+        ...state,
+        onCallTruth: onCallTruthStateWithProjection(state.onCallTruth, action.projection),
+      };
+    case "onCall.truth.reset":
+      return {
+        ...state,
+        onCallTruth: unknownOnCallTruthState(
+          action.runtimeEpoch === undefined ? state.onCallTruth.runtimeEpoch : action.runtimeEpoch,
+        ),
+      };
     case "execution.events.ingest": {
       const executionEventLog = mergeExecutionEvents(state.executionEventLog, action.events);
       const chatTraceLines = projectedChatTraceLines(state, executionEventLog);

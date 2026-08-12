@@ -211,11 +211,14 @@ function normalizeConversationLine(line: TranscriptLine): ConversationMessage | 
 }
 
 function appendSubmittedPrompt(history: ConversationMessage[], submittedPrompt: string): ConversationMessage[] {
-  const prompt = submittedPrompt.trim();
-  if (prompt) {
+  // The normalized view is only an emptiness check. The provider-facing current
+  // turn must retain the operator's exact bytes; otherwise the bridge sees a
+  // trimmed history message plus the raw prompt and can send both as two user
+  // messages.
+  if (submittedPrompt.trim()) {
     const previous = history[history.length - 1];
-    if (previous?.role !== "user" || previous.content !== prompt) {
-      history.push({role: "user", content: prompt});
+    if (previous?.role !== "user" || previous.content !== submittedPrompt) {
+      history.push({role: "user", content: submittedPrompt});
     }
   }
   return history.slice(-MAX_CONVERSATION_MESSAGES);
