@@ -12,12 +12,61 @@ from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
     ErrorEvent,
     SessionEnd,
+    SessionStart,
     TextComplete,
 )
 
 # Chat-lane sizing: messages sent per turn / retained per bridge process.
 CHAT_HISTORY_SEND_LIMIT = 24
 CHAT_HISTORY_RETAIN = 48
+_SLICE1_CHAT_PROVIDER_IDS = frozenset({"claude", "openrouter"})
+_ALLOWED_CHAT_EVENT_TYPES = frozenset(
+    {
+        "error",
+        "rate_limit",
+        "session_end",
+        "session_start",
+        "text_complete",
+        "text_delta",
+        "thinking_complete",
+        "thinking_delta",
+        "usage",
+    }
+)
+_FORBIDDEN_CHAT_EVENT_TYPES = frozenset(
+    {
+        "permission_decision",
+        "permission_outcome",
+        "permission_resolution",
+        "task_complete",
+        "task_progress",
+        "task_started",
+        "tool_args_delta",
+        "tool_call_complete",
+        "tool_call_start",
+        "tool_progress",
+        "tool_result",
+    }
+)
+_FORBIDDEN_CHAT_EVENT_PREFIXES = (
+    "command.",
+    "command_",
+    "permission.",
+    "permission_",
+    "task.",
+    "task_",
+    "tool.",
+    "tool_",
+)
+
+
+def _chat_event_is_forbidden(event_type: object) -> bool:
+    normalized = str(event_type or "").strip().lower()
+    return (
+        normalized not in _ALLOWED_CHAT_EVENT_TYPES
+        or normalized in _FORBIDDEN_CHAT_EVENT_TYPES
+        or normalized.startswith(_FORBIDDEN_CHAT_EVENT_PREFIXES)
+    )
 
 
 class TerminalBridgeChatMixin:
@@ -37,12 +86,24 @@ class TerminalBridgeChatMixin:
         session lifecycle per request.
         """
         request_id = run.request_id
-        prompt = str(request.get("prompt", "") or "").strip()
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
+            terminal = run.lifecycle.fail(
+                error_message or "invalid prompt",
+                error_code=error_code or "invalid_prompt",
+            )
+            if terminal is not None:
+                self._emit_recorded_session_event(run, terminal)
+            return
         active_tab = str(request.get("active_tab", "") or "chat")
         requested_provider = str(request.get("provider", "") or "").strip().lower()
         requested_model = str(request.get("model", "") or "").strip()
         requested_resume_id = str(request.get("resume_session_id", "") or "").strip()
-        lanes = self._chat_lanes(requested_provider, requested_model)
+        lanes = [
+            lane
+            for lane in self._chat_lanes(requested_provider, requested_model)
+            if lane[0] != "codex"
+        ]
         session_id = run.session_id
         if not lanes:
             message = "no chat-capable provider adapter is available"
@@ -69,6 +130,9 @@ class TerminalBridgeChatMixin:
                 "provider": lanes[0][0],
                 "model": lanes[0][1],
                 "mode": "chat",
+                "execution_mode": "read_only_no_tools",
+                "tools_enabled": False,
+                "authority": "NONE",
             }
         )
 
@@ -85,6 +149,7 @@ class TerminalBridgeChatMixin:
             adapter = self._adapters.get(provider_id)
             if adapter is None:
                 continue
+            options = self._sealed_chat_options(provider_id, options)
             self._set_active_provider(run, provider_id, model_id)
             run.phase = "streaming"
             messages = base_messages
@@ -96,6 +161,10 @@ class TerminalBridgeChatMixin:
             )
             resume_id: str | None = None
             if provider_id == "claude":
+                # Slice 1 uses the dedicated raw-single-user serializer. Keep
+                # history in the durable transcript; the subprocess prompt is
+                # exactly the newest operator utterance.
+                messages = base_messages[-1:]
                 # Provider-native continuity is an explicit operator action.
                 # Never leak the last Claude process session into a fresh turn.
                 resume_id = requested_resume_id or None
@@ -108,6 +177,8 @@ class TerminalBridgeChatMixin:
                 messages=messages,
                 model=model_id,
                 system_prompt=system_prompt,
+                tools=[],
+                tool_choice="none",
                 resume_session_id=resume_id,
                 provider_options=dict(options),
             )
@@ -115,15 +186,38 @@ class TerminalBridgeChatMixin:
             reply_parts: list[str] = []
             success: bool | None = None
             failure_text = ""
+            membrane_violation = False
+            session_start_seen = False
+            session_end_seen = False
             try:
                 async for event in adapter.stream(completion, session_id=session_id):
                     if run.cancel_requested:
                         raise asyncio.CancelledError
+                    lifecycle_violation = session_end_seen or (
+                        isinstance(event, SessionStart) and session_start_seen
+                    )
+                    if _chat_event_is_forbidden(event.type) or lifecycle_violation or (
+                        isinstance(event, SessionStart) and bool(event.tools_available)
+                    ):
+                        success = False
+                        membrane_violation = True
+                        failure_text = (
+                            f"slice1 membrane rejected provider event {event.type}"
+                        )
+                        buffer = []
+                        try:
+                            await adapter.cancel()
+                        except Exception:
+                            pass
+                        break
+                    if isinstance(event, SessionStart):
+                        session_start_seen = True
                     if isinstance(event, TextComplete) and event.role == "assistant" and event.content.strip():
                         reply_parts.append(event.content)
                     if isinstance(event, ErrorEvent) and not failure_text:
                         failure_text = event.message
                     if isinstance(event, SessionEnd):
+                        session_end_seen = True
                         success = bool(event.success)
                         if not event.success and not failure_text:
                             failure_text = str(event.error_message or event.error_code or "provider failed")
@@ -135,13 +229,40 @@ class TerminalBridgeChatMixin:
                 failure_text = f"{type(exc).__name__}: {exc}"
             if run.cancel_requested:
                 raise asyncio.CancelledError
+            if membrane_violation:
+                run.phase = "finalizing"
+                run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
+                self._record_and_emit_session_event(
+                    run,
+                    ErrorEvent(
+                        provider_id=provider_id,
+                        session_id=session_id,
+                        code="chat_membrane_violation",
+                        message=failure_text,
+                        retryable=False,
+                    ),
+                )
+                terminal = run.lifecycle.fail(
+                    failure_text,
+                    error_code="chat_membrane_violation",
+                )
+                if terminal is not None:
+                    self._emit_recorded_session_event(run, terminal)
+                return
             if success:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
                 for event in buffer:
                     accepted = self._record_and_emit_session_event(run, event)
                     if isinstance(accepted, SessionEnd) and accepted.success:
-                        self._emit_provider_route_receipt(run, accepted)
+                        self._emit_provider_route_receipt(
+                            run,
+                            accepted,
+                            requested_provider_id=provider_id,
+                            requested_model_id=model_id,
+                            expected_prompt=prompt,
+                            adapter=adapter,
+                        )
                 self._remember_chat_exchange(prompt, "\n\n".join(reply_parts).strip())
                 return
             lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
@@ -187,7 +308,11 @@ class TerminalBridgeChatMixin:
         seen: set[tuple[str, str]] = set()
 
         def add(provider_id: str, model_id: str, options: dict[str, Any], note: str) -> None:
-            if provider_id not in self._adapters or not model_id:
+            if (
+                provider_id not in _SLICE1_CHAT_PROVIDER_IDS
+                or provider_id not in self._adapters
+                or not model_id
+            ):
                 return
             key = (provider_id, model_id)
             if key in seen:
@@ -238,6 +363,23 @@ class TerminalBridgeChatMixin:
             add(provider_id, model_id, options, note)
         return lanes
 
+    def _sealed_chat_options(
+        self,
+        provider_id: str,
+        options: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Return provider options that caller input cannot weaken."""
+
+        if provider_id == "claude":
+            return self._chat_claude_options()
+        if provider_id == "openrouter":
+            timeout = options.get("timeout_sec")
+            sealed: dict[str, Any] = {"require_served_identity": True}
+            if timeout is not None:
+                sealed["timeout_sec"] = timeout
+            return sealed
+        return dict(options)
+
     def _chat_claude_model(self) -> str:
         # Genius strategy => Claude Opus 4.8 leads (the master lane). On the Max
         # plan every Claude tier costs the same, so cost-ranking to the cheapest
@@ -256,11 +398,12 @@ class TerminalBridgeChatMixin:
         except ValueError:
             budget = 0.25
         return {
-            "permission_mode": "default",
+            "permission_mode": "plan",
             "tools": "",
             "max_budget_usd": budget,
             "strict_mcp_config": True,
             "max_turns": 1,
+            "raw_single_user_prompt": True,
             "scrub_metered_keys": True,
             "setting_sources": "",
         }
@@ -276,9 +419,8 @@ class TerminalBridgeChatMixin:
                 content = item.get("content")
                 if role not in {"user", "assistant"} or not isinstance(content, str):
                     continue
-                text = content.strip()
-                if text:
-                    ts_messages.append({"role": role, "content": text})
+                if content.strip():
+                    ts_messages.append({"role": role, "content": content})
         history = [dict(item) for item in self._chat_history]
         if not history and ts_messages:
             # Bridge restarted mid-conversation: seed from the history the TS
@@ -300,6 +442,8 @@ class TerminalBridgeChatMixin:
             "You are the Dharma Helm — the conversational operator assistant of the dharma_swarm terminal, speaking in its chat pane.",
             f"Route: {provider_id}:{model_id} ({note}). Active tab: {active_tab}.",
             "Stay conversational and concise; keep continuity with the conversation history provided.",
-            self._navigator_manifest(),
+            "Slice 1 is physically read-only and no-tools. You cannot execute commands, create tasks, dispatch agents, mutate runtime or workspace state, or cause external effects.",
+            "All of your prose is unverified narration with authority NONE. Never claim that requested work was completed or promote task, project, route, organism, or effect state.",
+            "Do not emit Helm directives or machine-action sentinels; respond with narration only.",
         ]
         return "\n".join(lines)[:1400]

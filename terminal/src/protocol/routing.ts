@@ -2,7 +2,6 @@ import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets}
 import type {
   AgentRoutesPayload,
   CanonicalRoutingDecision,
-  ProviderRouteReceipt,
   RoutePolicyState,
   RoutingDecisionPayload,
   TabPreview,
@@ -111,33 +110,6 @@ export function routingDecisionPayloadFromEvent(event: JsonRecord): RoutingDecis
     strategies: asStringArray(payload.strategies),
     targets: asRecordList(payload.targets),
     fallback_targets: asRecordList(payload.fallback_targets),
-  };
-}
-
-export function providerRouteReceiptFromEvent(value: unknown): ProviderRouteReceipt | undefined {
-  const event = asRecord(value);
-  if (
-    stringField(event, "type") !== "route.receipt"
-    || stringField(event, "evidence_kind") !== "provider_completion"
-    || event.success !== true
-  ) {
-    return undefined;
-  }
-  const requestId = stringField(event, "request_id");
-  const sessionId = stringField(event, "session_id");
-  const provider = stringField(event, "provider_id");
-  const model = stringField(event, "model_id");
-  const routeId = stringField(event, "route_id");
-  if (!requestId || !sessionId || !provider || !model || !routeId) {
-    return undefined;
-  }
-  return {
-    requestId,
-    sessionId,
-    provider,
-    model,
-    routeId,
-    evidenceKind: "provider_completion",
   };
 }
 

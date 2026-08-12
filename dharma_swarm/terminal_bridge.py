@@ -66,6 +66,7 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
     TerminalBridgeSessionRuntimeMixin,
 )
@@ -78,6 +79,89 @@ from dharma_swarm.tui.engine.events import (
     ToolCallComplete,
 )
 
+_UNSUPPORTED_BRIDGE_COMMANDS = frozenset(
+    {
+        "agni",
+        "archive",
+        "darwin",
+        "evolve",
+        "gates",
+        "hum",
+        "logs",
+        "reset",
+        "stigmergy",
+        "swarm",
+        "truth",
+        "witness",
+    }
+)
+_UNCONSUMED_COMMAND_ACTIONS = frozenset(
+    {
+        "btw:open",
+        "cancel",
+        "chat:continue",
+        "chat:new",
+        "clear",
+        "copy",
+        "copylast",
+        "dashboard:open",
+        "paste",
+    }
+)
+_UNCONSUMED_COMMAND_ACTION_PREFIXES = ("mode:set:", "model:auto ", "model:set ")
+_UNCONSUMED_MODEL_ACTIONS = frozenset({"model:cooldown clear"})
+
+
+def _contains_non_horizontal_command_separator(value: str) -> bool:
+    """Reject line/control whitespace from the one-line command grammar."""
+
+    return any(character.isspace() and character not in {" ", "\t"} for character in value)
+
+
+def _command_name(raw_command: str) -> str:
+    """Return the command verb used for registry and support decisions."""
+
+    return raw_command.split(None, 1)[0].lower() if raw_command.strip() else ""
+
+
+def _validated_command_envelope(value: object) -> str | None:
+    """Accept only one exact, non-normalized command envelope.
+
+    Composer text with padding or line separators belongs to the raw chat
+    classifier.  A caller cannot turn it into a command by relying on bridge
+    trimming at the command.run boundary.
+    """
+
+    if not isinstance(value, str) or not value or value != value.strip():
+        return None
+    if _contains_non_horizontal_command_separator(value):
+        return None
+    normalized = value[1:] if value.startswith("/") else value
+    return normalized or None
+
+
+def _is_registered_command(raw_command: str) -> bool:
+    """Return whether the command verb exists in the installed registry."""
+
+    command = _command_name(raw_command)
+    return bool(
+        command
+        and system_commands_module is not None
+        and command in system_commands_module._ALL_COMMANDS
+    )
+
+
+def _is_unconsumed_command_action(action: object) -> bool:
+    """Return whether a legacy action signal has no Bun runtime consumer."""
+
+    action_text = str(action or "").strip()
+    return (
+        action_text in _UNCONSUMED_COMMAND_ACTIONS
+        or action_text in _UNCONSUMED_MODEL_ACTIONS
+        or action_text.startswith(_UNCONSUMED_COMMAND_ACTION_PREFIXES)
+    )
+
+
 def _json_default(value: object) -> object:
     if is_dataclass(value):
         return asdict(value)
@@ -85,7 +169,12 @@ def _json_default(value: object) -> object:
         return sorted(value)
     return str(value)
 
-class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin):
+
+class TerminalBridge(
+    TerminalBridgeSessionRuntimeMixin,
+    TerminalBridgeRouteTruthMixin,
+    TerminalBridgeChatMixin,
+):
     """Minimal stdio protocol server for a terminal frontend."""
 
     def __init__(self) -> None:
@@ -106,10 +195,29 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         self._state_dir = Path.home() / ".dharma" / "terminal"
         self._runtime_owner_id = f"terminal-bridge:{uuid.uuid4()}"
         self._runtime_owner_pid = os.getpid()
+        self._helm_route_evidence_by_seat: dict[str, model_status.RouteEvidence] = {}
+        self._helm_route_sources_by_seat: dict[str, Any] = {}
+        self._helm_on_call_projection = model_status.unknown_helm_on_call_projection(
+            now=datetime.now(timezone.utc),
+            current_runtime_epoch=self._runtime_owner_id,
+        )
         self._session_recovery_complete = False
         self._session_store = SessionStore()
         self._chat_history: list[dict[str, str]] = []
         self._ensure_adapters()
+
+    @staticmethod
+    def _validated_request_prompt(
+        request: dict[str, Any],
+    ) -> tuple[str | None, str | None, str | None]:
+        """Return a byte-preserved prompt or a typed validation failure."""
+
+        raw_prompt = request.get("prompt")
+        if not isinstance(raw_prompt, str) or not raw_prompt.strip():
+            return None, "missing_prompt", "prompt must contain non-whitespace text"
+        if "\x00" in raw_prompt:
+            return None, "invalid_prompt_nul", "prompt must not contain NUL bytes"
+        return raw_prompt, None, None
 
     def _load_repo_guidance(self, limit_chars: int = 2400) -> str:
         guidance_path = self._repo_root / "CLAUDE.md"
@@ -232,17 +340,26 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
                 OpenRouterAdapter,
             )
 
-            self._adapters = {
+            adapters = {
                 "claude": ClaudeAdapter(),
                 "codex": CodexAdapter(),
                 "openrouter": OpenRouterAdapter(),
             }
+            self._adapters = adapters
             self._completion_request_cls = CompletionRequest
         except Exception as exc:
             self._adapter_boot_error = f"{type(exc).__name__}: {exc}"
 
     def _available_provider_ids(self) -> set[str]:
         return set(self._adapters)
+
+    def _is_server_owned_chat_transport(self, provider_id: str, adapter: object) -> bool:
+        """Return the non-forgeable in-process provenance fact for a chat lane."""
+
+        return (
+            provider_id in {"claude", "openrouter"}
+            and self._adapters.get(provider_id) is adapter
+        )
 
     def _local_cli_attempt_authorized(self, provider_id: str) -> bool:
         """Whether an unverified local CLI lane may be attempted.
@@ -378,6 +495,9 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             return
         if request_type == "model.policy":
             await self._handle_model_policy(request_id, request)
+            return
+        if request_type == "helm.on_call.request":
+            self._emit_helm_on_call_projection(request_id)
             return
         if request_type == "operator.snapshot":
             await self._handle_operator_snapshot(request_id)
@@ -568,28 +688,66 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             payload=payload,
         )
 
-    async def _handle_command(self, request_id: str, request: dict[str, Any]) -> None:
-        raw_command = str(request.get("command", "") or "").strip()
-        if raw_command.startswith("/"):
-            raw_command = raw_command[1:]
+    async def _handle_command(
+        self,
+        request_id: str,
+        request: dict[str, Any],
+    ) -> dict[str, Any]:
+        supplied_command = request.get("command")
+        raw_command = _validated_command_envelope(supplied_command)
+        if raw_command is None:
+            result = {
+                "type": "command.result",
+                "request_id": request_id,
+                "command": supplied_command if isinstance(supplied_command, str) else "",
+                "target_pane": "control",
+                "output": "Command rejected: command.run requires one exact command line.",
+                "action": None,
+                "outcome": "failed",
+                "ok": False,
+                "supported": False,
+                "completed": False,
+            }
+            self._emit(result)
+            return result
         if self._commands is None:
-            self._emit({"type": "command.result", "request_id": request_id, "output": "System commands unavailable (terminal_commands not installed)", "ok": False})
-            return
-        output, action = self._commands.handle(raw_command)
-        if not str(output).strip() and isinstance(action, str) and action.startswith("model:"):
-            output = self._materialize_model_command(raw_command, action)
-        if not str(output).strip() and isinstance(action, str) and action.startswith("async:"):
-            output = self._materialize_async_command(raw_command, action)
-        self._emit(
-            {
+            result = {
+                "type": "command.result",
+                "request_id": request_id,
+                "command": raw_command,
+                "target_pane": self._command_target_pane(raw_command),
+                "output": "System commands unavailable (terminal_commands not installed)",
+                "action": None,
+                "outcome": "failed",
+                "ok": False,
+                "supported": False,
+                "completed": False,
+            }
+            self._emit(result)
+            return result
+        try:
+            output, action, outcome = self._evaluate_command(raw_command)
+            result = {
                 "type": "command.result",
                 "request_id": request_id,
                 "command": raw_command,
                 "target_pane": self._command_target_pane(raw_command),
                 "output": output,
                 "action": action,
+                "outcome": outcome,
+                "ok": outcome == "completed",
+                "supported": _is_registered_command(raw_command)
+                and outcome != "unsupported",
+                "completed": outcome == "completed",
             }
-        )
+        except Exception as exc:
+            result = {
+                "type": "command.result",
+                "request_id": request_id,
+                **self._failed_command_fields(raw_command, exc),
+            }
+        self._emit(result)
+        return result
 
     async def _handle_action_run(self, request_id: str, request: dict[str, Any]) -> None:
         action_type = str(request.get("action_type", "") or "").strip().lower()
@@ -701,14 +859,14 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         return "runtime_recorded"
 
     async def _handle_intent_resolve(self, request_id: str, request: dict[str, Any]) -> None:
-        prompt = str(request.get("prompt", "") or "").strip()
-        if not prompt:
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
             self._emit(
                 {
                     "type": "bridge.error",
                     "request_id": request_id,
-                    "code": "missing_prompt",
-                    "message": "intent.resolve requires a prompt",
+                    "code": error_code,
+                    "message": error_message,
                 }
             )
             return
@@ -793,14 +951,14 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         )
 
     async def _handle_session_bootstrap(self, request_id: str, request: dict[str, Any]) -> None:
-        prompt = str(request.get("prompt", "") or "").strip()
-        if not prompt:
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
             self._emit(
                 {
                     "type": "bridge.error",
                     "request_id": request_id,
-                    "code": "missing_prompt",
-                    "message": "session.bootstrap requires a prompt",
+                    "code": error_code,
+                    "message": error_message,
                 }
             )
             return
@@ -1466,19 +1624,19 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         return normalized
 
     def _build_session_bootstrap(self, request: dict[str, Any]) -> dict[str, Any]:
-        prompt = str(request.get("prompt", "") or "").strip()
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
+            raise ValueError(f"{error_code}: {error_message}")
         active_tab = str(request.get("active_tab", "") or "chat")
         selected_provider = str(
             request.get("provider", "") or model_routing.default_target().provider_id
         ).strip().lower()
         selected_model = str(request.get("model", "") or "").strip()
         intent = self._resolve_prompt_intent(prompt)
-        explicit_target = model_routing.resolve_model_target(prompt)
-        explicit_strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or model_routing.resolve_strategy(prompt)
-        if explicit_target is not None:
-            selected_provider = explicit_target.provider_id
-            selected_model = explicit_target.model_id
-        elif not selected_model:
+        explicit_strategy = model_routing.resolve_strategy(
+            str(request.get("strategy", "") or "")
+        )
+        if not selected_model:
             default_target = model_routing.default_target()
             selected_provider = selected_provider or default_target.provider_id
             selected_model = default_target.model_id
@@ -1533,13 +1691,14 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             provenance=["workspace.snapshot", "ontology.snapshot", "runtime.snapshot", "terminal.model_policy"],
         )
         route = f"{selected_provider}:{selected_model}"
-        working_memory = self._apply_turn_to_memory(
-            working_memory,
-            prompt=prompt,
-            intent=intent,
-            route=route,
-            active_tab=active_tab,
-        )
+        if intent.get("kind") != "chat":
+            working_memory = self._apply_turn_to_memory(
+                working_memory,
+                prompt=prompt,
+                intent=intent,
+                route=route,
+                active_tab=active_tab,
+            )
         rendered_working_memory = self._render_working_memory(working_memory)
         system_prompt = self._render_system_prompt(
             prompt=prompt,
@@ -1558,7 +1717,8 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             session_context_hint=session_context_hint,
             working_memory=rendered_working_memory,
         )
-        self._save_working_memory(working_memory)
+        if intent.get("kind") != "chat":
+            self._save_working_memory(working_memory)
         return {
             "prompt": prompt,
             "active_tab": active_tab,
@@ -2076,108 +2236,47 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         return "stable" if dirty == "0 staged, 0 unstaged, 0 untracked" else dirty
 
     def _resolve_prompt_intent(self, prompt: str) -> dict[str, Any]:
-        text = prompt.strip()
-        lowered = text.lower()
-        if not text:
-            return {"kind": "chat", "auto_execute": False, "confidence": "low", "reason": "empty prompt"}
-        if text.startswith("/"):
-            command = text[1:].split(None, 1)[0].lower()
-            return {
-                "kind": "command",
-                "auto_execute": True,
-                "confidence": "high",
-                "command": command,
-                "reason": "explicit slash command",
-            }
+        """Classify only exact registered command forms; preserve all else."""
 
-        if self._commands is not None:
-            bare_command, note = self._commands.resolve_bare_command(text)
-        else:
-            bare_command, note = None, None
-        if bare_command:
-            return {
-                "kind": "command",
-                "auto_execute": True,
-                "confidence": "high",
-                "command": bare_command,
-                "reason": note or "resolved bare command",
-            }
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("prompt must contain non-whitespace text")
+        if "\x00" in prompt:
+            raise ValueError("prompt must not contain NUL bytes")
 
-        explicit_target = model_routing.resolve_model_target(text)
-        explicit_strategy = model_routing.resolve_strategy(text)
-        if (explicit_target is not None or explicit_strategy is not None) and re.search(r"\b(switch|use|route|move|change|try|set)\b", lowered):
-            return {
-                "kind": "model_switch",
-                "auto_execute": True,
-                "confidence": "high",
-                "provider": explicit_target.provider_id if explicit_target is not None else "",
-                "model": explicit_target.model_id if explicit_target is not None else "",
-                "strategy": explicit_strategy or "",
-                "reason": "explicit model-routing request",
-            }
-
-        if re.search(r"\b(who are you|what are you|what can you do|where am i|what repo is this)\b", lowered):
-            return {
-                "kind": "identity",
-                "auto_execute": True,
-                "confidence": "high",
-                "reason": "identity-orientation request",
-            }
-
-        if re.search(r"\b(compact|summarize session|save session|checkpoint)\b", lowered):
-            return {
-                "kind": "memory",
-                "auto_execute": True,
-                "confidence": "medium",
-                "reason": "session memory request",
-            }
-
-        command_map = (
-            ("/runtime", ("runtime", "control plane", "runtime status", "active runs")),
-            ("/status", ("status", "health", "pulse", "doctor")),
-            ("/git", ("git", "repo status", "workspace status", "topology", "branch", "diff")),
-            ("/memory", ("memory", "archive", "notes", "remember")),
-            ("/foundations", ("ontology", "foundations", "telos", "dharma concepts", "concept graph")),
-            ("/swarm", ("swarm", "agents", "delegation", "subagent", "operator bridge")),
-            ("/context", ("context", "orientation", "brief me", "boot context")),
+        registered = (
+            frozenset(system_commands_module._ALL_COMMANDS)
+            if system_commands_module is not None
+            else frozenset()
         )
-        if re.match(r"^(show|run|open|check|view|inspect|brief)\b", lowered):
-            for command, phrases in command_map:
-                if any(phrase in lowered for phrase in phrases):
-                    return {
-                        "kind": "command",
-                        "auto_execute": True,
-                        "confidence": "medium",
-                        "command": command.lstrip("/"),
-                        "reason": "plain-language operator command",
-                    }
+        command_text = (
+            _validated_command_envelope(prompt) if prompt.startswith("/") else None
+        )
+        if command_text is not None:
+            command_name = command_text.split(None, 1)[0].lower() if command_text else ""
+            if command_name in registered:
+                return {
+                    "kind": "command",
+                    "auto_execute": True,
+                    "confidence": "high",
+                    "command": command_text,
+                    "reason": "explicit registered slash command",
+                }
 
-        if any(term in lowered for term in ("subagent", "delegate", "agent swarm", "frontier model", "open model")):
+        bare = prompt.strip()
+        if prompt == bare and len(bare.split()) == 1 and bare.lower() in registered:
             return {
-                "kind": "agent",
-                "auto_execute": False,
-                "confidence": "medium",
-                "reason": "agent-orchestration request",
-            }
-        if self._looks_like_tool_capable_work(lowered):
-            return {
-                "kind": "agent",
-                "auto_execute": False,
+                "kind": "command",
+                "auto_execute": True,
                 "confidence": "high",
-                "reason": "tool-capable repo work request",
+                "command": bare.lower(),
+                "reason": "exact registered bare command",
             }
-        if any(term in lowered for term in ("evolve", "improve yourself", "refine the shell", "cascade")):
-            return {
-                "kind": "evolution",
-                "auto_execute": False,
-                "confidence": "medium",
-                "reason": "self-improvement request",
-            }
+
         return {
             "kind": "chat",
             "auto_execute": False,
-            "confidence": "medium",
-            "reason": "default conversational turn",
+            "confidence": "high",
+            "reason": "byte-preserved conversational turn",
         }
 
     def _looks_like_tool_capable_work(self, lowered_prompt: str) -> bool:
@@ -2319,6 +2418,86 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
                 strategy="responsive",
             )
         )
+
+    def _classify_command_outcome(
+        self,
+        raw_command: str,
+        output: object,
+        action: object,
+    ) -> str:
+        """Translate the legacy command tuple into a fail-closed wire outcome."""
+
+        command = _command_name(raw_command)
+        registered = (
+            frozenset(system_commands_module._ALL_COMMANDS)
+            if system_commands_module is not None
+            else frozenset()
+        )
+        if not command:
+            return "failed"
+        if command not in registered or command in _UNSUPPORTED_BRIDGE_COMMANDS:
+            return "unsupported"
+
+        action_text = str(action or "").strip()
+        if _is_unconsumed_command_action(action_text):
+            return "unsupported"
+
+        rendered = str(output or "").strip().lower()
+        if "unknown command:" in rendered:
+            return "unsupported"
+        if "unsupported in helm slice 1" in rendered:
+            return "unsupported"
+        if any(
+            marker in rendered
+            for marker in (
+                "unknown model target:",
+                " is unroutable ",
+                "usage: /",
+            )
+        ):
+            return "failed"
+
+        if not rendered and action_text:
+            return "failed"
+        return "completed"
+
+    def _evaluate_command(self, raw_command: str) -> tuple[object, object, str]:
+        """Run one legacy command tuple and turn it into truthful wire state."""
+
+        if self._commands is None:
+            raise RuntimeError("system commands unavailable")
+        output, action = self._commands.handle(raw_command)
+        if not str(output).strip() and isinstance(action, str) and action.startswith("model:"):
+            output = self._materialize_model_command(raw_command, action)
+        if not str(output).strip() and isinstance(action, str) and action.startswith("async:"):
+            output = self._materialize_async_command(raw_command, action)
+        outcome = self._classify_command_outcome(raw_command, output, action)
+        if outcome == "unsupported" and _is_unconsumed_command_action(action):
+            output = (
+                f"Unsupported in Helm Slice 1: /{raw_command or '<empty>'} has no "
+                "bound Bun runtime consumer."
+            )
+        return output, action, outcome
+
+    def _failed_command_fields(
+        self,
+        raw_command: str,
+        exc: BaseException,
+    ) -> dict[str, Any]:
+        """Build a fail-closed command result without exposing exception contents."""
+
+        label = f"/{raw_command}" if raw_command else "an empty command"
+        return {
+            "command": raw_command,
+            "target_pane": self._command_target_pane(raw_command),
+            "output": f"Command {label} failed before completion ({type(exc).__name__}).",
+            "action": None,
+            "outcome": "failed",
+            "ok": False,
+            "supported": _is_registered_command(raw_command),
+            "completed": False,
+            "error_type": type(exc).__name__,
+        }
 
     def _run_action(self, action_type: str, request: dict[str, Any]) -> dict[str, Any]:
         if action_type == "surface.refresh":
@@ -2476,33 +2655,64 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             surface = self._build_evolution_surface()
             lines = [self._render_evolution_surface_text(surface), "", "## Requested action", raw_command or "/loops"]
             if normalized in {"evolve", "loops", "cascade"}:
-                lines.append("Evolution entry prepared. Use this as the operator launch surface while deeper execution wiring lands.")
+                lines.append(
+                    "Unsupported in Helm Slice 1: no evolution execution handler is available."
+                )
             else:
-                lines.append("Unknown evolution entry. Known lanes: /evolve, /loops, /cascade <domain>.")
+                lines.append("Unknown evolution entry. Known unsupported lanes: /evolve, /loops, /cascade <domain>.")
             self._remember_action(f"evolution.run -> {raw_command or '/loops'}")
             return {
-                "ok": normalized in {"evolve", "loops", "cascade"},
-                "summary": f"evolution action {raw_command or '/loops'}",
+                "ok": False,
+                "outcome": "unsupported",
+                "completed": False,
+                "summary": f"unsupported evolution action {raw_command or '/loops'}",
                 "target_pane": "evolution",
                 "output": "\n".join(lines),
             }
         if action_type == "command.run":
-            raw_command = str(request.get("command", "") or "").strip()
-            if raw_command.startswith("/"):
-                raw_command = raw_command[1:]
+            supplied_command = request.get("command")
+            raw_command = _validated_command_envelope(supplied_command)
+            if raw_command is None:
+                return {
+                    "ok": False,
+                    "outcome": "failed",
+                    "completed": False,
+                    "supported": False,
+                    "command": supplied_command if isinstance(supplied_command, str) else "",
+                    "summary": "rejected non-exact command envelope",
+                    "target_pane": "control",
+                    "output": "Command rejected: command.run requires one exact command line.",
+                }
             if self._commands is None:
-                return {"ok": False, "summary": "System commands unavailable", "output": "terminal_commands not installed"}
-            output, action = self._commands.handle(raw_command)
-            if not str(output).strip() and isinstance(action, str) and action.startswith("async:"):
-                output = self._materialize_async_command(raw_command, action)
-            self._remember_action(f"command.run -> /{raw_command}")
-            return {
-                "ok": True,
-                "summary": f"executed /{raw_command}",
-                "target_pane": self._command_target_pane(raw_command),
-                "output": output,
-                "action": action,
-            }
+                return {
+                    "ok": False,
+                    "outcome": "failed",
+                    "completed": False,
+                    "supported": False,
+                    "command": raw_command,
+                    "summary": "System commands unavailable",
+                    "output": "terminal_commands not installed",
+                }
+            try:
+                output, action, outcome = self._evaluate_command(raw_command)
+                self._remember_action(f"command.run -> /{raw_command}")
+                return {
+                    "ok": outcome == "completed",
+                    "outcome": outcome,
+                    "completed": outcome == "completed",
+                    "supported": _is_registered_command(raw_command)
+                    and outcome != "unsupported",
+                    "command": raw_command,
+                    "summary": f"{outcome} /{raw_command}",
+                    "target_pane": self._command_target_pane(raw_command),
+                    "output": output,
+                    "action": action,
+                }
+            except Exception as exc:
+                return {
+                    **self._failed_command_fields(raw_command, exc),
+                    "summary": f"failed /{raw_command or '<empty>'}",
+                }
         if action_type == "approval.resolve":
             action_id = str(request.get("action_id", "") or "").strip()
             resolution = str(request.get("resolution", "") or "").strip().lower()
@@ -2549,6 +2759,8 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
             }
         return {
             "ok": False,
+            "outcome": "failed",
+            "completed": False,
             "summary": f"unknown action: {action_type or 'missing'}",
             "target_pane": "control",
             "output": f"Unknown action type: {action_type or 'missing'}",
@@ -2585,7 +2797,8 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
         return self._build_runtime_snapshot(), "control"
 
     def _command_target_pane(self, raw_command: str) -> str:
-        command = raw_command.split(None, 1)[0].lower()
+        parts = raw_command.split(None, 1)
+        command = parts[0].lower() if parts else ""
         if command in {"chat", "clear", "reset", "cancel", "paste", "copy", "copylast", "thread"}:
             return "chat"
         if command == "runtime":
