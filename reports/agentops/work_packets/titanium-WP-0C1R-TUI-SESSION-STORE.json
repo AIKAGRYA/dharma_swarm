@@ -1,0 +1,116 @@
+{
+  "id": "titanium-WP-0C1R-TUI-SESSION-STORE",
+  "base_ref": "12212397be1dbe0a9b0cc29be4311f930140e751",
+  "branch": "agent/session-store-recovery-20260812-v2",
+  "worktree": ".",
+  "intent": "Retire the duplicate legacy TUI SessionStore implementation while preserving the supported dharma_swarm.tui.engine import paths as a cycle-free compatibility seam to the canonical dharma_swarm.operator_core.session_store.SessionStore. Keep provider-runner package exports behaviorally stable and make no canonical persistence or on-disk schema changes.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-0C1R-TUI-SESSION-STORE.json",
+    "dharma_swarm/tui/engine/session_store.py",
+    "dharma_swarm/tui/engine/__init__.py",
+    "tests/test_tui_session_store.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/**",
+    ".semgrep/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/operator_core/**",
+    "docker-compose.yml",
+    "Dockerfile",
+    "Dockerfile.swarm",
+    "docs/governance/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "tools/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "tui-session-store-contracts",
+      "command": "python3 -m pytest -q tests/test_tui_session_store.py tests/test_engine_provider_runner.py tests/tui",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "terminal-session-consumer-contracts",
+      "command": "python3 -m pytest -q tests/test_terminal_bridge.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "session-store-import-identity",
+      "command": "python3 -m pytest -q tests/test_tui_session_store.py -k tui_session_store_imports_resolve_to_one_canonical_class",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "ruff-scoped",
+      "command": "python3 -m ruff check dharma_swarm/tui/engine/session_store.py dharma_swarm/tui/engine/__init__.py tests/test_tui_session_store.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "legacy-module-has-no-session-store-class",
+      "command": "python3 -c \"import ast; from pathlib import Path; tree=ast.parse(Path('dharma_swarm/tui/engine/session_store.py').read_text(encoding='utf-8')); raise SystemExit(1 if any(isinstance(node, ast.ClassDef) and node.name == 'SessionStore' for node in ast.walk(tree)) else 0)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(tui): unify SessionStore persistence owner"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0C1R-TUI-SESSION-STORE",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "12212397be1dbe0a9b0cc29be4311f930140e751",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The canonical operator_core SessionStore imports dharma_swarm.tui.engine.events while dharma_swarm.tui.engine.__init__ eagerly imports provider_runner and the duplicate legacy session_store; replacing that module with a compatibility re-export therefore requires lazy package exports to avoid partial-initialization cycles.",
+      "The supported TUI module and package SessionStore import paths must remain identity-equal to the canonical operator_core class while persistence ownership moves exclusively to operator_core."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/operator_core/session_store.py",
+      "dharma_swarm/tui/engine/session_store.py",
+      "dharma_swarm/tui/engine/__init__.py",
+      "tests/test_tui_session_store.py"
+    ],
+    "honest_blockers": [],
+    "rollback": "Revert the packet-scoped implementation commit to restore the duplicate legacy TUI persistence implementation and eager package exports together.",
+    "packet_digest": "fe9da4f1c5a8b9cac2aed3e045ff776e1a0bdbdce200907fe75d9e0f2ea67097"
+  }
+}
