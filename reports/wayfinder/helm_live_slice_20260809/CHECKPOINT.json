@@ -1,0 +1,80 @@
+{
+  "schema": "dharma.helm.slice1.checkpoint.v1",
+  "observed_at": "2026-08-09T00:32:39Z",
+  "status": "IMPLEMENTATION_IN_PROGRESS",
+  "base_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "head_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "codex/helm-live-slice-20260809",
+  "worktree": "/Users/dhyana/ds_helm_live_slice_20260809",
+  "issue_lock": {
+    "marker": "HELM-SLICE1-POST-AUDIT-LOCK",
+    "url": "https://github.com/AmitabhainArunachala/dharma_swarm/issues/1277#issuecomment-5226785831"
+  },
+  "work_packet": {
+    "id": "helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2",
+    "contract_digest": "d12f485a6f25c247ed3d2e4b63dbcba5cec3e5996c1c16483c126a3feae17249",
+    "file_sha256": "1a436ad30cf792239cd2bf9b26f6bd4c811b604be8a9ec4d617112657a5544c9",
+    "preflight": "passed",
+    "preflight_report": "/Users/dhyana/.dharma/helm_live_slice_20260809/agentops_report/reports/agentops/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2/preflight-bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4/report.json"
+  },
+  "delegation": {
+    "kimi_k3": {
+      "status": "blocked_external_quota",
+      "provider_calls": 4,
+      "result": "HTTP 403 usage-limit on both managed CLI and canonical runtime-provider routes",
+      "receipt": "/Users/dhyana/.dharma/helm_live_slice_20260809/kimi_k3_recon_receipt.json",
+      "receipt_sha256": "4066ca66a2d702975c970119ae3a36836c5855ea0b8e62f8b59c05f8ffe6d89b",
+      "tools_granted": []
+    },
+    "managed_read_only_lanes": [
+      "wp1_truth: complete; sole positive RouteVerification constructor and fixed seven-seat projection verified",
+      "wp2_membrane: complete; bridge intent, raw-input, no-tools, narration authority, and command-outcome membrane verified",
+      "wp3_terminal: Phase A codec/state/outcomes complete; executing exclusive Phase B app/render/reconnect/false-green integration"
+    ]
+  },
+  "verified_baseline": {
+    "make_onboard": "passed",
+    "preflight_collection": "15043 tests collected",
+    "preflight_behavioral_sentinel": "67 passed",
+    "wp1_recon_baseline": "79 passed; ruff clean before implementation",
+    "wp1_truth_implementation": "52 focused passed; 119 combined passed with 1 warning; ruff and git diff --check clean",
+    "wp2_bridge_adapter": "55 passed (27 bridge + 28 adapter); ruff and git diff --check clean",
+    "root_python_integration": "83 combined truth/projection/bridge passed; 28 adapter regressions passed; ruff clean",
+    "terminal_phase_a": "14 codec/state/outcome tests passed; typecheck passed; forged ON_CALL evidence variants fail closed",
+    "terminal_dependencies": "bun install --frozen-lockfile passed; 298 lockfile-pinned packages installed in ignored node_modules",
+    "terminal_guardian_preflight": "passed: typecheck, 165 focused tests, and real tmux 80x24 compact smoke"
+  },
+  "known_live_truth": {
+    "verified_on_call": "not evaluated",
+    "registered_exact_seats_at_base": [
+      "kimi-k3",
+      "opus-4.8"
+    ],
+    "missing_or_mismatched_at_base": [
+      "fable-5",
+      "gpt-5.6",
+      "grok-4.5-4.6-lineage",
+      "fugu-ultra",
+      "opus-5.0"
+    ],
+    "live_journey_calls_used": 0,
+    "live_journey_call_cap": 14
+  },
+  "completed": [
+    "Read the attached delivery brief and canonical audit evidence",
+    "Verified origin/main remains at the expected base",
+    "Created one isolated worktree and branch",
+    "Posted the idempotent issue-law lock",
+    "Exhausted safe Kimi K3 delegation routes and recorded the quota blocker",
+    "Completed three decorrelated read-only reconnaissance lanes",
+    "Passed governed clean-tree agent-build preflight",
+    "Read the canonical terminal architecture and anti-spaghetti checklist",
+    "Passed Terminal Guardian preflight including compact-terminal smoke",
+    "Froze forged-positive deserialization rejection and Python-computed receipt age as cross-lane interfaces",
+    "Completed and focused-verified the WP2 server-side command/chat membrane with no provider calls",
+    "Completed and focused-verified WP1 Python-owned RouteVerification, strict positive-deserialization rejection, and fixed seven-seat projection",
+    "Integrated durable transcript-derived RouteEvidence into the bridge; caller truth is ignored, Claude verifier promotes 1/7, and OpenRouter request echo remains REJECTED",
+    "Completed terminal Phase A strict codec/state/outcome primitives and rejected forged positive evidence at the TypeScript wire boundary"
+  ],
+  "next": "Finish WP3 terminal handoff and rendering integration, then resolve the Claude raw-prompt and OpenRouter served-identity adapter seams under a follow-up governed packet before any live journey."
+}
