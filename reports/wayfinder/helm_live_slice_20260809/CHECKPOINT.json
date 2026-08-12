@@ -1,6 +1,6 @@
 {
   "schema": "dharma.helm.slice1.checkpoint.v2",
-  "observed_at": "2026-08-12T15:21:50Z",
+  "observed_at": "2026-08-12T16:47:27Z",
   "status": "CODE_COMPLETE_LIVE_PROOF_BLOCKED",
   "claim_boundary": {
     "code_complete": true,
@@ -18,7 +18,8 @@
     "recovery_branch": "agent/helm-live-slice-recovery-v4-20260812",
     "recovery_parent_sha": "43e93f6de62f787789ca4be28cfcd848e7aeec29",
     "origin_main_at_recovery": "12212397be1dbe0a9b0cc29be4311f930140e751",
-    "delivery_commit": "the commit containing this checkpoint"
+    "initial_delivery_sha": "2d1deb2a771752e7e9ed3d7592624e6632fe0b6a",
+    "ci_policy_followup": "the commit containing this checkpoint"
   },
   "work_packet": {
     "id": "helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2",
@@ -39,14 +40,16 @@
     "authority": "provider narration has NONE; TypeScript cannot construct or refresh ON_CALL"
   },
   "verification": {
-    "python_packet_regression": "186 passed",
+    "python_packet_regression": "190 passed after CI-policy follow-up",
     "python_ruff": "passed",
     "terminal_full": "683 passed, 0 failed, 4070 expectations; typecheck passed",
     "terminal_guardian": "passed: 168 focused tests, bridge syntax, typecheck, and real 80x24 tmux smoke",
     "adversarial_recheck": "passed after exact-command, multi-choice/native-finish, and rejected-cancellation edge fixes",
     "broad_fast_suite": "6826 passed before -x stopped on one pre-existing timing-sensitive harness test exceeding the suite's 10 second timeout",
     "isolated_harness_timeout_test": "1 passed in 47.98 seconds",
-    "diff_check": "passed"
+    "diff_check": "passed",
+    "hygiene_delta_ratchet": "passed locally after recording a sanitized provider-cancellation failure instead of swallowing it",
+    "module_budget": "passed locally after behavior-preserving admission-helper extraction; terminal_bridge.py is 2770 lines against the 2792-line ceiling"
   },
   "live_truth": {
     "pre_authoritative_projection_state": "UNKNOWN",

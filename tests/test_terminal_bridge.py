@@ -1086,8 +1086,10 @@ def test_local_success_session_end_never_emits_provider_route_receipt(
         "workspace.snapshot.result",
     ],
 )
+@pytest.mark.parametrize("cancel_fails", [False, True])
 def test_chat_rejects_and_never_buffers_tool_task_command_or_effect_events(
     forbidden_event: str,
+    cancel_fails: bool,
     tmp_path,
     capsys,
 ) -> None:
@@ -1107,6 +1109,8 @@ def test_chat_rejects_and_never_buffers_tool_task_command_or_effect_events(
 
         async def cancel(self):
             self.cancel_calls += 1
+            if cancel_fails:
+                raise RuntimeError("sensitive cancel detail")
 
         async def close(self):
             return None
@@ -1185,6 +1189,14 @@ def test_chat_rejects_and_never_buffers_tool_task_command_or_effect_events(
     ]
     assert forbidden_event not in transcript_types
     assert "permission_decision" not in transcript_types
+    membrane_error = next(
+        event
+        for event in emitted
+        if event.get("type") == "error"
+        and event.get("code") == "chat_membrane_violation"
+    )
+    assert ("provider cancellation failed" in membrane_error["message"]) is cancel_fails
+    assert "sensitive cancel detail" not in json.dumps(emitted)
     terminal = next(event for event in emitted if event["type"] == "session_end")
     assert terminal["success"] is False
     assert terminal["error_code"] == "chat_membrane_violation"

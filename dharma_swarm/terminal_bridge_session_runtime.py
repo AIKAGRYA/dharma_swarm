@@ -9,6 +9,12 @@ from typing import Any
 from dharma_swarm.operator_core.session_lifecycle import SessionLifecycleRecorder
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
+try:
+    from dharma_swarm.tui.commands import system_commands as system_commands_module
+    from dharma_swarm.tui.commands.system_commands import SystemCommandHandler
+except ImportError:
+    system_commands_module = None  # type: ignore[assignment]
+    SystemCommandHandler = None  # type: ignore[assignment,misc]
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
     SessionEnd,
@@ -19,10 +25,107 @@ _NARRATION_EVENT_TYPES = frozenset(
     {"text_delta", "text_complete", "thinking_delta", "thinking_complete"}
 )
 _COMMAND_OUTCOMES = frozenset({"completed", "accepted", "unsupported", "failed"})
+_UNSUPPORTED_BRIDGE_COMMANDS = frozenset(
+    {
+        "agni",
+        "archive",
+        "darwin",
+        "evolve",
+        "gates",
+        "hum",
+        "logs",
+        "reset",
+        "stigmergy",
+        "swarm",
+        "truth",
+        "witness",
+    }
+)
+_UNCONSUMED_COMMAND_ACTIONS = frozenset(
+    {
+        "btw:open",
+        "cancel",
+        "chat:continue",
+        "chat:new",
+        "clear",
+        "copy",
+        "copylast",
+        "dashboard:open",
+        "paste",
+    }
+)
+_UNCONSUMED_COMMAND_ACTION_PREFIXES = ("mode:set:", "model:auto ", "model:set ")
+_UNCONSUMED_MODEL_ACTIONS = frozenset({"model:cooldown clear"})
+
+
+def _contains_non_horizontal_command_separator(value: str) -> bool:
+    """Reject line/control whitespace from the one-line command grammar."""
+
+    return any(
+        character.isspace() and character not in {" ", "\t"}
+        for character in value
+    )
+
+
+def _command_name(raw_command: str) -> str:
+    """Return the command verb used for registry and support decisions."""
+
+    return raw_command.split(None, 1)[0].lower() if raw_command.strip() else ""
+
+
+def _validated_command_envelope(value: object) -> str | None:
+    """Accept only one exact, non-normalized command envelope.
+
+    Composer text with padding or line separators belongs to the raw chat
+    classifier. A caller cannot turn it into a command by relying on bridge
+    trimming at the command.run boundary.
+    """
+
+    if not isinstance(value, str) or not value or value != value.strip():
+        return None
+    if _contains_non_horizontal_command_separator(value):
+        return None
+    normalized = value[1:] if value.startswith("/") else value
+    return normalized or None
+
+
+def _is_registered_command(raw_command: str) -> bool:
+    """Return whether the command verb exists in the installed registry."""
+
+    command = _command_name(raw_command)
+    return bool(
+        command
+        and system_commands_module is not None
+        and command in system_commands_module._ALL_COMMANDS
+    )
+
+
+def _is_unconsumed_command_action(action: object) -> bool:
+    """Return whether a legacy action signal has no Bun runtime consumer."""
+
+    action_text = str(action or "").strip()
+    return (
+        action_text in _UNCONSUMED_COMMAND_ACTIONS
+        or action_text in _UNCONSUMED_MODEL_ACTIONS
+        or action_text.startswith(_UNCONSUMED_COMMAND_ACTION_PREFIXES)
+    )
 
 
 class TerminalBridgeSessionRuntimeMixin:
     """Own session admission, lifecycle recording, and provider streaming."""
+
+    @staticmethod
+    def _validated_request_prompt(
+        request: dict[str, Any],
+    ) -> tuple[str | None, str | None, str | None]:
+        """Return a byte-preserved prompt or a typed validation failure."""
+
+        raw_prompt = request.get("prompt")
+        if not isinstance(raw_prompt, str) or not raw_prompt.strip():
+            return None, "missing_prompt", "prompt must contain non-whitespace text"
+        if "\x00" in raw_prompt:
+            return None, "invalid_prompt_nul", "prompt must not contain NUL bytes"
+        return raw_prompt, None, None
 
     def _launch_session_start(
         self,

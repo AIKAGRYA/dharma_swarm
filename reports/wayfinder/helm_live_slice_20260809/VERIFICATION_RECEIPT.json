@@ -1,6 +1,6 @@
 {
   "schema": "dharma.helm.slice1.verification_receipt.v1",
-  "observed_at": "2026-08-12T15:21:50Z",
+  "observed_at": "2026-08-12T16:47:27Z",
   "status": "CODE_COMPLETE_LIVE_PROOF_BLOCKED",
   "subject": {
     "branch": "agent/helm-live-slice-recovery-v4-20260812",
@@ -28,7 +28,7 @@
     {
       "gate": "packet-python-regression",
       "result": "passed",
-      "detail": "186 passed in 3.00 seconds"
+      "detail": "190 passed in 3.00 seconds after the CI-policy follow-up"
     },
     {
       "gate": "packet-python-ruff-and-diff",
@@ -54,6 +54,11 @@
       "gate": "broad-test-fast",
       "result": "environment_timeout_after_6826_passes",
       "detail": "the -x run stopped when tests/test_harness_audit.py::TestScorers::test_context_efficiency exceeded the suite-wide 10 second timeout; isolated rerun passed in 47.98 seconds"
+    },
+    {
+      "gate": "pr-ci-policy-followup-local",
+      "result": "passed",
+      "detail": "the touched-file hygiene regression was removed with a sanitized, test-covered cancellation failure; terminal_bridge.py was reduced to 2770 lines against the immutable 2792-line Rule 10 ceiling without changing behavior"
     }
   ],
   "live_observation": {
@@ -95,7 +100,7 @@
     "contracts": "22 passed",
     "nats_substrate": "115 passed",
     "uplift_guards": "passed after deriving the Kimi OpenRouter identity from the canonical model-pool export",
-    "module_budget": "passed",
+    "module_budget": "passed after behavior-preserving command and prompt admission helper extraction; terminal_bridge.py is 2770 lines against the 2792-line ceiling",
     "docops_pr_mode": "passed with generated-count drift advisory, matching the pull-request workflow",
     "claim_evidence": "passed in the track's current advisory enforcement mode",
     "strict_local_wrapper": "stopped only on generated DocOps count drift; the repository PR workflow intentionally uses --counts-advisory and the post-merge reconciler owns those files"

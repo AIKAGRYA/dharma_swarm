@@ -208,7 +208,9 @@ class TerminalBridgeChatMixin:
                         try:
                             await adapter.cancel()
                         except Exception:
-                            pass
+                            failure_text = (
+                                f"{failure_text}; provider cancellation failed"
+                            )
                         break
                     if isinstance(event, SessionStart):
                         session_start_seen = True
