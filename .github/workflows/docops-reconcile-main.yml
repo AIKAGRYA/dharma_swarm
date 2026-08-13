@@ -198,7 +198,7 @@ jobs:
               if [ -z "$extra_paths" ]; then
                 remote_head="$(git rev-parse FETCH_HEAD)"
                 if required_contexts_present "$remote_head"; then
-                  echo "Canonical DocOps bytes already match open rolling PR #${existing}, and its exact head is actionable; no refresh needed."
+                  echo "Canonical DocOps bytes already match the open rolling PR #${existing}, and its exact head is actionable; no refresh needed."
                   exit 0
                 fi
                 echo "Canonical DocOps bytes match rolling PR #${existing}, but its exact head lacks required evidence; refreshing it."
