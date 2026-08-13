@@ -1145,6 +1145,28 @@ def test_chat_membrane_rejects_deep_zero_tool_usage_without_recursing() -> None:
     )
 
 
+def test_chat_membrane_accepts_exact_flat_claude_zero_counters() -> None:
+    assert not terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {
+            "model_usage": {
+                "claude_fable_5": {
+                    "web_search_requests": 0,
+                    "web_fetch_requests": False,
+                }
+            }
+        }
+    )
+
+
+@pytest.mark.parametrize("counter", [1, True, "0", [], {}, {"count": 0}])
+def test_chat_membrane_rejects_nonzero_or_untyped_flat_claude_counters(
+    counter: object,
+) -> None:
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"model_usage": {"claude_fable_5": {"web_search_requests": counter}}}
+    )
+
+
 @pytest.mark.parametrize("metadata_kind", ["usage", "rate_limit"])
 def test_external_preview_rejects_untyped_provider_metadata(
     tmp_path: Path,

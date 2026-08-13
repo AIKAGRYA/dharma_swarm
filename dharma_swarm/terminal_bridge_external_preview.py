@@ -190,7 +190,7 @@ _ZERO_TOOL_USAGE_COUNTER_KEYS = frozenset({
 })
 
 
-def external_preview_tool_usage_is_zero(value: object) -> bool:
+def _external_preview_tool_usage_is_zero(value: object) -> bool:
     """Admit only the provider's flat, bounded zero-counter accounting shape."""
 
     if value is None:
@@ -201,7 +201,9 @@ def external_preview_tool_usage_is_zero(value: object) -> bool:
         return value == 0
     if isinstance(value, list):
         return not value
-    if not isinstance(value, dict) or len(value) > len(_ZERO_TOOL_USAGE_COUNTER_KEYS):
+    if not isinstance(value, dict) or len(value) > len(
+        _ZERO_TOOL_USAGE_COUNTER_KEYS
+    ):
         return False
     for key, counter in value.items():
         if key not in _ZERO_TOOL_USAGE_COUNTER_KEYS:
@@ -212,6 +214,17 @@ def external_preview_tool_usage_is_zero(value: object) -> bool:
         elif not isinstance(counter, (int, float)) or counter != 0:
             return False
     return True
+
+
+def external_preview_tool_usage_disposition(
+    key: str,
+    value: object,
+) -> bool | None:
+    if key in {"server_tool_use", "server_tool_use_details"}:
+        return _external_preview_tool_usage_is_zero(value)
+    if key in _ZERO_TOOL_USAGE_COUNTER_KEYS:
+        return _external_preview_tool_usage_is_zero({key: value})
+    return None
 
 
 def explicit_external_preview_lane(
