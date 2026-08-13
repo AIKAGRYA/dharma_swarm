@@ -1,0 +1,101 @@
+{
+  "id": "helm-worldclass-terminal-WP-HELMZEROTOOL1",
+  "base_ref": "8aeeb2e2220a71854aba4dc57a771438846f5135",
+  "branch": "agent/helm-four-model-preview-20260813",
+  "worktree": ".",
+  "intent": "Distinguish explicit zero-valued server_tool_use accounting from positive tool evidence at the Helm preview membrane. Claude Fable's authenticated successful result reports a server_tool_use object whose counters are all zero; accept only recursively empty, false, or numeric-zero values, continue rejecting any positive, true, string, malformed, or unbounded structure, and sanitize the raw provider payload before persistence. Keep terminal_bridge_chat below its 1000-line hard ceiling by owning the preview-specific zero-usage predicate in the existing external-preview helper. Do not alter provider selection, response identity, terminal UI, or Helm OnCall truth.",
+  "allowed_files": [
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_external_preview.py",
+    "tests/test_terminal_bridge.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMZEROTOOL1.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/tui/engine/adapters/**",
+    "dharma_swarm/helm_route_truth_*.py",
+    "terminal/**",
+    "dashboard/**",
+    ".github/**",
+    "Makefile"
+  ],
+  "gates": [
+    {
+      "name": "zero-tool-usage-bridge-regression",
+      "command": "python3 -m pytest -q tests/test_terminal_bridge.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "zero-tool-usage-ruff",
+      "command": "python3 -m ruff check dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_external_preview.py tests/test_terminal_bridge.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "zero-tool-usage-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "zero-tool-usage-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "zero-tool-usage-semantics-removal-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/terminal_bridge_external_preview.py'); t=p.read_text(); old='return value == 0'; new='return False'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/test_terminal_bridge.py','-k','chat_membrane_accepts_only_explicit_zero_server_tool_usage']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(helm): distinguish zero tool usage"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELMZEROTOOL1",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8aeeb2e2220a71854aba4dc57a771438846f5135",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Claude CLI 2.1.220 returns successful no-tools usage metadata with server_tool_use counters set to zero, while the generic structural scanner treats the nonempty object itself as positive tool evidence.",
+      "The membrane must distinguish a typed zero observation from positive authority without accepting string zeroes, true booleans, positive counts, or malformed nested values."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/terminal_bridge_chat.py structural no-tools membrane",
+      "dharma_swarm/terminal_bridge_external_preview.py preview-only truth helpers",
+      "tests/test_terminal_bridge.py preview membrane adversarial coverage"
+    ],
+    "honest_blockers": [
+      "This packet admits zero-valued accounting only; it does not reinterpret any tool call, tool result, positive counter, or nonempty authority inventory as safe.",
+      "A bounded live TUI retry remains required because the exact zero-usage shape came from the authenticated Anthropic account response."
+    ],
+    "rollback": "Revert the packet-scoped bridge membrane commit. The sealed Claude adapter and other preview routes remain available, but the Anthropic turn will return to fail-closed rejection on zero-valued usage accounting.",
+    "packet_digest": "52edbd3d36c69212697d3050d05f47c7d7027deb8b2482e643b07371a1e49be6"
+  }
+}

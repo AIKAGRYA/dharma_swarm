@@ -1044,7 +1044,15 @@ def test_external_preview_discards_provider_raw_after_membrane_scan(
                 input_tokens=1,
                 output_tokens=1,
                 model_breakdown={"provider_private": secret},
-                raw={"provider_trace": secret},
+                raw={
+                    "provider_trace": secret,
+                    "usage": {
+                        "server_tool_use": {
+                            "web_search_requests": 0,
+                            "web_fetch_requests": 0,
+                        }
+                    },
+                },
             )
             yield SessionEnd(
                 provider_id="claude",
@@ -1086,6 +1094,33 @@ def test_external_preview_discards_provider_raw_after_membrane_scan(
     assert "provider_private" not in persisted_start.system_info
     assert persisted_usage.model_breakdown == {}
     assert secret not in repr(transcript)
+
+
+@pytest.mark.parametrize(
+    "safe_usage",
+    [
+        0,
+        False,
+        {},
+        {"web_search_requests": 0, "web_fetch_requests": False},
+        {"nested": {"tool_count": 0}},
+    ],
+)
+def test_chat_membrane_accepts_only_explicit_zero_server_tool_usage(
+    safe_usage: object,
+) -> None:
+    assert not terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use": safe_usage}}
+    )
+
+
+@pytest.mark.parametrize("active_usage", [1, True, "0", {"web_search_requests": 1}])
+def test_chat_membrane_rejects_positive_or_malformed_server_tool_usage(
+    active_usage: object,
+) -> None:
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use": active_usage}}
+    )
 
 
 @pytest.mark.parametrize("metadata_kind", ["usage", "rate_limit"])
