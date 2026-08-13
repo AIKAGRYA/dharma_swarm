@@ -16,6 +16,7 @@ from dharma_swarm.model_status import LIVE_CALL_MATRIX_DIR_ENV
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.terminal_bridge import TerminalBridge, system_commands_module
+from dharma_swarm import terminal_bridge_chat
 from dharma_swarm.terminal_bridge_text import render_model_policy_text
 from dharma_swarm.tui import model_routing
 from dharma_swarm.tui.engine.events import (
@@ -35,6 +36,13 @@ HELM_SLICE1_COMPOUND_FIXTURE = (
     / "terminal_bridge"
     / "helm_slice1_compound_adversarial.json"
 )
+
+LOCAL_PREVIEW_MODEL_ENV = "DHARMA_HELM_LOCAL_PREVIEW_MODEL"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_local_preview_model(monkeypatch) -> None:
+    monkeypatch.delenv(LOCAL_PREVIEW_MODEL_ENV, raising=False)
 
 
 class _FakeProfile:
@@ -161,6 +169,7 @@ def test_terminal_bridge_bootstraps_commands_and_adapters() -> None:
     try:
         assert bridge._commands is not None
         assert {"claude", "codex", "openrouter"} <= set(bridge._adapters)
+        assert "ollama" not in bridge._adapters
         assert bridge._completion_request_cls is not None
     finally:
         asyncio.run(bridge.close())
@@ -201,7 +210,11 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
 
         assert policy["schema_version"] == "dharma.model_status.v1"
         assert targets["opus-4.8"]["selectable"] is True
-        assert targets["gpt-5.5"]["selectable"] is True
+        assert targets["gpt-5.5"]["selectable"] is False
+        assert targets["gpt-5.5"]["chat_executable"] is False
+        assert targets["gpt-5.5"]["availability_reason"] == (
+            "terminal_chat_transport_unsupported"
+        )
         assert targets["kimi-k2.6"]["available"] is True
         assert targets["kimi-k2.6"]["selectable"] is False
         assert targets["kimi-k2.6"]["availability_reason"] == "terminal_adapter_missing"
@@ -240,23 +253,121 @@ def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
         openrouter_targets = [target for target in policy["targets"] if target["provider"] == "openrouter"]
 
         assert codex_targets
-        assert all(target["selectable"] is True for target in codex_targets)
+        assert all(target["selectable"] is False for target in codex_targets)
         assert all(target["available"] is False for target in codex_targets)
-        assert {target["route_state"] for target in codex_targets} == {"unverified"}
+        assert {target["route_state"] for target in codex_targets} == {"unavailable"}
         assert {target["availability_reason"] for target in codex_targets} == {
-            "local_cli_auth_unverified"
+            "terminal_chat_transport_unsupported"
         }
+        assert all(target["chat_executable"] is False for target in codex_targets)
+        assert "codex" not in terminal_bridge_chat._SLICE1_CHAT_PROVIDER_IDS
         assert all(target["selectable"] is False for target in claude_targets)
         assert all(target["selectable"] is False for target in openrouter_targets)
-        assert policy["selected_provider"] == "codex"
+        assert policy["selected_provider"] != "codex"
         assert policy["available_providers"] == []
-        assert {entry["id"] for entry in policy["attemptable_providers"]} == {"codex"}
+        assert policy["attemptable_providers"] == []
         # Codex advertises the shell tool and is therefore excluded from the
         # Slice-1 primary-chat membrane even when a local CLI attempt is
         # otherwise authorized.
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
     finally:
         asyncio.run(bridge.close())
+
+
+def test_local_preview_is_env_gated_selected_and_strictly_single_lane(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
+    bridge = TerminalBridge()
+
+    try:
+        assert "ollama" in bridge._adapters
+        policy = bridge._build_model_policy_summary(
+            selected_provider="ollama",
+            selected_model="mistral:latest",
+            strategy="responsive",
+        )
+        preview = next(
+            target for target in policy["targets"] if target.get("preview_only")
+        )
+
+        assert preview["route_id"] == "ollama:mistral:latest"
+        assert preview["label"].endswith("(local preview; not a Helm OnCall seat)")
+        assert preview["picker_visible"] is True
+        assert preview["selectable"] is True
+        assert preview["chat_executable"] is True
+        assert preview["exact_model_proven"] is False
+        assert preview["helm_on_call_eligible"] is False
+        assert preview["route_state"] == "unverified"
+        assert policy["selected_route"] == "ollama:mistral:latest"
+        assert policy["default_route"] == "ollama:mistral:latest"
+        assert policy["fallback_chain"] == []
+        assert bridge._chat_lanes("ollama", "mistral:latest") == [
+            (
+                "ollama",
+                "mistral:latest",
+                {},
+                "explicit local preview; no external fallback",
+            )
+        ]
+        assert bridge._chat_lanes("ollama", "wrong-model") == []
+        assert bridge._chat_lanes("codex", "gpt-5.5") == []
+
+        asyncio.run(bridge._handle_handshake("preview-handshake"))
+        event = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert event["default_provider"] == "ollama"
+        assert event["default_model"] == "mistral:latest"
+        assert event["policy"]["selected_route"] == "ollama:mistral:latest"
+    finally:
+        asyncio.run(bridge.close())
+
+
+def test_local_preview_identity_matches_ack_invocation_and_durable_metadata(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    bridge = TerminalBridge()
+    adapter = _RouteCaptureAdapter("ollama")
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"ollama": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "local-preview-route",
+                {
+                    "provider": "ollama",
+                    "model": "mistral:latest",
+                    "prompt": "verify local preview route ownership",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()
+    ]
+    ack = next(event for event in emitted if event["type"] == "session.ack")
+    receipt = next(event for event in emitted if event["type"] == "route.receipt")
+    meta = bridge._session_store.load_meta(ack["session_id"])
+
+    assert (ack["provider"], ack["model"]) == ("ollama", "mistral:latest")
+    assert adapter.completion_models == ["mistral:latest"]
+    assert (meta["provider_id"], meta["model_id"]) == (
+        "ollama",
+        "mistral:latest",
+    )
+    assert receipt["route_id"] == "ollama:mistral:latest"
 
 
 def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
