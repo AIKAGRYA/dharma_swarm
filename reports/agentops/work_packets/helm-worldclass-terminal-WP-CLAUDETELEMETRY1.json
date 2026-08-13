@@ -1,0 +1,103 @@
+{
+  "id": "helm-worldclass-terminal-WP-CLAUDETELEMETRY1",
+  "base_ref": "62462d9d9b3bcdd06c027afed0576b24485f2ad6",
+  "branch": "agent/helm-four-model-preview-20260813",
+  "worktree": ".",
+  "intent": "Restore the sealed Anthropic account preview against Claude CLI 2.1.220 by strictly validating and discarding its non-response rate_limit_event and system/thinking_tokens telemetry frames before canonical projection. Admit only exact bounded telemetry shapes and scalar types observed on the authenticated account lane; retain strict UTF-8, duplicate-key rejection, no-tools response scanning, explicit successful result, response-owned model identity, raw sanitization, and fail-closed handling for every unknown or malformed frame. Do not persist telemetry, broaden provider authority, or modify bridge, terminal, route policy, or Helm truth.",
+  "allowed_files": [
+    "dharma_swarm/tui/engine/adapters/claude.py",
+    "tests/tui/test_claude_adapter_v11.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-CLAUDETELEMETRY1.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_external_preview.py",
+    "dharma_swarm/tui/engine/adapters/claude_cli.py",
+    "dharma_swarm/tui/engine/adapters/codex_text.py",
+    "dharma_swarm/tui/engine/adapters/kimi_code.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth.py",
+    "terminal/**",
+    "dashboard/**",
+    ".github/**",
+    "Makefile"
+  ],
+  "gates": [
+    {
+      "name": "claude-telemetry-adapter-regression",
+      "command": "python3 -m pytest -q tests/tui/test_claude_adapter_v11.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "claude-telemetry-ruff",
+      "command": "python3 -m ruff check dharma_swarm/tui/engine/adapters/claude.py tests/tui/test_claude_adapter_v11.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "claude-telemetry-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "claude-telemetry-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "claude-rate-telemetry-admission-removal-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/tui/engine/adapters/claude.py'); t=p.read_text(); old='if event_type == \\\"rate_limit_event\\\":'; new='if event_type == \\\"disabled_rate_limit_event\\\":'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/tui/test_claude_adapter_v11.py','-k','strict_preview_accepts_and_discards_bounded_telemetry_frames']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(helm): admit bounded Claude telemetry"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-CLAUDETELEMETRY1",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "62462d9d9b3bcdd06c027afed0576b24485f2ad6",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Claude CLI 2.1.220 emits rate_limit_event and system/thinking_tokens frames during a successful claude-fable-5 no-tools turn, while the strict preview parser currently rejects every non-init system or rate event before the assistant response.",
+      "These telemetry frames are not completion evidence and should not be projected or persisted, but their exact shape must be validated so permissive ignoring cannot hide malformed or tool-bearing provider output."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/tui/engine/adapters/claude.py strict preview raw-event validation",
+      "tests/tui/test_claude_adapter_v11.py strict preview protocol adversarial coverage"
+    ],
+    "honest_blockers": [
+      "The fix is bound to the exact telemetry shapes observed from installed Claude CLI 2.1.220. Any future unknown field or type remains a sanitized fail-closed error until separately reviewed.",
+      "A bounded live TUI retry is required after mocked adapter gates because the failure was discovered only on the authenticated Anthropic account stream."
+    ],
+    "rollback": "Revert the packet-scoped adapter compatibility commit. Other preview routes and the response-owned route projection remain unchanged; the Anthropic lane will return to fail-closed unavailable behavior.",
+    "packet_digest": "2e78f257104d1a7e2e150f4590ac18da62c89993863f6ab79a0f641c9be736bd"
+  }
+}

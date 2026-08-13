@@ -12,6 +12,7 @@ from dharma_swarm.tui.engine.adapters.base import CompletionRequest, ProviderCon
 from dharma_swarm.tui.engine.adapters.claude import ClaudeAdapter
 from dharma_swarm.tui.engine.events import (
     ErrorEvent,
+    RateLimitEvent,
     SessionEnd,
     SessionStart,
     TextComplete,
@@ -31,7 +32,9 @@ def _j(obj: dict) -> str:
 
 
 def _adapter() -> ClaudeAdapter:
-    return ClaudeAdapter(config=ProviderConfig(provider_id="claude", default_model="claude-sonnet-4-5"))
+    return ClaudeAdapter(
+        config=ProviderConfig(provider_id="claude", default_model="claude-sonnet-4-5")
+    )
 
 
 def test_build_command_is_permission_checked_by_default() -> None:
@@ -227,7 +230,12 @@ def test_normalize_tool_and_stream_deltas() -> None:
             "uuid": "u2",
             "message": {
                 "content": [
-                    {"type": "tool_use", "id": "toolu_123", "name": "Read", "input": {"file_path": "x.py"}}
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_123",
+                        "name": "Read",
+                        "input": {"file_path": "x.py"},
+                    }
                 ]
             },
         }
@@ -237,7 +245,11 @@ def test_normalize_tool_and_stream_deltas() -> None:
             "type": "user",
             "session_id": "provider-session-2",
             "uuid": "u3",
-            "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_123", "content": "ok"}]},
+            "message": {
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "toolu_123", "content": "ok"}
+                ]
+            },
         }
     )
     text_delta = _j(
@@ -272,19 +284,37 @@ def test_normalize_tool_and_stream_deltas() -> None:
         }
     )
     progress = _j(
-        {"type": "tool_progress", "tool_use_id": "toolu_123", "tool_name": "Read", "elapsed_time_seconds": 1.2}
+        {
+            "type": "tool_progress",
+            "tool_use_id": "toolu_123",
+            "tool_name": "Read",
+            "elapsed_time_seconds": 1.2,
+        }
     )
 
     out = []
-    for line in [assistant_tool, tool_result, text_delta, think_delta, arg_delta, progress]:
+    for line in [
+        assistant_tool,
+        tool_result,
+        text_delta,
+        think_delta,
+        arg_delta,
+        progress,
+    ]:
         out.extend(a._normalize_line(line, session_id=sid, profile=p))
 
-    assert any(isinstance(e, ToolCallComplete) and e.tool_call_id == "toolu_123" for e in out)
+    assert any(
+        isinstance(e, ToolCallComplete) and e.tool_call_id == "toolu_123" for e in out
+    )
     assert any(isinstance(e, ToolResult) and e.tool_call_id == "toolu_123" for e in out)
     assert any(isinstance(e, TextDelta) and e.content == "He" for e in out)
     assert any(isinstance(e, ThinkingDelta) and "analyzing" in e.content for e in out)
-    assert any(isinstance(e, ToolArgumentsDelta) and e.tool_call_id == "toolu_123" for e in out)
-    assert any(isinstance(e, ToolProgress) and e.tool_call_id == "toolu_123" for e in out)
+    assert any(
+        isinstance(e, ToolArgumentsDelta) and e.tool_call_id == "toolu_123" for e in out
+    )
+    assert any(
+        isinstance(e, ToolProgress) and e.tool_call_id == "toolu_123" for e in out
+    )
 
 
 def test_normalize_thinking_and_error_flow() -> None:
@@ -317,7 +347,9 @@ def test_normalize_thinking_and_error_flow() -> None:
     for line in [thinking, err]:
         out.extend(a._normalize_line(line, session_id=sid, profile=p))
 
-    assert any(isinstance(e, ThinkingComplete) and e.content == "deep thought" for e in out)
+    assert any(
+        isinstance(e, ThinkingComplete) and e.content == "deep thought" for e in out
+    )
     assert any(isinstance(e, ErrorEvent) and e.code == "error_max_turns" for e in out)
     assert any(isinstance(e, SessionEnd) and (not e.success) for e in out)
 
@@ -380,7 +412,9 @@ class _BrokenProc(_FakeProc):
 
 
 @pytest.mark.asyncio
-async def test_stream_uses_subprocess_and_yields_events(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_stream_uses_subprocess_and_yields_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     a = _adapter()
     lines = [
         _j(
@@ -479,6 +513,7 @@ async def test_strict_preview_requires_explicit_result_and_marks_exact_init(
             _j(
                 {
                     "type": "assistant",
+                    "session_id": "provider-strict",
                     "message": {"content": [{"type": "text", "text": "PONG"}]},
                 }
             ),
@@ -510,6 +545,255 @@ async def test_strict_preview_requires_explicit_result_and_marks_exact_init(
     terminal = next(event for event in events if isinstance(event, SessionEnd))
     assert terminal.success is False
     assert terminal.error_code == "incomplete_provider_response"
+
+
+def _rate_telemetry(session_id: str = "provider-telemetry") -> dict:
+    return {
+        "type": "rate_limit_event",
+        "rate_limit_info": {
+            "status": "allowed",
+            "resetsAt": 1_787_000_000_000,
+            "rateLimitType": "five_hour",
+            "utilization": 0.25,
+            "isUsingOverage": False,
+            "surpassedThreshold": 0.0,
+        },
+        "session_id": session_id,
+        "uuid": "rate-frame-1",
+    }
+
+
+def _thinking_telemetry(session_id: str = "provider-telemetry") -> dict:
+    return {
+        "type": "system",
+        "subtype": "thinking_tokens",
+        "estimated_tokens": 128,
+        "estimated_tokens_delta": 32,
+        "session_id": session_id,
+        "uuid": "thinking-frame-1",
+    }
+
+
+def _strict_success_lines(*middle: dict) -> list[str]:
+    return [
+        _j(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": "provider-telemetry",
+                "model": "claude-sonnet-4-5",
+                "tools": [],
+            }
+        ),
+        *(_j(item) for item in middle),
+        _j(
+            {
+                "type": "assistant",
+                "session_id": "provider-telemetry",
+                "message": {"content": [{"type": "text", "text": "PONG"}]},
+            }
+        ),
+        _j(
+            {
+                "type": "result",
+                "session_id": "provider-telemetry",
+                "subtype": "success",
+                "is_error": False,
+                "total_cost_usd": 0.0,
+                "duration_ms": 1,
+                "num_turns": 1,
+            }
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_strict_preview_accepts_and_discards_bounded_telemetry_frames(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter()
+    lines = _strict_success_lines(
+        _rate_telemetry(),
+        _thinking_telemetry(),
+        _rate_telemetry(),
+    )
+    process = _FakeProc(lines, exit_code=0)
+    normalized_types: list[str] = []
+    original_normalize = adapter._normalize_line
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    def normalize(line: str, *, session_id: str, profile: object):
+        raw = json.loads(line)
+        normalized_types.append(f"{raw.get('type')}:{raw.get('subtype')}")
+        return original_normalize(line, session_id=session_id, profile=profile)
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    monkeypatch.setattr(adapter, "_normalize_line", normalize)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [event async for event in adapter.stream(request, session_id="telemetry")]
+
+    assert any(isinstance(event, SessionStart) for event in events)
+    assert any(
+        isinstance(event, TextComplete) and event.content == "PONG" for event in events
+    )
+    assert any(isinstance(event, SessionEnd) and event.success for event in events)
+    assert not any(isinstance(event, RateLimitEvent) for event in events)
+    assert "rate_limit_event:None" not in normalized_types
+    assert "system:thinking_tokens" not in normalized_types
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        {**_rate_telemetry(), "future_field": "must-not-be-dropped"},
+        {
+            **_rate_telemetry(),
+            "rate_limit_info": {
+                **_rate_telemetry()["rate_limit_info"],
+                "toolCalls": [{"name": "shell"}],
+            },
+        },
+        {
+            **_rate_telemetry(),
+            "rate_limit_info": {
+                **_rate_telemetry()["rate_limit_info"],
+                "resetsAt": True,
+            },
+        },
+        {
+            **_rate_telemetry(),
+            "rate_limit_info": {
+                **_rate_telemetry()["rate_limit_info"],
+                "utilization": float("nan"),
+            },
+        },
+        {
+            **_rate_telemetry(),
+            "rate_limit_info": {
+                **_rate_telemetry()["rate_limit_info"],
+                "utilization": 10**400,
+            },
+        },
+        {**_thinking_telemetry(), "tools": []},
+        {**_thinking_telemetry(), "estimated_tokens": True},
+        _thinking_telemetry(session_id="different-provider-session"),
+    ],
+)
+async def test_strict_preview_rejects_malformed_or_mismatched_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+    hostile: dict,
+) -> None:
+    adapter = _adapter()
+    process = _FakeProc(_strict_success_lines(hostile), exit_code=0)
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [
+        event async for event in adapter.stream(request, session_id="telemetry-bad")
+    ]
+
+    assert any(isinstance(event, ErrorEvent) for event in events)
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+    assert terminal.error_code == "malformed_provider_event"
+    assert "must-not-be-dropped" not in repr(events)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("frame_type", "bad_session_id"),
+    [
+        ("assistant", None),
+        ("assistant", "spliced-session"),
+        ("result", None),
+        ("result", "spliced-session"),
+    ],
+)
+async def test_strict_preview_binds_every_response_frame_to_init_session(
+    monkeypatch: pytest.MonkeyPatch,
+    frame_type: str,
+    bad_session_id: str | None,
+) -> None:
+    adapter = _adapter()
+    frames = [json.loads(line) for line in _strict_success_lines()]
+    target = next(frame for frame in frames if frame["type"] == frame_type)
+    if bad_session_id is None:
+        target.pop("session_id", None)
+    else:
+        target["session_id"] = bad_session_id
+    process = _FakeProc([_j(frame) for frame in frames], exit_code=0)
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [event async for event in adapter.stream(request, session_id="splice")]
+
+    assert any(isinstance(event, ErrorEvent) for event in events)
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+    assert terminal.error_code == "malformed_provider_event"
+
+
+@pytest.mark.asyncio
+async def test_strict_preview_bounds_dropped_telemetry_frames(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = ClaudeAdapter(
+        config=ProviderConfig(
+            provider_id="claude",
+            default_model="claude-sonnet-4-5",
+            extra={"strict_preview_max_frames": 2},
+        )
+    )
+    process = _FakeProc(
+        _strict_success_lines(_rate_telemetry(), _thinking_telemetry()),
+        exit_code=0,
+    )
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [
+        event async for event in adapter.stream(request, session_id="telemetry-cap")
+    ]
+
+    assert any(
+        isinstance(event, ErrorEvent) and event.code == "provider_output_limit"
+        for event in events
+    )
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+    assert terminal.error_code == "provider_output_limit"
 
 
 @pytest.mark.asyncio
@@ -578,7 +862,9 @@ async def test_cancel_without_active_process_is_safe() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_handles_stdout_read_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_stream_handles_stdout_read_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     a = _adapter()
 
     async def _fake_spawn(cmd: list[str], env: dict[str, str]) -> _BrokenProc:
@@ -588,7 +874,9 @@ async def test_stream_handles_stdout_read_exception(monkeypatch: pytest.MonkeyPa
 
     req = CompletionRequest(messages=[{"role": "user", "content": "hello"}])
     events = [e async for e in a.stream(req, session_id="dgc-test-broken-stdout")]
-    assert any(isinstance(e, ErrorEvent) and e.code == "stream_read_error" for e in events)
+    assert any(
+        isinstance(e, ErrorEvent) and e.code == "stream_read_error" for e in events
+    )
     terminals = [event for event in events if isinstance(event, SessionEnd)]
     assert len(terminals) == 1
     assert terminals[0].success is False
@@ -620,7 +908,9 @@ async def test_stream_drains_large_stderr_without_deadlock(
 
     async def collect() -> list[object]:
         request = CompletionRequest(messages=[{"role": "user", "content": "hello"}])
-        return [event async for event in adapter.stream(request, session_id="dgc-stderr")]
+        return [
+            event async for event in adapter.stream(request, session_id="dgc-stderr")
+        ]
 
     events = await asyncio.wait_for(collect(), timeout=5)
     assert any(isinstance(event, SessionEnd) and event.success for event in events)
