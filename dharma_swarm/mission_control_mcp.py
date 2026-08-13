@@ -9,85 +9,96 @@ prove a live executor.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import sqlite3
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, TypeAlias
 
 from dharma_swarm.daemon_config import dharma_state_dir
-from dharma_swarm.models import TaskPriority, TaskStatus
+from dharma_swarm.mission_control_mcp_mutations import (
+    AUTHORIZED_PRINCIPAL_METADATA_KEY as AUTHORIZED_PRINCIPAL_METADATA_KEY,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_CREATE as MISSION_CREATE,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_CREATE_TASK as MISSION_CREATE_TASK,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_FINISH_ATTEMPT as MISSION_FINISH_ATTEMPT,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_HEARTBEAT_LEASE as MISSION_HEARTBEAT_LEASE,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_START_ATTEMPT as MISSION_START_ATTEMPT,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MUTATION_TOOL_NAMES as MUTATION_TOOL_NAMES,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MutationAuthorizer as MutationAuthorizer,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MutationDecision as MutationDecision,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    MutationRequest as MutationRequest,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    PrincipalDecision as PrincipalDecision,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    TrustedPrincipal as TrustedPrincipal,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    TrustedPrincipalResolver as TrustedPrincipalResolver,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    _ArgumentError as _ArgumentError,
+)
+from dharma_swarm.mission_control_mcp_mutations import _MissionControlMCPMutations
+from dharma_swarm.mission_control_mcp_mutations import (
+    _authorized_metadata as _authorized_metadata,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    _normalize_identifier as _normalize_identifier,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    _normalize_lease_seconds as _normalize_lease_seconds,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    _normalize_priority as _normalize_priority,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
+    _normalize_terminal_status as _normalize_terminal_status,
+)
+from dharma_swarm.models import TaskPriority as TaskPriority
+from dharma_swarm.models import TaskStatus
 
 
 SCHEMA_VERSION = "dharma.mission_control.v1"
-AUTHORIZED_PRINCIPAL_METADATA_KEY = "mission_control_authorized_principal"
 
 MISSION_GET = "mission_get"
 MISSION_SNAPSHOT = "mission_snapshot"
 MISSION_LIST_TASKS = "mission_list_tasks"
-MISSION_CREATE = "mission_create"
-MISSION_CREATE_TASK = "mission_create_task"
-MISSION_START_ATTEMPT = "mission_start_attempt"
-MISSION_HEARTBEAT_LEASE = "mission_heartbeat_lease"
-MISSION_FINISH_ATTEMPT = "mission_finish_attempt"
 
 READ_TOOL_NAMES = (
     MISSION_GET,
     MISSION_SNAPSHOT,
     MISSION_LIST_TASKS,
 )
-MUTATION_TOOL_NAMES = (
-    MISSION_CREATE,
-    MISSION_CREATE_TASK,
-    MISSION_START_ATTEMPT,
-    MISSION_HEARTBEAT_LEASE,
-    MISSION_FINISH_ATTEMPT,
-)
 TOOL_NAMES = READ_TOOL_NAMES + MUTATION_TOOL_NAMES
 
 
-@dataclass(frozen=True, slots=True)
-class MutationRequest:
-    """Minimal, non-secret context presented to a mutation authorizer.
-
-    Descriptions, results, evidence, and metadata are intentionally excluded so
-    an authorization integration cannot accidentally treat request content as
-    a bearer credential or leak it through policy logs.
-    """
-
-    tool_name: str
-    principal: str
-    mission_id: str
-    task_id: str = ""
-    attempt_id: str = ""
-    attempt_key: str = ""
-    agent_id: str = ""
-    operator_id: str = ""
-    created_by: str = ""
-    assigned_by: str = ""
-    priority: str = ""
-    dependency_count: int = 0
-    dependency_ids: tuple[str, ...] = ()
-    has_idempotency_key: bool = False
-    lease_seconds: int | None = None
-    terminal_status: str = ""
-    failure_code_present: bool = False
-
-
-MutationDecision: TypeAlias = bool | Awaitable[bool]
-MutationAuthorizer: TypeAlias = Callable[[MutationRequest], MutationDecision]
-PrincipalDecision: TypeAlias = str | Awaitable[str]
-TrustedPrincipalResolver: TypeAlias = Callable[[], PrincipalDecision]
-TrustedPrincipal: TypeAlias = str | TrustedPrincipalResolver
 ReadStateGuard: TypeAlias = Callable[[str], bool]
 
-
-class _ArgumentError(ValueError):
-    """A safe, caller-correctable MCP argument error."""
+# Preserve the facade's historical import and pickle identity after extraction.
+MutationRequest.__module__ = __name__
 
 
 def _copy_immutable_sqlite(source: Path, destination: Path) -> None:
@@ -152,56 +163,7 @@ class _ImmutableSnapshotMissionControl:
         )
 
 
-def _normalize_lease_seconds(value: Any) -> int:
-    """Return an authorization-safe lease duration without bool coercion."""
-
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise _ArgumentError("lease_ttl_seconds must be a positive integer")
-    return value
-
-
-def _normalize_identifier(value: Any, label: str) -> str:
-    """Mirror Mission Control identifier normalization before authorization."""
-
-    normalized = str(value or "").strip()
-    if not normalized:
-        raise _ArgumentError(f"{label} is required")
-    if any(character.isspace() for character in normalized):
-        raise _ArgumentError(f"{label} must not contain whitespace")
-    return normalized
-
-
-def _authorized_metadata(
-    metadata: Mapping[str, Any] | None,
-    principal: str,
-) -> dict[str, Any]:
-    """Copy caller metadata and stamp the transport-authenticated identity.
-
-    The reserved field is written last so request content can never impersonate
-    the principal resolved by the trusted embedding transport.
-    """
-
-    return {
-        **dict(metadata or {}),
-        AUTHORIZED_PRINCIPAL_METADATA_KEY: principal,
-    }
-
-
-def _normalize_priority(value: Any) -> TaskPriority:
-    try:
-        return TaskPriority(value)
-    except (TypeError, ValueError) as exc:
-        raise _ArgumentError(f"invalid task priority: {value!r}") from exc
-
-
-def _normalize_terminal_status(value: Any) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized not in {"succeeded", "failed"}:
-        raise _ArgumentError("outcome must be 'succeeded' or 'failed'")
-    return normalized
-
-
-class MissionControlMCPService:
+class MissionControlMCPService(_MissionControlMCPMutations):
     """JSON-safe service layer used by the FastMCP tool functions."""
 
     def __init__(
@@ -255,183 +217,6 @@ class MissionControlMCPService:
         except Exception as exc:
             return self._failure(MISSION_LIST_TASKS, exc)
 
-    async def create_mission(
-        self,
-        mission_id: str,
-        title: str,
-        objective: str = "",
-        *,
-        operator_id: str = "system",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        tool_name = MISSION_CREATE
-        return await self._mutate(
-            tool_name,
-            lambda principal: MutationRequest(
-                tool_name=tool_name,
-                principal=principal,
-                mission_id=_normalize_identifier(mission_id, "mission_id"),
-                operator_id=principal,
-            ),
-            lambda request: self._control.create_mission(
-                request.mission_id,
-                title=title,
-                goal=objective,
-                operator_id=request.principal,
-                metadata=_authorized_metadata(metadata, request.principal),
-            ),
-        )
-
-    async def create_task(
-        self,
-        mission_id: str,
-        title: str,
-        description: str = "",
-        *,
-        priority: str = "normal",
-        created_by: str = "system",
-        depends_on: list[str] | None = None,
-        idempotency_key: str = "",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        tool_name = MISSION_CREATE_TASK
-
-        def request_factory(principal: str) -> MutationRequest:
-            parsed_priority = _normalize_priority(priority)
-            dependency_ids = tuple(
-                _normalize_identifier(item, "depends_on item")
-                for item in (depends_on or ())
-            )
-            return MutationRequest(
-                tool_name=tool_name,
-                principal=principal,
-                mission_id=_normalize_identifier(mission_id, "mission_id"),
-                created_by=principal,
-                priority=parsed_priority.value,
-                dependency_count=len(dependency_ids),
-                dependency_ids=dependency_ids,
-                has_idempotency_key=bool(str(idempotency_key or "").strip()),
-            )
-
-        async def operation(request: MutationRequest) -> Any:
-            return await self._control.create_task(
-                request.mission_id,
-                title=title,
-                description=description,
-                priority=TaskPriority(request.priority),
-                created_by=request.principal,
-                depends_on=(
-                    list(request.dependency_ids) if depends_on is not None else None
-                ),
-                idempotency_key=idempotency_key,
-                metadata=_authorized_metadata(metadata, request.principal),
-            )
-
-        return await self._mutate(tool_name, request_factory, operation)
-
-    async def start_attempt(
-        self,
-        mission_id: str,
-        task_id: str,
-        attempt_key: str,
-        agent_id: str,
-        *,
-        lease_ttl_seconds: int = 300,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        tool_name = MISSION_START_ATTEMPT
-        return await self._mutate(
-            tool_name,
-            lambda principal: MutationRequest(
-                tool_name=tool_name,
-                principal=principal,
-                mission_id=_normalize_identifier(mission_id, "mission_id"),
-                task_id=_normalize_identifier(task_id, "task_id"),
-                attempt_key=str(attempt_key or "").strip(),
-                agent_id=_normalize_identifier(agent_id, "agent_id"),
-                assigned_by=principal,
-                lease_seconds=_normalize_lease_seconds(lease_ttl_seconds),
-            ),
-            lambda request: self._control.start_attempt(
-                request.mission_id,
-                request.task_id,
-                request.agent_id,
-                attempt_key=request.attempt_key,
-                lease_seconds=request.lease_seconds,
-                assigned_by=request.principal,
-                metadata=_authorized_metadata(metadata, request.principal),
-            ),
-        )
-
-    async def heartbeat_lease(
-        self,
-        mission_id: str,
-        task_id: str,
-        attempt_id: str,
-        agent_id: str,
-        *,
-        lease_ttl_seconds: int = 300,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        tool_name = MISSION_HEARTBEAT_LEASE
-        return await self._mutate(
-            tool_name,
-            lambda principal: MutationRequest(
-                tool_name=tool_name,
-                principal=principal,
-                mission_id=_normalize_identifier(mission_id, "mission_id"),
-                task_id=_normalize_identifier(task_id, "task_id"),
-                attempt_id=_normalize_identifier(attempt_id, "attempt_id"),
-                agent_id=_normalize_identifier(agent_id, "agent_id"),
-                lease_seconds=_normalize_lease_seconds(lease_ttl_seconds),
-            ),
-            lambda request: self._control.heartbeat_lease(
-                request.mission_id,
-                request.task_id,
-                request.agent_id,
-                attempt_id=request.attempt_id,
-                lease_seconds=request.lease_seconds,
-                metadata=_authorized_metadata(metadata, request.principal),
-            ),
-        )
-
-    async def finish_attempt(
-        self,
-        mission_id: str,
-        task_id: str,
-        attempt_id: str,
-        agent_id: str,
-        outcome: str,
-        *,
-        result: str = "",
-        error: str = "",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        tool_name = MISSION_FINISH_ATTEMPT
-        return await self._mutate(
-            tool_name,
-            lambda principal: MutationRequest(
-                tool_name=tool_name,
-                principal=principal,
-                mission_id=_normalize_identifier(mission_id, "mission_id"),
-                task_id=_normalize_identifier(task_id, "task_id"),
-                attempt_id=_normalize_identifier(attempt_id, "attempt_id"),
-                agent_id=_normalize_identifier(agent_id, "agent_id"),
-                terminal_status=_normalize_terminal_status(outcome),
-                failure_code_present=bool(str(error or "").strip()),
-            ),
-            lambda request: self._control.finish_attempt(
-                request.mission_id,
-                request.task_id,
-                request.agent_id,
-                attempt_id=request.attempt_id,
-                status=request.terminal_status,
-                result=result,
-                failure_code=error,
-                metadata=_authorized_metadata(metadata, request.principal),
-            ),
-        )
-
     async def _read(
         self,
         tool_name: str,
@@ -449,63 +234,6 @@ class MissionControlMCPService:
         except Exception as exc:
             return self._failure(tool_name, exc)
 
-    async def _mutate(
-        self,
-        tool_name: str,
-        request_factory: Callable[[str], MutationRequest],
-        operation: Callable[[MutationRequest], Awaitable[Any]],
-    ) -> dict[str, Any]:
-        if self._mutation_authorizer is None:
-            return self._mutation_denied(tool_name)
-        principal = await self._resolve_trusted_principal()
-        if principal is None:
-            return self._mutation_denied(tool_name)
-        try:
-            request = request_factory(principal)
-        except Exception as exc:
-            return self._failure(tool_name, exc)
-        if not await self._is_authorized(request):
-            return self._mutation_denied(tool_name)
-        try:
-            return self._success(tool_name, await operation(request))
-        except Exception as exc:
-            return self._failure(tool_name, exc)
-
-    async def _is_authorized(self, request: MutationRequest) -> bool:
-        authorizer = self._mutation_authorizer
-        if authorizer is None:
-            return False
-        try:
-            decision = authorizer(request)
-            if inspect.isawaitable(decision):
-                decision = await decision
-        except Exception:
-            return False
-        return decision is True
-
-    async def _resolve_trusted_principal(self) -> str | None:
-        source = self._trusted_principal
-        if source is None:
-            return None
-        try:
-            principal = source() if callable(source) else source
-            if inspect.isawaitable(principal):
-                principal = await principal
-        except Exception:
-            return None
-        if not isinstance(principal, str):
-            return None
-        normalized = principal.strip()
-        if (
-            not normalized
-            or len(normalized) > 256
-            or any(
-                character.isspace() or ord(character) < 32 for character in normalized
-            )
-        ):
-            return None
-        return normalized
-
     def _read_state_is_available(self, tool_name: str) -> bool:
         guard = self._read_state_guard
         if guard is None:
@@ -514,14 +242,6 @@ class MissionControlMCPService:
             return guard(tool_name) is True
         except Exception:
             return False
-
-    @staticmethod
-    def _mutation_denied(tool_name: str) -> dict[str, Any]:
-        return MissionControlMCPService._error(
-            tool_name,
-            "mutation_not_authorized",
-            "mutation denied: this Mission Control MCP surface is read-only by default",
-        )
 
     @staticmethod
     def _state_not_initialized(tool_name: str) -> dict[str, Any]:
@@ -584,6 +304,20 @@ class MissionControlMCPService:
             "tool": tool_name,
             "error": {"code": code, "message": message},
         }
+
+
+# Preserve pre-split callable provenance for introspection and function pickles.
+for _public_method_name in (
+    "create_mission",
+    "create_task",
+    "start_attempt",
+    "heartbeat_lease",
+    "finish_attempt",
+):
+    _public_method = getattr(MissionControlMCPService, _public_method_name)
+    _public_method.__module__ = __name__
+    _public_method.__qualname__ = f"MissionControlMCPService.{_public_method.__name__}"
+del _public_method, _public_method_name
 
 
 def _json_projection(value: Any) -> Any:

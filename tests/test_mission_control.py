@@ -1887,3 +1887,36 @@ async def test_snapshot_and_resolution_fail_closed_on_scan_saturation(
     monkeypatch.setattr(mission_control._runtime, "list_task_claims", saturated_claims)
     with pytest.raises(MissionControlError, match="claim scan saturated"):
         await mission_control._claims_for_fencing(task.task_id)
+
+
+def test_public_callable_provenance_survives_module_split() -> None:
+    """Keep rollback-compatible function paths across private mixin extraction."""
+    import pickle
+
+    from dharma_swarm.mission_control_mcp import MissionControlMCPService
+    from dharma_swarm.mission_control_projection import reconciliation
+
+    expected = [
+        (MissionControl.start_attempt, "dharma_swarm.mission_control", "MissionControl.start_attempt"),
+        (MissionControl.heartbeat_lease, "dharma_swarm.mission_control", "MissionControl.heartbeat_lease"),
+        (MissionControl.finish_attempt, "dharma_swarm.mission_control", "MissionControl.finish_attempt"),
+        (reconciliation, "dharma_swarm.mission_control_projection", "reconciliation"),
+    ]
+    expected.extend(
+        (
+            getattr(MissionControlMCPService, method_name),
+            "dharma_swarm.mission_control_mcp",
+            f"MissionControlMCPService.{method_name}",
+        )
+        for method_name in (
+            "create_mission",
+            "create_task",
+            "start_attempt",
+            "heartbeat_lease",
+            "finish_attempt",
+        )
+    )
+    for function, module_name, qualified_name in expected:
+        assert function.__module__ == module_name
+        assert function.__qualname__ == qualified_name
+        assert pickle.loads(pickle.dumps(function, protocol=0)) is function
