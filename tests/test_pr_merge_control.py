@@ -3,6 +3,7 @@ import asyncio
 import json
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -23,10 +24,12 @@ def _bound_facts(
         "repo": _TEST_REPO,
         "pr": {
             "number": 12,
+            "baseRefName": "main",
             "baseRefOid": base_sha,
             "headRefOid": head_sha,
         },
         "risk": risk or {"level": "LOW"},
+        "authority_policy": prc.automerge_policy_identity(),
     }
 
 
@@ -35,11 +38,76 @@ def _bound_pr_view(
 ):
     view = {
         "number": 12,
+        "baseRefName": "main",
         "baseRefOid": base_sha,
         "headRefOid": head_sha,
     }
     view.update(payload or {})
     return view
+
+
+def _merge_authorization_evidence(
+    *,
+    repo=_TEST_REPO,
+    pr=12,
+    base_sha=_SNAPSHOT_BASE_SHA,
+    head_sha=_SNAPSHOT_HEAD_SHA,
+    title="",
+    authority_class="docs_low",
+    base_ref="main",
+):
+    evidence = {
+        "schema": "dharma.merge_authorization_evidence.v1",
+        "repo": repo,
+        "pr": pr,
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "base_ref": base_ref,
+        "policy_sha256": prc.automerge_policy_identity()["sha256"],
+        "intent_sha256": prc.canonical_json_sha256(title),
+        "authority_class": authority_class,
+        "ai_evidence_ids": [101],
+        "operator_warrant": (
+            {
+                "kind": "github_review",
+                "id": 202,
+                "actor": "amitabhainarunachala",
+                "head_sha": head_sha,
+            }
+            if authority_class == "code"
+            else None
+        ),
+        "provenance": "unsigned-github-snapshot",
+        "actuation_eligible": False,
+    }
+    evidence["digest"] = prc.canonical_json_sha256(evidence)
+    return evidence
+
+
+def _write_merge_authorization(
+    directory,
+    *,
+    base_sha=_SNAPSHOT_BASE_SHA,
+    head_sha=_SNAPSHOT_HEAD_SHA,
+    title="",
+    authority_class="docs_low",
+):
+    path = directory / "merge-authorization.json"
+    prc.write_json(
+        path,
+        {
+            "schema": "dharma.automerge_tier_policy_report.v2",
+            "passed": True,
+            "violations": [],
+            "authorization_evidence": _merge_authorization_evidence(
+                base_sha=base_sha,
+                head_sha=head_sha,
+                title=title,
+                authority_class=authority_class,
+            ),
+        },
+    )
+    return path
 
 
 def _write_review_evidence(out_dir):
@@ -725,6 +793,8 @@ def _write_current_fanout_packet(
     base_sha="base123",
     updated_at="2026-06-01T02:00:00Z",
     gate_decision="MERGE_CANDIDATE",
+    gate_blockers=None,
+    gate_generated_at="2026-06-01T02:00:00Z",
 ):
     packet_dir = state_root / f"pr-{pr_number}" / "20260601T020000Z"
     packet_dir.mkdir(parents=True)
@@ -744,7 +814,12 @@ def _write_current_fanout_packet(
         },
     )
     prc.write_json(
-        packet_dir / "MERGE_GATE.json", {"decision": gate_decision, "blockers": []}
+        packet_dir / "MERGE_GATE.json",
+        {
+            "decision": gate_decision,
+            "blockers": [] if gate_blockers is None else gate_blockers,
+            "generated_at": gate_generated_at,
+        },
     )
     return packet_dir
 
@@ -899,8 +974,274 @@ def test_select_fanout_plan_reprocesses_blocked_gate(tmp_path):
     assert plan["skipped_current"] == []
 
 
+def test_select_fanout_plan_defers_recent_unchanged_blocker_and_fills_batch(
+    tmp_path,
+):
+    _write_current_fanout_packet(
+        tmp_path,
+        gate_decision="BLOCKED",
+        gate_blockers=["required check is pending"],
+        gate_generated_at="2026-08-12T01:30:00Z",
+    )
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "recently blocked",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            },
+            {
+                "number": 13,
+                "title": "next work",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T03:00:00Z",
+                "reviewDecision": "NONE",
+            },
+            {
+                "number": 14,
+                "title": "more work",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "fed654",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T04:00:00Z",
+                "reviewDecision": "NONE",
+            },
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=2,
+        state_root=tmp_path,
+        skip_current=True,
+        now=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [13, 14]
+    assert plan["skipped_current"] == [
+        {
+            "number": 12,
+            "title": "recently blocked",
+            "status": "GITHUB_GREEN_NEEDS_PACKET",
+            "packet_dir": str(tmp_path / "pr-12" / "20260601T020000Z"),
+            "head_sha": "abc123",
+            "updatedAt": "2026-06-01T02:00:00Z",
+            "reason": (
+                "latest unchanged BLOCKED packet/gate is inside the bounded retry cooldown"
+            ),
+            "deferred": True,
+            "retry_in_s": 1800.0,
+        }
+    ]
+
+
+def test_select_fanout_plan_reprocesses_expired_unchanged_blocker(tmp_path):
+    _write_current_fanout_packet(
+        tmp_path,
+        gate_decision="BLOCKED",
+        gate_blockers=["required check is pending"],
+        gate_generated_at="2026-08-12T01:00:00Z",
+    )
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "retry due",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+        now=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+@pytest.mark.parametrize("retry_s", [-1.0, float("inf"), float("nan")])
+def test_blocked_retry_interval_cannot_be_unbounded(tmp_path, retry_s):
+    _write_current_fanout_packet(
+        tmp_path,
+        gate_decision="BLOCKED",
+        gate_blockers=["required check is pending"],
+        gate_generated_at="2026-08-12T01:30:00Z",
+    )
+    item = {
+        "number": 12,
+        "status": "GITHUB_GREEN_NEEDS_PACKET",
+        "head_sha": "abc123",
+        "base_sha": "base123",
+        "updatedAt": "2026-06-01T02:00:00Z",
+        "reviewDecision": "NONE",
+    }
+
+    current = prc.current_fanout_receipt_for_item(
+        tmp_path,
+        item,
+        blocked_retry_s=retry_s,
+        now=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+    )
+
+    assert current["current"] is False
+    assert current["reason"].endswith("retry cooldown expired")
+
+
+def test_select_fanout_plan_reprocesses_recent_blocker_when_tuple_drifts(tmp_path):
+    _write_current_fanout_packet(
+        tmp_path,
+        gate_decision="BLOCKED",
+        gate_blockers=["required check is pending"],
+        gate_generated_at="2026-08-12T01:30:00Z",
+    )
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new head bypasses cooldown",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+        now=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+@pytest.mark.parametrize(
+    "gate_payload",
+    [
+        {"decision": "BLOCKED", "blockers": ["pending"]},
+        {
+            "decision": "BLOCKED",
+            "blockers": ["pending"],
+            "generated_at": "not-a-timestamp",
+        },
+        {
+            "decision": "BLOCKED",
+            "blockers": ["pending"],
+            "generated_at": "2026-08-12T03:00:00Z",
+        },
+        {
+            "decision": "UNKNOWN",
+            "blockers": ["pending"],
+            "generated_at": "2026-08-12T01:30:00Z",
+        },
+        {
+            "decision": "BLOCKED",
+            "blockers": "pending",
+            "generated_at": "2026-08-12T01:30:00Z",
+        },
+        {
+            "decision": "BLOCKED",
+            "blockers": [],
+            "generated_at": "2026-08-12T01:30:00Z",
+        },
+    ],
+    ids=(
+        "missing-timestamp",
+        "malformed-timestamp",
+        "future-timestamp",
+        "malformed-decision",
+        "malformed-blockers-type",
+        "blocked-without-blockers",
+    ),
+)
+def test_select_fanout_plan_reprocesses_malformed_or_future_gate(
+    tmp_path, gate_payload
+):
+    packet_dir = _write_current_fanout_packet(tmp_path)
+    prc.write_json(packet_dir / "MERGE_GATE.json", gate_payload)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "fail closed",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+        now=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_rotates_order_with_deterministic_offset(tmp_path):
+    summary = {
+        "items": [
+            {
+                "number": number,
+                "title": f"item {number}",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "updatedAt": f"2026-06-01T0{number}:00:00Z",
+            }
+            for number in (1, 2, 3, 4)
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=2,
+        state_root=tmp_path,
+        skip_current=False,
+        fanout_offset=3,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [4, 1]
+    assert plan["skipped_current"] == []
+
+
 def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
-    _write_current_fanout_packet(tmp_path)
+    _write_current_fanout_packet(
+        tmp_path,
+        gate_decision="BLOCKED",
+        gate_blockers=["required check is pending"],
+        gate_generated_at="2026-08-12T01:30:00Z",
+    )
     summary = {
         "items": [
             {
@@ -925,6 +1266,15 @@ def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
 
     assert [item["number"] for item in plan["selected"]] == [12]
     assert plan["skipped_current"] == []
+
+
+def test_fanout_parser_exposes_bounded_retry_and_rotation_controls():
+    args = prc.build_parser().parse_args(
+        ["fanout", "--blocked-retry-s", "90", "--fanout-offset", "17"]
+    )
+
+    assert args.blocked_retry_s == 90.0
+    assert args.fanout_offset == 17
 
 
 def test_select_fanout_plan_zero_max_selects_none(tmp_path):
@@ -1634,24 +1984,14 @@ def test_mike_merge_authority_runs_gh_when_gate_clean():
     receipt = prc.run_mike_merge_authority(
         pr_number=12,
         gate={
-            "decision": "MERGE_CANDIDATE",
-            "pr": 12,
-            "repo": _TEST_REPO,
-            "blockers": [],
-            "packet_dir": "/tmp/packet",
+            **_candidate_merge_gate(),
             "required_reviewers": ["copilot", "claude", "devin"],
-            "head_sha": _SNAPSHOT_HEAD_SHA,
-            "base_sha": _SNAPSHOT_BASE_SHA,
-            "base_cas_enforced": True,
-            "risk_snapshot": {
-                "head_sha": _SNAPSHOT_HEAD_SHA,
-                "base_sha": _SNAPSHOT_BASE_SHA,
-            },
         },
         method="squash",
         auto=True,
         runner=runner,
         pr_fetcher=lambda _pr: _bound_pr_view(),
+        authority_proof_validator=lambda _proof: [],
     )
 
     assert seen == {
@@ -1684,25 +2024,12 @@ def test_mike_merge_authority_matches_head_commit_when_present():
 
     prc.run_mike_merge_authority(
         pr_number=12,
-        gate={
-            "decision": "MERGE_CANDIDATE",
-            "pr": 12,
-            "repo": _TEST_REPO,
-            "blockers": [],
-            "packet_dir": "/tmp/packet",
-            "required_reviewers": [],
-            "head_sha": _SNAPSHOT_HEAD_SHA,
-            "base_sha": _SNAPSHOT_BASE_SHA,
-            "base_cas_enforced": True,
-            "risk_snapshot": {
-                "head_sha": _SNAPSHOT_HEAD_SHA,
-                "base_sha": _SNAPSHOT_BASE_SHA,
-            },
-        },
+        gate=_candidate_merge_gate(),
         method="squash",
         auto=True,
         runner=runner,
         pr_fetcher=lambda _pr: _bound_pr_view(),
+        authority_proof_validator=lambda _proof: [],
     )
 
     assert seen["command"] == [
@@ -1731,6 +2058,11 @@ def _candidate_merge_gate():
         "head_sha": _SNAPSHOT_HEAD_SHA,
         "base_sha": _SNAPSHOT_BASE_SHA,
         "base_cas_enforced": True,
+        "merge_intent": "",
+        "authority_policy": prc.automerge_policy_identity(),
+        "base_ref": "main",
+        "merge_authorization_evidence": _merge_authorization_evidence(),
+        "merge_authority_proof": {"fixture": "trusted-proof"},
         "risk_snapshot": {
             "head_sha": _SNAPSHOT_HEAD_SHA,
             "base_sha": _SNAPSHOT_BASE_SHA,
@@ -1769,6 +2101,7 @@ def test_mike_merge_authority_rejects_incoherent_gate_binding(mutation, reason):
         auto=False,
         runner=runner,
         pr_fetcher=lambda _pr: _bound_pr_view(),
+        authority_proof_validator=lambda _proof: [],
     )
 
     assert called is False
@@ -1791,6 +2124,7 @@ def test_mike_merge_authority_rejects_live_base_or_head_drift():
         auto=False,
         runner=runner,
         pr_fetcher=lambda _pr: _bound_pr_view(base_sha="c" * 40),
+        authority_proof_validator=lambda _proof: [],
     )
 
     assert called is False
@@ -1815,11 +2149,95 @@ def test_mike_merge_authority_prohibits_execution_without_proven_base_cas():
         auto=False,
         runner=runner,
         pr_fetcher=lambda _pr: _bound_pr_view(),
+        authority_proof_validator=lambda _proof: [],
     )
 
     assert called is False
     assert receipt["status"] == "SKIPPED"
     assert receipt["reason"] == "strict base-CAS enforcement is not proven"
+
+
+def test_mike_merge_authority_rejects_missing_or_stale_typed_evidence():
+    gate = _candidate_merge_gate()
+    gate["merge_authorization_evidence"] = None
+    receipt = prc.run_mike_merge_authority(
+        pr_number=12,
+        gate=gate,
+        method="squash",
+        auto=False,
+        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
+        pr_fetcher=lambda _pr: _bound_pr_view(),
+    )
+    assert receipt["status"] == "SKIPPED"
+    assert receipt["reason"] == (
+        "merge authorization evidence is absent, stale, or mismatched"
+    )
+
+    gate = _candidate_merge_gate()
+    gate["merge_authorization_evidence"]["head_sha"] = "c" * 40
+    receipt = prc.run_mike_merge_authority(
+        pr_number=12,
+        gate=gate,
+        method="squash",
+        auto=False,
+        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
+        pr_fetcher=lambda _pr: _bound_pr_view(),
+    )
+    assert receipt["status"] == "SKIPPED"
+    assert any("head_sha binding" in blocker for blocker in receipt["blockers"])
+
+
+def test_safe_p0_authenticated_merge_authority_is_uninhabited():
+    receipt = prc.run_mike_merge_authority(
+        pr_number=12,
+        gate=_candidate_merge_gate(),
+        method="squash",
+        auto=False,
+        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
+        pr_fetcher=lambda _pr: _bound_pr_view(),
+    )
+
+    assert receipt["status"] == "SKIPPED"
+    assert receipt["reason"] == "authenticated merge authority is unavailable"
+    assert any("unavailable in safe P0" in row for row in receipt["blockers"])
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("repo", "other/repo"),
+        ("pr", 99),
+        ("head_sha", "c" * 40),
+        ("base_sha", "d" * 40),
+        ("base_ref", "release"),
+        ("policy_sha256", "e" * 64),
+        ("intent_sha256", "f" * 64),
+        ("authority_class", "operator_only"),
+    ],
+)
+def test_authorization_evidence_binding_mutations_fail_closed(field, value):
+    evidence = _merge_authorization_evidence()
+    evidence[field] = value
+    evidence["digest"] = prc.canonical_json_sha256(
+        {key: item for key, item in evidence.items() if key != "digest"}
+    )
+    report = {
+        "schema": "dharma.automerge_tier_policy_report.v2",
+        "passed": True,
+        "violations": [],
+        "authorization_evidence": evidence,
+    }
+    authorized, blockers = prc.validate_merge_authorization(
+        report,
+        repo=_TEST_REPO,
+        pr_number=12,
+        head_sha=_SNAPSHOT_HEAD_SHA,
+        base_sha=_SNAPSHOT_BASE_SHA,
+        base_ref="main",
+        title="",
+    )
+    assert authorized is None
+    assert blockers
 
 
 def test_render_github_comment_states_conditional_merge_boundary():
@@ -1838,8 +2256,9 @@ def test_render_github_comment_states_conditional_merge_boundary():
 
     text = prc.render_github_comment(packet, gate)
 
-    assert "- Authority: `conditional_merge_after_clean_gate`" in text
-    assert "only when explicitly asked to `merge when clean`" in text
+    assert "- Authority: `evidence_only_safe_p0`" in text
+    assert "cannot construct authenticated `MergeAuthorized`" in text
+    assert "merge actuation remains disabled" in text
     assert "`copilot_review.md` plus `copilot_review_receipt.json`" in text
     assert "`claude_review.md` plus `claude_review_receipt.json`" in text
     assert "`devin_review.md` plus `devin_review_receipt.json`" in text
@@ -2047,6 +2466,9 @@ def test_gate_blocks_nonpassing_onboarding_admission_parity(
 
 _WORKFLOWS_ROOT = Path(__file__).resolve().parents[1]
 _AUTOMERGE_WORKFLOW = _WORKFLOWS_ROOT / ".github" / "workflows" / "automerge.yml"
+_BACKLOG_WORKFLOW = (
+    _WORKFLOWS_ROOT / ".github" / "workflows" / "merge-master-mike-backlog.yml"
+)
 _PARITY_MANIFEST = (
     _WORKFLOWS_ROOT / "scripts" / "governance" / "ci_parity_manifest.json"
 )
@@ -2247,7 +2669,7 @@ def test_automerge_skip_matches_mike_fail_on_every_nonsuccess_state():
 
 def test_workflow_dispatch_event_and_schedule_paths_share_one_gate_job():
     """WP-0F2 entry-path proof (plan :1106): manual workflow_dispatch, PR
-    events, check_suite, review events, and the scheduled sweep all enter the
+    events, review events, and the scheduled sweep all enter the
     single `evaluate` job, whose manifest-load and candidate-evaluation steps
     carry no event-conditional `if`, so every path traverses the identical
     required-check evaluation."""
@@ -2255,11 +2677,29 @@ def test_workflow_dispatch_event_and_schedule_paths_share_one_gate_job():
     triggers = workflow.get("on") or workflow.get(True)
     assert {
         "pull_request",
-        "check_suite",
         "pull_request_review",
         "schedule",
         "workflow_dispatch",
     } <= set(triggers)
+    assert "check_suite" not in triggers
+    assert set(triggers["pull_request"]["types"]) == {
+        "opened",
+        "reopened",
+        "labeled",
+        "unlabeled",
+        "synchronize",
+        "ready_for_review",
+        "converted_to_draft",
+        "edited",
+    }
+    assert set(triggers["pull_request_review"]["types"]) == {
+        "submitted",
+        "edited",
+        "dismissed",
+    }
+    assert triggers["schedule"] == [
+        {"cron": "3,13,23,33,43,53 * * * *"}
+    ]
     jobs = workflow["jobs"]
     assert list(jobs) == ["evaluate"]
     steps = {step.get("name"): step for step in jobs["evaluate"]["steps"]}
@@ -2270,11 +2710,86 @@ def test_workflow_dispatch_event_and_schedule_paths_share_one_gate_job():
     event_pr = jobs["evaluate"]["env"]["EVENT_PR"]
     assert "github.event.pull_request.number" in event_pr
     assert "github.event.inputs.pr" in event_pr
+    assert "CHECK_SUITE_SHA" not in _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_bot_pr_waiver_cannot_bypass_required_check_evaluation():
-    """WP-0F2 waiver-scope proof (plan :1097): `bot-pr` waives reviewer
-    receipts only. Lexical confinement over automerge.yml's evaluate script:
+def test_merge_workflows_cancel_only_superseded_shards_and_rotate_backlog():
+    automerge = yaml.safe_load(_AUTOMERGE_WORKFLOW.read_text(encoding="utf-8"))
+    concurrency = automerge["concurrency"]
+    assert concurrency["cancel-in-progress"] is True
+    assert "github.event.pull_request.number" in concurrency["group"]
+    assert "github.event.inputs.pr" in concurrency["group"]
+    assert "github.event_name" in concurrency["group"]
+
+    backlog_text = _BACKLOG_WORKFLOW.read_text(encoding="utf-8")
+    backlog = yaml.safe_load(backlog_text)
+    backlog_concurrency = backlog["concurrency"]
+    assert backlog_concurrency["cancel-in-progress"] is True
+    assert "github.event_name" in backlog_concurrency["group"]
+    assert "github.event.inputs.mode" in backlog_concurrency["group"]
+    assert "FANOUT_OFFSET: ${{ github.run_number }}" in backlog_text
+    assert '--fanout-offset "${FANOUT_OFFSET}"' in backlog_text
+    assert 'MERGE_MODE: "off"' in backlog_text
+    assert "auto-when-clean" not in backlog_text
+    assert backlog["permissions"]["contents"] == "read"
+    assert backlog["permissions"]["pull-requests"] == "read"
+
+
+def test_automerge_dispatcher_cannot_construct_operator_authority():
+    text = _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert "OPERATOR_LABEL" not in text
+    assert "operator-approved" not in text
+    assert 'approved="$(echo "$view"' not in text
+    assert 'operator_ok="$(echo "$view"' not in text
+    assert "large or hot-path PRs always stay" in text
+    assert "this dispatcher cannot arm unattended merge" in text
+
+
+def test_automerge_dispatch_fingerprint_hashes_semantic_gate_inputs():
+    text = _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert "dharma.automerge_dispatch_input.v2" in text
+    assert "gh api graphql --paginate" in text
+    assert "reviewThreads(first:100,after:$endCursor)" in text
+    assert "unique_by(.id)" in text
+    assert "sha256sum" in text
+    for semantic in (
+        "controller_sha:",
+        "policy_sha256:",
+        "ci_manifest_sha256:",
+        "head_sha:",
+        "base_sha:",
+        "base_ref:",
+        "title:",
+        "body:",
+        "labels:",
+        "checks:",
+        "reviews:",
+        "comments:",
+        "threads:",
+        "merge_when_clean:",
+    ):
+        assert semantic in text
+    assert "[.statusCheckRollup[]?] | length" not in text
+    assert "[.latestReviews[]?] | length" not in text
+    assert 'repos/${GH_REPO}/issues/${pr}/comments?per_page=100' in text
+    assert '.login == "github-actions[bot]"' in text
+
+
+def test_automerge_honors_durable_operator_opt_out():
+    text = _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert 'OPT_OUT_LABEL: "mike-disabled"' in text
+    assert "explicit ${OPT_OUT_LABEL} operator opt-out" in text
+    workflow = yaml.safe_load(text)
+    steps = {step.get("name"): step for step in workflow["jobs"]["evaluate"]["steps"]}
+    enroll = steps["Auto-enroll bot and automated PRs"]
+    assert "schedule" in enroll["if"]
+    assert "workflow_dispatch" in enroll["if"]
+    assert "mike-disabled" in enroll["run"]
+
+
+def test_bot_pr_label_cannot_bypass_required_check_evaluation():
+    """`bot-pr` is routing metadata only. Lexical confinement over
+    automerge.yml's evaluate script:
     the required-check block (step-3 comment through the step-4 comment)
     gates on missing_required / required_not_green with an unconditional
     skip, and contains no bot-pr, mike-watch, or merge_when_clean branch
@@ -2345,10 +2860,13 @@ def test_gate_reports_advisory_red_and_pending_without_granting_authority(
             backup_reviewers="backup_opus",
             backup_reviewer_reason="",
             required_reviewers="none",
+            merge_authorization=str(_write_merge_authorization(tmp_path)),
         )
     )
 
     assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["base_cas_enforced"] is False
+    assert gate["merge_authority_proof"] is None
     assert gate["blockers"] == []
     assert any("reported failing checks" in warning for warning in gate["warnings"])
     assert any("reported pending checks" in warning for warning in gate["warnings"])
@@ -2397,6 +2915,7 @@ def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(
             allow_backup_reviewer=True,
             backup_reviewers="backup_opus",
             backup_reviewer_reason="Claude Code subscription credits unavailable",
+            merge_authorization=str(_write_merge_authorization(tmp_path)),
         )
     )
 
@@ -2448,6 +2967,7 @@ def test_gate_blocks_missing_dynamic_required_reviewer(tmp_path, monkeypatch):
             backup_reviewers="backup_opus",
             backup_reviewer_reason="",
             required_reviewers="copilot,claude,devin",
+            merge_authorization=str(_write_merge_authorization(tmp_path)),
         )
     )
 
@@ -2499,6 +3019,7 @@ def test_gate_accepts_dynamic_required_reviewer_quorum(tmp_path, monkeypatch):
             backup_reviewers="backup_opus",
             backup_reviewer_reason="",
             required_reviewers="copilot,claude,devin",
+            merge_authorization=str(_write_merge_authorization(tmp_path)),
         )
     )
 
@@ -2549,6 +3070,7 @@ def test_gate_accepts_explicit_no_reviewer_quorum_for_docs_low_policy(
             backup_reviewers="backup_opus",
             backup_reviewer_reason="",
             required_reviewers="none",
+            merge_authorization=str(_write_merge_authorization(tmp_path)),
         )
     )
 
@@ -2652,11 +3174,11 @@ def test_thread_with_unknown_participant_is_not_advisory_only():
     assert prc.thread_is_advisory_only(thread) is False
 
 
-def test_gate_waives_required_reviewers_for_bot_pr(tmp_path, monkeypatch):
+def test_bot_pr_label_never_waives_review_or_authority(tmp_path, monkeypatch):
     out_dir = tmp_path / "packet"
     out_dir.mkdir()
     prc.write_json(out_dir / "FACTS.json", _bound_facts())
-    # No reviewer receipts written on purpose: a bot-pr must merge without them.
+    # No review or authorization evidence: routing metadata cannot grant either.
     monkeypatch.setattr(
         prc,
         "fetch_pr_view",
@@ -2691,11 +3213,12 @@ def test_gate_waives_required_reviewers_for_bot_pr(tmp_path, monkeypatch):
         )
     )
 
-    assert gate["decision"] == "MERGE_CANDIDATE"
-    assert gate["required_reviewers"] == []
+    assert gate["decision"] == "BLOCKED"
+    assert gate["required_reviewers"] == ["codex", "claude"]
     assert gate["bot_pr"]["is_bot_pr"] is True
-    assert any("waived required reviewer receipts" in w for w in gate["warnings"])
-    assert not any("receipt" in b for b in gate["blockers"])
+    assert any("routing metadata only" in warning for warning in gate["warnings"])
+    assert any("review" in blocker.lower() for blocker in gate["blockers"])
+    assert any("merge authorization" in blocker for blocker in gate["blockers"])
 
 
 def test_gate_blocks_advisory_bot_threads_for_native_policy_parity(
@@ -2843,6 +3366,7 @@ def test_gate_does_not_waive_threads_for_non_bot_pr(tmp_path, monkeypatch):
 
 
 def _gate_args(out_dir, tmp_path):
+    authorization = _write_merge_authorization(tmp_path)
     return argparse.Namespace(
         pr=12,
         packet_dir=str(out_dir),
@@ -2853,6 +3377,7 @@ def _gate_args(out_dir, tmp_path):
         backup_reviewers="backup_opus",
         backup_reviewer_reason="",
         required_reviewers="codex,claude",
+        merge_authorization=str(authorization),
     )
 
 
@@ -2865,6 +3390,7 @@ def _bot_pr_view():
         "statusCheckRollup": _ci_required_success_rollup(),
         "labels": [{"name": "bot-pr"}],
         "body": _BOT_PR_BODY,
+        "baseRefName": "main",
         "baseRefOid": _SNAPSHOT_BASE_SHA,
         "headRefOid": _SNAPSHOT_HEAD_SHA,
     }
@@ -3040,8 +3566,8 @@ def test_resolved_thread_comment_truncation_does_not_wedge_resolution_truth(
 
 def test_gate_recomputes_risk_from_current_head_not_packet(tmp_path, monkeypatch):
     # Codex adversarial audit 2026-08-01 counterexample: a packet recorded at a
-    # LOW head must never authorize a HIGH current head. Even a bot-pr (which
-    # waives receipts) must block on live-recomputed risk.
+    # LOW head must never authorize a HIGH current head. Even a bot-pr with a
+    # caller-supplied legacy human-approved boolean stays operator-only.
     out_dir = tmp_path / "packet"
     out_dir.mkdir()
     prc.write_json(
@@ -3069,10 +3595,12 @@ def test_gate_recomputes_risk_from_current_head_not_packet(tmp_path, monkeypatch
         ],
     )
 
-    gate = prc.build_gate(_gate_args(out_dir, tmp_path))
+    args = _gate_args(out_dir, tmp_path)
+    args.human_approved = True
+    gate = prc.build_gate(args)
 
     assert gate["decision"] == "BLOCKED"
-    assert "HIGH risk requires --human-approved" in gate["blockers"]
+    assert "HIGH risk is operator-only; Mike cannot actuate" in gate["blockers"]
     assert gate["risk"]["level"] == "HIGH"
     assert gate["packet_risk"] == {"level": "LOW"}
     assert any("risk drift" in w for w in gate["warnings"])
@@ -3514,7 +4042,7 @@ def test_gate_ignores_mutable_pr_files_and_blocks_on_immutable_high_risk(
 
     assert mutable_calls == []
     assert gate["risk"]["level"] == "HIGH"
-    assert "HIGH risk requires --human-approved" in gate["blockers"]
+    assert "HIGH risk is operator-only; Mike cannot actuate" in gate["blockers"]
 
 
 def test_render_github_comment_prefers_current_gate_risk():
@@ -3534,7 +4062,7 @@ def test_render_github_comment_prefers_current_gate_risk():
     }
     gate = {
         "decision": "BLOCKED",
-        "blockers": ["HIGH risk requires --human-approved"],
+        "blockers": ["HIGH risk is operator-only; Mike cannot actuate"],
         "warnings": [],
         "required_reviewers": [],
         "risk": {
