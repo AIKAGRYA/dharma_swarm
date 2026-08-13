@@ -14,7 +14,7 @@ from dharma_swarm.terminal_bridge_external_preview import (
     explicit_external_preview_lane,
     external_preview_route,
     external_preview_targets,
-    external_preview_tool_usage_is_zero,
+    external_preview_tool_usage_disposition,
     sanitize_external_preview_event,
 )
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
@@ -163,8 +163,8 @@ def _chat_event_contains_tool_evidence(value: object) -> bool:
                     if item not in (None, "none"):
                         return True
                     continue
-                if key in {"server_tool_use", "server_tool_use_details"}:
-                    if not external_preview_tool_usage_is_zero(item):
+                if (tool_usage := external_preview_tool_usage_disposition(key, item)) is not None:
+                    if not tool_usage:
                         return True
                     continue
                 if key in _CHAT_TOOL_STRUCTURAL_KEYS and item not in (
