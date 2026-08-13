@@ -125,6 +125,7 @@
 /dharma_swarm/moonshot_provider.py      @AmitabhainArunachala  # blast=156
 /dharma_swarm/provider_policy.py        @AmitabhainArunachala  # blast=156
 /dharma_swarm/provider_transport.py     @AmitabhainArunachala  # blast=156
+/dharma_swarm/provider_deadpool.py      @AmitabhainArunachala  # blast=169
 /dharma_swarm/providers.py              @AmitabhainArunachala  # blast=156
 /dharma_swarm/router_v1.py              @AmitabhainArunachala  # blast=156
 /dharma_swarm/runtime_provider.py       @AmitabhainArunachala  # blast=156

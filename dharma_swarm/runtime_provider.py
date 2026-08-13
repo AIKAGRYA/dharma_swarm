@@ -54,6 +54,7 @@ from dharma_swarm.model_hierarchy import (
     default_model,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
+from dharma_swarm.provider_deadpool import ProviderDeadpool, is_connection_dead_error
 from dharma_swarm.ollama_config import (
     build_ollama_headers,
     ollama_transport_mode,
@@ -874,6 +875,9 @@ def preferred_runtime_provider_configs(
     return deduplicate_runtime_provider_configs(configs)
 
 
+_PREFERRED_CHAIN_DEADPOOL: ProviderDeadpool[ProviderType] = ProviderDeadpool()
+
+
 async def complete_via_preferred_runtime_providers(
     *,
     messages: list[dict[str, str]],
@@ -911,6 +915,14 @@ async def complete_via_preferred_runtime_providers(
             "keys only to widen the roster."
         )
 
+    active_configs = [
+        config for config in configs
+        if not _PREFERRED_CHAIN_DEADPOOL.active(config.provider)
+    ]
+    if active_configs:
+        # Fail open when every lane is deadpooled: re-probe rather than refuse.
+        configs = active_configs
+
     last_exc: Exception | None = None
     for config in configs:
         provider = create_runtime_provider(config)
@@ -929,9 +941,12 @@ async def complete_via_preferred_runtime_providers(
                 )
             else:
                 response = await provider.complete(request)
+            _PREFERRED_CHAIN_DEADPOOL.clear(config.provider)
             return response, config
         except Exception as exc:
             last_exc = exc
+            if is_connection_dead_error(exc):
+                _PREFERRED_CHAIN_DEADPOOL.record(config.provider, error=str(exc)[:120])
         finally:
             close = getattr(provider, "close", None)
             if callable(close):

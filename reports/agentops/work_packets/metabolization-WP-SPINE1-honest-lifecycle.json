@@ -1,0 +1,71 @@
+{
+ "id": "metabolization-WP-SPINE1-honest-lifecycle",
+ "base_ref": "62dffbaa0bdc1f86f072161b422c4a88dd6c4cda",
+ "branch": "claude/dharma-swarm-operator-debrief-xh8jin",
+ "worktree": ".",
+ "intent": "Metabolization spine fixes: accept late task completions instead of discarding finished work, dispatch operator-submitted tasks before system-spawned ones, raise the agentic task timeout default, deprioritize connection-dead providers in-session, route the evolve daemon through the shared provider chain instead of a hardwired OpenRouter handle, fix the two boot-seeding crashes, and surface knowledge-store fullness in onboard.",
+ "allowed_files": [
+  "dharma_swarm/config.py",
+  "dharma_swarm/gnani_lodestone.py",
+  "dharma_swarm/orchestrator.py",
+  "dharma_swarm/provider_deadpool.py",
+  "dharma_swarm/providers.py",
+  "dharma_swarm/runtime_provider.py",
+  "dharma_swarm/task_board.py",
+  "dharma_swarm/terminal_commands/evolution.py",
+  "docs/docops/AUTO_INVENTORY.md",
+  "docs/governance/SOVEREIGN_MANIFEST.md",
+  "docs/plans/METABOLIZATION_2026-08-09.md",
+  "docs/wiki/ORGANISM_IDENTITY.md",
+  "docs/wiki/ORGAN_MAP.md",
+  "docs/wiki/README.md",
+  "docs/wiki/SEEING.md",
+  "reports/agentops/work_packets/metabolization-WP-SPINE1-honest-lifecycle.json",
+  "reports/operator_debrief_2026-08-09/OPERATOR_DEBRIEF.md",
+  "reports/operator_debrief_2026-08-09/darshan_issue_one_outline.md",
+  "reports/operator_debrief_2026-08-09/day2/DAY2_ADDENDUM.md",
+  "reports/operator_debrief_2026-08-09/day2/blocked_items_verdicts.md",
+  "reports/operator_debrief_2026-08-09/day2/darshan_syndication_engine_spec.md",
+  "reports/operator_debrief_2026-08-09/day2/geb_anime_journey.md",
+  "reports/operator_debrief_2026-08-09/day2/rsi_lab_run.md",
+  "reports/operator_debrief_2026-08-09/day2/shrama_capital_architecture.md",
+  "reports/operator_debrief_2026-08-09/day2/sis_development_plan.md",
+  "reports/operator_debrief_2026-08-09/day2/youtube_pipeline.md",
+  "reports/operator_debrief_2026-08-09/japanese_app_research.md",
+  "reports/operator_debrief_2026-08-09/pr_backlog_review.md",
+  "reports/operator_debrief_2026-08-09/world_radar_digest.md",
+  "scripts/governance/agent_onboard.py",
+  "scripts/governance/darshan_pack.py",
+  "tests/test_config.py",
+  "tests/test_darshan_pack.py",
+  "tests/test_evolve_daemon_provider.py",
+  "tests/test_orchestrator.py",
+  "tests/test_orchestrator_user_priority.py",
+  "tests/test_provider_reachability.py",
+  "tests/test_task_board_late_completion.py"
+ ],
+ "forbidden_files": [],
+ "gates": [
+  {
+   "name": "metabolization-spine-tests",
+   "command": "python3 -m pytest tests/test_task_board_late_completion.py tests/test_orchestrator_user_priority.py tests/test_provider_reachability.py tests/test_evolve_daemon_provider.py tests/test_darshan_pack.py -q",
+   "expected_exit": 0,
+   "timeout_seconds": 900
+  },
+  {
+   "name": "metabolization-spine-ruff",
+   "command": "python3 -m ruff check dharma_swarm/task_board.py dharma_swarm/orchestrator.py dharma_swarm/config.py dharma_swarm/provider_deadpool.py dharma_swarm/providers.py dharma_swarm/runtime_provider.py dharma_swarm/terminal_commands/evolution.py dharma_swarm/gnani_lodestone.py scripts/governance/agent_onboard.py scripts/governance/darshan_pack.py",
+   "expected_exit": 0,
+   "timeout_seconds": 300
+  }
+ ],
+ "negative_controls": [],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "commit": {
+  "allowed": true,
+  "message": "Metabolization spine honesty: late-completion adoption, operator-first dispatch, provider deadpool, evolve-daemon brain, boot seeds, Darshan Pack"
+ }
+}

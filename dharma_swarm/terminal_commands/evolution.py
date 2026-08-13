@@ -3,12 +3,85 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 
 from dharma_swarm.terminal_commands._helpers import (
     _get_swarm,
     _run,
 )
+
+
+def _provider_candidates_for_model(model: str) -> "list[Any]":
+    """Order the provider types that can serve *model*, best lane first.
+
+    Mirrors the model-id prefix routing in
+    dharma_swarm/forge_v1/providers.py:_provider_for_model, projected onto
+    the router's registered lanes (no provider construction here).
+    """
+    from dharma_swarm.models import ProviderType
+
+    mid = (model or "").strip().lower()
+    if mid in {"claude-code", "claude_code"}:
+        return [ProviderType.CLAUDE_CODE]
+
+    candidates: list[ProviderType] = []
+    try:
+        from dharma_swarm.model_pool import entry_for_model_id
+
+        entry = entry_for_model_id(model)
+    except Exception:
+        entry = None
+    if entry is not None:
+        candidates.extend(route.provider for route in entry.routes)
+
+    if mid.startswith(("claude", "opus", "sonnet")):
+        candidates.extend((ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE))
+    elif mid.startswith(("gpt", "o1", "o3")):
+        candidates.append(ProviderType.OPENAI)
+    elif mid.startswith("gemini"):
+        candidates.append(ProviderType.GOOGLE_AI)
+    elif mid.endswith(":cloud"):
+        candidates.append(ProviderType.OLLAMA)
+    if "/" in mid or not candidates:
+        candidates.append(ProviderType.OPENROUTER)
+    return list(dict.fromkeys(candidates))
+
+
+def _resolve_evolution_provider(
+    router: Any, *, model: str, single_model: bool,
+) -> "tuple[Any, Any]":
+    """Resolve the think-provider for evolve auto/daemon via the router.
+
+    single_model: the provider must serve the requested model (e.g. the
+    ClaudeCodeProvider lane for "claude-code") — never an unconditional
+    OpenRouter. Multi-model: the roster routes per file, so any available
+    registered lane is an honest fallback provider.
+
+    Raises RuntimeError naming the configured providers if nothing matches.
+    """
+    registered: dict[Any, Any] = dict(getattr(router, "_providers", {}) or {})
+
+    def _available(provider: Any) -> bool:
+        return provider is not None and bool(getattr(provider, "available", True))
+
+    if single_model and (model or "").strip():
+        candidates = _provider_candidates_for_model(model)
+    else:
+        candidates = list(registered)
+
+    for provider_type in candidates:
+        provider = registered.get(provider_type)
+        if _available(provider):
+            return (provider_type, provider)
+
+    configured = ", ".join(
+        p.value for p in registered if _available(registered.get(p))
+    ) or "none"
+    wanted = f" for model {model!r}" if single_model and (model or "").strip() else ""
+    raise RuntimeError(
+        f"No available provider{wanted}. Configured providers: [{configured}]"
+    )
 
 def cmd_evolve_propose(component: str, description: str, change_type: str, diff: str) -> None:
     """Propose an evolution and run it through the pipeline."""
@@ -109,8 +182,6 @@ def cmd_evolve_auto(
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
     async def _auto():
-        from dharma_swarm.models import ProviderType
-
         swarm = await _get_swarm()
         if swarm._engine is None:
             print("Engine not initialized")
@@ -131,8 +202,17 @@ def cmd_evolve_auto(
                 src / "context.py",
             ]
 
-        # Fallback provider (OpenRouter)
-        provider = swarm._router.get_provider(ProviderType.OPENROUTER)
+        # Resolve the think-provider honestly: single-model must get the lane
+        # serving the requested model; multi-model gets any available fallback
+        # lane (the router does the real per-file routing).
+        try:
+            provider_type, provider = _resolve_evolution_provider(
+                swarm._router, model=model, single_model=single_model,
+            )
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}")
+            await swarm.shutdown()
+            return
 
         # Token budget
         if token_budget > 0:
@@ -147,7 +227,7 @@ def cmd_evolve_auto(
             print(roster_summary())
             print(f"\nEvolving {len(source_files)} files{' [SHADOW]' if shadow else ''}...")
         else:
-            print(f"Auto-evolving {len(source_files)} files with {model}{' [SHADOW]' if shadow else ''}...")
+            print(f"Auto-evolving {len(source_files)} files with {model} via {provider_type.value}{' [SHADOW]' if shadow else ''}...")
         for sf in source_files:
             print(f"  {sf.name}")
         print()
@@ -161,7 +241,7 @@ def cmd_evolve_auto(
             shadow=shadow,
         )
 
-        print(f"\n=== Auto-Evolution Results ===")
+        print("\n=== Auto-Evolution Results ===")
         print(f"Proposals generated: {result.proposals_submitted}")
         print(f"Passed gates:        {result.proposals_gated}")
         print(f"Tested:              {result.proposals_tested}")
@@ -193,9 +273,14 @@ def cmd_evolve_daemon(
             await swarm.shutdown()
             return
 
-        from dharma_swarm.models import ProviderType
-
-        provider = swarm._router.get_provider(ProviderType.OPENROUTER)
+        try:
+            provider_type, provider = _resolve_evolution_provider(
+                swarm._router, model=model, single_model=single_model,
+            )
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}")
+            await swarm.shutdown()
+            return
         use_router = not single_model
 
         # Token budget
@@ -205,16 +290,16 @@ def cmd_evolve_daemon(
         print(f"Darwin daemon starting{' [SHADOW]' if shadow else ''}")
         if use_router:
             from dharma_swarm.evolution_roster import roster_summary
-            print(f"  Mode:      MULTI-MODEL (roster)")
+            print("  Mode:      MULTI-MODEL (roster)")
             print(roster_summary())
         else:
-            print(f"  Model:     {model}")
+            print(f"  Model:     {model} via {provider_type.value}")
         print(f"  Interval:  {interval:.0f}s ({interval/60:.0f}min)")
         print(f"  Threshold: {threshold}")
         print(f"  Cycles:    {'infinite' if cycles is None else cycles}")
         if token_budget > 0:
             print(f"  Token cap: {token_budget:,}")
-        print(f"  Ctrl+C to stop\n")
+        print("  Ctrl+C to stop\n")
 
         try:
             await swarm._engine.daemon_loop(

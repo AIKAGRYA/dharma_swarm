@@ -2691,7 +2691,7 @@ class Orchestrator:
                 status=TaskStatus.COMPLETED,
                 result=result,
                 metadata=success_meta,
-            )
+                claim_id=str(td.metadata.get("claim_id") or "") or None)
             if self._pool is not None:
                 await self._pool.release(td.agent_id)
             self._active_dispatches.pop(td.task_id, None)

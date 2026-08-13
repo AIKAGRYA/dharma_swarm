@@ -221,15 +221,62 @@ def _load_cli_module() -> Any:
     return cli
 
 
+def _print_knowledge_stores() -> None:
+    """Render the KNOWLEDGE STORES section after the compact status view.
+
+    A fresh clone must announce the emptiness of its knowledge stores
+    instead of hiding it (docs/wiki/SEEING.md). Counting reuses the
+    stdlib-only Darshan Pack helpers (scripts/governance/darshan_pack.py),
+    loaded by path like the broken-register parser above; sqlite files are
+    opened read-only so an absent store is reported, never created. Guarded
+    end to end: this section may go missing, but must never change the
+    onboard verdict or exit code.
+    """
+    try:
+        path = REPO_ROOT / "scripts/governance/darshan_pack.py"
+        spec = importlib.util.spec_from_file_location(
+            "_dharma_darshan_pack_onboard", path
+        )
+        if spec is None or spec.loader is None:
+            return
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        home = module.dharma_home()
+        wiki_pages = len(list((REPO_ROOT / "docs/wiki").glob("*.md")))
+        memory_atoms = module.sqlite_count(
+            home / "agent_memory/memories.db", "memories"
+        )
+        ontology_objects = module.sqlite_count(home / "ontology.db", "objects")
+        propositions = module.sqlite_count(
+            home / "state/knowledge.db", "propositions"
+        )
+        print("\nKNOWLEDGE STORES")
+        print(f"  Wiki pages (docs/wiki/*.md): {wiki_pages}")
+        print(f"  Memory atoms (~/.dharma/agent_memory/memories.db): {memory_atoms}")
+        print(f"  Ontology objects (~/.dharma/ontology.db): {ontology_objects}")
+        print(
+            "  Knowledge propositions (~/.dharma/state/knowledge.db): "
+            f"{propositions}"
+        )
+        print("  Full view: python3 scripts/governance/darshan_pack.py")
+    except Exception:
+        return
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     # Handle --help before importing any non-stdlib package.  parse_known_args
     # is used so unknown flags (e.g. a usage-error test) pass through to the
     # compact engine.
-    parser.parse_known_args(argv)
+    args, _unknown = parser.parse_known_args(argv)
 
     cli = _load_cli_module()
-    return cli.main(argv)
+    exit_code = cli.main(argv)
+    # Human render only: --json output must stay pure JSON, and a usage
+    # error (exit 2) renders no status view to append to.
+    if not args.json and exit_code != 2:
+        _print_knowledge_stores()
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -68,6 +68,18 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+def _field_max_length(model_cls: Any, field_name: str, default: int) -> int:
+    """Read a pydantic-2 string field's max_length constraint from the schema."""
+    field = getattr(model_cls, "model_fields", {}).get(field_name)
+    if field is not None:
+        for constraint in field.metadata:
+            max_length = getattr(constraint, "max_length", None)
+            if isinstance(max_length, int):
+                return max_length
+    return default
+
+
 # ---------------------------------------------------------------------------
 # 1. Stigmergy marks (channel: gnani) — narrative identity injected as
 #    high-salience pheromone trails that any agent will encounter via
@@ -420,12 +432,19 @@ class GnaniLodestone:
             store = StigmergyStore()
             injected = 0
             now = datetime.now(timezone.utc).isoformat()
+            # Seeded narrative text is longer than the mark schema allows —
+            # truncate to the schema's own limit instead of crashing boot.
+            observation_limit = _field_max_length(StigmergicMark, "observation", 200)
 
             for mark_data in _GNANI_MARKS:
-                # Check for existing mark by id
+                # Check for existing mark by id (query_relevant matches
+                # keywords against observation + file_path, so query by the
+                # mark's file_path and compare ids exactly)
                 try:
                     existing = await store.query_relevant(
-                        query=mark_data["id"], limit=5
+                        task_keywords=[mark_data["file_path"]],
+                        limit=20,
+                        channel=mark_data["channel"],
                     )
                     already_exists = any(
                         getattr(m, "id", None) == mark_data["id"]
@@ -442,7 +461,7 @@ class GnaniLodestone:
                     agent=mark_data["agent"],
                     file_path=mark_data["file_path"],
                     action=mark_data["action"],
-                    observation=mark_data["observation"],
+                    observation=mark_data["observation"][:observation_limit],
                     salience=mark_data["salience"],
                     connections=["GNANI_LODESTONE.md"],
                     access_count=0,
@@ -457,38 +476,43 @@ class GnaniLodestone:
             return 0
 
     async def _seed_concepts(self) -> int:
-        """Add Gnani layer concept nodes to ConceptGraph."""
-        try:
-            from dharma_swarm.graph_nexus import ConceptGraph, ConceptNode
+        """Add Gnani layer concept nodes to the semantic ConceptGraph.
 
-            telos_dir = self._state_dir / "telos"
-            cg = ConceptGraph(telos_dir=telos_dir)
-            try:
-                await cg.load()
-            except Exception:
-                pass  # Start fresh if needed
+        ConceptGraph lives in semantic_gravity (graph_nexus only wraps it);
+        the canonical persistence path matches GraphNexus._load_concept_graph.
+        """
+        try:
+            from dharma_swarm.semantic_gravity import ConceptGraph, ConceptNode
+
+            path = self._state_dir / "meta" / "concept_graph.json"
+            cg = await ConceptGraph.load(path)
 
             added = 0
             for concept_data in _GNANI_CONCEPTS:
-                # Check if already exists
-                existing = await cg.get_node(concept_data["id"])
-                if existing is not None:
+                # Check if already exists (by id, then by name)
+                if cg.get_node(concept_data["id"]) is not None:
+                    continue
+                if cg.find_by_name(concept_data["name"]):
                     continue
 
                 node = ConceptNode(
                     id=concept_data["id"],
                     name=concept_data["name"],
-                    description=concept_data["description"],
+                    definition=concept_data["description"],
+                    source_file="GNANI_LODESTONE.md",
+                    category="philosophical",
                     salience=concept_data["salience"],
-                    tags=concept_data.get("tags", []),
-                    metadata={"pillar": concept_data.get("pillar", "viveka"),
-                               "source": "gnani_lodestone"},
+                    metadata={
+                        "pillar": concept_data.get("pillar", "viveka"),
+                        "tags": concept_data.get("tags", []),
+                        "source": "gnani_lodestone",
+                    },
                 )
-                await cg.add_node(node)
+                cg.add_node(node)
                 added += 1
 
             if added > 0:
-                await cg.save()
+                await cg.save(path)
 
             return added
         except Exception as exc:

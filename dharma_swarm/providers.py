@@ -49,6 +49,7 @@ from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.jikoku_instrumentation import jikoku_traced_provider  # type: ignore
+from dharma_swarm.provider_deadpool import ProviderDeadpool, is_connection_dead_error
 from dharma_swarm.ollama_config import (
     OLLAMA_DEFAULT_CLOUD_MODEL,
     OLLAMA_DEFAULT_LOCAL_MODEL,
@@ -2159,6 +2160,7 @@ class ModelRouter:
         )
         self._sticky_session_seconds = max(0.0, effective_sticky_seconds)
         self._sticky_min_tokens = max(0, effective_sticky_min_tokens)
+        self._provider_deadpool: ProviderDeadpool[ProviderType] = ProviderDeadpool()
         self._session_affinity: dict[str, dict[str, Any]] = {}
         self._provider_rewards: dict[str, float] = {}
         self._provider_reward_counts: dict[str, int] = {}
@@ -2931,6 +2933,14 @@ class ModelRouter:
                 fallback_providers=chain[1:],
                 reasons=[*decision.reasons, "receipt_consumption_applied"],
             )
+        chain, deadpool_applied = self._provider_deadpool.filter(chain)
+        if deadpool_applied and chain:
+            decision = replace(
+                decision,
+                selected_provider=chain[0],
+                fallback_providers=chain[1:],
+                reasons=[*decision.reasons, "provider_deadpool_applied"],
+            )
         task_signature = build_task_signature(
             action_name=enriched_request.action_name,
             context=enriched_request.context,
@@ -3159,6 +3169,7 @@ class ModelRouter:
                     )
                     continue
                 breaker.record_success()
+                self._provider_deadpool.clear(provider_type)
                 prompt_tokens, completion_tokens, total_tokens = self._token_usage(response)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
@@ -3264,6 +3275,10 @@ class ModelRouter:
                     if "attempt_started" in locals()
                     else 0.0
                 )
+                if is_connection_dead_error(exc):
+                    self._provider_deadpool.record(
+                        provider_type, error=str(exc)[:120]
+                    )
                 self._update_reward(provider_type, reward_model, -1.0)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
