@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
+import json
 import os
+import re
 from typing import Any
 
 from dharma_swarm import model_status
+from dharma_swarm.terminal_bridge_external_preview import (
+    explicit_external_preview_lane,
+    external_preview_route,
+    external_preview_targets,
+    sanitize_external_preview_event,
+)
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
 from dharma_swarm.tui.engine.events import (
@@ -20,7 +29,12 @@ from dharma_swarm.tui.engine.events import (
 # Chat-lane sizing: messages sent per turn / retained per bridge process.
 CHAT_HISTORY_SEND_LIMIT = 24
 CHAT_HISTORY_RETAIN = 48
-_SLICE1_CHAT_PROVIDER_IDS = frozenset({"claude", "ollama", "openrouter"})
+_MAX_PREVIEW_BUFFER_BYTES = 8 * 1024 * 1024
+_MAX_PREVIEW_ASSISTANT_BYTES = 4 * 1024 * 1024
+_SLICE1_CHAT_PROVIDER_IDS = frozenset(
+    {"claude", "codex_text", "grok_oauth", "kimi_code", "ollama", "openrouter"}
+)
+_DEDICATED_PREVIEW_PROVIDER_IDS = frozenset({"codex_text", "grok_oauth", "kimi_code"})
 _ALLOWED_CHAT_EVENT_TYPES = frozenset(
     {
         "error",
@@ -59,6 +73,59 @@ _FORBIDDEN_CHAT_EVENT_PREFIXES = (
     "tool.",
     "tool_",
 )
+_CHAT_TOOL_STRUCTURAL_KEYS = frozenset(
+    {
+        "function_call",
+        "function_calls",
+        "image_generation_call",
+        "image_generation_calls",
+        "mcp_call",
+        "mcp_calls",
+        "server_tool_use",
+        "server_tool_use_details",
+        "shell_call",
+        "shell_calls",
+        "tool",
+        "tool_call",
+        "tool_calls",
+        "tool_use",
+        "tool_uses",
+        "web_search_call",
+        "web_search_calls",
+    }
+)
+_CHAT_TOOL_TYPE_MARKERS = (
+    "code_interpreter",
+    "computer_call",
+    "computer_use",
+    "code_interpreter_call",
+    "file_search",
+    "function_call",
+    "image_generation_call",
+    "mcp_call",
+    "server_tool_use",
+    "shell_call",
+    "tool_call",
+    "tool_use",
+    "web_search",
+)
+_CHAT_TOOL_KEY_MARKERS = (
+    "code_interpreter",
+    "computer_call",
+    "computer_use",
+    "file_search",
+    "function_call",
+    "image_generation",
+    "mcp",
+    "server_tool_use",
+    "shell_call",
+    "tool",
+    "web_search",
+)
+_CHAT_TOOL_CAPABILITIES = frozenset({
+    "code_interpreter", "computer_use", "function_call", "mcp",
+    "parallel_tools", "shell", "tool_use", "web_search",
+})
 
 
 def _chat_event_is_forbidden(event_type: object) -> bool:
@@ -68,6 +135,77 @@ def _chat_event_is_forbidden(event_type: object) -> bool:
         or normalized in _FORBIDDEN_CHAT_EVENT_TYPES
         or normalized.startswith(_FORBIDDEN_CHAT_EVENT_PREFIXES)
     )
+
+
+def _chat_event_contains_tool_evidence(value: object) -> bool:
+    """Bounded structural scan; ordinary narration strings are never parsed."""
+
+    pending: list[object] = [value]
+    seen = 0
+    while pending:
+        current = pending.pop()
+        seen += 1
+        if seen > 4096:
+            return True
+        if isinstance(current, dict):
+            for raw_key, item in current.items():
+                key = _normalize_chat_structural_label(raw_key)
+                if key == "tools":
+                    if item not in (None, []):
+                        return True
+                    continue
+                if key == "parallel_tool_calls":
+                    if item not in (None, False):
+                        return True
+                    continue
+                if key == "tool_choice":
+                    if item not in (None, "none"):
+                        return True
+                    continue
+                if key in _CHAT_TOOL_STRUCTURAL_KEYS and item not in (
+                    None,
+                    "",
+                    [],
+                    {},
+                ):
+                    return True
+                if (
+                    any(marker in key for marker in _CHAT_TOOL_KEY_MARKERS)
+                    and item not in (None, "", [], {})
+                ):
+                    return True
+                if key in {
+                    "event",
+                    "finish_reason",
+                    "finishreason",
+                    "kind",
+                    "native_finish_reason",
+                    "nativefinishreason",
+                    "object",
+                    "stop_reason",
+                    "stopreason",
+                    "type",
+                }:
+                    normalized = _normalize_chat_structural_label(item)
+                    if any(marker in normalized for marker in _CHAT_TOOL_TYPE_MARKERS):
+                        return True
+                if isinstance(item, (dict, list)):
+                    pending.append(item)
+        elif isinstance(current, list):
+            pending.extend(current)
+    return False
+
+
+def _normalize_chat_structural_label(value: object) -> str:
+    label = str(value or "").strip()
+    label = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", label)
+    label = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", label)
+    return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+
+
+def _chat_session_start_has_tool_authority(event: SessionStart) -> bool:
+    capabilities = {_normalize_chat_structural_label(item) for item in event.capabilities}
+    return bool(event.tools_available) or bool(capabilities & _CHAT_TOOL_CAPABILITIES)
 
 
 class TerminalBridgeChatMixin:
@@ -151,7 +289,13 @@ class TerminalBridgeChatMixin:
             if adapter is None:
                 continue
             options = self._sealed_chat_options(provider_id, options)
-            self._set_active_provider(run, provider_id, model_id)
+            preview_route = external_preview_route(provider_id, model_id)
+            self._set_active_provider(
+                run,
+                provider_id,
+                model_id,
+                update_selection=True,
+            )
             run.phase = "streaming"
             messages = base_messages
             system_prompt: str | None = self._render_chat_system_prompt(
@@ -161,15 +305,17 @@ class TerminalBridgeChatMixin:
                 note=note,
             )
             resume_id: str | None = None
-            if provider_id == "claude":
+            if provider_id in {"claude", "codex_text"}:
                 # Slice 1 uses the dedicated raw-single-user serializer. Keep
                 # history in the durable transcript; the subprocess prompt is
                 # exactly the newest operator utterance.
                 messages = base_messages[-1:]
                 # Provider-native continuity is an explicit operator action.
                 # Never leak the last Claude process session into a fresh turn.
-                resume_id = requested_resume_id or None
-                if resume_id:
+                resume_id = requested_resume_id or None if provider_id == "claude" else None
+                if provider_id == "codex_text":
+                    system_prompt = None
+                elif resume_id:
                     # The CLI session already holds the conversation; send only
                     # the newest user message and skip re-appending the prompt.
                     messages = base_messages[-1:]
@@ -190,15 +336,54 @@ class TerminalBridgeChatMixin:
             membrane_violation = False
             session_start_seen = False
             session_end_seen = False
+            preview_buffer_bytes = 0
+            preview_assistant_bytes = 0
             try:
                 async for event in adapter.stream(completion, session_id=session_id):
                     if run.cancel_requested:
                         raise asyncio.CancelledError
+                    if preview_route is not None:
+                        preview_buffer_bytes += len(
+                            json.dumps(
+                                asdict(event),
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                                default=str,
+                            ).encode("utf-8")
+                        )
+                        if isinstance(event, TextComplete):
+                            preview_assistant_bytes += len(
+                                event.content.encode("utf-8")
+                            )
+                        if (
+                            preview_buffer_bytes > _MAX_PREVIEW_BUFFER_BYTES
+                            or preview_assistant_bytes
+                            > _MAX_PREVIEW_ASSISTANT_BYTES
+                        ):
+                            success = False
+                            membrane_violation = True
+                            failure_text = (
+                                "slice1 membrane rejected oversized provider response"
+                            )
+                            buffer = []
+                            try:
+                                await adapter.cancel()
+                            except Exception:
+                                failure_text = (
+                                    f"{failure_text}; provider cancellation failed"
+                                )
+                            break
                     lifecycle_violation = session_end_seen or (
                         isinstance(event, SessionStart) and session_start_seen
                     )
                     if _chat_event_is_forbidden(event.type) or lifecycle_violation or (
-                        isinstance(event, SessionStart) and bool(event.tools_available)
+                        isinstance(event, SessionStart)
+                        and _chat_session_start_has_tool_authority(event)
+                    ) or (
+                        preview_route is not None and isinstance(event, ErrorEvent)
+                    ) or (
+                        preview_route is not None
+                        and _chat_event_contains_tool_evidence(event.raw)
                     ):
                         success = False
                         membrane_violation = True
@@ -213,6 +398,8 @@ class TerminalBridgeChatMixin:
                                 f"{failure_text}; provider cancellation failed"
                             )
                         break
+                    if preview_route is not None:
+                        event = sanitize_external_preview_event(event)
                     if isinstance(event, SessionStart):
                         session_start_seen = True
                     if isinstance(event, TextComplete) and event.role == "assistant" and event.content.strip():
@@ -232,6 +419,29 @@ class TerminalBridgeChatMixin:
                 failure_text = f"{type(exc).__name__}: {exc}"
             if run.cancel_requested:
                 raise asyncio.CancelledError
+            preview_start = (
+                next(
+                    (
+                        event
+                        for event in buffer
+                        if isinstance(event, SessionStart)
+                    ),
+                    None,
+                )
+                if preview_route is not None
+                else None
+            )
+            preview_identity_mismatch = bool(
+                preview_route is not None
+                and provider_id in {"claude", "kimi_code"}
+                and (
+                    preview_start is None
+                    or preview_start.model != model_id
+                    or not bool(
+                        preview_start.system_info.get("exact_model_proven", False)
+                    )
+                )
+            )
             if membrane_violation:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
@@ -252,20 +462,82 @@ class TerminalBridgeChatMixin:
                 if terminal is not None:
                     self._emit_recorded_session_event(run, terminal)
                 return
+            if preview_route is not None and (
+                not (success is True and session_start_seen and bool(reply_parts))
+                or preview_identity_mismatch
+            ):
+                # Preview receipts are evidence-bearing operator diagnostics.
+                # A transport exit alone is never a completion, and raw
+                # provider errors (including CLI stderr) must not cross this
+                # boundary because they may contain credentials or host data.
+                code = (
+                    "preview_identity_mismatch"
+                    if preview_identity_mismatch
+                    else (
+                        "preview_incomplete_response"
+                        if success is True
+                        else "preview_provider_failed"
+                    )
+                )
+                failure_text = "preview route produced no usable sealed response"
+                success = False
+                buffer = [
+                    ErrorEvent(
+                        provider_id=provider_id,
+                        session_id=session_id,
+                        code=code,
+                        message=failure_text,
+                        retryable=False,
+                    ),
+                    SessionEnd(
+                        provider_id=provider_id,
+                        session_id=session_id,
+                        success=False,
+                        error_code=code,
+                        error_message=failure_text,
+                    ),
+                ]
             if success:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
+                preview_served_model = model_id
+                preview_exact_model_proven = False
+                if preview_route is not None:
+                    if preview_start is not None:
+                        preview_served_model = preview_start.model
+                        preview_exact_model_proven = bool(
+                            preview_start.system_info.get("exact_model_proven", False)
+                        )
                 for event in buffer:
                     accepted = self._record_and_emit_session_event(run, event)
                     if isinstance(accepted, SessionEnd) and accepted.success:
-                        self._emit_provider_route_receipt(
-                            run,
-                            accepted,
-                            requested_provider_id=provider_id,
-                            requested_model_id=model_id,
-                            expected_prompt=prompt,
-                            adapter=adapter,
-                        )
+                        if preview_route is not None:
+                            self._emit(
+                                {
+                                    "type": "route.receipt",
+                                    "request_id": run.request_id,
+                                    "session_id": run.session_id,
+                                    "provider_id": provider_id,
+                                    "model_id": model_id,
+                                    "requested_model_id": model_id,
+                                    "served_model_id": preview_served_model,
+                                    "route_id": preview_route.route_id,
+                                    "evidence_kind": "preview_provider_completion",
+                                    "success": True,
+                                    "preview_only": True,
+                                    "helm_on_call_eligible": False,
+                                    "exact_model_proven": preview_exact_model_proven,
+                                }
+                            )
+                        else:
+                            self._emit_provider_route_receipt(
+                                run,
+                                accepted,
+                                requested_provider_id=provider_id,
+                                requested_model_id=model_id,
+                                expected_prompt=prompt,
+                                adapter=adapter,
+                            )
                 self._remember_chat_exchange(prompt, "\n\n".join(reply_parts).strip())
                 return
             lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
@@ -340,6 +612,10 @@ class TerminalBridgeChatMixin:
                 route_status.status == "live_routable"
                 for route_status in route_statuses
             )
+            exact_model_proven = bool(
+                projected is not None
+                and getattr(projected.verification, "status", None) == "verified"
+            )
             adapter_available = provider_id in terminal_providers
             oracle_unverified = bool(route_statuses) and all(
                 route_status.status == "unverified"
@@ -365,8 +641,10 @@ class TerminalBridgeChatMixin:
                 route_state = "unavailable"
                 availability_reason = "terminal_chat_transport_unsupported"
             elif model_available and adapter_available:
-                route_state = "ready"
-                availability_reason = None
+                route_state = "ready" if exact_model_proven else "unverified"
+                availability_reason = (
+                    None if exact_model_proven else "exact_model_unproven"
+                )
             elif local_attempt_authorized:
                 route_state = "unverified"
                 availability_reason = "local_cli_auth_unverified"
@@ -392,7 +670,7 @@ class TerminalBridgeChatMixin:
                     "picker_visible": selectable,
                     "selectable": selectable,
                     "chat_executable": chat_executable,
-                    "exact_model_proven": model_available,
+                    "exact_model_proven": exact_model_proven,
                     "available": model_available,
                     "availability_reason": availability_reason,
                     "pool_id": getattr(projected, "id", None),
@@ -438,6 +716,22 @@ class TerminalBridgeChatMixin:
                 }
             )
 
+        preview_targets = external_preview_targets(terminal_providers)
+        preview_route_ids = {
+            str(target["route_id"])
+            for target in preview_targets
+        }
+        # A preview route can intentionally reuse a canonical provider/model
+        # identity (Kimi K3 does).  Its narrower authority must win instead of
+        # leaving two contradictory picker rows where the first silently
+        # regains fallback or Helm-promotion semantics.
+        targets = [
+            target
+            for target in targets
+            if str(target.get("route_id", "")) not in preview_route_ids
+        ]
+        targets.extend(preview_targets)
+
         selected_available = any(
             target["provider"] == selected_provider and target["model"] == selected_model
             and bool(target.get("selectable"))
@@ -445,10 +739,7 @@ class TerminalBridgeChatMixin:
         )
         if not selected_available and targets:
             selectable_targets = [target for target in targets if bool(target.get("selectable"))]
-            fallback_target = next(
-                (target for target in selectable_targets if target["provider"] == "codex"),
-                selectable_targets[0] if selectable_targets else targets[0],
-            )
+            fallback_target = selectable_targets[0] if selectable_targets else targets[0]
             selected_provider = str(fallback_target["provider"])
             selected_model = str(fallback_target["model"])
 
@@ -460,10 +751,10 @@ class TerminalBridgeChatMixin:
             ),
             None,
         )
-        selected_is_local_preview = bool(
+        selected_is_preview = bool(
             active_target and active_target.get("preview_only")
         )
-        fallback_chain = [] if selected_is_local_preview else [
+        fallback_chain = [] if selected_is_preview else [
             {
                 "alias": str(target["alias"]),
                 "provider": str(target["provider"]),
@@ -487,6 +778,7 @@ class TerminalBridgeChatMixin:
                 attemptable_provider_counts[provider] = (
                     attemptable_provider_counts.get(provider, 0) + 1
                 )
+        default_provider, default_model = self._terminal_default_route()
         return {
             "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
             "oracle_state": projection.oracle_state,
@@ -496,15 +788,7 @@ class TerminalBridgeChatMixin:
             "selected_route": f"{selected_provider}:{selected_model}",
             "strategy": strategy,
             "strategies": list(model_routing.ROUTING_STRATEGIES),
-            "default_route": (
-                f"ollama:{preview_model}"
-                if preview_selectable
-                else (
-                    f"{targets[0]['provider']}:{targets[0]['model']}"
-                    if targets
-                    else f"{model_routing.default_target().provider_id}:{model_routing.default_target().model_id}"
-                )
-            ),
+            "default_route": f"{default_provider}:{default_model}",
             "active_label": str(active_target["label"]) if active_target else selected_model,
             "fallback_chain": fallback_chain,
             "targets": targets,
@@ -539,6 +823,20 @@ class TerminalBridgeChatMixin:
                 ]
             # An Ollama request is never rewritten onto a metered or unrelated
             # external provider. A missing/mismatched opt-in fails closed.
+            return []
+
+        preview_route = external_preview_route(requested_provider, requested_model)
+        if preview_route is not None:
+            explicit_lane = explicit_external_preview_lane(
+                requested_provider,
+                requested_model,
+                self._adapters,
+            )
+            return [explicit_lane] if explicit_lane is not None else []
+        if requested_provider in _DEDICATED_PREVIEW_PROVIDER_IDS:
+            # These namespaces have exactly one governed route each. A typo,
+            # stale served alias, or forged picker value must never fall back
+            # onto a different account/provider.
             return []
 
         def add(provider_id: str, model_id: str, options: dict[str, Any], note: str) -> None:
@@ -597,6 +895,17 @@ class TerminalBridgeChatMixin:
             add(provider_id, model_id, options, note)
         return lanes
 
+    def _is_enabled_external_preview_route(
+        self,
+        provider_id: str,
+        model_id: str,
+    ) -> bool:
+        return explicit_external_preview_lane(
+            provider_id,
+            model_id,
+            self._adapters,
+        ) is not None
+
     def _sealed_chat_options(
         self,
         provider_id: str,
@@ -639,6 +948,8 @@ class TerminalBridgeChatMixin:
             "max_turns": 1,
             "raw_single_user_prompt": True,
             "scrub_metered_keys": True,
+            "subscription_auth_only": True,
+            "strict_preview_protocol": True,
             "setting_sources": "",
         }
 
