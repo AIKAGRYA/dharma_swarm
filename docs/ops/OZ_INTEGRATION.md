@@ -27,7 +27,7 @@ Inspect / run read-only checks / review / recommend / open PRs and issues — ye
    `gh secret set WARP_API_KEY` (paste the Warp API key from `warp://settings/platform`).
    Optional: set repo variable `WARP_AGENT_PROFILE`.
 2. W1 smoke test (verify a PR by hand before relying on the workflow):
-   `oz agent run-cloud --environment fGXBFftNfOkc2nKXSmyBNn --skill "AmitabhainArunachala/dharma_swarm:oz-verify-claim" --prompt "Verify PR #<n>"`
+   `oz agent run-cloud --environment fGXBFftNfOkc2nKXSmyBNn --skill "AIKAGRYA/dharma_swarm:oz-verify-claim" --prompt "Verify PR #<n>"`
 3. W4 weekly hygiene schedule (after the skill is on the env's default branch):
    `oz schedule create --name "dharma repo hygiene" --cron "0 16 * * 1" --environment fGXBFftNfOkc2nKXSmyBNn --prompt "Read and run the oz-repo-hygiene skill; open ONE consolidated triage PR. Recommend only; never merge."`
 4. Monitor: `oz run list` / `oz run get <id>`; `oz schedule list`.

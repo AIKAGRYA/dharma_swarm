@@ -1,8 +1,8 @@
 {
   "schema": "ci-parity-guard/v1",
-  "repo": "AmitabhainArunachala/dharma_swarm",
+  "repo": "AIKAGRYA/dharma_swarm",
   "branch": "main",
-  "note": "Expected merge-blocking required-check set. Ground truth is the live branch protection; regenerate the actual side with: gh api repos/AmitabhainArunachala/dharma_swarm/branches/main/protection --jq .required_status_checks.contexts . When this set is changed in branch protection, update this manifest in the same change so the ci-parity gate stays green. regression_sensitive marks contexts a base change can regress after the PR run went green (they must run in the merge queue and must never swallow errors).",
+  "note": "Expected merge-blocking required-check set. Ground truth is the live branch protection; regenerate the actual side with: gh api repos/AIKAGRYA/dharma_swarm/branches/main/protection --jq .required_status_checks.contexts . When this set is changed in branch protection, update this manifest in the same change so the ci-parity gate stays green. regression_sensitive marks contexts a base change can regress after the PR run went green (they must run in the merge queue and must never swallow errors).",
   "required_contexts": [
     {
       "context": "pytest (3.11)",
