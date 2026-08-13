@@ -73,6 +73,12 @@ def _canonical_claude_model() -> str:
 
 CLAUDE_DEFAULT_MODEL = _canonical_claude_model()
 
+_STRICT_PREVIEW_MAX_BYTES = 4 * 1024 * 1024
+_STRICT_PREVIEW_MAX_FRAMES = 4096
+_STRICT_ACCEPT = "accept"
+_STRICT_DROP_TELEMETRY = "drop_telemetry"
+_STRICT_REJECT = "reject"
+
 
 def _capability_names(caps: Capability) -> list[str]:
     names: list[str] = []
@@ -176,6 +182,13 @@ class ClaudeAdapter(ProviderAdapter):
         strict_preview_protocol = bool(
             request.provider_options.get("strict_preview_protocol")
         )
+        strict_preview_bytes = 0
+        strict_preview_frames = 0
+        strict_provider_session_id: str | None = None
+        strict_max_bytes = max(1, int(self._config.extra.get(
+            "strict_preview_max_bytes", _STRICT_PREVIEW_MAX_BYTES)))
+        strict_max_frames = max(1, int(self._config.extra.get(
+            "strict_preview_max_frames", _STRICT_PREVIEW_MAX_FRAMES)))
 
         try:
             assert proc.stdout is not None
@@ -196,6 +209,49 @@ class ClaudeAdapter(ProviderAdapter):
                     break
                 if not line:
                     break
+                if strict_preview_protocol:
+                    strict_preview_bytes += len(line)
+                    strict_preview_frames += 1
+                    if (
+                        strict_preview_bytes > strict_max_bytes
+                        or strict_preview_frames > strict_max_frames
+                    ):
+                        stream_read_error = "Claude preview output exceeded its resource bound"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code="provider_output_limit",
+                            message=stream_read_error,
+                            retryable=False,
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code="provider_output_limit",
+                            error_message=stream_read_error,
+                        )
+                        emitted_session_end = True
+                        stream_read_failed = True
+                        break
+                    if emitted_session_end:
+                        stream_read_error = "Claude returned data after its terminal result"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code="unexpected_provider_event",
+                            message=stream_read_error,
+                            retryable=False,
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code="unexpected_provider_event",
+                            error_message=stream_read_error,
+                        )
+                        stream_read_failed = True
+                        break
                 try:
                     raw_line = line.decode(
                         "utf-8",
@@ -249,7 +305,8 @@ class ClaudeAdapter(ProviderAdapter):
                         emitted_session_end = True
                         stream_read_failed = True
                         break
-                    if not _strict_preview_raw_event_is_valid(parsed_raw):
+                    disposition = _strict_preview_raw_event_disposition(parsed_raw)
+                    if disposition == _STRICT_REJECT:
                         stream_read_error = "Claude returned invalid preview metadata"
                         yield ErrorEvent(
                             provider_id=self.provider_id,
@@ -268,6 +325,61 @@ class ClaudeAdapter(ProviderAdapter):
                         emitted_session_end = True
                         stream_read_failed = True
                         break
+                    if disposition == _STRICT_DROP_TELEMETRY:
+                        if (
+                            strict_provider_session_id is None
+                            or parsed_raw.get("session_id")
+                            != strict_provider_session_id
+                        ):
+                            stream_read_error = "Claude telemetry session identity did not match"
+                            yield ErrorEvent(
+                                provider_id=self.provider_id,
+                                session_id=session_id,
+                                code="malformed_provider_event",
+                                message=stream_read_error,
+                                retryable=False,
+                            )
+                            yield SessionEnd(
+                                provider_id=self.provider_id,
+                                session_id=session_id,
+                                success=False,
+                                error_code="malformed_provider_event",
+                                error_message=stream_read_error,
+                            )
+                            emitted_session_end = True
+                            stream_read_failed = True
+                            break
+                        continue
+                    raw_type = parsed_raw.get("type")
+                    provider_session_id = parsed_raw.get("session_id")
+                    identity_mismatch = (
+                        raw_type == "system"
+                        and strict_provider_session_id not in {None, provider_session_id}
+                    ) or (
+                        raw_type in {"assistant", "result"}
+                        and provider_session_id != strict_provider_session_id
+                    )
+                    if identity_mismatch:
+                        stream_read_error = "Claude provider session identity changed"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code="malformed_provider_event",
+                            message=stream_read_error,
+                            retryable=False,
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code="malformed_provider_event",
+                            error_message=stream_read_error,
+                        )
+                        emitted_session_end = True
+                        stream_read_failed = True
+                        break
+                    if raw_type == "system":
+                        strict_provider_session_id = str(provider_session_id)
                     raw_line = json.dumps(
                         parsed_raw,
                         ensure_ascii=False,
@@ -678,6 +790,80 @@ def _strict_preview_event_is_valid(event: CanonicalEventType) -> bool:
     return True
 
 
+def _strict_preview_raw_event_disposition(raw: dict[str, Any]) -> str:
+    event_type = raw.get("type")
+    if event_type == "rate_limit_event":
+        return (
+            _STRICT_DROP_TELEMETRY
+            if _strict_rate_limit_telemetry_is_valid(raw)
+            else _STRICT_REJECT
+        )
+    if event_type == "system" and raw.get("subtype") == "thinking_tokens":
+        return (
+            _STRICT_DROP_TELEMETRY
+            if _strict_thinking_telemetry_is_valid(raw)
+            else _STRICT_REJECT
+        )
+    return _STRICT_ACCEPT if _strict_preview_raw_event_is_valid(raw) else _STRICT_REJECT
+
+
+def _strict_rate_limit_telemetry_is_valid(raw: dict[str, Any]) -> bool:
+    if set(raw) != {"type", "rate_limit_info", "session_id", "uuid"}:
+        return False
+    if not _bounded_string(raw.get("session_id")) or not _bounded_string(
+        raw.get("uuid")
+    ):
+        return False
+    info = raw.get("rate_limit_info")
+    if not isinstance(info, dict):
+        return False
+    allowed = {
+        "status",
+        "resetsAt",
+        "rateLimitType",
+        "overageStatus",
+        "overageDisabledReason",
+        "isUsingOverage",
+        "utilization",
+        "surpassedThreshold",
+    }
+    if not set(info).issubset(allowed):
+        return False
+    if not _bounded_string(info.get("status")) or not _bounded_string(
+        info.get("rateLimitType")
+    ):
+        return False
+    if not _bounded_nonnegative_int(info.get("resetsAt"), maximum=10**15):
+        return False
+    if not isinstance(info.get("isUsingOverage"), bool):
+        return False
+    for key in ("overageStatus", "overageDisabledReason"):
+        if key in info and not _bounded_string(info[key]):
+            return False
+    for key in ("utilization", "surpassedThreshold"):
+        if key in info and not _unit_interval_number(info[key]):
+            return False
+    return True
+
+
+def _strict_thinking_telemetry_is_valid(raw: dict[str, Any]) -> bool:
+    if set(raw) != {
+        "type",
+        "subtype",
+        "estimated_tokens",
+        "estimated_tokens_delta",
+        "session_id",
+        "uuid",
+    }:
+        return False
+    return (
+        _bounded_string(raw.get("session_id"))
+        and _bounded_string(raw.get("uuid"))
+        and _bounded_nonnegative_int(raw.get("estimated_tokens"), maximum=10**8)
+        and _bounded_nonnegative_int(raw.get("estimated_tokens_delta"), maximum=10**8)
+    )
+
+
 def _strict_preview_raw_event_is_valid(raw: dict[str, Any]) -> bool:
     event_type = raw.get("type")
     if not isinstance(event_type, str):
@@ -698,7 +884,7 @@ def _strict_preview_raw_event_is_valid(raw: dict[str, Any]) -> bool:
         return isinstance(raw.get("mcp_servers", []), list)
     if event_type == "assistant":
         message = raw.get("message")
-        if not isinstance(message, dict):
+        if not isinstance(message, dict) or not _bounded_string(raw.get("session_id")):
             return False
         content = message.get("content")
         if not isinstance(content, list) or not content:
@@ -728,7 +914,7 @@ def _strict_preview_raw_event_is_valid(raw: dict[str, Any]) -> bool:
         return False
     if raw.get("subtype") != "success" or raw.get("is_error") is not False:
         return False
-    if not isinstance(raw.get("session_id", ""), str):
+    if not _bounded_string(raw.get("session_id")):
         return False
     for key in ("duration_ms", "num_turns"):
         if not _nonnegative_int(raw.get(key)):
@@ -764,3 +950,21 @@ def _nonempty_string(value: object) -> bool:
 
 def _nonnegative_int(value: object) -> bool:
     return not isinstance(value, bool) and isinstance(value, int) and value >= 0
+
+
+def _bounded_string(value: object, *, maximum: int = 256) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= maximum
+
+
+def _bounded_nonnegative_int(value: object, *, maximum: int) -> bool:
+    return _nonnegative_int(value) and int(value) <= maximum
+
+
+def _unit_interval_number(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return False
+    return math.isfinite(number) and 0.0 <= number <= 1.0
