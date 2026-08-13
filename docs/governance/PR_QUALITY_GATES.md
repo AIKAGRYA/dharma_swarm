@@ -421,7 +421,7 @@ make gitleaks
 make module-budget
 
 # PR health triage (requires gh CLI auth)
-python3 scripts/governance/pr_ci_health.py --repo AmitabhainArunachala/dharma_swarm
+python3 scripts/governance/pr_ci_health.py --repo AIKAGRYA/dharma_swarm
 
 # Track status
 python3 scripts/governance/check_track_status.py
