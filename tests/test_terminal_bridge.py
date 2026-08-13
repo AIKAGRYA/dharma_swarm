@@ -1101,9 +1101,9 @@ def test_external_preview_discards_provider_raw_after_membrane_scan(
     [
         0,
         False,
+        [],
         {},
         {"web_search_requests": 0, "web_fetch_requests": False},
-        {"nested": {"tool_count": 0}},
     ],
 )
 def test_chat_membrane_accepts_only_explicit_zero_server_tool_usage(
@@ -1114,12 +1114,34 @@ def test_chat_membrane_accepts_only_explicit_zero_server_tool_usage(
     )
 
 
-@pytest.mark.parametrize("active_usage", [1, True, "0", {"web_search_requests": 1}])
+@pytest.mark.parametrize(
+    "active_usage",
+    [
+        1,
+        True,
+        "",
+        "0",
+        {"web_search_requests": 1},
+        {"tool_count": 0},
+        {"tool_call": {"count": 0}},
+        {"web_search_call": {"queries": []}},
+        [0] * 5000,
+    ],
+)
 def test_chat_membrane_rejects_positive_or_malformed_server_tool_usage(
     active_usage: object,
 ) -> None:
     assert terminal_bridge_chat._chat_event_contains_tool_evidence(
         {"usage": {"server_tool_use": active_usage}}
+    )
+
+
+def test_chat_membrane_rejects_deep_zero_tool_usage_without_recursing() -> None:
+    deep_usage: object = 0
+    for _ in range(1200):
+        deep_usage = [deep_usage]
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use_details": deep_usage}}
     )
 
 
