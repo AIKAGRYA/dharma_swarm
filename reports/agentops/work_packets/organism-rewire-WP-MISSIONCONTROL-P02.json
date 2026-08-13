@@ -1,0 +1,126 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/mission_control_lifecycle.py",
+    "dharma_swarm/mission_control_recovery.py",
+    "dharma_swarm/mission_control_reconciliation.py",
+    "dharma_swarm/mission_control_mcp.py",
+    "dharma_swarm/mission_control_mcp_mutations.py",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/mission_control_execution_support.py",
+    "tests/test_mission_control.py",
+    "tests/test_mission_control_mcp.py",
+    "tests/test_mission_control_execution.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P02.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "e5ca457a21949d4b9e7564260026199cf0e1584f",
+  "branch": "codex/mission-control-20260812",
+  "commit": {
+    "allowed": true,
+    "message": "refactor(control): split mission control modules"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/operator_core/**",
+    "scripts/**",
+    "scripts/governance/hygiene/**",
+    "docs/governance/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "Makefile",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control.py tests/test_mission_control_mcp.py tests/test_mission_control_execution.py tests/test_task_board.py tests/test_runtime_state_invariants.py tests/test_mcp_server.py",
+      "expected_exit": 0,
+      "name": "mission-control-split-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_projection.py dharma_swarm/mission_control_lifecycle.py dharma_swarm/mission_control_recovery.py dharma_swarm/mission_control_reconciliation.py dharma_swarm/mission_control_mcp.py dharma_swarm/mission_control_mcp_mutations.py dharma_swarm/mission_control_execution.py dharma_swarm/mission_control_execution_support.py tests/test_mission_control.py tests/test_mission_control_mcp.py tests/test_mission_control_execution.py",
+      "expected_exit": 0,
+      "name": "mission-control-split-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-P02",
+  "intent": "Resolve PR 1325's attributable quality-ratchet failure with a behavior-preserving decomposition of the additive Mission Control facade, projections, MCP server, and Orchestrator adapter. Keep every newly introduced production module at or below 500 physical lines while preserving public imports, read-only defaults, authority boundaries, idempotency, crash reconciliation, and exact executable evidence. Do not change canonical owner schemas or broaden executor enrollment.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; files=list(Path('dharma_swarm').glob('mission_control*.py')); oversized=[f'{p}:{sum(1 for _ in p.open())}' for p in files if sum(1 for _ in p.open()) > 500]; raise SystemExit(1 if oversized else 0)\"",
+      "expected_exit": 0,
+      "name": "mission-control-modules-stay-within-500-lines",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_projection.py",
+      "dharma_swarm/mission_control_mcp.py",
+      "dharma_swarm/mission_control_execution.py"
+    ],
+    "collision": {
+      "checked_at_sha": "e5ca457a21949d4b9e7564260026199cf0e1584f",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "RuntimeStateStore still has no schema-level one-current-lease-per-task compare-and-swap, so mutation deployment remains single-writer.",
+      "RuntimeStateStore still permits direct receipt upserts and Mission Control cannot make owner receipts immutable.",
+      "Mission Control and TaskBoard remain separate databases without an atomic cross-store lifecycle transaction.",
+      "Immutable SQLite snapshots may lag rows committed only to a live WAL until checkpointed.",
+      "Recorded task, claim, run, or receipt state never proves an executor process is alive.",
+      "The required Qwen3-Coder 480B council identity is retired and provider fallback cannot satisfy that witness, so council pass_fullness is not claimed."
+    ],
+    "interface_mismatches": [
+      "The repository fitness ratchet rejects each newly introduced production module above 500 lines even though the separate module-budget guard allows up to 1,000 lines.",
+      "Public imports and the python -m dharma_swarm.mission_control_mcp entrypoint must remain stable across the decomposition.",
+      "Mixins may share the owner stores only through the existing MissionControl and OrchestratorMissionAdapter instances; the split must not instantiate another state substrate."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "039bc6117177aff3a3a0d829cfc838d90d65374d698d744b24ae6bb942d3cc93",
+    "rollback": "Revert this decomposition commit. The preceding typed Mission Control commits remain intact, but PR 1325's quality ratchet will return to red.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-P02"
+  },
+  "worktree": "."
+}
