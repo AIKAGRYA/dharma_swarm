@@ -78,7 +78,7 @@ def test_cloud_lanes_never_require_copilot_receipts():
             "inputs.mode || 'packet-only'",
             "inputs.max_prs || '5'",
             "inputs.limit || '100'",
-            "inputs.merge_mode || 'off'",
+                'MERGE_MODE: "off"',
         ),
     }
     for name, fallbacks in expected_fallbacks.items():

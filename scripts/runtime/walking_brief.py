@@ -82,10 +82,70 @@ KILLSWITCH_PATH = "docs/ops/loop_control/KILLSWITCH"
 CONTROL_REF = "loop-control"
 WORD_BUDGET_NOTE = "Sections are hard-capped; follow links for detail."
 MAX_ROWS = 8
+MAX_NEEDS_JOHN = 5
+
+AUTOMERGE_WORKFLOW = "automerge.yml"
+ROUTER_WORKFLOW = "codex-mention-router.yml"
+BACKLOG_WORKFLOW = "merge-master-mike-backlog.yml"
+
+_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _workflow_url(repo: str, workflow: str) -> str:
+    """Return a same-repository URL rather than trusting API-supplied URLs."""
+    if not _REPO_RE.fullmatch(repo):
+        return ""
+    return f"https://github.com/{repo}/actions/workflows/{workflow}"
+
+
+def _pr_url(repo: str, number: object) -> str:
+    if not _REPO_RE.fullmatch(repo):
+        return ""
+    try:
+        pr_number = int(number)
+    except (TypeError, ValueError):
+        return ""
+    if pr_number < 1:
+        return ""
+    return f"https://github.com/{repo}/pull/{pr_number}"
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _age_label(observed_at: object, generated_at: object) -> str:
+    """Describe age relative to the receipt time, never the wall clock.
+
+    `compose_brief` is intentionally deterministic: replaying the same gathered
+    receipt later must not silently turn a fresh heartbeat into a stale one.
+    """
+    observed = _parse_timestamp(observed_at)
+    generated = _parse_timestamp(generated_at)
+    if observed is None or generated is None:
+        return "age unknown"
+    seconds = int((generated - observed).total_seconds())
+    if seconds < 0:
+        return "age unknown (future timestamp)"
+    if seconds < 60:
+        return f"{seconds}s ago"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    return f"{seconds // 86400}d ago"
 
 
 def _gh(args: list[str], *, timeout: int = 60) -> subprocess.CompletedProcess:
@@ -129,8 +189,9 @@ def gather_walk_ready(repo: str) -> list[dict] | None:
     return data if isinstance(data, list) else None
 
 
-def gather_automerge_log(repo: str) -> list[dict] | None:
-    since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
+def gather_automerge_log(repo: str, generated_at: str | None = None) -> list[dict] | None:
+    anchor = _parse_timestamp(generated_at) or datetime.now(timezone.utc)
+    since = (anchor - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
     rows: list[dict] = []
     for label in ("automerge", "bot-pr"):
         data = _gh_json(
@@ -177,14 +238,86 @@ def gather_nightly_main(repo: str) -> dict | None:
     }
 
 
-def gather(repo: str) -> dict:
+def gather_workflow_state(repo: str, workflow: str) -> dict:
+    """Gather an enablement fact with an explicit true/false/unknown value."""
+    data = _gh_json(["api", f"repos/{repo}/actions/workflows/{workflow}"])
+    state = str(data.get("state") or "") if isinstance(data, dict) else ""
+    if state == "active":
+        enabled: bool | None = True
+    elif state.startswith("disabled"):
+        enabled = False
+    else:
+        enabled = None
     return {
-        "generated_at": _utc_now_iso(),
+        "enabled": enabled,
+        "state": state or "unknown",
+        "url": _workflow_url(repo, workflow),
+    }
+
+
+def _gather_latest_workflow_run(
+    repo: str,
+    workflow: str,
+    *,
+    event: str | None = None,
+    status: str | None = None,
+) -> dict | None:
+    query = ["per_page=1"]
+    if event:
+        query.append(f"event={event}")
+    if status:
+        query.append(f"status={status}")
+    data = _gh_json(
+        [
+            "api",
+            f"repos/{repo}/actions/workflows/{workflow}/runs?{'&'.join(query)}",
+        ]
+    )
+    if not isinstance(data, dict):
+        return None
+    runs = data.get("workflow_runs")
+    if not isinstance(runs, list):
+        return None
+    if not runs:
+        return {"found": False, "url": _workflow_url(repo, workflow)}
+    run = runs[0]
+    if not isinstance(run, dict):
+        return None
+    return {
+        "found": True,
+        "conclusion": run.get("conclusion") or run.get("status") or "unknown",
+        "completed_at": run.get("updated_at") or run.get("created_at") or "",
+        # A stable workflow URL stays useful even if a run is later deleted,
+        # and cannot be redirected by malformed gathered input.
+        "url": _workflow_url(repo, workflow),
+        "head_sha": run.get("head_sha") or "",
+    }
+
+
+def gather_scanner_heartbeat(repo: str) -> dict | None:
+    # This workflow currently emits packets; it is not a merge authority.
+    return _gather_latest_workflow_run(repo, BACKLOG_WORKFLOW)
+
+
+def gather_router_progress(repo: str) -> dict | None:
+    # Show the newest explicitly-dispatched activity, including failures. A
+    # green workflow is not proof that a gate passed or a merge occurred.
+    return _gather_latest_workflow_run(repo, ROUTER_WORKFLOW, event="workflow_dispatch")
+
+
+def gather(repo: str) -> dict:
+    generated_at = _utc_now_iso()
+    return {
+        "generated_at": generated_at,
         "repo": repo,
         "killswitch": gather_killswitch(repo),
         "walk_ready": gather_walk_ready(repo),
-        "automerge_log": gather_automerge_log(repo),
+        "automerge_log": gather_automerge_log(repo, generated_at),
         "nightly_main": gather_nightly_main(repo),
+        "router_workflow": gather_workflow_state(repo, ROUTER_WORKFLOW),
+        "automerge_workflow": gather_workflow_state(repo, AUTOMERGE_WORKFLOW),
+        "scanner_heartbeat": gather_scanner_heartbeat(repo),
+        "router_progress": gather_router_progress(repo),
         # Producers that land in later workstreams; compose_brief renders an
         # explicit not-landed line for each None/missing key.
         "lane_runs": None,        # PR-E hardening lane receipts
@@ -205,6 +338,98 @@ def _not_landed(producer: str) -> list[str]:
     return [f"_no producer landed yet ({producer})_"]
 
 
+def _safe_action_title(value: object) -> str:
+    # A PR title is untrusted. Besides markdown metacharacters, remove raw
+    # URLs so each item has exactly one action URL: the canonical repo link.
+    without_urls = re.sub(r"https?://\S+", "[external URL removed]", str(value or ""))
+    return _md_escape(without_urls[:60])
+
+
+def derive_needs_john(data: dict) -> tuple[list[str], int]:
+    """Build the bounded phone queue, with control-plane failures first."""
+    repo = str(data.get("repo") or "")
+    items: list[str] = []
+
+    for label, workflow, state in (
+        ("Merge router", ROUTER_WORKFLOW, data.get("router_workflow")),
+        ("Automerge", AUTOMERGE_WORKFLOW, data.get("automerge_workflow")),
+    ):
+        state = state if isinstance(state, dict) else {}
+        enabled = state.get("enabled")
+        url = _workflow_url(repo, workflow)
+        if not url:
+            continue
+        if enabled is False:
+            raw_state = _safe_action_title(state.get("state") or "disabled")
+            items.append(
+                f"- 🔴 [{label}: {raw_state}]({url}) — keep disarmed until the "
+                "P0 repair is reviewed; then make the explicit operator decision."
+            )
+        elif enabled is None:
+            items.append(
+                f"- 🟠 [{label}: state UNKNOWN]({url}) — API evidence is "
+                "unavailable; verify before treating this control as enabled."
+            )
+
+    ready = data.get("walk_ready")
+    if isinstance(ready, list):
+        for pr in ready:
+            if not isinstance(pr, dict):
+                continue
+            url = _pr_url(repo, pr.get("number"))
+            if not url:
+                continue
+            draft = " — draft: flip ready before merging" if pr.get("isDraft") else ""
+            items.append(
+                f"- 👍 [#{int(pr['number'])} {_safe_action_title(pr.get('title'))}]"
+                f"({url}){draft}"
+            )
+
+    overflow = max(0, len(items) - MAX_NEEDS_JOHN)
+    return items[:MAX_NEEDS_JOHN], overflow
+
+
+def _workflow_state_line(label: str, state: object) -> str:
+    state = state if isinstance(state, dict) else {}
+    enabled = state.get("enabled")
+    raw = _md_escape(str(state.get("state") or "unknown"))
+    if enabled is True:
+        return f"🟢 {label}: **enabled** (`{raw}`)"
+    if enabled is False:
+        return f"🔴 {label}: **DISABLED** (`{raw}`)"
+    return f"🟠 {label}: **UNKNOWN** — API evidence unavailable"
+
+
+def _progress_line(progress: object, generated_at: object) -> str:
+    if progress is None:
+        return "🟠 Latest router workflow activity: **UNKNOWN** (API query failed)"
+    if not isinstance(progress, dict) or progress.get("found") is not True:
+        return "🟡 Latest router workflow activity: none found"
+    conclusion = str(progress.get("conclusion") or "unknown").lower()
+    icon = "🟢" if conclusion == "success" else "🔴"
+    return (
+        f"{icon} Latest router `workflow_dispatch` activity (not proof of merge): "
+        f"`{conclusion}` — "
+        f"{_age_label(progress.get('completed_at'), generated_at)} "
+        f"(head `{str(progress.get('head_sha') or '?')[:12]}`)"
+    )
+
+
+def _scanner_lines(heartbeat: object, generated_at: object) -> list[str]:
+    disclaimer = "**Packet scanner only — this is not merge authority or merge progress.**"
+    if heartbeat is None:
+        return [disclaimer, "🟠 heartbeat UNKNOWN (API query failed)"]
+    if not isinstance(heartbeat, dict) or heartbeat.get("found") is not True:
+        return [disclaimer, "🟡 no backlog run found"]
+    conclusion = str(heartbeat.get("conclusion") or "unknown").lower()
+    icon = "🔴" if conclusion not in {"success", "queued", "in_progress"} else "🔵"
+    return [
+        disclaimer,
+        f"{icon} latest scanner run: `{conclusion}` — "
+        f"{_age_label(heartbeat.get('completed_at'), generated_at)}",
+    ]
+
+
 def compose_brief(data: dict) -> str:
     out: list[str] = [
         BRIEF_MARKER,
@@ -222,12 +447,38 @@ def compose_brief(data: dict) -> str:
     else:
         out += _section("🟢 KILLSWITCH", ["not engaged"])
 
+    needs_john, needs_overflow = derive_needs_john(data)
+    if needs_john:
+        needs_rows = list(needs_john)
+        if needs_overflow:
+            needs_rows.append(
+                f"- …and {needs_overflow} additional Needs John item(s) omitted"
+            )
+    else:
+        needs_rows = ["none"]
+    out += _section(f"📱 Needs John (max {MAX_NEEDS_JOHN})", needs_rows)
+
+    out += _section(
+        "🔐 Merge arm + router activity",
+        [
+            _workflow_state_line("Router", data.get("router_workflow")),
+            _workflow_state_line("Automerge", data.get("automerge_workflow")),
+            _progress_line(data.get("router_progress"), data.get("generated_at")),
+        ],
+    )
+    out += _section(
+        "🔎 Mike scanner heartbeat",
+        _scanner_lines(data.get("scanner_heartbeat"), data.get("generated_at")),
+    )
+
     ready = data.get("walk_ready")
     if ready is None:
         rows = ["_walk-ready query FAILED — state UNKNOWN, check the Actions run_"]
     elif ready:
+        repo = str(data.get("repo") or "")
         rows = [
-            f"- #{p['number']} [{_md_escape(p['title'][:60])}]({p['url']})"
+            f"- #{p['number']} [{_safe_action_title(p['title'])}]"
+            f"({_pr_url(repo, p['number'])})"
             + (" *(draft — flip ready, then merge)*" if p.get("isDraft") else "")
             for p in ready[:MAX_ROWS]
         ]
