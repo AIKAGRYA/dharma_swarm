@@ -87,6 +87,11 @@ A2A_BUS = Path.home() / ".dharma/a2a_bus"
 DEPLOY_RECEIPT = Path.home() / ".dharma/ops/deploy_receipt.json"
 LANE_MAP = Path.home() / ".dharma/ops/parallel_lane_map.json"
 
+# The live census is intended to be refreshed hourly. A saved receipt remains
+# usable as historical evidence for two intervals, but it is never current
+# process evidence and can never promote a surface to LIVE by itself.
+CENSUS_RECEIPT_FRESH_AFTER_SECONDS = 2 * 60 * 60
+
 
 def _normalize_context_path(value: str) -> str:
     """Normalize host-specific absolute paths for portable committed artifacts."""
@@ -117,12 +122,7 @@ def _is_repo_root_context_path(value: str) -> bool:
         return False
 
 
-def _census_receipt_path() -> Path | None:
-    """Receipt path declared by the census owner (scripts/runtime/live_ops_census.py).
-
-    State-dir knowledge stays in the owner; this view only borrows its
-    DEFAULT_OUTPUT constant (which honors DHARMA_STATE_DIR).
-    """
+def _load_census_owner() -> Any | None:
     census_src = REPO_ROOT / "scripts/runtime/live_ops_census.py"
     if not census_src.exists():
         return None
@@ -134,7 +134,28 @@ def _census_receipt_path() -> Path | None:
         spec.loader.exec_module(module)
     except Exception:
         return None
+    return module
+
+
+def _census_receipt_path() -> Path | None:
+    """Return the state path declared by the live-census owner."""
+    module = _load_census_owner()
+    if module is None:
+        return None
     return Path(module.DEFAULT_OUTPUT)
+
+
+def _current_liveness_payload() -> dict[str, Any]:
+    """Build one in-memory census with current read-only process/port probes."""
+    module = _load_census_owner()
+    if module is None:
+        return {}
+    payload = module.build_live_ops_census(
+        repo_root=REPO_ROOT,
+        state_root=module.DEFAULT_STATE_ROOT,
+        run_probes=True,
+    )
+    return payload if isinstance(payload, dict) else {}
 
 
 @dataclass
@@ -174,7 +195,12 @@ class CustodyReport:
 class Liveness:
     receipt: str
     generated_at: str = ""
-    surfaces: list[dict[str, str]] = field(default_factory=list)
+    receipt_freshness: str = "missing"
+    receipt_age_seconds: float | None = None
+    fresh_after_seconds: int = CENSUS_RECEIPT_FRESH_AFTER_SECONDS
+    observed_at: str = ""
+    probe_error: str = ""
+    surfaces: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -638,33 +664,137 @@ def build_custody() -> CustodyReport:
     )
 
 
-def build_liveness() -> Liveness:
-    receipt_path = _census_receipt_path()
-    if receipt_path is None or not receipt_path.exists():
-        return Liveness(
-            receipt=(
-                "no census receipt — run "
-                "python3 scripts/runtime/live_ops_census.py --write"
-            )
-        )
+def _parse_utc_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
     try:
-        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-    except Exception:
-        return Liveness(receipt=f"unreadable receipt at {_normalize_context_path(str(receipt_path))}")
-    surfaces = []
-    for surface in payload.get("surfaces") or []:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _surface_probe_status(observation: str, *, receipt_stale: bool) -> str:
+    if observation == "live":
+        return "live"
+    if observation == "stopped":
+        return "stopped"
+    return "stale" if receipt_stale else "unknown"
+
+
+def build_liveness(*, now: datetime | None = None) -> Liveness:
+    observed_now = now or datetime.now(timezone.utc)
+    if observed_now.tzinfo is None:
+        observed_now = observed_now.replace(tzinfo=timezone.utc)
+    else:
+        observed_now = observed_now.astimezone(timezone.utc)
+
+    receipt_path = _census_receipt_path()
+    receipt_label = (
+        _normalize_context_path(str(receipt_path))
+        if receipt_path is not None
+        else "census owner unavailable"
+    )
+    receipt_payload: dict[str, Any] = {}
+    receipt_freshness = "missing"
+    generated_at = ""
+    receipt_age_seconds: float | None = None
+    if receipt_path is not None and receipt_path.exists():
+        try:
+            candidate = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(candidate, dict):
+                raise ValueError("receipt root must be an object")
+            receipt_payload = candidate
+            generated_at = str(candidate.get("generated_at") or "")
+            generated = _parse_utc_timestamp(generated_at)
+            if generated is None:
+                receipt_freshness = "invalid"
+            else:
+                receipt_age_seconds = round(
+                    (observed_now - generated).total_seconds(),
+                    3,
+                )
+                if receipt_age_seconds < 0:
+                    receipt_freshness = "future"
+                elif receipt_age_seconds <= CENSUS_RECEIPT_FRESH_AFTER_SECONDS:
+                    receipt_freshness = "fresh"
+                else:
+                    receipt_freshness = "stale"
+        except Exception:
+            receipt_freshness = "unreadable"
+            receipt_label = f"unreadable receipt at {receipt_label}"
+    elif receipt_path is not None:
+        receipt_label = (
+            "no census receipt — run "
+            "python3 scripts/runtime/live_ops_census.py --write"
+        )
+
+    probe_error = ""
+    try:
+        current_payload = _current_liveness_payload()
+    except Exception as exc:
+        current_payload = {}
+        probe_error = f"current census probe failed: {type(exc).__name__}: {exc}"
+
+    receipt_surfaces: dict[str, dict[str, Any]] = {}
+    current_surfaces: dict[str, dict[str, Any]] = {}
+    surface_order: list[str] = []
+    for surface in receipt_payload.get("surfaces") or []:
         if not isinstance(surface, dict):
             continue
+        surface_id = str(surface.get("surface_id") or surface.get("id") or "")
+        if not surface_id:
+            continue
+        receipt_surfaces[surface_id] = surface
+        surface_order.append(surface_id)
+    for surface in current_payload.get("surfaces") or []:
+        if not isinstance(surface, dict):
+            continue
+        surface_id = str(surface.get("surface_id") or surface.get("id") or "")
+        if not surface_id:
+            continue
+        current_surfaces[surface_id] = surface
+        if surface_id not in receipt_surfaces:
+            surface_order.append(surface_id)
+
+    surfaces: list[dict[str, Any]] = []
+    for surface_id in surface_order:
+        receipt_surface = receipt_surfaces.get(surface_id, {})
+        current_surface = current_surfaces.get(surface_id, {})
+        receipt_status = str(receipt_surface.get("status") or "")
+        observation = str(current_surface.get("observation") or "unknown")
+        receipt_stale = bool(receipt_status) and receipt_freshness == "stale"
         surfaces.append(
             {
-                "id": str(surface.get("surface_id") or surface.get("id") or ""),
-                "label": str(surface.get("label", "")),
-                "status": str(surface.get("status", "")),
+                "id": surface_id,
+                "label": str(
+                    current_surface.get("label")
+                    or receipt_surface.get("label")
+                    or ""
+                ),
+                "status": _surface_probe_status(
+                    observation,
+                    receipt_stale=receipt_stale,
+                ),
+                "receipt_status": receipt_status,
+                "observation": observation,
+                "process_observation": str(
+                    current_surface.get("process_observation") or "unavailable"
+                ),
+                "port_observation": str(
+                    current_surface.get("port_observation") or "unavailable"
+                ),
             }
         )
     return Liveness(
-        receipt=_normalize_context_path(str(receipt_path)),
-        generated_at=str(payload.get("generated_at", "")),
+        receipt=receipt_label,
+        generated_at=generated_at,
+        receipt_freshness=receipt_freshness,
+        receipt_age_seconds=receipt_age_seconds,
+        observed_at=str(current_payload.get("generated_at") or ""),
+        probe_error=probe_error,
         surfaces=surfaces,
     )
 
@@ -1031,12 +1161,31 @@ def render(packet: OrientationPacket) -> None:
     for path in packet.custody.missing:
         print(f"  MISSING: {path}")
 
-    _section("LIVENESS — owner: live ops census receipt (read-only)")
+    _section("LIVENESS — saved receipt + current read-only process/port probes")
     print(f"  Receipt: {packet.liveness.receipt}")
     if packet.liveness.generated_at:
         print(f"  Generated: {packet.liveness.generated_at}")
+    age = (
+        f"{packet.liveness.receipt_age_seconds:.3f}s"
+        if packet.liveness.receipt_age_seconds is not None
+        else "unknown"
+    )
+    print(
+        f"  Receipt freshness: {packet.liveness.receipt_freshness.upper()} "
+        f"(age={age}, fresh_through={packet.liveness.fresh_after_seconds}s)"
+    )
+    if packet.liveness.observed_at:
+        print(f"  Current probe observed: {packet.liveness.observed_at}")
+    if packet.liveness.probe_error:
+        print(f"  Probe error: {packet.liveness.probe_error}")
     for surface in packet.liveness.surfaces:
-        print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
+        print(
+            f"  [{surface['status'].upper():<8}] {surface['id']} — {surface['label']} "
+            f"(receipt={surface['receipt_status'] or 'none'}, "
+            f"current={surface['observation']}, "
+            f"process={surface['process_observation']}, "
+            f"port={surface['port_observation']})"
+        )
 
     _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
     c = packet.loop1

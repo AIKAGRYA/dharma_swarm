@@ -26,8 +26,16 @@ from dharma_swarm.operator_core.semantic_receipt import (  # noqa: E402
     validate_semantic_receipt,
     utc_now_iso,
 )
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
-DEFAULT_OUT_DIR = REPO_ROOT / "reports" / "agentops" / "semantic_receipts"
+DEFAULT_SEMANTIC_RESPONDER_STATE_DIR = (
+    dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
+    / "external_agents"
+    / "codex_composer"
+    / "nest"
+    / "semantic_responder"
+)
+DEFAULT_OUT_DIR = DEFAULT_SEMANTIC_RESPONDER_STATE_DIR / "semantic_receipts"
 DEFAULT_OLLAMA_ENDPOINT = "http://127.0.0.1:11434/api/generate"
 
 

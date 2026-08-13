@@ -7,6 +7,19 @@ from typing import Any
 import scripts.runtime.codex_composer_semantic_responder as responder
 
 
+def test_live_receipt_defaults_share_responder_state_custody() -> None:
+    receipt_dirs = {
+        responder.DEFAULT_SEMANTIC_RECEIPT_DIR,
+        responder.DEFAULT_ARTIFACT_RECEIPT_DIR,
+        responder.DEFAULT_DRAIN_RECEIPT_DIR,
+        responder.DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
+    }
+
+    assert receipt_dirs
+    assert all(path.is_relative_to(responder.DEFAULT_STATE_DIR) for path in receipt_dirs)
+    assert all(not path.is_relative_to(responder.REPO_ROOT) for path in receipt_dirs)
+
+
 def _delivery_record(tmp_path: Path, *, packet_id: str = "packet-1") -> Path:
     path = tmp_path / "inbox" / f"{packet_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
