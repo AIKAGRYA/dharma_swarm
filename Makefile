@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility vision organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -279,6 +279,7 @@ help:
 	@echo "  make onboarding-macos-compatibility  Reproduce the required GNU Make 3.81 + Darwin proof"
 	@echo "  make organism-status Render the whole-organism projection (runtime, agents, liveness)"
 	@echo "  make orient       Compatibility alias for make organism-status"
+	@echo "  make vision       Render the vision transmission: what this is FOR (read-only; ARGS=--crystal|--full|--registry|--json|--check|--packet)"
 	@echo "  make agent-register Check persistent A2A identity registration route and drift"
 	@echo "  make agent-onboard Compatibility alias for make agent-register"
 	@echo "  make agent-build-preflight PACKET=<path>  Admit one exact packet and baseline"
@@ -546,6 +547,7 @@ docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 	$(PYTHON) scripts/governance/render_active_track_includes.py --check
+	$(PYTHON) scripts/docops/vision_navigation.py --check
 
 slop-ratchet:
 	$(PYTHON) scripts/governance/slop_ratchet.py
@@ -767,6 +769,14 @@ spine-check:
 onboard:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
 
+# Purpose/telos transmission + vision-doc navigation. Read-only projection of
+# docs/vision_maps/VISION_TRANSMISSION.md and the MEGAFILE_INDEX Slot-1 draft
+# registry. Deliberately has NO prerequisites (no onboard dependence) and no
+# authority: not session status, liveness, edit admission, ratification, or
+# merge. Documented flags forward via ARGS, e.g. `make vision ARGS=--crystal`.
+vision:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/docops/vision_navigation.py $(ARGS)
+
 # Full local reproducer for the required macOS compatibility context. Invoke
 # this target through stock /usr/bin/make so a parser regression fails before
 # any recipe can falsely report success.
@@ -777,6 +787,7 @@ onboarding-macos-compatibility:
 		printf '%s\n' "$$version"
 	@/usr/bin/make -n onboard >/dev/null
 	@/usr/bin/make -n orient >/dev/null
+	@/usr/bin/make -n vision >/dev/null
 	@/usr/bin/make -n help >/dev/null
 	$(PYTHON) -m pytest -q \
 		tests/test_agent_work_packet.py::test_darwin_negative_confinement_executes_and_denies_outside_write \
