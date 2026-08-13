@@ -7,24 +7,31 @@ from datetime import datetime
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
+    ACTIVE_CLAIM_STATUSES,
     OPEN_CLAIM_STATUSES,
     OWNER_TERMINAL_ATTEMPT_STATUSES,
     RECOVERY_RECEIPT_TYPE,
     SCHEMA_VERSION,
+    TERMINAL_CAS_STALE_AFTER_SECONDS,
     TERMINAL_RECEIPT_TYPE,
-    AgentLeaseView,
     AttemptView,
     MissionControlError,
-    MissionView,
-    ReceiptView,
     ReconciliationState,
     TaskView,
+    attempt_view,
     claim_is_active,
     claim_is_expired,
     claim_is_open,
-    public_attempt_status,
+    lease_view,
+    mission_view,
+    receipt_view,
+    receipt_matches_identity,
+    recovery_receipt_matches_contract,
     session_id,
     stable_id,
+    terminal_operation_metadata,
+    terminal_receipt_contract,
+    task_view,
     utc_now,
 )
 from dharma_swarm.models import Task, TaskStatus
@@ -181,89 +188,6 @@ async def project_terminal_task(
         raise MissionControlError(str(exc)) from exc
 
 
-def mission_view(session: SessionState) -> MissionView:
-    mission_id = str(session.metadata.get("mission_id") or "")
-    return MissionView(
-        mission_id=mission_id,
-        session_id=session.session_id,
-        title=str(session.metadata.get("title") or ""),
-        goal=str(session.metadata.get("goal") or ""),
-        operator_id=session.operator_id,
-        status=session.status,
-        metadata=dict(session.metadata),
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-    )
-
-
-def task_view(task: Task, mission_id: str) -> TaskView:
-    return TaskView(
-        task_id=task.id,
-        mission_id=mission_id,
-        title=task.title,
-        description=task.description,
-        status=task.status,
-        priority=task.priority,
-        assigned_to=str(task.assigned_to or ""),
-        result=str(task.result or ""),
-        metadata=dict(task.metadata),
-        created_at=task.created_at,
-        updated_at=task.updated_at,
-    )
-
-
-def attempt_view(
-    run: DelegationRun, identity: ExecutionIdentity | None
-) -> AttemptView:
-    return AttemptView(
-        attempt_id=run.run_id,
-        mission_id=str(run.metadata.get("mission_id") or ""),
-        session_id=run.session_id,
-        task_id=run.task_id,
-        claim_id=run.claim_id,
-        assigned_to=run.assigned_to,
-        assigned_by=run.assigned_by,
-        status=public_attempt_status(run.status),
-        failure_code=run.failure_code,
-        idempotency_key=identity.idempotency_key if identity is not None else "",
-        metadata=dict(run.metadata),
-        started_at=run.started_at,
-        completed_at=run.completed_at,
-    )
-
-
-def lease_view(claim: TaskClaim, *, now: datetime) -> AgentLeaseView:
-    return AgentLeaseView(
-        claim_id=claim.claim_id,
-        mission_id=str(claim.metadata.get("mission_id") or ""),
-        session_id=claim.session_id,
-        task_id=claim.task_id,
-        agent_id=claim.agent_id,
-        attempt_id=str(claim.metadata.get("attempt_id") or ""),
-        status=claim.status,
-        active=claim_is_active(claim, now),
-        expired=claim_is_expired(claim, now),
-        heartbeat_at=claim.heartbeat_at,
-        stale_after=claim.stale_after,
-        metadata=dict(claim.metadata),
-    )
-
-
-def receipt_view(receipt: RuntimeReceipt, mission_id: str) -> ReceiptView:
-    return ReceiptView(
-        receipt_id=receipt.receipt_id,
-        mission_id=str(receipt.payload.get("mission_id") or mission_id),
-        task_id=receipt.task_id,
-        attempt_id=receipt.run_id,
-        agent_id=receipt.agent_id,
-        receipt_type=receipt.receipt_type,
-        status=receipt.status,
-        idempotency_key=receipt.idempotency_key,
-        payload=dict(receipt.payload),
-        created_at=receipt.created_at,
-    )
-
-
 def _identity_matches(
     identity: ExecutionIdentity,
     *,
@@ -294,21 +218,6 @@ def _identity_matches(
     return True
 
 
-def _receipt_matches_identity(
-    receipt: RuntimeReceipt, identity: ExecutionIdentity
-) -> bool:
-    return (
-        receipt.run_id == identity.run_id
-        and receipt.task_id == identity.task_id
-        and receipt.trace_id == identity.trace_id
-        and receipt.correlation_id == identity.correlation_id
-        and receipt.causation_id == identity.causation_id
-        and receipt.parent_run_id == identity.parent_run_id
-        and receipt.agent_id == identity.agent_id
-        and receipt.idempotency_key == identity.idempotency_key
-    )
-
-
 def reconciliation(
     mission_id: str,
     tasks: tuple[TaskView, ...],
@@ -323,6 +232,13 @@ def reconciliation(
     task_by_id = {task.task_id: task for task in tasks}
     run_by_id = {run.run_id: run for run in runs}
     claim_by_id = {claim.claim_id: claim for claim in claims}
+    allowed_run_statuses = {"queued", "running", *OWNER_TERMINAL_ATTEMPT_STATUSES}
+    allowed_claim_statuses = {
+        *OPEN_CLAIM_STATUSES,
+        "completed",
+        "failed",
+        "stale_recovered",
+    }
 
     for run in runs:
         identity = identities.get(run.run_id)
@@ -333,6 +249,7 @@ def reconciliation(
             or not run.assigned_to
             or run.metadata.get("schema_version") != SCHEMA_VERSION
             or run.metadata.get("mission_id") != mission_id
+            or run.status not in allowed_run_statuses
             or identity is None
             or not _identity_matches(
                 identity, mission_id=mission_id, run=run, claim=claim
@@ -351,10 +268,15 @@ def reconciliation(
             or not claim.agent_id
             or claim.metadata.get("schema_version") != SCHEMA_VERSION
             or claim.metadata.get("mission_id") != mission_id
+            or claim.status.lower() not in allowed_claim_statuses
             or not attempt_id
             or identity is None
             or not _identity_matches(
                 identity, mission_id=mission_id, run=run, claim=claim
+            )
+            or (
+                run is None
+                and claim.status.lower() not in OPEN_CLAIM_STATUSES
             )
             or (run is not None and run.claim_id != claim.claim_id)
         ):
@@ -364,18 +286,26 @@ def reconciliation(
     recovery_by_run: dict[str, list[RuntimeReceipt]] = {}
     for receipt in receipts:
         identity = identities.get(receipt.run_id)
-        if identity is None or not _receipt_matches_identity(receipt, identity):
+        if identity is None or not receipt_matches_identity(receipt, identity):
             return ReconciliationState.FOREIGN_RUNTIME_RECORD
-        if receipt.receipt_type in {TERMINAL_RECEIPT_TYPE, RECOVERY_RECEIPT_TYPE}:
-            if (
-                receipt.payload.get("schema_version") != SCHEMA_VERSION
-                or receipt.payload.get("mission_id") != mission_id
-                or receipt.payload.get("attempt_id") != receipt.run_id
-            ):
-                return ReconciliationState.FOREIGN_RUNTIME_RECORD
         if receipt.receipt_type == TERMINAL_RECEIPT_TYPE:
+            if (
+                receipt.run_id not in run_by_id
+                or identity.claim_id not in claim_by_id
+            ):
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            try:
+                terminal_receipt_contract(receipt, identity, mission_id)
+            except MissionControlError:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             terminal_by_run.setdefault(receipt.run_id, []).append(receipt)
         elif receipt.receipt_type == RECOVERY_RECEIPT_TYPE:
+            if (
+                receipt.run_id not in run_by_id
+                or identity.claim_id not in claim_by_id
+                or not recovery_receipt_matches_contract(receipt, identity, mission_id)
+            ):
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             recovery_by_run.setdefault(receipt.run_id, []).append(receipt)
 
     if any(len(group) != 1 for group in terminal_by_run.values()) or any(
@@ -384,6 +314,10 @@ def reconciliation(
         return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
     if set(terminal_by_run) & set(recovery_by_run):
         return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+
+    terminal_by_task: dict[str, list[RuntimeReceipt]] = {}
+    for run_id, group in terminal_by_run.items():
+        terminal_by_task.setdefault(run_by_id[run_id].task_id, []).extend(group)
 
     active_by_task: dict[str, int] = {}
     for claim in claims:
@@ -400,6 +334,12 @@ def reconciliation(
             (run is not None and run.status in OWNER_TERMINAL_ATTEMPT_STATUSES)
             or (task is not None and task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED})
         ):
+            if run is not None and (
+                terminal_by_run.get(run.run_id) or recovery_by_run.get(run.run_id)
+            ):
+                # Durable evidence and the run precede the claim projection.
+                # This is repairable drift, not contradictory truth.
+                return ReconciliationState.NEEDS_TASK_PROJECTION
             return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
 
     run_claim_ids = {run.claim_id for run in runs if run.claim_id}
@@ -413,6 +353,7 @@ def reconciliation(
         terminals = terminal_by_run.get(run.run_id, [])
         recoveries = recovery_by_run.get(run.run_id, [])
         task = task_by_id[run.task_id]
+        claim = claim_by_id.get(run.claim_id)
         if run.status in {"completed", "failed"} and not terminals:
             return ReconciliationState.MISSING_TERMINAL_RECEIPT
         if run.status == "stale_recovered" and not recoveries:
@@ -429,12 +370,37 @@ def reconciliation(
                 if receipt.status == "succeeded"
                 else TaskStatus.FAILED
             )
+            if claim is None:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            if claim.status.lower() in OPEN_CLAIM_STATUSES:
+                return ReconciliationState.NEEDS_TASK_PROJECTION
+            if claim.status != expected_owner:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             if run.status not in OWNER_TERMINAL_ATTEMPT_STATUSES or task.status != expected_task:
                 return ReconciliationState.NEEDS_TASK_PROJECTION
         elif recoveries:
             if recoveries[0].status != "stale_recovered":
                 return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            if claim is None:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            if claim.status.lower() in OPEN_CLAIM_STATUSES:
+                return ReconciliationState.NEEDS_TASK_PROJECTION
+            if claim.status != "stale_recovered":
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             if run.status != "stale_recovered":
+                return ReconciliationState.NEEDS_TASK_PROJECTION
+            if (
+                task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED}
+                and not terminal_by_task.get(task.task_id)
+            ):
+                # Recovery evidence cannot authorize a terminal task outcome.
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            if (
+                task.status in {TaskStatus.ASSIGNED, TaskStatus.RUNNING}
+                and task.metadata.get("mission_attempt_id") == run.run_id
+            ):
+                # Recovery closes the old lineage before a replacement attempt
+                # can repair TaskBoard.  The crash window is drift, not coherence.
                 return ReconciliationState.NEEDS_TASK_PROJECTION
         elif run.status == "running" and task.status != TaskStatus.RUNNING:
             return ReconciliationState.NEEDS_TASK_PROJECTION
@@ -443,6 +409,67 @@ def reconciliation(
             or task.assigned_to != run.assigned_to
         ):
             return ReconciliationState.NEEDS_TASK_PROJECTION
+
+        if run.status == "queued" and claim is not None:
+            if claim.status.lower() in OPEN_CLAIM_STATUSES:
+                if claim.status.lower() != "claimed":
+                    return ReconciliationState.NEEDS_TASK_PROJECTION
+            else:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+        if run.status == "running" and claim is not None:
+            if claim.status.lower() in OPEN_CLAIM_STATUSES:
+                if (
+                    claim.status.lower() not in ACTIVE_CLAIM_STATUSES
+                    or claim.acked_at is None
+                ):
+                    return ReconciliationState.NEEDS_TASK_PROJECTION
+            else:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+
+    runs_by_task: dict[str, list[DelegationRun]] = {}
+    for run in runs:
+        runs_by_task.setdefault(run.task_id, []).append(run)
+    for task in tasks:
+        task_runs = runs_by_task.get(task.task_id, [])
+        if task.status == TaskStatus.ASSIGNED:
+            matching = [
+                run
+                for run in task_runs
+                if run.status == "queued"
+                and run.assigned_to == task.assigned_to
+                and task.metadata.get("mission_attempt_id") == run.run_id
+                and task.metadata.get("mission_claim_id") == run.claim_id
+            ]
+            if len(matching) != 1:
+                return ReconciliationState.NEEDS_TASK_PROJECTION
+        elif task.status == TaskStatus.RUNNING:
+            matching = [
+                run
+                for run in task_runs
+                if run.status == "running"
+                and run.assigned_to == task.assigned_to
+                and task.metadata.get("mission_attempt_id") == run.run_id
+                and task.metadata.get("mission_claim_id") == run.claim_id
+            ]
+            if len(matching) != 1:
+                return ReconciliationState.NEEDS_TASK_PROJECTION
+        elif task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED}:
+            matching = [
+                receipt
+                for receipt in terminal_by_task.get(task.task_id, [])
+                if (
+                    task.status == TaskStatus.COMPLETED
+                    and receipt.status == "succeeded"
+                )
+                or (
+                    task.status == TaskStatus.FAILED
+                    and receipt.status == "failed"
+                )
+            ]
+            if len(matching) != 1:
+                return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+        elif task.status != TaskStatus.PENDING:
+            return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
 
     if any(
         claim.status.lower() in OPEN_CLAIM_STATUSES and claim_is_expired(claim, now)
@@ -512,13 +539,106 @@ class MissionControlProjectionMixin:
                     f"claim {claim.claim_id!r} is not active and acknowledged"
                 )
 
+    async def _project_terminal_lineage(
+        self,
+        mission_id: str,
+        *,
+        task: Task,
+        run: DelegationRun,
+        claim: TaskClaim,
+        identity: ExecutionIdentity,
+        receipt: RuntimeReceipt,
+    ) -> None:
+        """Repair terminal owner projections without ever reopening the claim."""
+        terminal_status, owner_status, result, failure_code, metadata = (
+            terminal_receipt_contract(receipt, identity, mission_id)
+        )
+        self._require_attempt_identity(
+            run, mission_id, identity.task_id, identity.agent_id
+        )
+        self._require_claim_identity(
+            claim,
+            mission_id,
+            identity.task_id,
+            identity.agent_id,
+            identity.run_id,
+        )
+        if run.claim_id != claim.claim_id or identity.claim_id != claim.claim_id:
+            raise MissionControlError(
+                f"attempt {identity.run_id!r} has conflicting terminal evidence"
+            )
+        if (
+            run.status in OWNER_TERMINAL_ATTEMPT_STATUSES
+            and run.status != owner_status
+        ):
+            raise MissionControlError(
+                f"attempt {identity.run_id!r} has conflicting terminal evidence"
+            )
+        now = utc_now()
+        if run.status != owner_status or run.completed_at is None:
+            run = await self._runtime.record_delegation_run(
+                replace(
+                    run,
+                    status=owner_status,
+                    completed_at=run.completed_at or now,
+                    failure_code=failure_code,
+                    metadata=self._attempt_metadata(
+                        metadata,
+                        base=run.metadata,
+                        mission_id=mission_id,
+                        attempt_id=identity.run_id,
+                        attempt_key=identity.idempotency_key,
+                    ),
+                )
+            )
+        current_task = await self._board.get(task.id)
+        if current_task is None:
+            raise MissionControlError(f"task {task.id!r} was not found")
+        if current_task.status in {
+            TaskStatus.PENDING,
+            TaskStatus.ASSIGNED,
+            TaskStatus.RUNNING,
+        }:
+            # A heartbeat can durably advance the run before TaskBoard reaches
+            # RUNNING.  Repair that earlier projection from the same fenced
+            # identity so terminal retry converges from PENDING or ASSIGNED.
+            await self._project_running_task(
+                current_task,
+                mission_id=mission_id,
+                agent_id=identity.agent_id,
+                attempt_id=identity.run_id,
+                claim_id=identity.claim_id,
+            )
+        # TaskBoard remains open if either projection crashes. Closing the claim
+        # happens last, so a replacement cannot be admitted from partial state.
+        await self._project_terminal_task(
+            task, terminal_status, result, failure_code
+        )
+        claim_terminal = "completed" if terminal_status == "succeeded" else "failed"
+        if claim.status != claim_terminal:
+            await self._runtime.record_task_claim(
+                replace(
+                    claim,
+                    status=claim_terminal,
+                    heartbeat_at=now,
+                    stale_after=now,
+                    metadata=self._attempt_metadata(
+                        metadata,
+                        base=claim.metadata,
+                        mission_id=mission_id,
+                        attempt_id=identity.run_id,
+                        attempt_key=identity.idempotency_key,
+                    ),
+                )
+            )
+
     async def _recover_expired_claim(
         self,
         mission_id: str,
         claim: TaskClaim,
         *,
         recovered_at: datetime,
-    ) -> None:
+    ) -> bool:
         """Close an expired lineage; no cross-process lease CAS is claimed."""
         attempt_id = str(claim.metadata.get("attempt_id") or "")
         self._require_claim_identity(
@@ -537,18 +657,80 @@ class MissionControlProjectionMixin:
                 f"execution identity for {attempt_id!r} has foreign fields"
             )
         run = await self._runtime.get_delegation_run(attempt_id)
-        if run is not None:
-            self._require_attempt_identity(
-                run, mission_id, claim.task_id, claim.agent_id
+        if run is None:
+            raise MissionControlError(
+                f"expired claim {claim.claim_id!r} has no associated attempt run"
             )
-            if run.claim_id != claim.claim_id:
-                raise MissionControlError(
-                    f"attempt {attempt_id!r} has foreign identity"
-                )
-            if run.status in {"completed", "failed"}:
+        self._require_attempt_identity(run, mission_id, claim.task_id, claim.agent_id)
+        if run.claim_id != claim.claim_id:
+            raise MissionControlError(f"attempt {attempt_id!r} has foreign identity")
+
+        terminal_receipts = await self._runtime.list_runtime_receipts(
+            run_id=attempt_id,
+            receipt_type=TERMINAL_RECEIPT_TYPE,
+            limit=2,
+        )
+        recovery_receipts = await self._runtime.list_runtime_receipts(
+            run_id=attempt_id,
+            receipt_type=RECOVERY_RECEIPT_TYPE,
+            limit=2,
+        )
+        if terminal_receipts:
+            if len(terminal_receipts) != 1 or recovery_receipts:
                 raise MissionControlError(
                     f"attempt {attempt_id!r} has conflicting terminal evidence"
                 )
+            terminal = terminal_receipts[0]
+            terminal_receipt_contract(terminal, identity, mission_id)
+            operation_hash, idempotency_metadata = terminal_operation_metadata(
+                terminal, identity, mission_id
+            )
+            try:
+                ownership_token = (
+                    await self._runtime.try_begin_idempotent_side_effect_with_token(
+                        identity,
+                        terminal.side_effect_key,
+                        metadata=idempotency_metadata,
+                        stale_after_seconds=TERMINAL_CAS_STALE_AFTER_SECONDS,
+                    )
+                )
+                ownership_token, ownership_complete = (
+                    await self._recover_terminal_ownership(
+                        identity,
+                        side_effect_key=terminal.side_effect_key,
+                        operation_hash=operation_hash,
+                        receipt=terminal,
+                        receipt_id=terminal.receipt_id,
+                        ownership_token=ownership_token,
+                    )
+                )
+                if not ownership_complete:
+                    await self._runtime.complete_idempotent_side_effect(
+                        identity,
+                        terminal.side_effect_key,
+                        status="completed",
+                        result_receipt_id=terminal.receipt_id,
+                        metadata=idempotency_metadata,
+                        expected_updated_at=ownership_token,
+                    )
+            except (KeyError, RuntimeError, ValueError) as exc:
+                raise MissionControlError(
+                    f"attempt {attempt_id!r} has conflicting terminal evidence"
+                ) from exc
+            task = await self._require_task(mission_id, claim.task_id)
+            await self._project_terminal_lineage(
+                mission_id,
+                task=task,
+                run=run,
+                claim=claim,
+                identity=identity,
+                receipt=terminal,
+            )
+            return True
+        if run.status in {"completed", "failed"}:
+            raise MissionControlError(
+                f"attempt {attempt_id!r} has conflicting terminal evidence"
+            )
 
         receipt_id = stable_id("receipt", attempt_id, "stale_recovered")
         side_effect_key = f"mission_control:{attempt_id}:stale_recovery"
@@ -559,13 +741,8 @@ class MissionControlProjectionMixin:
             "recovered_claim_id": claim.claim_id,
             "reason": "expired_lease",
         }
-        existing = await self._runtime.list_runtime_receipts(
-            run_id=attempt_id,
-            receipt_type=RECOVERY_RECEIPT_TYPE,
-            limit=100,
-        )
         recovery = self._matching_receipt(
-            existing,
+            recovery_receipts,
             identity=identity,
             receipt_type=RECOVERY_RECEIPT_TYPE,
             side_effect_key=side_effect_key,
@@ -610,6 +787,7 @@ class MissionControlProjectionMixin:
                     },
                 )
             )
+        return False
 
     async def _recover_terminal_ownership(
         self,

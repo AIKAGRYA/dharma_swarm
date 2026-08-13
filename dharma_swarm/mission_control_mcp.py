@@ -8,11 +8,15 @@ prove a live executor.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
+import sqlite3
+import tempfile
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import date, datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, TypeAlias
 
 from dharma_swarm.daemon_config import dharma_state_dir
@@ -20,6 +24,7 @@ from dharma_swarm.models import TaskPriority, TaskStatus
 
 
 SCHEMA_VERSION = "dharma.mission_control.v1"
+AUTHORIZED_PRINCIPAL_METADATA_KEY = "mission_control_authorized_principal"
 
 MISSION_GET = "mission_get"
 MISSION_SNAPSHOT = "mission_snapshot"
@@ -63,6 +68,7 @@ class MutationRequest:
     agent_id: str = ""
     operator_id: str = ""
     created_by: str = ""
+    assigned_by: str = ""
     priority: str = ""
     dependency_count: int = 0
     dependency_ids: tuple[str, ...] = ()
@@ -84,6 +90,68 @@ class _ArgumentError(ValueError):
     """A safe, caller-correctable MCP argument error."""
 
 
+def _copy_immutable_sqlite(source: Path, destination: Path) -> None:
+    """Copy a no-write main-database snapshot into disposable local state.
+
+    ``immutable=1`` prevents SQLite from creating or updating source WAL/SHM
+    sidecars. Rows committed only to a live WAL may therefore lag until the
+    owner checkpoints them. Mission Control reports the result as an observed
+    projection, never as executor liveness or a linearizable read.
+    """
+
+    source_uri = f"{source.resolve().as_uri()}?mode=ro&immutable=1"
+    with (
+        sqlite3.connect(source_uri, uri=True) as source_db,
+        sqlite3.connect(destination) as destination_db,
+    ):
+        source_db.backup(destination_db)
+
+
+class _ImmutableSnapshotMissionControl:
+    """Run owner projections against disposable copies, never canonical DBs."""
+
+    def __init__(self, *, task_db: Path, runtime_db: Path) -> None:
+        self.task_db = task_db
+        self.runtime_db = runtime_db
+
+    async def _call(
+        self,
+        method_name: str,
+        *args: Any,
+        require_task_db: bool,
+        **kwargs: Any,
+    ) -> Any:
+        from dharma_swarm.mission_control import MissionControl
+        from dharma_swarm.runtime_state import RuntimeStateStore
+        from dharma_swarm.task_board import TaskBoard
+
+        with tempfile.TemporaryDirectory(prefix="dharma-mission-control-read-") as raw:
+            root = Path(raw)
+            runtime_copy = root / "runtime.db"
+            task_copy = root / "tasks.db"
+            await asyncio.to_thread(
+                _copy_immutable_sqlite, self.runtime_db, runtime_copy
+            )
+            if require_task_db:
+                await asyncio.to_thread(_copy_immutable_sqlite, self.task_db, task_copy)
+            control = MissionControl(
+                TaskBoard(task_copy),
+                RuntimeStateStore(runtime_copy),
+            )
+            return await getattr(control, method_name)(*args, **kwargs)
+
+    async def get_mission(self, mission_id: str) -> Any:
+        return await self._call("get_mission", mission_id, require_task_db=False)
+
+    async def get_snapshot(self, mission_id: str) -> Any:
+        return await self._call("get_snapshot", mission_id, require_task_db=True)
+
+    async def list_tasks(self, mission_id: str, **kwargs: Any) -> Any:
+        return await self._call(
+            "list_tasks", mission_id, require_task_db=True, **kwargs
+        )
+
+
 def _normalize_lease_seconds(value: Any) -> int:
     """Return an authorization-safe lease duration without bool coercion."""
 
@@ -103,8 +171,20 @@ def _normalize_identifier(value: Any, label: str) -> str:
     return normalized
 
 
-def _normalize_actor(value: Any, *, default: str, label: str) -> str:
-    return _normalize_identifier(value or default, label)
+def _authorized_metadata(
+    metadata: Mapping[str, Any] | None,
+    principal: str,
+) -> dict[str, Any]:
+    """Copy caller metadata and stamp the transport-authenticated identity.
+
+    The reserved field is written last so request content can never impersonate
+    the principal resolved by the trusted embedding transport.
+    """
+
+    return {
+        **dict(metadata or {}),
+        AUTHORIZED_PRINCIPAL_METADATA_KEY: principal,
+    }
 
 
 def _normalize_priority(value: Any) -> TaskPriority:
@@ -191,18 +271,14 @@ class MissionControlMCPService:
                 tool_name=tool_name,
                 principal=principal,
                 mission_id=_normalize_identifier(mission_id, "mission_id"),
-                operator_id=_normalize_actor(
-                    operator_id,
-                    default="system",
-                    label="operator_id",
-                ),
+                operator_id=principal,
             ),
             lambda request: self._control.create_mission(
                 request.mission_id,
                 title=title,
                 goal=objective,
-                operator_id=request.operator_id,
-                metadata=metadata,
+                operator_id=request.principal,
+                metadata=_authorized_metadata(metadata, request.principal),
             ),
         )
 
@@ -230,11 +306,7 @@ class MissionControlMCPService:
                 tool_name=tool_name,
                 principal=principal,
                 mission_id=_normalize_identifier(mission_id, "mission_id"),
-                created_by=_normalize_actor(
-                    created_by,
-                    default="system",
-                    label="created_by",
-                ),
+                created_by=principal,
                 priority=parsed_priority.value,
                 dependency_count=len(dependency_ids),
                 dependency_ids=dependency_ids,
@@ -247,12 +319,12 @@ class MissionControlMCPService:
                 title=title,
                 description=description,
                 priority=TaskPriority(request.priority),
-                created_by=request.created_by,
+                created_by=request.principal,
                 depends_on=(
                     list(request.dependency_ids) if depends_on is not None else None
                 ),
                 idempotency_key=idempotency_key,
-                metadata=metadata,
+                metadata=_authorized_metadata(metadata, request.principal),
             )
 
         return await self._mutate(tool_name, request_factory, operation)
@@ -277,6 +349,7 @@ class MissionControlMCPService:
                 task_id=_normalize_identifier(task_id, "task_id"),
                 attempt_key=str(attempt_key or "").strip(),
                 agent_id=_normalize_identifier(agent_id, "agent_id"),
+                assigned_by=principal,
                 lease_seconds=_normalize_lease_seconds(lease_ttl_seconds),
             ),
             lambda request: self._control.start_attempt(
@@ -285,7 +358,8 @@ class MissionControlMCPService:
                 request.agent_id,
                 attempt_key=request.attempt_key,
                 lease_seconds=request.lease_seconds,
-                metadata=metadata,
+                assigned_by=request.principal,
+                metadata=_authorized_metadata(metadata, request.principal),
             ),
         )
 
@@ -317,7 +391,7 @@ class MissionControlMCPService:
                 request.agent_id,
                 attempt_id=request.attempt_id,
                 lease_seconds=request.lease_seconds,
-                metadata=metadata,
+                metadata=_authorized_metadata(metadata, request.principal),
             ),
         )
 
@@ -354,7 +428,7 @@ class MissionControlMCPService:
                 status=request.terminal_status,
                 result=result,
                 failure_code=error,
-                metadata=metadata,
+                metadata=_authorized_metadata(metadata, request.principal),
             ),
         )
 
@@ -422,8 +496,12 @@ class MissionControlMCPService:
         if not isinstance(principal, str):
             return None
         normalized = principal.strip()
-        if not normalized or len(normalized) > 256 or any(
-            character.isspace() or ord(character) < 32 for character in normalized
+        if (
+            not normalized
+            or len(normalized) > 256
+            or any(
+                character.isspace() or ord(character) < 32 for character in normalized
+            )
         ):
             return None
         return normalized
@@ -526,7 +604,9 @@ def _json_projection(value: Any) -> Any:
         return {str(key): _json_projection(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_projection(item) for item in value]
-    raise TypeError(f"unsupported Mission Control projection type: {type(value).__name__}")
+    raise TypeError(
+        f"unsupported Mission Control projection type: {type(value).__name__}"
+    )
 
 
 def create_mission_control_mcp(
@@ -563,10 +643,13 @@ def create_mission_control_mcp(
     server = FastMCP(
         server_name,
         instructions=(
-            "Read-first projection of canonical Mission Control state. "
+            "Read-first observed projection of canonical Mission Control state. "
+            "Bundled reads use immutable disposable snapshots and may lag rows "
+            "that the canonical owner has not checkpointed from its WAL. "
             "Mutation tools are denied unless the embedding process injects "
-            "both an authorizer and trusted principal identity. Attempt "
-            "records do not prove executor liveness."
+            "both an authorizer and trusted principal identity. The trusted "
+            "principal overrides caller actor fields and reserved attribution "
+            "metadata. Attempt records do not prove executor liveness."
         ),
     )
     read_only = ToolAnnotations(
@@ -583,24 +666,55 @@ def create_mission_control_mcp(
     )
 
     registrations = (
-        (service.get_mission, MISSION_GET,
-         "Read one canonical mission projection by mission ID.", read_only),
-        (service.get_snapshot, MISSION_SNAPSHOT,
-         "Read a coherent snapshot with reconciliation state.", read_only),
-        (service.list_tasks, MISSION_LIST_TASKS,
-         "List canonical TaskBoard tasks belonging to one mission.", read_only),
-        (service.create_mission, MISSION_CREATE,
-         "Create or project a mission; requires injected authorization.", mutation),
-        (service.create_task, MISSION_CREATE_TASK,
-         "Create a canonical task; requires injected authorization.", mutation),
-        (service.start_attempt, MISSION_START_ATTEMPT,
-         "Record an attempt and lease; authorized only; does not launch or prove a live executor.",
-         mutation),
-        (service.heartbeat_lease, MISSION_HEARTBEAT_LEASE,
-         "Refresh an existing lease; requires injected authorization.", mutation),
-        (service.finish_attempt, MISSION_FINISH_ATTEMPT,
-         "Record a terminal receipt then project task state; requires authorization.",
-         mutation),
+        (
+            service.get_mission,
+            MISSION_GET,
+            "Read one observed mission projection by mission ID.",
+            read_only,
+        ),
+        (
+            service.get_snapshot,
+            MISSION_SNAPSHOT,
+            "Read a bounded snapshot with explicit reconciliation or scan-saturation state.",
+            read_only,
+        ),
+        (
+            service.list_tasks,
+            MISSION_LIST_TASKS,
+            "List canonical TaskBoard tasks belonging to one mission.",
+            read_only,
+        ),
+        (
+            service.create_mission,
+            MISSION_CREATE,
+            "Create or project a mission; the trusted principal is its operator.",
+            mutation,
+        ),
+        (
+            service.create_task,
+            MISSION_CREATE_TASK,
+            "Create a canonical task; the trusted principal is its creator.",
+            mutation,
+        ),
+        (
+            service.start_attempt,
+            MISSION_START_ATTEMPT,
+            "Record an attempt and lease with the trusted principal as assigner; "
+            "does not launch or prove a live executor.",
+            mutation,
+        ),
+        (
+            service.heartbeat_lease,
+            MISSION_HEARTBEAT_LEASE,
+            "Refresh an existing lease; requires injected authorization.",
+            mutation,
+        ),
+        (
+            service.finish_attempt,
+            MISSION_FINISH_ATTEMPT,
+            "Record a terminal receipt then project task state; requires authorization.",
+            mutation,
+        ),
     )
     for function, name, description, tool_annotations in registrations:
         server.add_tool(
@@ -617,19 +731,16 @@ def create_mission_control_mcp(
 def create_default_mission_control_mcp() -> Any:
     """Bind canonical local owners to a read-only stdio-ready MCP server."""
 
-    from dharma_swarm.mission_control import MissionControl
-    from dharma_swarm.runtime_state import RuntimeStateStore
-    from dharma_swarm.task_board import TaskBoard
-
     state_dir = dharma_state_dir("DHARMA_STATE_DIR")
     task_db = state_dir / "db" / "tasks.db"
     runtime_db = state_dir / "state" / "runtime.db"
-    control = MissionControl(TaskBoard(task_db), RuntimeStateStore(runtime_db))
+    control = _ImmutableSnapshotMissionControl(
+        task_db=task_db,
+        runtime_db=runtime_db,
+    )
 
     def read_state_guard(tool_name: str) -> bool:
-        # Canonical owner read methods initialize SQLite before querying. Guard
-        # absent files here so merely connecting a read-only MCP client cannot
-        # create ~/.dharma, either database, or their parent directories.
+        # Guard absent files before constructing a disposable immutable copy.
         if tool_name == MISSION_GET:
             return runtime_db.is_file()
         return runtime_db.is_file() and task_db.is_file()

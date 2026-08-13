@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -10,6 +11,7 @@ from typing import Any
 import pytest
 
 from dharma_swarm.mission_control_mcp import (
+    AUTHORIZED_PRINCIPAL_METADATA_KEY,
     MISSION_CREATE,
     MISSION_CREATE_TASK,
     MISSION_FINISH_ATTEMPT,
@@ -298,7 +300,7 @@ async def test_authorizer_receives_only_minimal_non_secret_context() -> None:
             tool_name=MISSION_CREATE,
             principal="operator:alice",
             mission_id="m-1",
-            operator_id="system",
+            operator_id="operator:alice",
         )
     ]
     assert "Private" not in repr(requests[0])
@@ -308,8 +310,11 @@ async def test_authorizer_receives_only_minimal_non_secret_context() -> None:
         {
             "title": "Private mission title",
             "goal": "Private objective",
-            "operator_id": "system",
-            "metadata": {"private": "payload"},
+            "operator_id": "operator:alice",
+            "metadata": {
+                "private": "payload",
+                AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:alice",
+            },
         },
     )
 
@@ -420,6 +425,69 @@ async def test_create_task_converts_priority_on_authorized_path() -> None:
 
 
 @pytest.mark.asyncio
+async def test_trusted_principal_overrides_spoofed_actor_and_metadata_fields() -> None:
+    control = _FakeMissionControl()
+    service = MissionControlMCPService(
+        control,
+        mutation_authorizer=lambda _request: True,
+        trusted_principal="operator:trusted",
+    )
+    spoofed_metadata = {
+        "kept": "caller content",
+        AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:spoofed",
+    }
+
+    await service.create_mission(
+        "m",
+        "Mission",
+        operator_id="operator:spoofed",
+        metadata=spoofed_metadata,
+    )
+    await service.create_task(
+        "m",
+        "Task",
+        created_by="operator:spoofed",
+        metadata=spoofed_metadata,
+    )
+    await service.start_attempt(
+        "m",
+        "t",
+        "attempt-key",
+        "agent",
+        metadata=spoofed_metadata,
+    )
+    await service.heartbeat_lease(
+        "m",
+        "t",
+        "attempt",
+        "agent",
+        metadata=spoofed_metadata,
+    )
+    await service.finish_attempt(
+        "m",
+        "t",
+        "attempt",
+        "agent",
+        "succeeded",
+        metadata=spoofed_metadata,
+    )
+
+    expected_metadata = {
+        "kept": "caller content",
+        AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:trusted",
+    }
+    mission_call, task_call, start_call, heartbeat_call, finish_call = control.calls
+    assert mission_call[2]["operator_id"] == "operator:trusted"
+    assert task_call[2]["created_by"] == "operator:trusted"
+    assert start_call[2]["assigned_by"] == "operator:trusted"
+    for call in control.calls:
+        assert call[2]["metadata"] == expected_metadata
+    assert spoofed_metadata[AUTHORIZED_PRINCIPAL_METADATA_KEY] == "operator:spoofed"
+    assert heartbeat_call[2]["metadata"] == expected_metadata
+    assert finish_call[2]["metadata"] == expected_metadata
+
+
+@pytest.mark.asyncio
 async def test_fastmcp_registers_stable_names_and_honest_annotations() -> None:
     server = create_mission_control_mcp(_FakeMissionControl())
     tools = {tool.name: tool for tool in await server.list_tools()}
@@ -452,7 +520,9 @@ async def test_fastmcp_read_call_returns_structured_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fastmcp_mutation_is_denied_by_default_and_explicitly_authorizable() -> None:
+async def test_fastmcp_mutation_is_denied_by_default_and_explicitly_authorizable() -> (
+    None
+):
     denied_control = _FakeMissionControl()
     denied_server = create_mission_control_mcp(denied_control)
     denied = _structured_result(
@@ -532,6 +602,7 @@ async def test_all_attempt_mutations_route_through_authorizer() -> None:
             task_id="t",
             attempt_key="a",
             agent_id="agent",
+            assigned_by="operator:alice",
             lease_seconds=61,
         ),
         MutationRequest(
@@ -567,7 +638,11 @@ async def test_all_attempt_mutations_route_through_authorizer() -> None:
         {
             "attempt_key": "a",
             "lease_seconds": 61,
-            "metadata": {"secret": "start metadata"},
+            "assigned_by": "operator:alice",
+            "metadata": {
+                "secret": "start metadata",
+                AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:alice",
+            },
         },
     )
     assert control.calls[1][1:] == (
@@ -575,7 +650,10 @@ async def test_all_attempt_mutations_route_through_authorizer() -> None:
         {
             "attempt_id": "a",
             "lease_seconds": 62,
-            "metadata": {"secret": "heartbeat metadata"},
+            "metadata": {
+                "secret": "heartbeat metadata",
+                AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:alice",
+            },
         },
     )
     assert control.calls[2][1:] == (
@@ -585,7 +663,10 @@ async def test_all_attempt_mutations_route_through_authorizer() -> None:
             "status": "failed",
             "result": "private result",
             "failure_code": "E_PRIVATE",
-            "metadata": {"secret": "finish metadata"},
+            "metadata": {
+                "secret": "finish metadata",
+                AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:alice",
+            },
         },
     )
 
@@ -626,13 +707,24 @@ async def test_real_canonical_owners_round_trip_through_fastmcp(tmp_path) -> Non
     mission = _structured_result(
         await server.call_tool(
             MISSION_CREATE,
-            {"mission_id": "m-real", "title": "Real mission", "objective": "Prove joins"},
+            {
+                "mission_id": "m-real",
+                "title": "Real mission",
+                "objective": "Prove joins",
+                "operator_id": "operator:spoofed",
+                "metadata": {AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:spoofed"},
+            },
         )
     )
     task = _structured_result(
         await server.call_tool(
             MISSION_CREATE_TASK,
-            {"mission_id": "m-real", "title": "Round trip"},
+            {
+                "mission_id": "m-real",
+                "title": "Round trip",
+                "created_by": "operator:spoofed",
+                "metadata": {AUTHORIZED_PRINCIPAL_METADATA_KEY: "operator:spoofed"},
+            },
         )
     )
     task_id = task["data"]["task_id"]
@@ -677,8 +769,27 @@ async def test_real_canonical_owners_round_trip_through_fastmcp(tmp_path) -> Non
     )
 
     assert mission["data"]["goal"] == "Prove joins"
+    assert mission["data"]["operator_id"] == "operator:test"
+    assert mission["data"]["metadata"][AUTHORIZED_PRINCIPAL_METADATA_KEY] == (
+        "operator:test"
+    )
+    stored_task = await board.get(task_id)
+    assert stored_task is not None
+    assert stored_task.created_by == "operator:test"
+    assert stored_task.metadata[AUTHORIZED_PRINCIPAL_METADATA_KEY] == "operator:test"
+    assert attempt["data"]["assigned_by"] == "operator:test"
+    assert attempt["data"]["metadata"][AUTHORIZED_PRINCIPAL_METADATA_KEY] == (
+        "operator:test"
+    )
     assert heartbeat["data"]["attempt_id"] == attempt_id
+    assert heartbeat["data"]["metadata"][AUTHORIZED_PRINCIPAL_METADATA_KEY] == (
+        "operator:test"
+    )
     assert receipt["data"]["status"] == "succeeded"
+    receipt_principal = receipt["data"]["payload"]["metadata"][
+        AUTHORIZED_PRINCIPAL_METADATA_KEY
+    ]
+    assert receipt_principal == "operator:test"
     assert snapshot["ok"] is True, snapshot
     assert snapshot["data"]["reconciliation"] == "coherent"
     assert snapshot["data"]["proves_executor_liveness"] is False
@@ -710,9 +821,7 @@ async def test_default_factory_is_read_only_and_does_not_initialize_state(
     ]
 
     assert set(tools) == set(TOOL_NAMES)
-    assert {result["error"]["code"] for result in reads} == {
-        "state_not_initialized"
-    }
+    assert {result["error"]["code"] for result in reads} == {"state_not_initialized"}
     assert not state_dir.exists()
 
 
@@ -736,20 +845,124 @@ async def test_default_reads_do_not_create_absent_databases_in_existing_root(
     assert list(state_dir.iterdir()) == []
 
 
+@pytest.mark.asyncio
+async def test_default_reads_do_not_mutate_existing_database_tree_or_wal(
+    tmp_path, monkeypatch
+) -> None:
+    from dharma_swarm.mission_control import MissionControl
+    from dharma_swarm.runtime_state import RuntimeStateStore
+    from dharma_swarm.task_board import TaskBoard
+
+    state_dir = tmp_path / "canonical-state"
+    task_db = state_dir / "db" / "tasks.db"
+    runtime_db = state_dir / "state" / "runtime.db"
+    task_db.parent.mkdir(parents=True)
+    runtime_db.parent.mkdir(parents=True)
+    runtime = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    board = TaskBoard(task_db)
+    await runtime.init_db()
+    await board.init_db()
+    control = MissionControl(board, runtime)
+    await control.create_mission("m-checkpointed", title="Checkpointed mission")
+    await control.create_task("m-checkpointed", title="Checkpointed task")
+
+    for path in (runtime_db, task_db):
+        with sqlite3.connect(path) as connection:
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+
+    runtime_writer = sqlite3.connect(runtime_db)
+    task_writer = sqlite3.connect(task_db)
+    try:
+        for connection in (runtime_writer, task_writer):
+            assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+            connection.execute("PRAGMA wal_autocheckpoint=0")
+
+        # This mission remains committed only in the live WAL. Immutable bundled
+        # reads intentionally lag it rather than touching the canonical sidecar.
+        await control.create_mission("m-wal-only", title="WAL-only mission")
+        task_writer.execute("CREATE TABLE wal_only_probe (identifier TEXT PRIMARY KEY)")
+        task_writer.execute("INSERT INTO wal_only_probe VALUES ('present')")
+        task_writer.commit()
+        assert await control.get_mission("m-wal-only") is not None
+
+        expected_sidecars = {
+            runtime_db.with_name(f"{runtime_db.name}-wal"),
+            runtime_db.with_name(f"{runtime_db.name}-shm"),
+            task_db.with_name(f"{task_db.name}-wal"),
+            task_db.with_name(f"{task_db.name}-shm"),
+        }
+        assert all(path.is_file() for path in expected_sidecars)
+
+        def fingerprint() -> dict[str, tuple[Any, ...]]:
+            entries: dict[str, tuple[Any, ...]] = {}
+            paths = [state_dir, *state_dir.rglob("*")]
+            for path in sorted(
+                paths, key=lambda item: str(item.relative_to(state_dir))
+            ):
+                relative = (
+                    "." if path == state_dir else str(path.relative_to(state_dir))
+                )
+                stat = path.stat()
+                if path.is_dir():
+                    entries[relative] = ("directory", stat.st_mtime_ns, stat.st_mode)
+                else:
+                    entries[relative] = (
+                        "file",
+                        path.read_bytes(),
+                        stat.st_mtime_ns,
+                        stat.st_mode,
+                    )
+            return entries
+
+        before = fingerprint()
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(state_dir))
+        server = mission_control_mcp.create_default_mission_control_mcp()
+        checkpointed = _structured_result(
+            await server.call_tool(
+                MISSION_GET,
+                {"mission_id": "m-checkpointed"},
+            )
+        )
+        wal_only = _structured_result(
+            await server.call_tool(MISSION_GET, {"mission_id": "m-wal-only"})
+        )
+        snapshot = _structured_result(
+            await server.call_tool(
+                MISSION_SNAPSHOT,
+                {"mission_id": "m-checkpointed"},
+            )
+        )
+        tasks = _structured_result(
+            await server.call_tool(
+                MISSION_LIST_TASKS,
+                {"mission_id": "m-checkpointed"},
+            )
+        )
+
+        assert checkpointed["ok"] is True
+        assert wal_only["error"]["code"] == "not_found"
+        assert snapshot["ok"] is True
+        assert tasks["ok"] is True
+        assert fingerprint() == before
+    finally:
+        runtime_writer.close()
+        task_writer.close()
+
+
 def test_default_factory_binds_canonical_state_paths(tmp_path, monkeypatch) -> None:
     observed: dict[str, object] = {}
 
-    class _Board:
-        def __init__(self, path) -> None:
-            observed["task_board"] = path
-
-    class _Runtime:
-        def __init__(self, path) -> None:
-            observed["runtime_state"] = path
+    class _SnapshotControl:
+        def __init__(self, *, task_db, runtime_db) -> None:
+            observed["task_board"] = task_db
+            observed["runtime_state"] = runtime_db
 
     monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_path))
-    monkeypatch.setattr("dharma_swarm.task_board.TaskBoard", _Board)
-    monkeypatch.setattr("dharma_swarm.runtime_state.RuntimeStateStore", _Runtime)
+    monkeypatch.setattr(
+        mission_control_mcp,
+        "_ImmutableSnapshotMissionControl",
+        _SnapshotControl,
+    )
     mission_control_mcp.create_default_mission_control_mcp()
 
     assert observed == {

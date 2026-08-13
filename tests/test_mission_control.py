@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import dharma_swarm.mission_control as mission_control_module
 import dharma_swarm.runtime_state as runtime_state_module
 from dharma_swarm.mission_control import (
     SCHEMA_VERSION,
@@ -14,7 +15,7 @@ from dharma_swarm.mission_control import (
     MissionControlError,
     ReconciliationState,
 )
-from dharma_swarm.models import TaskStatus
+from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import RuntimeStateStore, TaskClaim
 from dharma_swarm.task_board import TaskBoard, TaskBoardError
@@ -412,7 +413,10 @@ async def test_snapshot_reports_receipt_projection_crash_honestly(
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
     assert snapshot.tasks[0].status == TaskStatus.RUNNING
-    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
+    assert (
+        snapshot.reconciliation
+        == ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+    )
 
 
 @pytest.mark.asyncio
@@ -811,8 +815,8 @@ async def test_create_task_fails_closed_when_idempotency_scan_saturates(
     assert backing is not None
 
     async def saturated_scan(*args, **kwargs):
-        assert kwargs["limit"] == 10_000
-        return [backing] * 10_000
+        assert kwargs["limit"] == 10_001
+        return [backing] * 10_001
 
     monkeypatch.setattr(mission_control._board, "list_tasks", saturated_scan)
     with pytest.raises(MissionControlError, match="scan saturated"):
@@ -864,10 +868,10 @@ async def test_conflicting_concurrent_finishes_publish_one_terminal_receipt(
 @pytest.mark.asyncio
 async def test_tests_use_only_explicit_state_paths(
     mission_control: MissionControl,
+    tmp_path: Path,
 ) -> None:
     assert mission_control._runtime.db_path.name == "runtime.db"
-    assert str(mission_control._runtime.db_path).startswith("/private/") or \
-        "pytest-" in str(mission_control._runtime.db_path)
+    assert mission_control._runtime.db_path.is_relative_to(tmp_path)
     assert mission_control._runtime.db_path != Path.home() / ".dharma/state/runtime.db"
 
 
@@ -1149,3 +1153,737 @@ async def test_snapshot_reports_multiple_terminal_receipts_as_conflict(
         snapshot.reconciliation
         == ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
     )
+
+
+@pytest.mark.asyncio
+async def test_expired_takeover_repairs_durable_terminal_without_new_attempt(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    original_record_run = mission_control._runtime.record_delegation_run
+
+    async def crash_before_terminal_run_projection(run):
+        if run.run_id == attempt.attempt_id and run.status == "completed":
+            raise RuntimeError("simulated receipt-before-run crash")
+        return await original_record_run(run)
+
+    monkeypatch.setattr(
+        mission_control._runtime,
+        "record_delegation_run",
+        crash_before_terminal_run_projection,
+    )
+    with pytest.raises(RuntimeError, match="receipt-before-run"):
+        await mission_control.finish_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+            status="succeeded",
+            result="durable-result",
+        )
+    monkeypatch.setattr(
+        mission_control._runtime,
+        "record_delegation_run",
+        original_record_run,
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert claim is not None and claim.status == "active"
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+
+    with pytest.raises(MissionControlError, match="cannot start from 'completed'"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="must-not-be-created",
+        )
+
+    repaired_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    repaired_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    projected = await mission_control._board.get(task.task_id)
+    recoveries = await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_recovery",
+        limit=10,
+    )
+    runs = await mission_control._runtime.list_delegation_runs(
+        task_id=task.task_id,
+        limit=10,
+    )
+    assert repaired_run is not None and repaired_run.status == "completed"
+    assert repaired_claim is not None and repaired_claim.status == "completed"
+    assert projected is not None and projected.status == TaskStatus.COMPLETED
+    assert recoveries == []
+    assert [run.run_id for run in runs] == [attempt.attempt_id]
+
+
+@pytest.mark.asyncio
+async def test_terminal_projection_keeps_claim_open_until_task_is_terminal(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+
+    async def crash_before_task_projection(*args, **kwargs):
+        raise TaskBoardError("task projection unavailable")
+
+    monkeypatch.setattr(
+        mission_control._board, "complete", crash_before_task_projection
+    )
+    with pytest.raises(MissionControlError, match="task projection unavailable"):
+        await mission_control.finish_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+            status="succeeded",
+        )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert run is not None and run.status == "completed"
+    assert claim is not None and claim.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_post_task_pre_claim_crash_is_projection_drift_not_coherent(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    original_record_claim = mission_control._runtime.record_task_claim
+
+    async def crash_before_claim_close(claim):
+        if claim.claim_id == attempt.claim_id and claim.status == "completed":
+            raise RuntimeError("simulated task-before-claim crash")
+        return await original_record_claim(claim)
+
+    monkeypatch.setattr(
+        mission_control._runtime, "record_task_claim", crash_before_claim_close
+    )
+    with pytest.raises(RuntimeError, match="task-before-claim"):
+        await mission_control.finish_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+            status="succeeded",
+        )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.tasks[0].status == TaskStatus.COMPLETED
+    assert snapshot.attempts[0].status == "succeeded"
+    assert snapshot.leases[0].status == "active"
+    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
+
+    monkeypatch.setattr(
+        mission_control._runtime, "record_task_claim", original_record_claim
+    )
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+    )
+    repaired = await mission_control.get_snapshot("m-alpha")
+    assert repaired is not None
+    assert repaired.leases[0].status == "completed"
+    assert repaired.reconciliation == ReconciliationState.COHERENT
+
+
+@pytest.mark.asyncio
+async def test_snapshot_rejects_terminal_claim_outcome_mismatch(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(replace(claim, status="failed"))
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert (
+        snapshot.reconciliation
+        == ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+    )
+
+
+@pytest.mark.asyncio
+async def test_recovery_claim_close_crash_is_projection_drift_and_retry_repairs(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="recovery-crash-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    original_record_claim = mission_control._runtime.record_task_claim
+
+    async def crash_before_recovery_claim_close(candidate):
+        if candidate.claim_id == first.claim_id and candidate.status == "stale_recovered":
+            raise RuntimeError("simulated recovery-before-claim crash")
+        return await original_record_claim(candidate)
+
+    monkeypatch.setattr(
+        mission_control._runtime,
+        "record_task_claim",
+        crash_before_recovery_claim_close,
+    )
+    with pytest.raises(RuntimeError, match="recovery-before-claim"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="recovery-crash-two",
+        )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.attempts[0].status == "stale_recovered"
+    assert snapshot.leases[0].status == "active"
+    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
+
+    monkeypatch.setattr(
+        mission_control._runtime, "record_task_claim", original_record_claim
+    )
+    second = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_key="recovery-crash-two",
+    )
+    repaired = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert repaired is not None and repaired.status == "stale_recovered"
+    assert second.status == "queued"
+
+
+@pytest.mark.asyncio
+async def test_terminal_claim_without_run_never_reports_coherent(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+    )
+
+    async def missing_runs(*args, **kwargs):
+        return []
+
+    async def missing_receipts(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        mission_control._runtime, "list_delegation_runs", missing_runs
+    )
+    monkeypatch.setattr(
+        mission_control._runtime, "list_runtime_receipts", missing_receipts
+    )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.leases[0].status == "completed"
+    assert snapshot.attempts == ()
+    assert snapshot.reconciliation == ReconciliationState.FOREIGN_RUNTIME_RECORD
+
+
+@pytest.mark.asyncio
+async def test_snapshot_receipt_budget_is_global_across_attempts(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="receipt-budget-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    second = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_key="receipt-budget-two",
+    )
+    await mission_control.heartbeat_lease(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_id=second.attempt_id,
+    )
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_id=second.attempt_id,
+        status="succeeded",
+    )
+
+    monkeypatch.setattr(mission_control_module, "RUNTIME_SCAN_LIMIT", 2)
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert len(snapshot.receipts) <= 2
+    assert snapshot.reconciliation == ReconciliationState.EVIDENCE_SCAN_SATURATED
+
+
+@pytest.mark.asyncio
+async def test_terminal_finish_repairs_running_run_with_assigned_task(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_key="running-projection-crash",
+    )
+    original_project_running = mission_control._project_running_task
+
+    async def crash_after_running_run(*args, **kwargs):
+        raise RuntimeError("simulated run-before-task crash")
+
+    monkeypatch.setattr(
+        mission_control, "_project_running_task", crash_after_running_run
+    )
+    with pytest.raises(RuntimeError, match="run-before-task"):
+        await mission_control.heartbeat_lease(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+        )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    projected = await mission_control._board.get(task.task_id)
+    assert run is not None and run.status == "running"
+    assert projected is not None and projected.status == TaskStatus.ASSIGNED
+
+    monkeypatch.setattr(
+        mission_control, "_project_running_task", original_project_running
+    )
+    receipt = await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+        result="repaired",
+    )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert receipt.status == "succeeded"
+    assert snapshot is not None
+    assert snapshot.tasks[0].status == TaskStatus.COMPLETED
+    assert snapshot.attempts[0].status == "succeeded"
+    assert snapshot.leases[0].status == "completed"
+    assert snapshot.reconciliation == ReconciliationState.COHERENT
+
+
+@pytest.mark.asyncio
+async def test_post_recovery_pre_replacement_crash_is_projection_drift(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="post-recovery-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    original_recover = mission_control._recover_expired_claim
+
+    async def recover_then_crash(*args, **kwargs):
+        repaired_terminal = await original_recover(*args, **kwargs)
+        assert repaired_terminal is False
+        raise RuntimeError("simulated recovery-before-replacement crash")
+
+    monkeypatch.setattr(
+        mission_control, "_recover_expired_claim", recover_then_crash
+    )
+    with pytest.raises(RuntimeError, match="recovery-before-replacement"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="post-recovery-two",
+        )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.tasks[0].status == TaskStatus.RUNNING
+    assert snapshot.tasks[0].metadata["mission_attempt_id"] == first.attempt_id
+    assert snapshot.attempts[0].status == "stale_recovered"
+    assert snapshot.leases[0].status == "stale_recovered"
+    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
+
+    monkeypatch.setattr(
+        mission_control, "_recover_expired_claim", original_recover
+    )
+    second = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_key="post-recovery-two",
+    )
+    repaired = await mission_control.get_snapshot("m-alpha")
+    assert second.status == "queued"
+    assert repaired is not None
+    assert repaired.tasks[0].metadata["mission_attempt_id"] == second.attempt_id
+    assert repaired.reconciliation == ReconciliationState.COHERENT
+
+
+@pytest.mark.asyncio
+async def test_recovery_evidence_cannot_authorize_terminal_task(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="recovery-terminal-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    await mission_control._recover_expired_claim(
+        "m-alpha", claim, recovered_at=datetime.now(timezone.utc)
+    )
+    await mission_control._board.complete(task.task_id, result="foreign completion")
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert (
+        snapshot.reconciliation
+        == ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+    )
+
+
+@pytest.mark.asyncio
+async def test_recovered_attempt_then_replacement_success_is_coherent(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="replacement-success-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    second = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_key="replacement-success-two",
+    )
+    await mission_control.heartbeat_lease(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_id=second.attempt_id,
+    )
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_id=second.attempt_id,
+        status="succeeded",
+    )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert {attempt.status for attempt in snapshot.attempts} == {
+        "stale_recovered",
+        "succeeded",
+    }
+    assert snapshot.tasks[0].status == TaskStatus.COMPLETED
+    assert snapshot.reconciliation == ReconciliationState.COHERENT
+
+
+@pytest.mark.asyncio
+async def test_task_projection_without_matching_run_is_never_coherent(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    await mission_control._board.assign(task.task_id, "foreign-agent")
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.tasks[0].status == TaskStatus.ASSIGNED
+    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
+
+
+@pytest.mark.asyncio
+async def test_unknown_owner_lifecycle_status_is_foreign_runtime_state(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-a", attempt_key="unknown-owner-status"
+    )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    assert run is not None
+    await mission_control._runtime.record_delegation_run(
+        replace(run, status="mystery")
+    )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.reconciliation == ReconciliationState.FOREIGN_RUNTIME_RECORD
+
+
+@pytest.mark.asyncio
+async def test_creation_races_are_serialized_with_complete_content(
+    mission_control: MissionControl,
+) -> None:
+    mission_results = await asyncio.gather(
+        mission_control.create_mission(
+            "race-mission", title="One", operator_id="operator-one"
+        ),
+        mission_control.create_mission(
+            "race-mission", title="Two", operator_id="operator-two"
+        ),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(item, MissionControlError) for item in mission_results) == 1
+
+    await mission_control.create_mission("task-race", title="Task race")
+    task_results = await asyncio.gather(
+        mission_control.create_task(
+            "task-race",
+            title="Exactly once",
+            priority=TaskPriority.HIGH,
+            created_by="creator",
+            idempotency_key="same-key",
+            metadata={"shape": "same"},
+        ),
+        mission_control.create_task(
+            "task-race",
+            title="Exactly once",
+            priority=TaskPriority.HIGH,
+            created_by="creator",
+            idempotency_key="same-key",
+            metadata={"shape": "same"},
+        ),
+    )
+    assert task_results[0].task_id == task_results[1].task_id
+    assert len(await mission_control.list_tasks("task-race")) == 1
+
+
+@pytest.mark.parametrize(
+    "changed",
+    (
+        {"priority": TaskPriority.HIGH},
+        {"created_by": "different-creator"},
+        {"metadata": {"shape": "different"}},
+    ),
+)
+@pytest.mark.asyncio
+async def test_task_idempotency_rejects_all_material_content_conflicts(
+    mission_control: MissionControl,
+    changed: dict[str, object],
+) -> None:
+    await mission_control.create_mission("content-check", title="Content")
+    base = {
+        "title": "Stable task",
+        "priority": TaskPriority.NORMAL,
+        "created_by": "creator",
+        "idempotency_key": "content-key",
+        "metadata": {"shape": "base"},
+    }
+    await mission_control.create_task("content-check", **base)
+    with pytest.raises(MissionControlError, match="conflicting content"):
+        await mission_control.create_task(
+            "content-check",
+            **{**base, **changed},
+        )
+
+
+@pytest.mark.asyncio
+async def test_cross_mission_dependency_is_rejected(
+    mission_control: MissionControl,
+) -> None:
+    await mission_control.create_mission("mission-one", title="One")
+    await mission_control.create_mission("mission-two", title="Two")
+    dependency = await mission_control.create_task(
+        "mission-one", title="Foreign dependency"
+    )
+    with pytest.raises(MissionControlError, match="does not belong"):
+        await mission_control.create_task(
+            "mission-two",
+            title="Must remain scoped",
+            depends_on=[dependency.task_id],
+        )
+
+
+@pytest.mark.asyncio
+async def test_task_idempotency_rejects_a_changed_dependency_set(
+    mission_control: MissionControl,
+) -> None:
+    await mission_control.create_mission("dependency-content", title="Dependencies")
+    first_dependency = await mission_control.create_task(
+        "dependency-content", title="First dependency"
+    )
+    second_dependency = await mission_control.create_task(
+        "dependency-content", title="Second dependency"
+    )
+    await mission_control.create_task(
+        "dependency-content",
+        title="Dependent",
+        depends_on=[first_dependency.task_id],
+        idempotency_key="dependency-key",
+    )
+    with pytest.raises(MissionControlError, match="conflicting content"):
+        await mission_control.create_task(
+            "dependency-content",
+            title="Dependent",
+            depends_on=[second_dependency.task_id],
+            idempotency_key="dependency-key",
+        )
+
+
+@pytest.mark.asyncio
+async def test_snapshot_rejects_forged_recovery_receipt_contract(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(
+        mission_control,
+        task.task_id,
+        agent_id="agent-a",
+        attempt_key="recovery-contract-one",
+    )
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+    )
+    await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_key="recovery-contract-two",
+    )
+    recovery = await mission_control._runtime.list_runtime_receipts(
+        run_id=first.attempt_id,
+        receipt_type="mission_attempt_recovery",
+        limit=2,
+    )
+    assert len(recovery) == 1
+    await mission_control._runtime.record_runtime_receipt(
+        replace(recovery[0], side_effect_key="forged-recovery-effect")
+    )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert (
+        snapshot.reconciliation
+        == ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+    )
+
+
+@pytest.mark.asyncio
+async def test_snapshot_and_resolution_fail_closed_on_scan_saturation(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    backing = await mission_control._board.get(task.task_id)
+    assert backing is not None
+    monkeypatch.setattr(mission_control_module, "TASK_SCAN_LIMIT", 1)
+
+    async def saturated_tasks(*args, **kwargs):
+        assert kwargs["limit"] == 2
+        return [backing, backing]
+
+    monkeypatch.setattr(mission_control._board, "list_tasks", saturated_tasks)
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.reconciliation == ReconciliationState.EVIDENCE_SCAN_SATURATED
+
+    monkeypatch.undo()
+    attempt = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-a", attempt_key="scan-attempt"
+    )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert run is not None and claim is not None
+    monkeypatch.setattr(mission_control_module, "RUNTIME_SCAN_LIMIT", 1)
+
+    async def saturated_runs(*args, **kwargs):
+        assert kwargs["limit"] == 2
+        return [run, run]
+
+    monkeypatch.setattr(
+        mission_control._runtime, "list_delegation_runs", saturated_runs
+    )
+    with pytest.raises(MissionControlError, match="attempt scan saturated"):
+        await mission_control.heartbeat_lease(
+            "m-alpha", task.task_id, "agent-a"
+        )
+
+    async def saturated_claims(*args, **kwargs):
+        assert kwargs["limit"] == 2
+        return [claim, claim]
+
+    monkeypatch.setattr(mission_control._runtime, "list_task_claims", saturated_claims)
+    with pytest.raises(MissionControlError, match="claim scan saturated"):
+        await mission_control._claims_for_fencing(task.task_id)

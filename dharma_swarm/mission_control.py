@@ -8,9 +8,11 @@ executor process is live.
 TaskBoard and RuntimeStateStore use separate databases.  Mutations therefore
 write runtime evidence before projecting terminal task state; a crash between
 those steps is reported as ``needs_task_projection`` and is never presented as
-an atomic completion.  The adapter serializes its own terminal writes with the
-runtime idempotency record, but the owner still permits direct receipt upserts;
-true receipt immutability requires an owner-schema constraint.
+an atomic completion. Terminal retry repairs a PENDING or ASSIGNED TaskBoard
+projection from the same fenced identity before completing it. The adapter
+serializes its own terminal writes with the runtime idempotency record, but the
+owner still permits direct receipt upserts; true receipt immutability requires
+an owner-schema constraint.
 """
 
 from __future__ import annotations
@@ -82,6 +84,20 @@ def _serialized_task(method):
     return guarded
 
 
+def _operation_hash(label: str, payload: dict[str, Any]) -> str:
+    """Hash caller-controlled creation intent using TaskBoard's JSON boundary."""
+    try:
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise MissionControlError(f"{label} metadata must be JSON-serializable") from exc
+    return hashlib.sha256(encoded).hexdigest()
+
+
 class MissionControl(MissionControlProjectionMixin):
     """Join and mutate canonical owner records without creating new storage."""
 
@@ -98,6 +114,8 @@ class MissionControl(MissionControlProjectionMixin):
         self._board = board
         self._runtime = runtime_state
         self._task_locks: dict[str, asyncio.Lock] = {}
+        self._mission_locks: dict[str, asyncio.Lock] = {}
+        self._task_creation_locks: dict[str, asyncio.Lock] = {}
 
     async def create_mission(
         self,
@@ -112,33 +130,47 @@ class MissionControl(MissionControlProjectionMixin):
         title = str(title or "").strip()
         if not title:
             raise MissionControlError("title is required")
-        session_id = mission_session_id(mission_id)
-        existing = await self._runtime.get_session(session_id)
-        expected = {
+        goal = str(goal or "")
+        operator_id = str(operator_id or "system")
+        requested_metadata = {
             **dict(metadata or {}),
             "schema_version": SCHEMA_VERSION,
             "mission_id": mission_id,
             "title": title,
-            "goal": str(goal or ""),
+            "goal": goal,
         }
-        if existing is not None:
-            if (
-                existing.metadata.get("mission_id") != mission_id
-                or existing.metadata.get("schema_version") != SCHEMA_VERSION
-                or existing.metadata.get("title") != title
-                or existing.metadata.get("goal", "") != str(goal or "")
-            ):
-                raise MissionControlError(
-                    f"mission {mission_id!r} already exists with conflicting content"
-                )
-            return mission_view(existing)
-        session = SessionState(
-            session_id=session_id,
-            operator_id=str(operator_id or "system"),
-            status="active",
-            metadata=expected,
+        creation_hash = _operation_hash(
+            "mission",
+            {
+                "operator_id": operator_id,
+                "metadata": requested_metadata,
+            },
         )
-        return mission_view(await self._runtime.upsert_session(session))
+        expected = {
+            **requested_metadata,
+            "mission_creation_hash": creation_hash,
+        }
+        lock = self._mission_locks.setdefault(mission_id, asyncio.Lock())
+        async with lock:
+            session_id = mission_session_id(mission_id)
+            existing = await self._runtime.get_session(session_id)
+            if existing is not None:
+                if (
+                    existing.operator_id != operator_id
+                    or existing.metadata.get("mission_creation_hash")
+                    != creation_hash
+                ):
+                    raise MissionControlError(
+                        f"mission {mission_id!r} already exists with conflicting content"
+                    )
+                return mission_view(existing)
+            session = SessionState(
+                session_id=session_id,
+                operator_id=operator_id,
+                status="active",
+                metadata=expected,
+            )
+            return mission_view(await self._runtime.upsert_session(session))
 
     async def get_mission(self, mission_id: str) -> MissionView | None:
         session = await self._runtime.get_session(mission_session_id(mission_id))
@@ -161,25 +193,34 @@ class MissionControl(MissionControlProjectionMixin):
     ) -> TaskView:
         mission_id = clean_identifier(mission_id, "mission_id")
         await self._require_mission(mission_id)
-        key = str(idempotency_key or "").strip()
-        if key:
-            scanned = await self._board.list_tasks(limit=TASK_SCAN_LIMIT)
-            for task in scanned:
-                if task.metadata.get("mission_task_idempotency_key") == key:
-                    if (
-                        task.metadata.get("mission_id") != mission_id
-                        or task.metadata.get("schema_version") != SCHEMA_VERSION
-                    ):
-                        continue
-                    if task.title != title or task.description != description:
-                        raise MissionControlError(
-                            f"task idempotency key {key!r} has conflicting content"
-                        )
-                    return task_view(task, mission_id)
-            if len(scanned) >= TASK_SCAN_LIMIT:
+        title = str(title or "")
+        description = str(description or "")
+        try:
+            priority = TaskPriority(priority)
+        except ValueError as exc:
+            raise MissionControlError(f"invalid task priority: {priority!r}") from exc
+        created_by = str(created_by or "system")
+        dependency_ids = [
+            clean_identifier(dependency_id, "depends_on item")
+            for dependency_id in (depends_on or ())
+        ]
+        if len(set(dependency_ids)) != len(dependency_ids):
+            raise MissionControlError("depends_on contains a duplicate task ID")
+        for dependency_id in dependency_ids:
+            dependency = await self._board.get(dependency_id)
+            if dependency is None:
                 raise MissionControlError(
-                    "task idempotency scan saturated; uniqueness cannot be proven"
+                    f"dependency task {dependency_id!r} was not found"
                 )
+            if (
+                dependency.metadata.get("mission_id") != mission_id
+                or dependency.metadata.get("schema_version") != SCHEMA_VERSION
+            ):
+                raise MissionControlError(
+                    f"dependency task {dependency_id!r} does not belong to "
+                    f"mission {mission_id!r}"
+                )
+        key = str(idempotency_key or "").strip()
         task_metadata = {
             **dict(metadata or {}),
             "schema_version": SCHEMA_VERSION,
@@ -187,15 +228,51 @@ class MissionControl(MissionControlProjectionMixin):
         }
         if key:
             task_metadata["mission_task_idempotency_key"] = key
-        task = await self._board.create(
-            title=title,
-            description=description,
-            priority=priority,
-            created_by=created_by,
-            depends_on=depends_on,
-            metadata=task_metadata,
+        operation_hash = _operation_hash(
+            "task",
+            {
+                "title": title,
+                "description": description,
+                "priority": priority.value,
+                "created_by": created_by,
+                "depends_on": sorted(dependency_ids),
+                "metadata": task_metadata,
+            },
         )
-        return task_view(task, mission_id)
+        task_metadata["mission_task_creation_hash"] = operation_hash
+        lock_key = f"{mission_id}\x1f{key}" if key else f"{mission_id}\x1f:new"
+        lock = self._task_creation_locks.setdefault(lock_key, asyncio.Lock())
+        async with lock:
+            if key:
+                scanned = await self._board.list_tasks(limit=TASK_SCAN_LIMIT + 1)
+                for task in scanned[:TASK_SCAN_LIMIT]:
+                    if task.metadata.get("mission_task_idempotency_key") == key:
+                        if (
+                            task.metadata.get("mission_id") != mission_id
+                            or task.metadata.get("schema_version") != SCHEMA_VERSION
+                        ):
+                            continue
+                        if (
+                            task.metadata.get("mission_task_creation_hash")
+                            != operation_hash
+                        ):
+                            raise MissionControlError(
+                                f"task idempotency key {key!r} has conflicting content"
+                            )
+                        return task_view(task, mission_id)
+                if len(scanned) > TASK_SCAN_LIMIT:
+                    raise MissionControlError(
+                        "task idempotency scan saturated; uniqueness cannot be proven"
+                    )
+            task = await self._board.create(
+                title=title,
+                description=description,
+                priority=priority,
+                created_by=created_by,
+                depends_on=dependency_ids,
+                metadata=task_metadata,
+            )
+            return task_view(task, mission_id)
 
     async def list_tasks(
         self,
@@ -314,15 +391,29 @@ class MissionControl(MissionControlProjectionMixin):
 
         now = utc_now()
         orphan_claim = await self._runtime.get_task_claim(claim_id)
+        terminal_repaired = False
         for prior_claim in claims:
             if (
                 prior_claim.claim_id != claim_id
                 and prior_claim.status.lower() in OPEN_CLAIM_STATUSES
                 and claim_is_expired(prior_claim, now)
             ):
-                await self._recover_expired_claim(
+                terminal_repaired = await self._recover_expired_claim(
                     mission_id, prior_claim, recovered_at=now
                 )
+                if terminal_repaired:
+                    break
+        # Recovery may have projected pre-existing terminal evidence.  Re-read
+        # the independent TaskBoard owner before minting any replacement lineage.
+        task = await self._require_task(mission_id, task_id)
+        if task.status not in {
+            TaskStatus.PENDING,
+            TaskStatus.ASSIGNED,
+            TaskStatus.RUNNING,
+        }:
+            raise MissionControlError(
+                f"task {task_id!r} cannot start from {task.status.value!r}"
+            )
         claims = await self._claims_for_fencing(task_id)
         active = [
             claim
@@ -683,41 +774,14 @@ class MissionControl(MissionControlProjectionMixin):
                 raise MissionControlError(
                     f"terminal ownership for attempt {run.run_id!r} was lost"
                 ) from exc
-        now = utc_now()
-        if run.status != owner_terminal_status or run.completed_at is None:
-            await self._runtime.record_delegation_run(
-                replace(
-                    run,
-                    status=owner_terminal_status,
-                    completed_at=run.completed_at or now,
-                    failure_code=str(failure_code or ""),
-                    metadata=self._attempt_metadata(
-                        metadata,
-                        base=run.metadata,
-                        mission_id=mission_id,
-                        attempt_id=run.run_id,
-                        attempt_key=attempt_key,
-                    ),
-                )
-            )
-        claim_terminal = "completed" if terminal_status == "succeeded" else "failed"
-        if claim.status != claim_terminal:
-            await self._runtime.record_task_claim(
-                replace(
-                    claim,
-                    status=claim_terminal,
-                    heartbeat_at=now,
-                    stale_after=now,
-                    metadata=self._attempt_metadata(
-                        metadata,
-                        base=claim.metadata,
-                        mission_id=mission_id,
-                        attempt_id=run.run_id,
-                        attempt_key=attempt_key,
-                    ),
-                )
-            )
-        await self._project_terminal_task(task, terminal_status, result, failure_code)
+        await self._project_terminal_lineage(
+            mission_id,
+            task=task,
+            run=run,
+            claim=claim,
+            identity=identity,
+            receipt=receipt,
+        )
         return receipt_view(receipt, mission_id)
 
     async def get_snapshot(self, mission_id: str) -> MissionSnapshot | None:
@@ -726,32 +790,48 @@ class MissionControl(MissionControlProjectionMixin):
         if mission is None:
             return None
         now = utc_now()
-        tasks = await self.list_tasks(mission_id, limit=1_000)
-        runs = await self._runtime.list_delegation_runs(
-            session_id=mission_session_id(mission_id), limit=RUNTIME_SCAN_LIMIT
+        scanned_tasks = await self._board.list_tasks(limit=TASK_SCAN_LIMIT + 1)
+        scan_saturated = len(scanned_tasks) > TASK_SCAN_LIMIT
+        tasks = tuple(
+            task_view(task, mission_id)
+            for task in scanned_tasks[:TASK_SCAN_LIMIT]
+            if task.metadata.get("mission_id") == mission_id
+            and task.metadata.get("schema_version") == SCHEMA_VERSION
         )
-        claims = await self._runtime.list_task_claims(
-            session_id=mission_session_id(mission_id), limit=RUNTIME_SCAN_LIMIT
+        scanned_runs = await self._runtime.list_delegation_runs(
+            session_id=mission_session_id(mission_id), limit=RUNTIME_SCAN_LIMIT + 1
         )
+        scanned_claims = await self._runtime.list_task_claims(
+            session_id=mission_session_id(mission_id), limit=RUNTIME_SCAN_LIMIT + 1
+        )
+        scan_saturated = scan_saturated or len(scanned_runs) > RUNTIME_SCAN_LIMIT
+        scan_saturated = scan_saturated or len(scanned_claims) > RUNTIME_SCAN_LIMIT
+        runs = scanned_runs[:RUNTIME_SCAN_LIMIT]
+        claims = scanned_claims[:RUNTIME_SCAN_LIMIT]
         receipts: list[RuntimeReceipt] = []
         identities: dict[str, ExecutionIdentity | None] = {}
-        for run in runs:
-            identities[run.run_id] = await self._runtime.get_execution_identity(
-                run.run_id
+        attempt_ids = {run.run_id for run in runs}
+        attempt_ids.update(
+            str(claim.metadata.get("attempt_id") or "") for claim in claims
+        )
+        attempt_ids.discard("")
+        receipt_budget = RUNTIME_SCAN_LIMIT
+        for attempt_id in sorted(attempt_ids):
+            identities[attempt_id] = await self._runtime.get_execution_identity(
+                attempt_id
             )
-            receipts.extend(
-                await self._runtime.list_runtime_receipts(
-                    run_id=run.run_id, limit=RUNTIME_SCAN_LIMIT
-                )
+            run_receipts = await self._runtime.list_runtime_receipts(
+                run_id=attempt_id, limit=receipt_budget + 1
             )
-        for claim in claims:
-            attempt_id = str(claim.metadata.get("attempt_id") or "")
-            if attempt_id and attempt_id not in identities:
-                identities[attempt_id] = await self._runtime.get_execution_identity(
-                    attempt_id
-                )
-        state = reconciliation(
-            mission_id, tasks, runs, claims, receipts, identities, now
+            scan_saturated = scan_saturated or len(run_receipts) > receipt_budget
+            receipts.extend(run_receipts[:receipt_budget])
+            receipt_budget = max(0, receipt_budget - len(run_receipts))
+        state = (
+            ReconciliationState.EVIDENCE_SCAN_SATURATED
+            if scan_saturated
+            else reconciliation(
+                mission_id, tasks, runs, claims, receipts, identities, now
+            )
         )
         return MissionSnapshot(
             mission=mission,
@@ -791,15 +871,20 @@ class MissionControl(MissionControlProjectionMixin):
         limit: int,
     ) -> list[Task]:
         scan_limit = max(1_000, min(TASK_SCAN_LIMIT, limit * 10))
-        tasks = await self._board.list_tasks(
-            status=status, assigned_to=assigned_to, limit=scan_limit
+        scanned = await self._board.list_tasks(
+            status=status, assigned_to=assigned_to, limit=scan_limit + 1
         )
-        return [
+        tasks = [
             task
-            for task in tasks
+            for task in scanned[:scan_limit]
             if task.metadata.get("mission_id") == mission_id
             and task.metadata.get("schema_version") == SCHEMA_VERSION
-        ][:limit]
+        ]
+        if len(tasks) < limit and len(scanned) > scan_limit:
+            raise MissionControlError(
+                "task scan saturated; requested mission list may be incomplete"
+            )
+        return tasks[:limit]
 
     async def _resolve_attempt(
         self,
@@ -819,8 +904,12 @@ class MissionControl(MissionControlProjectionMixin):
             runs = await self._runtime.list_delegation_runs(
                 session_id=mission_session_id(mission_id),
                 task_id=task_id,
-                limit=RUNTIME_SCAN_LIMIT,
+                limit=RUNTIME_SCAN_LIMIT + 1,
             )
+            if len(runs) > RUNTIME_SCAN_LIMIT:
+                raise MissionControlError(
+                    "attempt scan saturated; unique attempt cannot be proven"
+                )
             matching = [run for run in runs if run.assigned_to == agent_id]
             if len(matching) > 1:
                 raise MissionControlError(
@@ -835,9 +924,9 @@ class MissionControl(MissionControlProjectionMixin):
     async def _claims_for_fencing(self, task_id: str) -> list[TaskClaim]:
         claims = await self._runtime.list_task_claims(
             task_id=task_id,
-            limit=RUNTIME_SCAN_LIMIT,
+            limit=RUNTIME_SCAN_LIMIT + 1,
         )
-        if len(claims) >= RUNTIME_SCAN_LIMIT:
+        if len(claims) > RUNTIME_SCAN_LIMIT:
             raise MissionControlError(
                 "claim scan saturated; exclusive lease ownership cannot be proven"
             )

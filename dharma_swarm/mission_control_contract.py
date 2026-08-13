@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from dharma_swarm.models import TaskPriority, TaskStatus
-from dharma_swarm.runtime_state import TaskClaim
+from dharma_swarm.models import Task, TaskPriority, TaskStatus
+from dharma_swarm.runtime_state import (
+    DelegationRun,
+    RuntimeReceipt,
+    SessionState,
+    TaskClaim,
+)
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 SCHEMA_VERSION = "dharma.mission_control.v1"
@@ -42,6 +49,7 @@ class ReconciliationState(str, Enum):
     CONFLICTING_ACTIVE_CLAIMS = "conflicting_active_claims"
     ACTIVE_CLAIM_WITHOUT_RUN = "active_claim_without_run"
     EXPIRED_LEASE = "expired_lease"
+    EVIDENCE_SCAN_SATURATED = "evidence_scan_saturated"
     FOREIGN_RUNTIME_RECORD = "foreign_runtime_record"
     CONFLICTING_TERMINAL_EVIDENCE = "conflicting_terminal_evidence"
 
@@ -134,6 +142,89 @@ class MissionSnapshot:
     proves_executor_liveness: bool = False
 
 
+def mission_view(session: SessionState) -> MissionView:
+    mission_id = str(session.metadata.get("mission_id") or "")
+    return MissionView(
+        mission_id=mission_id,
+        session_id=session.session_id,
+        title=str(session.metadata.get("title") or ""),
+        goal=str(session.metadata.get("goal") or ""),
+        operator_id=session.operator_id,
+        status=session.status,
+        metadata=dict(session.metadata),
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+    )
+
+
+def task_view(task: Task, mission_id: str) -> TaskView:
+    return TaskView(
+        task_id=task.id,
+        mission_id=mission_id,
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        priority=task.priority,
+        assigned_to=str(task.assigned_to or ""),
+        result=str(task.result or ""),
+        metadata=dict(task.metadata),
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
+def attempt_view(
+    run: DelegationRun, identity: ExecutionIdentity | None
+) -> AttemptView:
+    return AttemptView(
+        attempt_id=run.run_id,
+        mission_id=str(run.metadata.get("mission_id") or ""),
+        session_id=run.session_id,
+        task_id=run.task_id,
+        claim_id=run.claim_id,
+        assigned_to=run.assigned_to,
+        assigned_by=run.assigned_by,
+        status=public_attempt_status(run.status),
+        failure_code=run.failure_code,
+        idempotency_key=identity.idempotency_key if identity is not None else "",
+        metadata=dict(run.metadata),
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+    )
+
+
+def lease_view(claim: TaskClaim, *, now: datetime) -> AgentLeaseView:
+    return AgentLeaseView(
+        claim_id=claim.claim_id,
+        mission_id=str(claim.metadata.get("mission_id") or ""),
+        session_id=claim.session_id,
+        task_id=claim.task_id,
+        agent_id=claim.agent_id,
+        attempt_id=str(claim.metadata.get("attempt_id") or ""),
+        status=claim.status,
+        active=claim_is_active(claim, now),
+        expired=claim_is_expired(claim, now),
+        heartbeat_at=claim.heartbeat_at,
+        stale_after=claim.stale_after,
+        metadata=dict(claim.metadata),
+    )
+
+
+def receipt_view(receipt: RuntimeReceipt, mission_id: str) -> ReceiptView:
+    return ReceiptView(
+        receipt_id=receipt.receipt_id,
+        mission_id=str(receipt.payload.get("mission_id") or mission_id),
+        task_id=receipt.task_id,
+        attempt_id=receipt.run_id,
+        agent_id=receipt.agent_id,
+        receipt_type=receipt.receipt_type,
+        status=receipt.status,
+        idempotency_key=receipt.idempotency_key,
+        payload=dict(receipt.payload),
+        created_at=receipt.created_at,
+    )
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -154,6 +245,117 @@ def session_id(mission_id: str) -> str:
 def stable_id(prefix: str, *parts: str) -> str:
     payload = "\x1f".join(parts).encode("utf-8")
     return f"{prefix}_{hashlib.sha256(payload).hexdigest()[:24]}"
+
+
+def receipt_matches_identity(
+    receipt: RuntimeReceipt, identity: ExecutionIdentity
+) -> bool:
+    return (
+        receipt.run_id == identity.run_id
+        and receipt.task_id == identity.task_id
+        and receipt.trace_id == identity.trace_id
+        and receipt.correlation_id == identity.correlation_id
+        and receipt.causation_id == identity.causation_id
+        and receipt.parent_run_id == identity.parent_run_id
+        and receipt.agent_id == identity.agent_id
+        and receipt.idempotency_key == identity.idempotency_key
+    )
+
+
+def terminal_receipt_contract(
+    receipt: RuntimeReceipt,
+    identity: ExecutionIdentity,
+    mission_id: str,
+) -> tuple[str, str, str, str, dict[str, Any]]:
+    """Validate terminal evidence and return its projection fields."""
+    payload = receipt.payload
+    metadata = payload.get("metadata")
+    status = receipt.status
+    if (
+        not receipt_matches_identity(receipt, identity)
+        or receipt.receipt_type != TERMINAL_RECEIPT_TYPE
+        or status not in {"succeeded", "failed"}
+        or receipt.receipt_id != stable_id("receipt", identity.run_id, status)
+        or receipt.side_effect_key != f"mission_control:{identity.run_id}:terminal"
+        or payload.get("schema_version") != SCHEMA_VERSION
+        or payload.get("mission_id") != mission_id
+        or payload.get("attempt_id") != identity.run_id
+        or not isinstance(payload.get("result"), str)
+        or not isinstance(payload.get("failure_code"), str)
+        or not isinstance(metadata, dict)
+        or metadata.get("schema_version") != SCHEMA_VERSION
+        or metadata.get("mission_id") != mission_id
+        or metadata.get("attempt_id") != identity.run_id
+        or metadata.get("attempt_key") != identity.idempotency_key
+    ):
+        raise MissionControlError(
+            f"attempt {identity.run_id!r} has conflicting terminal evidence"
+        )
+    owner_status = "completed" if status == "succeeded" else "failed"
+    return (
+        status,
+        owner_status,
+        payload["result"],
+        payload["failure_code"],
+        dict(metadata),
+    )
+
+
+def recovery_receipt_matches_contract(
+    receipt: RuntimeReceipt,
+    identity: ExecutionIdentity,
+    mission_id: str,
+) -> bool:
+    """Return whether a recovery receipt is canonical for its exact claim."""
+    return (
+        receipt_matches_identity(receipt, identity)
+        and receipt.receipt_type == RECOVERY_RECEIPT_TYPE
+        and receipt.status == "stale_recovered"
+        and receipt.receipt_id
+        == stable_id("receipt", identity.run_id, "stale_recovered")
+        and receipt.side_effect_key
+        == f"mission_control:{identity.run_id}:stale_recovery"
+        and receipt.payload.get("schema_version") == SCHEMA_VERSION
+        and receipt.payload.get("mission_id") == mission_id
+        and receipt.payload.get("attempt_id") == identity.run_id
+        and receipt.payload.get("recovered_claim_id") == identity.claim_id
+        and receipt.payload.get("reason") == "expired_lease"
+    )
+
+
+def terminal_operation_metadata(
+    receipt: RuntimeReceipt,
+    identity: ExecutionIdentity,
+    mission_id: str,
+) -> tuple[str, dict[str, Any]]:
+    """Reconstruct the exact finish CAS metadata from durable evidence."""
+    operation = {
+        "schema_version": SCHEMA_VERSION,
+        "mission_id": mission_id,
+        "attempt_id": identity.run_id,
+        "task_id": identity.task_id,
+        "agent_id": identity.agent_id,
+        "status": receipt.status,
+        "receipt_id": receipt.receipt_id,
+        "payload": receipt.payload,
+    }
+    operation_hash = hashlib.sha256(
+        json.dumps(
+            operation,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    return operation_hash, {
+        "operation_hash": operation_hash,
+        "schema_version": SCHEMA_VERSION,
+        "mission_id": mission_id,
+        "attempt_id": identity.run_id,
+        "task_id": identity.task_id,
+        "agent_id": identity.agent_id,
+        "terminal_status": receipt.status,
+    }
 
 
 def claim_is_expired(claim: TaskClaim, now: datetime) -> bool:
@@ -197,12 +399,17 @@ __all__ = [
     "TERMINAL_CAS_STALE_AFTER_SECONDS",
     "TERMINAL_RECEIPT_TYPE",
     "TaskView",
+    "attempt_view",
     "claim_is_active",
     "claim_is_expired",
     "claim_is_open",
     "clean_identifier",
+    "lease_view",
+    "mission_view",
     "public_attempt_status",
+    "receipt_view",
     "session_id",
     "stable_id",
+    "task_view",
     "utc_now",
 ]
