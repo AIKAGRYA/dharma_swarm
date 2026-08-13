@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -172,6 +173,9 @@ class ClaudeAdapter(ProviderAdapter):
         )
         stream_read_failed = False
         stream_read_error = ""
+        strict_preview_protocol = bool(
+            request.provider_options.get("strict_preview_protocol")
+        )
 
         try:
             assert proc.stdout is not None
@@ -192,11 +196,136 @@ class ClaudeAdapter(ProviderAdapter):
                     break
                 if not line:
                     break
-                raw_line = line.decode("utf-8", errors="replace").strip()
+                try:
+                    raw_line = line.decode(
+                        "utf-8",
+                        errors="strict" if strict_preview_protocol else "replace",
+                    ).strip()
+                except UnicodeDecodeError:
+                    stream_read_error = "Claude returned invalid UTF-8"
+                    yield ErrorEvent(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        code="malformed_provider_event",
+                        message=stream_read_error,
+                        retryable=False,
+                    )
+                    yield SessionEnd(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        success=False,
+                        error_code="malformed_provider_event",
+                        error_message=stream_read_error,
+                    )
+                    emitted_session_end = True
+                    stream_read_failed = True
+                    break
                 if not raw_line:
                     continue
+                if strict_preview_protocol:
+                    try:
+                        parsed_raw = json.loads(
+                            raw_line,
+                            object_pairs_hook=_unique_json_object,
+                        )
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        parsed_raw = None
+                    if not isinstance(parsed_raw, dict):
+                        stream_read_error = "Claude returned malformed provider output"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code="malformed_provider_event",
+                            message=stream_read_error,
+                            retryable=False,
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code="malformed_provider_event",
+                            error_message=stream_read_error,
+                        )
+                        emitted_session_end = True
+                        stream_read_failed = True
+                        break
+                    if not _strict_preview_raw_event_is_valid(parsed_raw):
+                        stream_read_error = "Claude returned invalid preview metadata"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code="malformed_provider_event",
+                            message=stream_read_error,
+                            retryable=False,
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code="malformed_provider_event",
+                            error_message=stream_read_error,
+                        )
+                        emitted_session_end = True
+                        stream_read_failed = True
+                        break
+                    raw_line = json.dumps(
+                        parsed_raw,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
                 events = self._normalize_line(raw_line, session_id=session_id, profile=profile)
+                if strict_preview_protocol and not events:
+                    stream_read_error = "Claude returned unexpected provider output"
+                    yield ErrorEvent(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        code="unexpected_provider_event",
+                        message=stream_read_error,
+                        retryable=False,
+                    )
+                    yield SessionEnd(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        success=False,
+                        error_code="unexpected_provider_event",
+                        error_message=stream_read_error,
+                    )
+                    emitted_session_end = True
+                    stream_read_failed = True
+                    break
+                if strict_preview_protocol and not all(
+                    _strict_preview_event_is_valid(event) for event in events
+                ):
+                    stream_read_error = "Claude returned invalid preview metadata"
+                    yield ErrorEvent(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        code="malformed_provider_event",
+                        message=stream_read_error,
+                        retryable=False,
+                    )
+                    yield SessionEnd(
+                        provider_id=self.provider_id,
+                        session_id=session_id,
+                        success=False,
+                        error_code="malformed_provider_event",
+                        error_message=stream_read_error,
+                    )
+                    emitted_session_end = True
+                    stream_read_failed = True
+                    break
                 for event in events:
+                    if strict_preview_protocol and isinstance(event, SessionStart):
+                        event.capabilities = [
+                            capability
+                            for capability in event.capabilities
+                            if capability not in {"tool_use", "parallel_tools"}
+                        ]
+                        event.system_info = {
+                            **event.system_info,
+                            "tool_authority": "none",
+                            "tools_disabled": True,
+                        }
                     if isinstance(event, SessionEnd):
                         emitted_session_end = True
                     yield event
@@ -233,6 +362,21 @@ class ClaudeAdapter(ProviderAdapter):
                     success=False,
                     error_code="process_exit",
                     error_message=f"claude exited with code {exit_code}",
+                )
+            elif exit_code == 0 and not emitted_session_end and strict_preview_protocol:
+                yield ErrorEvent(
+                    provider_id=self.provider_id,
+                    session_id=session_id,
+                    code="incomplete_provider_response",
+                    message="Claude ended before an explicit result event",
+                    retryable=False,
+                )
+                yield SessionEnd(
+                    provider_id=self.provider_id,
+                    session_id=session_id,
+                    success=False,
+                    error_code="incomplete_provider_response",
+                    error_message="Claude ended before an explicit result event",
                 )
             elif exit_code == 0 and not emitted_session_end:
                 yield SessionEnd(
@@ -330,6 +474,10 @@ class ClaudeAdapter(ProviderAdapter):
                         "permission_mode": parsed.permission_mode,
                         "claude_code_version": parsed.claude_code_version,
                         "mcp_servers": parsed.mcp_servers,
+                        "requested_model": profile.model_id,
+                        "served_model": parsed.model,
+                        "served_identity_source": "system.init.model",
+                        "exact_model_proven": parsed.model == profile.model_id,
                     },
                 )
             )
@@ -492,3 +640,127 @@ class ClaudeAdapter(ProviderAdapter):
             return events
 
         return events
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate Claude provider JSON key")
+        value[key] = item
+    return value
+
+
+def _strict_preview_event_is_valid(event: CanonicalEventType) -> bool:
+    if isinstance(event, RateLimitEvent):
+        return False
+    if not isinstance(event, UsageReport):
+        return True
+    token_values = (
+        event.input_tokens,
+        event.output_tokens,
+        event.cache_read_tokens,
+        event.cache_write_tokens,
+        event.thinking_tokens,
+    )
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in token_values):
+        return False
+    if event.total_cost_usd is None:
+        return True
+    if isinstance(event.total_cost_usd, bool) or not isinstance(
+        event.total_cost_usd, (int, float)
+    ):
+        return False
+    cost = float(event.total_cost_usd)
+    if not math.isfinite(cost) or cost < 0:
+        return False
+    event.total_cost_usd = cost
+    return True
+
+
+def _strict_preview_raw_event_is_valid(raw: dict[str, Any]) -> bool:
+    event_type = raw.get("type")
+    if not isinstance(event_type, str):
+        return False
+    if event_type == "system":
+        if raw.get("subtype") != "init":
+            return False
+        if not _nonempty_string(raw.get("model")) or not isinstance(
+            raw.get("session_id"), str
+        ):
+            return False
+        tools = raw.get("tools")
+        if not isinstance(tools, list) or not all(isinstance(item, str) for item in tools):
+            return False
+        for key in ("cwd", "permissionMode", "permission_mode", "claude_code_version"):
+            if key in raw and not isinstance(raw[key], str):
+                return False
+        return isinstance(raw.get("mcp_servers", []), list)
+    if event_type == "assistant":
+        message = raw.get("message")
+        if not isinstance(message, dict):
+            return False
+        content = message.get("content")
+        if not isinstance(content, list) or not content:
+            return False
+        for block in content:
+            if not isinstance(block, dict):
+                return False
+            block_type = block.get("type")
+            if block_type == "text":
+                if not isinstance(block.get("text"), str):
+                    return False
+            elif block_type == "thinking":
+                if not isinstance(block.get("thinking"), str):
+                    return False
+            else:
+                return False
+        for value in (
+            raw.get("uuid", ""),
+            raw.get("session_id", ""),
+            raw.get("parent_tool_use_id"),
+            message.get("stop_reason"),
+        ):
+            if value is not None and not isinstance(value, str):
+                return False
+        return message.get("usage") is None or isinstance(message.get("usage"), dict)
+    if event_type != "result":
+        return False
+    if raw.get("subtype") != "success" or raw.get("is_error") is not False:
+        return False
+    if not isinstance(raw.get("session_id", ""), str):
+        return False
+    for key in ("duration_ms", "num_turns"):
+        if not _nonnegative_int(raw.get(key)):
+            return False
+    cost = raw.get("total_cost_usd")
+    if isinstance(cost, bool) or not isinstance(cost, (int, float)):
+        return False
+    if not math.isfinite(float(cost)) or float(cost) < 0:
+        return False
+    if raw.get("result") is not None and not isinstance(raw.get("result"), str):
+        return False
+    errors = raw.get("errors", [])
+    if not isinstance(errors, list) or not all(isinstance(item, str) for item in errors):
+        return False
+    usage = raw.get("model_usage", {})
+    if not isinstance(usage, dict):
+        return False
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
+        "thinking_tokens",
+    ):
+        if key in usage and not _nonnegative_int(usage[key]):
+            return False
+    return True
+
+
+def _nonempty_string(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _nonnegative_int(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 0

@@ -63,6 +63,44 @@ def test_build_env_clears_all_nested_claude_markers(
     assert env["HELM_ENV_SENTINEL"] == "preserved"
 
 
+def test_subscription_only_environment_cannot_be_forced_to_metered_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "metered-key-must-not-cross")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "metered-token-must-not-cross")
+    monkeypatch.setenv("DHARMA_FORCE_ANTHROPIC_API", "1")
+    monkeypatch.setenv("OPENAI_API_KEY", "unrelated-openai-secret")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "unrelated-router-secret")
+    monkeypatch.setenv("KIMI_API_KEY", "unrelated-kimi-secret")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "https://unrelated-cloud.invalid")
+    monkeypatch.setenv("XAI_API_KEY", "unrelated-xai-secret")
+    monkeypatch.setenv("UNREGISTERED_VENDOR_SECRET", "must-not-cross")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "must-not-cross")
+    monkeypatch.setenv("HELM_ENV_SENTINEL", "preserved")
+
+    env = _adapter()._build_env(
+        CompletionRequest(
+            messages=[{"role": "user", "content": "hello"}],
+            provider_options={
+                "scrub_metered_keys": True,
+                "subscription_auth_only": True,
+            },
+        )
+    )
+
+    assert "ANTHROPIC_API_KEY" not in env
+    assert "ANTHROPIC_AUTH_TOKEN" not in env
+    assert "DHARMA_FORCE_ANTHROPIC_API" not in env
+    assert "OPENAI_API_KEY" not in env
+    assert "OPENROUTER_API_KEY" not in env
+    assert "KIMI_API_KEY" not in env
+    assert "OLLAMA_BASE_URL" not in env
+    assert "XAI_API_KEY" not in env
+    assert "UNREGISTERED_VENDOR_SECRET" not in env
+    assert "DEEPSEEK_API_KEY" not in env
+    assert "HELM_ENV_SENTINEL" not in env
+
+
 def test_build_prompt_and_command_strip_subprocess_nul_bytes() -> None:
     request = CompletionRequest(
         messages=[{"role": "user", "content": "before\x00after"}],
@@ -295,6 +333,17 @@ class _FakeStdout:
         return self._lines.pop(0)
 
 
+class _RawFakeStdout:
+    def __init__(self, lines: list[bytes]) -> None:
+        self._lines = list(lines)
+
+    async def readline(self) -> bytes:
+        if not self._lines:
+            await asyncio.sleep(0)
+            return b""
+        return self._lines.pop(0)
+
+
 class _BrokenStdout:
     async def readline(self) -> bytes:
         raise RuntimeError("Separator is found, but chunk is longer than limit")
@@ -369,6 +418,157 @@ async def test_stream_uses_subprocess_and_yields_events(monkeypatch: pytest.Monk
     events = [e async for e in a.stream(req, session_id="dgc-test-stream")]
     assert any(isinstance(e, SessionStart) for e in events)
     assert any(isinstance(e, SessionEnd) for e in events)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "hostile_line",
+    [
+        b'{"type":"future_event","tool_calls":[{"name":"shell"}]}\n',
+        b'{"type":"assistant","message":{"content":[{"type":"tool_use","type":"text","text":"PONG"}]}}\n',
+        b'{"type":"assistant","message":{"content":[{"type":"text","text":"PO\xffNG"}]}}\n',
+        b'{"type":"result","subtype":"error_max_turns","total_cost_usd":0,"duration_ms":1,"num_turns":1}\n',
+        b'{"type":"assistant","message":{"content":[{"type":"text","text":{"secret":"must-not-escape"}}]}}\n',
+        b'{"type":"system","subtype":"init","session_id":{"secret":"must-not-escape"},"model":"claude-sonnet-4-5","tools":[]}\n',
+        b'{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":{"secret":"must-not-escape"}}}}\n',
+    ],
+)
+async def test_strict_preview_protocol_rejects_unknown_duplicate_or_invalid_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_line: bytes,
+) -> None:
+    adapter = _adapter()
+    process = _FakeProc([], exit_code=0)
+    process.stdout = _RawFakeStdout([hostile_line])
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [
+        event async for event in adapter.stream(request, session_id="strict-preview")
+    ]
+
+    assert not any(isinstance(event, SessionStart | TextComplete) for event in events)
+    assert any(isinstance(event, ErrorEvent) for event in events)
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+
+
+@pytest.mark.asyncio
+async def test_strict_preview_requires_explicit_result_and_marks_exact_init(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter()
+    process = _FakeProc(
+        [
+            _j(
+                {
+                    "type": "system",
+                    "subtype": "init",
+                    "session_id": "provider-strict",
+                    "model": "claude-sonnet-4-5",
+                    "tools": [],
+                }
+            ),
+            _j(
+                {
+                    "type": "assistant",
+                    "message": {"content": [{"type": "text", "text": "PONG"}]},
+                }
+            ),
+        ],
+        exit_code=0,
+    )
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [
+        event async for event in adapter.stream(request, session_id="strict-incomplete")
+    ]
+
+    start = next(event for event in events if isinstance(event, SessionStart))
+    assert start.system_info["served_model"] == "claude-sonnet-4-5"
+    assert start.system_info["exact_model_proven"] is True
+    assert start.system_info["tool_authority"] == "none"
+    assert start.system_info["tools_disabled"] is True
+    assert "tool_use" not in start.capabilities
+    assert "parallel_tools" not in start.capabilities
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+    assert terminal.error_code == "incomplete_provider_response"
+
+
+@pytest.mark.asyncio
+async def test_strict_preview_rejects_untyped_cost_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "provider-cost-secret-must-not-escape"
+    adapter = _adapter()
+    process = _FakeProc(
+        [
+            _j(
+                {
+                    "type": "system",
+                    "subtype": "init",
+                    "session_id": "provider-strict-cost",
+                    "model": "claude-sonnet-4-5",
+                    "tools": [],
+                }
+            ),
+            _j(
+                {
+                    "type": "assistant",
+                    "message": {"content": [{"type": "text", "text": "PONG"}]},
+                }
+            ),
+            _j(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "total_cost_usd": secret,
+                    "duration_ms": 1,
+                    "num_turns": 1,
+                }
+            ),
+        ],
+        exit_code=0,
+    )
+
+    async def spawn(*args: object, **kwargs: object) -> _FakeProc:
+        return process
+
+    monkeypatch.setattr(adapter, "_spawn_process", spawn)
+    request = CompletionRequest(
+        messages=[{"role": "user", "content": "hello"}],
+        model="claude-sonnet-4-5",
+        provider_options={"strict_preview_protocol": True},
+    )
+
+    events = [
+        event async for event in adapter.stream(request, session_id="strict-cost")
+    ]
+
+    rendered = repr(events)
+    assert secret not in rendered
+    assert not any(isinstance(event, UsageReport) for event in events)
+    terminal = next(event for event in events if isinstance(event, SessionEnd))
+    assert terminal.success is False
+    assert terminal.error_code == "malformed_provider_event"
 
 
 @pytest.mark.asyncio
