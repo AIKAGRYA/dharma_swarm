@@ -441,6 +441,22 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     ];
   }
 
+  if (type === "session_start") {
+    const provider = String(event.provider_id ?? "").trim();
+    const model = String(event.model ?? "").trim();
+    if (!provider || !model) {
+      return [];
+    }
+    return [canonicalEvent(event, {
+      sourceEventType: type,
+      kind: "status",
+      phase: "running",
+      title: "provider session started",
+      summary: `${provider}:${model}`,
+      timestamp: timestampFromEvent(event),
+    })];
+  }
+
   if (type === "session.bootstrap.result" || type === "session.ack") {
     return [
       canonicalEvent(event, {
@@ -570,6 +586,7 @@ type ChatTurn = {
   assistant?: string;
   assistantTimestamp?: string;
   route?: string;
+  routeSource?: "request_ack" | "provider_session_start";
   endedWithoutResponse?: boolean;
   acceptedCommandPending?: boolean;
   promptMs?: number;
@@ -683,8 +700,12 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       }
       continue;
     }
-    if (event.sourceEventType === "session.ack" && event.summary) {
+    if (event.sourceEventType === "session_start" && event.summary) {
       activeTurn.route = event.summary;
+      activeTurn.routeSource = "provider_session_start";
+    } else if (event.sourceEventType === "session.ack" && event.summary && activeTurn.routeSource !== "provider_session_start") {
+      activeTurn.route = event.summary;
+      activeTurn.routeSource = "request_ack";
     }
     // F-157: queued-offline lifecycle — pending holds the turn in the explicit queued
     // state; dispatched releases it back to running (real bridge events take over);
