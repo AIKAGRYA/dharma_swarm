@@ -1227,6 +1227,56 @@ def _trim_context_to_budget(
     return request.model_copy(update={"messages": new_messages})
 
 
+def _prepend_organism_genome(request: LLMRequest, config: AgentConfig) -> LLMRequest:
+    """Prepend the invariant plural-genome block to ``request.system``.
+
+    Composes with (never replaces) the existing system prompt, on every
+    provider. Idempotency is exact, not marker-based: only the current
+    role-specific genome at the beginning of the system prompt is accepted as
+    already injected. A stale/truncated/wrong-role/spoofed genome marker fails
+    closed instead of bypassing the boot contract.
+
+    Fail-closed: if the genome cannot be constructed/rendered, this raises
+    ``OrganismGenomeError``. Dispatch must NOT fall through to a model call with
+    a genome-less prompt — the invariant is that the whole plural vision is
+    present before the first token. The caller runs inside ``run_task``'s
+    try/except, so this becomes an honest, inspectable task failure rather than
+    green theater or a silent degradation.
+    """
+    from dharma_swarm.orientation_packet import (
+        GENOME_BLOCK_PREFIX,
+        GENOME_BLOCK_START,
+        OrganismGenomeError,
+        render_organism_genome,
+    )
+
+    existing = request.system or ""
+    role_value = getattr(getattr(config, "role", None), "value", None)
+    try:
+        genome = render_organism_genome(role=role_value)
+    except OrganismGenomeError:
+        logger.error("Organism genome construction failed; failing closed", exc_info=True)
+        raise
+    except Exception as exc:  # defensive: any unexpected failure still fails closed
+        logger.error("Organism genome injection failed; failing closed", exc_info=True)
+        raise OrganismGenomeError(str(exc)) from exc
+
+    if existing == genome or existing.startswith(f"{genome}\n\n"):
+        remainder = existing[len(genome):]
+        if GENOME_BLOCK_PREFIX in remainder:
+            raise OrganismGenomeError(
+                "duplicate organism genome block in system prompt"
+            )
+        return request
+    if GENOME_BLOCK_PREFIX in existing or GENOME_BLOCK_START in existing:
+        raise OrganismGenomeError(
+            "conflicting organism genome marker in system prompt"
+        )
+
+    combined = f"{genome}\n\n{existing}".strip() if existing.strip() else genome
+    return request.model_copy(update={"system": combined})
+
+
 def _build_prompt(
     task: Task,
     config: AgentConfig,
@@ -1840,6 +1890,12 @@ class AgentRunner:
         task: Task,
         request: LLMRequest,
     ) -> tuple[Any | None, Any | None, LLMResponse]:
+        # Defense in depth at the actual provider boundary. run_task injects
+        # earlier so the genome is present during all prompt composition, while
+        # this exact/idempotent recheck guarantees that direct internal calls,
+        # semantic retries, routed providers, and every tool-loop round cannot
+        # dispatch a stale, wrong-role, duplicated, or missing genome.
+        request = _prepend_organism_genome(request, self._config)
         if self._provider is None:
             raise RuntimeError("Provider unavailable")
         if _is_routed_provider(self._provider):
@@ -2269,6 +2325,14 @@ class AgentRunner:
                     + "\n".join(f"  - {s}" for s in gate.suggestions)
                 )
             request = _build_prompt(task, self._config, plan_context=plan_context)
+            # Organism genome: every dispatched request, on every provider,
+            # inherits the invariant plural genome BEFORE its first token. This
+            # is composed at the dispatch seam (not inside _build_system_prompt)
+            # so it cannot be erased by an explicit non-Claude system_prompt and
+            # so the exact-string builder contracts stay intact. The genome is
+            # protected content prepended ahead of task/provider context; it is
+            # never trimmed away below.
+            request = _prepend_organism_genome(request, self._config)
             await _inject_stigmergy_context(request, task, self._config)
             # Token budget gate: trim lower-priority context sections if over ceiling.
             _tok = _estimate_prompt_tokens(request)
