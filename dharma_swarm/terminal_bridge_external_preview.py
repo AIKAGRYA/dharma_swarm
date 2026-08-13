@@ -184,18 +184,34 @@ def external_preview_targets(
     return targets
 
 
+_ZERO_TOOL_USAGE_COUNTER_KEYS = frozenset({
+    "web_fetch_requests",
+    "web_search_requests",
+})
+
+
 def external_preview_tool_usage_is_zero(value: object) -> bool:
-    if value in (None, "", [], {}):
+    """Admit only the provider's flat, bounded zero-counter accounting shape."""
+
+    if value is None:
         return True
     if isinstance(value, bool):
         return value is False
     if isinstance(value, (int, float)):
         return value == 0
-    if isinstance(value, dict):
-        return all(external_preview_tool_usage_is_zero(item) for item in value.values())
     if isinstance(value, list):
-        return all(external_preview_tool_usage_is_zero(item) for item in value)
-    return False
+        return not value
+    if not isinstance(value, dict) or len(value) > len(_ZERO_TOOL_USAGE_COUNTER_KEYS):
+        return False
+    for key, counter in value.items():
+        if key not in _ZERO_TOOL_USAGE_COUNTER_KEYS:
+            return False
+        if isinstance(counter, bool):
+            if counter:
+                return False
+        elif not isinstance(counter, (int, float)) or counter != 0:
+            return False
+    return True
 
 
 def explicit_external_preview_lane(
