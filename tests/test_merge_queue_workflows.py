@@ -121,3 +121,48 @@ def test_coherence_pr_body_steps_are_pr_only() -> None:
     ):
         step = _step(workflow, "coherence-delta", name)
         assert "github.event_name == 'pull_request'" in step["if"]
+
+
+def test_semgrep_uses_exact_merge_group_delta_fail_closed() -> None:
+    workflow = _workflow("semgrep.yml")
+    triggers = workflow["on"]
+    assert isinstance(triggers, dict)
+    assert triggers["merge_group"] == {"types": ["checks_requested"]}
+
+    checkout = _step(workflow, "semgrep", "Checkout exact event head")
+    checkout_with = checkout["with"]
+    assert isinstance(checkout_with, dict)
+    assert "pull_request.head.sha" in checkout_with["ref"]
+    assert "merge_group.head_sha" in checkout_with["ref"]
+    assert "github.event.after" in checkout_with["ref"]
+    assert "github.sha" in checkout_with["ref"]
+    assert checkout_with["fetch-depth"] == "0"
+    assert checkout_with["persist-credentials"] == "false"
+
+    gate = _step(workflow, "semgrep", "Strict gate (local rules only)")
+    env = gate["env"]
+    script = gate["run"]
+    assert isinstance(env, dict)
+    assert isinstance(script, str)
+    assert gate["shell"] == "sh"
+    assert "merge_group.base_sha" in env["MERGE_GROUP_BASE_SHA"]
+    assert "merge_group.head_sha" in env["MERGE_GROUP_HEAD_SHA"]
+    assert "github.event.action" in env["MERGE_GROUP_ACTION"]
+    assert "merge_group.base_ref" in env["MERGE_GROUP_BASE_REF"]
+    assert "github.sha" in env["EVENT_SHA"]
+    assert "set -eu" in script
+    assert "pipefail" not in script
+    assert "args=(" not in script
+    assert "merge_group)" in script
+    assert 'base="$MERGE_GROUP_BASE_SHA"' in script
+    assert 'head="$MERGE_GROUP_HEAD_SHA"' in script
+    assert "checks_requested" in script
+    assert "refs/heads/main" in script
+    assert "Unsupported Semgrep event" in script
+    assert 'actual_head="$(git rev-parse HEAD)"' in script
+    assert 'merge_base="$(git merge-base "$base" "$head")"' in script
+    assert "git merge-base --is-ancestor" in script
+    assert 'head="$EVENT_SHA"' in script
+    assert 'if [ "$PUSH_BEFORE_SHA" = "$zero_sha" ]' in script
+    assert "Delta Semgrep event" in script
+    assert '--baseline-commit "$base"' in script
