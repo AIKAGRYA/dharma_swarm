@@ -6,6 +6,7 @@ import asyncio
 import os
 from typing import Any
 
+from dharma_swarm import model_status
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
 from dharma_swarm.tui.engine.events import (
@@ -19,7 +20,7 @@ from dharma_swarm.tui.engine.events import (
 # Chat-lane sizing: messages sent per turn / retained per bridge process.
 CHAT_HISTORY_SEND_LIMIT = 24
 CHAT_HISTORY_RETAIN = 48
-_SLICE1_CHAT_PROVIDER_IDS = frozenset({"claude", "openrouter"})
+_SLICE1_CHAT_PROVIDER_IDS = frozenset({"claude", "ollama", "openrouter"})
 _ALLOWED_CHAT_EVENT_TYPES = frozenset(
     {
         "error",
@@ -305,9 +306,240 @@ class TerminalBridgeChatMixin:
             if terminal is not None:
                 self._emit_recorded_session_event(run, terminal)
 
+    def _build_model_policy_summary(self, *, selected_provider: str, selected_model: str, strategy: str) -> dict[str, Any]:
+        strategy = model_routing.resolve_strategy(strategy) or "responsive"
+        projection = model_status.floor_model_status()
+        status_by_model_id: dict[str, Any] = {}
+        for projected in projection.models:
+            status_by_model_id[projected.id] = projected
+            for route_status in projected.route_statuses:
+                status_by_model_id[route_status.model_id] = projected
+
+        terminal_providers = self._available_provider_ids()
+        local_attempt_cache: dict[str, bool] = {}
+        seen_routes: set[tuple[str, str]] = set()
+        targets: list[dict[str, Any]] = []
+        for target in model_routing.all_targets():
+            provider_id = target.provider_id
+            route = (provider_id, target.model_id)
+            if route in seen_routes:
+                continue
+            seen_routes.add(route)
+            projected = status_by_model_id.get(target.model_id)
+            provider_values = {provider.value for provider in target.pool_providers}
+            route_statuses = (
+                [
+                    route_status
+                    for route_status in projected.route_statuses
+                    if route_status.provider in provider_values
+                ]
+                if projected is not None
+                else []
+            )
+            model_available = any(
+                route_status.status == "live_routable"
+                for route_status in route_statuses
+            )
+            adapter_available = provider_id in terminal_providers
+            oracle_unverified = bool(route_statuses) and all(
+                route_status.status == "unverified"
+                and route_status.reason == "key_status_unknown"
+                for route_status in route_statuses
+            )
+            local_attempt_authorized = False
+            if adapter_available and oracle_unverified:
+                if provider_id not in local_attempt_cache:
+                    local_attempt_cache[provider_id] = (
+                        self._local_cli_attempt_authorized(provider_id)
+                    )
+                local_attempt_authorized = local_attempt_cache[provider_id]
+            chat_executable = provider_id in {"claude", "openrouter"}
+            selectable = adapter_available and chat_executable and (
+                model_available or local_attempt_authorized
+            )
+            if (
+                adapter_available
+                and not chat_executable
+                and (model_available or local_attempt_authorized)
+            ):
+                route_state = "unavailable"
+                availability_reason = "terminal_chat_transport_unsupported"
+            elif model_available and adapter_available:
+                route_state = "ready"
+                availability_reason = None
+            elif local_attempt_authorized:
+                route_state = "unverified"
+                availability_reason = "local_cli_auth_unverified"
+            elif model_available and not adapter_available:
+                route_state = "unavailable"
+                availability_reason = "terminal_adapter_missing"
+            else:
+                route_state = "unavailable"
+                availability_reason = (
+                    getattr(projected, "unavailable_reason", None)
+                    or "no_live_route"
+                    if projected is not None
+                    else "model_status_missing"
+                )
+            targets.append(
+                {
+                    "alias": target.alias,
+                    "provider": provider_id,
+                    "model": target.model_id,
+                    "label": target.label,
+                    "route_id": f"{provider_id}:{target.model_id}",
+                    "route_state": route_state,
+                    "picker_visible": selectable,
+                    "selectable": selectable,
+                    "chat_executable": chat_executable,
+                    "exact_model_proven": model_available,
+                    "available": model_available,
+                    "availability_reason": availability_reason,
+                    "pool_id": getattr(projected, "id", None),
+                    "tier": getattr(projected, "tier", "unknown"),
+                    "lane": getattr(projected, "lane", "floor"),
+                    "status": getattr(projected, "status", "unavailable"),
+                    "available_routes": list(getattr(projected, "available_routes", [])),
+                }
+            )
+
+        preview_model = self._local_preview_model()
+        preview_selectable = bool(
+            preview_model and "ollama" in terminal_providers
+        )
+        if preview_model:
+            targets.append(
+                {
+                    "alias": "local-preview",
+                    "provider": "ollama",
+                    "model": preview_model,
+                    "label": (
+                        f"{preview_model} (local preview; not a Helm OnCall seat)"
+                    ),
+                    "route_id": f"ollama:{preview_model}",
+                    "route_state": "unverified",
+                    "picker_visible": preview_selectable,
+                    "selectable": preview_selectable,
+                    "chat_executable": preview_selectable,
+                    "exact_model_proven": False,
+                    "preview_only": True,
+                    "helm_on_call_eligible": False,
+                    "available": False,
+                    "availability_reason": (
+                        "local_preview_exact_model_unproven"
+                        if preview_selectable
+                        else "terminal_adapter_missing"
+                    ),
+                    "pool_id": None,
+                    "tier": "preview",
+                    "lane": "local_preview",
+                    "status": "unverified",
+                    "available_routes": [],
+                }
+            )
+
+        selected_available = any(
+            target["provider"] == selected_provider and target["model"] == selected_model
+            and bool(target.get("selectable"))
+            for target in targets
+        )
+        if not selected_available and targets:
+            selectable_targets = [target for target in targets if bool(target.get("selectable"))]
+            fallback_target = next(
+                (target for target in selectable_targets if target["provider"] == "codex"),
+                selectable_targets[0] if selectable_targets else targets[0],
+            )
+            selected_provider = str(fallback_target["provider"])
+            selected_model = str(fallback_target["model"])
+
+        active_target = next(
+            (
+                target
+                for target in targets
+                if target["provider"] == selected_provider and target["model"] == selected_model
+            ),
+            None,
+        )
+        selected_is_local_preview = bool(
+            active_target and active_target.get("preview_only")
+        )
+        fallback_chain = [] if selected_is_local_preview else [
+            {
+                "alias": str(target["alias"]),
+                "provider": str(target["provider"]),
+                "model": str(target["model"]),
+                "label": str(target["label"]),
+                "route_id": str(target["route_id"]),
+                "route_state": str(target["route_state"]),
+                "availability_reason": target.get("availability_reason"),
+            }
+            for target in targets
+            if not (target["provider"] == selected_provider and target["model"] == selected_model)
+            and bool(target.get("selectable"))
+        ][:6]
+        provider_counts: dict[str, int] = {}
+        attemptable_provider_counts: dict[str, int] = {}
+        for target in targets:
+            provider = str(target["provider"])
+            if bool(target.get("available")):
+                provider_counts[provider] = provider_counts.get(provider, 0) + 1
+            if bool(target.get("selectable")):
+                attemptable_provider_counts[provider] = (
+                    attemptable_provider_counts.get(provider, 0) + 1
+                )
+        return {
+            "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
+            "oracle_state": projection.oracle_state,
+            "live_providers": projection.live_providers,
+            "selected_provider": selected_provider,
+            "selected_model": selected_model,
+            "selected_route": f"{selected_provider}:{selected_model}",
+            "strategy": strategy,
+            "strategies": list(model_routing.ROUTING_STRATEGIES),
+            "default_route": (
+                f"ollama:{preview_model}"
+                if preview_selectable
+                else (
+                    f"{targets[0]['provider']}:{targets[0]['model']}"
+                    if targets
+                    else f"{model_routing.default_target().provider_id}:{model_routing.default_target().model_id}"
+                )
+            ),
+            "active_label": str(active_target["label"]) if active_target else selected_model,
+            "fallback_chain": fallback_chain,
+            "targets": targets,
+            "available_providers": [
+                {"id": provider, "model_count": count}
+                for provider, count in sorted(provider_counts.items())
+            ],
+            "attemptable_providers": [
+                {"id": provider, "model_count": count}
+                for provider, count in sorted(attemptable_provider_counts.items())
+            ],
+        }
+
     def _chat_lanes(self, requested_provider: str, requested_model: str) -> list[tuple[str, str, dict[str, Any], str]]:
         lanes: list[tuple[str, str, dict[str, Any], str]] = []
         seen: set[tuple[str, str]] = set()
+
+        preview_model = self._local_preview_model()
+        if requested_provider == "ollama":
+            if (
+                preview_model
+                and requested_model == preview_model
+                and "ollama" in self._adapters
+            ):
+                return [
+                    (
+                        "ollama",
+                        preview_model,
+                        {},
+                        "explicit local preview; no external fallback",
+                    )
+                ]
+            # An Ollama request is never rewritten onto a metered or unrelated
+            # external provider. A missing/mismatched opt-in fails closed.
+            return []
 
         def add(provider_id: str, model_id: str, options: dict[str, Any], note: str) -> None:
             if (
