@@ -28,15 +28,14 @@ This gate asserts three things and exits non-zero on any drift:
        * ANY ``continue-on-error: true`` (job or step) on a
          regression-sensitive required job — such a gate must be able to fail
          hard everywhere, because a base change can regress it;
-       * a ``github.event_name != 'merge_group'`` self-skip on a
-         regression-sensitive required job — the job would be reported
-         "skipped = satisfied" in the merge queue, blind to a regression the
-         base change introduces after the PR run went green.
+       * every required workflow must subscribe to ``merge_group`` and no
+         required job may self-skip that event. A skipped required check is
+         accepted by GitHub, but it is not evidence about the synthetic
+         future-main commit.
 
-Dead ``merge_group:`` triggers (a workflow subscribed to ``merge_group`` whose
-every job self-skips on ``merge_group``, so the trigger can never run work)
-are surfaced as WARNINGS. They are coherence noise, not a false-green risk, so
-they do not fail the gate by default.
+Dead ``merge_group:`` triggers in non-required workflows (a workflow subscribed
+to ``merge_group`` whose every job self-skips it) remain warnings. A required
+producer with the same shape is drift and fails the gate.
 
 Oracle: ``gh api repos/<slug>/branches/<branch>/protection`` (external,
 checkable) + ``.github/workflows/*.yml`` (in-repo, checkable). No modelling of
@@ -282,10 +281,16 @@ def _is_merge_group_self_skip(if_text: str) -> bool:
     if not if_text:
         return False
     flat = " ".join(if_text.split())
-    return (
+    explicit_exclusion = (
         "github.event_name != 'merge_group'" in flat
         or 'github.event_name != "merge_group"' in flat
     )
+    pr_only_event = (
+        "github.event_name == 'pull_request'" in flat
+        or 'github.event_name == "pull_request"' in flat
+        or "github.event.pull_request." in flat
+    ) and "merge_group" not in flat
+    return explicit_exclusion or pr_only_event
 
 
 def _extract_triggers(on_value: Any) -> set[str]:
@@ -444,6 +449,11 @@ def run_check(
                 f"'{wf_name}' which does not exist under {workflows_dir}"
             )
             continue
+        if "merge_group" not in wf.triggers:
+            report.drift.append(
+                f"MERGE-QUEUE-BLIND: required workflow '{wf_name}' for "
+                f"context '{context}' does not subscribe to merge_group"
+            )
         job = wf.jobs.get(job_id)
         if job is None:
             report.drift.append(
@@ -467,6 +477,15 @@ def run_check(
                 f"never report failure"
             )
 
+        if job.self_skips_merge_group():
+            report.drift.append(
+                f"MERGE-QUEUE-BLIND: required job '{job_id}' ({context}) in "
+                f"'{wf_name}' self-skips on merge_group (if: {job.if_text}); "
+                f"skipped is "
+                f"accepted by GitHub but proves nothing about the synthetic "
+                f"future-main commit"
+            )
+
         if regression_sensitive:
             for st in job.steps:
                 if st.continue_on_error:
@@ -476,13 +495,6 @@ def run_check(
                         f"'{st.name}' with continue-on-error: true — a "
                         f"base-change regression here would be swallowed"
                     )
-            if job.self_skips_merge_group():
-                report.drift.append(
-                    f"MERGE-QUEUE-BLIND: regression-sensitive required job "
-                    f"'{job_id}' ({context}) in '{wf_name}' self-skips on "
-                    f"merge_group (if: github.event_name != 'merge_group'); a "
-                    f"base change would be reported skipped=satisfied"
-                )
         else:
             # Best-effort steps on a non-regression-sensitive gate are
             # allowed, but surface them so the classification stays honest.

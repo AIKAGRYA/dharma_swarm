@@ -1,0 +1,116 @@
+{
+  "id": "titanium-WP-MERGE-QUEUE-READINESS-V2",
+  "base_ref": "1366d819ceb321424c3b059f9243644df4d77d52",
+  "branch": "agent/merge-queue-readiness-20260813",
+  "worktree": ".",
+  "intent": "Operator-authorized WP-0F1/WP-0G closure slice: make every merge-authoritative workflow emit truthful evidence on a native merge-group candidate, keep DocOps generated counts advisory on pull-request and merge-group deltas but strict on scheduled/manual main audits, make rolling DocOps PR delivery check-triggering and fail closed until every canonical required context exists on the exact delivered head, and repair the Semgrep merge-group delta path exposed by the first live canary. This packet changes no runtime merge authority, does not re-enable legacy automerge or Merge Master Mike, and grants no bypass of branch protection or review-thread policy.",
+  "allowed_files": [
+    ".github/workflows/docops.yml",
+    ".github/workflows/coherence-delta.yml",
+    ".github/workflows/docops-reconcile-main.yml",
+    ".github/workflows/semgrep.yml",
+    "scripts/governance/check_ci_parity.py",
+    "tests/test_docops_reconcile_workflow.py",
+    "tests/test_merge_queue_workflows.py",
+    "tests/governance/test_ci_parity_guard.py",
+    "reports/agentops/work_packets/titanium-WP-MERGE-QUEUE-READINESS-V2.json"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    ".github/workflows/gitleaks.yml",
+    ".github/workflows/tests.yml",
+    ".github/workflows/active-track.yml",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "docs/governance/ACTIVE_TRACK.yaml"
+  ],
+  "gates": [
+    {
+      "name": "merge-queue-workflow-contracts",
+      "command": "python3 -m pytest -q tests/test_merge_queue_workflows.py tests/test_docops_reconcile_workflow.py tests/governance/test_ci_parity_guard.py tests/test_gitleaks_workflow.py tests/test_workflow_cache_token_guard.py tests/test_workflow_path_filters.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "merge-queue-test-lint",
+      "command": "python3 -m ruff check scripts/governance/check_ci_parity.py tests/governance/test_ci_parity_guard.py tests/test_merge_queue_workflows.py tests/test_docops_reconcile_workflow.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "changed-scope-diff-check",
+      "command": "git diff --check -- .github/workflows/docops.yml .github/workflows/coherence-delta.yml .github/workflows/docops-reconcile-main.yml .github/workflows/semgrep.yml scripts/governance/check_ci_parity.py tests/governance/test_ci_parity_guard.py tests/test_docops_reconcile_workflow.py tests/test_merge_queue_workflows.py reports/agentops/work_packets/titanium-WP-MERGE-QUEUE-READINESS-V2.json",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "merge-group-required-job-self-skip-mutation-is-rejected",
+      "command": "python3 -c \"from pathlib import Path; import subprocess, sys; p=Path('.github/workflows/coherence-delta.yml'); t=p.read_text(); anchor=\\\"github.event_name == 'merge_group' ||\\\"; mutated=t.replace(anchor, \\\"github.event_name == 'pull_request' ||\\\", 1); assert mutated != t; p.write_text(mutated); raise SystemExit(subprocess.run([sys.executable, 'scripts/governance/check_ci_parity.py', '--allow-missing-live']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "merge-group-semgrep-missing-base-mutation-is-rejected",
+      "command": "python3 -c \"from pathlib import Path; import subprocess, sys; p=Path('.github/workflows/semgrep.yml'); t=p.read_text(); anchor='base=\\\"$MERGE_GROUP_BASE_SHA\\\"'; mutated=t.replace(anchor, 'base=\\\"\\\"', 1); assert mutated != t; p.write_text(mutated); raise SystemExit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_merge_queue_workflows.py::test_semgrep_uses_exact_merge_group_delta_fail_closed']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): make native merge queue evidence truthful"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MERGE-QUEUE-READINESS-V2",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "1366d819ceb321424c3b059f9243644df4d77d52",
+      "details": []
+    },
+    "interface_mismatches": [
+      "docops.yml infers pull-request mode from GITHUB_BASE_REF, which is absent on merge_group and makes queue candidates run the strict main-only generated-count policy.",
+      "coherence-delta.yml self-skips its required job on merge_group, producing no executed queue-candidate evidence.",
+      "docops-reconcile-main.yml applies the direct-main [skip ci] loop guard to rolling PR commits and accepts any single check run instead of proving that all six canonical required contexts exist on the exact delivered head."
+      ,"semgrep.yml treats merge_group as a full-repository scan because it never selects merge_group.base_sha, so the live zero-red canary produced a red advisory check on pre-existing findings instead of evaluating the candidate delta."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/gitleaks.yml",
+      ".github/workflows/docops.yml",
+      ".github/workflows/coherence-delta.yml",
+      ".github/workflows/docops-reconcile-main.yml",
+      "tests/test_gitleaks_workflow.py",
+      "tests/test_docops_reconcile_workflow.py"
+    ],
+    "honest_blockers": [
+      "Structural and pull-request checks cannot establish native merge-group behavior; proof requires one real merge queue candidate after repository ruleset activation.",
+      "The native merge queue ruleset is live GitHub state, not repository content; retain classic protection until the second canary produces all six required checks and no failed merge-group workflow on its exact synthetic SHA.",
+      "The first native canary was safely invalidated after Semgrep exposed missing merge-group base semantics; a second live canary is required after this packet closes that exact defect."
+    ],
+    "rollback": "Before merge, disable or remove the canary ruleset and dequeue the PR. After merge, revert this commit only after disabling native merge queue; retain classic branch protection throughout. Do not re-enable the legacy automerge or Mike router as rollback.",
+    "packet_digest": "39a3bc547b384b41b5fde023d8920dead6d3f659d4828b92cfac344b387a6fe5"
+  }
+}
