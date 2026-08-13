@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -31,6 +32,12 @@ from dharma_swarm.mission_control_mcp import (
 )
 from dharma_swarm import mission_control_mcp
 from dharma_swarm.models import TaskPriority, TaskStatus
+
+_MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
+_requires_mcp = pytest.mark.skipif(
+    not _MCP_AVAILABLE,
+    reason="mcp optional dependency not installed",
+)
 
 
 @dataclass(frozen=True)
@@ -488,6 +495,7 @@ async def test_trusted_principal_overrides_spoofed_actor_and_metadata_fields() -
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_fastmcp_registers_stable_names_and_honest_annotations() -> None:
     server = create_mission_control_mcp(_FakeMissionControl())
     tools = {tool.name: tool for tool in await server.list_tools()}
@@ -507,6 +515,7 @@ async def test_fastmcp_registers_stable_names_and_honest_annotations() -> None:
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_fastmcp_read_call_returns_structured_payload() -> None:
     server = create_mission_control_mcp(_FakeMissionControl())
 
@@ -520,6 +529,7 @@ async def test_fastmcp_read_call_returns_structured_payload() -> None:
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_fastmcp_mutation_is_denied_by_default_and_explicitly_authorizable() -> (
     None
 ):
@@ -689,6 +699,7 @@ def test_main_runs_the_default_server_over_stdio(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_real_canonical_owners_round_trip_through_fastmcp(tmp_path) -> None:
     from dharma_swarm.mission_control import MissionControl
     from dharma_swarm.runtime_state import RuntimeStateStore
@@ -796,6 +807,7 @@ async def test_real_canonical_owners_round_trip_through_fastmcp(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_default_factory_is_read_only_and_does_not_initialize_state(
     tmp_path, monkeypatch
 ) -> None:
@@ -826,6 +838,7 @@ async def test_default_factory_is_read_only_and_does_not_initialize_state(
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_default_reads_do_not_create_absent_databases_in_existing_root(
     tmp_path, monkeypatch
 ) -> None:
@@ -846,6 +859,7 @@ async def test_default_reads_do_not_create_absent_databases_in_existing_root(
 
 
 @pytest.mark.asyncio
+@_requires_mcp
 async def test_default_reads_do_not_mutate_existing_database_tree_or_wal(
     tmp_path, monkeypatch
 ) -> None:
@@ -949,6 +963,7 @@ async def test_default_reads_do_not_mutate_existing_database_tree_or_wal(
         task_writer.close()
 
 
+@_requires_mcp
 def test_default_factory_binds_canonical_state_paths(tmp_path, monkeypatch) -> None:
     observed: dict[str, object] = {}
 
