@@ -143,7 +143,7 @@ secret acts is unattended via `scripts/ops/vps_cloud_init.yaml`:
 **Path B — manual (any Ubuntu box with docker):**
 
 ```bash
-git clone https://github.com/AmitabhainArunachala/dharma_swarm && cd dharma_swarm
+git clone https://github.com/AIKAGRYA/dharma_swarm && cd dharma_swarm
 cp .env.example .env    # then fill: provider keys (dkeys export), DEVIN_NATS_PW if bridging AGNI
 docker compose --profile vps up -d --build   # drop --profile vps to skip litestream
 docker compose exec swarm dgc spine tail --limit 5   # felt-proof: receipts flowing

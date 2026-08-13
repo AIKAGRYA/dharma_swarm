@@ -1,0 +1,33 @@
+{
+  "schema": "dharma_swarm.repository_identity.v1",
+  "canonical": {
+    "identity": "AIKAGRYA/dharma_swarm",
+    "origin_url": "https://github.com/AIKAGRYA/dharma_swarm.git"
+  },
+  "legacy_compatibility": {
+    "identity": "AmitabhainArunachala/dharma_swarm",
+    "cutoff_utc": "2026-08-15T15:00:00Z",
+    "before_cutoff": "warn_nonblocking",
+    "at_or_after_cutoff": "config_error"
+  },
+  "explicitly_blocked": [
+    "shakti-saraswati/dharma_swarm"
+  ],
+  "sterile_clone_policy": {
+    "absent_origin": "nonblocking",
+    "local_path_origin": "nonblocking"
+  },
+  "inspection": {
+    "source": "raw_local_git_config",
+    "key": "remote.origin.url",
+    "command": [
+      "git",
+      "config",
+      "--local",
+      "--null",
+      "--get-all",
+      "remote.origin.url"
+    ],
+    "global_url_rewrites": "ignored"
+  }
+}
