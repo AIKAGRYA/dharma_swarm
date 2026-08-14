@@ -1,0 +1,98 @@
+{
+  "allowed_files": [
+    "tests/test_mission_control_mcp.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P03.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "6efea83fd9c36b59173f24ec44d4a16ac444d8c3",
+  "branch": "codex/mission-control-20260812",
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): respect optional Mission Control MCP runtime"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "scripts/**",
+    "docs/**",
+    "Makefile",
+    "Dockerfile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock",
+    "ACTIVE_SURFACE_MANIFEST.yaml"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_mcp.py tests/test_mcp_server.py",
+      "expected_exit": 0,
+      "name": "mission-control-and-legacy-mcp-contracts",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check tests/test_mission_control_mcp.py",
+      "expected_exit": 0,
+      "name": "mission-control-mcp-test-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-P03",
+  "intent": "Close PR 1325's attributable Python matrix failure without broadening the production or development dependency surface. Preserve MCP as an optional extra, keep Mission Control's service and authority tests mandatory, and selectively skip only the eight FastMCP integration tests when the optional mcp package is absent.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mcp_server.py -k create_mcp_server_import_error",
+      "expected_exit": 0,
+      "name": "optional-mcp-import-error-remains-explicit",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "tests/test_mission_control_mcp.py",
+      "tests/test_mcp_server.py",
+      "pyproject.toml"
+    ],
+    "collision": {
+      "checked_at_sha": "6efea83fd9c36b59173f24ec44d4a16ac444d8c3",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The standard dev environment does not execute the eight FastMCP integration tests; the dedicated MCP-enabled AgentOps gate and plugin evaluation remain their executable evidence.",
+      "The draft PR still requires explicit before-merge approval and does not claim full review-council unanimity."
+    ],
+    "interface_mismatches": [
+      "The repository-wide pytest workflow intentionally omits the optional mcp extra but previously collected eight Mission Control FastMCP integration tests unconditionally."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "00b0985544268c28ea5fd77be46dcc79893e49ce8f5d130109c26158976a7c6f",
+    "rollback": "Revert this test-contract commit; Mission Control remains implemented, but the standard dev-only Python matrix will again fail while collecting optional FastMCP integration tests.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-P03"
+  },
+  "worktree": "."
+}

@@ -1,0 +1,109 @@
+{
+  "id": "WP-MIKE-P0-20260813",
+  "base_ref": "5497ca339f67485589423048269a2a22c4eeba54",
+  "branch": "codex/merge-loop-p0-20260813",
+  "worktree": ".",
+  "intent": "Repair the contained Merge Master Mike P0 without reopening merge authority: replace blocked-PR starvation with bounded cooldown plus deterministic scan rotation; remove the automerge check-suite stampede and shard superseded runs; encode one shared risk-tiered authority policy in which docs-low may be unattended only under deterministic gates, code requires current-head AI evidence plus an exact current-head operator warrant, and high-risk/referee changes remain operator-only; and make the mobile walking brief distinguish scanner heartbeat from the disabled merge arm. Preserve fail-closed base-CAS enforcement, keep both live merge workflows disabled, and do not start the stale local daemon.",
+  "allowed_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "reports/agentops/work_packets/WP-MIKE-P0-20260813.json",
+    "scripts/governance/automerge_tier_policy.json",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/walking_brief.py",
+    "tests/test_automerge_tier_policy.py",
+    "tests/test_loop_killswitch_workflows.py",
+    "tests/test_merge_master_mike_daemon.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_github_reviews.py",
+    "tests/test_walking_brief.py"
+  ],
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "terminal/**",
+    "tools/**"
+  ],
+  "gates": [
+    {
+      "name": "merge-p0-focused-tests",
+      "command": "python3 -m pytest tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py tests/test_automerge_tier_policy.py tests/test_merge_master_mike_daemon.py tests/test_walking_brief.py tests/test_loop_killswitch_workflows.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "merge-p0-ruff",
+      "command": "python3 -m ruff check scripts/runtime/pr_merge_control.py scripts/runtime/walking_brief.py scripts/governance/check_automerge_tier_policy.py tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py tests/test_automerge_tier_policy.py tests/test_merge_master_mike_daemon.py tests/test_walking_brief.py tests/test_loop_killswitch_workflows.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "empty-test-selection-stays-red",
+      "command": "python3 -m pytest tests/test_pr_merge_control.py -q -k nonexistent_test_ever",
+      "expected_exit": 5,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(merge): close P0 scheduling and authority gaps"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MIKE-P0-20260813",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "5497ca339f67485589423048269a2a22c4eeba54",
+      "details": []
+    },
+    "interface_mismatches": [
+      "GitHub merge queue/base-CAS enforcement is not proven live, so the actuator must remain disabled even when a local gate is otherwise clean.",
+      "The cloud backlog runner has ephemeral RUNNER_TEMP state, so fairness must not depend solely on persisted local receipts."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/pr_merge_control.py",
+      "scripts/governance/check_automerge_tier_policy.py",
+      ".github/workflows/automerge.yml",
+      "scripts/runtime/walking_brief.py"
+    ],
+    "honest_blockers": [
+      "Live merge workflows remain disabled until this repair is reviewed and merged by the operator.",
+      "Unattended merge execution remains uninhabited until live server-side base-CAS or merge-queue enforcement is independently verified."
+    ],
+    "rollback": "revert the repair commit on branch codex/merge-loop-p0-20260813; leave live merge workflows disabled and the local launchd service unloaded",
+    "packet_digest": "6341fd9a94f09395c0fb32135b03e4b2832f13fadee00bbe04a8ed60fb4d1cd7"
+  }
+}
