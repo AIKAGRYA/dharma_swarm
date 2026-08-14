@@ -16,12 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from datetime import datetime, timezone
-import json
-import math
-import os
 from pathlib import Path
-import stat
 from typing import Any, AsyncIterator
 
 import httpx
@@ -35,7 +30,16 @@ from .base import (
     ProviderAdapter,
     ProviderConfig,
 )
+from .grok_oauth_auth import load_current_oauth_key as _load_oauth_key_from_path
 from .grok_oauth_codec import validate_sse_completion
+from .grok_oauth_request import (
+    INVALID as _INVALID,
+    MAX_OUTPUT_TOKENS as _MAX_OUTPUT_TOKENS,
+    bounded_output_tokens as _bounded_output_tokens,
+    normalize_messages as _request_input,
+    optional_instructions as _optional_instructions,
+    request_timeout as _request_timeout,
+)
 from ..events import ErrorEvent, SessionEnd, SessionStart, TextComplete, UsageReport
 
 _GROK_OAUTH_BASE_URL = "https://cli-chat-proxy.grok.com/v1"
@@ -46,9 +50,6 @@ _SERVED_MODEL_ID = f"{_REQUESTED_MODEL_ID}-build"
 _CLIENT_VERSION = "1.0.0"
 _CLIENT_IDENTIFIER = "grok-shell"
 _USER_AGENT = f"xai-grok-shell/{_CLIENT_VERSION}"
-_MAX_OUTPUT_TOKENS = 4096
-_DEFAULT_OUTPUT_TOKENS = 1024
-_MAX_AUTH_FILE_BYTES = 64 * 1024
 _MAX_SSE_BYTES = 4 * 1024 * 1024
 _RETRYABLE_HTTP_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
 _CAPABILITIES = Capability.SYSTEM_PROMPT | Capability.CONTEXT_USAGE | Capability.CANCEL
@@ -406,178 +407,12 @@ class GrokOAuthResponsesAdapter(ProviderAdapter):
         )
 
 
-class _InvalidSentinel:
-    pass
-
-
 class _ResponseTooLarge(Exception):
     pass
 
 
-_INVALID = _InvalidSentinel()
-
-
-def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _load_current_oauth_key() -> tuple[str | None, tuple[str, str] | None]:
-    missing = (
-        "missing_oauth_auth",
-        "Grok OAuth credentials are unavailable",
-    )
-    insecure = (
-        "insecure_oauth_auth",
-        "Grok OAuth credential file permissions are not secure",
-    )
-    malformed = (
-        "malformed_oauth_auth",
-        "Grok OAuth credential file is invalid",
-    )
-
-    path = _GROK_AUTH_PATH
-    try:
-        metadata = path.lstat()
-    except FileNotFoundError:
-        return None, missing
-    except OSError:
-        return None, missing
-    if stat.S_ISLNK(metadata.st_mode):
-        return None, insecure
-
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    try:
-        descriptor = os.open(path, flags)
-    except FileNotFoundError:
-        return None, missing
-    except OSError:
-        return None, insecure
-
-    try:
-        opened_metadata = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(opened_metadata.st_mode)
-            or stat.S_IMODE(opened_metadata.st_mode) != 0o600
-            or opened_metadata.st_uid != os.getuid()
-            or opened_metadata.st_size > _MAX_AUTH_FILE_BYTES
-        ):
-            return None, insecure
-        with os.fdopen(descriptor, "r", encoding="utf-8") as stream:
-            descriptor = -1
-            raw = stream.read(_MAX_AUTH_FILE_BYTES + 1)
-    except (OSError, UnicodeError):
-        return None, malformed
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-
-    if not raw or len(raw.encode("utf-8")) > _MAX_AUTH_FILE_BYTES:
-        return None, malformed
-    try:
-        data = json.loads(raw, object_pairs_hook=_unique_json_object)
-    except (TypeError, ValueError):
-        return None, malformed
-    if not isinstance(data, dict):
-        return None, malformed
-
-    records: list[dict[str, Any]] = []
-    if "key" in data or "expires_at" in data:
-        records.append(data)
-    records.extend(
-        value
-        for value in data.values()
-        if isinstance(value, dict) and ("key" in value or "expires_at" in value)
-    )
-    if not records:
-        return None, malformed
-    if len(records) != 1:
-        return None, (
-            "ambiguous_oauth_auth",
-            "Grok OAuth credential selection is ambiguous",
-        )
-
-    # Deliberately read only the access key and its expiry.  In particular,
-    # this adapter never reads, emits, or uses a refresh token.
-    record = records[0]
-    key = record.get("key")
-    expires_at = record.get("expires_at")
-    if (
-        not isinstance(key, str)
-        or not key.strip()
-        or len(key) > 16_384
-        or "\r" in key
-        or "\n" in key
-        or not isinstance(expires_at, str)
-        or not expires_at.strip()
-        or len(expires_at) > 128
-    ):
-        return None, malformed
-    try:
-        expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-    except ValueError:
-        return None, malformed
-    if expiry.tzinfo is None:
-        return None, malformed
-    if expiry.astimezone(timezone.utc) <= _now_utc():
-        return None, (
-            "expired_oauth_auth",
-            "Grok OAuth access credential is expired",
-        )
-    return key, None
-
-
-def _request_input(messages: Any) -> list[dict[str, str]] | None:
-    if not isinstance(messages, list) or not messages:
-        return None
-    normalized: list[dict[str, str]] = []
-    for message in messages:
-        if not isinstance(message, dict) or set(message) != {"role", "content"}:
-            return None
-        role = message.get("role")
-        content = message.get("content")
-        if role not in {"system", "user", "assistant"}:
-            return None
-        if not isinstance(content, str) or not content.strip():
-            return None
-        normalized.append({"role": role, "content": content})
-    return normalized
-
-
-def _optional_instructions(value: Any) -> str | None | _InvalidSentinel:
-    if value is None:
-        return None
-    if not isinstance(value, str) or not value.strip():
-        return _INVALID
-    return value
-
-
-def _bounded_output_tokens(value: Any) -> int | None:
-    if value is None:
-        return _DEFAULT_OUTPUT_TOKENS
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        return None
-    return min(value, _MAX_OUTPUT_TOKENS)
-
-
-def _request_timeout(value: Any) -> float:
-    try:
-        timeout = float(value) if value is not None else 120.0
-    except (TypeError, ValueError):
-        return 120.0
-    if not math.isfinite(timeout):
-        return 120.0
-    return min(max(timeout, 1.0), 300.0)
-
-
-def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    value: dict[str, Any] = {}
-    for key, item in pairs:
-        if key in value:
-            raise ValueError("duplicate Grok OAuth credential key")
-        value[key] = item
-    return value
+    return _load_oauth_key_from_path(_GROK_AUTH_PATH)
 
 
 def _failure_events(
