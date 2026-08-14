@@ -116,12 +116,16 @@ def _assert_control_plane_topology(manifest: dict) -> None:
     assert all(node["owns_state"] is False for node in nodes.values())
     assert all(node["owns_new_store"] is False for node in nodes.values())
     assert all(node["runtime_live"] is False for node in nodes.values())
+    assert all(
+        node["implementation_status"] == "admitted_not_alive" for node in nodes.values()
+    )
     assert all(node["proves_executor_liveness"] is False for node in nodes.values())
     assert {
         node_id: node["writes_owner_state"] for node_id, node in nodes.items()
     } == CONTROL_PLANE_NODE_WRITES
     assert nodes["apex_sarathi"]["authority"] == "proposal_only"
     assert nodes["mission_control"]["authority"] == "TaskBoard+RuntimeStateStore"
+    assert nodes["governed_dispatch"]["authority"] == "injected_verifier_only"
     assert nodes["a2a_transport"]["lifecycle_owner"] == "A2A"
     assert nodes["operator_projection"]["authority"] == "projection_only"
     assert nodes["operator_brief_projection"]["output_verified"] is False
@@ -131,6 +135,10 @@ def _assert_control_plane_topology(manifest: dict) -> None:
     }
     assert len(topology["edges"]) == len(CONTROL_PLANE_EDGES)
     assert edges == CONTROL_PLANE_EDGES
+    assert all(
+        edge["implementation_status"] == "admitted_not_alive"
+        for edge in topology["edges"]
+    )
     assert all(edge["confers_authority"] is False for edge in topology["edges"])
     assert all(edge["proves_executor_liveness"] is False for edge in topology["edges"])
     assert {
@@ -213,6 +221,22 @@ class TestLoadManifest:
             node_liveness_mutant, "node runtime liveness"
         )
 
+        node_status_mutant = copy.deepcopy(manifest)
+        node_status_mutant["control_plane_topology"]["nodes"][0][
+            "implementation_status"
+        ] = "live"
+        _assert_control_plane_mutant_rejected(
+            node_status_mutant, "node implementation status"
+        )
+
+        dispatch_authority_mutant = copy.deepcopy(manifest)
+        dispatch_authority_mutant["control_plane_topology"]["nodes"][2]["authority"] = (
+            "self_authorized"
+        )
+        _assert_control_plane_mutant_rejected(
+            dispatch_authority_mutant, "dispatch authority"
+        )
+
         edge_authority_mutant = copy.deepcopy(manifest)
         edge_authority_mutant["control_plane_topology"]["edges"][0][
             "confers_authority"
@@ -224,6 +248,14 @@ class TestLoadManifest:
             "proves_executor_liveness"
         ] = True
         _assert_control_plane_mutant_rejected(edge_liveness_mutant, "edge liveness")
+
+        edge_status_mutant = copy.deepcopy(manifest)
+        edge_status_mutant["control_plane_topology"]["edges"][0][
+            "implementation_status"
+        ] = "live"
+        _assert_control_plane_mutant_rejected(
+            edge_status_mutant, "edge implementation status"
+        )
 
         state_write_mutant = copy.deepcopy(manifest)
         state_write_mutant["control_plane_topology"]["nodes"][3][
