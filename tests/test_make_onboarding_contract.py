@@ -1006,6 +1006,26 @@ def test_make_forwards_onboard_args_and_usage_exit() -> None:
     )
 
 
+def test_make_vision_forwards_args_and_has_no_prerequisites() -> None:
+    """`make vision` is a read-only projection with NO onboard dependence.
+
+    The header must be exactly `vision:` — any prerequisite would couple
+    vision-level orientation to session status, which the command boundary
+    table forbids.
+    """
+    recipe = _recipe("vision")
+    header = recipe.splitlines()[0]
+    assert header == "vision:", (
+        f"make vision must declare no prerequisites, got header {header!r}"
+    )
+    assert "PYTHONDONTWRITEBYTECODE=1" in recipe, (
+        "make vision must disable bytecode like the onboard pattern"
+    )
+    assert "scripts/docops/vision_navigation.py $(ARGS)" in recipe, (
+        "make vision must forward documented flags via $(ARGS)"
+    )
+
+
 @pytest.mark.timeout(120)
 def test_door_delegates_to_compact_engine(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
