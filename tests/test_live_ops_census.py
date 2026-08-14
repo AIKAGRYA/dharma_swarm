@@ -83,6 +83,8 @@ def test_live_ops_census_folds_in_canonical_sources(tmp_path: Path) -> None:
 
     surfaces = {surface["id"]: surface for surface in payload["surfaces"]}
     assert surfaces["substrate.dharma_daemon"]["status"] == "live"
+    assert surfaces["substrate.dharma_daemon"]["human_authority_required"] is True
+    assert "issue #1246" in surfaces["substrate.dharma_daemon"]["next_action"]
     assert surfaces["transport.nats"]["status"] == "live"
     assert surfaces["evidence.a2a_mirrors"]["status"] == "live"
     assert surfaces["evidence.a2a_mirrors"]["desired_state"] == "evidence-mirror-not-authority"
@@ -138,6 +140,7 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
         if surface["human_authority_required"]
     }
     assert {
+        "substrate.dharma_daemon",
         "revenue.cashclaw_gate",
         "remote.agni",
         "agent.merge_master_mike",
