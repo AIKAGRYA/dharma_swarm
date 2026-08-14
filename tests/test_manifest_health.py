@@ -36,6 +36,142 @@ from dharma_swarm.manifest_health import (
 )
 
 
+CONTROL_PLANE_CLAIM_LADDER = [
+    "MissionProposal",
+    "AcceptedMissionTask",
+    "MissionDispatchRequest",
+    "AuthorizedDispatch",
+    "DeliveryAck",
+    "HandlerAck",
+    "SemanticOutcome",
+    "VerifiedOutcome",
+    "PromotionWarrant",
+    "MergeAuthorized",
+]
+CONTROL_PLANE_NODE_IDS = {
+    "apex_sarathi",
+    "mission_control",
+    "governed_dispatch",
+    "a2a_transport",
+    "operator_projection",
+    "operator_brief_projection",
+}
+CONTROL_PLANE_EDGES = {
+    ("apex_sarathi", "mission_control", "MissionProposal"),
+    ("mission_control", "governed_dispatch", "MissionDispatchRequest"),
+    ("governed_dispatch", "a2a_transport", "AuthorizedDispatch"),
+    ("a2a_transport", "mission_control", "A2AExecutionObservation"),
+    ("mission_control", "operator_projection", "MissionSnapshot"),
+    ("apex_sarathi", "operator_projection", "SarathiProjection"),
+    ("mission_control", "operator_brief_projection", "MissionSnapshot"),
+}
+CONTROL_PLANE_FORBIDDEN_COERCIONS = {
+    "proposal_to_accepted_task",
+    "accepted_task_to_dispatch_request",
+    "dispatch_request_to_authorized_dispatch",
+    "authorized_dispatch_to_delivery_ack",
+    "delivery_ack_to_handler_ack",
+    "handler_ack_to_semantic_outcome",
+    "semantic_outcome_to_verified_outcome",
+    "verified_outcome_to_promotion_warrant",
+    "promotion_warrant_to_merge_authorized",
+}
+CONTROL_PLANE_NODE_WRITES = {
+    "apex_sarathi": False,
+    "mission_control": True,
+    "governed_dispatch": False,
+    "a2a_transport": True,
+    "operator_projection": False,
+    "operator_brief_projection": False,
+}
+CONTROL_PLANE_EDGE_WRITES = {
+    ("apex_sarathi", "mission_control", "MissionProposal"): True,
+    ("mission_control", "governed_dispatch", "MissionDispatchRequest"): False,
+    ("governed_dispatch", "a2a_transport", "AuthorizedDispatch"): True,
+    ("a2a_transport", "mission_control", "A2AExecutionObservation"): False,
+    ("mission_control", "operator_projection", "MissionSnapshot"): False,
+    ("apex_sarathi", "operator_projection", "SarathiProjection"): False,
+    ("mission_control", "operator_brief_projection", "MissionSnapshot"): False,
+}
+
+
+def _assert_control_plane_topology(manifest: dict) -> None:
+    topology = manifest["control_plane_topology"]
+    assert topology["schema_version"] == "dharma.control_plane.topology.v1"
+    assert topology["claim_ceiling"] == "admitted_not_alive"
+    assert topology["canonical_state_owners"] == ["TaskBoard", "RuntimeStateStore"]
+    assert topology["owns_new_state"] is False
+    assert topology["owns_new_store"] is False
+    assert topology["proves_executor_liveness"] is False
+    assert topology["implicit_claim_promotion"] is False
+    assert topology["claim_ladder"] == CONTROL_PLANE_CLAIM_LADDER
+    assert topology["claim_contract"]["non_coercible"] is True
+    assert set(topology["claim_contract"]["forbidden_coercions"]) == (
+        CONTROL_PLANE_FORBIDDEN_COERCIONS
+    )
+
+    nodes = {node["id"]: node for node in topology["nodes"]}
+    assert len(topology["nodes"]) == len(CONTROL_PLANE_NODE_IDS)
+    assert set(nodes) == CONTROL_PLANE_NODE_IDS
+    assert all(node["owns_state"] is False for node in nodes.values())
+    assert all(node["owns_new_store"] is False for node in nodes.values())
+    assert all(node["runtime_live"] is False for node in nodes.values())
+    assert all(node["proves_executor_liveness"] is False for node in nodes.values())
+    assert {
+        node_id: node["writes_owner_state"] for node_id, node in nodes.items()
+    } == CONTROL_PLANE_NODE_WRITES
+    assert nodes["apex_sarathi"]["authority"] == "proposal_only"
+    assert nodes["mission_control"]["authority"] == "TaskBoard+RuntimeStateStore"
+    assert nodes["a2a_transport"]["lifecycle_owner"] == "A2A"
+    assert nodes["operator_projection"]["authority"] == "projection_only"
+    assert nodes["operator_brief_projection"]["output_verified"] is False
+
+    edges = {
+        (edge["source"], edge["target"], edge["carries"]) for edge in topology["edges"]
+    }
+    assert len(topology["edges"]) == len(CONTROL_PLANE_EDGES)
+    assert edges == CONTROL_PLANE_EDGES
+    assert all(edge["confers_authority"] is False for edge in topology["edges"])
+    assert all(edge["proves_executor_liveness"] is False for edge in topology["edges"])
+    assert {
+        (edge["source"], edge["target"], edge["carries"]): edge["writes_owner_state"]
+        for edge in topology["edges"]
+    } == CONTROL_PLANE_EDGE_WRITES
+    observation = next(
+        edge
+        for edge in topology["edges"]
+        if (edge["source"], edge["target"]) == ("a2a_transport", "mission_control")
+    )
+    assert observation["rule"] == "projection_only_no_mission_attempt_lifecycle"
+
+    authorities = topology["independent_authorities"]
+    assert authorities["forge_promotion"].endswith("/verify_promotion.py")
+    assert authorities["merge"] == "scripts/runtime/pr_merge_control.py"
+
+    metabolic_nodes = manifest["autocatalytic_portfolio"]["nodes"]
+    assert len(metabolic_nodes) == 10
+    metabolic_ids = {node["id"] for node in metabolic_nodes}
+    assert not {"mission_control", "governed_dispatch", "a2a_transport"} & metabolic_ids
+
+    assert manifest["state_dir"]["task_board_db"] == "~/.dharma/db/tasks.db"
+    integrations = {row["id"]: row for row in manifest["integrations"]}
+    assert integrations["task_board_db"]["used_by"] == [
+        "swarm_manager",
+        "mission_control",
+    ]
+    assert {"mission_control", "a2a_transport"} <= set(
+        integrations["runtime_db"]["used_by"]
+    )
+
+
+def _assert_control_plane_mutant_rejected(mutant: dict, label: str) -> None:
+    try:
+        _assert_control_plane_topology(mutant)
+    except AssertionError:
+        return
+    raise AssertionError(f"{label} mutant was accepted")
+
+
 class TestLoadManifest:
     def test_loads_successfully(self) -> None:
         manifest = load_manifest()
@@ -50,6 +186,76 @@ class TestLoadManifest:
         assert "loops" in manifest
         assert "health_check_registry" in manifest
         assert "autocatalytic_portfolio" in manifest
+        assert "control_plane_topology" in manifest
+        _assert_control_plane_topology(manifest)
+
+        authority_mutant = copy.deepcopy(manifest)
+        authority_mutant["control_plane_topology"]["implicit_claim_promotion"] = True
+        _assert_control_plane_mutant_rejected(
+            authority_mutant, "implicit claim-promotion"
+        )
+
+        liveness_mutant = copy.deepcopy(manifest)
+        liveness_mutant["control_plane_topology"]["proves_executor_liveness"] = True
+        _assert_control_plane_mutant_rejected(liveness_mutant, "false-liveness")
+
+        coercion_mutant = copy.deepcopy(manifest)
+        coercion_mutant["control_plane_topology"]["claim_contract"]["non_coercible"] = (
+            False
+        )
+        _assert_control_plane_mutant_rejected(coercion_mutant, "claim coercion")
+
+        node_liveness_mutant = copy.deepcopy(manifest)
+        node_liveness_mutant["control_plane_topology"]["nodes"][1]["runtime_live"] = (
+            True
+        )
+        _assert_control_plane_mutant_rejected(
+            node_liveness_mutant, "node runtime liveness"
+        )
+
+        edge_authority_mutant = copy.deepcopy(manifest)
+        edge_authority_mutant["control_plane_topology"]["edges"][0][
+            "confers_authority"
+        ] = True
+        _assert_control_plane_mutant_rejected(edge_authority_mutant, "edge authority")
+
+        edge_liveness_mutant = copy.deepcopy(manifest)
+        edge_liveness_mutant["control_plane_topology"]["edges"][2][
+            "proves_executor_liveness"
+        ] = True
+        _assert_control_plane_mutant_rejected(edge_liveness_mutant, "edge liveness")
+
+        state_write_mutant = copy.deepcopy(manifest)
+        state_write_mutant["control_plane_topology"]["nodes"][3][
+            "writes_owner_state"
+        ] = False
+        _assert_control_plane_mutant_rejected(
+            state_write_mutant, "A2A owner-state write"
+        )
+
+        duplicate_node_mutant = copy.deepcopy(manifest)
+        duplicate_node_mutant["control_plane_topology"]["nodes"].append(
+            copy.deepcopy(duplicate_node_mutant["control_plane_topology"]["nodes"][0])
+        )
+        _assert_control_plane_mutant_rejected(
+            duplicate_node_mutant, "duplicate topology node"
+        )
+
+        duplicate_edge_mutant = copy.deepcopy(manifest)
+        duplicate_edge_mutant["control_plane_topology"]["edges"].append(
+            copy.deepcopy(duplicate_edge_mutant["control_plane_topology"]["edges"][0])
+        )
+        _assert_control_plane_mutant_rejected(
+            duplicate_edge_mutant, "duplicate topology edge"
+        )
+
+        eleventh_node_mutant = copy.deepcopy(manifest)
+        eleventh_node_mutant["autocatalytic_portfolio"]["nodes"].append(
+            {"id": "mission_control"}
+        )
+        _assert_control_plane_mutant_rejected(
+            eleventh_node_mutant, "eleventh metabolic-node"
+        )
 
     def test_autocatalytic_state_defaults_follow_manifest_override(
         self, tmp_path: Path
@@ -328,7 +534,9 @@ class TestBuildHealthReport:
         for checks in ([], expected[:1], [*expected, "manifest_only"], expected[::-1]):
             drift = copy.deepcopy(portfolio)
             drift["nodes"][0]["promotion_checks"] = checks
-            assert any("promotion_checks" in error for error in validate_portfolio(drift))
+            assert any(
+                "promotion_checks" in error for error in validate_portfolio(drift)
+            )
         unknown = copy.deepcopy(portfolio)
         unknown["nodes"][0]["id"] = "manifest_only"
         assert any("no code-owned" in error for error in validate_portfolio(unknown))

@@ -1,0 +1,104 @@
+{
+  "allowed_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "tests/test_manifest_health.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "fc0fa8d0e0fc5efff953d68b11ba1a47c37409a9",
+  "branch": "agent/mission-control-organism-integration",
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit mission control organism integration"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "scripts/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_active_track_governance.py tests/test_manifest_health.py",
+      "expected_exit": 0,
+      "name": "governance-and-manifest-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION",
+  "intent": "Durably admit the exact additive Mission Control, governed-dispatch, A2A, Apex Sarathi, immutable read-model, API projection, dashboard, and Operator Brief citation surfaces before implementation. Declare a non-coercible authority ladder from proposal through merge, explicitly cap every admitted edge at recorded evidence rather than executor liveness, and preserve TaskBoard, RuntimeStateStore, A2A, Forge, and Merge Master ownership boundaries.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py -k managed_blocks_in_sync",
+      "expected_exit": 0,
+      "name": "generated-governance-blocks-remain-bound",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_mcp.py",
+      "dharma_swarm/autocatalytic_adapters_sense_execute.py",
+      "dharma_swarm/a2a/nats_transport.py",
+      "api/routers/control_surface.py",
+      "dashboard/src/app/dashboard/control-surface/page.tsx"
+    ],
+    "collision": {
+      "checked_at_sha": "fc0fa8d0e0fc5efff953d68b11ba1a47c37409a9",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Admission and later code wiring do not start a Sarathi process, Mission Control MCP, API server, A2A consumer, NATS topology, or fleet supervisor.",
+      "The current self-hashed execution lease is not authenticated authority for higher-risk dispatch; the backend slice must require an injected authenticity verifier.",
+      "A2A publish and consume acknowledgements are transport evidence, not semantic outcome, promotion, merge, or process-liveness proof.",
+      "The first operator projection requires an explicit mission_id and intentionally performs no unbounded mission discovery.",
+      "Forge remains the sole promotion arbiter and Merge Master Mike remains the sole conditional merge authority."
+    ],
+    "interface_mismatches": [
+      "Mission Control has no list_missions API; the read-only operator vertical must use explicit mission identity and immutable SQLite snapshots.",
+      "A2A owns its native lifecycle and receipts, so wrapping A2A dispatch in MissionControl start, heartbeat, or finish would duplicate authority and state.",
+      "Sarathi PlannedDelegation dependencies are proposal-local labels, not Mission Control task IDs; an explicit complete dependency mapping is required.",
+      "The existing control-surface router is already mounted; the operator vertical should extend that GET-only surface instead of editing sibling-owned api/main.py.",
+      "Legacy Sarathi wake and mailbox artifacts are private projections and cannot be promoted into canonical Mission Control truth."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "5a35db1cf8d778d60f6098cfd7494aa7e2647ce38319abcc1495f07768655487",
+    "rollback": "Revert the governance admission commit. No runtime, transport, database, API, dashboard, daemon, or external state is changed by this packet.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-P2-ADMISSION"
+  },
+  "worktree": "."
+}

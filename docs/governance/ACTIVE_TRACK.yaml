@@ -835,6 +835,43 @@ active_tracks:
       - docs/README.md
       - docs/persistent_agents/**
       - reports/agentops/work_packets/organism-rewire-WP-SARATHIROOT-P0.json
+      # Operator-authorized P2/P2.1 amendment (2026-08-14): Mission Control is
+      # the typed coordination membrane between Sarathi proposals and canonical
+      # executor owners. Exact paths admit the already landed P0/P1 modules and
+      # their named additive adapters without transferring TaskBoard,
+      # RuntimeStateStore, Orchestrator, A2A, Forge, or Merge Master.
+      # Operator-facing integration is limited to the existing GET-only control
+      # surface and exact cockpit projection files; it does not admit api/main.py
+      # or a broad dashboard/API ownership claim.
+      - dharma_swarm/mission_control.py
+      - dharma_swarm/mission_control_contract.py
+      - dharma_swarm/mission_control_execution.py
+      - dharma_swarm/mission_control_execution_support.py
+      - dharma_swarm/mission_control_lifecycle.py
+      - dharma_swarm/mission_control_mcp.py
+      - dharma_swarm/mission_control_mcp_mutations.py
+      - dharma_swarm/mission_control_projection.py
+      - dharma_swarm/mission_control_reconciliation.py
+      - dharma_swarm/mission_control_recovery.py
+      - dharma_swarm/mission_control_dispatch.py
+      - dharma_swarm/mission_control_a2a.py
+      - dharma_swarm/mission_control_sarathi.py
+      - tests/test_mission_control.py
+      - tests/test_mission_control_execution.py
+      - tests/test_mission_control_mcp.py
+      - tests/test_mission_control_dispatch.py
+      - tests/test_mission_control_a2a.py
+      - tests/test_mission_control_sarathi.py
+      - api/routers/control_surface.py
+      - tests/test_control_surface.py
+      - tests/test_control_surface_router_threadpool.py
+      - tests/test_control_surface_mission_sarathi.py
+      - dashboard/src/app/dashboard/control-surface/page.tsx
+      - dashboard/src/hooks/useMissionSarathi.ts
+      - dashboard/src/components/cockpit/MissionSarathiStrip.tsx
+      - dharma_swarm/operator_brief/mission_control_citations.py
+      - tests/test_operator_brief_mission_control_citations.py
+      - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -928,6 +965,18 @@ active_tracks:
         what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; add only the generic RuntimeStateStore transaction seam and receipt-layer declaration needed to make reply-event plus receipt atomic; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
         kind: code
         blocker: true
+      - id: 12
+        what: "P2 governed Mission Control dispatch: admit a fail-closed authority envelope whose authenticated principal, exact mission/task/dispatch identity, authority reference, and authority digest are verified by injected owner adapters before a single canonical executor dispatch. Add a canonical A2A adapter that preserves A2A-native task/context/run identity and observes exact durable publish, consume, and outcome receipts without wrapping the owner lifecycle in Mission Control attempts. Retries may recover an identical durable execution reference; publish ACK, consume ACK, recorded running state, or lease freshness prove only the corresponding write and never executor liveness or semantic completion."
+        kind: code
+        blocker: true
+      - id: 13
+        what: "P2.1 Apex Sarathi -> Mission Control proposal adapter: translate a Sarathi PlannedDelegation into typed MissionProposal data, require an explicit complete mapping from proposal-local dependency labels to canonical Mission Control task IDs, and keep governance admission plus dispatch authority as separate fail-closed steps. Legacy Sarathi wake, mailbox, and receipt artifacts remain private projections; a proposal, plan, model consensus, or identity assertion cannot coerce itself into GovernanceAdmission or AuthorizedDispatch."
+        kind: code
+        blocker: true
+      - id: 14
+        what: "P2.1 operator vertical: expose an immutable, bounded, explicit-mission read model through the already-mounted GET-only control-surface router; render the typed Sarathi/Mission Control ladder in the existing dashboard control-surface cockpit; and permit Operator Brief to cite exact mission/task/attempt/evidence references without treating identifiers as facts. Absence of canonical state must render as uninitialized/unknown, and the projection must not initialize stores, discover an unbounded fleet, start daemons, mutate runtime state, or upgrade receipts into liveness, outcome, promotion, or merge claims."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -936,6 +985,10 @@ active_tracks:
       - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
       - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
       - The Sarathi P0 root must compose shared engines through adapters; it must not copy, fork, or move sibling-owned runtimes, stores, gateways, schedulers, evolution engines, or tool executors.
+      - MissionProposal, GovernanceAdmission, AuthorizedDispatch, DeliveryAck, HandlerAck, VerifiedOutcome, Promotion, and Merge are distinct non-coercible claim types; no earlier rung may imply or synthesize a later rung.
+      - A task claim, execution lease, publish ACK, consume ACK, heartbeat row, recorded running status, or dashboard freshness indicator must not be represented as authenticated action authority, executor liveness, verified semantic outcome, promotion eligibility, or merge permission.
+      - Mission Control must not become a scheduler, worker pool, transport, receipt store, liveness oracle, evaluator, promotion arbiter, or merge authority; canonical owners retain those responsibilities, Forge alone arbitrates promotion, and Merge Master Mike remains the sole conditional merge lane.
+      - Read models, API responses, cockpit panels, and Operator Brief citations must remain projections of bounded evidence; they must not initialize absent stores, mutate owner state, perform implicit fleet-wide discovery, or turn missing evidence into a healthy/live claim.
 
   - id: dharmagraph-engine-2026-07
     name: DharmaGraph — sovereign durable graph runtime consolidation
