@@ -3,10 +3,10 @@
 ```yaml
 document_role: active_spec
 status: CANDIDATE_NOT_ADMITTED
-prepared_at: 2026-08-14
+prepared_at: 2026-08-15
 canonical_repository: AIKAGRYA/dharma_swarm
-runtime_baseline: origin/main@bd779ddc10b04172b1392645ef3525cd8861ff89
-implementation_candidate: agent/nihonga-helm-frontier-20260814@809393420c5b8770adc3f5aa9997933ef8599539
+runtime_baseline: origin/main@a5a61b73c8848b86664f9d5bbcf21986df43c02c
+implementation_candidate: agent/nihonga-helm-frontier-20260814@5d918322bad165d7373bd16e8aed1ab24811803e
 product: one Dharma Helm TUI
 ```
 
@@ -35,9 +35,10 @@ permission, Forge, or merge authorities. This explicit role and replacement
 statement follows `docs/AGENTS.md:45-52`.
 
 Admission requires all of the following before code from this branch is called
-current: reconcile this branch with the current `origin/main`; resolve the stale
-Helm track/terminal-owner contradiction; approve the owned paths and slices;
-record an admission decision; and rerun the gates in Section 12.
+current: resolve the stale Helm track/terminal-owner contradiction; approve the
+owned paths and slices; record an admission decision; and rerun the gates in
+Section 12. The candidate now contains `origin/main@a5a61b73c`; that integration
+fact does not itself admit the product.
 
 ## 1. Executive decision
 
@@ -69,33 +70,33 @@ permission, completion, or truth.
 ### 1.1 Non-claims
 
 - This proposal is not shipped or merged.
-- The current local UI slice is implemented and tested only in an uncommitted
-  working tree on the candidate branch; it is not current-main product truth.
+- The current local UI slice is implemented, committed, and tested on the
+  candidate branch; it is not current-main product truth.
 - A successful model response is not an OnCall verdict.
 - Four preview adapters are not “any model,” and adapter compatibility is not
   verified model support.
-- Mission Control is now admitted on current main, but this candidate branch is
-  behind that admission and the terminal is not thereby wired to it.
+- Mission Control is admitted and present in this candidate's current-main
+  ancestry, but the terminal is not thereby wired to it.
 - No public evidence proves that any benchmark TUI was “built by GPT-5.6-sol
   Ultra.” Public repositories generally do not expose meaningful model/effort
   provenance, and this spec makes no chain-of-thought attribution.
 
 ## 2. Baseline and latest-state ledger
 
-This is the observation boundary as of 2026-08-14 JST. Recheck every hash at
+This is the observation boundary as of 2026-08-15 JST. Recheck every hash at
 admission.
 
 | Layer | Observed state | Disposition |
 |---|---|---|
 | Canonical repository | `https://github.com/AIKAGRYA/dharma_swarm.git` | Sole GitHub authority. |
-| Current `origin/main` | `bd779ddc10b0`, “admit Mission Control organism integration” ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; newer than this branch. |
+| Current `origin/main` | `a5a61b73c884`, bounded fleet truth topology ([PR #1344](https://github.com/AIKAGRYA/dharma_swarm/pull/1344)) atop Mission Control admission ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; contained by this candidate. |
 | Helm chassis landing | `88458e06f750`, Bun/Ink Helm merged by [PR #1078](https://github.com/AIKAGRYA/dharma_swarm/pull/1078); golden closeout by [PR #1073](https://github.com/AIKAGRYA/dharma_swarm/pull/1073) | Preserve as chassis, not final IA. |
-| Candidate branch | `agent/nihonga-helm-frontier-20260814@809393420c5b` | Local integration candidate; must reconcile with current main. |
+| Candidate branch | `agent/nihonga-helm-frontier-20260814@5d918322bad1` | Local integration candidate containing current main plus the model-preview stack and Nihonga S1. |
 | Locked terminal appearance | `680b013c027194eb50416840d63055f025ca4bb7`, later included in the Helm landing | Exact warm Nihonga token authority. |
 | Wayfinder live slice | Issue [#1277](https://github.com/AIKAGRYA/dharma_swarm/issues/1277), lock [comment](https://github.com/AIKAGRYA/dharma_swarm/issues/1277#issuecomment-5226785831), draft [PR #1324](https://github.com/AIKAGRYA/dharma_swarm/pull/1324) | Truth-law source; live proof remained blocked/degraded, not closure. |
 | Mission Control | Core merged by [PR #1325](https://github.com/AIKAGRYA/dharma_swarm/pull/1325); integration paths admitted by current-main [PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346) | Canonical coordination membrane/projection source, never a second scheduler/store. |
 | Four-model preview | `708923bb2`, draft [PR #1341](https://github.com/AIKAGRYA/dharma_swarm/pull/1341) | Unmerged, no-tools, singleton, preview-only, OnCall-ineligible. |
-| Local Nihonga slice | Seven files under `terminal/src/nihonga/` plus focused tests | Implemented locally; not committed, merged, or live-provider proof. |
+| Local Nihonga slice | Seven files under `terminal/src/nihonga/` plus focused tests and 42 governed frames | Committed on the candidate branch; not merged and not live-provider proof. |
 | Governance status | Current Helm entry remains `ACTIVE`; an unmerged closure branch claims `SHIPPED/CLOSED_NOT_PROD` | Canonical state is the stale `ACTIVE` value until reconciled; do not borrow the closure claim. |
 
 Current main admits Mission Control as a typed membrane without transferring
@@ -522,8 +523,8 @@ category budget.
 
 | Slice | Categories (max 2) | Deliverable | Gate/status |
 |---|---|---|---|
-| S0 — admit/rebase | documentation/governance only | reconcile `809393` with current main; settle Helm track and terminal owner; admit this spec | **Required; not done.** |
-| S1 — Nihonga shell | UI state + UI rendering | five places, three planes, responsive profiles (including focus-weighted Standard), Room/Boundary bands, six-region honest projection, bounded compact PaneSwitcher row; preserve zen/scroll | **Implemented locally, unmerged.** Locally reported evidence: 693 passed/0 failed and 42 deterministic golden frames at 80×24, 100×30, and 120×40; `git diff --numstat -- terminal/src/app.tsx` is 119/119, net-zero growth in the legacy app entrypoint while the new shell lives in bounded modules. Rerun after rebase. |
+| S0 — admit/rebase | documentation/governance only | reconcile with current main; settle Helm track and terminal owner; admit this spec | **Partly complete:** current-main integration is committed at `5d918322b`; track/owner reconciliation and admission remain. |
+| S1 — Nihonga shell | UI state + UI rendering | five places, three planes, responsive profiles (including focus-weighted Standard), Room/Boundary bands, six-region honest projection, bounded compact PaneSwitcher row; preserve zen/scroll | **Implemented and committed on the candidate; unmerged.** Post-integration evidence: 693 passed/0 failed and 42 deterministic golden frames at 80×24, 100×30, and 120×40; `git diff --numstat -- terminal/src/app.tsx` is 119/119, net-zero growth in the legacy app entrypoint while the new shell lives in bounded modules. |
 | S2 — owner projection envelopes | protocol + bridge | versioned bounded snapshots for MissionControl/TaskBoard/RuntimeState/Swarm/A2A/evolution; explicit freshness/divergence/unknown | No terminal rendering changes. |
 | S3 — organism views | UI state + UI rendering | bind S2 projections to six regions, Home query, Activity, Evidence; remove mocks/zeros | No new backend state. |
 | S4 — recursive Inspector | input handling + UI state | exact entity resolver, bounded focus stack, one-Esc pop, per-place anchors, mention-attack resistance | Model prose cannot retarget. |
@@ -567,8 +568,10 @@ a falsifiable negative control, not a cross-stack rewrite.
 
 ### 12.1 Admission and truth
 
-- [ ] Branch contains current `origin/main` and is clean except the declared
-  patch; hashes and PR states in this spec are refreshed.
+- [x] Branch contains `origin/main@a5a61b73c` at the 2026-08-15 observation
+  boundary.
+- [ ] Branch is clean, published as a draft PR, and hashes/PR states are
+  refreshed at handoff.
 - [ ] `make onboard`, docs integrity, ownership checks, and governed closeout
   pass.
 - [ ] One admitted owner names the spec and every touched path.
@@ -638,7 +641,7 @@ Helm investigation. “Reference” means useful input, not edit/runtime authori
 
 | ID | Artifact / provenance | Status | Binding disposition |
 |---|---|---|---|
-| A1 | Current `origin/main@bd779ddc10b0`; Bun/Ink `terminal/**`, Python `operator_core/**`; Helm landing `88458e06`; April Bun shared-core/surface/convergence specs; PTY/goldens | **Canonical runtime chassis** | Keep and reconcile; current code/tests beat all proposals. |
+| A1 | Current `origin/main@a5a61b73c884`; Bun/Ink `terminal/**`, Python `operator_core/**`; Helm landing `88458e06`; April Bun shared-core/surface/convergence specs; PTY/goldens | **Canonical runtime chassis** | Keep and reconcile; current code/tests beat all proposals. |
 | A2 | Operator-picked Nihonga commit `680b013c027194eb50416840d63055f025ca4bb7`; current `terminal/src/theme.ts:1-50` | **Locked terminal visual authority** | Exact warm palette and semantic laws; supersedes cool terminal/dashboard palettes. |
 | A3 | `/Users/dhyana/dharma_tui_reverse_spec_20260804/`: 25 lens reports, synthesis, and `master_forge_spec/{README,MASTER_FORGE_SPEC,UX_AND_INFORMATION_ARCHITECTURE,DESIGN_SYSTEM,TECHNICAL_ARCHITECTURE,AGENT_AND_CAPABILITY_MODEL,BUILD_ROADMAP,ACCEPTANCE_AND_KILL_GATES,EVIDENCE_BOUNDARY,tasks/prd.json}` | **External active-spec candidate/reference** | Richest target IA; this file replaces it only if admitted. The corpus count/completion is recorded at `/Users/dhyana/dharma_tui_reverse_spec_20260804/STATUS.md:3-12`; the package explicitly owns no repo authority (`.../master_forge_spec/README.md:1-18`). |
 | A4 | `/Users/dhyana/Desktop/Projects/DharmaSwarm FrontEnd/` visual/design corpus: `MANDALA_MISSION_CONTROL_CANON.md`, `ART_DIRECTION_v2_2026-06-15_RUG_TO_INSTRUMENT.md`, `LIVING_ONTOLOGY_v1_DESIGN_2026-06-15.md`, `MANDALA_COCKPIT_MASTER_SPEC_PROMPT_2026-06-23.md`, `FRONTEND_DESIGN_PACKET_INDEX.md`, Wave06 V/W/X images and critique, v14 postmortem | **Operator-locked composition reference; no git authority** | Preserve meditation hall + command bridge, rug→instrument, ma/asymmetry/depth, V+W+X formula. Reject old cool palette, single health, fixed ten organs, and painting hero. |
