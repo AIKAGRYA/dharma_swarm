@@ -10,15 +10,18 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import importlib.util
 import json
 import os
 import re
 import signal
 import shlex
+import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -43,6 +46,9 @@ DEFAULT_NATS_CA_PEM_PATH = (
     REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
 )
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
+AUTOMERGE_POLICY_PATH = (
+    REPO_ROOT / "scripts" / "governance" / "automerge_tier_policy.json"
+)
 REQUIRED_COHERENCE_FIELDS = (
     "Organ touched",
     "Declared-vs-actual gap closed",
@@ -52,11 +58,18 @@ REQUIRED_COHERENCE_FIELDS = (
 BAD_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}
 PASS_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 REVIEW_VERDICTS = ("APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN")
-REVIEW_VERDICT_RE = re.compile(
-    r"\b(APPROVE|REQUEST_CHANGES|BLOCKED|NEEDS_HUMAN)\b", re.IGNORECASE
+GIT_COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
+REVIEW_EVIDENCE_FILES = (
+    "FACTS.json",
+    "PR_BODY.md",
+    "changed_files.txt",
+    "DIFF.patch",
+    "REVIEW_PACKET.md",
 )
+MAX_REVIEW_EVIDENCE_BYTES = 512 * 1024
 DEFAULT_AGENT_TIMEOUT_S = 600.0
 DEFAULT_AGENT_KILL_GRACE_S = 5.0
+DEFAULT_BLOCKED_RETRY_S = 3600.0
 DEFAULT_FANOUT_STATUSES = ("GITHUB_GREEN_NEEDS_PACKET", "NEEDS_AGENT_REVIEW")
 DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.fleet",
@@ -69,20 +82,12 @@ DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.perplexity",
 )
 DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
-# PRs carrying this label are produced by trusted automation (automerge.yml
-# enrolls bot/automated PRs). For these, Merge Master Mike waives the human/
-# agent reviewer-receipt requirement and ignores advisory-bot comment threads
-# so a genuinely green automation PR can merge without a human in the loop.
-# Every other gate (mergeable, failing/pending checks, CHANGES_REQUESTED,
-# Coherence Delta, CI truth, HIGH/CRITICAL risk) still applies unchanged.
+# This label selects routing only. It never waives review evidence or creates
+# merge authority; author-controlled metadata cannot inhabit MergeAuthorized.
 BOT_PR_LABEL = "bot-pr"
-# Review bots whose comment threads are advisory/non-blocking: they post
-# informational summaries (and re-post on every push) but never represent a
-# human request for changes. Their perpetually-unresolved threads must not
-# wedge a trusted bot-pr merge gate. Greptile (`greptile-apps`) is the
-# canonical example. This neither silences the bot nor relaxes substance for
-# human/agent reviewers — it only scopes the bot-pr thread waiver. See
-# build_gate() and thread_is_advisory_only().
+# Review bots whose threads are advisory in substance. They are identified for
+# diagnostics, but native conversation-resolution policy still blocks every
+# unresolved thread; this controller never claims a waiver GitHub will reject.
 ADVISORY_REVIEW_BOTS = frozenset({"greptile-apps"})
 MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
     "MERGE_MASTER_MIKE_NATS_URL",
@@ -241,6 +246,176 @@ def review_receipt_path(out_dir: Path, agent: str) -> Path:
     return out_dir / f"{agent}_review_receipt.json"
 
 
+def review_prompt_path(out_dir: Path, agent: str) -> Path:
+    prompt_name = "PROMPT_CLAUDE.md" if agent == "claude" else "PROMPT_CODEX.md"
+    return out_dir / prompt_name
+
+
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def canonical_json_sha256(payload: object) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return sha256_bytes(encoded)
+
+
+def automerge_policy_identity(path: Path = AUTOMERGE_POLICY_PATH) -> dict[str, str]:
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PRControlError(f"cannot load automerge authority policy: {exc}") from exc
+    if policy.get("schema") != "dharma.automerge_tier_policy.v3":
+        raise PRControlError("automerge authority policy schema is not v3")
+    return {
+        "schema": str(policy["schema"]),
+        "sha256": canonical_json_sha256(policy),
+    }
+
+
+def validate_merge_authorization(
+    report: object,
+    *,
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+    base_ref: str,
+    title: str,
+    policy_identity: dict[str, str] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Validate policy evidence without promoting its hash into authority.
+
+    This validates integrity and exact bindings only.  The report is an
+    unsigned GitHub snapshot and therefore cannot inhabit MergeAuthorized.
+    The production actuator separately requires an authenticated authority
+    proof, which is deliberately unavailable in safe P0.
+    """
+    blockers: list[str] = []
+    if not isinstance(report, dict):
+        return None, ["merge authorization report is missing or malformed"]
+    if report.get("schema") != "dharma.automerge_tier_policy_report.v2":
+        blockers.append("merge authorization report schema is not v2")
+    if report.get("passed") is not True or report.get("violations"):
+        blockers.append("merge authorization policy did not pass")
+    evidence_raw = report.get("authorization_evidence")
+    evidence = evidence_raw if isinstance(evidence_raw, dict) else None
+    if evidence is None:
+        blockers.append("merge authorization evidence is absent")
+        return None, blockers
+    if evidence.get("schema") != "dharma.merge_authorization_evidence.v1":
+        blockers.append("merge authorization evidence schema is not v1")
+    expected = {
+        "repo": repo,
+        "pr": pr_number,
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "base_ref": base_ref,
+        "intent_sha256": canonical_json_sha256(title),
+    }
+    for field, value in expected.items():
+        if evidence.get(field) != value:
+            blockers.append(f"merge authorization {field} binding is mismatched")
+    identity = policy_identity or automerge_policy_identity()
+    if evidence.get("policy_sha256") != identity.get("sha256"):
+        blockers.append("merge authorization policy binding is stale or mismatched")
+    authority_class = str(evidence.get("authority_class") or "")
+    if authority_class not in {"docs_low", "code"}:
+        blockers.append("merge authorization class is not actuator-eligible")
+    evidence_ids = evidence.get("ai_evidence_ids")
+    if (
+        not isinstance(evidence_ids, list)
+        or not evidence_ids
+        or any(not isinstance(value, int) or value <= 0 for value in evidence_ids)
+        or len(evidence_ids) != len(set(evidence_ids))
+    ):
+        blockers.append("merge authorization lacks current-head AI evidence")
+    if authority_class == "code":
+        warrant = evidence.get("operator_warrant")
+        if (
+            not isinstance(warrant, dict)
+            or warrant.get("head_sha") != head_sha
+            or warrant.get("kind") != "github_review"
+            or not isinstance(warrant.get("id"), int)
+            or warrant["id"] <= 0
+            or not str(warrant.get("actor") or "")
+        ):
+            blockers.append("code merge authorization lacks a current-head operator warrant")
+    if evidence.get("provenance") != "unsigned-github-snapshot":
+        blockers.append("merge authorization evidence provenance is invalid")
+    if evidence.get("actuation_eligible") is not False:
+        blockers.append("merge authorization evidence must not claim actuation authority")
+    claimed_digest = str(evidence.get("digest") or "")
+    digest_payload = {key: value for key, value in evidence.items() if key != "digest"}
+    if claimed_digest != canonical_json_sha256(digest_payload):
+        blockers.append("merge authorization permit digest is invalid")
+    return (evidence if not blockers else None), blockers
+
+
+def validate_merge_authority_proof(_proof: object) -> list[str]:
+    """Keep MergeAuthorized uninhabited until a trusted proof issuer exists.
+
+    A future implementation must authenticate issuer/provenance and bind the
+    repo, PR, target ref, base/head, policy, live evidence reduction, merge
+    method, and server-side base-CAS/ruleset proof.  An unkeyed digest or local
+    receipt is not such a proof.
+    """
+    return [
+        "authenticated MergeAuthorized proof is unavailable in safe P0; "
+        "authorization evidence cannot grant actuation"
+    ]
+
+
+def read_review_evidence_snapshot(out_dir: Path) -> dict[str, bytes]:
+    """Capture each review input once so the reviewer never follows mutable paths."""
+
+    snapshot: dict[str, bytes] = {}
+    remaining = MAX_REVIEW_EVIDENCE_BYTES
+    for name in REVIEW_EVIDENCE_FILES:
+        path = out_dir / name
+        try:
+            with path.open("rb") as handle:
+                payload = handle.read(remaining + 1)
+        except OSError as exc:
+            raise PRControlError(
+                f"review evidence is missing or unreadable: {name}"
+            ) from exc
+        if len(payload) > remaining:
+            raise PRControlError(
+                "review evidence exceeds "
+                f"{MAX_REVIEW_EVIDENCE_BYTES}-byte limit while reading {name}"
+            )
+        snapshot[name] = payload
+        remaining -= len(payload)
+    return snapshot
+
+
+def review_evidence_digest(snapshot: dict[str, bytes]) -> str:
+    digest = hashlib.sha256()
+    if tuple(snapshot) != REVIEW_EVIDENCE_FILES:
+        raise PRControlError("review evidence snapshot is incomplete or out of order")
+    total_bytes = sum(len(payload) for payload in snapshot.values())
+    if total_bytes > MAX_REVIEW_EVIDENCE_BYTES:
+        raise PRControlError(
+            f"review evidence exceeds {MAX_REVIEW_EVIDENCE_BYTES}-byte limit"
+        )
+    for name, payload in snapshot.items():
+        encoded_name = name.encode("utf-8")
+        digest.update(len(encoded_name).to_bytes(4, "big"))
+        digest.update(encoded_name)
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def review_evidence_sha256(out_dir: Path) -> str:
+    """Hash the exact packet evidence a local reviewer is instructed to read."""
+
+    return review_evidence_digest(read_review_evidence_snapshot(out_dir))
+
+
 def review_label(agent: str) -> str:
     labels = {
         "copilot": "GitHub Copilot",
@@ -258,6 +433,14 @@ def review_label(agent: str) -> str:
         "backup_warp_oz": "Backup Warp/Oz",
     }
     return labels.get(agent, agent.replace("_", " ").title())
+
+
+def review_prompt_label(agent: str) -> str:
+    if agent == "claude":
+        return "Claude Code Opus"
+    # All non-Claude local reviewer lanes intentionally share PROMPT_CODEX.md
+    # and the Codex execution contract; keep its canonical bytes agent-stable.
+    return "Codex"
 
 
 def backup_reviewer_agents(args: argparse.Namespace) -> list[str]:
@@ -466,33 +649,142 @@ def fetch_pr_files(pr_number: int, repo: str) -> list[dict[str, Any]]:
     )
 
 
+def valid_commit_oid(value: str) -> bool:
+    return bool(GIT_COMMIT_OID_RE.fullmatch(value))
+
+
+def fetch_pr_files_at_revision(
+    repo: str, base_sha: str, head_sha: str
+) -> list[dict[str, Any]]:
+    """Fetch the changed files for one immutable base/head commit pair.
+
+    The pull-files endpoint follows the branch's current ref, so using it after
+    a separate PR-view request permits an A→B→A race. The compare endpoint is
+    addressed only by full commit OIDs and therefore binds risk classification
+    to the same revision pair recorded by the merge gate.
+    """
+
+    if not valid_commit_oid(base_sha):
+        raise PRControlError("base SHA must be a full 40-character commit OID")
+    if not valid_commit_oid(head_sha):
+        raise PRControlError("head SHA must be a full 40-character commit OID")
+
+    payload = gh_json(
+        ["api", f"repos/{repo}/compare/{base_sha}...{head_sha}"], timeout=180
+    )
+    if not isinstance(payload, dict):
+        raise PRControlError("immutable commit comparison returned a non-object")
+    observed_base = str((payload.get("base_commit") or {}).get("sha") or "")
+    if observed_base != base_sha:
+        raise PRControlError(
+            f"immutable commit comparison returned base {observed_base or '<missing>'}, "
+            f"expected {base_sha}"
+        )
+    files = payload.get("files")
+    if not isinstance(files, list) or not all(isinstance(item, dict) for item in files):
+        raise PRControlError(
+            "immutable commit comparison returned an invalid file list"
+        )
+    # GitHub caps compare responses at 300 changed files. Exactly 300 is
+    # ambiguous, so fail closed rather than under-classifying a possibly
+    # truncated CRITICAL surface as merely HIGH.
+    if len(files) >= 300:
+        raise PRControlError(
+            "immutable commit comparison reached GitHub's 300-file cap"
+        )
+    validate_changed_files(files)
+
+    # The compare endpoint paginates its `commits` array (30 entries by
+    # default), so `commits[-1]` is not necessarily the requested head. Verify
+    # the immutable head through its own full-OID endpoint instead. The compare
+    # request itself is already addressed by the exact base/head pair; this
+    # second read prevents a truncated commit page from becoming a permanent
+    # false blocker while preserving fail-closed response validation.
+    head_payload = gh_json(
+        ["api", f"repos/{repo}/commits/{head_sha}"], timeout=180
+    )
+    if not isinstance(head_payload, dict):
+        raise PRControlError("immutable head lookup returned a non-object")
+    observed_head = str(head_payload.get("sha") or "")
+    if observed_head != head_sha:
+        raise PRControlError(
+            f"immutable head lookup returned {observed_head or '<missing>'}, "
+            f"expected {head_sha}"
+        )
+    return files
+
+
+def fetch_pr_diff_at_revision(repo: str, base_sha: str, head_sha: str) -> str:
+    """Fetch a patch addressed by the same immutable commits as risk."""
+
+    if not valid_commit_oid(base_sha) or not valid_commit_oid(head_sha):
+        raise PRControlError("immutable diff requires full base and head commit OIDs")
+    result = run(
+        [
+            "gh",
+            "api",
+            f"repos/{repo}/compare/{base_sha}...{head_sha}",
+            "-H",
+            "Accept: application/vnd.github.diff",
+        ],
+        timeout=180,
+    )
+    return result.stdout
+
+
+def fetch_review_merge_base(repo: str, base_sha: str, head_sha: str) -> str:
+    """Resolve the immutable three-dot merge base for one review range."""
+
+    if not valid_commit_oid(base_sha) or not valid_commit_oid(head_sha):
+        raise PRControlError("review merge-base lookup requires full commit OIDs")
+    payload = gh_json(
+        ["api", f"repos/{repo}/compare/{base_sha}...{head_sha}"],
+        timeout=180,
+    )
+    if not isinstance(payload, dict):
+        raise PRControlError("review merge-base comparison returned a non-object")
+    observed_base = str((payload.get("base_commit") or {}).get("sha") or "")
+    merge_base = str((payload.get("merge_base_commit") or {}).get("sha") or "")
+    if observed_base != base_sha:
+        raise PRControlError(
+            f"review merge-base comparison returned base {observed_base or '<missing>'}, "
+            f"expected {base_sha}"
+        )
+    if not valid_commit_oid(merge_base):
+        raise PRControlError("review merge-base comparison omitted a full merge-base OID")
+    head_payload = gh_json(["api", f"repos/{repo}/commits/{head_sha}"], timeout=180)
+    if not isinstance(head_payload, dict):
+        raise PRControlError("review head lookup returned a non-object")
+    observed_head = str(head_payload.get("sha") or "")
+    if observed_head != head_sha:
+        raise PRControlError(
+            f"review head lookup returned {observed_head or '<missing>'}, expected {head_sha}"
+        )
+    return merge_base
+
+
 def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
     owner, name = repo.split("/", 1)
     query = """
-    query($owner: String!, $name: String!, $number: Int!) {
+    query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
-          reviewThreads(first: 100) {
+          reviewThreads(first: 100, after: $cursor) {
             nodes {
               isResolved
               isOutdated
-              comments(first: 5) {
-                nodes {
-                  author { login }
-                  body
-                  path
-                  line
-                  createdAt
-                }
-              }
             }
+            pageInfo { hasNextPage endCursor }
           }
         }
       }
     }
     """
-    result = run(
-        [
+    nodes: list[dict[str, Any]] = []
+    cursor = ""
+    seen_cursors: set[str] = set()
+    while True:
+        command = [
             "gh",
             "api",
             "graphql",
@@ -504,34 +796,94 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
             f"name={name}",
             "-F",
             f"number={pr_number}",
-        ],
-        timeout=120,
-        check=False,
-    )
-    if result.code != 0:
-        return {
-            "ok": False,
-            "error": (result.stderr or result.stdout).strip(),
-            "unresolved": None,
-        }
-    payload = json.loads(result.stdout)
-    nodes = (
-        payload.get("data", {})
-        .get("repository", {})
-        .get("pullRequest", {})
-        .get("reviewThreads", {})
-        .get("nodes", [])
-    )
+        ]
+        if cursor:
+            command.extend(["-f", f"cursor={cursor}"])
+        result = run(command, timeout=120, check=False)
+        if result.code != 0:
+            return {
+                "ok": False,
+                "error": (result.stderr or result.stdout).strip(),
+                "unresolved": None,
+            }
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            return {
+                "ok": False,
+                "error": f"review-thread query returned invalid JSON: {exc}",
+                "unresolved": None,
+            }
+        if not isinstance(payload, dict) or payload.get("errors"):
+            return {
+                "ok": False,
+                "error": f"review-thread query returned GraphQL errors: {payload.get('errors') if isinstance(payload, dict) else payload!r}",
+                "unresolved": None,
+            }
+        try:
+            connection = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+            page_nodes = connection["nodes"]
+            page_info = connection["pageInfo"]
+        except (KeyError, TypeError):
+            return {
+                "ok": False,
+                "error": "review-thread query returned incomplete connection data",
+                "unresolved": None,
+            }
+        if not isinstance(page_nodes, list) or not all(
+            isinstance(node, dict) for node in page_nodes
+        ):
+            return {
+                "ok": False,
+                "error": "review-thread query returned invalid thread nodes",
+                "unresolved": None,
+            }
+        for node in page_nodes:
+            if (
+                type(node.get("isResolved")) is not bool
+                or type(node.get("isOutdated")) is not bool
+            ):
+                return {
+                    "ok": False,
+                    "error": "review-thread query returned invalid resolution state",
+                    "unresolved": None,
+                }
+        nodes.extend(page_nodes)
+        if (
+            not isinstance(page_info, dict)
+            or type(page_info.get("hasNextPage")) is not bool
+        ):
+            return {
+                "ok": False,
+                "error": "review-thread query omitted thread pagination state",
+                "unresolved": None,
+            }
+        if not page_info.get("hasNextPage"):
+            break
+        next_cursor = str(page_info.get("endCursor") or "")
+        if not next_cursor or next_cursor in seen_cursors:
+            return {
+                "ok": False,
+                "error": "review-thread pagination did not advance",
+                "unresolved": None,
+            }
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+
     unresolved = [
         node
         for node in nodes
-        if not node.get("isResolved") and not node.get("isOutdated")
+        if not node.get("isResolved")
     ]
+    unresolved_outdated_count = sum(
+        1 for node in unresolved if node.get("isOutdated") is True
+    )
     return {
         "ok": True,
         "threads": nodes,
         "unresolved": unresolved,
         "unresolved_count": len(unresolved),
+        "unresolved_outdated_count": unresolved_outdated_count,
     }
 
 
@@ -539,18 +891,22 @@ def thread_is_advisory_only(thread: dict[str, Any]) -> bool:
     """True when every comment in a review thread was authored by an advisory
     review bot (see ADVISORY_REVIEW_BOTS).
 
-    Such a thread carries no human/agent change request, so it must not wedge a
-    trusted bot-pr merge gate. A thread with any non-advisory participant (a
-    human, Copilot, Codex, Devin, …) is never advisory-only and still blocks.
+    This is diagnostic classification only. Native conversation-resolution
+    policy still blocks the unresolved thread. A thread with any non-advisory
+    participant (human, Copilot, Codex, Devin, …) is never advisory-only.
     """
     comments = ((thread or {}).get("comments") or {}).get("nodes") or []
-    logins = {
-        str(((comment or {}).get("author") or {}).get("login") or "").lower()
-        for comment in comments
-    }
-    logins.discard("")
-    if not logins:
+    if not comments:
         return False
+    logins: set[str] = set()
+    for comment in comments:
+        author = (comment or {}).get("author")
+        login = (
+            str(author.get("login") or "").lower() if isinstance(author, dict) else ""
+        )
+        if not login:
+            return False
+        logins.add(login)
     advisory = {bot.lower() for bot in ADVISORY_REVIEW_BOTS}
     return logins <= advisory
 
@@ -583,9 +939,7 @@ def _coherence_checker() -> Any:
     if _coherence_checker_module is not None:
         return _coherence_checker_module
     module_name = "_dharma_check_pr_coherence_delta"
-    spec = importlib.util.spec_from_file_location(
-        module_name, _COHERENCE_CHECKER_PATH
-    )
+    spec = importlib.util.spec_from_file_location(module_name, _COHERENCE_CHECKER_PATH)
     if spec is None or spec.loader is None:
         raise PRControlError(
             f"cannot load Coherence Delta checker at {_COHERENCE_CHECKER_PATH}"
@@ -601,9 +955,7 @@ def _coherence_checker() -> Any:
     return module
 
 
-def coherence_results(
-    body: str, comments: list[str] | None = None
-) -> dict[str, Any]:
+def coherence_results(body: str, comments: list[str] | None = None) -> dict[str, Any]:
     """Validate Coherence Delta fields by delegating to the CI checker.
 
     Accepts everything scripts/governance/check_pr_coherence_delta.py accepts —
@@ -627,22 +979,74 @@ def coherence_results(
     }
 
 
+def validate_changed_files(files: list[dict[str, Any]]) -> None:
+    """Reject partial or malformed compare entries before risk classification."""
+
+    allowed_statuses = {
+        "added",
+        "removed",
+        "modified",
+        "renamed",
+        "copied",
+        "changed",
+        "unchanged",
+    }
+    for index, item in enumerate(files):
+        filename = item.get("filename")
+        if (
+            not isinstance(filename, str)
+            or not filename
+            or filename.startswith("/")
+            or ".." in Path(filename).parts
+        ):
+            raise PRControlError(f"changed file {index} has an invalid filename")
+        status = item.get("status")
+        if status not in allowed_statuses:
+            raise PRControlError(
+                f"changed file {filename!r} has invalid status {status!r}"
+            )
+        for field in ("additions", "deletions"):
+            value = item.get(field)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise PRControlError(
+                    f"changed file {filename!r} has invalid {field} {value!r}"
+                )
+        if status == "renamed":
+            previous = item.get("previous_filename")
+            if (
+                not isinstance(previous, str)
+                or not previous
+                or previous.startswith("/")
+                or ".." in Path(previous).parts
+            ):
+                raise PRControlError(
+                    f"renamed file {filename!r} has invalid previous_filename"
+                )
+
+
 def risk_from_files(files: list[dict[str, Any]]) -> dict[str, Any]:
+    validate_changed_files(files)
     names = [str(item.get("filename") or "") for item in files]
+    renamed_from = [
+        str(item["previous_filename"])
+        for item in files
+        if item.get("status") == "renamed"
+    ]
+    risk_paths = names + renamed_from
     hot = [
         name
-        for name in names
+        for name in risk_paths
         if any(
             name == pattern or name.startswith(pattern) for pattern in HOT_PATH_PATTERNS
         )
     ]
     deletions = [
         name for name, item in zip(names, files) if item.get("status") == "removed"
-    ]
+    ] + renamed_from
     additions = sum(int(item.get("additions") or 0) for item in files)
     deletions_count = sum(int(item.get("deletions") or 0) for item in files)
-    docs_only = bool(names) and all(
-        name.startswith("docs/") or name.endswith(".md") for name in names
+    docs_only = bool(risk_paths) and all(
+        name.startswith("docs/") or name.endswith(".md") for name in risk_paths
     )
 
     if any(
@@ -665,18 +1069,35 @@ def risk_from_files(files: list[dict[str, Any]]) -> dict[str, Any]:
         "docs_only": docs_only,
         "hot_paths": hot,
         "removed_files": deletions,
+        "renamed_from_files": renamed_from,
     }
 
 
-def render_agent_prompt(agent: str, packet_path: Path, pr_number: int) -> str:
-    packet_dir_path = packet_path.parent
+def render_agent_prompt(
+    agent: str,
+    packet_path: Path,
+    pr_number: int,
+    *,
+    evidence_snapshot: dict[str, bytes] | None = None,
+) -> str:
+    snapshot = evidence_snapshot or read_review_evidence_snapshot(packet_path.parent)
+    evidence_digest = review_evidence_digest(snapshot)
+    evidence_blocks = []
+    for name, payload in snapshot.items():
+        evidence_blocks.extend(
+            [
+                f"--- BEGIN SNAPSHOT {name} sha256={sha256_bytes(payload)} bytes={len(payload)} ---",
+                payload.decode("utf-8", errors="replace"),
+                f"--- END SNAPSHOT {name} ---",
+            ]
+        )
+    embedded_evidence = "\n".join(evidence_blocks)
     return f"""You are {agent}, reviewing Dharma Swarm PR #{pr_number}.
 
-This is a bounded queue review, not an open-ended repo exploration. Primary
-context is already prepared for you. Read:
-{packet_path}
-{packet_dir_path / "DIFF.patch"}
-{packet_dir_path / "FACTS.json"}
+This is a bounded queue review, not an open-ended repo exploration. The exact
+review evidence is embedded below as an immutable stdin snapshot with digest
+`{evidence_digest}`. Review only that embedded snapshot. Do not open or re-read
+the mutable packet paths while this review runs.
 
 Then review the PR with a code-review stance: findings first, highest severity
 first, with file/line evidence. Do not approve from vibes. Do not merge. Do not
@@ -710,6 +1131,10 @@ Concrete gaps only.
 
 ## Merge Conditions
 The exact conditions that must be true before merge.
+
+## Immutable Review Evidence
+
+{embedded_evidence}
 """
 
 
@@ -859,14 +1284,35 @@ def cmd_packet(args: argparse.Namespace) -> int:
     root = expand(args.state_root)
     pr = fetch_pr_view(args.pr)
     repo = repo_name()
-    files = fetch_pr_files(args.pr, repo)
+    head_sha = str(pr.get("headRefOid") or "")
+    base_sha = str(pr.get("baseRefOid") or "")
+    if not valid_commit_oid(head_sha) or not valid_commit_oid(base_sha):
+        raise PRControlError(
+            "packet creation requires full current base and head commit OIDs"
+        )
+    files = fetch_pr_files_at_revision(repo, base_sha, head_sha)
     threads = fetch_review_threads(args.pr, repo)
-    diff = fetch_pr_diff(args.pr)
+    if not threads.get("ok"):
+        raise PRControlError(
+            "cannot build review packet without complete review-thread state: "
+            f"{threads.get('error') or 'unknown query failure'}"
+        )
+    diff = fetch_pr_diff_at_revision(repo, base_sha, head_sha)
+    if files and not diff.strip():
+        raise PRControlError("immutable diff is empty for a non-empty file comparison")
     classification = classify_pr(pr)
     coherence = coherence_results(pr.get("body") or "")
     ci_truth = ci_truth_for_pr(pr, args)
     risk = risk_from_files(files)
-    out_dir = root / f"pr-{args.pr}" / stamp()
+    policy_identity = automerge_policy_identity()
+    packet_id = stamp()
+    out_dir = root / f"pr-{args.pr}" / packet_id
+    if out_dir.exists():
+        raise PRControlError(f"review packet directory already exists: {out_dir}")
+    packet_files = [
+        {key: value for key, value in item.items() if key != "patch"}
+        for item in files
+    ]
     packet = {
         "schema": "dharma.pr_review.packet.v1",
         "generated_at": utc_now(),
@@ -876,25 +1322,52 @@ def cmd_packet(args: argparse.Namespace) -> int:
         "coherence": coherence,
         "ci_truth": ci_truth,
         "risk": risk,
-        "files": files,
+        "authority_policy": policy_identity,
+        "files": packet_files,
         "review_threads": threads,
     }
-    write_json(out_dir / "FACTS.json", packet)
-    write_text(out_dir / "PR_BODY.md", pr.get("body") or "")
-    write_text(
-        out_dir / "changed_files.txt",
-        "\n".join(str(item.get("filename") or "") for item in files) + "\n",
+    evidence_snapshot = {
+        "FACTS.json": (
+            json.dumps(packet, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8"),
+        "PR_BODY.md": str(pr.get("body") or "").encode("utf-8"),
+        "changed_files.txt": (
+            "\n".join(str(item.get("filename") or "") for item in files) + "\n"
+        ).encode("utf-8"),
+        "DIFF.patch": diff.encode("utf-8"),
+        "REVIEW_PACKET.md": render_packet_markdown(packet).encode("utf-8"),
+    }
+    review_evidence_digest(evidence_snapshot)
+    prompts = {
+        "PROMPT_CODEX.md": render_agent_prompt(
+            "Codex",
+            out_dir / "REVIEW_PACKET.md",
+            args.pr,
+            evidence_snapshot=evidence_snapshot,
+        ).encode("utf-8"),
+        "PROMPT_CLAUDE.md": render_agent_prompt(
+            "Claude Code Opus",
+            out_dir / "REVIEW_PACKET.md",
+            args.pr,
+            evidence_snapshot=evidence_snapshot,
+        ).encode("utf-8"),
+    }
+
+    root.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=f".pr-{args.pr}-{packet_id}-", dir=root)
     )
-    write_text(out_dir / "DIFF.patch", diff)
-    write_text(out_dir / "REVIEW_PACKET.md", render_packet_markdown(packet))
-    write_text(
-        out_dir / "PROMPT_CODEX.md",
-        render_agent_prompt("Codex", out_dir / "REVIEW_PACKET.md", args.pr),
-    )
-    write_text(
-        out_dir / "PROMPT_CLAUDE.md",
-        render_agent_prompt("Claude Code Opus", out_dir / "REVIEW_PACKET.md", args.pr),
-    )
+    try:
+        for artifacts in (evidence_snapshot, prompts):
+            for name, payload in artifacts.items():
+                (staging_dir / name).write_bytes(payload)
+        out_dir.parent.mkdir(parents=True, exist_ok=True)
+        if out_dir.exists():
+            raise PRControlError(f"review packet directory already exists: {out_dir}")
+        staging_dir.rename(out_dir)
+    finally:
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
     print(f"packet={out_dir}")
     print(
         f"status={classification['status']} risk={risk['level']} coherence={'pass' if coherence['ok'] else 'fail'}"
@@ -912,15 +1385,17 @@ def has_review(path: Path) -> bool:
 
 
 def _single_review_verdict(text: str) -> str | None:
-    matches = [match.upper() for match in REVIEW_VERDICT_RE.findall(text)]
-    unique = sorted(set(matches))
-    if len(unique) == 1:
-        return unique[0]
-    return None
+    candidate = text.strip()
+    for prefix, suffix in (("**", "**"), ("__", "__"), ("`", "`")):
+        if candidate.startswith(prefix) and candidate.endswith(suffix):
+            candidate = candidate[len(prefix) : -len(suffix)].strip()
+            break
+    candidate = candidate.upper()
+    return candidate if candidate in REVIEW_VERDICTS else None
 
 
 def extract_review_verdict(text: str) -> str:
-    """Extract the required review verdict from the `## Verdict` section."""
+    """Parse one exact token from the first line of the Verdict section."""
 
     in_verdict = False
     for line in text.splitlines():
@@ -931,23 +1406,59 @@ def extract_review_verdict(text: str) -> str:
             header = stripped.lstrip("#").strip().lower()
             in_verdict = header.startswith("verdict")
             if in_verdict:
-                verdict = _single_review_verdict(stripped)
-                if verdict:
-                    return verdict
+                inline = stripped.lstrip("#").strip()[len("verdict") :]
+                inline = inline.lstrip(":").strip()
+                if inline:
+                    return _single_review_verdict(inline) or "UNKNOWN"
             continue
-        if in_verdict:
-            verdict = _single_review_verdict(stripped)
-            if verdict:
-                return verdict
+        if in_verdict and stripped:
+            return _single_review_verdict(stripped) or "UNKNOWN"
     return "UNKNOWN"
 
 
-def load_agent_review_status(out_dir: Path, agent: str) -> dict[str, Any]:
+def load_agent_review_status(
+    out_dir: Path,
+    agent: str,
+    *,
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+) -> dict[str, Any]:
     output_path = review_output_path(out_dir, agent)
+    prompt_path = review_prompt_path(out_dir, agent)
     receipt_path = review_receipt_path(out_dir, agent)
     text = ""
+    output_digest = ""
     if output_path.exists():
-        text = output_path.read_text(encoding="utf-8", errors="replace")
+        output_bytes = output_path.read_bytes()
+        output_digest = sha256_bytes(output_bytes)
+        text = output_bytes.decode("utf-8", errors="replace")
+    prompt_digest = (
+        sha256_bytes(prompt_path.read_bytes()) if prompt_path.exists() else ""
+    )
+    evidence_digest = ""
+    evidence_error = ""
+    evidence_snapshot: dict[str, bytes] | None = None
+    try:
+        evidence_snapshot = read_review_evidence_snapshot(out_dir)
+        evidence_digest = review_evidence_digest(evidence_snapshot)
+    except PRControlError as exc:
+        evidence_error = str(exc)
+    canonical_prompt_digest = ""
+    valid_pr_number = (
+        not isinstance(pr_number, bool)
+        and isinstance(pr_number, int)
+        and pr_number > 0
+    )
+    if evidence_snapshot is not None and valid_pr_number:
+        canonical_prompt = render_agent_prompt(
+            review_prompt_label(agent),
+            out_dir / "REVIEW_PACKET.md",
+            pr_number,
+            evidence_snapshot=evidence_snapshot,
+        )
+        canonical_prompt_digest = sha256_bytes(canonical_prompt.encode("utf-8"))
 
     receipt: dict[str, Any] | None = None
     receipt_error = ""
@@ -961,13 +1472,54 @@ def load_agent_review_status(out_dir: Path, agent: str) -> dict[str, Any]:
         except (OSError, json.JSONDecodeError) as exc:
             receipt_error = str(exc)
 
+    binding_errors: list[str] = []
+    if receipt is not None:
+        repo_parts = repo.split("/")
+        if len(repo_parts) != 2 or not all(repo_parts):
+            binding_errors.append("repository binding is missing or invalid")
+        if not valid_pr_number:
+            binding_errors.append("PR number binding is missing or invalid")
+        if not valid_commit_oid(head_sha):
+            binding_errors.append("current head SHA is missing or invalid")
+        if not valid_commit_oid(base_sha):
+            binding_errors.append("review base SHA is missing or invalid")
+        parsed_verdict = extract_review_verdict(text) if text.strip() else "MISSING"
+        expected_bindings = {
+            "repo": repo,
+            "pr": pr_number,
+            "base_sha": base_sha,
+            "head_sha": head_sha,
+            "output_sha256": output_digest,
+            "prompt_sha256": canonical_prompt_digest,
+            "evidence_sha256": evidence_digest,
+            "agent": agent,
+            "verdict": parsed_verdict,
+        }
+        for field, expected in expected_bindings.items():
+            if receipt.get(field) != expected:
+                binding_errors.append(
+                    f"{field}={receipt.get(field)!r}, expected {expected!r}"
+                )
+        if not output_digest:
+            binding_errors.append("review output is missing")
+        if not prompt_digest:
+            binding_errors.append("review prompt is missing")
+        elif prompt_digest != canonical_prompt_digest:
+            binding_errors.append(
+                "review prompt is not the canonical evidence snapshot"
+            )
+        if not evidence_digest:
+            binding_errors.append(evidence_error or "review evidence is missing")
+    if binding_errors:
+        receipt_error = "review binding mismatch: " + "; ".join(binding_errors)
+
     return {
         "agent": agent,
         "output": str(output_path),
         "output_present": output_path.exists() and len(text.strip()) >= 40,
         "receipt": str(receipt_path),
         "receipt_present": receipt_path.exists(),
-        "receipt_valid": receipt is not None,
+        "receipt_valid": receipt is not None and not binding_errors,
         "receipt_error": receipt_error,
         "receipt_status": receipt.get("status") if receipt else None,
         "exit_code": receipt.get("exit_code") if receipt else None,
@@ -975,6 +1527,12 @@ def load_agent_review_status(out_dir: Path, agent: str) -> dict[str, Any]:
         "timeout_s": receipt.get("timeout_s") if receipt else None,
         "duration_s": receipt.get("duration_s") if receipt else None,
         "verdict": extract_review_verdict(text) if text.strip() else "MISSING",
+        "reviewed_pr_number": receipt.get("pr") if receipt else None,
+        "reviewed_head_sha": receipt.get("head_sha") if receipt else None,
+        "reviewed_base_sha": receipt.get("base_sha") if receipt else None,
+        "review_output_sha256": output_digest,
+        "review_prompt_sha256": prompt_digest,
+        "review_evidence_sha256": evidence_digest,
     }
 
 
@@ -1049,8 +1607,8 @@ def fetch_pr_comments(pr_number: int) -> list[str]:
     surface so its verdict can never be stricter than CI's. The surface is
     strictly additive — a failed fetch degrades to body-only validation (the
     pre-existing behavior), it never blocks."""
-    repo = repo_name()
     try:
+        repo = repo_name()
         data = gh_json(
             ["api", f"repos/{repo}/issues/{pr_number}/comments", "--paginate"]
         )
@@ -1093,9 +1651,9 @@ def _github_review_verdict(state: str) -> str:
     if state == "CHANGES_REQUESTED":
         return "REQUEST_CHANGES"
     if state in {"COMMENTED", "REVIEWED"}:
-        # A trusted reviewer looked and did not request changes. Any findings it
-        # raised live as review THREADS, which the gate blocks on separately, so
-        # a comment review safely counts as "reviewed" here.
+        # Canonical owner policy counts a COMMENTED review from the trusted App
+        # as reviewed; substantive findings are enforced through the complete
+        # review-thread surface fetched separately by the gate.
         return "PASS"
     return "UNKNOWN"
 
@@ -1150,6 +1708,9 @@ def resolve_agent_review_status(
     out_dir: Path,
     agent: str,
     *,
+    repo: str = "",
+    pr_number: int = 0,
+    base_sha: str = "",
     pr_reviews: list[dict[str, Any]],
     accept_github_reviews: bool,
     human_approved: bool = False,
@@ -1157,7 +1718,14 @@ def resolve_agent_review_status(
 ) -> dict[str, Any]:
     """Local receipt first; if it is absent and accept_github_reviews is on, fall
     back to a trusted native GitHub review OF THE CURRENT HEAD as the receipt SOURCE."""
-    local = load_agent_review_status(out_dir, agent)
+    local = load_agent_review_status(
+        out_dir,
+        agent,
+        repo=repo,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        base_sha=base_sha,
+    )
     local.setdefault("source", "local")
     if not accept_github_reviews:
         return local
@@ -1306,6 +1874,86 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
 
     blockers: list[str] = []
     warnings: list[str] = []
+    head_sha = str(current_pr.get("headRefOid") or "")
+    base_sha = str(current_pr.get("baseRefOid") or "")
+    packet_pr_raw = original.get("pr")
+    packet_pr = packet_pr_raw if isinstance(packet_pr_raw, dict) else {}
+    packet_repo = str(original.get("repo") or "")
+    packet_pr_number = packet_pr.get("number")
+    packet_head = str(packet_pr.get("headRefOid") or "")
+    packet_base = str(packet_pr.get("baseRefOid") or "")
+    packet_review_merge_base = ""
+    live_review_merge_base = ""
+    reused_review_range = False
+    try:
+        current_policy_identity = automerge_policy_identity()
+    except PRControlError as exc:
+        current_policy_identity = {"schema": "UNKNOWN", "sha256": ""}
+        blockers.append(str(exc))
+    packet_policy_raw = original.get("authority_policy")
+    packet_policy = packet_policy_raw if isinstance(packet_policy_raw, dict) else {}
+
+    if current_pr.get("number") != args.pr:
+        blockers.append("current PR number is missing or mismatched")
+    if packet_repo != repo:
+        blockers.append("packet repository is missing or mismatched")
+    if packet_pr_number != args.pr:
+        blockers.append("packet PR number is missing or mismatched")
+    if packet_policy != current_policy_identity:
+        blockers.append(
+            "packet authority policy is missing, stale, or mismatched; rebuild the packet"
+        )
+    if not head_sha:
+        blockers.append("current PR does not expose its head SHA")
+    elif not valid_commit_oid(head_sha):
+        blockers.append("current PR head SHA is not a full commit OID")
+    if not base_sha:
+        blockers.append("current PR does not expose its base SHA")
+    elif not valid_commit_oid(base_sha):
+        blockers.append("current PR base SHA is not a full commit OID")
+    if not packet_head:
+        blockers.append("packet does not record its head SHA")
+    elif not valid_commit_oid(packet_head):
+        blockers.append("packet head SHA is not a full commit OID")
+    elif valid_commit_oid(head_sha) and packet_head != head_sha:
+        blockers.append(
+            f"stale packet: packet head {packet_head} != current head {head_sha}"
+            " — rebuild the packet at the current head"
+        )
+    if not packet_base:
+        blockers.append("packet does not record its base SHA")
+    elif not valid_commit_oid(packet_base):
+        blockers.append("packet base SHA is not a full commit OID")
+    elif (
+        valid_commit_oid(base_sha)
+        and valid_commit_oid(head_sha)
+        and packet_base != base_sha
+    ):
+        try:
+            packet_review_merge_base = fetch_review_merge_base(
+                repo, packet_base, head_sha
+            )
+            live_review_merge_base = fetch_review_merge_base(repo, base_sha, head_sha)
+        except Exception as exc:
+            blockers.append(
+                "cannot prove unchanged review range after base change "
+                f"({exc}) — rebuild the packet at the current base"
+            )
+        else:
+            if packet_review_merge_base != live_review_merge_base:
+                blockers.append(
+                    "review range changed after base change: packet merge base "
+                    f"{packet_review_merge_base} != live merge base "
+                    f"{live_review_merge_base} — rebuild the packet and reviews"
+                )
+            else:
+                reused_review_range = True
+                warnings.append(
+                    f"base changed from packet base {packet_base} to {base_sha}; "
+                    f"unchanged review merge base {live_review_merge_base} permits "
+                    "receipt reuse, while live risk and merge authority use the "
+                    "current base"
+                )
     if current_pr.get("isDraft"):
         blockers.append("PR is draft")
     if current_classification["mergeable"] != "MERGEABLE":
@@ -1336,47 +1984,46 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     is_bot_pr = BOT_PR_LABEL in pr_labels
     bot_pr_waivers: list[str] = []
 
-    unresolved_threads = current_threads.get("unresolved") or []
+    unresolved_raw = current_threads.get("unresolved")
     unresolved_count = current_threads.get("unresolved_count")
-    if is_bot_pr:
-        blocking_threads = [
-            thread
-            for thread in unresolved_threads
-            if not thread_is_advisory_only(thread)
-        ]
-        ignored_advisory = len(unresolved_threads) - len(blocking_threads)
-        blocking_unresolved_count = len(blocking_threads)
-        if ignored_advisory:
-            bot_pr_waivers.append(
-                f"bot-pr: ignored {ignored_advisory} advisory review thread(s) "
-                f"from {', '.join(sorted(ADVISORY_REVIEW_BOTS))} (non-blocking)"
-            )
-    else:
-        blocking_unresolved_count = unresolved_count or 0
+    thread_state_ok = (
+        current_threads.get("ok") is True
+        and isinstance(unresolved_raw, list)
+        and type(unresolved_count) is int
+        and unresolved_count == len(unresolved_raw)
+    )
+    if not thread_state_ok:
+        detail = str(current_threads.get("error") or "incomplete thread result")
+        blockers.append(f"cannot verify complete review-thread state ({detail})")
+        unresolved_count = None
+    blocking_unresolved_count = unresolved_count if thread_state_ok else None
+    if is_bot_pr and blocking_unresolved_count:
+        warnings.append(
+            "native conversation-resolution policy does not waive unresolved "
+            "threads on bot-pr pull requests"
+        )
     if blocking_unresolved_count:
         blockers.append(f"{blocking_unresolved_count} unresolved review threads")
 
     required_reviewers = required_reviewer_agents(args)
-    if is_bot_pr and required_reviewers:
-        bot_pr_waivers.append(
-            "bot-pr: waived required reviewer receipts "
-            f"({', '.join(required_reviewers)}) — trusted automation merges when green"
-        )
-        required_reviewers = []
+    if is_bot_pr:
+        warnings.append("bot-pr is routing metadata only; it grants no review waiver")
     accept_github_reviews = getattr(args, "accept_github_reviews", False)
-    head_sha = current_pr.get("headRefOid") or ""
     pr_reviews = (
         fetch_pr_reviews(args.pr)
-        if accept_github_reviews and required_reviewers
+        if accept_github_reviews and required_reviewers and valid_commit_oid(head_sha)
         else []
     )
     review_statuses = {
         agent: resolve_agent_review_status(
             out_dir,
             agent,
+            repo=repo,
+            pr_number=args.pr,
+            base_sha=packet_base,
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
-            human_approved=args.human_approved,
+            human_approved=False,
             head_sha=head_sha,
         )
         for agent in required_reviewers
@@ -1385,9 +2032,12 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         agent: resolve_agent_review_status(
             out_dir,
             agent,
+            repo=repo,
+            pr_number=args.pr,
+            base_sha=packet_base,
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
-            human_approved=args.human_approved,
+            human_approved=False,
             head_sha=head_sha,
         )
         for agent in backup_reviewer_agents(args)
@@ -1395,7 +2045,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     claude_blockers: list[str] = []
     for agent, status in review_statuses.items():
         agent_blockers = agent_review_blockers(
-            status, human_approved=args.human_approved
+            status, human_approved=False
         )
         if agent == "claude":
             claude_blockers = agent_blockers
@@ -1420,7 +2070,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     else:
         accepted_backup = ""
         for agent, status in backup_statuses.items():
-            if not agent_review_blockers(status, human_approved=args.human_approved):
+            if not agent_review_blockers(status, human_approved=False):
                 accepted_backup = agent
                 break
         if not accepted_backup:
@@ -1437,9 +2087,52 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
                 f"Claude review unavailable; accepted {review_label(accepted_backup)} backup reviewer because: {backup_policy['reason']}"
             )
 
+    # Risk is recomputed from an immutable base/head commit pair — never from
+    # the mutable pull-files endpoint or the packet snapshot. A separate PR
+    # view followed by a branch-relative files read admits an A→B→A race, so
+    # the comparison itself is addressed only by the captured commit OIDs.
+    current_files = None
+    current_risk: dict[str, Any] = {"level": "UNKNOWN", "files_changed": None}
+    if valid_commit_oid(base_sha) and valid_commit_oid(head_sha):
+        try:
+            current_files = fetch_pr_files_at_revision(repo, base_sha, head_sha)
+            current_risk = risk_from_files(current_files)
+        except Exception as exc:
+            blockers.append(
+                "cannot fetch immutable current PR files to recompute risk "
+                f"({exc}) — fail closed"
+            )
+    if current_files is not None:
+        if current_risk["level"] in {"HIGH", "CRITICAL"}:
+            blockers.append(
+                f"{current_risk['level']} risk is operator-only; Mike cannot actuate"
+            )
+
+    authorization_report: object = None
+    authorization_path = str(getattr(args, "merge_authorization", "") or "")
+    if authorization_path:
+        try:
+            authorization_report = load_json(expand(authorization_path))
+        except (OSError, json.JSONDecodeError) as exc:
+            blockers.append(f"cannot load merge authorization report ({exc})")
+    permit, authorization_blockers = validate_merge_authorization(
+        authorization_report,
+        repo=repo,
+        pr_number=args.pr,
+        head_sha=head_sha,
+        base_sha=base_sha,
+        base_ref=str(current_pr.get("baseRefName") or ""),
+        title=str(current_pr.get("title") or ""),
+        policy_identity=current_policy_identity,
+    )
+    blockers.extend(authorization_blockers)
+
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
-    if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
-        blockers.append(f"{original_risk} risk requires --human-approved")
+    if original_risk != current_risk["level"]:
+        warnings.append(
+            f"risk drift: packet recorded {original_risk}, "
+            f"current head computes {current_risk['level']}"
+        )
     if current_classification["checks"]["unknown"]:
         warnings.append(
             f"unknown checks: {', '.join(current_classification['checks']['unknown'])}"
@@ -1465,10 +2158,16 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             agent: status.get("source", "local")
             for agent, status in review_statuses.items()
         },
-        "head_sha": current_pr.get("headRefOid") or "",
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "base_ref": str(current_pr.get("baseRefName") or ""),
+        "merge_intent": str(current_pr.get("title") or ""),
         "review_threads": {
             "ok": current_threads.get("ok"),
             "unresolved_count": unresolved_count,
+            "unresolved_outdated_count": current_threads.get(
+                "unresolved_outdated_count"
+            ),
             "blocking_unresolved_count": blocking_unresolved_count,
         },
         "bot_pr": {
@@ -1480,7 +2179,27 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "review_receipts": review_statuses,
         "backup_review_receipts": backup_statuses,
         "backup_review_policy": backup_policy,
-        "risk": original.get("risk", {}),
+        "risk": current_risk,
+        "risk_snapshot": {"base_sha": base_sha, "head_sha": head_sha},
+        "authority_policy": current_policy_identity,
+        "merge_authorization_evidence": permit,
+        "merge_authority_proof": None,
+        "review_snapshot": {"base_sha": packet_base, "head_sha": packet_head},
+        "review_range": {
+            "packet_base_sha": packet_base,
+            "live_base_sha": base_sha,
+            "head_sha": head_sha,
+            "packet_merge_base_sha": packet_review_merge_base,
+            "live_merge_base_sha": live_review_merge_base,
+            "reused_after_base_change": reused_review_range,
+        },
+        # Live policy does not currently prove a strict/up-to-date base CAS.
+        # Keep gate evaluation useful, but prohibit merge execution until the
+        # canonical policy consumer can set this from enforced repository state.
+        "base_cas_enforced": False,
+        "packet_risk": original.get("risk", {}),
+        "packet_head": packet_head,
+        "packet_base": packet_base,
     }
 
 
@@ -1565,12 +2284,25 @@ def render_github_comment(
 ) -> str:
     pr = packet["pr"]
     classification = packet["classification"]
-    risk = packet["risk"]
+    risk = (gate or {}).get("risk") or packet.get("risk") or {}
+    packet_risk = (gate or {}).get("packet_risk") or packet.get("risk") or {}
     coherence = packet["coherence"]
     decision = gate.get("decision") if gate else "PACKET_ONLY"
     blockers = gate.get("blockers", []) if gate else []
     warnings = gate.get("warnings", []) if gate else []
     ci_truth = (gate or packet).get("ci_truth", {})
+
+    def risk_summary(value: dict[str, Any]) -> str:
+        level = str(value.get("level") or "UNKNOWN")
+        counts = (
+            value.get("files_changed"),
+            value.get("additions"),
+            value.get("deletions"),
+        )
+        if any(item is None for item in counts):
+            return f"`{level}` (counts unavailable)"
+        files_changed, additions, deletions = counts
+        return f"`{level}` ({files_changed} files, +{additions}/-{deletions})"
 
     lines = [
         "<!-- dharma-pr-review-control:auto -->",
@@ -1580,10 +2312,15 @@ def render_github_comment(
         f"- Decision: `{decision}`",
         f"- Queue status: `{classification['status']}`",
         f"- Mergeable: `{classification['mergeable']}`",
-        f"- Risk: `{risk['level']}` ({risk['files_changed']} files, +{risk['additions']}/-{risk['deletions']})",
+        f"- Risk: {risk_summary(risk)}",
+        *(
+            [f"- Packet risk (historical): {risk_summary(packet_risk)}"]
+            if gate is not None
+            else []
+        ),
         f"- CI Truth: `{ci_truth.get('verdict', 'UNKNOWN')}`",
         f"- Coherence Delta: `{'pass' if coherence['ok'] else 'fail'}`",
-        "- Authority: `conditional_merge_after_clean_gate`",
+        "- Authority: `evidence_only_safe_p0`",
         "",
         "### Blockers",
         "",
@@ -1619,7 +2356,8 @@ def render_github_comment(
             "",
             "### Authority Boundary",
             "",
-            "- GitHub Action Mike may create packets, run deterministic gates, post this status comment, and run `gh pr merge --auto` only when explicitly asked to `merge when clean`.",
+            "- GitHub Action Mike may create packets, run deterministic gates, and post this status comment.",
+            "- Safe P0 emits authorization evidence only. It cannot construct authenticated `MergeAuthorized`, and merge actuation remains disabled until trusted provenance plus server-side base-CAS proofs are live.",
             "- Mike may not approve PRs, push code, mark human approval, resolve review threads, or bypass branch protection.",
             "- Branch protection and GitHub auto-merge remain enforcement layers after Mike's gate.",
             "",
@@ -1650,10 +2388,13 @@ def gh_merge_command(
     method: str = "squash",
     auto: bool = True,
     match_head_commit: str = "",
+    repo: str = "",
 ) -> list[str]:
     cmd = ["gh", "pr", "merge", str(pr_number), f"--{method}", "--delete-branch"]
     if auto:
         cmd.insert(4, "--auto")
+    if repo:
+        cmd.extend(["--repo", repo])
     if match_head_commit:
         cmd.extend(["--match-head-commit", match_head_commit])
     return cmd
@@ -1666,13 +2407,23 @@ def run_mike_merge_authority(
     method: str,
     auto: bool,
     runner: Callable[..., CommandResult] = run,
+    pr_fetcher: Callable[[int], dict[str, Any]] = fetch_pr_view,
+    policy_identity_fetcher: Callable[[], dict[str, str]] = automerge_policy_identity,
+    authority_proof_validator: Callable[[object], list[str]] = validate_merge_authority_proof,
 ) -> dict[str, Any]:
     match_head_commit = str(gate.get("head_sha") or "")
-    command = gh_merge_command(
-        pr_number,
-        method=method,
-        auto=auto,
-        match_head_commit=match_head_commit,
+    gate_base_commit = str(gate.get("base_sha") or "")
+    gate_repo = str(gate.get("repo") or "")
+    command = (
+        gh_merge_command(
+            pr_number,
+            method=method,
+            auto=auto,
+            match_head_commit=match_head_commit,
+            repo=gate_repo,
+        )
+        if valid_commit_oid(match_head_commit)
+        else []
     )
     receipt: dict[str, Any] = {
         "schema": "dharma.pr_review.mike_merge_receipt.v1",
@@ -1685,8 +2436,13 @@ def run_mike_merge_authority(
         "gate_decision": gate.get("decision"),
         "gate_packet_dir": gate.get("packet_dir"),
         "head_sha": match_head_commit,
+        "base_sha": gate_base_commit,
+        "base_cas_enforced": gate.get("base_cas_enforced") is True,
         "required_reviewers": gate.get("required_reviewers", []),
         "risk": gate.get("risk", {}),
+        "merge_authorization_evidence": gate.get("merge_authorization_evidence"),
+        "merge_authority_proof": gate.get("merge_authority_proof"),
+        "authority_policy": gate.get("authority_policy"),
         "command": command,
         "status": "SKIPPED",
         "reason": "gate decision is not MERGE_CANDIDATE",
@@ -1696,6 +2452,107 @@ def run_mike_merge_authority(
     }
     if gate.get("decision") != "MERGE_CANDIDATE":
         receipt["blockers"] = gate.get("blockers", [])
+        return receipt
+    if not valid_commit_oid(match_head_commit):
+        receipt["reason"] = "gate head SHA is missing or invalid"
+        receipt["blockers"] = ["merge authority requires a full head commit OID"]
+        return receipt
+    if not valid_commit_oid(gate_base_commit):
+        receipt["reason"] = "gate base SHA is missing or invalid"
+        receipt["blockers"] = ["merge authority requires a full base commit OID"]
+        return receipt
+    if gate.get("pr") != pr_number:
+        receipt["reason"] = "gate PR binding is missing or mismatched"
+        receipt["blockers"] = ["merge authority requires the exact PR binding"]
+        return receipt
+    if not gate_repo or gate_repo.count("/") != 1:
+        receipt["reason"] = "gate repository binding is missing or invalid"
+        receipt["blockers"] = ["merge authority requires an explicit repository"]
+        return receipt
+    if gate.get("blockers"):
+        receipt["reason"] = "candidate gate still records blockers"
+        receipt["blockers"] = list(gate.get("blockers") or [])
+        return receipt
+    # BaseCasProven<repo, base, ruleset> is deliberately uninhabited in safe
+    # P0.  Check this independent proof obligation before reducing authority
+    # evidence so the actuator's hard containment remains explicit and stable.
+    if gate.get("base_cas_enforced") is not True:
+        receipt["reason"] = "strict base-CAS enforcement is not proven"
+        receipt["blockers"] = [
+            "merge execution is prohibited until canonical policy proves "
+            "strict/up-to-date base enforcement"
+        ]
+        return receipt
+    try:
+        current_policy_identity = policy_identity_fetcher()
+    except Exception as exc:
+        receipt["reason"] = "cannot refresh authority policy before merge"
+        receipt["blockers"] = [f"authority policy refresh failed: {exc}"]
+        return receipt
+    live_title = ""
+    authorization, authorization_blockers = validate_merge_authorization(
+        {
+            "schema": "dharma.automerge_tier_policy_report.v2",
+            "passed": True,
+            "violations": [],
+            "authorization_evidence": gate.get("merge_authorization_evidence"),
+        },
+        repo=gate_repo,
+        pr_number=pr_number,
+        head_sha=match_head_commit,
+        base_sha=gate_base_commit,
+        base_ref=str(gate.get("base_ref") or ""),
+        title=str(gate.get("merge_intent") or ""),
+        policy_identity=current_policy_identity,
+    )
+    if authorization is None:
+        receipt["reason"] = "merge authorization evidence is absent, stale, or mismatched"
+        receipt["blockers"] = authorization_blockers
+        return receipt
+    authority_proof_blockers = authority_proof_validator(
+        gate.get("merge_authority_proof")
+    )
+    if authority_proof_blockers:
+        receipt["reason"] = "authenticated merge authority is unavailable"
+        receipt["blockers"] = authority_proof_blockers
+        return receipt
+    risk_snapshot = gate.get("risk_snapshot")
+    if not isinstance(risk_snapshot, dict) or (
+        risk_snapshot.get("base_sha") != gate_base_commit
+        or risk_snapshot.get("head_sha") != match_head_commit
+    ):
+        receipt["reason"] = "gate risk snapshot is missing or mismatched"
+        receipt["blockers"] = [
+            "merge authority requires risk computed for the exact base/head pair"
+        ]
+        return receipt
+    try:
+        live_pr = pr_fetcher(pr_number)
+    except Exception as exc:
+        receipt["reason"] = "cannot refresh PR binding before merge"
+        receipt["blockers"] = [f"live PR refresh failed: {exc}"]
+        return receipt
+    live_base = str(live_pr.get("baseRefOid") or "")
+    live_base_ref = str(live_pr.get("baseRefName") or "")
+    live_head = str(live_pr.get("headRefOid") or "")
+    live_number = live_pr.get("number")
+    live_title = str(live_pr.get("title") or "")
+    if (
+        live_number != pr_number
+        or live_base != gate_base_commit
+        or live_base_ref != str(gate.get("base_ref") or "")
+        or live_head != match_head_commit
+    ):
+        receipt["reason"] = "live PR binding changed after gate evaluation"
+        receipt["blockers"] = [
+            "merge authority requires a fresh gate for the current PR/base/head"
+        ]
+        return receipt
+    if canonical_json_sha256(live_title) != authorization.get("intent_sha256"):
+        receipt["reason"] = "live merge intent changed after authorization"
+        receipt["blockers"] = [
+            "merge authority requires a fresh permit for the current PR title"
+        ]
         return receipt
 
     result = runner(command, timeout=300, check=False)
@@ -1855,6 +2712,7 @@ def cmd_merge(args: argparse.Namespace) -> int:
             method=args.method,
             auto=args.auto,
             match_head_commit=str(gate.get("head_sha") or ""),
+            repo=str(gate.get("repo") or ""),
         )
         print(f"dry_run=true command={' '.join(shlex.quote(part) for part in command)}")
         write_json(
@@ -1888,10 +2746,60 @@ def cmd_merge(args: argparse.Namespace) -> int:
     return 0 if merge_receipt["status"] == "MERGE_COMMAND_ACCEPTED" else 2
 
 
+def load_review_packet_binding(
+    out_dir: Path,
+    *,
+    expected_pr_number: int,
+    expected_repo: str = "",
+) -> dict[str, Any]:
+    """Load the immutable receipt bindings from one review packet."""
+
+    facts = load_json(out_dir / "FACTS.json")
+    if not isinstance(facts, dict):
+        raise PRControlError("review packet facts must be a JSON object")
+    facts_pr_value = facts.get("pr")
+    facts_pr = facts_pr_value if isinstance(facts_pr_value, dict) else {}
+    facts_repo = str(facts.get("repo") or "")
+    facts_pr_number = facts_pr.get("number")
+    facts_head = str(facts_pr.get("headRefOid") or "")
+    facts_base = str(facts_pr.get("baseRefOid") or "")
+    repo_parts = facts_repo.split("/")
+    if len(repo_parts) != 2 or not all(repo_parts):
+        raise PRControlError("review packet repository binding is missing or invalid")
+    if expected_repo and facts_repo != expected_repo:
+        raise PRControlError("review packet repository binding is mismatched")
+    if facts_pr_number != expected_pr_number:
+        raise PRControlError("review packet PR binding is missing or mismatched")
+    if not valid_commit_oid(facts_head) or not valid_commit_oid(facts_base):
+        raise PRControlError("review packet requires full base and head commit OIDs")
+    return {
+        "repo": facts_repo,
+        "pr_number": expected_pr_number,
+        "head_sha": facts_head,
+        "base_sha": facts_base,
+    }
+
+
 def cmd_run_agent(args: argparse.Namespace) -> int:
     out_dir = latest_or_arg_packet(args)
-    prompt_name = "PROMPT_CLAUDE.md" if args.agent == "claude" else "PROMPT_CODEX.md"
-    prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
+    binding = load_review_packet_binding(
+        out_dir,
+        expected_pr_number=args.pr,
+    )
+    facts_repo = binding["repo"]
+    facts_head = binding["head_sha"]
+    facts_base = binding["base_sha"]
+    evidence_snapshot = read_review_evidence_snapshot(out_dir)
+    evidence_digest = review_evidence_digest(evidence_snapshot)
+    prompt_path = review_prompt_path(out_dir, args.agent)
+    prompt = render_agent_prompt(
+        review_prompt_label(args.agent),
+        out_dir / "REVIEW_PACKET.md",
+        args.pr,
+        evidence_snapshot=evidence_snapshot,
+    )
+    prompt_bytes = prompt.encode("utf-8")
+    write_text(prompt_path, prompt)
     command, env = review_command_and_env(args.agent)
     timeout_s = (
         args.timeout_s
@@ -1910,9 +2818,26 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
         timeout_s=timeout_s,
         kill_grace_s=kill_grace_s,
     )
+    try:
+        post_review_evidence_digest = review_evidence_sha256(out_dir)
+    except PRControlError:
+        post_review_evidence_digest = ""
     raw_output = (result["stdout"] or result["stderr"]).strip()
     exit_code = int(result["exit_code"])
-    if result["timed_out"] or result["status"] == "spawn_failed":
+    if post_review_evidence_digest != evidence_digest:
+        result["status"] = "evidence_changed"
+        exit_code = 2
+        result["exit_code"] = exit_code
+        review_text = render_agent_failure_review(
+            args.agent,
+            reason="evidence_changed",
+            command=command,
+            timeout_s=timeout_s,
+            duration_s=result["duration_s"],
+            stdout=result["stdout"],
+            stderr=result["stderr"],
+        )
+    elif result["timed_out"] or result["status"] == "spawn_failed":
         review_text = render_agent_failure_review(
             args.agent,
             reason=result["status"],
@@ -1940,12 +2865,17 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
 
     output_path = review_output_path(out_dir, args.agent)
     write_text(output_path, review_text)
+    output_digest = sha256_bytes(output_path.read_bytes())
     write_json(
         review_receipt_path(out_dir, args.agent),
         {
             "schema": "dharma.pr_review.agent_receipt.v1",
             "generated_at": utc_now(),
             "agent": args.agent,
+            "repo": facts_repo,
+            "pr": args.pr,
+            "base_sha": facts_base,
+            "head_sha": facts_head,
             "command": command,
             "status": result["status"],
             "exit_code": exit_code,
@@ -1959,6 +2889,9 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
             "stderr_bytes": len(result["stderr"].encode("utf-8")),
             "verdict": extract_review_verdict(review_text),
             "output": str(output_path),
+            "output_sha256": output_digest,
+            "prompt_sha256": sha256_bytes(prompt_bytes),
+            "evidence_sha256": evidence_digest,
         },
     )
     print(
@@ -2465,15 +3398,50 @@ def _packet_gate_summary(packet_dir_path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(gate, dict):
         return None
-    blockers = gate.get("blockers") if isinstance(gate.get("blockers"), list) else []
+
+    decision = gate.get("decision")
+    blockers = gate.get("blockers")
+    generated_at = gate.get("generated_at")
+    if decision not in {"MERGE_CANDIDATE", "BLOCKED"}:
+        return None
+    if not isinstance(blockers, list) or any(
+        not isinstance(blocker, str) or not blocker.strip() for blocker in blockers
+    ):
+        return None
+    if decision == "MERGE_CANDIDATE" and blockers:
+        return None
+    if decision == "BLOCKED" and not blockers:
+        return None
+    if _parse_utc_timestamp(generated_at) is None:
+        return None
     return {
-        "decision": str(gate.get("decision") or ""),
-        "blockers": [str(blocker) for blocker in blockers],
+        "decision": decision,
+        "blockers": blockers,
+        "generated_at": generated_at,
     }
 
 
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
 def current_fanout_receipt_for_item(
-    state_root: Path, item: dict[str, Any]
+    state_root: Path,
+    item: dict[str, Any],
+    *,
+    blocked_retry_s: float = DEFAULT_BLOCKED_RETRY_S,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     pr_number = int(item.get("number") or 0)
     packet_path = latest_packet_dir_or_none(state_root, pr_number)
@@ -2494,15 +3462,9 @@ def current_fanout_receipt_for_item(
         return result
     gate = _packet_gate_summary(packet_path)
     if gate is None:
-        result["reason"] = "latest packet merge gate unreadable"
+        result["reason"] = "latest packet merge gate unreadable or malformed"
         return result
     result["gate"] = gate
-    if gate["decision"] != "MERGE_CANDIDATE":
-        result["reason"] = f"latest merge gate is {gate['decision'] or 'UNKNOWN'}"
-        return result
-    if gate["blockers"]:
-        result["reason"] = "latest merge gate still has blockers"
-        return result
     observed = _packet_fingerprint(packet_path)
     if observed is None:
         result["reason"] = "latest packet facts unreadable"
@@ -2512,15 +3474,45 @@ def current_fanout_receipt_for_item(
         result["reason"] = "queue item has no head SHA"
         return result
     stable_keys = ("head_sha", "base_sha", "updated_at", "status", "review_decision")
-    if all(observed.get(key) == expected.get(key) for key in stable_keys):
+    if not all(observed.get(key) == expected.get(key) for key in stable_keys):
+        result["reason"] = (
+            "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
+        )
+        return result
+
+    generated_at = _parse_utc_timestamp(gate["generated_at"])
+    if generated_at is None:
+        result["reason"] = "latest packet merge gate timestamp is malformed"
+        return result
+    effective_now = now or datetime.now(timezone.utc)
+    if effective_now.tzinfo is None or effective_now.utcoffset() is None:
+        raise ValueError("fanout comparison time must include a timezone")
+    effective_now = effective_now.astimezone(timezone.utc)
+    age_s = (effective_now - generated_at).total_seconds()
+    result["gate_age_s"] = age_s
+    if age_s < 0:
+        result["reason"] = "latest packet merge gate timestamp is in the future"
+        return result
+
+    if gate["decision"] == "MERGE_CANDIDATE":
         result["current"] = True
         result["reason"] = (
             "latest clean packet/gate already matches PR head, base, update time, queue status, and review decision"
         )
         return result
-    result["reason"] = (
-        "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
-    )
+
+    retry_s = float(blocked_retry_s)
+    if not 0.0 < retry_s < float("inf"):
+        retry_s = 0.0
+    if age_s < retry_s:
+        result["current"] = True
+        result["deferred"] = True
+        result["retry_in_s"] = retry_s - age_s
+        result["reason"] = (
+            "latest unchanged BLOCKED packet/gate is inside the bounded retry cooldown"
+        )
+        return result
+    result["reason"] = "latest unchanged BLOCKED packet/gate retry cooldown expired"
     return result
 
 
@@ -2531,6 +3523,9 @@ def select_fanout_plan(
     max_prs: int,
     state_root: Path,
     skip_current: bool,
+    blocked_retry_s: float = DEFAULT_BLOCKED_RETRY_S,
+    fanout_offset: int = 0,
+    now: datetime | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     if max_prs <= 0:
         return {"selected": [], "skipped_current": []}
@@ -2546,12 +3541,20 @@ def select_fanout_plan(
             int(item.get("number") or 0),
         )
     )
+    if candidates:
+        offset = max(0, int(fanout_offset)) % len(candidates)
+        candidates = candidates[offset:] + candidates[:offset]
 
     selected: list[dict[str, Any]] = []
     skipped_current: list[dict[str, Any]] = []
     for item in candidates:
         if skip_current:
-            current = current_fanout_receipt_for_item(state_root, item)
+            current = current_fanout_receipt_for_item(
+                state_root,
+                item,
+                blocked_retry_s=blocked_retry_s,
+                now=now,
+            )
             if current["current"]:
                 skipped_current.append(
                     {
@@ -2562,6 +3565,8 @@ def select_fanout_plan(
                         "head_sha": current.get("head_sha", ""),
                         "updatedAt": current.get("updatedAt", ""),
                         "reason": current.get("reason", ""),
+                        "deferred": current.get("deferred", False),
+                        "retry_in_s": current.get("retry_in_s"),
                     }
                 )
                 continue
@@ -2636,14 +3641,14 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
             "## Authority",
             "",
             "- GitHub comment text is rendered locally only; posting remains a separate explicit action.",
-            "- Merge is allowed only when `merge_mode=auto-when-clean` and the deterministic gate is clean.",
+            "- Safe P0 is evidence-only: a clean deterministic gate does not grant merge authority.",
             "",
         ]
     )
     if receipt.get("merge_mode") == "auto-when-clean":
         lines.insert(
             -1,
-            "- This fanout may run Mike's conditional merge command after a clean gate.",
+            "- This fanout may evaluate the merge actuator, but authenticated authority and base-CAS proofs remain required and unavailable in safe P0.",
         )
     else:
         lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
@@ -2661,6 +3666,99 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
             ]
         )
     return "\n".join(lines)
+
+
+def capture_fanout_stage(
+    stage: str, action: Callable[[], Any]
+) -> tuple[Any | None, dict[str, str] | None]:
+    """Run one per-PR fanout stage without aborting unrelated queue items."""
+
+    try:
+        return action(), None
+    except Exception as exc:
+        message = str(exc).strip() or repr(exc)
+        return None, {
+            "stage": stage,
+            "error_type": type(exc).__name__,
+            "message": message,
+        }
+
+
+def fanout_failure_row(
+    item: dict[str, Any],
+    pr_number: int,
+    failure: dict[str, str],
+    *,
+    packet_dir_path: Path | None = None,
+    reviewers: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Render a fail-closed per-PR exception as durable fanout evidence."""
+
+    stage = failure["stage"]
+    error_type = failure["error_type"]
+    message = failure["message"]
+    row: dict[str, Any] = {
+        "number": pr_number,
+        "title": item.get("title"),
+        "status": item.get("status"),
+        "packet_status": "failed" if stage == "packet" else "created",
+        "reviewers": reviewers or [],
+        "failure_stage": stage,
+        "error_type": error_type,
+        "error": message,
+        "gate_decision": "BLOCKED",
+        "blockers": [f"{stage} failed ({error_type}): {message}"],
+    }
+    if packet_dir_path is not None:
+        row["packet_dir"] = str(packet_dir_path)
+    return row
+
+
+def finalize_fanout_item(
+    args: argparse.Namespace,
+    item: dict[str, Any],
+    pr_number: int,
+    out_dir: Path,
+    reviewer_rows: list[dict[str, Any]],
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    """Write post-gate artifacts and return one completed fanout row."""
+
+    write_json(out_dir / "MERGE_GATE.json", gate)
+    write_text(out_dir / "MERGE_GATE.md", render_gate_markdown(gate))
+    packet = load_json(out_dir / "FACTS.json")
+    comment_path = out_dir / "GITHUB_COMMENT.md"
+    merge_summary: dict[str, Any] | None = None
+    merge_receipt: dict[str, Any] | None = None
+    if args.merge_mode == "auto-when-clean":
+        merge_receipt = run_mike_merge_authority(
+            pr_number=pr_number,
+            gate=gate,
+            method=args.merge_method,
+            auto=args.merge_auto,
+        )
+        write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
+        merge_summary = {
+            "status": merge_receipt.get("status"),
+            "reason": merge_receipt.get("reason"),
+            "method": merge_receipt.get("method"),
+            "auto": merge_receipt.get("auto"),
+            "receipt": str(out_dir / "MIKE_MERGE_RECEIPT.json"),
+            "exit_code": merge_receipt.get("exit_code"),
+        }
+    write_text(comment_path, render_github_comment(packet, gate, merge_receipt))
+    return {
+        "number": pr_number,
+        "title": item.get("title"),
+        "status": item.get("status"),
+        "packet_dir": str(out_dir),
+        "reviewers": reviewer_rows,
+        "gate_decision": gate["decision"],
+        "blockers": gate["blockers"],
+        "warnings": gate["warnings"],
+        "comment_path": str(comment_path),
+        "merge": merge_summary,
+    }
 
 
 def cmd_fanout(args: argparse.Namespace) -> int:
@@ -2686,6 +3784,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         max_prs=args.max_prs,
         state_root=root,
         skip_current=should_skip_current_fanout(args),
+        blocked_retry_s=getattr(args, "blocked_retry_s", DEFAULT_BLOCKED_RETRY_S),
+        fanout_offset=getattr(args, "fanout_offset", 0),
     )
     selected = plan["selected"]
     skipped_current = plan["skipped_current"]
@@ -2703,7 +3803,14 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             pr=pr_number,
             ci_truth_contract=args.ci_truth_contract,
         )
-        packet_code = cmd_packet(packet_args)
+        packet_result, failure = capture_fanout_stage(
+            "packet", lambda: int(cmd_packet(packet_args))
+        )
+        if failure is not None:
+            processed.append(fanout_failure_row(item, pr_number, failure))
+            continue
+        assert isinstance(packet_result, int)
+        packet_code = packet_result
         if packet_code != 0:
             processed.append(
                 {
@@ -2719,9 +3826,38 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             )
             continue
 
-        out_dir = packet_dir(root, pr_number)
+        packet_dir_result, failure = capture_fanout_stage(
+            "packet-directory", lambda: packet_dir(root, pr_number)
+        )
+        if failure is not None:
+            processed.append(fanout_failure_row(item, pr_number, failure))
+            continue
+        assert isinstance(packet_dir_result, Path)
+        out_dir = packet_dir_result
         reviewer_rows: list[dict[str, Any]] = []
+        review_failed = False
+        review_binding: dict[str, Any] | None = None
         if not args.packet_only:
+            binding_result, failure = capture_fanout_stage(
+                "packet-binding",
+                lambda: load_review_packet_binding(
+                    out_dir,
+                    expected_pr_number=pr_number,
+                    expected_repo=repo,
+                ),
+            )
+            if failure is not None:
+                processed.append(
+                    fanout_failure_row(
+                        item,
+                        pr_number,
+                        failure,
+                        packet_dir_path=out_dir,
+                    )
+                )
+                continue
+            assert isinstance(binding_result, dict)
+            review_binding = binding_result
             for agent in agents:
                 run_args = argparse.Namespace(
                     state_root=str(root),
@@ -2731,13 +3867,47 @@ def cmd_fanout(args: argparse.Namespace) -> int:
                     timeout_s=args.timeout_s,
                     kill_grace_s=args.kill_grace_s,
                 )
-                exit_code = cmd_run_agent(run_args)
-                status = load_agent_review_status(out_dir, agent)
+                review_result, failure = capture_fanout_stage(
+                    f"review:{agent}",
+                    lambda: (
+                        cmd_run_agent(run_args),
+                        load_agent_review_status(
+                            out_dir,
+                            agent,
+                            **review_binding,
+                        ),
+                    ),
+                )
+                if failure is not None:
+                    reviewer_rows.append(
+                        {
+                            "agent": agent,
+                            "exit_code": None,
+                            "status": "failed",
+                            "error_type": failure["error_type"],
+                            "error": failure["message"],
+                        }
+                    )
+                    processed.append(
+                        fanout_failure_row(
+                            item,
+                            pr_number,
+                            failure,
+                            packet_dir_path=out_dir,
+                            reviewers=reviewer_rows,
+                        )
+                    )
+                    review_failed = True
+                    break
+                assert review_result is not None
+                exit_code, status = review_result
                 reviewer_rows.append(
                     {
                         "agent": agent,
                         "exit_code": exit_code,
                         "status": status.get("receipt_status"),
+                        "receipt_valid": status.get("receipt_valid"),
+                        "receipt_error": status.get("receipt_error"),
                         "timed_out": status.get("timed_out"),
                         "duration_s": status.get("duration_s"),
                         "verdict": status.get("verdict"),
@@ -2745,6 +3915,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
                         "receipt": status.get("receipt"),
                     }
                 )
+        if review_failed:
+            continue
 
         gate_args = argparse.Namespace(
             state_root=str(root),
@@ -2758,45 +3930,48 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             required_reviewers=args.required_reviewers,
             accept_github_reviews=getattr(args, "accept_github_reviews", False),
             ci_truth_contract=args.ci_truth_contract,
+            merge_authorization=getattr(args, "merge_authorization", ""),
         )
-        gate = build_gate(gate_args)
-        write_json(out_dir / "MERGE_GATE.json", gate)
-        write_text(out_dir / "MERGE_GATE.md", render_gate_markdown(gate))
-        packet = load_json(out_dir / "FACTS.json")
-        comment_path = out_dir / "GITHUB_COMMENT.md"
-        merge_summary: dict[str, Any] | None = None
-        merge_receipt: dict[str, Any] | None = None
-        if args.merge_mode == "auto-when-clean":
-            merge_receipt = run_mike_merge_authority(
-                pr_number=pr_number,
-                gate=gate,
-                method=args.merge_method,
-                auto=args.merge_auto,
+        gate_result, failure = capture_fanout_stage(
+            "gate", lambda: build_gate(gate_args)
+        )
+        if failure is not None:
+            processed.append(
+                fanout_failure_row(
+                    item,
+                    pr_number,
+                    failure,
+                    packet_dir_path=out_dir,
+                    reviewers=reviewer_rows,
+                )
             )
-            write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
-            merge_summary = {
-                "status": merge_receipt.get("status"),
-                "reason": merge_receipt.get("reason"),
-                "method": merge_receipt.get("method"),
-                "auto": merge_receipt.get("auto"),
-                "receipt": str(out_dir / "MIKE_MERGE_RECEIPT.json"),
-                "exit_code": merge_receipt.get("exit_code"),
-            }
-        write_text(comment_path, render_github_comment(packet, gate, merge_receipt))
-        processed.append(
-            {
-                "number": pr_number,
-                "title": item.get("title"),
-                "status": item.get("status"),
-                "packet_dir": str(out_dir),
-                "reviewers": reviewer_rows,
-                "gate_decision": gate["decision"],
-                "blockers": gate["blockers"],
-                "warnings": gate["warnings"],
-                "comment_path": str(comment_path),
-                "merge": merge_summary,
-            }
+            continue
+        assert isinstance(gate_result, dict)
+        gate = gate_result
+        final_result, failure = capture_fanout_stage(
+            "post-gate",
+            lambda: finalize_fanout_item(
+                args,
+                item,
+                pr_number,
+                out_dir,
+                reviewer_rows,
+                gate,
+            ),
         )
+        if failure is not None:
+            processed.append(
+                fanout_failure_row(
+                    item,
+                    pr_number,
+                    failure,
+                    packet_dir_path=out_dir,
+                    reviewers=reviewer_rows,
+                )
+            )
+            continue
+        assert isinstance(final_result, dict)
+        processed.append(final_result)
 
     receipt = {
         "schema": "dharma.pr_review.mike_fanout.v1",
@@ -2807,6 +3982,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         "packet_only": args.packet_only,
         "limit": args.limit,
         "max_prs": args.max_prs,
+        "blocked_retry_s": getattr(args, "blocked_retry_s", DEFAULT_BLOCKED_RETRY_S),
+        "fanout_offset": getattr(args, "fanout_offset", 0),
         "statuses": statuses,
         "agents": agents,
         "required_reviewers": required_reviewers,
@@ -2947,6 +4124,16 @@ def build_parser() -> argparse.ArgumentParser:
             help="Path to the CI truth contract consumed by packet and merge-gate evaluation.",
         )
 
+    def add_merge_authorization_flag(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--merge-authorization",
+            default="",
+            help=(
+                "Path to a trusted-default-branch policy report containing an "
+                "exact repo/PR/head/base/policy-bound MergeAuthorized permit"
+            ),
+        )
+
     def add_legacy_pending_flag(command: argparse.ArgumentParser) -> None:
         command.add_argument(
             "--allow-pending",
@@ -2991,6 +4178,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(fanout)
     add_backup_reviewer_flags(fanout)
     add_ci_truth_flags(fanout)
+    add_merge_authorization_flag(fanout)
     fanout.add_argument(
         "--packet-only",
         action="store_true",
@@ -3005,6 +4193,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--reprocess-current",
         action="store_true",
         help="Process PRs even when the latest packet/gate already matches the current PR head and status",
+    )
+    fanout.add_argument(
+        "--blocked-retry-s",
+        type=float,
+        default=DEFAULT_BLOCKED_RETRY_S,
+        help=(
+            "Seconds to defer an unchanged BLOCKED packet/gate before retrying "
+            f"(default: {int(DEFAULT_BLOCKED_RETRY_S)})"
+        ),
+    )
+    fanout.add_argument(
+        "--fanout-offset",
+        type=int,
+        default=0,
+        help="Rotate the ordered eligible queue by this offset before bounded selection",
     )
     fanout.add_argument(
         "--merge-mode",
@@ -3053,6 +4256,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(gate)
     add_backup_reviewer_flags(gate)
     add_ci_truth_flags(gate)
+    add_merge_authorization_flag(gate)
     gate.set_defaults(func=cmd_gate)
 
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
@@ -3063,6 +4267,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_reviewer_policy_flags(merge)
     add_backup_reviewer_flags(merge)
     add_ci_truth_flags(merge)
+    add_merge_authorization_flag(merge)
     merge.add_argument(
         "--method", choices=("squash", "merge", "rebase"), default="squash"
     )

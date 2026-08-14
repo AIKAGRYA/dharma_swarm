@@ -68,6 +68,7 @@ def test_json_carries_true_verdict_and_conditions(ops_dir: Path) -> None:
     ids = [row["id"] for row in payload["conditions"]]
     assert ids == sorted(ids)
     assert "receipt_persisted" in ids
+    assert "repository_identity" in ids
 
 
 # --- O3-B8: no repository write in any entry mode ----------------------------
