@@ -87,6 +87,7 @@ EXIT_OK = 0
 EXIT_USAGE = 2
 EXIT_REGISTRY = 3
 EXIT_ROT = 4
+EXIT_CITATION = 5
 
 
 class RegistryError(Exception):
@@ -600,11 +601,17 @@ def run_check(repo_root: Path) -> int:
         except RotError as exc:
             rot_problems.append(str(exc))
 
+    citation_problems, citation_backlog = check_citations(repo_root)
+
     for problem in registry_problems:
         lines.append(f"FAIL registry: {problem}")
     for problem in rot_problems:
         lines.append(f"FAIL transmission: {problem}")
-    if not registry_problems and not rot_problems:
+    for problem in citation_problems:
+        lines.append(f"FAIL citation: {problem}")
+    if citation_backlog:
+        lines.append(f"WARN citation: {citation_backlog}")
+    if not registry_problems and not rot_problems and not citation_problems:
         lines.append(
             f"OK vision registry: {REGISTRY_ROW_COUNT} rows · "
             f"{OPEN_ROW_COUNT} OPEN rows · tier pins T0/T1/T2 verified · "
@@ -616,7 +623,43 @@ def run_check(repo_root: Path) -> int:
         return EXIT_REGISTRY
     if rot_problems:
         return EXIT_ROT
+    if citation_problems:
+        return EXIT_CITATION
     return EXIT_OK
+
+
+def check_citations(repo_root: Path) -> tuple[list[str], str]:
+    """Stage 0 source-fidelity gate, run over the render path.
+
+    Hard failures (BROKEN / DRIFTED / UNPINNABLE) mean a citation points at
+    something that is not there or no longer says what was claimed. UNPINNED
+    and FLAGGED are the migration backlog: reported with a count so the ratchet
+    is visible, not silent, but not yet blocking.
+    """
+    import vision_citations as citations
+
+    try:
+        text = load_artifact(repo_root)
+        for tier in TIERS:
+            tier_slice(text, tier)
+    except (RotError, OSError):
+        # A missing or structurally broken artifact is the rot gate's finding,
+        # not a citation finding; do not mask its typed exit.
+        return [], ""
+    hard: list[str] = []
+    backlog: dict[str, int] = {}
+    for tier in TIERS:
+        findings = citations.audit_text(repo_root, tier_slice(text, tier), tier)
+        for finding in findings:
+            if finding.severity in ("BROKEN", "DRIFTED", "UNPINNABLE"):
+                hard.append(finding.render())
+            else:
+                backlog[finding.severity] = backlog.get(finding.severity, 0) + 1
+    summary = ""
+    if backlog:
+        detail = " · ".join(f"{key} {value}" for key, value in sorted(backlog.items()))
+        summary = f"{detail} — citations resolve but are not yet span-pinned (migration backlog)"
+    return hard, summary
 
 
 def main(argv: list[str] | None = None) -> int:
