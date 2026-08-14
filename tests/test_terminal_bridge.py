@@ -406,9 +406,15 @@ def test_local_preview_is_env_gated_selected_and_strictly_single_lane(
     capsys,
 ) -> None:
     monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
+    monkeypatch.setattr(
+        bridge,
+        "_local_cli_attempt_authorized",
+        lambda provider_id: False,
+    )
 
     try:
         assert "ollama" in bridge._adapters

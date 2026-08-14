@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import os
 from pathlib import Path
-import re
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 
 from dharma_swarm.api_keys import ALL_API_KEY_ENV_KEYS, PROVIDER_BASE_URL_ENV_KEYS
 
@@ -26,6 +24,16 @@ from .base import (
     ProviderAdapter,
     ProviderConfig,
 )
+from .codex_text_codec import (
+    _SAFE_ITEM_TYPES,
+    _SAFE_TOP_LEVEL_EVENTS,
+    _contains_structural_tool_evidence,
+    _decode_provider_event,
+    _extract_message_text,
+    _looks_tool_shaped,
+    _safe_usage as _coerce_usage,
+)
+from .codex_text_process import CodexTextProcessMixin
 from ..events import ErrorEvent, SessionEnd, SessionStart, TextComplete, UsageReport
 
 
@@ -116,53 +124,6 @@ _SUBSCRIPTION_CHILD_ENV_ALLOWLIST = frozenset(
     }
 )
 
-_SAFE_TOP_LEVEL_EVENTS = frozenset(
-    {
-        "thread.started",
-        "turn.started",
-        "item.started",
-        "item.completed",
-        "turn.completed",
-        "error",
-    }
-)
-_SAFE_ITEM_TYPES = frozenset(
-    {
-        "agent_message",
-        "message",
-        "reasoning",
-        "reasoning_summary",
-        "thinking",
-        "error",
-    }
-)
-_TOOL_MARKERS = (
-    "command",
-    "computer",
-    "exec",
-    "function_call",
-    "image",
-    "mcp",
-    "shell",
-    "tool",
-    "web_search",
-    "browser",
-    "apply_patch",
-)
-_STRUCTURAL_DISCRIMINATORS = frozenset(
-    {
-        "event",
-        "finish_reason",
-        "kind",
-        "native_finish_reason",
-        "object",
-        "stop_reason",
-        "stopreason",
-        "type",
-    }
-)
-_MAX_EVENT_NODES = 4096
-
 
 class _RequestRejected(ValueError):
     """Internal marker for a request outside the sealed text-only contract."""
@@ -176,78 +137,11 @@ def _capability_names(capabilities: Capability) -> list[str]:
     ]
 
 
-def _looks_tool_shaped(label: object) -> bool:
-    normalized = _normalize_structural_label(label)
-    return any(marker in normalized for marker in _TOOL_MARKERS)
-
-
-def _normalize_structural_label(label: object) -> str:
-    value = str(label or "").strip()
-    value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value)
-    value = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", value)
-    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
-
-
-def _contains_structural_tool_evidence(value: object) -> bool:
-    """Reject nested tool structure without interpreting ordinary text."""
-
-    pending: list[object] = [value]
-    seen = 0
-    while pending:
-        current = pending.pop()
-        seen += 1
-        if seen > _MAX_EVENT_NODES:
-            return True
-        if isinstance(current, dict):
-            for raw_key, child in current.items():
-                key = _normalize_structural_label(raw_key)
-                if _looks_tool_shaped(key):
-                    return True
-                if key in _STRUCTURAL_DISCRIMINATORS and _looks_tool_shaped(child):
-                    return True
-                if isinstance(child, (dict, list)):
-                    pending.append(child)
-        elif isinstance(current, list):
-            pending.extend(current)
-    return False
-
-
-def _extract_message_text(item: dict[str, Any]) -> str:
-    text = item.get("text")
-    if isinstance(text, str):
-        return text
-    content = item.get("content")
-    if isinstance(content, str):
-        return content
-    if not isinstance(content, list):
-        return ""
-    chunks: list[str] = []
-    for part in content:
-        if isinstance(part, str):
-            chunks.append(part)
-        elif isinstance(part, dict) and isinstance(part.get("text"), str):
-            chunks.append(part["text"])
-    return "".join(chunks)
-
-
-def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate provider JSON key")
-        result[key] = value
-    return result
-
-
-class CodexTextAdapter(ProviderAdapter):
+class CodexTextAdapter(CodexTextProcessMixin, ProviderAdapter):
     """Run one exact model through Codex CLI with no executable authority."""
 
     provider_id = "codex_text"
-    _READ_CHUNK_SIZE = 64 * 1024
-    _MAX_PENDING_EVENT_BYTES = 8 * 1024 * 1024
-    _MAX_TOTAL_STDOUT_BYTES = 16 * 1024 * 1024
-    _MAX_ASSISTANT_BYTES = 4 * 1024 * 1024
-    _CANCEL_GRACE_SECONDS = 5.0
+    _safe_usage = staticmethod(_coerce_usage)
 
     def __init__(
         self,
@@ -332,18 +226,8 @@ class CodexTextAdapter(ProviderAdapter):
                 if not raw_line:
                     continue
                 try:
-                    raw = json.loads(
-                        raw_line,
-                        object_pairs_hook=_unique_json_object,
-                    )
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    failure = (
-                        "malformed_provider_event",
-                        "Codex text lane rejected malformed provider output.",
-                    )
-                    await self._terminate_process(process)
-                    break
-                if not isinstance(raw, dict):
+                    raw = _decode_provider_event(raw_line)
+                except (TypeError, ValueError):
                     failure = (
                         "malformed_provider_event",
                         "Codex text lane rejected malformed provider output.",
@@ -570,113 +454,6 @@ class CodexTextAdapter(ProviderAdapter):
             key: value
             for key, value in environment.items()
             if key in _SUBSCRIPTION_CHILD_ENV_ALLOWLIST
-        }
-
-    async def _spawn_process(
-        self,
-        command: list[str],
-        environment: dict[str, str],
-    ) -> asyncio.subprocess.Process:
-        return await asyncio.create_subprocess_exec(
-            *command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(self._workdir),
-            env=environment,
-        )
-
-    async def _write_prompt(
-        self,
-        process: asyncio.subprocess.Process,
-        prompt: bytes,
-    ) -> None:
-        if process.stdin is None:
-            raise RuntimeError("Codex text subprocess stdin is unavailable")
-        process.stdin.write(prompt)
-        await process.stdin.drain()
-        process.stdin.close()
-        wait_closed = getattr(process.stdin, "wait_closed", None)
-        if callable(wait_closed):
-            with contextlib.suppress(Exception):
-                await wait_closed()
-
-    async def _iter_stdout_lines(
-        self,
-        process: asyncio.subprocess.Process,
-    ) -> AsyncIterator[str]:
-        if process.stdout is None:
-            return
-        pending = bytearray()
-        total_bytes = 0
-        while True:
-            chunk = await process.stdout.read(self._READ_CHUNK_SIZE)
-            if not chunk:
-                break
-            total_bytes += len(chunk)
-            if total_bytes > self._MAX_TOTAL_STDOUT_BYTES:
-                raise ValueError("Codex text provider output exceeded the total limit")
-            pending.extend(chunk)
-            while True:
-                newline = pending.find(b"\n")
-                if newline < 0:
-                    break
-                if newline > self._MAX_PENDING_EVENT_BYTES:
-                    raise ValueError(
-                        "Codex text provider event exceeded the buffer limit"
-                    )
-                raw = bytes(pending[:newline])
-                del pending[: newline + 1]
-                yield raw.decode("utf-8", errors="strict")
-            if len(pending) > self._MAX_PENDING_EVENT_BYTES:
-                raise ValueError("Codex text provider event exceeded the buffer limit")
-        if pending:
-            if len(pending) > self._MAX_PENDING_EVENT_BYTES:
-                raise ValueError("Codex text provider event exceeded the buffer limit")
-            yield pending.decode("utf-8", errors="strict")
-
-    async def _discard_stderr(self, process: asyncio.subprocess.Process) -> None:
-        if process.stderr is None:
-            return
-        while True:
-            try:
-                chunk = await process.stderr.read(self._READ_CHUNK_SIZE)
-            except TypeError:
-                chunk = await process.stderr.read()
-            if not chunk:
-                return
-
-    async def _terminate_process(self, process: asyncio.subprocess.Process) -> None:
-        if process.returncode is not None:
-            return
-        with contextlib.suppress(ProcessLookupError):
-            process.terminate()
-        try:
-            await asyncio.wait_for(
-                process.wait(),
-                timeout=self._CANCEL_GRACE_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
-            with contextlib.suppress(Exception):
-                await process.wait()
-
-    @staticmethod
-    def _safe_usage(raw: object) -> dict[str, int] | None:
-        if not isinstance(raw, dict):
-            return None
-
-        def as_nonnegative_int(value: object) -> int:
-            try:
-                return max(0, int(value or 0))
-            except (TypeError, ValueError):
-                return 0
-
-        return {
-            "input_tokens": as_nonnegative_int(raw.get("input_tokens")),
-            "output_tokens": as_nonnegative_int(raw.get("output_tokens")),
-            "cache_read_tokens": as_nonnegative_int(raw.get("cached_input_tokens")),
         }
 
     async def _failure_events(
