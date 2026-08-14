@@ -1,0 +1,103 @@
+{
+  "id": "WP-CODEX-PR-LOOP-20260814",
+  "base_ref": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+  "branch": "codex/pr-convergence-planner-20260815",
+  "worktree": ".",
+  "intent": "Persist the pure, advisory action-planning layer for the active native Codex PR convergence goal. Classify exact-head snapshots into bounded wait, review-request, transient-rerun, stranded-refresh, repair, queue-candidate, operator-exception, and operator-cancelled states; cap the projected operator inbox at five; and keep every emitted action explicitly non-authoritative. Do not enable Mike, mutate GitHub, create a scheduler or receipt store, or inhabit merge authority.",
+  "allowed_files": [
+    "reports/agentops/work_packets/WP-CODEX-PR-LOOP-20260814.json",
+    "scripts/runtime/pr_convergence_policy.py",
+    "tests/test_pr_convergence_policy.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/governance/**",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/reviewer_quorum_repair.py",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json",
+    "terminal/**",
+    "tools/**"
+  ],
+  "gates": [
+    {
+      "name": "convergence-planner-tests",
+      "command": "python3 -m pytest tests/test_pr_convergence_policy.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "convergence-planner-ruff",
+      "command": "python3 -m ruff check scripts/runtime/pr_convergence_policy.py tests/test_pr_convergence_policy.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "empty-test-selection-stays-red",
+      "command": "python3 -m pytest tests/test_pr_convergence_policy.py -q -k nonexistent_test_ever",
+      "expected_exit": 5,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(merge): type Codex convergence actions"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-CODEX-PR-LOOP",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+      "details": []
+    },
+    "interface_mismatches": [
+      "pr_convergence_policy.py is an existing advisory helper invoked by the Mike daemon but is not named in any active-track owned_surfaces glob; this packet changes only that unowned pure helper and its dedicated test.",
+      "The native Codex goal is the reasoning/execution plane; this pure planner is only an audited projection and must never be described as an autonomous agent.",
+      "The live automerge and router workflows remain disabled and current Mike merge authority remains uninhabited."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/pr_convergence_policy.py",
+      "scripts/governance/pr_ci_health.py",
+      "scripts/runtime/walking_brief.py"
+    ],
+    "honest_blockers": [
+      "Automatic native-queue admission remains a responsibility of the active Codex goal until an authenticated, separately reviewed executor exists.",
+      "High-risk, operator-only, ambiguous, or manually cancelled PRs remain outside unattended authority."
+    ],
+    "rollback": "revert the planner commit; the native Codex goal and GitHub merge queue remain independently fail-closed",
+    "packet_digest": "81f60f7eef2662ea45398d3f264d207e26a7e9240fe3ce642c5c26a7a209b1b9"
+  }
+}
