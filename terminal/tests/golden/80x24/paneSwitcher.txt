@@ -1,9 +1,13 @@
- ◆ DHARMA  ·  Chat  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear
-[Chat] Mission Repo Commands Models Ontology ▸
+ ◆ DHARMA HELM  /  CONVERSATION  ·  ds_nihonga_helm_frontier_20260814
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]
+────────────────────────────────────────────────────────────────────────────────
+ · Home · ◆ Conv · · Acti · · Evid · · Syst
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
+OVERLAY / TEMPORARY
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Pane Switcher                                                                │
-│ rows 1-10 of 15 | Enter jump | Esc close | j/k or arrows move                │
+│ rows 1-6 of 15 | Enter jump | Esc close | j/k or arrows move                 │
 │                                                                              │
 │ ▶ 1. Chat · chat                                                             │
 │ • 2. Mission · mission                                                       │
@@ -11,13 +15,9 @@
 │ • 4. Commands · commands                                                     │
 │ • 5. Models · models                                                         │
 │ • 6. Ontology · ontology                                                     │
-│ • 7. Runtime · runtime                                                       │
-│ • 8. Sessions · sessions                                                     │
-│ • 9. Approvals · approvals                                                   │
-│ • 10. Control · control                                                      │
-│                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated idle
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯

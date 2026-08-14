@@ -133,8 +133,31 @@ Workflows: 1
       [],
     );
 
-    expect(sections[0]?.rows[0]).toBe("Authority placeholder | bridge offline | awaiting authoritative repo refresh");
-    expect(sections[1]?.rows[0]).toBe("Authority placeholder | bridge offline | awaiting authoritative repo refresh");
+    expect(sections[0]?.rows[0]).toBe("Repo authority placeholder | bridge offline | awaiting authoritative repo refresh");
+    expect(sections[1]?.rows[0]).toBe("Repo authority placeholder | bridge offline | awaiting authoritative repo refresh");
+  });
+
+  test("keeps repo and correlated control authority explicit", () => {
+    const sections = buildRepoPaneSections(
+      {
+        Authority: "placeholder | awaiting authoritative repo refresh",
+        "Repo root": REPO_ROOT,
+        Branch: "main",
+        Head: "95210b1",
+      },
+      [],
+      {
+        Authority: "resyncing | awaiting authoritative control refresh",
+        "Runtime DB": "/tmp/runtime.db",
+        "Loop state": "cycle 4 running",
+      },
+      [],
+    );
+
+    expect(sections[0]?.rows.slice(0, 2)).toEqual([
+      "Repo authority placeholder | awaiting authoritative repo refresh",
+      "Control authority resyncing | awaiting authoritative control refresh",
+    ]);
   });
 
   test("prefers an explicit repo truth preview over recomputing snapshot truth rows", () => {

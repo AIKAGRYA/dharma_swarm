@@ -1,6 +1,9 @@
- ◆ DHARMA  ·  Commands  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear
-◂ Mission Repo [Commands] Models Ontology Runtime ▸
+ ◆ DHARMA HELM  /  SYSTEM  ·  ds_nihonga_helm_frontier_20260814
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]
+────────────────────────────────────────────────────────────────────────────────
+ · Home · · Conv · · Acti · · Evid · ◆ Syst
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Commands                                                                     │
 │ Registered command graph and operational affordances.                        │
@@ -13,11 +16,8 @@
 │                                                                              │
 │                                                                              │
 │                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated idle
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯

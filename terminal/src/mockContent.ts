@@ -12,8 +12,8 @@ export function buildInitialTabs(): TabSpec[] {
       kind: "chat",
       lines: [
         // FACE-1 zen-pure welcome: at most 2 short dim lines (thinking kind = dim).
-        line("boot-1", "thinking", "Dharma Terminal"),
-        line("boot-2", "thinking", "Type a message below · F2 opens the cockpit"),
+        line("boot-1", "thinking", "Dharma Helm · Quiet Field"),
+        line("boot-2", "thinking", "Type a message below · F2 unfolds the Whole Helm"),
       ],
     },
     {

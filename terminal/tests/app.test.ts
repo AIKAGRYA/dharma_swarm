@@ -977,46 +977,31 @@ describe("snapshotActionsForBridgeEvent", () => {
       stdin.write("\u0012");
       await flushRender();
 
-      const bootState = createInitialAppState(initialState);
-      const expectedRepoRows = [
+      // Panorama interleaves wrapped rows from its 45/35/20 planes in the
+      // terminal raster. Assert the restored owner-truth atoms, not the old
+      // single-pane line layout that Nihonga intentionally replaced.
+      const expectedVisibleTruth = [
         "Operator Snapshot",
         "Snapshot",
-        "Git main@95210b1 | high (552 local changes) | sync tracking origin/main in sync",
-        "Snapshot branch main@95210b1 | tracking origin/main in sync",
-        "Snapshot dirty high (552 local changes) | staged 0 | unstaged 510 | untracked 42",
-        "Snapshot topology degraded (1 warning, 2 peers) | warnings 1 (sab_canonical_repo_missing)",
-        "Snapshot hotspots change terminal (274)",
-        "Snapshot hotspot pressure change terminal (274)",
-        "Task terminal-repo-pane | complete/fail | tsc=ok",
+        "Git main@95210b1",
+        "552 local changes",
+        "origin/main in sync",
+        "staged 0",
+        "unstaged 510",
+        "untracked 42",
+        "sab_canonical_repo_missing",
+        "terminal (274)",
+        "terminal-repo-pane",
+        "cycle 4",
+        "cycle_acceptance",
+        "Sessions=18",
+        "Runs=0",
       ];
-      const expectedSidebarLines = buildVisibleContextSidebarLines(
-        bootState.tabs,
-        "Repo",
-        bootState.provider,
-        bootState.model,
-        bootState.bridgeStatus,
-        {...bootstrapWorkspacePreview, Authority: "placeholder | bridge booting | awaiting authoritative repo refresh"},
-        {...bootstrapRuntimePreview, Authority: "placeholder | bridge booting | awaiting authoritative control refresh"},
-      ).filter((line) =>
-        [
-          "Repo Preview",
-          "Control Preview",
-          "Authority placeholder | bridge booting | awaiting authoritative repo refresh",
-          "Authority placeholder | bridge booting | awaiting authoritative control refresh",
-          "Branch main@95210b1",
-          "Outcome complete | accept fail",
-          "Runtime /Users/dhyana/.dharma/state/runtime.db",
-          "Loop cycle 4 running | continue required",
-        ].includes(line),
-      );
       const normalized = normalizeTerminalText(rendered);
 
       expect(sentMessages.map((message) => message.type).filter((type) => type === "handshake").length).toBeLessThanOrEqual(1);
-      for (const row of expectedRepoRows) {
-        expect(normalized).toContain(normalizeTerminalText(row));
-      }
-      for (const line of expectedSidebarLines) {
-        expect(normalized).toContain(normalizeTerminalText(line));
+      for (const token of expectedVisibleTruth) {
+        expect(normalized).toContain(normalizeTerminalText(token));
       }
     } finally {
       instance.unmount();
@@ -1071,17 +1056,19 @@ describe("snapshotActionsForBridgeEvent", () => {
       const normalized = normalizeTerminalText(rendered);
 
       for (const row of [
-        "Control",
         "Runtime",
         "Runtime Signal",
-        "Loop cycle 4 running | continue required | 2026-04-01T00:00:00Z",
-        "Verification 1 failing, 3/4 passing | failing cycle_acceptance",
+        "Loop cycle 4",
+        "continue required",
+        "Verification",
+        "cycle_acceptance",
         "Overview",
-        "Loop cycle 4 running | 3 done, 1 pending of 4 | terminal-repo-pane",
-        "Decision continue required | Add an app-level bootstrap/refresh snapshot test.",
+        "terminal-repo-pane",
+        "Add an app-level bootstrap/refresh snapshot test.",
         "selected runtime card",
-        "State /Users/dhyana/.dharma/terminal_supervisor/terminal-20260401T034429Z/state",
-        "Runtime 18 sessions | 0 runs",
+        "terminal-20260401T034429Z/state",
+        "18 sessions",
+        "0 runs",
       ]) {
         expect(normalized).toContain(normalizeTerminalText(row));
       }
@@ -11069,15 +11056,18 @@ Workflows: 1
 
       expect(sentMessages.every((message) => message.type === "handshake")).toBe(true);
       for (const line of [
-        "Repo Preview",
-        "Control Preview",
-        "Authority placeholder | bridge booting | awaiting authoritative repo refresh",
-        "Authority placeholder | bridge booting | awaiting authoritative control refresh",
-        "Branch divergence local +2/-0 | peer dharma_swarm drift main...origin/main",
-        "Detached peers dgc-core detached",
-        "Loop cycle 6 running | continue required",
-        "Verify tsc=ok",
-        "Next Hydrate control preview from runtime state.",
+        "Operator Snapshot",
+        "Repo authority placeholder",
+        "Control authority placeholder",
+        "main@804d5d1",
+        "local +2/-0",
+        "dharma_swarm",
+        "dgc-core",
+        "detached",
+        "cycle 6",
+        "tsc=ok",
+        "Hydrate control preview",
+        "/Users/dhyana/.dharma/state/runtime.db",
       ]) {
         expect(normalized).toContain(normalizeTerminalText(line));
       }
@@ -11378,11 +11368,16 @@ Workflows: 1
 
       expect(sentMessages.every((message) => message.type === "handshake")).toBe(true);
       for (const line of [
-        "Repo Preview",
-        "Lead peer dharma_swarm (canonical_core, main...origin/main, dirty True)",
-        "Pressure dharma_swarm Δ563 (517 modified, 46 untracked)",
-        "Pressure preview 1 warning | dharma_swarm Δ563 (517 modified, 46 untracked)",
-        "Branch divergence local +0/-0 | peer dharma_swarm track main...origin/main",
+        "Operator Snapshot",
+        "Lead peer",
+        "dharma_swarm",
+        "canonical_core",
+        "main...origin/main",
+        "563",
+        "517 modified",
+        "46 untracked",
+        "local +0/-0",
+        "terminal (274)",
       ]) {
         expect(normalized).toContain(normalizeTerminalText(line));
       }

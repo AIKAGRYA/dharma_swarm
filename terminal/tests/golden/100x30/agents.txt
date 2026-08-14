@@ -1,29 +1,29 @@
- ◆ DHARMA COMMAND POST  ·  Agents  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Approvals Control [Agents] Evolution Thinking Tools ▸
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Agents                                                                                           │
-│ route profiles and execution posture | j/k or ↑/↓ select route                                   │
-│                                                                                                  │
-│  Routes                            Route brief                                                   │
-│  typed routing intents             selected route plus OpenClaw envelope                         │
-│  No typed agent routes yet.        No selected route.                                            │
-│                                    OpenClaw                                                      │
-│                                    present n/a | readable n/a                                    │
-│                                    agents n/a | providers n/a                                    │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                 100×30 · standard
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ · Home   · Conversation   ◆ Activity   · Evidence   · System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
+┌────────────────────────────────────────┐CONTEXT / ORGANISM
+│ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
+│  Dharma Helm · Quiet Field             ││ Agents                                                 │
+│  Type a message below · F2 unfolds     ││ route profiles and execution posture | j/k or ↑/↓      │
+│  the Whole Helm                        ││ select route                                           │
+│                                        ││                                                        │
+│                                        ││  Routes              Route brief                       │
+│                                        ││  typed routing       selected route plus OpenClaw      │
+│                                        ││  intents             envelope                          │
+│                                        ││  No typed agent      No selected route.                │
+│                                        ││  routes yet.         OpenClaw                          │
+│                                        ││                      present n/a | readable n/a        │
+│                                        ││                      agents n/a | providers n/a        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+└────────────────────────────────────────┘╰────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                     idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
