@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
   merge_group:
+    types: [checks_requested]
   schedule:
     # Weekly freshness check for docs/docops/assertions.yaml ttl_days.
     - cron: "37 12 * * 1"
@@ -23,10 +24,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout exact event head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -34,26 +37,85 @@ jobs:
           python-version: "3.11"
 
       - name: Run DocOps gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_CHANGE_CANDIDATE: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           mkdir -p reports/docops
 
           # Generated counts (SOVEREIGN_MANIFEST assertions + AUTO_INVENTORY
-          # auto-sections) are advisory on PRs: PRs no longer hand-commit them,
-          # and docops-reconcile-main.yml reconciles them after each merge
-          # (direct push with the bypass token, else a rolling bot PR). Every
-          # other DocOps check (path guards, canonical guard, TTL staleness,
-          # auto-section config, doc review) stays strict everywhere.
+          # auto-sections) are advisory on PR and merge-group candidates: PRs
+          # no longer hand-commit them, and docops-reconcile-main.yml
+          # reconciles them after each merge (direct push with the bypass
+          # token, else a rolling bot PR). Every other DocOps check (path
+          # guards, canonical guard, TTL staleness, auto-section config, doc
+          # review) stays strict everywhere.
           #
           # The weekly schedule / manual dispatch run against main is STRICT on
           # counts: it is the floor that catches a rotted reconcile loop. (The
           # pre-2026-07-03 all-advisory version let main's counts stay stale for
           # weeks while the reconcile push was silently rejected 102 times.)
+          validate_sha() {
+            local label="$1"
+            local sha="$2"
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error::${label} is not an exact 40-character commit SHA"
+              exit 2
+            fi
+            if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$sha"
+            fi
+            git cat-file -e "${sha}^{commit}"
+          }
+
           args=(--report-json reports/docops/check.json)
-          if [ -n "${GITHUB_BASE_REF:-}" ]; then
-            args+=(--counts-advisory)
-            git fetch origin "${GITHUB_BASE_REF}" --depth=1
-            args+=(--changed-from "origin/${GITHUB_BASE_REF}")
+          event_base=""
+          event_head=""
+          expected_candidate="false"
+          case "$EVENT_NAME" in
+            pull_request)
+              event_base="$PR_BASE_SHA"
+              event_head="$PR_HEAD_SHA"
+              expected_candidate="true"
+              ;;
+            merge_group)
+              event_base="$MERGE_GROUP_BASE_SHA"
+              event_head="$MERGE_GROUP_HEAD_SHA"
+              expected_candidate="true"
+              ;;
+            schedule|workflow_dispatch)
+              # Main audits remain strict on generated counts.
+              ;;
+            *)
+              echo "::error::Unsupported DocOps event ${EVENT_NAME}"
+              exit 2
+              ;;
+          esac
+
+          if [ "$IS_CHANGE_CANDIDATE" != "$expected_candidate" ]; then
+            echo "::error::event classifier disagrees with ${EVENT_NAME}"
+            exit 2
+          fi
+
+          if [ -n "$event_base" ]; then
+            validate_sha event_base "$event_base"
+            validate_sha event_head "$event_head"
+            actual_head="$(git rev-parse HEAD)"
+            if [ "$actual_head" != "$event_head" ]; then
+              echo "::error::checkout HEAD ${actual_head} does not match event head ${event_head}"
+              exit 2
+            fi
+            if [ "$EVENT_NAME" = "merge_group" ] \
+                && ! git merge-base --is-ancestor "$event_base" "$event_head"; then
+              echo "::error::merge-group base ${event_base} is not an ancestor of ${event_head}"
+              exit 2
+            fi
+            args+=(--counts-advisory --changed-from "$event_base")
           fi
 
           python3 scripts/docops/check_docops_integrity.py "${args[@]}"

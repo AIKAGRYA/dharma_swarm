@@ -673,7 +673,7 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
                 "view",
                 str(pr_number),
                 "--repo",
-                "AmitabhainArunachala/dharma_swarm",
+                "AIKAGRYA/dharma_swarm",
                 "--json",
                 "state,mergedAt",
             ],

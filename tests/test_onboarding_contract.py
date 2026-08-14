@@ -113,7 +113,7 @@ def _valid_v1() -> dict[str, Any]:
 def _stable_core() -> dict[str, Any]:
     return {
         "repository": {
-            "identity": "AmitabhainArunachala/dharma_swarm",
+            "identity": "AIKAGRYA/dharma_swarm",
             "head": "1" * 40,
             "branch": "test/onboarding-contract",
         },
@@ -379,6 +379,14 @@ def test_timestamp_live_delta_and_previous_digest_do_not_change_stable_digest(
     monkeypatch.setattr(receipt, "stable_digest", mandated_primitive)
     assert receipt.compute_stable_digest(baseline["stable_core"]) == "primitive-was-used"
     assert calls == [baseline["stable_core"]]
+
+
+def test_stable_core_repository_shape_remains_exact() -> None:
+    from dharma_swarm.operator_core.onboarding import evidence
+
+    repository = evidence.collect_stable_core()["repository"]
+    assert set(repository) == {"identity", "head", "branch"}
+    assert repository["identity"] == "AIKAGRYA/dharma_swarm"
 
 
 def test_ops_dir_inside_repo_and_symlink_escape_are_config_error(
