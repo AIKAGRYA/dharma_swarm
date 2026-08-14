@@ -3,7 +3,7 @@ title: "Karpathy Wiki Pattern — local conformance"
 confidence: 0.90
 sources:
   - https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
-  - /Users/dhyana/ds_karpathy_wiki_metabolism_20260815/reports/wiki/sources/2026-08-15-chetana-compiler-audit.md
+  - https://github.com/AIKAGRYA/dharma_swarm/blob/3b0f0bacafe2adb4ccecc8111851d12a5ebcb35f/reports/wiki/sources/2026-08-15-chetana-compiler-audit.md
 stale_after: "2026-09-15"
 related:
   - karpathy-llm-wiki
