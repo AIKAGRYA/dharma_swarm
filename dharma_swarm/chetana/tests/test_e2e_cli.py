@@ -8,6 +8,7 @@ touching the operator's real wiki or staging.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import subprocess
@@ -29,7 +30,11 @@ def cli_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(home))
     from dharma_swarm.dharma_kernel import DharmaKernel, KernelGuard
 
-    asyncio.run(KernelGuard(home / ".dharma" / "kernel.json").save(DharmaKernel.create_default()))
+    asyncio.run(
+        KernelGuard(home / ".dharma" / "kernel.json").save(
+            DharmaKernel.create_default()
+        )
+    )
     return home
 
 
@@ -69,9 +74,180 @@ def test_cli_help_shows_all_subcommands(cli_home: Path):
         "palace",
         "query",
         "cross-update",
+        "compile",
+        "backlinks",
         "status",
     ]:
         assert sub in proc.stdout, f"subcommand {sub} missing from --help"
+
+
+def test_cli_compile_is_dry_run_by_default_and_apply_is_explicit(
+    cli_home: Path, tmp_path: Path
+):
+    wiki = tmp_path / "wiki"
+    page = wiki / "concepts" / "metric.md"
+    page.parent.mkdir(parents=True)
+    page.write_text("AUROC 0.909\n", encoding="utf-8")
+    source = tmp_path / "ledger.md"
+    source.write_text("C05: AUROC 0.904\n", encoding="utf-8")
+
+    def digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "schema_version": "chetana.integration.v2",
+                "plan_id": "e2e-c05-correction",
+                "sources": [
+                    {
+                        "evidence_id": "ledger",
+                        "path": str(source),
+                        "sha256": digest(source),
+                        "observed_at": "2025-01-01T01:00:00+09:00",
+                        "declared_authority": "canonical-ledger",
+                        "declared_verifier": "e2e exact replacement",
+                        "claims": [{"claim_id": "C05", "locator": "C05"}],
+                    }
+                ],
+                "rationale": "Propagate an authoritative correction.",
+                "pages": [
+                    {
+                        "path": "concepts/metric.md",
+                        "expected_sha256": digest(page),
+                        "operations": [
+                            {
+                                "mode": "correct",
+                                "claim_bindings": [
+                                    {"evidence_id": "ledger", "claim_id": "C05"}
+                                ],
+                                "old": "0.909",
+                                "new": "0.904",
+                                "expected_count": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    dry = _run(
+        [
+            "compile",
+            str(plan),
+            "--wiki-root",
+            str(wiki),
+            "--canonical-ledger-root",
+            str(tmp_path),
+            "--show-diff",
+        ],
+        home=cli_home,
+    )
+    assert dry.returncode == 0, dry.stderr
+    assert "DRY-RUN" in dry.stdout
+    assert "+AUROC 0.904" in dry.stdout
+    assert page.read_text(encoding="utf-8") == "AUROC 0.909\n"
+
+    applied = _run(
+        [
+            "compile",
+            str(plan),
+            "--wiki-root",
+            str(wiki),
+            "--apply",
+            "--reviewer",
+            "operator",
+            "--canonical-ledger-root",
+            str(tmp_path),
+        ],
+        home=cli_home,
+    )
+    assert applied.returncode == 0, applied.stderr
+    assert "APPLIED" in applied.stdout
+    assert page.read_text(encoding="utf-8") == "AUROC 0.904\n"
+    assert "claim_ids: C05" in (wiki / "log.md").read_text(encoding="utf-8")
+
+
+def test_cli_backlinks_applies_only_the_selected_custom_root_page(
+    cli_home: Path, tmp_path: Path
+) -> None:
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    source = wiki / "source.md"
+    target = wiki / "target.md"
+    source.write_text("# Source\n\n[[target]]\n", encoding="utf-8")
+    target.write_text("# Target\n", encoding="utf-8")
+
+    applied = _run(
+        [
+            "backlinks",
+            "--root",
+            str(wiki),
+            "--page",
+            "target.md",
+            "--apply",
+        ],
+        home=cli_home,
+    )
+
+    assert applied.returncode == 0, applied.stderr
+    assert "APPLIED" in applied.stdout
+    assert "pages_written: 1" in applied.stdout
+    assert "[[source]]" in target.read_text(encoding="utf-8")
+    assert "BACKLINKS_BEGIN" not in source.read_text(encoding="utf-8")
+
+
+def test_cli_backlinks_refuses_unreviewed_bulk_apply_over_25_pages(
+    cli_home: Path, tmp_path: Path
+) -> None:
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    targets: list[Path] = []
+    for index in range(26):
+        (wiki / f"source-{index}.md").write_text(
+            f"# Source {index}\n\n[[target-{index}]]\n", encoding="utf-8"
+        )
+        target = wiki / f"target-{index}.md"
+        target.write_text(f"# Target {index}\n", encoding="utf-8")
+        targets.append(target)
+
+    refused = _run(
+        ["backlinks", "--root", str(wiki), "--apply"],
+        home=cli_home,
+    )
+
+    assert refused.returncode == 2
+    assert "25-page migration limit" in refused.stderr
+    assert all("BACKLINKS_BEGIN" not in target.read_text() for target in targets)
+
+
+def test_cli_backlinks_refuses_scoped_apply_over_25_pages(
+    cli_home: Path, tmp_path: Path
+) -> None:
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    selected: list[str] = []
+    targets: list[Path] = []
+    for index in range(26):
+        (wiki / f"source-{index}.md").write_text(
+            f"# Source {index}\n\n[[target-{index}]]\n", encoding="utf-8"
+        )
+        target = wiki / f"target-{index}.md"
+        target.write_text(f"# Target {index}\n", encoding="utf-8")
+        targets.append(target)
+        selected.extend(["--page", target.name])
+
+    refused = _run(
+        ["backlinks", "--root", str(wiki), *selected, "--apply"],
+        home=cli_home,
+    )
+
+    assert refused.returncode == 2
+    assert "25-page migration limit" in refused.stderr
+    assert all("BACKLINKS_BEGIN" not in target.read_text() for target in targets)
 
 
 def test_cli_ingest_then_status(cli_home: Path):
@@ -79,10 +255,14 @@ def test_cli_ingest_then_status(cli_home: Path):
         [
             "ingest",
             "this is an inline note",
-            "--kind", "note",
-            "--title", "CLI ingest test",
-            "--confidence", "0.7",
-            "--captured-by", "cli-e2e-test",
+            "--kind",
+            "note",
+            "--title",
+            "CLI ingest test",
+            "--confidence",
+            "0.7",
+            "--captured-by",
+            "cli-e2e-test",
         ],
         home=cli_home,
     )
@@ -101,10 +281,14 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
         [
             "ingest",
             "Strange loops emerge from tangled hierarchies in transformer self-attention.",
-            "--kind", "note",
-            "--title", "E2E pipeline atom",
-            "--tag", "consciousness",
-            "--tag", "hofstadter",
+            "--kind",
+            "note",
+            "--title",
+            "E2E pipeline atom",
+            "--tag",
+            "consciousness",
+            "--tag",
+            "hofstadter",
         ],
         home=cli_home,
     )
@@ -189,7 +373,9 @@ def test_cli_full_pipeline_ingest_promote_decay_revive(cli_home: Path):
     assert "E2E pipeline atom" in p6.stdout
 
     # 7. REVIVE --all --apply — atom rewritten with revival_chain
-    p7 = _run(["revive", "--all", "--apply", "--reviewer", "cli-revival"], home=cli_home)
+    p7 = _run(
+        ["revive", "--all", "--apply", "--reviewer", "cli-revival"], home=cli_home
+    )
     assert p7.returncode == 0, p7.stderr
 
     # 8. Verify revival_chain in the trusted atom's frontmatter

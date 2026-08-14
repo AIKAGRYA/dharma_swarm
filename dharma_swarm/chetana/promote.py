@@ -19,9 +19,9 @@ Every promote call:
    11. Returns PromoteResult with paths + decision.
 
 approve_atom() is the ONLY door into the trusted projection: it flips
-review_status to 'approved', re-signs (v2 covers review_status), moves the file
-from pending/staging into concepts/, and only then runs cross-update + the
-vector auto-ingest (scoped to the approved file).
+review_status to 'approved', re-signs (v2 covers review_status), and commits the
+page move + backlinks + index + log in one transaction. Only after that durable
+boundary does it run the vector auto-ingest (scoped to the approved file).
 """
 
 from __future__ import annotations
@@ -32,10 +32,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import staging as staging_mod
-from .cross_update import cross_update_trusted
+from .cross_update import cross_update_trusted, integrate_approved_atom
 from .governance import current_kernel_signature, gate_check_atom
 from .promote_support import (
-    _admit_to_manifest,
     _auto_ingest_file,
     _require_staged_path,
     _resign_v2,
@@ -193,7 +192,12 @@ def promote(
     emit_mark(
         action="chetana.promote",
         content=f"{schema.title} | {result.decision}",
-        connections=["chetana", "promote", schema.type, result.review_status or "staged"],
+        connections=[
+            "chetana",
+            "promote",
+            schema.type,
+            result.review_status or "staged",
+        ],
         salience=schema.confidence,
     )
 
@@ -208,7 +212,7 @@ def promote(
 
 @dataclass
 class ApproveResult:
-    decision: str  # APPROVED | ALREADY_APPROVED | REJECTED_PRIOR | BAD_STATE | NOT_FOUND | NEEDS_PROMOTE | PARSE_ERROR | SIGNATURE_MISMATCH | GATE_BLOCKED | COLLISION
+    decision: str  # APPROVED | ALREADY_APPROVED | REJECTED_PRIOR | BAD_STATE | NOT_FOUND | NEEDS_PROMOTE | PARSE_ERROR | SIGNATURE_MISMATCH | GATE_BLOCKED | COLLISION | INTEGRATION_BLOCKED
     trusted_path: Path | None = None
     prior_status: str | None = None
     reviewer: str | None = None
@@ -219,15 +223,15 @@ class ApproveResult:
 def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
     """Human-explicit approval — the ONLY door into the trusted projection.
 
-    Accepts a pending atom (wiki/pending/), a staged-with-provenance atom, or
-    an already-trusted atom whose review_status is staged|auto_promoted.
+    Accepts a pending atom (wiki/pending/) or an already-trusted atom whose
+    review_status is staged|auto_promoted.
     Before flipping anything it re-verifies the promote-time v2 signature
     (pending files are agent-writable — a body edited after promote must not
     ride an operator's approval into trusted) and re-runs the telos gates on
     the bytes actually being approved. Then it flips review_status →
     'approved', re-signs with v2 (which covers review_status), moves the file
-    into the trusted dir, then runs cross-update + the (env-gated) vector
-    auto-ingest scoped to this file.
+    into the trusted dir in the same anchored transaction as backlinks, index,
+    and log. The (env-gated) vector ingest runs only after that transaction.
     """
     if not reviewer or not str(reviewer).strip():
         return ApproveResult(
@@ -250,7 +254,24 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
                 target = candidates[0]
     if not target.exists():
         return ApproveResult(decision="NOT_FOUND", error=f"{path} not found")
+    if target.is_symlink():
+        return ApproveResult(
+            decision="BAD_STATE", error=f"refusing approval through symlink: {target}"
+        )
     target = target.resolve()
+    allowed_roots = (
+        staging_mod.WIKI_PENDING_ROOT.resolve(),
+        staging_mod.TRUSTED_DEFAULT.resolve(),
+    )
+    if not any(target.is_relative_to(root) for root in allowed_roots):
+        return ApproveResult(
+            decision="BAD_STATE",
+            error=(
+                f"refusing in-place approval outside the trusted dir: {target} "
+                f"(trusted root: {staging_mod.TRUSTED_DEFAULT}); move the atom "
+                "through promote into wiki/pending first"
+            ),
+        )
 
     text = target.read_text(encoding="utf-8")
     try:
@@ -347,85 +368,36 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
     new_schema = _resign_v2(new_schema, body, kernel_sig)
 
     notes: list[str] = []
-    movable_roots = (staging_mod.STAGING_ROOT, staging_mod.WIKI_PENDING_ROOT)
-    in_movable_root = False
-    for root in movable_roots:
-        try:
-            target.relative_to(root.resolve())
-            in_movable_root = True
-            break
-        except ValueError:
-            continue
-
-    if in_movable_root:
-        try:
-            trusted_path = write_trusted(new_schema, body)
-        except FileExistsError as e:
-            # Slug collision with an existing trusted/legacy page: fail closed,
-            # leave the pending copy untouched for the operator to resolve.
-            return ApproveResult(
-                decision="COLLISION",
-                prior_status=current_status,
-                error=str(e),
-                notes=[f"pending copy left untouched at {target}"],
-            )
-        # Bind the unlink to the exact bytes that were verified: if another
-        # writer replaced the pending file after the read above, deleting the
-        # path would destroy the newer, unverified atom (TOCTOU).
-        try:
-            if target.read_text(encoding="utf-8") != text:
-                notes.append(
-                    "pending file changed after verification; "
-                    f"left in place at {target} (re-promote to approve the new bytes)"
-                )
-            else:
-                target.unlink()
-        except OSError as e:
-            notes.append(f"failed to remove source file: {type(e).__name__}: {e}")
-    else:
-        # In-place approval is only legal inside the trusted projection —
-        # approving a file at an arbitrary path would mint 'approved' status
-        # for content that never enters concepts/.
-        try:
-            target.relative_to(staging_mod.TRUSTED_DEFAULT.resolve())
-        except ValueError:
-            return ApproveResult(
-                decision="BAD_STATE",
-                prior_status=current_status,
-                error=(
-                    f"refusing in-place approval outside the trusted dir: {target} "
-                    f"(trusted root: {staging_mod.TRUSTED_DEFAULT}); move the atom "
-                    "into staging/pending and re-promote"
-                ),
-            )
-        trusted_path = target
-        trusted_path.write_text(assemble_atom(new_schema, body), encoding="utf-8")
-
     try:
-        log_path = append_wiki_log(
-            operation="approve",
-            title=new_schema.title,
-            atom_path=trusted_path,
-            atom_id=new_schema.atom_id,
+        cross = integrate_approved_atom(
+            source_path=target,
+            source_original_text=text,
+            approved_text=assemble_atom(new_schema, body),
+            reviewer=reviewer,
+            prior_status=current_status,
         )
-        notes.append(f"log appended → {log_path}")
-    except OSError as e:
-        notes.append(f"log append failed: {e}")
-    try:
-        cross = cross_update_trusted(trusted_path)
-        notes.append(
-            "cross-update: "
-            f"backlinks={len(cross.backlinks_updated)}, "
-            f"missing_related={len(cross.missing_related)}, "
-            f"contradictions={len(cross.contradictions_flagged)}"
+    except FileExistsError as e:
+        return ApproveResult(
+            decision="COLLISION",
+            prior_status=current_status,
+            error=str(e),
+            notes=[f"approval source left untouched at {target}"],
         )
     except Exception as e:
-        notes.append(f"cross-update failed: {type(e).__name__}: {e}")
-
-    # Manifest admission must precede the scoped ingest: the ingest (and every
-    # manifest-gated reader) drops files without a trusted manifest row, so an
-    # approved atom would otherwise stay unsearchable until a manual re-sign.
-    _admit_to_manifest(trusted_path, notes)
+        return ApproveResult(
+            decision="INTEGRATION_BLOCKED",
+            prior_status=current_status,
+            error=f"atomic integration failed: {type(e).__name__}: {e}",
+            notes=[f"approval source left untouched at {target}"],
+        )
+    trusted_path = cross.atom_path
+    notes.extend(cross.notes)
+    notes.append(
+        "atomic integration: "
+        f"backlinks={len(cross.backlinks_updated)}, "
+        f"missing_related={len(cross.missing_related)}, "
+        f"contradictions={len(cross.contradictions_flagged)}"
+    )
 
     if _wiki_vector_auto_ingest_enabled("approved"):
         _auto_ingest_file(trusted_path, notes)
@@ -444,4 +416,3 @@ def approve_atom(*, path: Path | str, reviewer: str) -> ApproveResult:
         reviewer=reviewer,
         notes=notes,
     )
-

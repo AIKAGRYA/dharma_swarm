@@ -19,9 +19,18 @@ import argparse
 import inspect
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
+from .backlinks import (
+    DEFAULT_CONTENT_LAYER_NAMES,
+    BacklinkError,
+    apply_backlink_plan,
+    plan_backlinks,
+    reconcile_backlinks,
+    select_backlink_changes,
+)
 from .decay import decay_summary, scan_decay
 from .cross_update import cross_update_summary, cross_update_trusted
 from .gap_scan import gap_scan, gap_summary, write_gap_queue
@@ -38,10 +47,16 @@ from .revival import (
 from .staging import (
     STAGING_ROOT,
     TRUSTED_DEFAULT,
+    WIKI_ROOT,
     list_pending,
     list_quarantine,
     list_staged,
     list_trusted,
+)
+from .wiki_compiler import (
+    IntegrationPlanError,
+    compilation_summary,
+    compile_integration_plan,
 )
 
 
@@ -49,7 +64,11 @@ logger = logging.getLogger(__name__)
 
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
-    src_path = Path(args.source).expanduser().resolve() if Path(args.source).expanduser().exists() else args.source
+    src_path = (
+        Path(args.source).expanduser().resolve()
+        if Path(args.source).expanduser().exists()
+        else args.source
+    )
     result = ingest(
         source=src_path,
         source_kind=args.kind,
@@ -61,7 +80,9 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         tags=args.tags or [],
         related=args.related or [],
     )
-    print(f"chetana.ingest → {result.staged_count} staged, {result.skipped_count} skipped")
+    print(
+        f"chetana.ingest → {result.staged_count} staged, {result.skipped_count} skipped"
+    )
     for atom in result.atoms:
         print(f"  → {atom}")
     for note in result.notes:
@@ -130,7 +151,9 @@ def _cmd_decay(args: argparse.Namespace) -> int:
             "quarantined": [str(p) for p in report.quarantined],
             "stale": [a.__dict__ | {"path": str(a.path)} for a in report.stale],
         }
-        Path(args.json).expanduser().write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        Path(args.json).expanduser().write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
     return 0
 
 
@@ -165,11 +188,86 @@ def _cmd_cross_update(args: argparse.Namespace) -> int:
         candidates = list(TRUSTED_DEFAULT.glob(f"{args.path}.md"))
         if candidates:
             path = candidates[0]
-    result = cross_update_trusted(path)
+    try:
+        result = cross_update_trusted(path)
+    except (BacklinkError, OSError, ValueError) as exc:
+        print(f"chetana.cross-update refused: {exc}", file=sys.stderr)
+        return 2
     print(cross_update_summary(result))
     for related in result.missing_related:
         print(f"  · missing related page: {related}")
     return 0
+
+
+def _cmd_compile(args: argparse.Namespace) -> int:
+    """Validate or explicitly apply an evidence-bound integration plan."""
+    try:
+        result = compile_integration_plan(
+            args.plan,
+            wiki_root=args.wiki_root,
+            apply=args.apply,
+            reviewer=args.reviewer,
+            canonical_ledger_roots=args.canonical_ledger_root,
+            audited_source_roots=args.audited_source_root,
+        )
+    except IntegrationPlanError as exc:
+        print(f"chetana.compile refused: {exc}", file=sys.stderr)
+        return 2
+    print(compilation_summary(result))
+    if args.show_diff and result.diff:
+        print()
+        print(result.diff, end="")
+    return 0
+
+
+def _cmd_backlinks(args: argparse.Namespace) -> int:
+    """Check or explicitly reconcile computed backlink projections."""
+    roots = args.root or [WIKI_ROOT / name for name in DEFAULT_CONTENT_LAYER_NAMES]
+    try:
+        if args.page:
+            report = plan_backlinks(roots)
+            selection_base = Path(
+                os.path.commonpath(
+                    [str(Path(root).expanduser().resolve()) for root in roots]
+                )
+            )
+            selected = [
+                path if path.is_absolute() else selection_base / path
+                for path in args.page
+            ]
+            report = select_backlink_changes(report, selected)
+            if args.apply:
+                if report.changed_count > 25:
+                    raise BacklinkError(
+                        "selected apply exceeds the 25-page migration limit"
+                    )
+                report = apply_backlink_plan(report)
+        else:
+            report = reconcile_backlinks(roots)
+            if args.apply:
+                if report.changed_count > 25:
+                    raise BacklinkError(
+                        "bulk apply exceeds the 25-page migration limit; "
+                        "use repeated --page arguments for a reviewed batch"
+                    )
+                report = apply_backlink_plan(report)
+    except BacklinkError as exc:
+        print(f"chetana.backlinks refused: {exc}", file=sys.stderr)
+        return 2
+    state = "APPLIED" if report.applied else "CHECK"
+    print(f"# chetana backlinks — {state}")
+    print(f"- scanned: {report.scanned_count}")
+    print(f"- semantic_edges: {report.edge_count}")
+    print(f"- pages_with_drift: {report.changed_count}")
+    print(f"- missing_backlinks: {report.missing_count}")
+    print(f"- false_backlinks: {report.false_count}")
+    print(f"- unresolved_links: {report.unresolved_count}")
+    print(f"- pages_written: {report.written_count}")
+    return (
+        1
+        if report.unresolved_count or (not report.applied and report.changed_count)
+        else 0
+    )
 
 
 def _cmd_approve(args: argparse.Namespace) -> int:
@@ -236,14 +334,15 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     current_kernel_sig = placeholder
     try:
         from dharma_swarm.dharma_kernel import KernelGuard  # type: ignore
+
         kernel = KernelGuard()
         loaded = kernel.load()
         if inspect.isawaitable(loaded):
             import asyncio
+
             loaded = asyncio.run(loaded)
-        resolved = (
-            getattr(loaded, "signature", None)
-            or getattr(getattr(kernel, "_kernel", None), "signature", None)
+        resolved = getattr(loaded, "signature", None) or getattr(
+            getattr(kernel, "_kernel", None), "signature", None
         )
         if resolved:
             current_kernel_sig = resolved
@@ -267,7 +366,9 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         targets, kernel_signature=current_kernel_sig
     )
 
-    print("# chetana verify\n- current kernel sig: <redacted; compare via dgc dharma status>")
+    print(
+        "# chetana verify\n- current kernel sig: <redacted; compare via dgc dharma status>"
+    )
     print(f"- mode: {args.mode}")
     for label in VERIFY_BUCKETS:
         rows = buckets[label]
@@ -283,14 +384,23 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     print("  verified      = sig matches under current kernel ✓")
     print("  zero-sig      = signed with placeholder (silent integrity failure)")
     print("  kernel-drift  = sig is real but kernel has rotated")
-    print("  no-provenance = pre-chetana wiki atom; never went through promote pipeline")
+    print(
+        "  no-provenance = pre-chetana wiki atom; never went through promote pipeline"
+    )
     print("  schema-error  = malformed YAML or unrecoverable parse failure")
-    print("  unapproved    = provenance present but review_status != approved (overlaps above)")
-    print("  v1-approved   = approved atom on forgeable body-only v1 sig (overlaps verified)")
+    print(
+        "  unapproved    = provenance present but review_status != approved (overlaps above)"
+    )
+    print(
+        "  v1-approved   = approved atom on forgeable body-only v1 sig (overlaps verified)"
+    )
 
     if args.mode == "production":
         verdict, reasons = production_verdict(
-            buckets, unapproved, kernel_signature=current_kernel_sig, v1_approved=v1_approved
+            buckets,
+            unapproved,
+            kernel_signature=current_kernel_sig,
+            v1_approved=v1_approved,
         )
         print(f"\nproduction verdict: {verdict.upper()}")
         for reason in reasons:
@@ -346,7 +456,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp_ing.add_argument("--title", default=None)
     sp_ing.add_argument(
         "--type",
-        choices=["atomic", "reference", "method", "framework", "spec", "tool", "concept", "decision"],
+        choices=[
+            "atomic",
+            "reference",
+            "method",
+            "framework",
+            "spec",
+            "tool",
+            "concept",
+            "decision",
+        ],
         default="atomic",
     )
     sp_ing.add_argument("--para", choices=["P", "A", "R", "Ar"], default=None)
@@ -387,7 +506,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="atom path (omit when using --all)",
     )
-    sp_rev.add_argument("--all", action="store_true", help="propose revival for every due atom")
+    sp_rev.add_argument(
+        "--all", action="store_true", help="propose revival for every due atom"
+    )
     sp_rev.add_argument(
         "--apply",
         action="store_true",
@@ -427,16 +548,88 @@ def build_parser() -> argparse.ArgumentParser:
     sp_st = sub.add_parser("status", help="show staged / trusted / quarantine counts")
     sp_st.set_defaults(func=_cmd_status)
 
-    sp_cu = sub.add_parser("cross-update", help="update index/backlinks for a trusted atom")
+    sp_cu = sub.add_parser(
+        "cross-update", help="update index/backlinks for a trusted atom"
+    )
     sp_cu.add_argument("path", help="trusted atom path or slug")
     sp_cu.set_defaults(func=_cmd_cross_update)
+
+    sp_comp = sub.add_parser(
+        "compile",
+        help="validate an evidence-bound multi-page integration plan (dry-run by default)",
+    )
+    sp_comp.add_argument("plan", help="path to a chetana.integration.v2 JSON plan")
+    sp_comp.add_argument(
+        "--wiki-root",
+        default=None,
+        help="override the wiki root (primarily for isolated verification)",
+    )
+    sp_comp.add_argument(
+        "--apply",
+        action="store_true",
+        help="write all validated page patches and append a typed operation receipt",
+    )
+    sp_comp.add_argument(
+        "--reviewer",
+        default=None,
+        help="recorded reviewer name (required with --apply; not authentication)",
+    )
+    sp_comp.add_argument(
+        "--canonical-ledger-root",
+        action="append",
+        type=Path,
+        default=None,
+        help="operator-configured root allowed to mint canonical-ledger evidence",
+    )
+    sp_comp.add_argument(
+        "--audited-source-root",
+        action="append",
+        type=Path,
+        default=None,
+        help="operator-configured root allowed to mint audited-source evidence",
+    )
+    sp_comp.add_argument(
+        "--show-diff",
+        action="store_true",
+        help="print the unified diff after validation",
+    )
+    sp_comp.set_defaults(func=_cmd_compile)
+
+    sp_bl = sub.add_parser(
+        "backlinks",
+        help="check deterministic backlinks derived from authored wikilinks",
+    )
+    sp_bl.add_argument(
+        "--root",
+        action="append",
+        type=Path,
+        default=None,
+        help="content root to scan (repeatable; defaults to curated wiki layers)",
+    )
+    sp_bl.add_argument(
+        "--apply",
+        action="store_true",
+        help="write marker-bounded backlink projections after a full stale-plan check",
+    )
+    sp_bl.add_argument(
+        "--page",
+        action="append",
+        type=Path,
+        default=None,
+        help="limit migration to an explicit page path (repeatable)",
+    )
+    sp_bl.set_defaults(func=_cmd_backlinks)
 
     sp_vf = sub.add_parser(
         "verify",
         help="round-trip atom axiom_signature against current kernel; surface drift + zero-sigs",
     )
-    sp_vf.add_argument("path", nargs="?", default=".", help="atom path (omit to verify all trusted)")
-    sp_vf.add_argument("--show", type=int, default=0, help="show first N paths per bucket")
+    sp_vf.add_argument(
+        "path", nargs="?", default=".", help="atom path (omit to verify all trusted)"
+    )
+    sp_vf.add_argument(
+        "--show", type=int, default=0, help="show first N paths per bucket"
+    )
     sp_vf.add_argument(
         "--mode",
         choices=["compat", "production"],
@@ -453,7 +646,9 @@ def build_parser() -> argparse.ArgumentParser:
         "approve",
         help="human-explicit approval: staged → approved (distinct from auto_promoted)",
     )
-    sp_ap.add_argument("path", help="staged atom path or atom_id (resolved under staging)")
+    sp_ap.add_argument(
+        "path", help="staged atom path or atom_id (resolved under staging)"
+    )
     sp_ap.add_argument(
         "--reviewer",
         default=None,
