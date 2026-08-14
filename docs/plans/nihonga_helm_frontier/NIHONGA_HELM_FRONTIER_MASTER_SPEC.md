@@ -9,7 +9,7 @@ canonical_runtime_baseline: origin/main@a5a61b73c8848b86664f9d5bbcf21986df43c02c
 delivery_stack_base: agent/helm-four-model-preview-20260813@708923bb2a7a9616d523da8cf7f55bfe58e3113a
 implementation_candidate: agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9ec7534196c53ce3d1bbe71fdaf242
 delivery_pr: https://github.com/AIKAGRYA/dharma_swarm/pull/1349
-tested_integration_preview: agent/nihonga-helm-frontier-20260814@74b2370a16d370abd4f3a96c8498c1ed44294005
+tested_integration_preview: closed PR #1348@74b2370a16d370abd4f3a96c8498c1ed44294005
 product: one Dharma Helm TUI
 ```
 
@@ -98,7 +98,7 @@ admission.
 | Current `origin/main` | `a5a61b73c884`, bounded fleet truth topology ([PR #1344](https://github.com/AIKAGRYA/dharma_swarm/pull/1344)) atop Mission Control admission ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; contained by the tested integration preview, not yet by the stacked delivery branch. |
 | Helm chassis landing | `88458e06f750`, Bun/Ink Helm merged by [PR #1078](https://github.com/AIKAGRYA/dharma_swarm/pull/1078); golden closeout by [PR #1073](https://github.com/AIKAGRYA/dharma_swarm/pull/1073) | Preserve as chassis, not final IA. |
 | Stacked delivery branch | `agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9e`, draft [PR #1349](https://github.com/AIKAGRYA/dharma_swarm/pull/1349) | Nihonga S1 implementation on exact parent preview `708923bb2`; deliberately small and reviewable. |
-| Tested integration preview | `agent/nihonga-helm-frontier-20260814@74b2370a1` | Same Nihonga slice plus the model-preview stack and current main; live operator test source, not the merge shape. |
+| Tested integration preview | closed [PR #1348](https://github.com/AIKAGRYA/dharma_swarm/pull/1348) at `74b2370a1` | Same Nihonga slice plus the model-preview stack and current main; retained live operator test source, not the merge shape. Superseded for review by PR #1349. |
 | Locked terminal appearance | `680b013c027194eb50416840d63055f025ca4bb7`, later included in the Helm landing | Exact warm Nihonga token authority. |
 | Wayfinder live slice | Issue [#1277](https://github.com/AIKAGRYA/dharma_swarm/issues/1277), lock [comment](https://github.com/AIKAGRYA/dharma_swarm/issues/1277#issuecomment-5226785831), draft [PR #1324](https://github.com/AIKAGRYA/dharma_swarm/pull/1324) | Truth-law source; live proof remained blocked/degraded, not closure. |
 | Mission Control | Core merged by [PR #1325](https://github.com/AIKAGRYA/dharma_swarm/pull/1325); integration paths admitted by current-main [PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346) | Canonical coordination membrane/projection source, never a second scheduler/store. |
@@ -664,7 +664,7 @@ Helm investigation. “Reference” means useful input, not edit/runtime authori
 | A12 | `/Users/dhyana/dharma_whole_field_failure_audit_20260807/`: verdict, first principles, roadmap, code/OSS audits, manifest, JSONL evidence, adversarial/baseline/code-path/source/vision evidence | **Failure/recovery research** | Preserve UNKNOWN verdict and sequence: truthful read-only → one hand → dry-run compiler → durable worker → multi-agent/external → evolution. |
 | A13 | `dharma_swarm/tui/**`, cool `dharma_dark` themes, splash, `docs/reports/TUI_WORLD_CLASS_SPLASH_REPROMPT_2026-03-12.md`; early Bun branch `dgc-splash-art@36d55d9` | **Legacy archaeology** | Mood/history only; not runtime or current terminal appearance. |
 | A14 | `origin/governance/close-helm-track-v2-20260803@26c19f9` versus canonical `origin/main:docs/governance/ACTIVE_TRACK.yaml` | **Unresolved governance contradiction** | Main's `ACTIVE` is authoritative though stale; reconcile before admitting this spec. |
-| A15 | Tested integration worktree `agent/nihonga-helm-frontier-20260814@74b2370a1`; stacked delivery implementation `agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9e`, draft PR #1349; `terminal/src/nihonga/**`, tests, app/goldens | **Committed implementation evidence; unmerged** | Use the integration worktree for operator proof and the stacked branch for review. Rebase the latter after parent landing; neither is runtime authority or current-main product truth. |
+| A15 | Tested integration worktree/closed PR #1348 at `agent/nihonga-helm-frontier-20260814@74b2370a1`; stacked delivery implementation `agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9e`, draft PR #1349; `terminal/src/nihonga/**`, tests, app/goldens | **Committed implementation evidence; unmerged** | Use the retained integration worktree for operator proof and the stacked branch for review. Rebase the latter after parent landing; neither is runtime authority or current-main product truth. |
 | A16 | Primary-source frontier repositories and behavior docs pinned in Section 8 | **External benchmark research** | Adopt patterns, respect licenses, and retain the no-model-provenance boundary. |
 
 ### 13.1 Precedence when artifacts disagree
