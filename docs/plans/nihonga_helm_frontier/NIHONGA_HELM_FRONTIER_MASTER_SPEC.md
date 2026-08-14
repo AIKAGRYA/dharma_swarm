@@ -5,8 +5,10 @@ document_role: active_spec
 status: CANDIDATE_NOT_ADMITTED
 prepared_at: 2026-08-15
 canonical_repository: AIKAGRYA/dharma_swarm
-runtime_baseline: origin/main@a5a61b73c8848b86664f9d5bbcf21986df43c02c
-implementation_candidate: agent/nihonga-helm-frontier-20260814@5d918322bad165d7373bd16e8aed1ab24811803e
+canonical_runtime_baseline: origin/main@a5a61b73c8848b86664f9d5bbcf21986df43c02c
+delivery_stack_base: agent/helm-four-model-preview-20260813@708923bb2a7a9616d523da8cf7f55bfe58e3113a
+implementation_candidate: agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9ec7534196c53ce3d1bbe71fdaf242
+tested_integration_preview: agent/nihonga-helm-frontier-20260814@74b2370a16d370abd4f3a96c8498c1ed44294005
 product: one Dharma Helm TUI
 ```
 
@@ -35,10 +37,12 @@ permission, Forge, or merge authorities. This explicit role and replacement
 statement follows `docs/AGENTS.md:45-52`.
 
 Admission requires all of the following before code from this branch is called
-current: resolve the stale Helm track/terminal-owner contradiction; approve the
-owned paths and slices; record an admission decision; and rerun the gates in
-Section 12. The candidate now contains `origin/main@a5a61b73c`; that integration
-fact does not itself admit the product.
+current: land or rebase the parent preview stack; reconcile current main;
+resolve the stale Helm track/terminal-owner contradiction; approve the owned
+paths and slices; record an admission decision; and rerun the gates in Section
+12. A separate integration preview at `74b2370a1` contains
+`origin/main@a5a61b73c`; that tested integration fact does not make this stacked
+delivery branch current or admit the product.
 
 ## 1. Executive decision
 
@@ -75,8 +79,9 @@ permission, completion, or truth.
 - A successful model response is not an OnCall verdict.
 - Four preview adapters are not “any model,” and adapter compatibility is not
   verified model support.
-- Mission Control is admitted and present in this candidate's current-main
-  ancestry, but the terminal is not thereby wired to it.
+- Mission Control is admitted on current main and present in the tested
+  integration preview, but not yet in this stacked delivery branch; the
+  terminal is not thereby wired to it.
 - No public evidence proves that any benchmark TUI was “built by GPT-5.6-sol
   Ultra.” Public repositories generally do not expose meaningful model/effort
   provenance, and this spec makes no chain-of-thought attribution.
@@ -89,9 +94,10 @@ admission.
 | Layer | Observed state | Disposition |
 |---|---|---|
 | Canonical repository | `https://github.com/AIKAGRYA/dharma_swarm.git` | Sole GitHub authority. |
-| Current `origin/main` | `a5a61b73c884`, bounded fleet truth topology ([PR #1344](https://github.com/AIKAGRYA/dharma_swarm/pull/1344)) atop Mission Control admission ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; contained by this candidate. |
+| Current `origin/main` | `a5a61b73c884`, bounded fleet truth topology ([PR #1344](https://github.com/AIKAGRYA/dharma_swarm/pull/1344)) atop Mission Control admission ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; contained by the tested integration preview, not yet by the stacked delivery branch. |
 | Helm chassis landing | `88458e06f750`, Bun/Ink Helm merged by [PR #1078](https://github.com/AIKAGRYA/dharma_swarm/pull/1078); golden closeout by [PR #1073](https://github.com/AIKAGRYA/dharma_swarm/pull/1073) | Preserve as chassis, not final IA. |
-| Candidate branch | `agent/nihonga-helm-frontier-20260814@5d918322bad1` | Local integration candidate containing current main plus the model-preview stack and Nihonga S1. |
+| Stacked delivery branch | `agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9e` | Nihonga S1 implementation on exact parent preview `708923bb2`; deliberately small and reviewable. |
+| Tested integration preview | `agent/nihonga-helm-frontier-20260814@74b2370a1` | Same Nihonga slice plus the model-preview stack and current main; live operator test source, not the merge shape. |
 | Locked terminal appearance | `680b013c027194eb50416840d63055f025ca4bb7`, later included in the Helm landing | Exact warm Nihonga token authority. |
 | Wayfinder live slice | Issue [#1277](https://github.com/AIKAGRYA/dharma_swarm/issues/1277), lock [comment](https://github.com/AIKAGRYA/dharma_swarm/issues/1277#issuecomment-5226785831), draft [PR #1324](https://github.com/AIKAGRYA/dharma_swarm/pull/1324) | Truth-law source; live proof remained blocked/degraded, not closure. |
 | Mission Control | Core merged by [PR #1325](https://github.com/AIKAGRYA/dharma_swarm/pull/1325); integration paths admitted by current-main [PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346) | Canonical coordination membrane/projection source, never a second scheduler/store. |
@@ -523,8 +529,8 @@ category budget.
 
 | Slice | Categories (max 2) | Deliverable | Gate/status |
 |---|---|---|---|
-| S0 — admit/rebase | documentation/governance only | reconcile with current main; settle Helm track and terminal owner; admit this spec | **Partly complete:** current-main integration is committed at `5d918322b`; track/owner reconciliation and admission remain. |
-| S1 — Nihonga shell | UI state + UI rendering | five places, three planes, responsive profiles (including focus-weighted Standard), Room/Boundary bands, six-region honest projection, bounded compact PaneSwitcher row; preserve zen/scroll | **Implemented and committed on the candidate; unmerged.** Post-integration evidence: 693 passed/0 failed and 42 deterministic golden frames at 80×24, 100×30, and 120×40; `git diff --numstat -- terminal/src/app.tsx` is 119/119, net-zero growth in the legacy app entrypoint while the new shell lives in bounded modules. |
+| S0 — admit/rebase | documentation/governance only | land/rebase the parent stack; reconcile with current main; settle Helm track and terminal owner; admit this spec | **Partly complete:** a separate tested integration preview contains current main at `74b2370a1`; this delivery branch remains stacked on `708923bb2` until its parent lands. Track/owner reconciliation and admission remain. |
+| S1 — Nihonga shell | UI state + UI rendering | five places, three planes, responsive profiles (including focus-weighted Standard), Room/Boundary bands, six-region honest projection, bounded compact PaneSwitcher row; preserve zen/scroll | **Implemented and committed on the delivery candidate; unmerged.** The tested integration preview produced 693 passed/0 failed and 42 deterministic golden frames at 80×24, 100×30, and 120×40; the stacked delivery head independently reproduces 693/0 and Terminal Guardian. In both shapes, `git diff --numstat -- terminal/src/app.tsx` is 119/119, net-zero growth in the legacy app entrypoint while the new shell lives in bounded modules. Rerun all proof after the eventual current-main rebase. |
 | S2 — owner projection envelopes | protocol + bridge | versioned bounded snapshots for MissionControl/TaskBoard/RuntimeState/Swarm/A2A/evolution; explicit freshness/divergence/unknown | No terminal rendering changes. |
 | S3 — organism views | UI state + UI rendering | bind S2 projections to six regions, Home query, Activity, Evidence; remove mocks/zeros | No new backend state. |
 | S4 — recursive Inspector | input handling + UI state | exact entity resolver, bounded focus stack, one-Esc pop, per-place anchors, mention-attack resistance | Model prose cannot retarget. |
@@ -568,8 +574,10 @@ a falsifiable negative control, not a cross-stack rewrite.
 
 ### 12.1 Admission and truth
 
-- [x] Branch contains `origin/main@a5a61b73c` at the 2026-08-15 observation
-  boundary.
+- [x] A separate tested integration preview contains `origin/main@a5a61b73c`
+  at the 2026-08-15 observation boundary.
+- [ ] Stacked delivery branch is rebased onto current main after its parent
+  preview stack lands.
 - [ ] Branch is clean, published as a draft PR, and hashes/PR states are
   refreshed at handoff.
 - [ ] `make onboard`, docs integrity, ownership checks, and governed closeout
@@ -655,7 +663,7 @@ Helm investigation. “Reference” means useful input, not edit/runtime authori
 | A12 | `/Users/dhyana/dharma_whole_field_failure_audit_20260807/`: verdict, first principles, roadmap, code/OSS audits, manifest, JSONL evidence, adversarial/baseline/code-path/source/vision evidence | **Failure/recovery research** | Preserve UNKNOWN verdict and sequence: truthful read-only → one hand → dry-run compiler → durable worker → multi-agent/external → evolution. |
 | A13 | `dharma_swarm/tui/**`, cool `dharma_dark` themes, splash, `docs/reports/TUI_WORLD_CLASS_SPLASH_REPROMPT_2026-03-12.md`; early Bun branch `dgc-splash-art@36d55d9` | **Legacy archaeology** | Mood/history only; not runtime or current terminal appearance. |
 | A14 | `origin/governance/close-helm-track-v2-20260803@26c19f9` versus canonical `origin/main:docs/governance/ACTIVE_TRACK.yaml` | **Unresolved governance contradiction** | Main's `ACTIVE` is authoritative though stale; reconcile before admitting this spec. |
-| A15 | Candidate worktree `agent/nihonga-helm-frontier-20260814@809393420` with concurrent `terminal/src/nihonga/**`, tests, app/goldens | **Local uncommitted implementation evidence** | Preserve as S1 candidate; rebase, inspect diff, rerun tests, and review before commit/merge. It is never a source of runtime truth. |
+| A15 | Tested integration worktree `agent/nihonga-helm-frontier-20260814@74b2370a1`; stacked delivery implementation `agent/nihonga-helm-frontier-stack-20260815@15fb6cd85e9e`; `terminal/src/nihonga/**`, tests, app/goldens | **Committed implementation evidence; unmerged** | Use the integration worktree for operator proof and the stacked branch for review. Rebase the latter after parent landing; neither is runtime authority or current-main product truth. |
 | A16 | Primary-source frontier repositories and behavior docs pinned in Section 8 | **External benchmark research** | Adopt patterns, respect licenses, and retain the no-model-provenance boundary. |
 
 ### 13.1 Precedence when artifacts disagree
