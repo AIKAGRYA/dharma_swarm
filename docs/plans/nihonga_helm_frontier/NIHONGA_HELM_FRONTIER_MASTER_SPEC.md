@@ -6,7 +6,9 @@ status: CANDIDATE_NOT_ADMITTED
 prepared_at: 2026-08-15
 canonical_repository: AIKAGRYA/dharma_swarm
 runtime_baseline: origin/main@a5a61b73c8848b86664f9d5bbcf21986df43c02c
-implementation_candidate: agent/nihonga-helm-frontier-20260814@5d918322bad165d7373bd16e8aed1ab24811803e
+implementation_candidate: agent/nihonga-helm-frontier-20260814@c6a4d7425f0a070d960f10bd54b2375175e0e9ad
+current_main_merge: 5d918322bad165d7373bd16e8aed1ab24811803e
+draft_pr: https://github.com/AIKAGRYA/dharma_swarm/pull/1348
 product: one Dharma Helm TUI
 ```
 
@@ -91,7 +93,7 @@ admission.
 | Canonical repository | `https://github.com/AIKAGRYA/dharma_swarm.git` | Sole GitHub authority. |
 | Current `origin/main` | `a5a61b73c884`, bounded fleet truth topology ([PR #1344](https://github.com/AIKAGRYA/dharma_swarm/pull/1344)) atop Mission Control admission ([PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346)) | Runtime/governance baseline; contained by this candidate. |
 | Helm chassis landing | `88458e06f750`, Bun/Ink Helm merged by [PR #1078](https://github.com/AIKAGRYA/dharma_swarm/pull/1078); golden closeout by [PR #1073](https://github.com/AIKAGRYA/dharma_swarm/pull/1073) | Preserve as chassis, not final IA. |
-| Candidate branch | `agent/nihonga-helm-frontier-20260814@5d918322bad1` | Local integration candidate containing current main plus the model-preview stack and Nihonga S1. |
+| Candidate branch | `agent/nihonga-helm-frontier-20260814`, draft [PR #1348](https://github.com/AIKAGRYA/dharma_swarm/pull/1348); UI commit `c6a4d7425`, current-main merge `5d918322b` | Published integration candidate containing current main plus the model-preview stack and Nihonga S1. |
 | Locked terminal appearance | `680b013c027194eb50416840d63055f025ca4bb7`, later included in the Helm landing | Exact warm Nihonga token authority. |
 | Wayfinder live slice | Issue [#1277](https://github.com/AIKAGRYA/dharma_swarm/issues/1277), lock [comment](https://github.com/AIKAGRYA/dharma_swarm/issues/1277#issuecomment-5226785831), draft [PR #1324](https://github.com/AIKAGRYA/dharma_swarm/pull/1324) | Truth-law source; live proof remained blocked/degraded, not closure. |
 | Mission Control | Core merged by [PR #1325](https://github.com/AIKAGRYA/dharma_swarm/pull/1325); integration paths admitted by current-main [PR #1346](https://github.com/AIKAGRYA/dharma_swarm/pull/1346) | Canonical coordination membrane/projection source, never a second scheduler/store. |
@@ -570,8 +572,8 @@ a falsifiable negative control, not a cross-stack rewrite.
 
 - [x] Branch contains `origin/main@a5a61b73c` at the 2026-08-15 observation
   boundary.
-- [ ] Branch is clean, published as a draft PR, and hashes/PR states are
-  refreshed at handoff.
+- [x] Branch is clean, published as draft PR #1348, and hashes/PR states are
+  refreshed at the 2026-08-15 handoff boundary.
 - [ ] `make onboard`, docs integrity, ownership checks, and governed closeout
   pass.
 - [ ] One admitted owner names the spec and every touched path.
