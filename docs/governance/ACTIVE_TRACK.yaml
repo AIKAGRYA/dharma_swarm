@@ -840,9 +840,10 @@ active_tracks:
       # executor owners. Exact paths admit the already landed P0/P1 modules and
       # their named additive adapters without transferring TaskBoard,
       # RuntimeStateStore, Orchestrator, A2A, Forge, or Merge Master.
-      # Operator-facing integration is limited to the existing GET-only control
-      # surface and exact cockpit projection files; it does not admit api/main.py
-      # or a broad dashboard/API ownership claim.
+      # Operator-facing integration may add only GET mission projections beneath
+      # the existing mixed-method control-surface router; its pre-existing POST
+      # handoff route remains untouched. Exact cockpit paths avoid api/main.py or
+      # a broad dashboard/API ownership claim.
       - dharma_swarm/mission_control.py
       - dharma_swarm/mission_control_contract.py
       - dharma_swarm/mission_control_execution.py
@@ -974,7 +975,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: 14
-        what: "P2.1 operator vertical: expose an immutable, bounded, explicit-mission read model through the already-mounted GET-only control-surface router; render the typed Sarathi/Mission Control ladder in the existing dashboard control-surface cockpit; and permit Operator Brief to cite exact mission/task/attempt/evidence references without treating identifiers as facts. Absence of canonical state must render as uninitialized/unknown, and the projection must not initialize stores, discover an unbounded fleet, start daemons, mutate runtime state, or upgrade receipts into liveness, outcome, promotion, or merge claims."
+        what: "P2.1 operator vertical: add only immutable, bounded, explicit-mission GET projections beneath the already-mounted mixed-method control-surface router without altering its existing POST handoff route; render the typed Sarathi/Mission Control ladder in the existing dashboard control-surface cockpit; and permit Operator Brief to cite exact mission/task/attempt/evidence references without treating identifiers as facts. Absence of canonical state must render as uninitialized/unknown, and the projection must not initialize stores, discover an unbounded fleet, start daemons, mutate runtime state, or upgrade receipts into liveness, outcome, promotion, or merge claims."
         kind: code
         blocker: true
 

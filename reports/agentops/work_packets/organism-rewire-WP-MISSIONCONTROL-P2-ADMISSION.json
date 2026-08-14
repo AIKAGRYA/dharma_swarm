@@ -86,11 +86,11 @@
       "Mission Control has no list_missions API; the read-only operator vertical must use explicit mission identity and immutable SQLite snapshots.",
       "A2A owns its native lifecycle and receipts, so wrapping A2A dispatch in MissionControl start, heartbeat, or finish would duplicate authority and state.",
       "Sarathi PlannedDelegation dependencies are proposal-local labels, not Mission Control task IDs; an explicit complete dependency mapping is required.",
-      "The existing control-surface router is already mounted; the operator vertical should extend that GET-only surface instead of editing sibling-owned api/main.py.",
+      "The existing mixed-method control-surface router is already mounted; the operator vertical may add only GET mission projections without altering its existing POST handoff route or editing sibling-owned api/main.py.",
       "Legacy Sarathi wake and mailbox artifacts are private projections and cannot be promoted into canonical Mission Control truth."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "5a35db1cf8d778d60f6098cfd7494aa7e2647ce38319abcc1495f07768655487",
+    "packet_digest": "88991f9faa038f74ec1c705c035e0f065ee92598ed810dfdbce209ca57d19d81",
     "rollback": "Revert the governance admission commit. No runtime, transport, database, API, dashboard, daemon, or external state is changed by this packet.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
