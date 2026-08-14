@@ -1,0 +1,108 @@
+{
+  "id": "dharmagraph-WP-MISSIONBRIDGE-HARDENING-V2-20260815",
+  "base_ref": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+  "branch": "agent/mission-graph-authority-hardening-v2-20260815",
+  "worktree": ".",
+  "intent": "Harden a candidate, shadow-only Mission Control graph bridge without production wiring. Bind graph, run, grant, and plan digests; reject foreign state; serialize run/resume; CAS checkpoint parents; and validate bounded observations. A pre-adapter plan reread narrows but does not eliminate the post-check/pre-effect race. Atomic TaskBoard owner CAS or an immutable authorized snapshot spanning effect admission is an explicit production-promotion prerequisite. Receipts and checkpoints never mint authority.",
+  "allowed_files": [
+    "dharma_swarm/graph/_persistence_lock.py",
+    "dharma_swarm/graph/persistence.py",
+    "dharma_swarm/graph/mission_control_bridge.py",
+    "tests/test_graph_mission_control_bridge.py",
+    "reports/agentops/work_packets/dharmagraph-WP-MISSIONBRIDGE-HARDENING-V2-20260815.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "docs/**",
+    "dharma_swarm/mission_control*.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "scripts/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock",
+    "packages/telos-kernel/**"
+  ],
+  "gates": [
+    {
+      "name": "mission-graph-regressions",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_graph_mission_control_bridge.py tests/test_graph_persistence_kernel.py tests/test_graph_durable_invoker.py tests/test_graph_neutral_langgraph_oracle.py tests/test_graph_pregel_properties.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "mission-graph-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/graph/_persistence_lock.py dharma_swarm/graph/persistence.py dharma_swarm/graph/mission_control_bridge.py tests/test_graph_mission_control_bridge.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "mutated-plan-after-admission-must-fail",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -c \"from pathlib import Path; import ast; p=Path('dharma_swarm/graph/mission_control_bridge.py'); s=p.read_text(); needle='    if current != request.plan_digest:\\\\n'; assert s.count(needle)==1; p.write_text(s.replace(needle,'    if False:\\\\n')); tree=ast.parse(p.read_text()); fn=next(n for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name=='_require_current_plan'); assert any(isinstance(n,ast.Compare) and any(isinstance(op,ast.NotEq) for op in n.ops) for n in ast.walk(fn))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(graph): harden shadow mission dispatch bridge"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MISSIONBRIDGE-HARDENING-V2",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Graph persistence lacks a nonblocking per-thread run lease and checkpoint-parent CAS for this bridge.",
+      "Task content can mutate after admission, so task identity alone cannot bind the reviewed plan.",
+      "Persisted grants and observations are untrusted recovery inputs and cannot confer authority."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/graph/persistence.py:GraphPersistenceKernel",
+      "dharma_swarm/graph/checkpoint.py:GraphCheckpoint",
+      "dharma_swarm/graph/compiler.py:CompiledGraph",
+      "dharma_swarm/graph/durable_invoker.py:DurableGraphInvoker"
+    ],
+    "honest_blockers": [
+      "Candidate and shadow-only: no production root imports or invokes this bridge.",
+      "Production promotion requires atomic TaskBoard owner CAS or an immutable authorized snapshot spanning effect admission, plus durable idempotent owner effects.",
+      "The pre-adapter plan reread narrows but cannot eliminate the post-check/pre-effect race.",
+      "File leases and checkpoint CAS are not distributed consensus or production-liveness proof.",
+      "Receipts, checkpoints, packet admission, and tests record evidence only; none grants runtime authority.",
+      "Hosted CI, review, merge approval, deployment, and live validation remain outside this packet."
+    ],
+    "rollback": "Revert the candidate bridge commit. With no production wiring, rollback removes the shadow surface without production-state migration.",
+    "packet_digest": "ff01c0c60fd5cb6b0e570eb72cc6eae91fecdd2120801a2a8451e6e0ca477a52"
+  }
+}
