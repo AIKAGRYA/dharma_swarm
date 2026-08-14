@@ -1,7 +1,6 @@
-// F-022: compactShell <=90 regression fence. The compact layout must keep
-// rendering after the F-021 one-line tab bar change — this file pins the
-// degradation markers (compact header brand, compact status label, one-line
-// tab bar, borderless summary strip) and the exact <=90 threshold.
+// Nihonga Helm responsive regression fence. The cockpit is one semantic view
+// projected through compact, standard, and panorama profiles; resize may alter
+// composition but never route/OnCall truth or the conversation draft.
 //
 // Width mechanism (the non-obvious part): App computes terminalWidth from
 // process.stdout.columns ?? Number(COLUMNS) (src/app.tsx) — NOT from the
@@ -11,10 +10,11 @@
 import {afterEach, expect, test} from "bun:test";
 import {PassThrough} from "node:stream";
 import React from "react";
-import {render} from "ink";
+import {Box, Text, render} from "ink";
 
 import {App} from "../src/app";
 import {DharmaBridge} from "../src/bridge";
+import {CausalFlowPlane, causalEventRowBudget} from "../src/nihonga/CausalFlowPlane";
 
 class TestStdout extends PassThrough {
   columns: number;
@@ -173,37 +173,29 @@ async function renderShellAt(
   return stripAnsi(rendered);
 }
 
-function summaryStripLines(frame: string): string[] {
-  // "loop unknown" is boot-deterministic in an empty supervisor state and
-  // exists only in cockpit chrome, so it also proves cockpit arrival.
-  return frame.split("\n").filter((line) => line.includes("loop unknown"));
-}
-
 function cockpitSettled(frame: string): boolean {
-  return frame.includes("loop unknown") && frame.includes("offline") && frame.includes("HELM") && frame.includes("?/7");
+  return frame.includes("◆ DHARMA HELM") && frame.includes("BOUNDARY") && frame.includes("offline") && frame.includes("?/7");
 }
 
-test("80x24 uses compact cockpit chrome", async () => {
+test("80x24 uses the compact Quiet Field without losing Helm truth", async () => {
   const frame = await renderShellAt(80, 24, cockpitSettled);
 
-  expect(frame).toContain("◆ DHARMA");
-  expect(frame).not.toContain("COMMAND POST");
+  expect(frame).toContain("◆ DHARMA HELM");
+  expect(frame).toContain("CONVERSATION");
+  expect(frame).toContain("BOUNDARY");
+  expect(frame).toContain("chat no-tools");
   expect(frame).toContain("○ offline");
   expect(frame).toContain("HELM ◌ UNKNOWN ?/7");
   for (const label of ["F5", "G56", "G46", "FU", "K3", "O50", "O48"]) {
     expect(frame).toContain(`${label} ?`);
   }
   expect(frame).not.toContain("OFFLINE");
-  const tabLine = frame.split("\n").find((line) => line.includes("[Chat]"));
-  expect(tabLine).toBeDefined();
-  expect(tabLine).toContain("Mission");
+  expect(frame).toContain("Home");
+  expect(frame).toContain("Conv");
+  expect(frame).toContain("Acti");
   expect(frame).not.toContain("|  route ");
   expect(frame).not.toContain("|  panes ");
-  const stripLines = summaryStripLines(frame);
-  expect(stripLines.length).toBeGreaterThan(0);
-  for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(false);
-  }
+  expect(frame).not.toContain("COMMAND POST");
 });
 
 test("80x24 keeps OnCall truth persistent in zen and scroll faces", async () => {
@@ -227,48 +219,80 @@ test("80x24 keeps OnCall truth persistent in zen and scroll faces", async () => 
   expect(scroll).toContain("composer · the scroll");
 });
 
-test("width 90 remains compact (inclusive boundary)", async () => {
+test("90x24 remains compact and truthful", async () => {
   const frame = await renderShellAt(90, 24, cockpitSettled);
 
-  expect(frame).toContain("◆ DHARMA");
+  expect(frame).toContain("◆ DHARMA HELM");
+  expect(frame).toContain("CONVERSATION / FOCUSED");
   expect(frame).not.toContain("COMMAND POST");
-  const stripLines = summaryStripLines(frame);
-  expect(stripLines.length).toBeGreaterThan(0);
-  for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(false);
-  }
+  expect(frame).not.toContain("ECOSYSTEM / ORGANISM");
 });
 
-test("width 91 restores wide cockpit chrome", async () => {
+test("100x28 selects the two-plane standard composition", async () => {
   const frame = await renderShellAt(
-    91,
-    24,
-    (current) => cockpitSettled(current) && current.includes("COMMAND POST"),
+    100,
+    28,
+    (current) => cockpitSettled(current) && current.includes("CONTEXT / ORGANISM"),
   );
 
-  expect(frame).toContain("◆ DHARMA");
-  expect(frame).toContain("COMMAND POST");
-  const stripLines = summaryStripLines(frame);
-  expect(stripLines.length).toBeGreaterThan(0);
-  for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(false);
-  }
+  expect(frame).toContain("CONVERSATION / INTENT");
+  expect(frame).toContain("CONTEXT / ORGANISM");
+  expect(frame).toContain("WHOLE ORGANISM");
+  expect(frame).not.toContain("CAUSAL / PROOF");
 });
 
-test("wide cockpit sanity check reaches App", async () => {
+test("120x30 and larger use the 45/35/20 panorama", async () => {
   const frame = await renderShellAt(
-    220,
-    60,
-    (current) => cockpitSettled(current) && current.includes("COMMAND POST"),
+    120,
+    30,
+    (current) => cockpitSettled(current) && current.includes("ECOSYSTEM / ORGANISM") && current.includes("CAUSAL / PROOF"),
   );
 
-  expect(frame).toContain("COMMAND POST");
+  expect(frame).toContain("CONVERSATION / INTENT");
+  expect(frame).toContain("ECOSYSTEM / ORGANISM");
+  expect(frame).toContain("CAUSAL / PROOF");
+  expect(frame).toContain("six stable fields");
   expect(frame).toContain("○ offline");
   expect(frame).not.toContain("OFFLINE");
   expect(frame).not.toContain("DHARMA TERMINAL");
-  const stripLines = summaryStripLines(frame);
-  expect(stripLines.length).toBeGreaterThan(0);
-  for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(false);
+});
+
+test("120x30 causal proof keeps newest high-volume event titles and summaries intact", async () => {
+  const events = Array.from({length: 15}, (_, index) => ({
+    id: `event-${index}`,
+    sourceEventType: "fixture",
+    kind: "status" as const,
+    phase: "running" as const,
+    title: `event ${index}`,
+    summary: `summary ${index}`,
+  }));
+  const stdout = new TestStdout(24, 19);
+  let rendered = "";
+  stdout.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+  const instance = render(
+    <Box width={24} height={19} flexDirection="column" borderStyle="single" paddingX={1}>
+      <Text>CAUSAL / PROOF</Text>
+      <CausalFlowPlane events={events} rowBudget={causalEventRowBudget(30)} />
+    </Box>,
+    {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    },
+  );
+
+  try {
+    await Bun.sleep(50);
+    const frame = stripAnsi(rendered);
+    expect(frame).toContain("event 14");
+    expect(frame).toContain("summary 14");
+    expect(frame).toContain("event 13");
+    expect(frame).toContain("15 canonical events");
+  } finally {
+    instance.unmount();
+    instance.cleanup();
   }
 });

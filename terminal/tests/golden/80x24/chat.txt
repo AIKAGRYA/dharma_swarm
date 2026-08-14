@@ -14,10 +14,10 @@
 
 
 
-
-
- Dharma Terminal
- Type a message below · F2 opens the cockpit
+ Dharma Helm · Quiet Field
+ Type a message below · F2 unfolds the Whole Helm
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯

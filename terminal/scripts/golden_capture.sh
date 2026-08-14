@@ -73,20 +73,20 @@ OVERLAY_TIMEOUT=${GOLDEN_OVERLAY_TIMEOUT:-25}
 # 80x24 frames; mock content from mockContent.ts and pane components).
 marker_for() {
   case $1 in
-    chat) printf 'F2 opens the cockpit' ;;  # FACE-1 zen welcome line 2 (mockContent.ts)
+    chat) printf 'F2 unfolds the Whole Helm' ;;  # Quiet Field welcome line 2 (mockContent.ts)
     mission) printf 'One state model. One bridge.' ;;
-    repo) printf 'Workspace snapshot loading' ;;
-    commands) printf 'Command graph loading' ;;
-    models) printf 'Model policy loading' ;;
-    ontology) printf 'Ontology snapshot loading' ;;
-    runtime) printf 'selected runtime card' ;;  # F-163 clamp: 'Frontend runtime: Bun' sits below the 80x24 clip line now
-    sessions) printf 'No selected session.' ;;
-    approvals) printf 'No selected approval.' ;;
-    control) printf 'Control-plane snapshot loading' ;;
-    agents) printf 'No selected route.' ;;
-    evolution) printf 'Cascade and self-improvement surface loading' ;;
+    repo) printf 'Workspace snapshot' ;;
+    commands) printf 'Command graph' ;;
+    models) printf 'Model policy' ;;
+    ontology) printf 'Ontology snapshot' ;;
+    runtime) printf 'Runtime Snapshot' ;;
+    sessions) printf '0 shown of 0' ;;
+    approvals) printf 'provisional-live' ;;
+    control) printf 'Control Snapshot' ;;
+    agents) printf 'route profiles' ;;
+    evolution) printf 'Cascade and self-improvement' ;;
     modelPicker) printf 'No model targets loaded.' ;;
-    paneSwitcher) printf '1. Chat' ;;  # F-163 clamp: deep list rows clip at 80x24; switcher needs selection-windowing (logged)
+    paneSwitcher) printf '1. Chat' ;;  # The selected row must remain visible at every governed size.
     *) return 1 ;;
   esac
 }
@@ -216,8 +216,8 @@ for size in $SIZES; do
     else
       if [[ "${id}" == mission ]]; then
         "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" F2
-        wait_settled "loop unknown" "${NAV_TIMEOUT}" >/dev/null \
-          || fail "did not enter cockpit at ${size}"
+        wait_settled "◆ DHARMA HELM" "${NAV_TIMEOUT}" >/dev/null \
+          || fail "did not enter the Nihonga Helm at ${size}"
         # Keyboard ownership is explicit: Cockpit keeps the composer focused
         # until Escape hands control to navigation. Without this boundary the
         # following Tab is correctly consumed by the composer and the walk

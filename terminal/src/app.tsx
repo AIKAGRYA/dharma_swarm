@@ -3,7 +3,7 @@ import {Box, Text, useApp, useInput, useStdin} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {normalizeCommandOutcome} from "./commandOutcome.ts";
-import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
+import {activityRowCount} from "./components/ActivityPane.tsx";
 import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
@@ -16,17 +16,12 @@ import {
   saveSupervisorControlSummary,
 } from "./persistence.ts";
 import {Composer} from "./components/Composer.tsx";
-import {ApprovalsPane} from "./components/ApprovalsPane.tsx";
-import {AgentsPane} from "./components/AgentsPane.tsx";
-import {ControlPane, buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
-import {ModelPicker} from "./components/ModelPicker.tsx";
+import {buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {OnCallTruthBand} from "./components/OnCallTruthBand.tsx";
-import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
-import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
+import {buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {NavigatorRail} from "./components/NavigatorRail.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
-import {SessionsPane} from "./components/SessionsPane.tsx";
 import {TourOverlay} from "./components/TourOverlay.tsx";
 import {ShellHeader} from "./components/ShellHeader.tsx";
 import {Sidebar} from "./components/Sidebar.tsx";
@@ -40,6 +35,10 @@ import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} 
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
+import {ActiveFacet} from "./nihonga/ActiveFacet.tsx";
+import {NihongaCockpit} from "./nihonga/NihongaCockpit.tsx";
+import {projectWholeOrganism} from "./nihonga/organismView.ts";
+import {contextControlForLayout, usesNihongaShell, viewportProfile} from "./nihonga/shellModel.ts";
 import {
   continuityStateFromSession,
   messagesForNextTurn,
@@ -2414,7 +2413,10 @@ export function App(): React.ReactElement {
   const activeTab = state.tabs.find((tab) => tab.id === state.uiMode.activeTabId) ?? state.tabs[0];
   const terminalWidth = (process.stdout.columns ?? Number(process.env.COLUMNS ?? "0")) || 120;
   const terminalHeight = (process.stdout.rows ?? Number(process.env.LINES ?? "0")) || 30;
-  const compactShell = terminalWidth <= 90;
+  const helmViewportProfile = viewportProfile(terminalWidth, terminalHeight);
+  const compactShell = helmViewportProfile === "compact"
+    || helmViewportProfile === "survival"
+    || helmViewportProfile === "resize-safe";
   // F-021: offsets re-derived from measured boot chrome — compact: header 4 +
   // summary 1 + tab bar 1 + pane chrome 3 + composer 3 + footer 5 = 17; wide
   // chrome measures ~22-24 but the offset stays at 20 so the expanded-trace
@@ -2686,8 +2688,8 @@ export function App(): React.ReactElement {
     // The confirmation rides the SAME assistant-event canonicalization as real
     // backend answers (F-173), so steering the UI reads like a conversation:
     // you ask, the Helm answers, the turn closes ✓ — multi-line tour included.
-    const respond = (message: string, activateTabId = "chat"): void => {
-      queueAppActions(dispatch, [
+    const respond = (message: string, activateTabId: string | null = "chat"): void => {
+      const actions: AppAction[] = [
         {
           type: "execution.events.ingest",
           events: [
@@ -2700,9 +2702,12 @@ export function App(): React.ReactElement {
             localCommandResultExecutionEvent(submitted, message.split("\n")[0] ?? message),
           ],
         },
-        {type: "tab.activate", tabId: activateTabId},
         {type: "status.set", value: message.split("\n")[0] ?? message},
-      ]);
+      ];
+      if (activateTabId) {
+        actions.splice(1, 0, {type: "tab.activate", tabId: activateTabId});
+      }
+      queueAppActions(dispatch, actions);
     };
     if (intent.kind === "layout") {
       dispatch({type: "layout.mode.set", mode: intent.mode});
@@ -2746,17 +2751,18 @@ export function App(): React.ReactElement {
       return;
     }
     if (intent.kind === "rail") {
-      const next = intent.on === "toggle" ? !stateRef.current.uiMode.railVisible : intent.on;
-      // The rail lives only in the cockpit face — turning it on brings the
-      // operator there so they can see it beside the Helm's panes.
-      if (next && stateRef.current.uiMode.layoutMode !== "cockpit") {
+      const opening = intent.on === "toggle"
+        ? stateRef.current.uiMode.activeOverlay.kind !== "paneSwitcher"
+        : intent.on;
+      if (opening && stateRef.current.uiMode.layoutMode !== "cockpit") {
         dispatch({type: "layout.mode.set", mode: "cockpit"});
       }
-      dispatch({type: "rail.set", visible: next});
+      dispatch({type: opening ? "paneSwitcher.open" : "paneSwitcher.close"});
       respond(
-        next
-          ? "Navigator docked — chat rides the right rail while the Helm's panes stay visible. Say \"undock\" or /rail to hide it."
-          : "Navigator undocked. /rail or \"dock the chat\" brings it back.",
+        opening
+          ? "Navigator opened — choose a facet inside the five-place Helm. Esc closes it."
+          : "Navigator closed.",
+        null,
       );
       return;
     }
@@ -2776,7 +2782,7 @@ export function App(): React.ReactElement {
     // FACE-3: the reading-first manuscript face.
     if (text === "/scroll") return {kind: "layout", mode: "scroll"};
     if (text === "/tour") return {kind: "tour"};
-    // Navigator rail: /navigator and /rail toggle the persistent chat rail.
+    // Legacy /rail spelling now opens/closes the five-place navigator.
     if (text === "/navigator" || text === "/rail") return {kind: "rail", on: "toggle"};
     return null;
   }
@@ -3386,17 +3392,13 @@ export function App(): React.ReactElement {
       return;
     }
     if (key.ctrl && input === "b") {
-      const current = stateRef.current.uiMode.sidebarVisible;
-      const statusMap: Record<string, string> = {
-        visible: "sidebar collapsed",
-        collapsed: "sidebar hidden",
-        hidden: `sidebar -> ${stateRef.current.uiMode.sidebarMode}`,
-      };
-      dispatch({type: "sidebar.toggle"});
-      dispatch({
-        type: "status.set",
-        value: statusMap[current] ?? "sidebar",
-      });
+      if (contextControlForLayout(stateRef.current.uiMode.layoutMode) === "legacy-sidebar") {
+        dispatch({type: "sidebar.toggle"});
+        dispatch({type: "status.set", value: "legacy deck context toggled"});
+      } else {
+        dispatch({type: "paneSwitcher.open"});
+        dispatch({type: "status.set", value: "context navigator opened"});
+      }
       return;
     }
     if (key.ctrl && input === "l") {
@@ -3530,8 +3532,8 @@ export function App(): React.ReactElement {
 
   // F-111: zen is the boot default and contains the transcript, persistent
   // Python-owned OnCall truth, the composer, and one thin status line — the
-  // Claude Code-grade main stage. Tab/^K still navigate: any non-chat pane or
-  // overlay falls through to full cockpit chrome; returning to chat restores zen.
+  // Claude Code-grade main stage. Selecting a facet unfolds the same Nihonga
+  // Helm below; it never falls through to the retired command-post shell.
   if (
     state.uiMode.layoutMode === "zen" &&
     activeTab?.kind === "chat" &&
@@ -3592,8 +3594,8 @@ export function App(): React.ReactElement {
   // FACE-3 the scroll: a reading-first manuscript — the conversation as a
   // clean centered column (~80 cols), one thin wave rule between turns, and
   // persistent Python-owned OnCall truth. Other telemetry remains folded behind
-  // a single toggleable drawer row (^D). The composer carries the frame's only
-  // border; Tab/^K still fall through to cockpit chrome below.
+  // a single toggleable drawer row (^D). Selecting a facet unfolds the same
+  // Nihonga Helm below; returning to Chat restores the manuscript face.
   if (
     state.uiMode.layoutMode === "scroll" &&
     activeTab?.kind === "chat" &&
@@ -3635,6 +3637,85 @@ export function App(): React.ReactElement {
         </Box>
         <Box flexGrow={1} />
       </Box>
+    );
+  }
+
+  const controlSurfacePreview = decorateSurfacePreview(
+    state.liveControlPreview ?? state.tabs.find((tab) => tab.id === "control")?.preview,
+    "control",
+    state.bridgeStatus,
+    state.authoritativeSurfaces,
+  );
+  const activeControlPreview = decorateSurfacePreview(
+    controlPanePreview(
+      state.liveControlPreview ??
+        activeTab?.preview ??
+        state.tabs.find((tab) => tab.id === "control")?.preview,
+      state.liveRepoPreview ?? state.tabs.find((tab) => tab.id === "repo")?.preview,
+    ),
+    "control",
+    state.bridgeStatus,
+    state.authoritativeSurfaces,
+  );
+  const activeFacet = (
+    <ActiveFacet
+      state={state}
+      activeTab={activeTab}
+      modelChoices={modelChoices}
+      compact={compactShell}
+      scrollOffset={activeScrollOffset}
+      windowSize={paneWindowSize}
+      repoPreview={decorateSurfacePreview(
+        state.liveRepoPreview ?? activeTab?.preview,
+        "repo",
+        state.bridgeStatus,
+        state.authoritativeSurfaces,
+      )}
+      controlPreview={controlSurfacePreview}
+      activeControlPreview={activeControlPreview}
+      displayedTranscriptLines={displayedTranscriptLines}
+      transcriptMeta={transcriptMeta}
+    />
+  );
+
+  if (usesNihongaShell(state.uiMode.layoutMode)) {
+    const chatTab = state.tabs.find((tab) => tab.kind === "chat");
+    const chatLines = displayedTranscriptLinesForTab(chatTab, state);
+    const chatMeta = transcriptMetaForTab(chatTab);
+    const chatScrollOffset = Math.min(
+      state.paneScrollOffsets[chatTab?.id ?? "chat"] ?? 0,
+      scrollMaxOffsetForTab(chatTab, state, paneWindowSize),
+    );
+    return (
+      <NihongaCockpit
+        width={terminalWidth}
+        height={terminalHeight}
+        activeTab={activeTab}
+        overlayActive={state.uiMode.activeOverlay.kind !== "none"}
+        activeFacet={activeFacet}
+        transcriptLines={chatLines}
+        transcriptScrollOffset={chatScrollOffset}
+        transcriptWindowSize={paneWindowSize}
+        transcriptSubtitle={chatMeta.subtitle}
+        transcriptEmptyState={chatMeta.emptyState}
+        transcriptAccentColor={chatMeta.accentColor}
+        regions={projectWholeOrganism({
+          bridgeStatus: state.bridgeStatus,
+          activeTurn: state.activeTurn,
+          routePolicy: state.routePolicy,
+          onCallTruth: state.onCallTruth,
+          authority: state.authoritativeSurfaces,
+        })}
+        events={state.executionEventLog}
+        prompt={state.prompt}
+        composerFocused={state.uiMode.keyboardFocus === "composer"}
+        activeTurn={state.activeTurn}
+        routePolicy={state.routePolicy}
+        liveRouteLabel={liveRouteLabel}
+        bridgeStatus={state.bridgeStatus}
+        onCallTruth={state.onCallTruth}
+        statusMode={focusModeFor(activeTab, state)}
+      />
     );
   }
 
@@ -3695,88 +3776,7 @@ export function App(): React.ReactElement {
             content at natural height so the outer overflow CLIPS instead of
             Yoga crushing columns into garble (F-022 clip-don't-squeeze). */}
         <Box flexShrink={0} flexGrow={1} flexDirection="column">
-        {state.uiMode.activeOverlay.kind === "paneSwitcher" ? (
-          <PaneSwitcher
-            tabs={state.tabs}
-            selectedIndex={Math.min(state.uiMode.activeOverlay.selectedIndex, Math.max(state.tabs.length - 1, 0))}
-          />
-        ) : state.uiMode.activeOverlay.kind === "modelPicker" ? (
-          <ModelPicker
-            choices={modelChoices}
-            selectedIndex={Math.min(state.uiMode.activeOverlay.selectedIndex, Math.max(modelChoices.length - 1, 0))}
-            title="Model Picker"
-            compact={compactShell}
-          />
-        ) : activeTab?.kind === "repo" ? (
-          <RepoPane
-            title={activeTab.title}
-            preview={decorateSurfacePreview(state.liveRepoPreview ?? activeTab.preview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
-            controlPreview={decorateSurfacePreview(state.liveControlPreview ?? state.tabs.find((tab) => tab.id === "control")?.preview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
-            controlLines={state.tabs.find((tab) => tab.id === "control")?.lines ?? []}
-            lines={activeTab.lines}
-            scrollOffset={activeScrollOffset}
-            windowSize={paneWindowSize}
-            selectedSectionIndex={state.paneFocusIndices[activeTab.id] ?? 0}
-          />
-        ) : activeTab?.kind === "control" || activeTab?.kind === "runtime" ? (
-          <ControlPane
-            title={activeTab.title}
-            mode={activeTab.kind}
-            preview={
-              decorateSurfacePreview(
-                controlPanePreview(
-                  state.liveControlPreview ??
-                    activeTab.preview ??
-                    state.tabs.find((tab) => tab.id === "control")?.preview,
-                  state.liveRepoPreview ?? state.tabs.find((tab) => tab.id === "repo")?.preview,
-                ),
-                "control",
-                state.bridgeStatus,
-                state.authoritativeSurfaces,
-              )
-            }
-            lines={
-              activeTab.kind === "runtime" && activeTab.lines.length === 0
-                ? (state.tabs.find((tab) => tab.id === "control")?.lines ?? [])
-                : activeTab.lines
-            }
-            scrollOffset={activeScrollOffset}
-            windowSize={paneWindowSize}
-            selectedSectionIndex={state.paneFocusIndices[activeTab.id] ?? 0}
-          />
-        ) : activeTab?.kind === "approvals" ? (
-          <ApprovalsPane title={activeTab.title} approvalPane={state.approvalPane} />
-        ) : activeTab?.kind === "sessions" ? (
-          <SessionsPane
-            title={activeTab.title}
-            sessionPane={state.sessionPane}
-            sessionContinuity={state.sessionContinuity}
-          />
-        ) : activeTab?.kind === "agents" ? (
-          <AgentsPane
-            title={activeTab.title}
-            lines={activeTab.lines}
-            selectedRouteIndex={state.paneFocusIndices[activeTab.id] ?? 0}
-          />
-        ) : activeTab?.kind === "thinking" || activeTab?.kind === "tools" || activeTab?.kind === "timeline" ? (
-          <ActivityPane
-            title={activeTab.title}
-            paneKind={activeTab.kind}
-            feed={state.activityFeed}
-            scrollOffset={activeScrollOffset}
-            windowSize={paneWindowSize}
-          />
-        ) : (
-          <TranscriptPane
-            title={activeTab?.title ?? "Workspace"}
-            lines={displayedTranscriptLines}
-            scrollOffset={activeScrollOffset}
-            windowSize={paneWindowSize}
-            subtitle={transcriptMeta.subtitle}
-            emptyState={transcriptMeta.emptyState}
-            accentColor={transcriptMeta.accentColor}
-          />
-        )}
+        {activeFacet}
         </Box>
         </Box>
         {/* Navigator rail: the sidebar's mirror image on the right edge — a
