@@ -16,7 +16,8 @@ export type UiIntent =
   // cost incident: "change models to glm 4." ran as an agentic claude turn).
   | {kind: "model_unknown"; query: string}
   | {kind: "tour"}
-  // Navigator rail toggle: dock/undock the persistent chat rail in the cockpit.
+  // Compatibility vocabulary for opening/closing the five-place navigator.
+  // The retired persistent chat rail is not part of the Nihonga Helm.
   | {kind: "rail"; on: boolean | "toggle"};
 
 type PaneRef = {id: string; title: string};
@@ -32,7 +33,8 @@ const UI_NOUN = /\b(mode|view|screen|layout|ui|tui|interface|dashboard|cockpit)\
 
 const PANE_NOUN = /\b(pane|panel|tab|surface|view|plane)\b/i;
 
-// Navigator rail: "dock the chat", "show the navigator", "undock", "hide the rail".
+// Navigator compatibility: legacy rail language resolves to the five-place
+// switcher rather than claiming a persistent rail that no longer renders.
 const RAIL_NOUN = /\b(navigator|rail|copilot|co-pilot)\b/i;
 // Rail-specific verbs (no other surface "docks") — sufficient on their own.
 const RAIL_VERB_OFF = /\b(undock|detach)\b/i;
@@ -55,7 +57,7 @@ export function matchUiIntent(
     return null;
   }
 
-  // Navigator rail — checked BEFORE the imperative gate because "dock"/"undock"
+  // Navigator compatibility — checked BEFORE the imperative gate because "dock"/"undock"
   // are rail-specific verbs that carry no imperative keyword. "dock the chat" /
   // "show the navigator" -> on; "undock" / "hide the rail" -> off. Ambiguous
   // verbs (show/hide/open/close) only count when a rail/chat noun is present.
@@ -291,12 +293,13 @@ export function tourLines(panes: PaneRef[]): string[] {
   return [
     "THE HELM — guided tour",
     "",
-    "Three layouts  (F2 toggles · /zen /cockpit /scroll · or just ask):",
-    "  zen      just this conversation — the boot default, you are here",
-    "  cockpit  full instrument panel — tabs, sidebar, telemetry",
+    "One Helm, three densities  (F2 toggles · /zen /cockpit /scroll):",
+    "  zen      Quiet Field — conversation, truth band, composer",
+    "  cockpit  Whole Helm — 45/35/20 panorama when the viewport permits",
     "  scroll   reading manuscript — centered column, ^D telemetry drawer",
     "",
-    "Panes  (Tab / Shift-Tab cycle · ^K switcher · or ask “open the models tab”):",
+    "Five places  Home · Conversation · Activity · Evidence · System",
+    "Facets  (Tab / Shift-Tab cycle · ^K switcher · or ask “open models”):",
     paneRow1,
     paneRow2,
     "",
@@ -304,7 +307,7 @@ export function tourLines(panes: PaneRef[]): string[] {
     "  Plain prompts go to the model.  Slash commands hit surfaces directly:",
     "  /status /runtime /models /git /memory /approvals /help  (/help lists all)",
     "",
-    "Keys  Enter send · Tab panes · ^K switcher · ^T trace · ^B sidebar · ^C quit",
+    "Keys  Enter send · Tab facets · Esc, then ^K/^B navigator · ^T trace · ^C quit",
     "",
     "Try /cockpit, then “back to zen” to return here.",
   ];

@@ -1,39 +1,39 @@
- ◆ DHARMA COMMAND POST  ·  Control  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Sessions Approvals [Control] Agents Evolution Thinking ▸
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Control                                                                                                              │
-│ control summary, loop health, and next action | j/k or ↑/↓ move between sections                                     │
-│                                                                                                                      │
-│  Sections                                 Control Snapshot                                                           │
-│  control loop cards                       selected control card                                                      │
-│                                           Control-plane snapshot loading...                                          │
-│  ▶ Control Snapshot                                                                                                  │
-│    1 rows                                                                                                            │
-│    Control-plane snapshot loading...                                                                                 │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  HOME  ·  ds_nihonga_helm_frontier_20260814                                         120×40 · panorama
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ◆ Home   · Conversation   · Activity   · Evidence   · System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
+┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
+│ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
+│  Dharma Helm · Quiet Field                         ││ Control                                ││ correlated events ·… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ control summary, loop health, and next ││                      │
+│                                                    ││  action | j/k or ↑/↓ move between      ││ ✖ ENOENT: no such f… │
+│                                                    ││ sections                               ││ ✖ bridge stdin is u… │
+│                                                    ││                                        ││                      │
+│                                                    ││  Sections      Control Snapshot        ││                      │
+│                                                    ││  control       selected control card   ││                      │
+│                                                    ││  loop cards    Control-plane snapshot  ││                      │
+│                                                    ││                loading...              ││                      │
+│                                                    ││  ▶ Control                             ││                      │
+│                                                    ││  Snapshot                              ││                      │
+│                                                    ││    1 rows                              ││                      │
+│                                                    ││    Control-p                           ││                      │
+│                                                    ││  lane                                  ││                      │
+│                                                    ││  snapshot                              ││                      │
+│                                                    ││  loading...                            ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ 2 canonical events … │
+└────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

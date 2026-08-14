@@ -7,6 +7,7 @@ import {THEME} from "../theme";
 type Props = {
   tabs: TabSpec[];
   selectedIndex: number;
+  maximumRows?: number;
 };
 
 export function paneSwitcherWindow(
@@ -21,8 +22,8 @@ export function paneSwitcherWindow(
   return {start, tabs: tabs.slice(start, start + rowCount)};
 }
 
-export function PaneSwitcher({tabs, selectedIndex}: Props): React.ReactElement {
-  const window = paneSwitcherWindow(tabs, selectedIndex);
+export function PaneSwitcher({tabs, selectedIndex, maximumRows}: Props): React.ReactElement {
+  const window = paneSwitcherWindow(tabs, selectedIndex, maximumRows);
   const end = window.start + window.tabs.length;
   return (
     <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
