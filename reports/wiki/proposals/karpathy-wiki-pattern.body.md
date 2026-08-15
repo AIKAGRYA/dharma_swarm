@@ -142,8 +142,9 @@ not a success claim.
 For a new authoritative correction, a complete future loop should discover all
 dependent current claims, produce a reviewable evidence-bound plan, preserve
 raw custody, apply only after real review, refresh derived projections, and
-finish with lint and query checks. A no-input cycle should be red only after its
-freshness SLA is exceeded. None of affected-page discovery, raw custody,
+finish with lint and query checks. A zero-input cycle must be red once its input
+freshness SLA is exceeded; independent lint failures remain red on their own.
+None of affected-page discovery, raw custody,
 automatic projection refresh for arbitrary compiler plans, cited-answer
 synthesis, or idempotent recurring integration is claimed as implemented today.
 

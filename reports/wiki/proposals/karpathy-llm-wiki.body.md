@@ -99,8 +99,8 @@ analysis, due diligence, travel planning, and course notes.
 The bottleneck in a human-maintained wiki is recurring bookkeeping: keeping
 summaries, contradictions, and cross-references consistent as the collection
 grows. An LLM can update many related files in one pass without tiring of that
-work. The design descends from Vannevar Bush's Memex—personal knowledge linked
-by associative trails—but adds a tireless maintainer.
+work. Karpathy relates the design in spirit to Vannevar Bush's Memex—personal
+knowledge linked by associative trails—but adds a tireless maintainer.
 
 ## Attribution boundary
 

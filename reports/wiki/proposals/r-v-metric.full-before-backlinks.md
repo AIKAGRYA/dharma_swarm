@@ -99,7 +99,7 @@ Three incompatible calculations currently share the R_V name:
 
 These backends must never be pooled. The historical “six of eight
 architectures contract” summary is non-poolable under C29 because directions,
-sample sizes, computations, and artifact custody differ. Pythia-2.8B's
+sample sizes, and artifact custody differ. Pythia-2.8B's
 historical expansion row remains disputed under C26 because its raw artifact is
 absent. The P0 Pythia sweep also labels pooled-SD Cohen's `d` as `g` without a
 Hedges J correction (M184).
