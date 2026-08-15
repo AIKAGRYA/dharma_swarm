@@ -1,0 +1,103 @@
+{
+  "id": "titanium-WP-DOCKER-SANDBOX-ADMISSION-R4-20260815",
+  "base_ref": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+  "branch": "governance/docker-sandbox-entrypoint-admission-r4-20260815",
+  "worktree": ".",
+  "intent": "Admission-only proposal for the repository-titanium-hardening-2026-07 owner: add dharma_swarm/docker_sandbox.py and its existing focused test tests/test_docker_sandbox.py to owned_surfaces, and record one still-open next item for a safe explicit entrypoint plus keepalive contract needed by digest-pinned, network-none, read-only-mount test execution. This packet changes no runtime code, claims no implementation or isolation, and does not re-arm evolution.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/titanium-WP-DOCKER-SANDBOX-ADMISSION-R4-20260815.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "tools/**",
+    "docs/plans/**",
+    "reports/governance/**"
+  ],
+  "gates": [
+    {
+      "name": "active-track-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_track_closure_rigor.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "admission-surface-must-be-present",
+      "command": "python3 -c \"from pathlib import Path; text=Path('docs/governance/ACTIVE_TRACK.yaml').read_text(encoding='utf-8'); raise SystemExit(1 if '      - dharma_swarm/docker_sandbox.py' in text and '      - tests/test_docker_sandbox.py' in text else 0)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(titanium): admit Docker sandbox entrypoint prerequisite"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-DOCKER-SANDBOX-ADMISSION-R4",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a5a61b73c8848b86664f9d5bbcf21986df43c02c",
+      "details": []
+    },
+    "interface_mismatches": [
+      "dharma_swarm/docker_sandbox.py ContainerConfig has no explicit entrypoint or keepalive selection, while DockerSandbox._ensure_container appends tail -f /dev/null after every configured image; the dependency-complete digest-pinned dharma-swarm image has a fixed provenance-checking entrypoint that rejects those arguments."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/docker_sandbox.py",
+      "dharma_swarm/sandbox.py",
+      "tests/test_docker_sandbox.py",
+      "docs/governance/ACTIVE_TRACK.yaml"
+    ],
+    "honest_blockers": [
+      "This proposal only admits two future implementation surfaces; it does not implement an entrypoint override, start a container, or prove generated-code isolation.",
+      "A later runtime packet must validate the configured entrypoint and keepalive argv, require a digest-pinned dependency-complete image, set NetworkMode.NONE, mount the workspace read-only, fail closed on invalid configuration, and exercise a real Docker run before any caller wiring is considered.",
+      "Evolution, DiffApplier, sealed-packet proof, agent-runner, and other production callers remain outside this packet and must not be edited or described as re-armed.",
+      "CLAUDE.md and docs/governance/SOVEREIGN_MANIFEST.md may change only through scripts/governance/render_active_track_includes.py; their managed blocks are projections of ACTIVE_TRACK.yaml, not independent policy edits.",
+      "Human merge remains required to ratify the ownership admission."
+    ],
+    "rollback": "Revert the admission-only commit and its tracked packet together. Runtime behavior is unchanged; rollback removes only the proposed Titanium ownership and still-open next item.",
+    "packet_digest": "eff37f72f7fc5786ab1fc81c73c22c6cc1803bed269e85b2c67217df57fa366b"
+  }
+}
