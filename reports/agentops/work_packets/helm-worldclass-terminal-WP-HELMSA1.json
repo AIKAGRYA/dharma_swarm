@@ -1,0 +1,129 @@
+{
+  "id": "helm-worldclass-terminal-WP-HELMSA1",
+  "base_ref": "120f709ced70e35429014352c5dae4025da9968d",
+  "branch": "agent/helm-self-aware-vps-20260815",
+  "worktree": ".",
+  "intent": "Implement Slice 1 of the Nihonga Helm self-awareness contract: a bounded versioned HelmContextEnvelope with explicit AuthorityStamp fields, dependency-injected projections from canonical Python owners only, honest unavailable or unknown states when owners are absent, a read-only bridge request, and a strict TypeScript decoder. Preserve raw prompts and all effect boundaries; do not instantiate RuntimeState, TaskBoard, swarm, A2A, evolution, or MissionControl owners merely to observe them, and do not add provider delivery, UI rendering, input actions, execution, or alternate truth ownership in this slice.",
+  "allowed_files": [
+    "dharma_swarm/operator_core/helm_context.py",
+    "dharma_swarm/operator_core/helm_context_projection.py",
+    "dharma_swarm/terminal_bridge_helm_context.py",
+    "dharma_swarm/terminal_bridge.py",
+    "tests/test_helm_context.py",
+    "tests/test_terminal_bridge_helm_context.py",
+    "tests/fixtures/terminal_bridge/helm_context_v1.json",
+    "terminal/src/helmContext/types.ts",
+    "terminal/src/protocol/helmContext.ts",
+    "terminal/tests/helmContextProtocol.test.ts",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMSA1.json",
+    "HELM_SELF_AWARE_BUILD_STATUS.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/mission_control*.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/archive.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_provider_context.py",
+    "dharma_swarm/tui/engine/adapters/**",
+    "terminal/src/app.tsx",
+    "terminal/src/state.ts",
+    "terminal/src/types.ts",
+    "terminal/src/components/**",
+    "terminal/src/nihonga/**",
+    "api/**",
+    "dashboard/**",
+    ".github/**",
+    "Makefile"
+  ],
+  "gates": [
+    {
+      "name": "helm-context-python",
+      "command": "python3 -m pytest -q tests/test_helm_context.py tests/test_terminal_bridge_helm_context.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "helm-context-ruff",
+      "command": "python3 -m ruff check dharma_swarm/operator_core/helm_context.py dharma_swarm/operator_core/helm_context_projection.py dharma_swarm/terminal_bridge_helm_context.py dharma_swarm/terminal_bridge.py tests/test_helm_context.py tests/test_terminal_bridge_helm_context.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "helm-context-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-context-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "provider-narrative-promotion-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/operator_core/helm_context.py'); t=p.read_text(); old='provider_state_promotion: bool = False'; new='provider_state_promotion: bool = True'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/test_helm_context.py','-k','provider_narrative_cannot_promote_owner_truth']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(helm): add bounded owner context envelope"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELMSA1",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "120f709ced70e35429014352c5dae4025da9968d",
+      "details": []
+    },
+    "interface_mismatches": [
+      "MissionControl exists on current remote main but is absent from this admitted stack, so its projection must remain unavailable until parent reconciliation rather than being replaced.",
+      "RuntimeState and TaskBoard read methods initialize SQLite state; observation must use injected already-running owners and must not guess paths or instantiate them.",
+      "Existing terminal authority is boolean and synthesized, while HelmContextEnvelope requires owner, source, modality, timestamps, expiry, and runtime epoch.",
+      "Existing bridge bootstrap contains configured examples and static zeros that are not canonical observed organism truth."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/operator_core/contracts.py",
+      "dharma_swarm/operator_core/session_store.py",
+      "dharma_swarm/operator_core/session_views.py",
+      "dharma_swarm/terminal_bridge.py",
+      "dharma_swarm/terminal_bridge_session_runtime.py",
+      "terminal/src/protocol/onCallTruth.ts",
+      "docs/plans/nihonga_helm_frontier/NIHONGA_HELM_FRONTIER_MASTER_SPEC.md"
+    ],
+    "honest_blockers": [
+      "MissionControl owner code is absent from this stack and cannot be truthfully projected until its admitted parent is reconciled.",
+      "No live RuntimeState, TaskBoard, SwarmManager, A2A/NATS, or evolution owner is injected into TerminalBridge on this branch; their live projections remain unavailable rather than fabricated.",
+      "NATS at 127.0.0.1:4222 is not listening; filesystem A2A mirrors are compatibility evidence only and do not prove live contact."
+    ],
+    "rollback": "Revert the Slice-1 commit. The envelope is additive, owns no durable store, performs no mutations, and leaves all canonical runtime owners and existing terminal projections unchanged.",
+    "packet_digest": "ddcf485cf3777878a1cf4c2605100bddc47e7c80952125b428e8ec171018f8b6"
+  }
+}

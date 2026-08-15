@@ -71,6 +71,7 @@ from dharma_swarm.terminal_bridge_external_preview import (
     KIMI_K3_MODEL_ID,
     default_external_preview_route,
 )
+from dharma_swarm.terminal_bridge_helm_context import TerminalBridgeHelmContextMixin
 from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
     TerminalBridgeSessionRuntimeMixin,
@@ -104,10 +105,16 @@ class TerminalBridge(
     TerminalBridgeSessionRuntimeMixin,
     TerminalBridgeRouteTruthMixin,
     TerminalBridgeChatMixin,
+    TerminalBridgeHelmContextMixin,
 ):
     """Minimal stdio protocol server for a terminal frontend."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        session_store: SessionStore | None = None,
+        helm_context_sources: object | None = None,
+    ) -> None:
         self._commands = SystemCommandHandler() if SystemCommandHandler is not None else None
         self._adapters: dict[str, Any] = {}
         self._adapter_boot_error: str | None = None
@@ -132,7 +139,8 @@ class TerminalBridge(
             current_runtime_epoch=self._runtime_owner_id,
         )
         self._session_recovery_complete = False
-        self._session_store = SessionStore()
+        self._session_store = session_store if session_store is not None else SessionStore()
+        self._initialize_helm_context(helm_context_sources=helm_context_sources)
         self._chat_history: list[dict[str, str]] = []
         self._ensure_adapters()
 
@@ -473,6 +481,9 @@ class TerminalBridge(
             return
         if request_type == "helm.on_call.request":
             self._emit_helm_on_call_projection(request_id)
+            return
+        if request_type == "helm.context.request":
+            await self._handle_helm_context_request(request_id, request)
             return
         if request_type == "operator.snapshot":
             await self._handle_operator_snapshot(request_id)
@@ -1393,28 +1404,28 @@ class TerminalBridge(
     def _build_git_summary(self) -> dict[str, Any]:
         try:
             branch = subprocess.run(
-                ["git", "-C", str(self._repo_root), "branch", "--show-current"],
+                ["git", "--no-optional-locks", "-C", str(self._repo_root), "branch", "--show-current"],
                 capture_output=True,
                 text=True,
                 timeout=5,
                 check=False,
             ).stdout.strip() or "(detached)"
             head = subprocess.run(
-                ["git", "-C", str(self._repo_root), "rev-parse", "--short", "HEAD"],
+                ["git", "--no-optional-locks", "-C", str(self._repo_root), "rev-parse", "--short", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,
                 check=False,
             ).stdout.strip() or "unknown"
             porcelain = subprocess.run(
-                ["git", "-C", str(self._repo_root), "status", "--porcelain"],
+                ["git", "--no-optional-locks", "-C", str(self._repo_root), "status", "--porcelain"],
                 capture_output=True,
                 text=True,
                 timeout=5,
                 check=False,
             ).stdout
             upstream_process = subprocess.run(
-                ["git", "-C", str(self._repo_root), "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+                ["git", "--no-optional-locks", "-C", str(self._repo_root), "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -1501,7 +1512,7 @@ class TerminalBridge(
 
         try:
             ahead_behind = subprocess.run(
-                ["git", "-C", str(self._repo_root), "rev-list", "--left-right", "--count", f"HEAD...{upstream}"],
+                ["git", "--no-optional-locks", "-C", str(self._repo_root), "rev-list", "--left-right", "--count", f"HEAD...{upstream}"],
                 capture_output=True,
                 text=True,
                 timeout=5,
