@@ -149,7 +149,8 @@ def _load_trusted_owned_surfaces(path: Path) -> tuple[str, ...]:
 
 
 TRUSTED_OWNED_SURFACES = _load_trusted_owned_surfaces(_ACTIVE_TRACK_PATH)
-TRUSTED_OWNED_SURFACES_DIGEST = hashlib.sha256(
+# Public content checksum; "trusted" denotes governance authority, not confidentiality.
+TRUSTED_OWNED_SURFACES_SHA256 = hashlib.sha256(
     json.dumps(TRUSTED_OWNED_SURFACES, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
 
@@ -915,7 +916,7 @@ def _classify_action(
         "policy_digest": policy_digest,
         "gate_fingerprint": gate_fingerprint,
         "authorization_evidence_digest": authorization_evidence["digest"],
-        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_DIGEST,
+        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_SHA256,
         "ai_evidence_id": fact["ai_evidence_id"],
         "ai_evidence_actor": fact["ai_evidence_actor"],
         "operator_warrant_id": fact.get("operator_warrant_id"),
@@ -1019,7 +1020,7 @@ def plan_convergence_actions(
         "planner_authority": dict(_NO_AUTHORITY),
         "owned_surface_policy": {
             "source": str(_ACTIVE_TRACK_PATH.relative_to(REPO_ROOT)),
-            "sha256": TRUSTED_OWNED_SURFACES_DIGEST,
+            "sha256": TRUSTED_OWNED_SURFACES_SHA256,
             "surface_count": len(TRUSTED_OWNED_SURFACES),
         },
         "order": order,
@@ -1144,7 +1145,10 @@ def main(argv=None) -> int:
         result = plan_from_payload(payload)
     else:
         result = _fetch_live(args.limit)
-    print(json.dumps(result, indent=2))
+    # This is the CLI's machine-readable result stream, not a diagnostic log.
+    # The plan contains public repository metadata and integrity digests only.
+    json.dump(result, sys.stdout, indent=2)
+    sys.stdout.write("\n")
     escalations = result.get("operator_inbox") or result.get("escalate") or []
     if escalations:
         print(f"\nescalate to operator: {escalations}", file=sys.stderr)

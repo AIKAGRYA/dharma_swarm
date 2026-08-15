@@ -14,16 +14,18 @@ from scripts.runtime.pr_convergence_policy import (
     HUMAN_EXCEPTION,
     MERGED,
     OPERATOR_CANCELLED,
+    PLAN_SCHEMA,
     QUEUE_CANDIDATE,
     REFRESH_STRANDED,
     REPAIR_CODE,
     REQUEST_REVIEW,
     RERUN_TRANSIENT,
     TRUSTED_POLICY_DIGEST,
-    TRUSTED_OWNED_SURFACES_DIGEST,
+    TRUSTED_OWNED_SURFACES_SHA256,
     WAIT,
     compute_convergence_order,
     is_decision_pr,
+    main,
     overlapping_surface,
     plan_convergence_actions,
     plan_from_payload,
@@ -138,7 +140,7 @@ def _fact(n: int, **overrides):
         "operator_warrant_id": None,
         "operator_warrant_head_sha": None,
         "operator_warrant_actor": None,
-        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_DIGEST,
+        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_SHA256,
         "operator_warrant_kind": None,
         "operator_warrant_state": None,
         "repairable_threads": False,
@@ -379,7 +381,7 @@ def test_docs_low_green_is_only_a_head_bound_queue_candidate() -> None:
         "ai_evidence_actor": "chatgpt-codex-connector[bot]",
         "operator_warrant_id": None,
         "operator_warrant_actor": None,
-        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_DIGEST,
+        "owned_surfaces_digest": TRUSTED_OWNED_SURFACES_SHA256,
         "effect": "request_native_queue_admission_after_live_revalidation",
         "not_a_merge_permit": True,
     }
@@ -833,7 +835,7 @@ def test_trusted_owner_registry_cannot_be_omitted_by_the_caller() -> None:
 
     out = _plan(*facts, files=files)
 
-    assert out["owned_surface_policy"]["sha256"] == TRUSTED_OWNED_SURFACES_DIGEST
+    assert out["owned_surface_policy"]["sha256"] == TRUSTED_OWNED_SURFACES_SHA256
     assert set(out["order"]["escalate"]) == {79, 80}
     assert all(row["action"] == HUMAN_EXCEPTION for row in out["items"])
 
@@ -881,6 +883,24 @@ def test_plan_from_payload_normalizes_json_object_keys() -> None:
 
     assert out["items"][0]["action"] == QUEUE_CANDIDATE
     assert out["order"]["order"] == [90]
+
+
+def test_snapshot_cli_emits_machine_readable_plan(tmp_path, capsys) -> None:
+    payload = {
+        "repo": REPO,
+        "open_prs": [_pr(90)],
+        "pr_files": {"90": ["docs/safe.md"]},
+        "facts": {"90": _fact(90)},
+        "owned_surfaces_complete": True,
+    }
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert main(["--snapshot-json", str(snapshot)]) == 0
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["schema"] == PLAN_SCHEMA
+    assert emitted["items"][0]["action"] == QUEUE_CANDIDATE
 
 
 def test_non_object_snapshot_root_is_rejected_cleanly() -> None:
