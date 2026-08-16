@@ -49,6 +49,8 @@ jobs:
               key="spine-adoption-refresh"; limit="1"; pattern="spine-adoption" ;;
             chore/docops-autorefresh*)
               key="docops-autorefresh";     limit="1"; pattern="chore/docops-autorefresh" ;;
+            chore/self-graph-refresh*)
+              key="self-graph-refresh";     limit="1"; pattern="chore/self-graph-refresh" ;;
             verdict/inter_agent*)
               key="verdict-inter-agent";    limit="3"; pattern="verdict/inter_agent" ;;
             chore/inter-agent*)
