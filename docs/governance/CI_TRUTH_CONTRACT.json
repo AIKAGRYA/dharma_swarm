@@ -1,7 +1,7 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 5,
-  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
+  "version": 6,
+  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow. Completeness is enforced: every PR-visible check name must carry a row here or an explicit exclusion, pinned by tests/test_ci_truth_contract_completeness.py.",
   "required_contexts_manifest": "scripts/governance/ci_parity_manifest.json",
   "required": [
     {
@@ -208,6 +208,190 @@
       "local_command": "git log --format=%s origin/main..HEAD",
       "failure_category": "commit_hygiene",
       "autofix": "manual"
+    },
+    {
+      "id": "agentops_packet_scope",
+      "names": ["AgentOps packet scope"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base <base-sha> --event-head <head-sha>",
+      "failure_category": "packet_scope",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "automerge_tier_policy",
+      "names": ["Automerge tier policy"],
+      "owner": "coordination",
+      "local_command": "python3 scripts/governance/check_automerge_tier_policy.py --help",
+      "failure_category": "merge_policy",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "ci_parity_guard",
+      "names": ["CI parity guard"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "failure_category": "ci_parity",
+      "autofix": "limited"
+    },
+    {
+      "id": "codeowners_blast_radius",
+      "names": ["CODEOWNERS — measured blast-radius routing"],
+      "owner": "architecture",
+      "local_command": "python3 scripts/governance/codeowners_blast_radius.py",
+      "failure_category": "review_routing",
+      "autofix": "manual"
+    },
+    {
+      "id": "cache_token_guard",
+      "names": ["Cache-poisoning and token least-privilege guard"],
+      "owner": "security",
+      "local_command": "python3 scripts/governance/check_workflow_cache_token.py",
+      "failure_category": "workflow_supply_chain",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "kernel_crosshair",
+      "names": ["Crosshair SMT counterexample search"],
+      "owner": "kernel",
+      "local_command": "python3 -m pytest packages/telos-kernel/telos_kernel/tests/test_crosshair.py -q -s",
+      "failure_category": "kernel_verification",
+      "autofix": "manual"
+    },
+    {
+      "id": "hermetic_lockfile",
+      "names": ["Hermetic install — lockfile drift fails"],
+      "owner": "runtime",
+      "local_command": "python3 -m pytest tests/test_hermetic_supply_chain.py -q",
+      "failure_category": "lockfile_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "hygiene_delta_ratchet",
+      "names": ["Hygiene delta-ratchet — touched-file regressions"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/hygiene/delta_ratchet.py",
+      "failure_category": "hygiene_ratchet",
+      "autofix": "limited"
+    },
+    {
+      "id": "import_provenance",
+      "names": ["Import-provenance — third-party declaration ratchet"],
+      "owner": "architecture",
+      "local_command": "python3 scripts/governance/check_import_provenance.py",
+      "failure_category": "import_provenance",
+      "autofix": "limited"
+    },
+    {
+      "id": "bot_pr_intent_limit",
+      "names": ["Intent PR limit"],
+      "owner": "coordination",
+      "local_command": "gh pr list --state open --json headRefName,author",
+      "failure_category": "lane_throttle",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "name_drift",
+      "names": ["Name-drift — first-party import resolution"],
+      "owner": "architecture",
+      "local_command": "python3 scripts/governance/check_name_drift.py",
+      "failure_category": "name_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "onboarding_session_status_job",
+      "names": ["Onboarding session status"],
+      "owner": "onboarding",
+      "local_command": "make onboard && python3 -m pytest -q tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_onboarding_ci_contract.py",
+      "failure_category": "session_status",
+      "autofix": "manual"
+    },
+    {
+      "id": "spine_bypass_delta",
+      "names": ["Spine bypass delta"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/spine_bypass_report.py --json",
+      "failure_category": "spine_adoption",
+      "autofix": "manual"
+    },
+    {
+      "id": "kernel_import_boundary",
+      "names": ["TCB import & AST boundary"],
+      "owner": "security",
+      "local_command": "python3 -m pytest packages/telos-kernel/telos_kernel/tests/test_import_boundary.py packages/telos-kernel/telos_kernel/tests/test_tcb_loc.py -q",
+      "failure_category": "kernel_boundary",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "semgrep_rule2_behavior",
+      "names": ["anti-slop rule 2 behavioral contract"],
+      "owner": "security",
+      "local_command": "make semgrep && python3 -m pytest tests/test_no_new_substrate.py -q",
+      "failure_category": "static_security",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "forge_bypass_guard",
+      "names": ["dharma forge bypass guard"],
+      "owner": "safety",
+      "local_command": "python3 scripts/governance/check_forge_bypass.py",
+      "failure_category": "rsi_bypass",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "langgraph_differential_oracle",
+      "names": ["differential-oracle"],
+      "owner": "graph",
+      "local_command": "python3 -m pytest tests/test_langgraph_differential_oracle.py -q",
+      "failure_category": "oracle_parity",
+      "autofix": "manual"
+    },
+    {
+      "id": "kernel_tests",
+      "names": ["kernel pytest + hypothesis"],
+      "owner": "kernel",
+      "local_command": "python3 -m pytest packages/telos-kernel/telos_kernel/tests -q",
+      "failure_category": "kernel_tests",
+      "autofix": "manual"
+    },
+    {
+      "id": "surface_manifest_check",
+      "names": ["manifest-check"],
+      "owner": "architecture",
+      "local_command": "python3 tools/manifest_check.py",
+      "failure_category": "surface_manifest_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "pudgala_rigor",
+      "names": ["rigor"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_claim_evidence_binding.py",
+      "failure_category": "claim_evidence",
+      "autofix": "limited"
+    },
+    {
+      "id": "terminal_suite",
+      "names": ["terminal"],
+      "owner": "terminal",
+      "local_command": "make terminal-check",
+      "failure_category": "terminal_suite",
+      "autofix": "manual"
+    },
+    {
+      "id": "kernel_titanium_verify",
+      "names": ["titanium-verify — sound purity/effect certification"],
+      "owner": "kernel",
+      "local_command": "python3 -m pytest packages/titanium-verify/titanium_verify/tests -q --tb=short",
+      "failure_category": "kernel_verification",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "oz_external_verifier",
+      "names": ["verify"],
+      "owner": "governance",
+      "local_command": "gh run view <run-id> --log",
+      "failure_category": "external_verifier",
+      "autofix": "forbidden"
     }
   ]
 }
