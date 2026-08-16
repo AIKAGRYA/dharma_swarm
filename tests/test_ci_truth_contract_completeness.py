@@ -65,12 +65,33 @@ def _triggers(document: dict) -> set[str]:
     return set()
 
 
+def _is_path_filtered(document: dict) -> bool:
+    """True when the workflow only runs for some diffs.
+
+    tests/test_workflow_path_filters.py forbids contracting a check name that
+    a path filter can withhold: on an excluded PR the check never reports, so
+    the CI-truth verdict would read MISSING and degrade for a lane that was
+    never meant to run. Completeness therefore stops where that contract
+    starts -- these names must stay uncontracted.
+    """
+    raw = document.get("on", document.get(True))
+    if not isinstance(raw, dict):
+        return False
+    for trigger in PR_TRIGGERS:
+        spec = raw.get(trigger)
+        if isinstance(spec, dict) and ("paths" in spec or "paths-ignore" in spec):
+            return True
+    return False
+
+
 def _pr_visible_job_names() -> dict[str, str]:
     """Map published job name -> workflow filename, for PR-visible workflows."""
     names: dict[str, str] = {}
     for path in sorted(WORKFLOW_DIR.glob("*.yml")):
         document = _load_yaml(path)
         if not (_triggers(document) & PR_TRIGGERS):
+            continue
+        if _is_path_filtered(document):
             continue
         jobs = document.get("jobs")
         if not isinstance(jobs, dict):
