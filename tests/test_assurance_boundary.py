@@ -226,10 +226,13 @@ def test_zero_parsed_layers_is_broken_not_vacuously_green(boundary):
 KNOWN_DANGLING_LAYERS = {"request_response"}
 
 
-def test_live_manifest_parses_three_spine_layers():
+def test_live_manifest_parses_declared_spine_layers():
     layers = ab.parse_spine_layers(REPO_ROOT)
     assert {layer["id"] for layer in layers} == {
-        "request_response", "dispatch_invocation", "test_acceptance",
+        "request_response",
+        "dispatch_invocation",
+        "test_acceptance",
+        "persistent_dialogue",
     }
 
 
