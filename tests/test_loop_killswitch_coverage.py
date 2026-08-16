@@ -44,7 +44,6 @@ AUTOMATION_TRIGGERS = frozenset(
 GUARDED_LANES = frozenset(
     {
         "automerge.yml",
-        "branch-janitor.yml",
         "codex-mention-router.yml",
         "docops-reconcile-main.yml",
         "hardening-lane.yml",
@@ -60,13 +59,30 @@ GUARDED_LANES = frozenset(
 # than growing a seventh inline copy of the guard.
 SHARED_ACTION_LANES = frozenset(
     {
-        "branch-janitor.yml",
         "docops-reconcile-main.yml",
         "pr-ci-health.yml",
         "pr-dedupe.yml",
         "stale-pr.yml",
     }
 )
+
+# Lanes that SHOULD halt and currently do not. These are open gaps, recorded
+# with the reason they could not be closed here -- deliberately kept separate
+# from EXEMPT_LANES so a real hole is never filed as a design decision.
+DEFERRED_LANES = {
+    "branch-janitor.yml": (
+        "owned by track sovereign-safety-tcb-2026-07; the AgentOps packet-scope "
+        "gate correctly refuses a titanium-scoped packet that edits a sibling "
+        "track's surface, so the guard must land in a packet filed under that "
+        "track. Deletes branches on dispatch"
+    ),
+    "active-track.yml": (
+        "carries the merge-required 'Onboarding admission parity' check, so a "
+        "workflow-level halt would block every merge in the repository. Needs a "
+        "job-level guard on its publish job alone, which force-pushes derived "
+        "status to generated/status on every main push"
+    ),
+}
 
 # Write-capable automated lanes that deliberately keep running while halted.
 # Every entry needs a reason a reviewer can check, not just an allowlist slot.
@@ -82,12 +98,6 @@ EXEMPT_LANES = {
     "walking-brief.yml": (
         "documented in-file exception: operator brief is reporting only and is "
         "the surface an operator reads while deciding whether to resume"
-    ),
-    "active-track.yml": (
-        "carries the merge-required 'Onboarding admission parity' check; "
-        "halting the workflow would block every merge. Its only write is the "
-        "derived, non-authoritative generated/status branch. Guarding that "
-        "single publish job is tracked follow-up work"
     ),
     "codeql.yml": (
         "its write scope is security-events (scan upload), not repository "
@@ -193,11 +203,12 @@ def test_newly_covered_lane_uses_the_shared_action(lane: str):
 
 
 def test_every_write_capable_automated_lane_is_classified():
-    """A new write-capable automated lane must be guarded or explicitly exempt."""
-    unclassified = _write_capable_automated_lanes() - GUARDED_LANES - set(EXEMPT_LANES)
+    """A new write-capable automated lane must be guarded, exempt, or deferred."""
+    classified = GUARDED_LANES | set(EXEMPT_LANES) | set(DEFERRED_LANES)
+    unclassified = _write_capable_automated_lanes() - classified
     assert not unclassified, (
-        "these write-capable automated workflows are neither guarded nor "
-        f"exempt from the loop kill-switch: {sorted(unclassified)}"
+        "these write-capable automated workflows are neither guarded, exempt, "
+        f"nor a recorded deferred gap for the loop kill-switch: {sorted(unclassified)}"
     )
 
 
@@ -205,6 +216,27 @@ def test_exemptions_are_real_and_reasoned():
     for lane, reason in EXEMPT_LANES.items():
         assert (WORKFLOW_DIR / lane).is_file(), f"exempt lane {lane} does not exist"
         assert len(reason.strip()) > 30, f"exemption for {lane} needs a real reason"
+
+
+def test_deferred_gaps_are_real_reasoned_and_still_open():
+    """A deferred lane is an admitted hole, not a design decision.
+
+    If one acquires a guard, it must graduate to GUARDED_LANES so the coverage
+    test starts enforcing it, rather than lingering here as a stale excuse.
+    """
+    for lane, reason in DEFERRED_LANES.items():
+        path = WORKFLOW_DIR / lane
+        assert path.is_file(), f"deferred lane {lane} does not exist"
+        assert len(reason.strip()) > 30, f"deferred lane {lane} needs a real reason"
+        assert not _has_guard(path), (
+            f"{lane} now carries a guard; move it from DEFERRED_LANES to "
+            "GUARDED_LANES so its coverage is enforced"
+        )
+
+
+def test_deferred_and_exempt_are_disjoint():
+    overlap = set(DEFERRED_LANES) & set(EXEMPT_LANES)
+    assert not overlap, f"a lane cannot be both an admitted gap and exempt: {overlap}"
 
 
 def test_switch_management_lanes_are_never_guarded():
