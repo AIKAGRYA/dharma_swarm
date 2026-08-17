@@ -2445,7 +2445,20 @@ def test_merge_workflows_cancel_only_superseded_shards_and_rotate_backlog():
     assert "github.event.inputs.mode" in backlog_concurrency["group"]
     assert "FANOUT_OFFSET: ${{ github.run_number }}" in backlog_text
     assert '--fanout-offset "${FANOUT_OFFSET}"' in backlog_text
-    assert 'MERGE_MODE: "off"' in backlog_text
+    # The backlog lane used to prove it was merge-off by pinning
+    # MERGE_MODE: "off". That env var addressed an actuator which could only
+    # ever return SKIPPED, and both are now deleted. The replacement is
+    # stronger: the lane passes no merge flag at all, because none exists.
+    # test_no_workflow_passes_a_flag_the_cli_rejects pins that repo-wide
+    # against build_parser(), so a resurrected flag fails there too.
+    backlog_code = "\n".join(
+        line
+        for line in backlog_text.splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    assert "--merge-mode" not in backlog_code
+    assert "--merge-method" not in backlog_code
+    assert "MERGE_METHOD" not in backlog_code
     assert "auto-when-clean" not in backlog_text
     assert backlog["permissions"]["contents"] == "read"
     assert backlog["permissions"]["pull-requests"] == "read"

@@ -107,10 +107,10 @@ jobs:
           LIMIT: ${{ inputs.limit || '100' }}
           STATUSES: ${{ inputs.statuses || 'GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW' }}
           REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex' }}
-          # The backlog lane is a sensor/packetizer. It has no per-PR,
-          # authenticated MergeAuthorized proof and is hard merge-off.
-          MERGE_MODE: "off"
-          MERGE_METHOD: squash
+          # The backlog lane is a sensor/packetizer. It never had merge
+          # authority: it passed --merge-mode "off" to an actuator that could
+          # only ever return SKIPPED. That actuator is gone and so are the
+          # flags, so there is nothing left here to switch off.
           NATS_REQUIRED: ${{ inputs.nats_required || false }}
           # RUNNER_TEMP is ephemeral. The monotonic Actions run number gives
           # scheduled packet-only passes a deterministic rotating queue start.
@@ -126,8 +126,6 @@ jobs:
             --fanout-offset "${FANOUT_OFFSET}"
             --statuses "${STATUSES}"
             --required-reviewers "${REQUIRED_REVIEWERS}"
-            --merge-mode "${MERGE_MODE}"
-            --merge-method "${MERGE_METHOD}"
             --nats-session
             --nats-timeout-s 8
           )
