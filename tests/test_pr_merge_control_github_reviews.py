@@ -73,12 +73,19 @@ def test_cloud_lanes_never_require_copilot_receipts():
         ".github/workflows/codex-mention-router.yml": (
             "REQUIRED_REVIEWERS: codex",
         ),
+        # MERGE_MODE: "off" was listed here as a fallback until the merge
+        # actuator was deleted. It pinned a mode on a code path that could
+        # only ever return SKIPPED; both the env var and the flag it fed are
+        # gone. The property it stood for -- this lane cannot merge -- is now
+        # structural and pinned harder elsewhere: test_pr_merge_control.py
+        # asserts the lane passes no merge flag, and
+        # test_pr_merge_control_no_actuation.py asserts no merge path exists
+        # to pass one to.
         ".github/workflows/merge-master-mike-backlog.yml": (
             "inputs.required_reviewers || 'codex'",
             "inputs.mode || 'packet-only'",
             "inputs.max_prs || '5'",
             "inputs.limit || '100'",
-                'MERGE_MODE: "off"',
         ),
     }
     for name, fallbacks in expected_fallbacks.items():
