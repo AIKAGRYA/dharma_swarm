@@ -370,30 +370,6 @@ class FailClosedStdlibTests(unittest.TestCase):
 
         self.assertEqual(risk["level"], "HIGH")
 
-    def test_live_base_or_head_drift_remains_blocked(self) -> None:
-        called = False
-
-        def runner(*_args, **_kwargs):
-            nonlocal called
-            called = True
-            return prc.CommandResult(0, "merged", "")
-
-        receipt = prc.run_mike_merge_authority(
-            pr_number=12,
-            gate=_candidate_gate(base_cas_enforced=True),
-            method="squash",
-            auto=False,
-            runner=runner,
-            pr_fetcher=lambda _pr: {
-                "number": 12,
-                "baseRefOid": "c" * 40,
-                "headRefOid": HEAD,
-            },
-        )
-
-        self.assertFalse(called)
-        self.assertEqual(receipt["status"], "SKIPPED")
-
     def test_review_input_is_immune_to_evidence_aba(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             packet_dir = Path(raw)
@@ -456,26 +432,6 @@ class FailClosedStdlibTests(unittest.TestCase):
         self.assertIn("reviewer received original captured evidence", review)
         self.assertNotIn("malicious transient diff", review)
         self.assertTrue(status["receipt_valid"])
-
-    def test_merge_execution_requires_proven_base_cas(self) -> None:
-        called = False
-
-        def runner(*_args, **_kwargs):
-            nonlocal called
-            called = True
-            return prc.CommandResult(0, "merged", "")
-
-        receipt = prc.run_mike_merge_authority(
-            pr_number=12,
-            gate=_candidate_gate(base_cas_enforced=False),
-            method="squash",
-            auto=False,
-            runner=runner,
-            pr_fetcher=lambda _pr: _current_pr(),
-        )
-
-        self.assertFalse(called)
-        self.assertEqual(receipt["reason"], "strict base-CAS enforcement is not proven")
 
 
 if __name__ == "__main__":

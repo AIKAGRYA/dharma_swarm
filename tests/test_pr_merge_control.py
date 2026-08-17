@@ -1330,23 +1330,16 @@ def test_select_fanout_plan_zero_max_does_not_scan_current_packets(tmp_path):
     assert plan == {"selected": [], "skipped_current": []}
 
 
-def test_should_skip_current_fanout_only_for_packet_only_off_mode():
+def test_should_skip_current_fanout_only_for_packet_only():
     base = {
         "reprocess_current": False,
         "packet_only": True,
-        "merge_mode": "off",
     }
 
     assert prc.should_skip_current_fanout(argparse.Namespace(**base)) is True
     assert (
         prc.should_skip_current_fanout(
             argparse.Namespace(**{**base, "packet_only": False})
-        )
-        is False
-    )
-    assert (
-        prc.should_skip_current_fanout(
-            argparse.Namespace(**{**base, "merge_mode": "auto-when-clean"})
         )
         is False
     )
@@ -1457,7 +1450,6 @@ def test_cmd_fanout_records_stage_exceptions_and_continues_queue(
             backup_reviewer_reason="",
             required_reviewers="codex,claude",
             accept_github_reviews=False,
-            merge_mode="off",
             merge_method="squash",
             merge_auto=True,
             nats_session=False,
@@ -1619,7 +1611,6 @@ def test_cmd_fanout_passes_packet_bindings_and_continues_after_bad_facts(
             backup_reviewer_reason="",
             required_reviewers="codex",
             accept_github_reviews=False,
-            merge_mode="off",
             merge_method="squash",
             merge_auto=True,
             nats_session=False,
@@ -1692,7 +1683,6 @@ def test_build_a2a_fanout_messages_targets_dynamic_fleet(tmp_path):
         fanout_dir=tmp_path / "fanout",
         subjects=list(prc.DEFAULT_A2A_NATS_SUBJECTS),
         required_reviewers=["copilot", "claude", "devin"],
-        merge_mode="auto-when-clean",
         dry_run=True,
         packet_only=False,
     )
@@ -1706,9 +1696,9 @@ def test_build_a2a_fanout_messages_targets_dynamic_fleet(tmp_path):
         "claude",
         "devin",
     ]
-    assert messages[0]["payload"]["authority"] == "conditional_merge"
+    assert messages[0]["payload"]["authority"] == "external_worker_evidence_only"
     assert (
-        "conditional_merge_after_clean_gate"
+        "no_merge"
         in messages[0]["payload"]["allowed_actions"]
     )
     assert "unconditional_merge" in messages[0]["payload"]["forbidden_actions"]
@@ -1724,7 +1714,6 @@ def test_publish_a2a_fanout_session_blocks_when_required_secrets_missing(tmp_pat
         fanout_dir=tmp_path / "fanout",
         subjects=["dharma.a2a.fleet"],
         required_reviewers=["copilot", "claude", "devin"],
-        merge_mode="off",
         dry_run=True,
         packet_only=False,
         required=True,
@@ -1873,7 +1862,6 @@ def test_publish_a2a_fanout_session_records_verified_acks_without_secret(tmp_pat
         fanout_dir=tmp_path / "fanout",
         subjects=["dharma.a2a.fleet", "dharma.a2a.merge_master_mike"],
         required_reviewers=["copilot", "claude", "devin"],
-        merge_mode="auto-when-clean",
         dry_run=False,
         packet_only=True,
         required=True,
@@ -1951,255 +1939,12 @@ def test_render_fanout_markdown_states_no_external_authority():
     assert "GitHub comment text is rendered locally only" in text
 
 
-def test_mike_merge_authority_skips_when_gate_blocked():
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate={"decision": "BLOCKED", "blockers": ["missing devin receipt"]},
-        method="squash",
-        auto=True,
-        runner=runner,
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["blockers"] == ["missing devin receipt"]
 
 
-def test_mike_merge_authority_runs_gh_when_gate_clean():
-    seen = {}
-
-    def runner(command, timeout, check):
-        seen["command"] = command
-        seen["timeout"] = timeout
-        seen["check"] = check
-        return prc.CommandResult(0, "merged\n", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate={
-            **_candidate_merge_gate(),
-            "required_reviewers": ["copilot", "claude", "devin"],
-        },
-        method="squash",
-        auto=True,
-        runner=runner,
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-        authority_proof_validator=lambda _proof: [],
-    )
-
-    assert seen == {
-        "command": [
-            "gh",
-            "pr",
-            "merge",
-            "12",
-            "--auto",
-            "--squash",
-            "--delete-branch",
-            "--repo",
-            _TEST_REPO,
-            "--match-head-commit",
-            _SNAPSHOT_HEAD_SHA,
-        ],
-        "timeout": 300,
-        "check": False,
-    }
-    assert receipt["status"] == "MERGE_COMMAND_ACCEPTED"
-    assert receipt["required_reviewers"] == ["copilot", "claude", "devin"]
 
 
-def test_mike_merge_authority_matches_head_commit_when_present():
-    seen = {}
-
-    def runner(command, timeout, check):
-        seen["command"] = command
-        return prc.CommandResult(0, "armed\n", "")
-
-    prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=_candidate_merge_gate(),
-        method="squash",
-        auto=True,
-        runner=runner,
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-        authority_proof_validator=lambda _proof: [],
-    )
-
-    assert seen["command"] == [
-        "gh",
-        "pr",
-        "merge",
-        "12",
-        "--auto",
-        "--squash",
-        "--delete-branch",
-        "--repo",
-        _TEST_REPO,
-        "--match-head-commit",
-        _SNAPSHOT_HEAD_SHA,
-    ]
 
 
-def _candidate_merge_gate():
-    return {
-        "decision": "MERGE_CANDIDATE",
-        "pr": 12,
-        "repo": _TEST_REPO,
-        "blockers": [],
-        "packet_dir": "/tmp/packet",
-        "required_reviewers": [],
-        "head_sha": _SNAPSHOT_HEAD_SHA,
-        "base_sha": _SNAPSHOT_BASE_SHA,
-        "base_cas_enforced": True,
-        "merge_intent": "",
-        "authority_policy": prc.automerge_policy_identity(),
-        "base_ref": "main",
-        "merge_authorization_evidence": _merge_authorization_evidence(),
-        "merge_authority_proof": {"fixture": "trusted-proof"},
-        "risk_snapshot": {
-            "head_sha": _SNAPSHOT_HEAD_SHA,
-            "base_sha": _SNAPSHOT_BASE_SHA,
-        },
-    }
-
-
-@pytest.mark.parametrize(
-    ("mutation", "reason"),
-    [
-        (lambda gate: gate.update(pr=99), "gate PR binding is missing or mismatched"),
-        (
-            lambda gate: gate.update(repo=""),
-            "gate repository binding is missing or invalid",
-        ),
-        (
-            lambda gate: gate["risk_snapshot"].update(head_sha="c" * 40),
-            "gate risk snapshot is missing or mismatched",
-        ),
-    ],
-)
-def test_mike_merge_authority_rejects_incoherent_gate_binding(mutation, reason):
-    gate = _candidate_merge_gate()
-    mutation(gate)
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "merged", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=gate,
-        method="squash",
-        auto=False,
-        runner=runner,
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-        authority_proof_validator=lambda _proof: [],
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == reason
-
-
-def test_mike_merge_authority_rejects_live_base_or_head_drift():
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "merged", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=_candidate_merge_gate(),
-        method="squash",
-        auto=False,
-        runner=runner,
-        pr_fetcher=lambda _pr: _bound_pr_view(base_sha="c" * 40),
-        authority_proof_validator=lambda _proof: [],
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == "live PR binding changed after gate evaluation"
-
-
-def test_mike_merge_authority_prohibits_execution_without_proven_base_cas():
-    gate = _candidate_merge_gate()
-    gate["base_cas_enforced"] = False
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "merged", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=gate,
-        method="squash",
-        auto=False,
-        runner=runner,
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-        authority_proof_validator=lambda _proof: [],
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == "strict base-CAS enforcement is not proven"
-
-
-def test_mike_merge_authority_rejects_missing_or_stale_typed_evidence():
-    gate = _candidate_merge_gate()
-    gate["merge_authorization_evidence"] = None
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=gate,
-        method="squash",
-        auto=False,
-        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-    )
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == (
-        "merge authorization evidence is absent, stale, or mismatched"
-    )
-
-    gate = _candidate_merge_gate()
-    gate["merge_authorization_evidence"]["head_sha"] = "c" * 40
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=gate,
-        method="squash",
-        auto=False,
-        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-    )
-    assert receipt["status"] == "SKIPPED"
-    assert any("head_sha binding" in blocker for blocker in receipt["blockers"])
-
-
-def test_safe_p0_authenticated_merge_authority_is_uninhabited():
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate=_candidate_merge_gate(),
-        method="squash",
-        auto=False,
-        runner=lambda *_args, **_kwargs: pytest.fail("merge command must not run"),
-        pr_fetcher=lambda _pr: _bound_pr_view(),
-    )
-
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == "authenticated merge authority is unavailable"
-    assert any("unavailable in safe P0" in row for row in receipt["blockers"])
 
 
 @pytest.mark.parametrize(
@@ -2265,35 +2010,6 @@ def test_render_github_comment_states_conditional_merge_boundary():
     assert "may not approve, merge" not in text
 
 
-def test_render_github_comment_includes_merge_receipt():
-    packet = {
-        "pr": {"number": 12},
-        "classification": {
-            "status": "GITHUB_GREEN_NEEDS_PACKET",
-            "mergeable": "MERGEABLE",
-        },
-        "risk": {"level": "LOW", "files_changed": 1, "additions": 2, "deletions": 0},
-        "coherence": {"ok": True},
-    }
-    gate = {
-        "decision": "MERGE_CANDIDATE",
-        "blockers": [],
-        "warnings": [],
-        "required_reviewers": ["copilot", "claude", "devin"],
-    }
-    merge_receipt = {
-        "status": "MERGE_COMMAND_ACCEPTED",
-        "reason": "gh pr merge accepted the conditional merge command",
-        "method": "squash",
-        "auto": True,
-        "exit_code": 0,
-    }
-
-    text = prc.render_github_comment(packet, gate, merge_receipt)
-
-    assert "### Merge Request" in text
-    assert "- Status: `MERGE_COMMAND_ACCEPTED`" in text
-    assert "- Auto-merge: `True`" in text
 
 
 def _write_approve_review(
@@ -2865,7 +2581,6 @@ def test_gate_reports_advisory_red_and_pending_without_granting_authority(
     )
 
     assert gate["decision"] == "MERGE_CANDIDATE"
-    assert gate["base_cas_enforced"] is False
     assert gate["merge_authority_proof"] is None
     assert gate["blockers"] == []
     assert any("reported failing checks" in warning for warning in gate["warnings"])
@@ -4080,58 +3795,8 @@ def test_render_github_comment_prefers_current_gate_risk():
     assert "- Packet risk (historical): `LOW` (1 files, +1/-0)" in text
 
 
-def test_run_mike_merge_authority_refuses_candidate_without_head():
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "merged", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate={
-            "decision": "MERGE_CANDIDATE",
-            "packet_dir": "/tmp/packet",
-            "required_reviewers": [],
-            "head_sha": "",
-            "base_sha": _SNAPSHOT_BASE_SHA,
-        },
-        method="squash",
-        auto=True,
-        runner=runner,
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == "gate head SHA is missing or invalid"
 
 
-def test_run_mike_merge_authority_refuses_candidate_without_base():
-    called = False
-
-    def runner(*_args, **_kwargs):
-        nonlocal called
-        called = True
-        return prc.CommandResult(0, "merged", "")
-
-    receipt = prc.run_mike_merge_authority(
-        pr_number=12,
-        gate={
-            "decision": "MERGE_CANDIDATE",
-            "packet_dir": "/tmp/packet",
-            "required_reviewers": [],
-            "head_sha": _SNAPSHOT_HEAD_SHA,
-            "base_sha": "",
-        },
-        method="squash",
-        auto=True,
-        runner=runner,
-    )
-
-    assert called is False
-    assert receipt["status"] == "SKIPPED"
-    assert receipt["reason"] == "gate base SHA is missing or invalid"
 
 
 def _load_bound_review_status(out_dir, agent="codex"):

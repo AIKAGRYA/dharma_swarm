@@ -584,43 +584,57 @@ def test_workflow_contract():
 def test_confirmation_token_is_honest_everywhere():
     """§0 token verdict: merge-pr-N claimed operator consent CI synthesized.
 
-    The live sites must all use automerge-policy-pass-N; the old token may
-    survive only inside an explanatory comment in pr_merge_control.py.
+    The dishonest token must be live nowhere. Since the merge actuator was
+    removed from pr_merge_control.py (the merge queue performs merges and the
+    controller is evidence-only), NEITHER token should appear at a live call
+    site: there is no longer a merge command to confirm. The tier policy still
+    declares the honest prefix for any future consumer that actuates.
     """
     control = (REPO_ROOT / "scripts" / "runtime" / "pr_merge_control.py").read_text()
-    assert 'f"automerge-policy-pass-{args.pr}"' in control
-    live_lines = [
-        line for line in control.splitlines()
-        if "merge-pr-" in line and not line.lstrip().startswith("#")
-    ]
-    assert live_lines == [], f"old token still live in pr_merge_control.py: {live_lines}"
+    for token in ("merge-pr-", "automerge-policy-pass-"):
+        live_lines = [
+            line for line in control.splitlines()
+            if token in line and not line.lstrip().startswith("#")
+        ]
+        assert live_lines == [], (
+            f"{token!r} is live in pr_merge_control.py, which no longer merges: "
+            f"{live_lines}"
+        )
     router = (REPO_ROOT / ".github" / "workflows" / "codex-mention-router.yml").read_text()
-    assert "automerge-policy-pass-${PR_NUMBER}" in router
     assert "merge-pr-${PR_NUMBER}" not in router
+    assert "automerge-policy-pass-${PR_NUMBER}" not in router, (
+        "the router no longer confirms a merge; Mike is evidence-only"
+    )
     assert POLICY["confirmation_token_prefix"] == "automerge-policy-pass-"
 
 
-def test_router_runs_binding_evaluation_before_arming_token():
-    """The token is a policy verdict, not a spelling: the router must run
-    the evaluator in --assume-unattended mode before the merge command ever
-    sees the token (Codex review on PR #1160)."""
+def test_router_evaluates_binding_policy_and_arms_no_token():
+    """The evaluator still runs; there is no longer a token for it to arm.
+
+    Originally this asserted the policy evaluator ran before the merge command
+    saw its confirmation token (Codex review on PR #1160). The merge command is
+    gone -- the merge queue performs merges -- so the honest invariant is that
+    the evaluator still produces a typed permit for the gate while no
+    confirmation token is armed anywhere in the lane.
+    """
     router = (REPO_ROOT / ".github" / "workflows" / "codex-mention-router.yml").read_text()
-    gate_at = router.index("--assume-unattended")
-    token_at = router.index("automerge-policy-pass-${PR_NUMBER}")
-    assert gate_at < token_at, "evaluator gate must precede the armed token"
+    assert "--assume-unattended" in router
     assert "check_automerge_tier_policy.py" in router
+    assert "automerge-policy-pass-${PR_NUMBER}" not in router, (
+        "a merge confirmation token is armed in a lane that cannot merge"
+    )
 
 
-def test_router_passes_typed_permit_to_gate_and_merge_and_disarms_backlog():
+def test_router_passes_typed_permit_to_gate_and_never_to_an_actuator():
     router = (REPO_ROOT / ".github/workflows/codex-mention-router.yml").read_text()
     evaluator_at = router.index("--output \"${authorization_report}\"")
     gate_at = router.index("gate \\")
-    merge_at = router.index("merge \\")
-    assert evaluator_at < gate_at < merge_at
-    assert router.count('--merge-authorization "${authorization_report}"') == 2
+    assert evaluator_at < gate_at
+    # Exactly one consumer of the typed permit: the deterministic gate.
+    assert router.count('--merge-authorization "${authorization_report}"') == 1
+    assert "\n                  merge \\" not in router, "router still invokes a merge command"
     backlog_block = router[router.index('if [ "${BACKLOG_REQUESTED}"') : gate_at]
-    assert "merge_mode=off" in backlog_block
-    assert "merge_mode=auto-when-clean" not in backlog_block
+    assert "merge_mode" not in backlog_block, "backlog still threads a merge mode"
     assert "--human-approved" not in router
     assert "merge-master-mike-pr-${{" in router
     assert "cancel-in-progress: true" in router
