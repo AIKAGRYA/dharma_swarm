@@ -12,6 +12,7 @@ on:
     branches: [main, "promote/**", "governance/**", "codex/**"]
     types: [opened, edited, reopened, synchronize, ready_for_review]
   merge_group:
+    types: [checks_requested]
 
 concurrency:
   group: coherence-delta-${{ github.ref }}
@@ -33,22 +34,70 @@ jobs:
   coherence-delta:
     name: Coherence Delta PR body
     runs-on: ubuntu-latest
-    # On merge_group batches there is no PR context (body, head/base
-    # SHAs); these PR-shaped validations already passed on the PR run
-    # before the PR entered the queue. Skipped = satisfied for required
-    # checks, so the queue is not blocked.
+    # A merge-group payload has no constituent PR bodies. The queue therefore
+    # re-attests the exact synthetic head and inherits body admission from the
+    # already-required PR checks; ALLGREEN queue policy is the authority that
+    # keeps a failing PR out of this path. This job still executes and can fail
+    # on malformed or mis-targeted queue evidence.
     # Also skip closed/merged PRs: bots edit PR bodies post-merge, and an
     # `edited` run spawned after merge can leave the required context in a
     # non-success state on the head SHA with no later event to repair it.
     if: >-
-      github.event_name != 'merge_group' &&
-      github.event.pull_request.state == 'open'
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.state == 'open')
     timeout-minutes: 5
     steps:
-      - name: Checkout
+      - name: Checkout exact event head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Attest merge-group candidate
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          MERGE_GROUP_ACTION: ${{ github.event.action }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          validate_sha() {
+            local label="$1"
+            local sha="$2"
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error::${label} is not an exact 40-character commit SHA"
+              exit 2
+            fi
+            git cat-file -e "${sha}^{commit}"
+          }
+
+          if [ "$MERGE_GROUP_ACTION" != "checks_requested" ]; then
+            echo "::error::Unexpected merge-group action ${MERGE_GROUP_ACTION}"
+            exit 2
+          fi
+          if [ "$MERGE_GROUP_BASE_REF" != "refs/heads/main" ]; then
+            echo "::error::Merge group targets ${MERGE_GROUP_BASE_REF}, not refs/heads/main"
+            exit 2
+          fi
+          validate_sha merge_group.base_sha "$MERGE_GROUP_BASE_SHA"
+          validate_sha merge_group.head_sha "$MERGE_GROUP_HEAD_SHA"
+          actual_head="$(git rev-parse HEAD)"
+          if [ "$actual_head" != "$MERGE_GROUP_HEAD_SHA" ]; then
+            echo "::error::checkout HEAD ${actual_head} does not match merge-group head ${MERGE_GROUP_HEAD_SHA}"
+            exit 2
+          fi
+          if ! git merge-base --is-ancestor \
+              "$MERGE_GROUP_BASE_SHA" "$MERGE_GROUP_HEAD_SHA"; then
+            echo "::error::merge-group base is not an ancestor of its synthetic head"
+            exit 2
+          fi
+          echo "Merge-group candidate attested on exact synthetic head ${MERGE_GROUP_HEAD_SHA}."
 
       - name: Fetch PR comments (comment fallback)
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -60,6 +109,7 @@ jobs:
       # Best-effort by design (continue-on-error): fork PRs get a read-only
       # token and cannot post comments. The validate step below is the gate.
       - name: Self-heal — derive + post Coherence Delta if missing
+        if: ${{ github.event_name == 'pull_request' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,6 +135,7 @@ jobs:
           fi
 
       - name: Validate Coherence Delta fields
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |

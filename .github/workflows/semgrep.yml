@@ -20,6 +20,7 @@ on:
     # follow-up, not done here. Filtering it back at the workflow level is not
     # the fix and is blocked by test_workflow_path_filters.py.
   merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   schedule:
@@ -46,10 +47,12 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
 
     steps:
-      - name: Checkout
+      - name: Checkout exact event head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.event.after || github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Run Semgrep CI
         # In CI we run BOTH the local .semgrep/ rules and the registry
@@ -75,19 +78,100 @@ jobs:
       - name: Strict gate (local rules only)
         # Local .semgrep/ rules are our owned signal. Fail the build on
         # any ERROR in our own rules — registry packs are advisory only.
+        shell: sh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          MERGE_GROUP_ACTION: ${{ github.event.action }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.event.after }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            base="${{ github.event.before }}"
-          else
-            base=""
+          set -eu
+          zero_sha="0000000000000000000000000000000000000000"
+
+          validate_sha() {
+            label="$1"
+            sha="$2"
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error::${label} is not an exact 40-character commit SHA"
+              exit 2
+            fi
+            git cat-file -e "${sha}^{commit}"
+          }
+
+          base=""
+          head=""
+          full_scan="false"
+          case "$EVENT_NAME" in
+            pull_request)
+              base="$PR_BASE_SHA"
+              head="$PR_HEAD_SHA"
+              ;;
+            merge_group)
+              if [ "$MERGE_GROUP_ACTION" != "checks_requested" ]; then
+                echo "::error::Unexpected merge-group action ${MERGE_GROUP_ACTION}"
+                exit 2
+              fi
+              if [ "$MERGE_GROUP_BASE_REF" != "refs/heads/main" ]; then
+                echo "::error::Merge group targets ${MERGE_GROUP_BASE_REF}, not refs/heads/main"
+                exit 2
+              fi
+              base="$MERGE_GROUP_BASE_SHA"
+              head="$MERGE_GROUP_HEAD_SHA"
+              ;;
+            push)
+              head="$PUSH_AFTER_SHA"
+              if [ "$PUSH_BEFORE_SHA" = "$zero_sha" ]; then
+                full_scan="true"
+              else
+                base="$PUSH_BEFORE_SHA"
+              fi
+              ;;
+            schedule)
+              # The weekly main audit deliberately scans the whole tree.
+              head="$EVENT_SHA"
+              full_scan="true"
+              ;;
+            *)
+              echo "::error::Unsupported Semgrep event ${EVENT_NAME}"
+              exit 2
+              ;;
+          esac
+
+          validate_sha event_head "$head"
+          actual_head="$(git rev-parse HEAD)"
+          if [ "$actual_head" != "$head" ]; then
+            echo "::error::checkout HEAD ${actual_head} does not match event head ${head}"
+            exit 2
           fi
 
-          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off --baseline-commit "$base"
+          if [ -n "$base" ]; then
+            validate_sha event_base "$base"
+            if [ "$EVENT_NAME" = "pull_request" ]; then
+              merge_base="$(git merge-base "$base" "$head")"
+              validate_sha event_merge_base "$merge_base"
+              base="$merge_base"
+            elif ! git merge-base --is-ancestor "$base" "$head"; then
+                echo "::error::event base ${base} is not an ancestor of event head ${head}"
+                exit 2
+            fi
+          fi
+
+          if [ "$full_scan" = "true" ]; then
+            scripts/governance/run_semgrep_with_ca.sh \
+              --config .semgrep --error --metrics=off
           else
-            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off
+            if [ -z "$base" ]; then
+              echo "::error::Delta Semgrep event ${EVENT_NAME} has no validated base"
+              exit 2
+            fi
+            scripts/governance/run_semgrep_with_ca.sh \
+              --config .semgrep --error --metrics=off --baseline-commit "$base"
           fi
 
   # ===========================================================================

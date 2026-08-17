@@ -1,5 +1,6 @@
 """Walking brief: pure-composition tests + workflow contract pins (PR-C)."""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,20 @@ def _base_data(**overrides):
         "walk_ready": [],
         "automerge_log": [],
         "nightly_main": {"conclusion": "success", "url": "https://x", "completed_at": "t"},
+        "router_workflow": {"enabled": True, "state": "active"},
+        "automerge_workflow": {"enabled": True, "state": "active"},
+        "scanner_heartbeat": {
+            "found": True,
+            "conclusion": "success",
+            "completed_at": "2026-07-29T20:59:30Z",
+            "head_sha": "a" * 40,
+        },
+        "router_progress": {
+            "found": True,
+            "conclusion": "success",
+            "completed_at": "2026-07-29T19:00:00Z",
+            "head_sha": "b" * 40,
+        },
         "lane_runs": None,
         "disagreements": None,
         "canary": None,
@@ -33,7 +48,8 @@ def test_brief_carries_marker_and_all_sections():
     body = walking_brief.compose_brief(_base_data())
     assert walking_brief.BRIEF_MARKER in body
     for heading in (
-        "KILLSWITCH", "Merge window", "Automerges", "Nightly main",
+        "KILLSWITCH", "Needs John", "Merge arm", "scanner heartbeat",
+        "Merge window", "Automerges", "Nightly main",
         "Lane runs", "Review disagreements", "Canary results",
         "Ingested from your comments",
     ):
@@ -203,6 +219,133 @@ def test_pending_nightly_renders_pending_not_red():
     )
     assert "🟡" in body
     assert "🔴" not in body
+
+
+# --- PR-C3 truthful merge-control inbox ----------------------------------
+
+
+def test_workflow_state_is_tri_state_and_fail_closed(monkeypatch):
+    calls = []
+
+    def fake(args):
+        calls.append(args)
+        if args[-1].endswith("automerge.yml"):
+            return {"state": "disabled_manually"}
+        if args[-1].endswith("codex-mention-router.yml"):
+            return {"state": "active"}
+        return None
+
+    monkeypatch.setattr(walking_brief, "_gh_json", fake)
+    assert walking_brief.gather_workflow_state(
+        "owner/repo", walking_brief.AUTOMERGE_WORKFLOW
+    )["enabled"] is False
+    assert walking_brief.gather_workflow_state(
+        "owner/repo", walking_brief.ROUTER_WORKFLOW
+    )["enabled"] is True
+    assert walking_brief.gather_workflow_state(
+        "owner/repo", "missing.yml"
+    )["enabled"] is None
+    assert all(call[0] == "api" for call in calls)
+
+
+def test_disabled_is_red_and_unknown_never_looks_enabled():
+    body = walking_brief.compose_brief(
+        _base_data(
+            router_workflow={"enabled": False, "state": "disabled_manually"},
+            automerge_workflow={"enabled": None, "state": "unknown"},
+        )
+    )
+    merge_section = body.split("### 🔐 Merge arm + router activity", 1)[1].split(
+        "### 🔎", 1
+    )[0]
+    assert "🔴 Router: **DISABLED**" in merge_section
+    assert "🟠 Automerge: **UNKNOWN**" in merge_section
+    assert "🟢 Automerge" not in merge_section
+
+
+def test_scanner_heartbeat_and_router_progress_are_separate_queries(monkeypatch):
+    calls = []
+
+    def fake(args):
+        endpoint = args[-1]
+        calls.append(endpoint)
+        return {
+            "workflow_runs": [
+                {
+                    "conclusion": "success",
+                    "updated_at": "2026-07-29T20:59:30Z",
+                    "head_sha": "c" * 40,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(walking_brief, "_gh_json", fake)
+    assert walking_brief.gather_scanner_heartbeat("owner/repo")["found"] is True
+    assert walking_brief.gather_router_progress("owner/repo")["found"] is True
+    assert walking_brief.BACKLOG_WORKFLOW in calls[0]
+    assert "event=workflow_dispatch" not in calls[0]
+    assert walking_brief.ROUTER_WORKFLOW in calls[1]
+    assert "event=workflow_dispatch" in calls[1]
+    assert "status=success" not in calls[1]
+
+
+def test_fresh_packet_scanner_never_claims_merge_health_and_age_is_deterministic():
+    body = walking_brief.compose_brief(
+        _base_data(
+            generated_at="2026-07-29T21:00:00Z",
+            router_progress={
+                "found": True,
+                "completed_at": "2026-07-29T19:00:00Z",
+                "head_sha": "d" * 40,
+            },
+            scanner_heartbeat={
+                "found": True,
+                "conclusion": "success",
+                "completed_at": "2026-07-29T20:59:30Z",
+                "head_sha": "e" * 40,
+            },
+        )
+    )
+    merge_section = body.split("### 🔐 Merge arm + router activity", 1)[1].split(
+        "### 🔎", 1
+    )[0]
+    scanner_section = body.split("### 🔎 Mike scanner heartbeat", 1)[1].split(
+        "### 👍", 1
+    )[0]
+    assert "2h ago" in merge_section
+    assert "30s ago" in scanner_section
+    assert "Packet scanner only" in scanner_section
+    assert "not merge authority or merge progress" in scanner_section
+    assert "🟢" not in scanner_section
+
+
+def test_needs_john_is_max_five_control_first_same_repo_links_with_overflow():
+    ready = [
+        {
+            "number": number,
+            "title": f"PR {number} https://attacker.example/bad",
+            "url": "https://attacker.example/not-used",
+            "isDraft": False,
+        }
+        for number in range(1, 7)
+    ]
+    data = _base_data(
+        router_workflow={"enabled": False, "state": "disabled_manually"},
+        automerge_workflow={"enabled": None, "state": "unknown"},
+        walk_ready=ready,
+    )
+    items, overflow = walking_brief.derive_needs_john(data)
+    assert len(items) == walking_brief.MAX_NEEDS_JOHN == 5
+    assert overflow == 3
+    assert "Merge router" in items[0]
+    assert "Automerge" in items[1]
+    for item in items:
+        urls = re.findall(r"https://[^)\s]+", item)
+        assert len(urls) == 1, item
+        assert urls[0].startswith("https://github.com/owner/repo/"), item
+    assert "attacker.example" not in "\n".join(items)
+    body = walking_brief.compose_brief(data)
+    assert "…and 3 additional Needs John item(s) omitted" in body
 
 
 # --- PR-C2 second review round (Greptile + Codex on #1166) ----------------

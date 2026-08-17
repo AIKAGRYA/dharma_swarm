@@ -12,8 +12,10 @@ name: docops-reconcile-main
 #   them back to main.
 #
 # Loop avoidance:
-#   The reconcile commit carries [skip ci], and pushes made with GITHUB_TOKEN do
-#   not trigger new workflow runs — so this job never re-triggers itself.
+#   Only a Tier-1 direct-main commit is amended to carry [skip ci], so this job
+#   never re-triggers itself. A Tier-2 rolling-PR commit deliberately carries no
+#   skip instruction: its pull_request checks are the proof that delivery is
+#   actionable, and this workflow does not listen to pushes on that branch.
 #
 # Delivery (two tiers, honest failure):
 #   Tier 1 — direct push to main. Requires a bypass-capable token as the
@@ -26,9 +28,9 @@ name: docops-reconcile-main
 #   FAILED job, not a warning.
 #   Tier 2 — fallback when no bypass token exists: push the rolling
 #   chore/docops-autorefresh branch (a lane already registered in
-#   bot-pr-limit.yml, max 1 open) and open/refresh a bot PR. The automerge
-#   workflow auto-enrolls bot-authored PRs (bot-pr label) and merges through
-#   the normal gate. If BOTH tiers fail, the job exits non-zero — visible red.
+#   bot-pr-limit.yml, max 1 open) and open/refresh a bot PR through the normal
+#   gate. Queue admission is a separate authority boundary. If BOTH tiers fail,
+#   the job exits non-zero — visible red.
 
 on:
   push:
@@ -39,6 +41,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  checks: read
   contents: write
   pull-requests: write
 
@@ -105,10 +108,74 @@ jobs:
             exit 0
           fi
 
+          required_contexts_present() {
+            local head_sha="$1"
+            local expected_file actual_file missing_file
+            expected_file="$(mktemp)"
+            actual_file="$(mktemp)"
+            missing_file="$(mktemp)"
+
+            python3 - <<'PY' > "$expected_file"
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("scripts/governance/ci_parity_manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          for row in manifest["required_contexts"]:
+              print(row["context"])
+          PY
+            sort -u -o "$expected_file" "$expected_file"
+
+            if ! gh api --paginate --slurp \
+                "repos/${GH_REPO}/commits/${head_sha}/check-runs?per_page=100&filter=all" \
+                | jq -r '
+                  [.[].check_runs[]
+                   | select(.app.id == 15368)
+                   | {id, name, conclusion}]
+                  | group_by(.name)
+                  | map(max_by(.id))
+                  | .[]
+                  | select(.conclusion == "success"
+                           or .conclusion == "neutral"
+                           or .conclusion == "skipped")
+                  | .name
+                ' \
+                > "$actual_file"; then
+              echo "::error::could not read check runs for exact head ${head_sha}"
+              return 1
+            fi
+            sort -u -o "$actual_file" "$actual_file"
+            comm -23 "$expected_file" "$actual_file" > "$missing_file"
+            if [ -s "$missing_file" ]; then
+              echo "Exact head ${head_sha} is missing required GitHub Actions contexts:"
+              sed 's/^/  - /' "$missing_file"
+              return 1
+            fi
+
+            expected_count="$(wc -l < "$expected_file" | tr -d ' ')"
+            echo "Exact head ${head_sha} has accepted terminal conclusions for all ${expected_count} canonical required contexts from GitHub Actions app 15368."
+          }
+
+          verify_required_contexts() {
+            local head_sha="$1"
+            for _attempt in 1 2 3 4; do
+              sleep 15
+              if required_contexts_present "$head_sha"; then
+                return 0
+              fi
+            done
+            echo "::error::reconcile head ${head_sha} did not receive every canonical required context within the wait budget, so this rolling PR is not actionable. Approve any workflow runs awaiting operator action, refresh the exact head, or provision DOCOPS_RECONCILE_TOKEN for direct-main delivery."
+            return 1
+          }
+
           # Tier 2 uses one rolling PR. A new main parent changes the commit
           # identity even when the two canonical files are byte-identical to
-          # that PR's current head; do not force-push and retrigger all CI in
-          # that case.
+          # that PR's current head. Reuse only an exact head that already has
+          # every canonical required context; otherwise refresh it so the PR
+          # event gets another chance to create the missing evidence.
           BRANCH="chore/docops-autorefresh"
           if [ "$HAS_BYPASS_TOKEN" != "true" ]; then
             existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open \
@@ -129,11 +196,16 @@ jobs:
                 | grep -v -x -e 'docs/docops/AUTO_INVENTORY.md' \
                             -e 'docs/governance/SOVEREIGN_MANIFEST.md' || true)"
               if [ -z "$extra_paths" ]; then
-                echo "Canonical DocOps bytes already match the open rolling PR #${existing}; no refresh needed."
-                exit 0
+                remote_head="$(git rev-parse FETCH_HEAD)"
+                if required_contexts_present "$remote_head"; then
+                  echo "Canonical DocOps bytes already match the open rolling PR #${existing}, and its exact head is actionable; no refresh needed."
+                  exit 0
+                fi
+                echo "Canonical DocOps bytes match rolling PR #${existing}, but its exact head lacks required evidence; refreshing it."
+              else
+                echo "Rolling PR #${existing} carries noncanonical paths; resetting via force-push:"
+                printf '%s\n' "$extra_paths"
               fi
-              echo "Rolling PR #${existing} carries noncanonical paths; resetting via force-push:"
-              printf '%s\n' "$extra_paths"
             fi
           fi
 
@@ -146,15 +218,22 @@ jobs:
           # Stage only the two governed count files — never a blanket `git add -A`
           # (respects local rule dharma.scripts-no-git-add-all).
           git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md
+          COMMIT_SUBJECT="chore(docops): reconcile generated counts"
+          COMMIT_BODY="Mechanical post-merge reconcile of the generated DocOps count files (AUTO_INVENTORY.md, SOVEREIGN_MANIFEST.md) from the tree. Generated by docops-reconcile-main.yml. No hand-authored content changed."
           git commit \
-            -m "chore(docops): reconcile generated counts [skip ci]" \
-            -m "Mechanical post-merge reconcile of the generated DocOps count files (AUTO_INVENTORY.md, SOVEREIGN_MANIFEST.md) from the tree. Generated by docops-reconcile-main.yml. No hand-authored content changed."
+            -m "$COMMIT_SUBJECT" \
+            -m "$COMMIT_BODY"
 
           # ---- Tier 1: direct push (only when a bypass-capable token is wired).
           # If another merge moved main between checkout and push, don't rebase
           # stale derived counts onto a newer tree — the newer push triggers its
           # own reconcile run (serialized by this job's concurrency group).
           if [ "$HAS_BYPASS_TOKEN" = "true" ]; then
+            # Only direct-main delivery needs the loop guard. Tier 2 keeps the
+            # original check-triggering commit message.
+            git commit --amend \
+              -m "${COMMIT_SUBJECT} [skip ci]" \
+              -m "$COMMIT_BODY"
             if git push origin HEAD:main; then
               echo "Reconcile delivered by direct push (bypass token)."
               exit 0
@@ -169,40 +248,33 @@ jobs:
 
           # ---- Tier 2: rolling bot PR through the normal merge gate.
           # Lane chore/docops-autorefresh is registered in bot-pr-limit.yml
-          # (max 1 open); automerge.yml auto-enrolls bot-authored PRs.
+          # (max 1 open); admission to the native queue remains separate.
           git push --force origin "HEAD:refs/heads/${BRANCH}"
           # WP-0G (TIT-008): delivery is not success — an actionable PR must
-          # have CHECKS on the delivered head. Events caused by GITHUB_TOKEN
-          # never trigger workflows, so a Tier-2 force-push can silently
-          # produce a checkless head ("the rolling repair PR can lose
-          # checks"). Verify, and go red with the operator fix when no check
-          # run appears on the new head within the wait budget.
-          verify_head_checks() {
-            head_sha="$(git rev-parse HEAD)"
-            for _attempt in 1 2 3 4; do
-              sleep 15
-              count="$(gh api "repos/${GH_REPO}/commits/${head_sha}/check-runs" \
-                --jq '.total_count' 2>/dev/null || echo 0)"
-              if [ "${count:-0}" -gt 0 ]; then
-                echo "Delivered head ${head_sha} has ${count} check run(s)."
-                return 0
-              fi
-            done
-            echo "::error::reconcile head ${head_sha} received no CI checks after force-update — pushes made with GITHUB_TOKEN cannot trigger workflows, so this rolling PR is not actionable. Provision the DOCOPS_RECONCILE_TOKEN bypass secret (fine-grained PAT or GitHub App token) so reconcile events trigger checks, or merge the rolling PR manually."
-            return 1
-          }
+          # have the complete canonical required-context set on the exact
+          # delivered head. A random optional check is not delivery proof.
           existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
-            echo "Refreshed open PR #${existing} on ${BRANCH}; verifying the new head has checks."
-            verify_head_checks
+            echo "Refreshed open PR #${existing} on ${BRANCH}; verifying its exact head has every required context."
+            verify_required_contexts "$(git rev-parse HEAD)"
             exit $?
           fi
+          body_file="${RUNNER_TEMP}/docops-reconcile-pr-body.md"
+          cat > "$body_file" <<'EOF'
+          Mechanical post-merge reconciliation of the two generated DocOps count projections. Tier 2 is used because no `DOCOPS_RECONCILE_TOKEN` bypass secret is provisioned. The rolling branch is refreshed until merged; queue admission remains separate.
+
+          ## Coherence Delta
+          - Organ touched: `docs/docops/AUTO_INVENTORY.md` and `docs/governance/SOVEREIGN_MANIFEST.md` (generated DocOps projections)
+          - Declared-vs-actual gap closed: none — this mechanically reconciles generated counts to the current main tree
+          - Proof that re-reads the map: the DocOps generator re-reads `docs/docops/assertions.yaml`, and the delivery verifier re-reads `scripts/governance/ci_parity_manifest.json`
+          - New drift introduced: none — delivery stages only the two governed generated files
+          EOF
           if gh pr create --repo "$GH_REPO" \
               --head "$BRANCH" --base main \
               --title "chore(docops): reconcile generated counts" \
-              --body "Mechanical post-merge reconcile of the generated DocOps count files (AUTO_INVENTORY.md, SOVEREIGN_MANIFEST.md) from the tree. Generated by docops-reconcile-main.yml (Tier 2 delivery: no DOCOPS_RECONCILE_TOKEN bypass secret is provisioned, so direct push to protected main is impossible). No hand-authored content changed. Rolling branch — force-updated by later reconciles until merged."; then
-            echo "Reconcile delivered as a bot PR on ${BRANCH}; verifying the head has checks."
-            verify_head_checks
+              --body-file "$body_file"; then
+            echo "Reconcile delivered as a bot PR on ${BRANCH}; verifying its exact head has every required context."
+            verify_required_contexts "$(git rev-parse HEAD)"
             exit $?
           fi
           # Neither tier delivered. This job's one purpose failed — say so in red.

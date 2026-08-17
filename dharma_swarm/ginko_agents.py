@@ -608,7 +608,7 @@ async def _call_openrouter(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/shakti-saraswati/dharma_swarm",
+        "HTTP-Referer": "https://github.com/AIKAGRYA/dharma_swarm",
         "X-Title": "Dharmic Quant Ginko Fleet",
     }
 

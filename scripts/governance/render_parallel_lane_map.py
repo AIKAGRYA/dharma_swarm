@@ -221,7 +221,7 @@ def load_open_prs(*, skip_github: bool) -> tuple[list[dict[str, Any]], list[str]
             "pr",
             "list",
             "--repo",
-            "AmitabhainArunachala/dharma_swarm",
+            "AIKAGRYA/dharma_swarm",
             "--state",
             "open",
             "--limit",
