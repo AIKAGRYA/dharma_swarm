@@ -245,28 +245,46 @@ jobs:
             # Guard + rebase + restore: never inline PR-head fetch/rebase/push.
             # The push inside the helper uses the checkout-persisted
             # trusted PAT selected above, so the rebased head triggers CI.
-            python3 scripts/governance/pr_ci_safe_rebase.py \
+            # Capture the helper's message: its EXIT CODE cannot tell success
+            # from a skip. pr_ci_safe_rebase.py sets exit_code = 0 on all 38
+            # `raise Skip` paths -- including "push rejected (lease or remote)",
+            # "rebase conflict; aborted" and "PR head moved before push" -- and
+            # signals real success only with a `REBASED PR #<n>:` prefix. Its
+            # own test pins that: tests/test_pr_ci_safe_rebase.py
+            # ::test_lease_rejection_does_not_report_success asserts
+            # `code == 0` on a rejected push. Gating on the exit code would
+            # treat a refused rebase as a completed one.
+            rebase_out="$(python3 scripts/governance/pr_ci_safe_rebase.py \
               --repo "$REPO" \
               --pr "$pr" \
               --expected-base "$base" \
-              --expected-head "$head" || {
+              --expected-head "$head")" || {
               echo "PR #$pr: safe-rebase helper exited nonzero; no success assumed — inspect helper output"
               continue
             }
-            # The strand label records a PAST fail-closed skip — "this lane had
-            # no push credential at the time" — not a property of the PR. Adding
-            # it without ever removing it makes it a one-way ratchet: a PR
-            # labelled once wears it forever, and reads as abandoned even after
-            # it is rebased and mergeable. Clearing it here is the only place
-            # the lane can prove the stranding is over, because this line is
-            # reached only after the helper actually rebased and pushed.
-            if gh api "repos/$REPO/issues/$pr" --jq '.labels[].name' 2>/dev/null \
-                | grep -qxF "$STRAND_LABEL"; then
-              if gh api -X DELETE \
-                  "repos/$REPO/issues/$pr/labels/$STRAND_LABEL" >/dev/null 2>&1; then
-                echo "PR #$pr: cleared $STRAND_LABEL after a successful rebase"
-              else
-                echo "PR #$pr: could not clear $STRAND_LABEL (non-fatal)"
+            printf '%s\n' "$rebase_out"
+            case "$rebase_out" in
+              "REBASED PR #$pr:"*) ;;
+              *)
+                echo "PR #$pr: helper did not rebase; leaving $STRAND_LABEL in place"
+                continue
+                ;;
+            esac
+            # Only past this point was the PR actually rebased and pushed. The
+            # strand label records a past fail-closed skip -- "this lane had no
+            # push credential at the time" -- not a property of the PR, and it
+            # was previously add-only, so a PR labelled once wore it forever
+            # and read as abandoned while being perfectly mergeable.
+            if label_names="$(gh api "repos/$REPO/issues/$pr" --jq '.labels[].name')"; then
+              if printf '%s\n' "$label_names" | grep -qxF "$STRAND_LABEL"; then
+                if gh api -X DELETE \
+                    "repos/$REPO/issues/$pr/labels/$STRAND_LABEL" >/dev/null 2>&1; then
+                  echo "PR #$pr: cleared $STRAND_LABEL after a confirmed rebase"
+                else
+                  echo "PR #$pr: could not clear $STRAND_LABEL (non-fatal)"
+                fi
               fi
+            else
+              echo "PR #$pr: could not read labels; leaving $STRAND_LABEL alone"
             fi
           done

@@ -590,62 +590,141 @@ def test_rebase_selection_uses_behind_by_not_mergeable_state():
     )
 
 
+# --- Behavioural contract for the strand-label lifecycle -------------------
+#
+# `ci-stranded-rebase-skipped` was add-only: pr-ci-health applied it when it
+# declined a rebase for want of push authority and never removed it, so a PR
+# labelled once wore it permanently. Measured 2026-08-17: nine open PRs carried
+# it while all nine merged cleanly against main.
+#
+# These tests EXECUTE the workflow step's shell against stub `gh` and a stub
+# rebase helper, rather than asserting on the YAML text. An earlier version of
+# this file asserted substring order instead; an adversarial review showed two
+# mutants that kept those assertions green while the workflow deleted labels on
+# rebases that never happened. Byte offsets are not behaviour.
+
+import os as _os
+import shutil as _shutil
+import subprocess as _subprocess
+import textwrap as _textwrap
+
 _WORKFLOW = (
     Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
 )
+_STRAND_LABEL = "ci-stranded-rebase-skipped"
 
 
-def _workflow_code() -> str:
-    """The workflow with comment-only lines stripped.
+def _rebase_step_script() -> str:
+    """The `run:` body of the rebase step, dedented for execution."""
+    lines = _WORKFLOW.read_text(encoding="utf-8").splitlines()
+    start = next(
+        i for i, ln in enumerate(lines)
+        if "Rebase conflict-free behind-main branches" in ln
+    )
+    run_at = next(i for i in range(start, len(lines)) if lines[i].strip() == "run: |")
+    indent = len(lines[run_at]) - len(lines[run_at].lstrip())
+    body = []
+    for ln in lines[run_at + 1:]:
+        if ln.strip() and (len(ln) - len(ln.lstrip())) <= indent:
+            break
+        body.append(ln)
+    return _textwrap.dedent("\n".join(body))
 
-    Prose describing a label is not label handling. Stripping comments keeps
-    these assertions measuring behaviour rather than the note next to it.
+
+def _run_rebase_step(tmp_path, helper_stdout: str, helper_rc: int = 0) -> tuple[str, list[str]]:
+    """Execute the step with stubbed `gh` and stubbed rebase helper.
+
+    Returns (combined output, list of gh argument-lines the step invoked).
     """
-    return "\n".join(
-        line
-        for line in _WORKFLOW.read_text(encoding="utf-8").splitlines()
-        if not line.lstrip().startswith("#")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "gh_calls.log"
+    (bin_dir / "gh").write_text(
+        "#!/usr/bin/env bash\n"
+        f'printf "%s\\n" "$*" >> "{calls}"\n'
+        'case "$*" in\n'
+        f'  *"--jq .labels[].name"*) printf "%s\\n" "{_STRAND_LABEL}"; exit 0 ;;\n'
+        "  *) exit 0 ;;\n"
+        "esac\n"
+    )
+    (bin_dir / "gh").chmod(0o755)
+    (bin_dir / "git").write_text("#!/usr/bin/env bash\nexit 0\n")
+    (bin_dir / "git").chmod(0o755)
+
+    helper = tmp_path / "scripts" / "governance"
+    helper.mkdir(parents=True)
+    (helper / "pr_ci_safe_rebase.py").write_text(
+        f"import sys\nprint({helper_stdout!r})\nsys.exit({helper_rc})\n"
+    )
+    # The step selects its target from triage.json, written by an earlier
+    # step. Supplying a real eligible row exercises the actual jq selector
+    # rather than bypassing it.
+    (tmp_path / "triage.json").write_text(
+        '[{"number": 904, "head": "feat/x", "base": "main",'
+        ' "categories": ["behind_main"]}]'
+    )
+
+    script = _rebase_step_script()
+    # `set -u` is active: every variable the step reads must be supplied, or
+    # bash aborts before the code under test runs.
+    env = dict(_os.environ)
+    env.update(
+        PATH=f"{bin_dir}:{env['PATH']}",
+        REPO="AIKAGRYA/dharma_swarm",
+        HAS_PUSH_TOKEN="true",
+        STRAND_LABEL=_STRAND_LABEL,
+        GH_TOKEN="stub",
+        TARGET_PR="904",
+        MODE="rebase",
+    )
+    proc = _subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=env,
+        capture_output=True, text=True, timeout=60,
+    )
+    logged = calls.read_text().splitlines() if calls.exists() else []
+    return proc.stdout + proc.stderr, logged
+
+
+def _deleted_the_label(gh_calls: list[str]) -> bool:
+    return any("DELETE" in c and _STRAND_LABEL in c for c in gh_calls)
+
+
+def test_label_is_cleared_when_the_helper_reports_a_real_rebase(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "REBASED PR #904: feat@abc onto origin/main")
+    assert _deleted_the_label(calls), (
+        f"a confirmed rebase must clear the stale label; gh calls were {calls}\n{out}"
     )
 
 
-def test_strand_label_is_removed_as_well_as_added():
-    """The strand label must not be a one-way ratchet.
+def test_label_survives_a_skip_that_exits_zero(tmp_path):
+    """The defect this contract exists for.
 
-    `ci-stranded-rebase-skipped` records that this lane skipped a rebase
-    because no credential proved push authority. That is a statement about a
-    past credential gap, not about the PR. It was only ever added -- never
-    removed -- so a PR labelled once wore it permanently and read as abandoned
-    even after it became rebased and mergeable. On 2026-08-17 nine open PRs
-    carried it while every one of them merged cleanly against main.
+    pr_ci_safe_rebase.py returns exit code 0 on all 38 `raise Skip` paths and
+    marks real success only with a `REBASED PR #<n>:` prefix — see its own
+    test_lease_rejection_does_not_report_success. A push rejected by the lease
+    means the PR was NOT rebased and is still stranded, so the label is still
+    true and must survive.
     """
-    code = _workflow_code()
-    assert 'labels[]=$STRAND_LABEL' in code, (
-        "the add path vanished; this test would then pass vacuously"
+    out, calls = _run_rebase_step(
+        tmp_path, "SKIP PR #904: push rejected (lease or remote): stale info"
     )
-    assert "-X DELETE" in code and "labels/$STRAND_LABEL" in code, (
-        "pr-ci-health adds ci-stranded-rebase-skipped but never removes it. "
-        "A label that only accumulates stops describing the PR and starts "
-        "hiding it: remove it once the lane has actually rebased the PR."
+    assert not _deleted_the_label(calls), (
+        f"the label was cleared on a SKIP — a rebase that never happened.\n"
+        f"gh calls: {calls}\n{out}"
     )
 
 
-def test_strand_label_is_cleared_only_after_a_real_rebase():
-    """Clearing it anywhere else would erase a still-true warning.
+def test_label_survives_a_rebase_conflict_skip(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "SKIP PR #904: rebase conflict; aborted")
+    assert not _deleted_the_label(calls), f"cleared on a conflict skip: {calls}\n{out}"
 
-    The removal must sit after the safe-rebase helper call, so it is reached
-    only when a rebase actually happened. Clearing it in the fail-closed
-    branch would delete an accurate signal and hide the missing credential.
-    """
-    code = _workflow_code()
-    helper = code.index("pr_ci_safe_rebase.py")
-    delete = code.index("-X DELETE")
-    assert delete > helper, (
-        "the label is cleared before the rebase helper runs, so it would be "
-        "removed without the stranding actually being resolved"
-    )
-    fail_closed = code.index('if [ "$HAS_PUSH_TOKEN" != "true" ]; then')
-    add = code.index('labels[]=$STRAND_LABEL')
-    assert fail_closed < add < helper, (
-        "the add path is expected inside the fail-closed branch, ahead of the "
-        "rebase helper; this test's ordering logic no longer matches the file"
-    )
+
+def test_label_survives_a_helper_hard_failure(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "ERROR PR #904: unexpected", helper_rc=1)
+    assert not _deleted_the_label(calls), f"cleared on a helper error: {calls}\n{out}"
+
+
+def test_the_harness_can_actually_observe_a_delete(tmp_path):
+    """Guard against the whole suite passing because nothing is ever detected."""
+    _, calls = _run_rebase_step(tmp_path, "REBASED PR #904: feat@abc onto origin/main")
+    assert calls, "no gh calls captured at all — the harness is not exercising the step"
