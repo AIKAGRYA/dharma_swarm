@@ -196,10 +196,9 @@ jobs:
 
           if [ "${BACKLOG_REQUESTED}" = "true" ]; then
             python3 -m pip install 'nats-py>=2.9' 'aiohttp>=3.9'
-            # A backlog fanout has no per-PR, exact-head operator warrant
-            # input. It may gather evidence and render gates, but it cannot
-            # construct MergeAuthorized and therefore never actuates.
-            merge_mode=off
+            # A backlog fanout gathers evidence and renders gates. It cannot
+            # actuate: the controller has no merge surface at all, and the
+            # merge queue is what performs merges.
             args=(
               --state-root "${state_root}"
               fanout
@@ -207,8 +206,6 @@ jobs:
               --max-prs 5
               --statuses GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW
               --required-reviewers "${REQUIRED_REVIEWERS}"
-              --merge-mode "${merge_mode}"
-              --merge-method "${MERGE_METHOD}"
               --packet-only
               --nats-session
               --nats-timeout-s 8
@@ -228,7 +225,7 @@ jobs:
               echo
               echo "- Trigger PR: \`#${PR_NUMBER}\`"
               echo "- Backlog mode: \`packet-only\`"
-              echo "- Merge mode: \`${merge_mode}\`"
+              echo "- Merge authority: \`none (evidence-only)\`"
               echo "- NATS required: \`${MERGE_MASTER_MIKE_NATS_REQUIRED}\`"
               echo "- Required reviewers: \`${REQUIRED_REVIEWERS}\`"
               echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -282,26 +279,12 @@ jobs:
               gate_exit="$?"
               set -e
             fi
+            # Mike does not merge. The merge queue does. This lane evaluates
+            # the deterministic gate and posts the verdict; a request to
+            # "merge when clean" is recorded and answered by the gate result,
+            # never by an actuator here.
             if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
-              if [ "${policy_exit}" != "0" ]; then
-                merge_exit="${policy_exit}"
-                echo "authority policy did not construct a permit (exit ${policy_exit})" >&2
-              else
-                set +e
-                python3 scripts/runtime/pr_merge_control.py \
-                  --state-root "${state_root}" \
-                  merge \
-                  --pr "${PR_NUMBER}" \
-                  --packet-dir "${packet_dir}" \
-                  --required-reviewers "${REQUIRED_REVIEWERS}" \
-                  --merge-authorization "${authorization_report}" \
-                  --method "${MERGE_METHOD}" \
-                  --auto \
-                  --execute \
-                  --confirm "automerge-policy-pass-${PR_NUMBER}"
-                merge_exit="$?"
-                set -e
-              fi
+              echo "merge-when-clean requested; Mike is evidence-only, the merge queue performs merges" >&2
             fi
             python3 scripts/runtime/pr_merge_control.py \
               --state-root "${state_root}" \

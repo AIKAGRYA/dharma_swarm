@@ -1,0 +1,131 @@
+{
+  "id": "mike-WP-DEAD-ACTUATOR-REMOVAL-20260817",
+  "base_ref": "4f43c6cc0745f83f8007ce279237792744a3037b",
+  "branch": "claude/mike-dead-merge-actuator-removal",
+  "worktree": ".",
+  "intent": "Remove Merge Master Mike's merge-actuation path, which is unreachable by construction and has been since safe P0. build_gate emitted a literal base_cas_enforced: False with no code path able to set it true, and validate_merge_authority_proof returned a constant blocker list; run_mike_merge_authority refused on either. The repository has since migrated to a GitHub merge queue that performs merges itself, and the merge-queue readiness packet explicitly declined to re-enable this lane. What remains after the deletion is the genuinely novel half: review packets, decorrelated agent execution with tamper-evident receipts, the deterministic gate, risk tiering and the hot-path operator hold. Net effect on behaviour: none, because the deleted code could only ever produce a SKIPPED receipt.",
+  "allowed_files": [
+    ".github/workflows/codex-mention-router.yml",
+    "reports/agentops/work_packets/mike-WP-DEAD-ACTUATOR-REMOVAL-20260817.json",
+    "scripts/runtime/pr_merge_control.py",
+    "tests/test_automerge_tier_policy.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_no_actuation.py",
+    "tests/test_pr_merge_control_stdlib.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/branch-janitor.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    ".github/workflows/tests.yml",
+    "Makefile",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/runtime/merge_master_mike_daemon.py"
+  ],
+  "gates": [
+    {
+      "name": "no-actuation-structural-contract",
+      "command": "python3 -m pytest tests/test_pr_merge_control_no_actuation.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "mike-controller-suites",
+      "command": "python3 -m pytest tests/test_pr_merge_control.py tests/test_pr_merge_control_stdlib.py tests/test_pr_merge_control_github_reviews.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "tier-policy-and-router-contracts",
+      "command": "python3 -m pytest tests/test_automerge_tier_policy.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "daemon-unaffected",
+      "command": "python3 -m pytest tests/test_merge_master_mike_daemon.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "controller-lints-clean",
+      "command": "python3 -m ruff check scripts/runtime/pr_merge_control.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "evidence-cli-still-builds",
+      "command": "python3 scripts/runtime/pr_merge_control.py --help",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "reintroducing-an-actuator-symbol-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('scripts/runtime/pr_merge_control.py'); t=p.read_text(); p.write_text(t+chr(10)+'def gh_merge_command(pr):'+chr(10)+'    return [chr(103)+chr(104), chr(112)+chr(114), chr(109)+chr(101)+chr(114)+chr(103)+chr(101)]'+chr(10)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_merge_control_no_actuation.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "restoring-a-merge-subcommand-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('scripts/runtime/pr_merge_control.py'); t=p.read_text(); n=t.replace('    comment = sub.add_parser(', '    sub.add_parser(chr(109)+chr(101)+chr(114)+chr(103)+chr(101))'+chr(10)+'    comment = sub.add_parser(',1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_merge_control_no_actuation.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "refactor(mike): delete the unreachable merge-actuation path"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-DEAD-ACTUATOR-REMOVAL",
+    "active_track": "merge-master-mike-d4-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "4f43c6cc0745f83f8007ce279237792744a3037b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The controller advertised a merge authority it structurally could not exercise: a 'merge' subcommand, a --merge-mode auto-when-clean option, a conditional_merge A2A authority claim and a MIKE_MERGE_RECEIPT artifact, all of which could only ever terminate in SKIPPED. The declared interface and the reachable behaviour disagreed, and the disagreement was load-bearing in the wrong direction -- readers believed Mike gated merges while branch protection required zero approvals.",
+      "The router asked for a merge confirmation token (automerge-policy-pass-N) for a command that could not act on it, so a policy verdict was being computed and then discarded."
+    ],
+    "closest_existing_implementation": [
+      "reports/agentops/work_packets/titanium-WP-MERGE-QUEUE-READINESS-V2.json",
+      "scripts/runtime/pr_merge_control.py",
+      "tests/test_pr_merge_control.py"
+    ],
+    "honest_blockers": [
+      "I DELETED ELEVEN SAFETY TESTS. That is only defensible because the property they guarded becomes stronger, not weaker: they proved a merge actuator REFUSED to fire, and tests/test_pr_merge_control_no_actuation.py now proves no merge path EXISTS -- no symbol, no subcommand, no 'gh pr merge' string, no permission field, no receipt artifact, and no unnamed function containing --match-head-commit. Absent code cannot regress or be re-enabled by a flag. Two negative controls reintroduce an actuator symbol and a merge subcommand and confirm the new tests fail. If merge authority is ever genuinely wanted here, these tests must be deleted deliberately and replaced with real authorization tests, which is the point.",
+      "MAKEFILE TARGET pr-merge IS NOW BROKEN AND I COULD NOT FIX IT HERE. Makefile:611 still defines pr-merge and Makefile:264 still advertises it with the retired merge-pr-N token. Makefile is a repository-titanium-hardening-2026-07 surface and this packet is merge-master-mike scoped, so editing it would be exactly the cross-track violation the packet-scope gate refused on PR #1363. The target now fails loudly with an argparse 'invalid choice' rather than silently, and Mike's own status comment no longer advertises it. Removing the target needs a packet filed under titanium.",
+      "BEHAVIOUR-PRESERVING IS A CLAIM ABOUT REACHABILITY, NOT AN OBSERVATION. I did not watch a production run before and after. The argument is that base_cas_enforced was a literal False with no writer and validate_merge_authority_proof returned a constant blocker list, so every path terminated in SKIPPED. That is verifiable by reading the deleted code in this diff, and the repository's own test asserted it. It is not the same as a live A/B.",
+      "THE ROUTER'S merge_when_clean INPUT STILL EXISTS AND NOW DOES ALMOST NOTHING. Removing the workflow_dispatch input would change automerge.yml, which dispatches it and is a forbidden file in this packet. The router logs that the request was received and evidence-only applies. Cleaning up the input pair belongs with the automerge lane's own change.",
+      "make test-fast COULD NOT RUN in the authoring environment: 42 pre-existing collection errors from absent optional dependencies (fastapi, bun/TUI), identical on origin/main. Evidence here is the six Mike suites plus ruff plus a CLI smoke, not the standard fast-suite line.",
+      "I DID NOT TOUCH merge_master_mike_daemon.py. Its cycle modes still speak of dry-run/packet-only/review and it remains 1,026 lines against 164 lines of test. It never actuated a merge itself -- it shells out to fanout -- so it is correct after this change, but it is under-tested and its retirement or demotion is unfinished work outside this packet."
+    ],
+    "rollback": "Single revert. The controller regains ~376 lines of merge-actuation code that terminates in SKIPPED on every path, the router regains a merge leg that cannot merge, and the eleven behavioural refusal tests return in place of the structural absence tests.",
+    "packet_digest": "3fd864ccc71a656971c56c6b882b7ca4e9aa4041fdb027fbc2ec69572b6e297b"
+  }
+}
