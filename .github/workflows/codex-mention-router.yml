@@ -175,7 +175,6 @@ jobs:
           # conflict, unresolved-thread, or CHANGES_REQUESTED checks — so the
           # quorum can clear in the cloud with no operator machine.
           DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"
-          MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
           MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
