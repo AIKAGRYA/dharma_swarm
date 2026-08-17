@@ -79,6 +79,9 @@ Keep these separate from:
 
 Current examples:
 
+- [SARATHI_SHELL_CENSUS_2026-08-02.md](SARATHI_SHELL_CENSUS_2026-08-02.md) —
+  dated behavior-first twelve-element census with immutable-revision evidence
+  and explicit post-snapshot reconciliation notes
 - [DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md](DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md) — merged product closure, bounded replay evidence, and the explicit needs-revision boundary for both Codex skills.
 - [20-AGENT-DEEP-AUDIT-2026-03-29.md](/Users/dhyana/dharma_swarm/docs/reports/20-AGENT-DEEP-AUDIT-2026-03-29.md)
 - [AGENT_PROMPT_SYNTHESIS.md](/Users/dhyana/dharma_swarm/docs/reports/AGENT_PROMPT_SYNTHESIS.md)
