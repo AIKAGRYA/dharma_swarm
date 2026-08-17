@@ -162,6 +162,11 @@ def test_no_top_level_function_mentions_merge_execution():
     assert not offenders, f"these functions look like merge actuators: {offenders}"
 
 
+CONTROLLER = "pr_merge_control.py"
+# Stop an invocation span here: what follows belongs to another command.
+_SHELL_BREAK = re.compile(r"\s(\||\|\||&&|;)\s")
+
+
 def _all_cli_options() -> set[str]:
     """Every option string the real CLI accepts, across all subcommands.
 
@@ -177,76 +182,130 @@ def _all_cli_options() -> set[str]:
     return options
 
 
-CONTROLLER = "pr_merge_control.py"
+def _run_blocks(text: str) -> list[str]:
+    """Each ``run:`` script body, so one step's flags cannot leak into another."""
+    lines = text.splitlines()
+    blocks: list[str] = []
+    i = 0
+    while i < len(lines):
+        head = re.match(r"^(\s*)run:\s*[|>]?\s*$", lines[i])
+        if not head:
+            i += 1
+            continue
+        indent = len(head.group(1))
+        body: list[str] = []
+        j = i + 1
+        while j < len(lines):
+            line = lines[j]
+            if line.strip() and (len(line) - len(line.lstrip())) <= indent:
+                break
+            body.append(line)
+            j += 1
+        blocks.append("\n".join(body))
+        i = j
+    return blocks
 
 
 def _controller_arg_text(text: str) -> str:
     """Only the argument text actually handed to the controller.
 
-    Workflows also call ``gh``, ``git`` and other scripts, so scanning a whole
-    file attributes their flags to this CLI. Two invocation shapes are used
-    here and both are extracted exactly:
+    Scoped three ways, because a looser scan misattributes other tools' flags:
 
-    1. a direct call, continued across ``\\``-terminated lines;
-    2. a ``args=(...)`` / ``args+=(...)`` array later expanded into the call.
+    * per ``run:`` block — a ``pip`` or ``gh`` argument array in a different
+      step is not this command's arguments;
+    * per array *name* — an invocation expanding ``"${mike_args[@]}"`` pulls
+      from ``mike_args=(...)``, never from an unrelated ``args=(...)``;
+    * truncated at ``|``, ``&&``, ``||`` and ``;`` — what follows a shell
+      operator is a different command (``| tee --append`` is tee's flag).
     """
-    lines = [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
     spans: list[str] = []
-
-    for i, line in enumerate(lines):
-        if CONTROLLER not in line:
+    for block in _run_blocks(text):
+        if CONTROLLER not in block:
             continue
-        spans.append(line)
-        j = i
-        while lines[j].rstrip().endswith("\\") and j + 1 < len(lines):
-            j += 1
-            spans.append(lines[j])
-
-    if f'{CONTROLLER} "${{args[@]}}"' in text:
-        collecting = False
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("args=(") or stripped.startswith("args+=("):
-                collecting = True
-                spans.append(line)
-                if stripped.endswith(")"):
-                    collecting = False
+        lines = [ln for ln in block.splitlines() if not ln.lstrip().startswith("#")]
+        arrays: set[str] = set()
+        for i, line in enumerate(lines):
+            if CONTROLLER not in line:
                 continue
-            if collecting:
-                spans.append(line)
-                if stripped == ")":
-                    collecting = False
+            span = [line[line.index(CONTROLLER) + len(CONTROLLER) :]]
+            j = i
+            while lines[j].rstrip().endswith("\\") and j + 1 < len(lines):
+                j += 1
+                span.append(lines[j])
+            joined = "\n".join(span)
+            cut = _SHELL_BREAK.search(joined)
+            if cut:
+                joined = joined[: cut.start()]
+            spans.append(joined)
+            arrays.update(re.findall(r'\$\{(\w+)\[@\]\}', joined))
+        for name in arrays:
+            collecting = False
+            for line in lines:
+                stripped = line.strip()
+                if re.match(rf"^{re.escape(name)}\+?=\(", stripped):
+                    collecting = True
+                    spans.append(line)
+                    if stripped.endswith(")"):
+                        collecting = False
+                    continue
+                if collecting:
+                    spans.append(line)
+                    if stripped == ")":
+                        collecting = False
     return "\n".join(spans)
 
 
 def _flags_workflows_pass() -> dict[str, set[str]]:
-    """Long flags each workflow hands to the controller."""
+    """Long flags each workflow hands to the controller.
+
+    The pattern allows underscores, digits and capitals and then drops any
+    ``=value`` tail, so ``--limit_max`` is captured whole rather than
+    truncated to the valid prefix ``--limit``.
+    """
     root = Path(__file__).resolve().parents[1]
     passed: dict[str, set[str]] = {}
-    for path in sorted((root / ".github" / "workflows").glob("*.yml")):
+    for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
         if CONTROLLER not in text:
             continue
-        found = set(re.findall(r"(--[a-z][a-z0-9-]+)", _controller_arg_text(text)))
+        found = {
+            token.split("=", 1)[0]
+            for token in re.findall(
+                r"(--[A-Za-z][A-Za-z0-9_-]*(?:=\S+)?)", _controller_arg_text(text)
+            )
+        }
         if found:
             passed[path.name] = found
     return passed
 
 
 def test_no_workflow_passes_a_flag_the_cli_rejects():
-    """A deleted flag must not leave a live caller behind.
+    """A deleted flag must not leave a live workflow caller behind.
 
     This is the check that was missing when the merge actuator came out:
     ``merge-master-mike-backlog.yml`` kept passing ``--merge-mode`` and
-    ``--merge-method`` to ``fanout`` after both were deleted. That workflow
-    runs hourly under ``set -euo pipefail``, so it would have failed every
-    hour with an argparse error while still looking merely "scheduled".
+    ``--merge-method`` to ``fanout`` after both were deleted. That lane runs
+    hourly under ``set -euo pipefail``, so it would have failed every hour
+    with an argparse error while still presenting as an ordinary scheduled
+    workflow.
 
-    Scope, stated honestly: this asserts each flag exists *somewhere* in the
-    CLI, not that it is valid for the subcommand that call uses. Binding flag
-    to subcommand would need to resolve shell arrays built at runtime, and a
-    guard that guesses produces false alarms and gets deleted. Flag existence
-    is the property that actually broke, and it is checkable exactly.
+    Scope, stated precisely, because the name promises more than it delivers:
+
+    * **Workflows only.** ``Makefile`` and ``scripts/**`` callers are NOT
+      covered. There is a live instance there right now -- ``make pr-merge``
+      invokes the deleted ``merge`` subcommand (``Makefile:611``). Widening
+      the corpus requires fixing that first, and ``Makefile`` belongs to
+      another track.
+    * **Flag existence, not flag/subcommand binding.** Only ``--state-root``
+      is global; the rest are subcommand-scoped, so a flag valid for
+      ``fanout`` handed to ``packet`` passes here and fails at runtime. All
+      four real call sites were audited by hand and are correct today.
+    * **Literal text only.** A flag assembled from a shell variable or by
+      string concatenation is invisible to any text scan.
+
+    What it does guarantee is exactly what broke: literal long flags on a
+    controller invocation name an option that exists in ``build_parser()``.
+    The accepted set is read from the parser, so it cannot drift.
     """
     accepted = _all_cli_options()
     by_workflow = _flags_workflows_pass()
