@@ -588,3 +588,64 @@ def test_rebase_selection_uses_behind_by_not_mergeable_state():
     assert 'select(.categories | index("merge_conflict") | not)' in workflow, (
         "a rebase cannot resolve a conflicted branch"
     )
+
+
+_WORKFLOW = (
+    Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+)
+
+
+def _workflow_code() -> str:
+    """The workflow with comment-only lines stripped.
+
+    Prose describing a label is not label handling. Stripping comments keeps
+    these assertions measuring behaviour rather than the note next to it.
+    """
+    return "\n".join(
+        line
+        for line in _WORKFLOW.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    )
+
+
+def test_strand_label_is_removed_as_well_as_added():
+    """The strand label must not be a one-way ratchet.
+
+    `ci-stranded-rebase-skipped` records that this lane skipped a rebase
+    because no credential proved push authority. That is a statement about a
+    past credential gap, not about the PR. It was only ever added -- never
+    removed -- so a PR labelled once wore it permanently and read as abandoned
+    even after it became rebased and mergeable. On 2026-08-17 nine open PRs
+    carried it while every one of them merged cleanly against main.
+    """
+    code = _workflow_code()
+    assert 'labels[]=$STRAND_LABEL' in code, (
+        "the add path vanished; this test would then pass vacuously"
+    )
+    assert "-X DELETE" in code and "labels/$STRAND_LABEL" in code, (
+        "pr-ci-health adds ci-stranded-rebase-skipped but never removes it. "
+        "A label that only accumulates stops describing the PR and starts "
+        "hiding it: remove it once the lane has actually rebased the PR."
+    )
+
+
+def test_strand_label_is_cleared_only_after_a_real_rebase():
+    """Clearing it anywhere else would erase a still-true warning.
+
+    The removal must sit after the safe-rebase helper call, so it is reached
+    only when a rebase actually happened. Clearing it in the fail-closed
+    branch would delete an accurate signal and hide the missing credential.
+    """
+    code = _workflow_code()
+    helper = code.index("pr_ci_safe_rebase.py")
+    delete = code.index("-X DELETE")
+    assert delete > helper, (
+        "the label is cleared before the rebase helper runs, so it would be "
+        "removed without the stranding actually being resolved"
+    )
+    fail_closed = code.index('if [ "$HAS_PUSH_TOKEN" != "true" ]; then')
+    add = code.index('labels[]=$STRAND_LABEL')
+    assert fail_closed < add < helper, (
+        "the add path is expected inside the fail-closed branch, ahead of the "
+        "rebase helper; this test's ordering logic no longer matches the file"
+    )

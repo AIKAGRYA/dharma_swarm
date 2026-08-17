@@ -253,4 +253,20 @@ jobs:
               echo "PR #$pr: safe-rebase helper exited nonzero; no success assumed — inspect helper output"
               continue
             }
+            # The strand label records a PAST fail-closed skip — "this lane had
+            # no push credential at the time" — not a property of the PR. Adding
+            # it without ever removing it makes it a one-way ratchet: a PR
+            # labelled once wears it forever, and reads as abandoned even after
+            # it is rebased and mergeable. Clearing it here is the only place
+            # the lane can prove the stranding is over, because this line is
+            # reached only after the helper actually rebased and pushed.
+            if gh api "repos/$REPO/issues/$pr" --jq '.labels[].name' 2>/dev/null \
+                | grep -qxF "$STRAND_LABEL"; then
+              if gh api -X DELETE \
+                  "repos/$REPO/issues/$pr/labels/$STRAND_LABEL" >/dev/null 2>&1; then
+                echo "PR #$pr: cleared $STRAND_LABEL after a successful rebase"
+              else
+                echo "PR #$pr: could not clear $STRAND_LABEL (non-fatal)"
+              fi
+            fi
           done
