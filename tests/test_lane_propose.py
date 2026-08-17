@@ -783,7 +783,8 @@ def test_only_the_dedicated_claim_line_records_consumption(monkeypatch) -> None:
         # An UNESCAPED marker, which the old whole-body scan would have taken.
         '- Note: "task_id": "T-UNESCAPED"\n'
     )
-    rows = [{"headRefName": "lane/hardening-20260802T120000Z", "body": body}]
+    rows = [{"headRefName": "lane/hardening-20260802T120000Z",
+             "state": "CLOSED", "createdAt": _iso_days_ago(1), "body": body}]
     monkeypatch.setattr(lane_propose, "_run", lambda *a, **k:
                         subprocess.CompletedProcess(
                             [], 0, json.dumps(rows), ""))
@@ -915,12 +916,104 @@ def test_a_deleted_path_has_no_delivered_bytes_to_diverge(
     assert lane_propose.index_transformed_paths(["a.py"]) == []
 
 
+def _iso_days_ago(days: int) -> str:
+    """A GitHub-shaped createdAt timestamp `days` in the past."""
+    from datetime import datetime, timedelta, timezone
+
+    stamp = datetime.now(timezone.utc) - timedelta(days=days)
+    return stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _claim_row(task_id: str, *, state: str, age_days: int) -> dict:
+    return {
+        "headRefName": "lane/hardening-20260101T000000Z",
+        "state": state,
+        "createdAt": _iso_days_ago(age_days),
+        "body": f'- Consumption claim: `{{"task_id": "{task_id}"}}`\n',
+    }
+
+
+def _attempted_from(monkeypatch, rows: list[dict]) -> set[str] | None:
+    monkeypatch.setattr(
+        lane_propose, "_run",
+        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(rows), ""))
+    return lane_propose.attempted_task_ids("o/r")
+
+
+def test_a_forged_claim_expires_instead_of_starving_a_task_forever(
+        monkeypatch) -> None:
+    """Codex P1 on #1200: the consumption claim is UNTRUSTED.
+
+    The claim reaches the PR body from the propose receipt, which
+    lane_deliver.load_propose_receipt calls "for narration only. Never a gate
+    input." The coding agent shares the proposing VM and can leave a
+    descendant that rewrites that receipt after the driver exits, so it can
+    put ANY task id in a genuine PR body.
+
+    Cryptographic binding cannot close this: the only available signer on the
+    propose side is the propose job, which is exactly what the attacker
+    controls. So the fix bounds the blast radius instead — a claim suppresses
+    for ATTEMPT_COOLDOWN_DAYS, then stops. A lie costs a delay, never
+    permanent starvation of an unrelated mailbox task.
+    """
+    monkeypatch.setattr(lane_propose, "ATTEMPT_COOLDOWN_DAYS", 14)
+
+    fresh_lie = _claim_row("T-VICTIM", state="CLOSED", age_days=1)
+    assert _attempted_from(monkeypatch, [fresh_lie]) == {"T-VICTIM"}
+
+    stale_lie = _claim_row("T-VICTIM", state="CLOSED", age_days=15)
+    assert _attempted_from(monkeypatch, [stale_lie]) == set(), (
+        "an expired claim must not suppress; a forged id would otherwise "
+        "starve a real task forever"
+    )
+
+
+def test_an_open_lane_pr_suppresses_regardless_of_age(monkeypatch) -> None:
+    """Work still in flight should not be re-proposed, however old."""
+    monkeypatch.setattr(lane_propose, "ATTEMPT_COOLDOWN_DAYS", 14)
+    row = _claim_row("T-INFLIGHT", state="OPEN", age_days=400)
+    assert _attempted_from(monkeypatch, [row]) == {"T-INFLIGHT"}
+
+
+def test_unusable_claim_timestamp_expires_rather_than_suppressing(
+        monkeypatch) -> None:
+    """An untrusted claim must never gain strength from malformed metadata."""
+    monkeypatch.setattr(lane_propose, "ATTEMPT_COOLDOWN_DAYS", 14)
+    for bad in ("", "not-a-date", None):
+        row = _claim_row("T-1", state="CLOSED", age_days=1)
+        if bad is None:
+            row.pop("createdAt")
+        else:
+            row["createdAt"] = bad
+        assert _attempted_from(monkeypatch, [row]) == set(), (
+            f"createdAt={bad!r} must read as expired, not as fresh"
+        )
+
+
+def test_attempt_query_requests_the_fields_the_cooldown_needs(
+        monkeypatch) -> None:
+    """The cooldown is only as good as the data it asks GitHub for."""
+    captured: list[list[str]] = []
+
+    def fake_run(cmd, **kw):
+        captured.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "[]", "")
+
+    monkeypatch.setattr(lane_propose, "_run", fake_run)
+    lane_propose.attempted_task_ids("o/r")
+    joined = " ".join(captured[0])
+    for field in ("body", "headRefName", "state", "createdAt"):
+        assert field in joined, f"attempt query must request {field}"
+
+
 def test_already_attempted_mailbox_task_is_not_reselected(monkeypatch) -> None:
     """Nothing writes a claim back to loop-tasks (propose holds contents:read),
     so consumption is inferred from the lane's own delivered PR bodies.
     Without it the oldest ready task was re-selected forever and newer tasks
     starved behind it."""
     rows = [{"headRefName": "lane/hardening-20260101T000000Z",
+             "state": "CLOSED",
+             "createdAt": _iso_days_ago(1),
              "body": '- Consumption claim: `{"task_id": "T-1"}`\n'
                      '- Target: `{"kind": "mailbox", "task_id": "T-1"}`'}]
     monkeypatch.setattr(
@@ -939,6 +1032,8 @@ def test_attempt_history_at_the_cap_fails_closed(monkeypatch) -> None:
     """
     monkeypatch.setattr(lane_propose, "ATTEMPT_HISTORY_LIMIT", 3)
     rows = [{"headRefName": f"lane/hardening-2026010{i}T000000Z",
+             "state": "CLOSED",
+             "createdAt": _iso_days_ago(1),
              "body": f'- Consumption claim: `{{"task_id": "T-{i}"}}`\n'}
             for i in range(3)]
     monkeypatch.setattr(

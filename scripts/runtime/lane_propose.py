@@ -56,7 +56,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 MAX_DIFF_LINES = int(os.environ.get("LANE_MAX_DIFF_LINES", "600"))
@@ -70,6 +70,15 @@ RECIPIENT = "hardening-lane"
 # closed (see attempted_task_ids) — at one delivery per run, three times a
 # week, this is roughly six years of lane output.
 ATTEMPT_HISTORY_LIMIT = int(os.environ.get("LANE_ATTEMPT_HISTORY_LIMIT", "1000"))
+# How long a delivered claim suppresses re-selection of its task.
+#
+# The claim is UNTRUSTED (see attempted_task_ids), so this window is the blast
+# radius of a forged one: a lie costs a delay, never permanent starvation. At
+# three runs a week the default is ~6 runs — far more than the tight
+# re-selection loop this suppression exists to break, and far less than
+# forever. An open lane PR suppresses regardless of age, because work that is
+# still in flight genuinely should not be re-proposed.
+ATTEMPT_COOLDOWN_DAYS = int(os.environ.get("LANE_ATTEMPT_COOLDOWN_DAYS", "14"))
 
 # The DHARMA_LANE_AGENT_CMD secret selects one of these literal argv
 # templates by KEY — it is a name, not a shell string. No environment-derived
@@ -262,24 +271,42 @@ CLAIM_RE = re.compile(r"^- Consumption claim: `(\{[^`]*\})`\s*$", re.MULTILINE)
 
 
 def attempted_task_ids(repo: str) -> set[str] | None:
-    """Task ids this lane has already delivered a PR for, in ANY state.
+    """Task ids recently claimed by this lane's own delivered PRs.
 
-    The lane has no way to write a claim back to `loop-tasks` — the proposing
-    job holds `contents: read` by design. So consumption is inferred from the
-    lane's own output instead: every delivered PR body carries its target,
-    including the task id.
+    THE CLAIM IS UNTRUSTED, AND THIS FUNCTION TREATS IT THAT WAY.
 
-    Without this, `ready_tasks()` kept returning the same oldest task after
-    its draft closed and the open-draft ceiling cleared, so every scheduled
-    run spent its whole agent budget re-doing one task while newer mailbox
-    tasks starved behind it.
+    The lane cannot write a claim back to `loop-tasks` — the proposing job
+    holds `contents: read` by design — so consumption is inferred from the
+    lane's own output: every delivered PR body carries its target's task id.
+    But that body is populated from the propose receipt, which
+    `lane_deliver.load_propose_receipt` classifies in its own docstring as
+    "for narration only. Never a gate input." The coding agent shares the
+    proposing VM and can leave a descendant that rewrites the receipt after
+    the driver exits, so a forged id can reach a genuine PR body. (Codex P1
+    on #1200.)
+
+    Cryptographic binding cannot fix this here: the only signer available on
+    the propose side is the propose job itself, which is precisely what the
+    attacker controls. There is no trusted key on the untrusted side of the
+    boundary, so a signature would attest to nothing.
+
+    What IS available is bounding the damage. Suppression is therefore
+    deliberately weak evidence: a claim rate-limits its task for
+    ATTEMPT_COOLDOWN_DAYS, and an open lane PR suppresses for as long as it
+    stays open. A forged claim costs one delayed cycle. It cannot starve an
+    unrelated mailbox task permanently, which was the actual harm.
+
+    That still breaks the loop this function exists to break: `ready_tasks()`
+    kept returning the same oldest task after its draft closed and the
+    open-draft ceiling cleared, so every scheduled run spent its whole agent
+    budget re-doing one task while newer tasks starved behind it.
 
     Returns None if the query failed, so callers can fail closed rather than
     treat "unknown" as "nothing attempted".
     """
     result = _run([
         GH_BIN, "pr", "list", "--repo", repo, "--state", "all",
-        "--label", "lane-output", "--json", "body,headRefName",
+        "--label", "lane-output", "--json", "body,headRefName,state,createdAt",
         "--limit", str(ATTEMPT_HISTORY_LIMIT),
     ])
     if result.returncode != 0:
@@ -301,9 +328,24 @@ def attempted_task_ids(repo: str) -> set[str] | None:
               "cannot prove a task is unattempted", file=sys.stderr)
         return None
     seen: set[str] = set()
+    now = datetime.now(timezone.utc)
     for row in rows:
         if not str(row.get("headRefName", "")).startswith(LANE_BRANCH_PREFIX):
             continue
+        # A claim only suppresses while it is still plausibly live: the PR is
+        # open, or it is younger than the cooldown. An unparseable or absent
+        # timestamp is treated as EXPIRED, not as fresh — an untrusted claim
+        # must never gain strength from malformed metadata.
+        if str(row.get("state", "")).upper() != "OPEN":
+            created_raw = str(row.get("createdAt", "")).replace("Z", "+00:00")
+            try:
+                created = datetime.fromisoformat(created_raw)
+            except ValueError:
+                continue
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if now - created > timedelta(days=ATTEMPT_COOLDOWN_DAYS):
+                continue
         # Read ONLY the dedicated claim line, not the whole body.
         #
         # The body also carries a `- Target:` blob holding the operator's
