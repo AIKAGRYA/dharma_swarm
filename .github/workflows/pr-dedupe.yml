@@ -73,6 +73,19 @@ jobs:
       GH_REPO: ${{ github.repository }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
+      # This lane closes PRs, so it obeys the kill-switch. The checkout exists
+      # only to load the guard action; the lane is schedule/dispatch-triggered,
+      # so the checked-out tree is the default branch, never candidate PR code.
+      - name: Checkout kill-switch guard
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Halt on loop kill-switch
+        uses: ./.github/actions/loop-killswitch
+        with:
+          github-token: ${{ github.token }}
+
       - name: Close ephemeral snapshot-report PRs
         run: |
           set -euo pipefail
