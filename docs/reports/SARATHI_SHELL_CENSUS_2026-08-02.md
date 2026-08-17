@@ -620,8 +620,12 @@ import sys
 
 commit = sys.argv[1]
 report_path = Path("docs/reports/SARATHI_SHELL_CENSUS_2026-08-02.md")
+# Built at runtime so this literal does not appear contiguously in the script
+# itself. Written inline, `str.split` would cut at THIS line rather than at the
+# real §8 heading, silently scanning only the first 624 of 966 lines.
+post_census_marker = "## 8." + " Post-census update"
 report = report_path.read_text(encoding="utf-8").split(
-    "## 8. Post-census update", 1
+    post_census_marker, 1
 )[0]
 
 spans = re.findall(r"`([^`\n]+)`", report)
