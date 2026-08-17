@@ -21,9 +21,11 @@ name: pr-dedupe
 #   they pile up (12+ at a time, burying real PRs). These snapshots carry no
 #   merge value — their data is a projection already rendered from owners
 #   (`make onboard`, reports/governance/**) — so this pass CLOSES every such
-#   snapshot PR outright (not keep-newest) with a governance comment + branch
-#   cleanup. The match is conservative: same-repo owner AND a known snapshot
-#   intent, plus either an automation marker or a declared snapshot-only branch.
+#   snapshot PR outright (not keep-newest) with a governance comment while
+#   preserving its branch ref for recovery. The match is conservative:
+#   same-repo owner AND one of two exact snapshot-only branch grammars paired
+#   with that lane's independently anchored title grammar. Automation markers
+#   and broad intent phrases never grant Pass 1 close authority.
 #
 #   Pass 2 — duplicate consolidation: groups remaining open PRs by normalized
 #   title (lowercased, whitespace collapsed, timestamps stripped) and, for
@@ -71,61 +73,100 @@ jobs:
       GH_REPO: ${{ github.repository }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
+      # This lane closes PRs, so it obeys the kill-switch. The checkout exists
+      # only to load the guard action; the lane is schedule/dispatch-triggered,
+      # so the checked-out tree is the default branch, never candidate PR code.
+      - name: Checkout kill-switch guard
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Halt on loop kill-switch
+        uses: ./.github/actions/loop-killswitch
+        with:
+          github-token: ${{ github.token }}
+
       - name: Close ephemeral snapshot-report PRs
         run: |
           set -euo pipefail
 
           repo_owner="${GH_REPO%%/*}"
 
-          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+          printf '%s\n\n' "## Ephemeral Snapshot-Report PR Cleanup" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          # This bounded scan fails safe: PRs outside the newest 200 remain
+          # untouched, and the job never claims global backlog completeness.
+          if gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
-            > /tmp/open_prs.json
+            > /tmp/open_prs.json; then
+            :
+          else
+            list_status=$?
+            printf '%s\n' "- **FAILED TO LIST OPEN PRS**; no PR was classified or closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::open PR listing failed — cleanup aborted"
+            exit "$list_status"
+          fi
 
           # A snapshot-report PR is a pure status projection that should never
           # have been a PR. The external Oz lane historically omitted
-          # [automated] while using the dedicated timestamped
-          # chore/ops-report-<YYYYMMDD…> branch shape, so accept either a title
-          # marker or that exact automation branch shape — never a bare
-          # chore/ops-report-* prefix, which a human topic branch (e.g.
-          # chore/ops-report-parser) could legitimately use. The
-          # same-repo-owner check remains mandatory because this workflow
-          # runs with pull_request_target write credentials.
+          # [automated] while using one of two dedicated timestamped branch
+          # shapes: chore/ops-report-YYYYMMDD... or
+          # ops/spine-adoption-pr-lifecycle-YYYY-MM-DD.... The lifecycle lane
+          # and the older chore/ops-report lane are special-cased: each exact
+          # branch grammar must be paired with its own anchored timestamped
+          # title, and neither can inherit broader legacy intent matchers.
+          # Git refs cannot contain a colon, so branch times use hhmm while
+          # titles use hh:mm. Never trust a bare prefix, which a human topic
+          # branch could legitimately use. The same-repo-owner check remains
+          # mandatory because this workflow runs with pull_request_target
+          # write credentials.
           SNAPSHOT_FILTER="$(cat <<'JQ'
             def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
             def snapshot_intent:
               ((.title // "") | ascii_downcase) as $t
               | ((.headRefName // "") | ascii_downcase) as $h
-              | (
-                  ($t | test("\\[automated\\]|\\[auto\\]"))
-                  or ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$"))
-                )
-                and (
-                  ($t | test("pr lifecycle \\+ spine adoption ops report"))
-                  or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
-                  or ($t | test("refresh spine adoption metric"))
-                  or ($h | test("pr-lifecycle-spine"))
-                  or ($h | test("spine-adoption-metric"))
-                );
+              | ($h | test("^ops/spine-adoption-pr-lifecycle-[0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{4}z)?$")) as $lifecycle_snapshot
+              | ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$")) as $legacy_ops_snapshot
+              | if $lifecycle_snapshot then
+                  ($t | test("^report\\(governance\\): ops runs? [0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{2}:[0-9]{2}z)?([^a-z0-9]|$)"))
+                elif $legacy_ops_snapshot then
+                  ($t | test("^chore\\(governance\\): ops report [0-9]{4}-[0-9]{2}-[0-9]{2}(t[0-9]{2}:?[0-9]{2}z)?([^a-z0-9]|$)"))
+                else
+                  false
+                end;
             [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
             | sort_by(.number) | .[]
           JQ
           )"
-          jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
-            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl || true
+          if jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
+            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl; then
+            :
+          else
+            jq_status=$?
+            printf '%s\n' "- **FAILED TO CLASSIFY SNAPSHOTS**; no PR was closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::snapshot classifier failed — cleanup aborted"
+            exit "$jq_status"
+          fi
 
           closed_count=0
-          summary="## Ephemeral Snapshot-Report PR Cleanup\n\n"
           if [ ! -s /tmp/snapshot_prs.jsonl ]; then
-            summary+="No snapshot-report PRs open.\n"
+            printf '%s\n' "No snapshot-report PRs open." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           while IFS= read -r entry; do
             number="$(echo "$entry" | jq -r '.number')"
             title="$(echo "$entry" | jq -r '.title')"
             head_ref="$(echo "$entry" | jq -r '.headRefName')"
-            summary+="- **CLOSED** #${number} (branch \`${head_ref}\`) — ${title}\n"
-            if [ "$DRY_RUN" = "false" ]; then
-              close_msg="## 🗂️ Auto-closed: ephemeral snapshot report
+            if [ "$DRY_RUN" != "false" ]; then
+              printf -- '- **WOULD CLOSE** #%s (branch `%s`) — %s\n' \
+                "$number" "$head_ref" "$title" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            close_msg="## 🗂️ Auto-closed: ephemeral snapshot report
 
           This PR is a **status snapshot** (PR-lifecycle / spine-adoption metric),
           not a change to merge. The same data is a projection already rendered
@@ -135,20 +176,29 @@ jobs:
           as artifacts/comments, never as standing PRs, so they are closed on
           sight to keep the PR list readable. No action needed.
 
-          If this was a real change, reopen and retitle so it no longer matches a
-          snapshot intent."
-              gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-              if gh pr close "$number" --repo "$GH_REPO"; then
-                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
-                closed_count=$((closed_count + 1))
-              else
-                echo "::warning::close of #${number} was rejected — not counted as closed"
-              fi
+          Its branch ref is intentionally preserved for recovery. If this was a
+          real change, reopen and retitle so it no longer matches a snapshot
+          intent."
+            comment_note=""
+            if ! gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg"; then
+              comment_note="; governance comment failed"
+              echo "::warning::comment on #${number} failed"
+            fi
+            if gh pr close "$number" --repo "$GH_REPO"; then
+              closed_count=$((closed_count + 1))
+              printf -- '- **CLOSED** #%s (branch `%s`) — %s%s\n' \
+                "$number" "$head_ref" "$title" "$comment_note" \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf -- '- **FAILED TO CLOSE** #%s (branch `%s`) — %s%s\n' \
+                "$number" "$head_ref" "$title" "$comment_note" \
+                >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning::close of #${number} was rejected — not counted as closed"
             fi
           done < /tmp/snapshot_prs.jsonl
 
-          summary+="\n**Summary:** ${closed_count} snapshot PR(s) closed (dry_run=${DRY_RUN})\n"
-          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n**Summary:** %s snapshot PR(s) closed (dry_run=%s)\n' \
+            "$closed_count" "$DRY_RUN" >> "$GITHUB_STEP_SUMMARY"
           echo "Snapshot closed: $closed_count"
 
       - name: Find and close duplicate automated PRs
@@ -158,16 +208,28 @@ jobs:
           repo_owner="${GH_REPO%%/*}"
           trusted_head_re='^(ops|chore|codex|devin|governance)/'
 
-          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+          printf '%s\n\n' "## Duplicate Automated PR Dedupe" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          # As above, the 200-PR bound is fail-safe: unseen PRs are untouched.
+          if gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
-            > /tmp/open_prs.json
+            > /tmp/open_prs.json; then
+            :
+          else
+            list_status=$?
+            printf '%s\n' "- **FAILED TO LIST OPEN PRS**; no duplicate was classified or closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::open PR listing failed — dedupe aborted"
+            exit "$list_status"
+          fi
 
           # Normalize titles and group. Title markers are not trusted by
           # themselves: pull_request_target has write credentials, so dedupe
           # only touches same-repo PRs that also have a trusted automation
           # signal (bot author, trusted head prefix, or maintainer-applied
           # opt-in label).
-          jq -c '
+          if jq -c '
             def label_names: (.labels // [] | map(.name));
             def trusted($owner; $head_re):
               ((.headRepositoryOwner.login // "") == $owner)
@@ -193,25 +255,37 @@ jobs:
             | map(select(length > 1) | sort_by(.number))
             | .[]
           ' --arg repo_owner "$repo_owner" --arg trusted_head_re "$trusted_head_re" \
-            /tmp/open_prs.json > /tmp/dupe_groups.jsonl || true
+            /tmp/open_prs.json > /tmp/dupe_groups.jsonl; then
+            :
+          else
+            jq_status=$?
+            printf '%s\n' "- **FAILED TO CLASSIFY DUPLICATES**; no PR was closed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::duplicate classifier failed — dedupe aborted"
+            exit "$jq_status"
+          fi
 
           closed_count=0
-          summary="## Duplicate Automated PR Dedupe\n\n"
 
           if [ ! -s /tmp/dupe_groups.jsonl ]; then
-            summary+="No duplicate automated PRs found.\n"
+            printf '%s\n' "No duplicate automated PRs found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           while IFS= read -r group; do
             keep="$(echo "$group" | jq -r '.[-1].number')"
             title="$(echo "$group" | jq -r '.[-1].title')"
-            summary+="### \`${title}\` — keeping #${keep}\n"
+            printf -- '### `%s` — keeping #%s\n' "$title" "$keep" \
+              >> "$GITHUB_STEP_SUMMARY"
             while IFS= read -r entry; do
               number="$(echo "$entry" | jq -r '.number')"
               head_ref="$(echo "$entry" | jq -r '.headRefName')"
-              summary+="- **CLOSED** #${number} (branch \`${head_ref}\`)\n"
-              if [ "$DRY_RUN" = "false" ]; then
-                close_msg="## 🗂️ Auto-closed: duplicate automated PR
+              if [ "$DRY_RUN" != "false" ]; then
+                printf -- '- **WOULD CLOSE** #%s (branch `%s`)\n' \
+                  "$number" "$head_ref" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+
+              close_msg="## 🗂️ Auto-closed: duplicate automated PR
 
           This PR duplicates **#${keep}** (same automated intent, newer snapshot).
           Per \`docs/governance/PR_QUALITY_GATES.md\` § Duplicate Automated PR Dedupe,
@@ -219,17 +293,30 @@ jobs:
 
           If this close is wrong, reopen and rename the title so it no longer
           matches the duplicate group."
-                gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-                if gh pr close "$number" --repo "$GH_REPO"; then
-                  gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
-                  closed_count=$((closed_count + 1))
-                else
-                  echo "::warning::close of #${number} was rejected — not counted as closed"
+              comment_note=""
+              if ! gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg"; then
+                comment_note="; governance comment failed"
+                echo "::warning::comment on #${number} failed"
+              fi
+              if gh pr close "$number" --repo "$GH_REPO"; then
+                delete_note=""
+                if ! gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null; then
+                  delete_note="; branch cleanup failed"
+                  echo "::warning::branch cleanup for #${number} failed"
                 fi
+                closed_count=$((closed_count + 1))
+                printf -- '- **CLOSED** #%s (branch `%s`)%s%s\n' \
+                  "$number" "$head_ref" "$comment_note" "$delete_note" \
+                  >> "$GITHUB_STEP_SUMMARY"
+              else
+                printf -- '- **FAILED TO CLOSE** #%s (branch `%s`)%s\n' \
+                  "$number" "$head_ref" "$comment_note" \
+                  >> "$GITHUB_STEP_SUMMARY"
+                echo "::warning::close of #${number} was rejected — not counted as closed"
               fi
             done < <(echo "$group" | jq -c '.[:-1][]')
           done < /tmp/dupe_groups.jsonl
 
-          summary+="\n**Summary:** ${closed_count} closed (dry_run=${DRY_RUN})\n"
-          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n**Summary:** %s closed (dry_run=%s)\n' \
+            "$closed_count" "$DRY_RUN" >> "$GITHUB_STEP_SUMMARY"
           echo "Closed: $closed_count"

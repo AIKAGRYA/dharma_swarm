@@ -3,7 +3,24 @@ name: semgrep
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    # DELIBERATELY UNFILTERED — this workflow publishes a CONTRACTED check name
+    # ('semgrep' in docs/governance/CI_TRUTH_CONTRACT.json).
+    #
+    # A workflow-level `paths:` filter makes the workflow not run at all, so no
+    # check appears in the rollup, and ci_truth.classify_check(None) returns
+    # MISSING. PASS_CONCLUSIONS (ci_truth.py:20) contains SKIPPED but NOT
+    # MISSING, so evaluate_rollup sets verdict = DEGRADED and the CLI exits 3 —
+    # permanently, on every docs-only and dependency-only PR. The operator
+    # report then cannot tell "advisory gate broken" from "advisory gate not
+    # applicable", which is the whole value of the report.
+    #
+    # Per-JOB filtering (as tests.yml does) is the correct answer here: the job
+    # reports `skipped`, and SKIPPED counts as PASS. That needs a classifier job
+    # in this workflow and a contract entry for its check name; it is deliberate
+    # follow-up, not done here. Filtering it back at the workflow level is not
+    # the fix and is blocked by test_workflow_path_filters.py.
   merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   schedule:
@@ -30,10 +47,12 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
 
     steps:
-      - name: Checkout
+      - name: Checkout exact event head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.event.after || github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Run Semgrep CI
         # In CI we run BOTH the local .semgrep/ rules and the registry
@@ -59,17 +78,157 @@ jobs:
       - name: Strict gate (local rules only)
         # Local .semgrep/ rules are our owned signal. Fail the build on
         # any ERROR in our own rules — registry packs are advisory only.
+        shell: sh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          MERGE_GROUP_ACTION: ${{ github.event.action }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.event.after }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            base="${{ github.event.before }}"
-          else
-            base=""
+          set -eu
+          zero_sha="0000000000000000000000000000000000000000"
+
+          validate_sha() {
+            label="$1"
+            sha="$2"
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error::${label} is not an exact 40-character commit SHA"
+              exit 2
+            fi
+            git cat-file -e "${sha}^{commit}"
+          }
+
+          base=""
+          head=""
+          full_scan="false"
+          case "$EVENT_NAME" in
+            pull_request)
+              base="$PR_BASE_SHA"
+              head="$PR_HEAD_SHA"
+              ;;
+            merge_group)
+              if [ "$MERGE_GROUP_ACTION" != "checks_requested" ]; then
+                echo "::error::Unexpected merge-group action ${MERGE_GROUP_ACTION}"
+                exit 2
+              fi
+              if [ "$MERGE_GROUP_BASE_REF" != "refs/heads/main" ]; then
+                echo "::error::Merge group targets ${MERGE_GROUP_BASE_REF}, not refs/heads/main"
+                exit 2
+              fi
+              base="$MERGE_GROUP_BASE_SHA"
+              head="$MERGE_GROUP_HEAD_SHA"
+              ;;
+            push)
+              head="$PUSH_AFTER_SHA"
+              if [ "$PUSH_BEFORE_SHA" = "$zero_sha" ]; then
+                full_scan="true"
+              else
+                base="$PUSH_BEFORE_SHA"
+              fi
+              ;;
+            schedule)
+              # The weekly main audit deliberately scans the whole tree.
+              head="$EVENT_SHA"
+              full_scan="true"
+              ;;
+            *)
+              echo "::error::Unsupported Semgrep event ${EVENT_NAME}"
+              exit 2
+              ;;
+          esac
+
+          validate_sha event_head "$head"
+          actual_head="$(git rev-parse HEAD)"
+          if [ "$actual_head" != "$head" ]; then
+            echo "::error::checkout HEAD ${actual_head} does not match event head ${head}"
+            exit 2
           fi
 
-          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off --baseline-commit "$base"
-          else
-            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off
+          if [ -n "$base" ]; then
+            validate_sha event_base "$base"
+            if [ "$EVENT_NAME" = "pull_request" ]; then
+              merge_base="$(git merge-base "$base" "$head")"
+              validate_sha event_merge_base "$merge_base"
+              base="$merge_base"
+            elif ! git merge-base --is-ancestor "$base" "$head"; then
+                echo "::error::event base ${base} is not an ancestor of event head ${head}"
+                exit 2
+            fi
           fi
+
+          if [ "$full_scan" = "true" ]; then
+            scripts/governance/run_semgrep_with_ca.sh \
+              --config .semgrep --error --metrics=off
+          else
+            if [ -z "$base" ]; then
+              echo "::error::Delta Semgrep event ${EVENT_NAME} has no validated base"
+              exit 2
+            fi
+            scripts/governance/run_semgrep_with_ca.sh \
+              --config .semgrep --error --metrics=off --baseline-commit "$base"
+          fi
+
+  # ===========================================================================
+  # The behavioral contract for anti-slop Rule 2 (.semgrep/dharma-anti-slop.yml
+  # + .semgrep/tests/test_no_new_substrate.py). Added 2026-08-04.
+  #
+  # WHY A SEPARATE JOB. Until now these tests SKIPPED in every automated lane:
+  # the pytest jobs install `.[dev]`, which carries no scanner, and the job
+  # above only runs production scans — so a regression deleting a detection
+  # shape went green everywhere, and the PR-time strict gate is
+  # `--baseline-commit`-scoped and examines no unchanged Python file. That is
+  # the same defect class as the one Rule 2's own message carried for fifteen
+  # weeks: a promise no execution ever checked.
+  #
+  # WHY NOT `semgrep` IN THE `dev` EXTRA. That would install the scanner into
+  # both required pytest matrix jobs and put its transitive pins (click, rich,
+  # requests, ...) into resolution with the whole package — a dependency
+  # conflict there takes down a REQUIRED lane. This job installs only
+  # `semgrep` + `pytest`, pinned to the ratified 1.168.0, and the test file
+  # imports nothing from dharma_swarm.
+  #
+  # LIMITATION, STATED: as of 2026-08-04 `semgrep` is not among main's
+  # required status checks (those are DocOps integrity gate, Coherence Delta
+  # PR body, gitleaks, pytest 3.11, pytest 3.12, Onboarding admission parity),
+  # so this job is visible-and-red rather than merge-blocking until the
+  # operator adds it to branch protection. It executes; it does not yet gate.
+  # ===========================================================================
+  rule2-behavior:
+    name: anti-slop rule 2 behavioral contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the ratified scanner and pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install "semgrep==1.168.0" "pytest>=7.0"
+
+      - name: Behavioral contract (fixture assertions, no skips permitted)
+        env:
+          # Turns a missing scanner into a hard failure instead of a skip.
+          DHARMA_REQUIRE_SEMGREP: "1"
+          # Fails closed if the installed scanner ever drifts off the pin.
+          DHARMA_SEMGREP_EXPECTED_VERSION: "1.168.0"
+        run: |
+          # --noconftest: tests/conftest.py has an autouse fixture that imports
+          # dharma_swarm; this test file needs no repo fixtures, only the
+          # scanner. -rs surfaces any skip in the log, and the
+          # test_scanner_is_present_where_this_contract_is_required guard turns
+          # the one that would matter into a failure.
+          python -m pytest -q -rs --noconftest tests/test_semgrep_rule2_behavior.py

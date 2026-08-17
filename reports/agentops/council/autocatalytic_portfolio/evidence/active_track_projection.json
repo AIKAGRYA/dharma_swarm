@@ -1,0 +1,36 @@
+{
+  "schema": "dharma.autocatalytic.active_track_projection.v1",
+  "observed_at": "2026-08-05T05:26:13Z",
+  "owner_file": "docs/governance/ACTIVE_TRACK.yaml",
+  "owner_file_sha256": "9244de6518d6fd2370198aa4e234420e4f23c9559d90bd825f997edc39b95523",
+  "portfolio_file": "ACTIVE_SURFACE_MANIFEST.yaml",
+  "portfolio_file_sha256": "8cfd10d07b272ed38b541f010ef42a1896616a44fb83f0ba9c8c5795d272775b",
+  "active_track_count": 10,
+  "active_track_ids": [
+    "darshan-publication-2026-07",
+    "dharmagraph-engine-2026-07",
+    "helm-worldclass-terminal-2026-06",
+    "hyperbolic-time-chamber-2026-07",
+    "loop-closure-2026-06",
+    "merge-master-mike-d4-2026-06",
+    "orchestration-arena-v1-2026-06",
+    "organism-rewire-2026-07",
+    "repository-titanium-hardening-2026-07",
+    "sovereign-safety-tcb-2026-07"
+  ],
+  "bound_track_ids": [
+    "darshan-publication-2026-07",
+    "dharmagraph-engine-2026-07",
+    "helm-worldclass-terminal-2026-06",
+    "hyperbolic-time-chamber-2026-07",
+    "loop-closure-2026-06",
+    "merge-master-mike-d4-2026-06",
+    "orchestration-arena-v1-2026-06",
+    "organism-rewire-2026-07",
+    "repository-titanium-hardening-2026-07",
+    "sovereign-safety-tcb-2026-07"
+  ],
+  "sets_equal": true,
+  "runtime_enforcement": "validate_portfolio rejects missing active bindings and bindings to non-active tracks",
+  "claim_boundary": "The portfolio is the active-track metabolism; distinct node substance is established separately by project adapters and typed ports."
+}

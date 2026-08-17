@@ -11,6 +11,7 @@ from dharma_swarm.runtime_state import (
     ContextBundleRecord,
     MemoryFact,
     RUNTIME_RECEIPT_TYPES,
+    RuntimeReceipt,
     RuntimeStateStore,
     SessionState,
     SessionEventRecord,
@@ -19,6 +20,48 @@ from dharma_swarm.runtime_state import (
     build_session_event_from_ledger_record,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
+
+
+def _atomic_event_receipt(
+    suffix: str,
+) -> tuple[SessionEventRecord, RuntimeReceipt]:
+    event = SessionEventRecord(
+        event_id=f"sevt-{suffix}",
+        session_id=f"sess-{suffix}",
+        ledger_kind="message",
+        event_name="message_consumed",
+        run_id=f"run-{suffix}",
+    )
+    receipt = RuntimeReceipt(
+        receipt_id=f"rr-{suffix}",
+        receipt_type="message_consumed",
+        status="completed",
+        run_id=event.run_id,
+    )
+    return event, receipt
+
+
+def _atomic_pair_counts(
+    store: RuntimeStateStore,
+    event: SessionEventRecord,
+    receipt: RuntimeReceipt,
+) -> tuple[int, int, int, int]:
+    with sqlite3.connect(store.db_path) as db:
+        row = db.execute(
+            "SELECT"
+            " (SELECT COUNT(*) FROM sessions WHERE session_id = ?),"
+            " (SELECT COUNT(*) FROM session_events WHERE event_id = ?),"
+            " (SELECT COUNT(*) FROM session_events_fts WHERE event_id = ?),"
+            " (SELECT COUNT(*) FROM runtime_receipts WHERE receipt_id = ?)",
+            (
+                event.session_id,
+                event.event_id,
+                event.event_id,
+                receipt.receipt_id,
+            ),
+        ).fetchone()
+    assert row is not None
+    return int(row[0]), int(row[1]), int(row[2]), int(row[3])
 
 
 @pytest.mark.asyncio
@@ -226,6 +269,57 @@ def test_session_event_and_episode_outbox_rollback_atomically(
         ).fetchone()[0]
     assert session_event_count == 0
     assert outbox_count == 0
+
+
+@pytest.mark.asyncio
+async def test_session_event_and_runtime_receipt_are_atomic_async(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    committed = _atomic_event_receipt("async-committed")
+    rolled_back = _atomic_event_receipt("async-rolled-back")
+
+    stored = await store.record_session_event_with_runtime_receipt(*committed)
+
+    def fail_receipt(_receipt) -> None:
+        raise OSError("injected runtime receipt failure")
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_state._runtime_receipt_insert",
+        fail_receipt,
+    )
+    with pytest.raises(OSError, match="runtime receipt"):
+        await store.record_session_event_with_runtime_receipt(*rolled_back)
+
+    assert stored == committed
+    assert _atomic_pair_counts(store, *committed) == (1, 1, 1, 1)
+    assert _atomic_pair_counts(store, *rolled_back) == (0, 0, 0, 0)
+
+
+def test_session_event_and_runtime_receipt_are_atomic_sync(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    committed = _atomic_event_receipt("sync-committed")
+    rolled_back = _atomic_event_receipt("sync-rolled-back")
+
+    stored = store.record_session_event_with_runtime_receipt_sync(*committed)
+
+    def fail_receipt(_receipt) -> None:
+        raise OSError("injected runtime receipt failure")
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_state._runtime_receipt_insert",
+        fail_receipt,
+    )
+    with pytest.raises(OSError, match="runtime receipt"):
+        store.record_session_event_with_runtime_receipt_sync(*rolled_back)
+
+    assert stored == committed
+    assert _atomic_pair_counts(store, *committed) == (1, 1, 1, 1)
+    assert _atomic_pair_counts(store, *rolled_back) == (0, 0, 0, 0)
 
 
 def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None:

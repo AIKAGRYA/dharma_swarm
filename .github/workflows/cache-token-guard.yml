@@ -3,6 +3,10 @@ name: cache-token-guard
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/governance/check_workflow_cache_token.py'
+      - '.github/workflows/cache-token-guard.yml'
   merge_group:
 
 concurrency:

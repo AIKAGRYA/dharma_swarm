@@ -1,0 +1,121 @@
+{
+  "schema": "dharma.autocatalytic.local_gate_receipt.v1",
+  "observed_at": "2026-08-05T08:16:15Z",
+  "base_commit": "9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+  "verified_implementation_commit": "2323d3a42f9419204db16222b6652010ea6aefc7",
+  "candidate_parent_commit": "0feebfacc4500d99f9192d336d762c0f6d339f2e",
+  "branch": "codex/autocatalytic-organism3-20260805",
+  "gates": [
+    {
+      "name": "work_packet_python_gate",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_manifest_health.py tests/test_store_inventory_census.py tests/test_a2a.py tests/test_catalytic_graph.py",
+      "result": "202 passed, 1 third-party deprecation warning",
+      "exit": 0
+    },
+    {
+      "name": "store_inventory_census",
+      "command": "python scripts/store_inventory_census.py --check; python -m pytest -q tests/test_store_inventory_census.py",
+      "result": "canonical artifact current; 4 passed; JSONL exact baseline explicitly justified 218 -> 219 for {cycle_id}.tasks.jsonl",
+      "exit": 0
+    },
+    {
+      "name": "packet_negative_control",
+      "command": "python -m pytest -q tests/test_autocatalytic_portfolio.py -k input_required_cannot_promote",
+      "result": "1 passed, 44 deselected",
+      "exit": 0
+    },
+    {
+      "name": "adversarial_semantic_matrix",
+      "command": "focused canonical-seed, source-contract, causal-cross-feed, and forgery cases",
+      "result": "20 passed; complete portfolio module 45 passed",
+      "exit": 0
+    },
+    {
+      "name": "typed_promotion_gate_adversarial_contract",
+      "command": "exact manifest mapping, missing/extra/reordered/unknown/non-boolean and forged-gate cases; all-true synthetic gate",
+      "result": "fail-closed cases passed; all-true remains blocked and authority_upgrade_authorized=false",
+      "exit": 0
+    },
+    {
+      "name": "state_root_override_integration",
+      "command": "alternate DHARMA_STATE_DIR precedence/fallback unit check plus default two-turn run and reload",
+      "result": "2 focused cases passed; archive, byte-identical alias, 20-row task log, exact ten-card set, and runtime.db remained under one alternate root",
+      "exit": 0
+    },
+    {
+      "name": "focused_ruff_and_module_budget",
+      "command": "ruff check on the complete autocatalytic implementation, manifest/API seams, and focused tests; explicit 14-module wc -l",
+      "result": "All checks passed; every one of the 14 fingerprinted semantic modules is below 500 LOC, with a maximum of 406 (facades 216/259/156; verifier 374)",
+      "exit": 0
+    },
+    {
+      "name": "global_quality_ratchet",
+      "command": "python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45 --baseline-merge-base-of 9fd1bfc39e6dc471c3ebddbde668e383bd818110",
+      "result": "green; modules_over_500_lines 207 -> 207; silent_exception_swallows improved 241 -> 239; every other counter non-regressing",
+      "exit": 0
+    },
+    {
+      "name": "dashboard_contract_tests",
+      "command": "node --experimental-strip-types --test src/lib/dashboardNav.test.ts src/lib/autocatalyticPortfolio.test.ts",
+      "result": "11 passed",
+      "exit": 0
+    },
+    {
+      "name": "variable_turn_receipt_count_regression",
+      "command": "semanticReceiptCountForWitness unit cases plus TruthBoundaryNotice witness binding",
+      "result": "2 turns -> 41 semantic rows; 3 turns -> 61; invalid or absent turn count -> generic exact-set wording instead of a fabricated number",
+      "exit": 0
+    },
+    {
+      "name": "focused_frontend_static_checks",
+      "command": "Node contract tests plus ESLint for organism routes, portfolio contract, and navigation",
+      "result": "11 Node tests passed; ESLint clean",
+      "exit": 0
+    },
+    {
+      "name": "next_production_build",
+      "command": "npm run build",
+      "result": "compiled; /dashboard/organism static and /dashboard/organism/[nodeId] dynamic routes emitted",
+      "exit": 0
+    },
+    {
+      "name": "committed_precommit_suite",
+      "command": "pre-commit hooks during commit ede0faad9; documented single-guard DHARMA_UPLIFT_BYPASS_DESTRUCTION=1 for the 14-module structural split, with [structural-delete-approved] retained in the commit body",
+      "result": "test hygiene, contract, uplift, forge, docops, hygiene, manifest, gitleaks, Semgrep, whitespace, conflict, size, YAML, and TOML hooks passed; no hook was disabled wholesale",
+      "exit": 0
+    },
+    {
+      "name": "pr_docops_gate",
+      "command": "python scripts/docops/check_docops_integrity.py --counts-advisory --changed-from origin/main",
+      "result": "passed; generated count drift remained advisory as declared by the PR workflow; all non-count integrity checks stayed strict",
+      "exit": 0
+    },
+    {
+      "name": "committed_packet_scope",
+      "command": "python scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base 9fd1bfc39e6dc471c3ebddbde668e383bd818110 --event-head 0feebfacc4500d99f9192d336d762c0f6d339f2e",
+      "result": "PASSED; exactly one P1 Session Entry packet covers every committed path through the candidate parent; final-head scope remains a post-commit gate",
+      "exit": 0
+    },
+    {
+      "name": "canonical_snapshot_check",
+      "command": "python -m dharma_swarm.autocatalytic_portfolio run --turns 2; fresh process check",
+      "result": "cycle autocat_fa3d5a51405c4bb4 under isolated DHARMA_STATE_DIR: 10 nodes; 13 edges; one SCC/set; validation_errors=[]; structure_only valid; local_mutable_runtime_receipt_consistency valid and independently_authenticated=false; 20 promotion gates evaluated, zero satisfied, zero authority upgrades; 14-module fingerprint independently matched",
+      "exit": 0
+    },
+    {
+      "name": "decorrelated_council_content_review",
+      "command": "fast-default six-lane council run 11 after persistence-layout evidence closure",
+      "result": "runner content gate pass_fullness; 6/6 parsed, minimum score 100, zero blockers and zero required changes",
+      "exit": 0
+    },
+    {
+      "name": "council_provider_identity_audit",
+      "command": "requested_model versus actual_model family audit for every required run-11 lane",
+      "result": "five required families matched; requested Qwen returned deepseek-v4-pro, so effective gate is hold_required_provider_substitution and the substituted review is not counted as Qwen-family decorrelation",
+      "exit": 0
+    }
+  ],
+  "scoped_typescript_claim": "The Next production build TypeScript phase passed. Raw repository-wide tsc --noEmit remains outside this packet claim because existing test/config TS5097 and unrelated RuntimeControlPlane test errors are not introduced by these files.",
+  "known_warning": "FastAPI TestClient emits a Starlette deprecation warning about future httpx2 migration; the mounted response-contract test passes.",
+  "external_effects_performed": false
+}

@@ -10,10 +10,65 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-07-11"
+last_updated: "2026-08-14"
+
+# WP-0C1R ratified research participants (operator decision A1, 2026-08-02,
+# Titanium campaign — reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md).
+# The Palantir research-pilot family and verifier_ranker_v0 inventory are
+# declared participants in the canonical state_dir slices they read/write.
+# Each group declares its accessed slices machine-readably in state_slices
+# (decorrelated review 2026-08-02: a prose-only slice list is not a
+# declaration). They mint no new slice; Semgrep Rule 1 allowlists exactly
+# these files per this declaration, and the contract test enforces the
+# lockstep in BOTH directions (an allowlist entry with no declaration fails).
+research_state_participants:
+  palantir_pilot:
+    files:
+      - dharma_swarm/palantir_pilot_manifest.py
+      - scripts/governance/palantir_pilot_audit.py
+      - scripts/governance/register_palantir_pilot.py
+      - scripts/research/palantir_contribution_packets.py
+      - scripts/research/palantir_deep_ingest.py
+      - scripts/research/palantir_learning_backlog.py
+      - scripts/research/palantir_pilot_curriculum.py
+      - scripts/research/palantir_pilot_orientation.py
+      - scripts/research/palantir_pilot_query.py
+      - scripts/research/palantir_playbook_evals.py
+      - scripts/research/palantir_public_source_cards.py
+      - scripts/research/palantir_public_source_index.py
+      - scripts/research/palantir_query_cookbook.py
+      - scripts/research/palantir_source_card_balanced_expand.py
+      - scripts/research/palantir_source_card_cleanup.py
+      - scripts/research/palantir_source_card_playbooks.py
+      - scripts/research/palantir_source_card_quality.py
+    state_slices:
+      # Research wiki notes + local-only deep-cards (never committed to git)
+      - "~/.dharma/knowledge/wiki/research/palantir-pilot.md"
+      - "~/.dharma/knowledge/wiki/research/palantir-pilot"
+      - "~/.dharma/knowledge/wiki/raw/palantir-pilot"
+      # Agent registration surfaces scoped to the pilot's own identity
+      - "~/.dharma/agents/palantir_pilot"
+      - "~/.dharma/external_agents/palantir_pilot"
+      - "~/.dharma/a2a/cards/palantir-pilot.json"
+  verifier_ranker_v0:
+    files:
+      - dharma_swarm/verifier_ranker_v0/inventory.py
+    state_slices:
+      # Read-only inventory surfaces (sqlite metadata / redacted rows only,
+      # per the SurfaceSpec table in verifier_ranker_v0/inventory.py)
+      - "~/.dharma/state/runtime.db"
+      - "~/.dharma/db/messages.db"
+      - "~/.dharma/datasets"
+      - "~/.dharma/forge_v1"
+      - "~/.dharma/traces"
+      - "~/.dharma/agent_memory"
+      - "~/.dharma/agents"
+      - "~/.dharma/external_agents"
+      - "~/.dharma/a2a/cards"
 
 state_dir:
   canonical: "~/.dharma"
+  task_board_db: "~/.dharma/db/tasks.db"
   runtime_db: "~/.dharma/state/runtime.db"
   telemetry_db: "~/.dharma/state/runtime.db"
   ontology_db: "~/.dharma/ontology.db"
@@ -30,6 +85,7 @@ state_dir:
   knowledge_quarantine: "~/.dharma/knowledge/quarantine"
   agent_state_hermes: "~/.dharma/agents/hermes-m5/state.json"
   a2a_bus_queue: "~/.dharma/a2a_bus/queue.jsonl"
+  autocatalytic_cycle_witnesses: "~/.dharma/a2a/autocatalytic_portfolio"
   promote_log: "~/.dharma/logs/consume_review_marks.jsonl"
   provider_credits_log: "~/.dharma/logs/provider_credits_latest.json"
   # Memory Common door (dharma_swarm/memory_common.py) + retrieval gate
@@ -124,6 +180,7 @@ dashboard_nav_sections:
       - GLM-5
       - Telemetry
       - Ecosystem Map
+      - Organism
       - Synthesizer
       - Agents
       - Tasks
@@ -205,6 +262,15 @@ health_check_registry:
     type: file_exists
   recursive_discovery_module_exists:
     description: "Verify the recursive discovery shadow receipt module exists"
+    type: file_exists
+  autocatalytic_contract_complete:
+    description: "Verify a metabolic node has one typed input, one typed output, a consumer, authority, and proof obligations"
+    type: structural
+  autocatalytic_proof_refs_exist:
+    description: "Verify every declared code/test proof reference exists in the repository"
+    type: file_exists
+  autocatalytic_node_page_exists:
+    description: "Verify the shared dynamic operator page and the node's canonical documentation page exist"
     type: file_exists
 
 # ── Dashboard Surfaces ────────────────────────────────────────────
@@ -374,6 +440,24 @@ dashboard_surfaces:
     health_check_ids: [dashboard_route_exists]
     priority: p2
     next_action: "Wire ecosystem to live module dependency graph"
+
+  - id: organism
+    label: "Organism"
+    route: /dashboard/organism
+    api_dependencies: [/api/manifest/autocatalytic]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered, api_endpoint_registered]
+    priority: p0
+    next_action: null
+
+  - id: organism_node
+    label: "Organism Node"
+    route: /dashboard/organism/[nodeId]
+    api_dependencies: [/api/manifest/autocatalytic]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered, api_endpoint_registered]
+    priority: p0
+    next_action: null
 
   - id: synthesizer
     label: "Synthesizer"
@@ -556,13 +640,20 @@ integrations:
     status: live
     used_by: [agent_runner]
 
+  - id: task_board_db
+    label: "Task Board SQLite"
+    type: database
+    path: "~/.dharma/db/tasks.db"
+    status: live
+    used_by: [swarm_manager, mission_control]
+
   - id: runtime_db
     label: "Runtime SQLite"
     type: database
     path: "~/.dharma/state/runtime.db"
     status: live
     health_check_ids: [runtime_db_present]
-    used_by: [swarm_manager, telemetry]
+    used_by: [swarm_manager, telemetry, mission_control, a2a_transport]
 
   - id: ontology_db
     label: "Ontology SQLite"
@@ -718,6 +809,184 @@ loops:
     next_action: null
 
 # =========================================================================
+# Mission Control topology — admitted intent, not runtime liveness
+# =========================================================================
+# This is a typed control-plane declaration over existing state owners. It
+# neither starts a process nor creates a scheduler, database, transport, or
+# receipt store. Every node and edge remains non-live until runtime evidence
+# independently establishes a stronger claim.
+control_plane_topology:
+  id: dharma-mission-control
+  schema_version: dharma.control_plane.topology.v1
+  claim_ceiling: admitted_not_alive
+  canonical_state_owners: [TaskBoard, RuntimeStateStore]
+  owns_new_state: false
+  owns_new_store: false
+  proves_executor_liveness: false
+  implicit_claim_promotion: false
+  claim_ladder:
+    - MissionProposal
+    - AcceptedMissionTask
+    - MissionDispatchRequest
+    - AuthorizedDispatch
+    - DeliveryAck
+    - HandlerAck
+    - SemanticOutcome
+    - VerifiedOutcome
+    - PromotionWarrant
+    - MergeAuthorized
+  state_ownership:
+    task_board:
+      module: dharma_swarm.task_board
+      path_ref: state_dir.task_board_db
+      role: canonical_task_owner
+    runtime_state:
+      module: dharma_swarm.runtime_state
+      path_ref: state_dir.runtime_db
+      role: canonical_runtime_evidence_owner
+    integration_contract: |
+      Mission Control is an additive adapter over TaskBoard and
+      RuntimeStateStore. The owners remain separate databases, so their
+      projections are not represented as an atomic transaction.
+
+  claim_contract:
+    non_coercible: true
+    statement: "MissionProposal != AcceptedMissionTask != MissionDispatchRequest != AuthorizedDispatch != DeliveryAck != HandlerAck != SemanticOutcome != VerifiedOutcome != PromotionWarrant != MergeAuthorized"
+    forbidden_coercions:
+      - proposal_to_accepted_task
+      - accepted_task_to_dispatch_request
+      - dispatch_request_to_authorized_dispatch
+      - authorized_dispatch_to_delivery_ack
+      - delivery_ack_to_handler_ack
+      - handler_ack_to_semantic_outcome
+      - semantic_outcome_to_verified_outcome
+      - verified_outcome_to_promotion_warrant
+      - promotion_warrant_to_merge_authorized
+    notes: |
+      Governance admission is an external prerequisite for these declared
+      surfaces; it is not a runtime claim-ladder value. MissionDispatchRequest
+      is not AuthorizedDispatch, and a task claim does not confer action
+      authority.
+
+  independent_authorities:
+    forge_promotion: dharma_swarm/forge_v1/forge_v2/verify_promotion.py
+    merge: scripts/runtime/pr_merge_control.py
+  independent_authority_rule: |
+    Forge remains the independent promotion arbiter and Merge Master Mike
+    remains the independent conditional-merge authority. Neither authority is
+    a topology node or conferred by any declared edge.
+
+  nodes:
+    - id: apex_sarathi
+      role: "Form typed chief-of-staff proposals; never self-authorize dispatch."
+      authority: proposal_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: mission_control
+      role: "Join canonical mission, task, attempt, lease, receipt, and reconciliation views."
+      authority: TaskBoard+RuntimeStateStore
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: true
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: governed_dispatch
+      role: "Resolve an independently authenticated authority reference before dispatch."
+      authority: injected_verifier_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: a2a_transport
+      role: "Publish and observe identity-bound A2A transport and handler evidence."
+      authority: transport_only
+      lifecycle_owner: A2A
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: true
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: operator_projection
+      role: "Project explicit-mission Mission Control and Sarathi state read-only."
+      authority: projection_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: operator_brief_projection
+      role: "Cite mission snapshots in the Operator Brief without promoting their claims."
+      authority: projection_only
+      owns_state: false
+      output_verified: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+
+  edges:
+    - source: apex_sarathi
+      target: mission_control
+      carries: MissionProposal
+      implementation_status: admitted_not_alive
+      writes_owner_state: true
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: governed_dispatch
+      carries: MissionDispatchRequest
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: governed_dispatch
+      target: a2a_transport
+      carries: AuthorizedDispatch
+      implementation_status: admitted_not_alive
+      writes_owner_state: true
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: a2a_transport
+      target: mission_control
+      carries: A2AExecutionObservation
+      rule: projection_only_no_mission_attempt_lifecycle
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: operator_projection
+      carries: MissionSnapshot
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: apex_sarathi
+      target: operator_projection
+      carries: SarathiProjection
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: operator_brief_projection
+      carries: MissionSnapshot
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+
+# =========================================================================
 # Correlation Spine — closure-layer receipt map (PR A.5)
 # =========================================================================
 # Doctrine (cross-agent convergence: Perplexity / Codex / Devin / Hermes /
@@ -745,6 +1014,7 @@ correlation_spine:
   invariant: "Receipts may differ by closure layer. Correlation identity must not."
   vocabulary:
     - canonical-store    # owns the source of truth for its layer
+    - canonical-within-layer # owns the receipt for one closure layer
     - derived-view       # read-only projection of a canonical-store
     - plugin-sink        # write-only export adapter (e.g. OTel)
     - cache              # ephemeral, rebuildable from canonical sources
@@ -792,6 +1062,20 @@ correlation_spine:
         ClosureEvidenceReceipt) are tracked as a follow-up, not forced
         here.
 
+    - id: persistent_dialogue
+      label: "Sarathi persistent-dialogue turn closure"
+      receipt_class: RuntimeReceipt
+      receipt_module: dharma_swarm.runtime_state
+      identity_field: trace_id
+      identity_alias: correlation_id
+      role: canonical-within-layer
+      owner: sarathi
+      notes: |
+        Sarathi P0 records the reply event and RuntimeReceipt subtype
+        sarathi_turn through one RuntimeStateStore transaction. RuntimeStateStore
+        remains the shared persistence owner; the Sarathi adapter does not
+        introduce a new store.
+
   cross_layer_joins:
     - "A2ATaskReceipt.correlation_id == EvidenceReceipt(spine).trace_id"
     - "EvidenceReceipt(spine).trace_id == EvidenceReceipt(closure_v0).correlation_id"
@@ -799,3 +1083,263 @@ correlation_spine:
   guard: scripts/uplift_guards/check_spine_ownership.py
   doctrine_ref: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
   anchor_doc: dharma_swarm/a2a/README.md
+
+# ── Ten-node autocatalytic portfolio ─────────────────────────────
+# This is the declared metabolic contract and a read model over existing
+# owners. It does not grant side-effect authority. A local cycle proves only
+# deterministic semantic A2A wiring; production and external-effect claims
+# remain capped by each node's authority and proof obligations.
+
+autocatalytic_portfolio:
+  id: dharma-autocatalytic-10
+  label: "Dharma Autocatalytic Organism"
+  schema_version: dharma.autocatalytic_portfolio.v1
+  claim_ceiling: local_rehearsal
+  entry_node: world_signal_supply
+  witness_dir: "~/.dharma/a2a/autocatalytic_portfolio"
+  promotion_rule:
+    schema: dharma.a2a.semantic_hop.v1
+    statement: "TransportAck cannot inhabit StructuralHop. StructuralHop proves exact task/artifact/causal/hash structure but carries no execution authority. StructuralCycleProof requires exactly ten ordered StructuralHop values. A cycle is only locally receipt-consistent after its mutable runtime rows reverify; that is not authenticated execution provenance."
+    transport_ack_promotes: false
+    structural_hop_requires: [terminal_completed, typed_semantic_artifact, causal_continuity, hash_continuity, project_adapter_recomputation]
+    receipt_consistent_cycle_requires: [exactly_ten_ordered_structural_hops, closed_signal_ring, persisted_local_mutable_receipt_consistency]
+    required_evidence: [terminal_completed, typed_semantic_artifact, causal_continuity, hash_continuity, project_adapter_recomputation, local_mutable_runtime_receipt_consistency]
+    forbidden_promotions: [transport_ack_to_structural_hop, nonterminal_to_structural_hop, artifact_free_to_structural_hop, local_receipt_consistency_to_authenticated_execution]
+
+  nodes:
+    - id: world_signal_supply
+      ordinal: 1
+      label: "World-Signal Supply Chain"
+      role: "Ground external feedback into source-linked opportunity signals."
+      project_bindings: [organism-rewire-2026-07]
+      authority: local_evidence
+      input_signal: promoted_feedback
+      output_signal: grounded_signal
+      cross_outputs:
+        - {signal: oracle_evidence, target: chamber_research}
+      transform: ground_feedback
+      next_node: sarathi_runtime
+      page: /dashboard/organism/world_signal_supply
+      doc: docs/architecture/autocatalytic_nodes/world_signal_supply.md
+      proof_refs:
+        - dharma_swarm/world_radar/go_bridge.py
+        - tests/test_world_radar_go_bridge.py
+      proof_obligations:
+        - "A fresh bronze source receipt binds every promoted signal to raw evidence."
+        - "No local rehearsal payload is described as a fresh world observation."
+      promotion_checks: [fresh_signal_promoted, bronze_bound]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: sarathi_runtime
+      ordinal: 2
+      label: "Persistent Agent / Sarathi Runtime"
+      role: "Turn grounded signals and loop debt into prioritized, identity-bound work."
+      project_bindings: [organism-rewire-2026-07, loop-closure-2026-06]
+      authority: local_evidence
+      input_signal: grounded_signal
+      cross_inputs:
+        - {signal: operator_intent, source: operator_experience}
+      output_signal: prioritized_work
+      transform: prioritize_grounded_work
+      next_node: dharmagraph_execution
+      page: /dashboard/organism/sarathi_runtime
+      doc: docs/architecture/autocatalytic_nodes/sarathi_runtime.md
+      proof_refs:
+        - scripts/runtime/sarathi_wake_daemon.py
+        - tests/test_sarathi_wake_daemon.py
+      proof_obligations:
+        - "A persistent-daemon receipt proves restart recovery and one real dispatch."
+        - "Priorities retain source and loop-audit correlation identity."
+      promotion_checks: [dispatch_proven, restart_recovery_proven, operator_intent_bound]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: dharmagraph_execution
+      ordinal: 3
+      label: "DharmaGraph Durable Execution"
+      role: "Execute prioritized work through idempotent, durable graph boundaries."
+      project_bindings: [dharmagraph-engine-2026-07]
+      authority: local_evidence
+      input_signal: prioritized_work
+      cross_inputs:
+        - {signal: safety_contract, source: assurance_merge}
+      output_signal: execution_receipt
+      transform: execute_durably
+      next_node: cybernetic_supervision
+      page: /dashboard/organism/dharmagraph_execution
+      doc: docs/architecture/autocatalytic_nodes/dharmagraph_execution.md
+      proof_refs:
+        - dharma_swarm/graph/durable_invoker.py
+        - tests/test_graph_durable_invoker.py
+      proof_obligations:
+        - "Every consequential invocation is protected by identity and idempotency, never unprotected_dispatch."
+        - "Graph events bind to canonical EvidenceReceipt rows."
+      promotion_checks: [executed, execution_receipt_present, causally_linked, safety_contract_satisfied]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: cybernetic_supervision
+      ordinal: 4
+      label: "Cybernetic Supervision & Loop Closure"
+      role: "Diagnose receipt-backed execution gaps and keep stalled loops visible."
+      project_bindings: [loop-closure-2026-06]
+      authority: local_evidence
+      input_signal: execution_receipt
+      output_signal: closure_gap
+      transform: diagnose_closure
+      next_node: arena_selection
+      page: /dashboard/organism/cybernetic_supervision
+      doc: docs/architecture/autocatalytic_nodes/cybernetic_supervision.md
+      proof_refs:
+        - dharma_swarm/cybernetics_codex.py
+        - tests/test_cybernetics_codex.py
+      proof_obligations:
+        - "A current-daemon witness distinguishes receipt presence from external loop closure."
+        - "The auditor remains read-only and cannot invent dispatch authority."
+      promotion_checks: [current_daemon_witness, predecessor_receipt_causally_matched]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: arena_selection
+      ordinal: 5
+      label: "Live Evaluation & Routing Feedback"
+      role: "Measure candidate responses under parity and select a bounded experiment."
+      project_bindings: [orchestration-arena-v1-2026-06]
+      authority: local_evidence
+      input_signal: closure_gap
+      output_signal: selected_experiment
+      transform: select_bounded_experiment
+      next_node: chamber_research
+      page: /dashboard/organism/arena_selection
+      doc: docs/architecture/autocatalytic_nodes/arena_selection.md
+      proof_refs:
+        - dharma_swarm/coordination/arena/measure.py
+        - tests/test_arena_parity_controls.py
+      proof_obligations:
+        - "A bounded consumer accepts only significant parity-controlled measurements."
+        - "Corpus rows do not alter routing before explicit promotion authority."
+      promotion_checks: [selected, authorized]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: chamber_research
+      ordinal: 6
+      label: "Chamber Research & Evolution"
+      role: "Turn selected experiments into falsifiable, source-resolvable change proposals."
+      project_bindings: [hyperbolic-time-chamber-2026-07]
+      authority: local_evidence
+      input_signal: selected_experiment
+      cross_inputs:
+        - {signal: oracle_evidence, source: world_signal_supply}
+      output_signal: proposed_change
+      transform: research_falsifiable_change
+      next_node: assurance_merge
+      page: /dashboard/organism/chamber_research
+      doc: docs/architecture/autocatalytic_nodes/chamber_research.md
+      proof_refs:
+        - dharma_swarm/chamber/traces.py
+        - tests/test_chamber_traces.py
+      proof_obligations:
+        - "Untrusted live solvers run inside a real process/network/filesystem isolation jail."
+        - "Predictions resolve against World Radar receipts without importing Arena promotion authority."
+      promotion_checks: [proposed, oracle_evidence_authorized]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: assurance_merge
+      ordinal: 7
+      label: "Assurance & Merge Membrane"
+      role: "Bind claims to evidence, verify CI truth, and integrate only authorized changes."
+      project_bindings: [sovereign-safety-tcb-2026-07, repository-titanium-hardening-2026-07, merge-master-mike-d4-2026-06]
+      authority: local_evidence
+      input_signal: proposed_change
+      output_signal: verified_release
+      cross_outputs:
+        - {signal: safety_contract, target: dharmagraph_execution}
+      transform: assure_and_integrate
+      next_node: operator_experience
+      page: /dashboard/organism/assurance_merge
+      doc: docs/architecture/autocatalytic_nodes/assurance_merge.md
+      proof_refs:
+        - scripts/governance/check_claim_evidence_binding.py
+        - scripts/runtime/ci_truth.py
+        - scripts/runtime/pr_merge_control.py
+      proof_obligations:
+        - "Required CI contexts and claim-evidence grades are observed on the exact candidate SHA."
+        - "A clean-room receipt and operator-ratified branch policy gate merge authority."
+      promotion_checks: [verified, merged, authorized]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: operator_experience
+      ordinal: 8
+      label: "Operator Experience Membrane"
+      role: "Project verified releases into legible, explicitly authorized operator actions."
+      project_bindings: [helm-worldclass-terminal-2026-06]
+      authority: projection_only
+      input_signal: verified_release
+      output_signal: authorized_action
+      cross_outputs:
+        - {signal: operator_intent, target: sarathi_runtime}
+      transform: request_operator_authority
+      next_node: external_value_delivery
+      page: /dashboard/organism/operator_experience
+      doc: docs/architecture/autocatalytic_nodes/operator_experience.md
+      proof_refs:
+        - dharma_swarm/terminal_bridge.py
+        - tests/test_terminal_bridge.py
+      proof_obligations:
+        - "A fresh measurable Helm delta, not a shipped-track label, justifies activation."
+        - "Approval identity is persisted before any consequential action."
+      promotion_checks: [authorization.granted]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: external_value_delivery
+      ordinal: 9
+      label: "External Value Delivery"
+      role: "Deliver an operator-authorized artifact and ingest a typed external outcome."
+      project_bindings: [darshan-publication-2026-07]
+      authority: external_gated
+      input_signal: authorized_action
+      output_signal: external_outcome
+      transform: deliver_and_observe
+      next_node: learning_promotion
+      page: /dashboard/organism/external_value_delivery
+      doc: docs/architecture/autocatalytic_nodes/external_value_delivery.md
+      proof_refs:
+        - docs/plans/DARSHAN_CHARTER_2026-07-12.md
+      proof_obligations:
+        - "An in-repo publisher and response ingestor emit one exact effect receipt."
+        - "Third-party posting requires explicit operator GO and cannot be simulated into truth."
+      promotion_checks: [publisher_present, response_ingestor_present, delivery_observed, independent_outcome_observed]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+    - id: learning_promotion
+      ordinal: 10
+      label: "Learning & Promotion Membrane"
+      role: "Promote verified outcomes into bounded feedback without self-certification."
+      project_bindings: [orchestration-arena-v1-2026-06, organism-rewire-2026-07]
+      authority: projection_only
+      input_signal: external_outcome
+      output_signal: promoted_feedback
+      transform: promote_verified_learning
+      next_node: world_signal_supply
+      page: /dashboard/organism/learning_promotion
+      doc: docs/architecture/autocatalytic_nodes/learning_promotion.md
+      proof_refs:
+        - dharma_swarm/coordination/arena/corpus.py
+        - tests/test_agent_runner_routing_feedback.py
+      proof_obligations:
+        - "Promotion requires independent outcome evidence and attenuated routing authority."
+        - "Model consensus, transport ACKs, and self-authored confidence cannot confer truth."
+      promotion_checks: [independent_outcome_observed, promotion.applied]
+      health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
+
+  edges:
+    - {source: world_signal_supply, target: sarathi_runtime, signal: grounded_signal, kind: enables}
+    - {source: sarathi_runtime, target: dharmagraph_execution, signal: prioritized_work, kind: enables}
+    - {source: dharmagraph_execution, target: cybernetic_supervision, signal: execution_receipt, kind: validates}
+    - {source: cybernetic_supervision, target: arena_selection, signal: closure_gap, kind: improves}
+    - {source: arena_selection, target: chamber_research, signal: selected_experiment, kind: enables}
+    - {source: chamber_research, target: assurance_merge, signal: proposed_change, kind: enables}
+    - {source: assurance_merge, target: operator_experience, signal: verified_release, kind: validates}
+    - {source: operator_experience, target: external_value_delivery, signal: authorized_action, kind: enables}
+    - {source: external_value_delivery, target: learning_promotion, signal: external_outcome, kind: validates}
+    - {source: learning_promotion, target: world_signal_supply, signal: promoted_feedback, kind: improves}
+    - {source: world_signal_supply, target: chamber_research, signal: oracle_evidence, kind: validates}
+    - {source: assurance_merge, target: dharmagraph_execution, signal: safety_contract, kind: validates}
+    - {source: operator_experience, target: sarathi_runtime, signal: operator_intent, kind: improves}

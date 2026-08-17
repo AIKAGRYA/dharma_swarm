@@ -11,6 +11,11 @@ the repaired contract:
   ran, and the overbroad "ALL GATES FUNCTIONAL" phrase is gone;
 - the recipe resolves the test runner through `$(VENV_PYTHON)` so a
   bootstrapped `.venv` is preferred.
+- collection alone uses plain assertions to avoid rewriting every collected
+  test module, while the behavioral sentinel keeps normal assertion semantics
+  and a module-level assertion still proves collection failure propagates.
+- collection and sentinel diagnostics use invocation-private temporary files,
+  so concurrent worktrees cannot overwrite one another's verifier evidence.
 
 Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0B).
 """
@@ -85,6 +90,26 @@ class TestRecipeStructure:
             "the sentinel and collection steps must prefer the bootstrapped .venv"
         )
 
+    def test_plain_assertions_are_confined_to_collection(self):
+        recipe = _recipe("verifier-selfcheck")
+        collection_lines = [
+            line for line in recipe.splitlines() if "--collect-only" in line
+        ]
+        assert len(collection_lines) == 1, collection_lines
+        assert "--assert=plain" in collection_lines[0], (
+            "collection-only must avoid rewriting every test assertion; this "
+            "is the measured verifier-selfcheck bottleneck"
+        )
+        sentinel_lines = [
+            line for line in recipe.splitlines() if "$(VERIFIER_SENTINEL)" in line
+        ]
+        assert sentinel_lines
+        assert not any("--assert=plain" in line for line in sentinel_lines), (
+            "plain assertion mode is a collection-only optimization; the "
+            "behavioral sentinel must retain normal assertion semantics"
+        )
+        assert recipe.count("--assert=plain") == 1
+
     def test_sentinel_failure_propagates_in_recipe_text(self):
         recipe = _recipe("verifier-selfcheck")
         sentinel_block = recipe[recipe.index("$(VERIFIER_SENTINEL)"):]
@@ -92,13 +117,22 @@ class TestRecipeStructure:
             "a failing sentinel must fail the target, not be swallowed"
         )
 
+    def test_diagnostic_logs_are_invocation_private_and_cleaned(self):
+        recipe = _recipe("verifier-selfcheck")
+        assert "/tmp/dharma-collect-check.log" not in recipe
+        assert "/tmp/dharma-sentinel-check.log" not in recipe
+        assert recipe.count("mktemp") == 2
+        assert recipe.count("$${TMPDIR:-/tmp}") == 2
+        assert recipe.count("trap 'rm -f") == 2
+        assert recipe.count("tail -120") == 2
+
 
 # ── Behavioral meta-tests (bounded, full target runs) ───────────────
 #
 # verifier-selfcheck's onboarding step requires a clean worktree, so the
 # target runs inside an isolated committed snapshot of the implementation
 # under test (the pattern established by test_make_onboarding_contract.py).
-# One snapshot is shared by both meta-tests.
+# One snapshot is shared by all meta-tests.
 
 
 def _snapshot_checkout(destination: Path) -> None:
@@ -182,3 +216,29 @@ def test_passing_sentinel_yields_narrowed_banner(clean_checkout: Path, tmp_path:
     )
     assert NARROWED_BANNER in result.stdout
     assert "ALL GATES FUNCTIONAL" not in result.stdout
+
+
+@pytest.mark.timeout(900)
+def test_plain_collection_failure_fails_the_target(
+    clean_checkout: Path, tmp_path: Path
+):
+    broken = clean_checkout / "tests" / "test_collection_failure_sentinel.py"
+    broken.write_text(
+        "assert False, 'deliberate module-level collection failure'\n",
+        encoding="utf-8",
+    )
+    try:
+        result = _make_selfcheck_in(
+            clean_checkout, tmp_path / "unreached_sentinel.py"
+        )
+    finally:
+        broken.unlink()
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0, (
+        "verifier-selfcheck exited zero with a module-level collection failure:\n"
+        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    assert "COLLECTION BROKEN" in output
+    assert broken.name in output
+    assert NARROWED_BANNER not in result.stdout

@@ -40,7 +40,7 @@ from collections import defaultdict
 from typing import Any
 
 
-REPO = "AmitabhainArunachala/dharma_swarm"
+REPO = "AIKAGRYA/dharma_swarm"
 MAX_CLOSES_PER_RUN = 200
 DEFAULT_CLOSE_COMMENT = (
     "Closing as duplicate. The Guardian dedup logic has been hardened "

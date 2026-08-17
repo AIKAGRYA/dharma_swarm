@@ -1,17 +1,19 @@
 name: pr-ci-health
 
-# Durable hourly PR CI-health backstop.
+# Durable hourly PR CI-health report plus explicit manual healing.
 #
 # This is the *mechanical* safety net that runs even when no agent session is
 # alive (the in-session `/pr-ci-health` loop dies with its ephemeral container).
-# A YAML job cannot reason, so it only does non-destructive / low-risk healing:
+# A YAML job cannot reason. The scheduled path is therefore report-only; the
+# two healing modes require an explicit workflow_dispatch invocation:
 #
 #   1. report  — triage every open PR via scripts/governance/pr_ci_health.py and
 #                refresh a single tracking issue + the run summary.
-#   2. rerun   — re-run failed workflow runs for PRs whose only failures are
+#   2. rerun   — manually re-run failed workflow runs for PRs whose only failures are
 #                transient infra flakes (e.g. the CodeQL default-setup umbrella
 #                status that completes in seconds while `codeql / python` passes).
-#   3. rebase  — rebase conflict-free behind-main PR branches onto origin/main
+#   3. rebase  — manually rebase one explicit conflict-free behind-main PR
+#                branch onto origin/main
 #                via scripts/governance/pr_ci_safe_rebase.py (fail-closed:
 #                count-bound explicit file pages, current+previous filenames,
 #                same-repo/head-SHA/race/lease binding). Session Entry packet
@@ -34,22 +36,21 @@ name: pr-ci-health
 on:
   schedule:
     - cron: "0 * * * *"
-  # Rebase on the event that actually strands PRs. Every merge to main puts
-  # every other open PR behind; with "require branches up to date" on, those
-  # PRs cannot merge (and armed auto-merge cannot fire) until something
-  # rebases them. On the hourly cron alone that wait was up to 59 minutes,
-  # so the operator hand-tapped "Update branch" on each PR instead — which
-  # restarts full CI on all of them, every time. Reacting to the merge
-  # itself closes that window to ~1 minute and the queue drains unattended.
-  # Runs in `rebase` mode only: triage feeds the rebase step, while the
-  # tracking-issue upsert and flake-rerun sweeps stay on the hourly pass.
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
-        description: "report | rerun | rebase | all"
-        default: "all"
+        description: "Mechanical operation"
+        required: true
+        type: choice
+        options:
+          - report
+          - rerun
+          - rebase
+        default: report
+      pr_number:
+        description: "Required for rebase: exactly one positive-integer PR number"
+        required: false
+        type: string
 
 concurrency:
   group: pr-ci-health
@@ -69,7 +70,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-      MODE: ${{ github.event.inputs.mode || (github.event_name == 'push' && 'rebase' || 'all') }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'report' }}
+      TARGET_PR: ${{ github.event.inputs.pr_number || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -85,13 +87,27 @@ jobs:
           # validated below; secret presence alone never authorizes a rebase.
           token: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT || github.token }}
 
+      - name: Halt on loop kill-switch
+        uses: ./.github/actions/loop-killswitch
+        with:
+          github-token: ${{ github.token }}
+
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 
+      - name: Validate explicit one-PR rebase target
+        if: github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_PR" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::rebase mode requires exactly one positive-integer pr_number input"
+            exit 2
+          fi
+
       - name: Validate trusted rebase push authority
-        if: env.MODE == 'all' || env.MODE == 'rebase'
+        if: github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'
         env:
           PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT }}
         run: |
@@ -123,7 +139,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upsert tracking issue
-        if: env.MODE == 'all' || env.MODE == 'report'
+        if: env.MODE == 'report'
         run: |
           set -euo pipefail
           title="PR CI-Health triage (auto)"
@@ -138,7 +154,7 @@ jobs:
           fi
 
       - name: Re-run transient infra failures
-        if: env.MODE == 'all' || env.MODE == 'rerun'
+        if: github.event_name == 'workflow_dispatch' && env.MODE == 'rerun'
         continue-on-error: true
         run: |
           set -uo pipefail
@@ -153,8 +169,8 @@ jobs:
             done
           done
 
-      - name: Rebase conflict-free behind-main branches
-        if: env.MODE == 'all' || env.MODE == 'rebase'
+      - name: Rebase conflict-free behind-main branches (one explicit target)
+        if: github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'
         continue-on-error: true
         env:
           # HAS_PUSH_TOKEN is written to GITHUB_ENV only after the selected
@@ -187,7 +203,15 @@ jobs:
           # unstable, which is why the auto-rebase reported success while the
           # operator still had to press "Update branch" by hand on every PR.
           # Conflicted branches are excluded: a rebase cannot resolve them.
-          mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.categories | index("merge_conflict") | not) | "\(.number)\t\(.head)\t\(.base)"' triage.json)
+          mapfile -t prs < <(jq -r --argjson target_pr "$TARGET_PR" '.[] | select(.number == $target_pr) | select(.categories | index("behind_main")) | select(.categories | index("merge_conflict") | not) | "\(.number)\t\(.head)\t\(.base)"' triage.json)
+          if [ "${#prs[@]}" -eq 0 ]; then
+            echo "PR #$TARGET_PR is not an eligible conflict-free behind-main target; no rebase attempted"
+            exit 0
+          fi
+          if [ "${#prs[@]}" -ne 1 ]; then
+            echo "::error::target selector returned ${#prs[@]} rows for PR #$TARGET_PR; refusing to rebase"
+            exit 2
+          fi
           for line in "${prs[@]:-}"; do
             [ -z "$line" ] && continue
             pr="$(echo "$line" | cut -f1)"; head="$(echo "$line" | cut -f2)"; base="$(echo "$line" | cut -f3)"
@@ -213,7 +237,7 @@ jobs:
               else
                 gh api -X POST "repos/$REPO/issues/$pr/labels" -f "labels[]=$STRAND_LABEL" \
                   || echo "PR #$pr: labeling failed"
-                gh pr comment "$pr" --repo "$REPO" --body "pr-ci-health: this PR is behind \`main\`, but the hourly auto-rebase was **skipped (fail-closed)**. No configured trusted credential currently proves repository push authority, and a rebase pushed with the default \`GITHUB_TOKEN\` never triggers workflows — the rebased head would have zero check runs (\`ci_never_ran\`). Rebase manually (any author/PAT push re-triggers CI), or configure a contents-write \`PR_CI_HEALTH_PUSH_TOKEN\`." \
+                gh pr comment "$pr" --repo "$REPO" --body "pr-ci-health: the requested one-PR rebase was **skipped (fail-closed)**. No configured trusted credential currently proves repository push authority, and a rebase pushed with the default \`GITHUB_TOKEN\` never triggers workflows — the rebased head would have zero check runs (\`ci_never_ran\`). Rebase manually (any author/PAT push re-triggers CI), or configure a contents-write \`PR_CI_HEALTH_PUSH_TOKEN\`." \
                   || echo "PR #$pr: comment failed"
               fi
               continue

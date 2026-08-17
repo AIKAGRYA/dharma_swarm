@@ -128,6 +128,33 @@ def _log(system: str, msg: str) -> None:
     logger.info("[%s] %s", system, msg)
 
 
+def _log_system_failure(system: str, exc: BaseException) -> None:
+    """Log a failed system loop WITH its full traceback.
+
+    A bare ``f"failed: {exc}"`` swallows the stack. The 2026-07-17
+    dispatch-dropoff outage ran 91h undiagnosed because the swarm loop's
+    import-time IndexError surfaced only as
+    ``System swarm failed: tuple index out of range`` with no frame info.
+    ``repr(exc)`` also keeps empty-message exceptions identifiable; a safe
+    fallback covers custom exceptions whose ``__repr__`` is itself broken.
+    """
+    try:
+        detail = repr(exc)
+    except BaseException:
+        # Failure reporting must not take down the supervisor when a custom
+        # exception has a broken __repr__ implementation.
+        detail = f"<{type(exc).__name__} repr failed>"
+    _log("orchestrator", f"System {system} failed: {detail}")
+    # Logger._log truth-tests exception instances before normalizing them to
+    # exc_info tuples.  Pass the tuple directly so falsey custom exceptions
+    # cannot silently lose their originating traceback.
+    logger.error(
+        "System %s failed",
+        system,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+
+
 def _tick_loop(supervisor: Any | None, name: str) -> None:
     """WP-LC1 per-iteration liveness tick; no-op when unsupervised."""
     if supervisor is not None:
@@ -1945,7 +1972,7 @@ async def _run_guardian_loop(
         from dharma_swarm.guardian_crew import start_guardian_loop
         crew_task = asyncio.ensure_future(start_guardian_loop(
             state_dir=STATE_DIR,
-            github_repo="AmitabhainArunachala/dharma_swarm",
+            github_repo="AIKAGRYA/dharma_swarm",
             shutdown_event=shutdown_event,
             room_registry=room_registry,
         ))
@@ -2447,7 +2474,7 @@ async def orchestrate(background: bool = False) -> None:
 
                 exc = t.exception()
                 if exc is not None:
-                    _log("orchestrator", f"System {name} failed: {exc}")
+                    _log_system_failure(name, exc)
                     restart_queue.append(name)
                     continue
 
@@ -2467,6 +2494,12 @@ async def orchestrate(background: bool = False) -> None:
                     tasks[name] = asyncio.create_task(task_factories[name](), name=name)
                 else:
                     _log("orchestrator", f"System {name} exceeded max restarts, abandoning")
+                    logger.error(
+                        "System %s abandoned after %d failed restarts — daemon is degraded "
+                        "(check ops/loop_liveness.json)",
+                        name,
+                        max_restarts,
+                    )
                     abandoned_loops.add(name)
 
             _write_loop_liveness(restart_counts)

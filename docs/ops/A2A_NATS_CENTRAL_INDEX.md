@@ -152,8 +152,8 @@ Use these when you need the current central view:
 ```bash
 cd /Users/dhyana/ds_a2a_always_on_spine_20260701
 git status --short --branch
-gh pr view 744 --repo AmitabhainArunachala/dharma_swarm --web
-gh pr checks 744 --repo AmitabhainArunachala/dharma_swarm
+gh pr view 744 --repo AIKAGRYA/dharma_swarm --web
+gh pr checks 744 --repo AIKAGRYA/dharma_swarm
 sed -n '1,240p' docs/ops/A2A_NATS_CENTRAL_INDEX.md
 ```
 

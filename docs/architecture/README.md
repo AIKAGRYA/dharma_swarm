@@ -23,7 +23,7 @@ disciplines:
   - operations
 inspiration:
   - operator_runtime
-  - canonical_truth
+  - authority_boundaries
 connected_relevant_files:
   - docs/README.md
   - docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
@@ -69,6 +69,13 @@ Use it for:
 
 Current examples:
 
+- [FLEET_LOGICAL_FILESYSTEM_AND_TRUTH_ARCHITECTURE.md](FLEET_LOGICAL_FILESYSTEM_AND_TRUTH_ARCHITECTURE.md) —
+  PROPOSED reference for one logical namespace and verifiable fleet truth across
+  the operator Mac, Agni, Meghadharma, and Rushabdev without full-disk mirroring;
+  live roles and capacity still require owner-specific probes.
+- [FLEET_COMMAND_OPERATOR_SURFACE.md](FLEET_COMMAND_OPERATOR_SURFACE.md) —
+  DRAFT architecture for a thin, phone-first operator client over the
+  owner-defined A2A, TaskBoard, roster, presence, and governance surfaces.
 - [HOLON_RUNTIME_FULL_ESTATE_MAP.md](HOLON_RUNTIME_FULL_ESTATE_MAP.md) — current
   holon-specific reference for the Hermes-class code body, runtime boundaries,
   and a dated readiness witness; live state still comes from onboarding/Live Ops.
@@ -77,6 +84,9 @@ Current examples:
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)
 - [SWARM_BOARDSTORE_SPEC.md](SWARM_BOARDSTORE_SPEC.md)
 - [SWARMLENS_MASTER_SPEC.md](/Users/dhyana/dharma_swarm/docs/architecture/SWARMLENS_MASTER_SPEC.md)
+
+Proposed decisions related to the Fleet Command surface are ADRs 011, 012, and
+013 under `ADRs/`.
 
 Rule:
 

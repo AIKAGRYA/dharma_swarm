@@ -1,0 +1,119 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_mcp.py",
+    "dharma_swarm/mission_control_projection.py",
+    "tests/test_mission_control.py",
+    "tests/test_mission_control_mcp.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P01.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "8e1f515b8dd88aa44202982612fad60adabe4ef9",
+  "branch": "codex/mission-control-20260812",
+  "commit": {
+    "allowed": true,
+    "message": "fix(control): harden mission evidence and immutable reads"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/operator_core/**",
+    "scripts/**",
+    "docs/governance/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "Makefile",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control.py tests/test_mission_control_mcp.py tests/test_mission_control_execution.py tests/test_task_board.py tests/test_runtime_state_invariants.py tests/test_mcp_server.py",
+      "expected_exit": 0,
+      "name": "mission-control-hardened-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_projection.py dharma_swarm/mission_control_mcp.py tests/test_mission_control.py tests/test_mission_control_mcp.py",
+      "expected_exit": 0,
+      "name": "mission-control-hardened-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-P01",
+  "intent": "Resolve the independent P0 adversarial-review blockers without changing canonical owner schemas: prevent stale recovery from superseding durable terminal evidence, fail closed when bounded snapshot scans cannot prove completeness, make the bundled read-only MCP observe immutable disposable SQLite snapshots, serialize same-instance mission/task creation, validate complete idempotent task content and mission-local dependencies, strengthen receipt provenance, and durably attribute authorized MCP mutations. Preserve the explicit boundary that cross-process lease uniqueness requires a later RuntimeStateStore owner CAS.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; p=Path('dharma_swarm/mission_control_mcp.py').read_text(); required=['immutable=1','TemporaryDirectory','_ImmutableSnapshotMissionControl']; forbidden=['MissionControl(TaskBoard(task_db)','RuntimeStateStore(runtime_db)']; raise SystemExit(0 if all(x in p for x in required) and not any(x in p for x in forbidden) else 1)\"",
+      "expected_exit": 0,
+      "name": "default-mcp-never-opens-canonical-db-writable",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_projection.py",
+      "dharma_swarm/mission_control_mcp.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/task_board.py"
+    ],
+    "collision": {
+      "checked_at_sha": "8e1f515b8dd88aa44202982612fad60adabe4ef9",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "RuntimeStateStore still has no schema-level one-current-lease-per-task compare-and-swap, so facade locks cannot guarantee exclusivity across processes or bypassing writers.",
+      "RuntimeStateStore still permits direct receipt upserts, so Mission Control can validate and fail closed on contradictory evidence but cannot make owner receipts immutable.",
+      "Immutable SQLite snapshots intentionally may lag rows committed only to a live WAL until the owner checkpoints them; read tools report observed state, not linearizable current state.",
+      "Mission Control and TaskBoard remain separate databases without an atomic cross-store lifecycle transaction.",
+      "Recorded task, claim, run, or receipt state never proves an executor process is alive."
+    ],
+    "interface_mismatches": [
+      "Owner read APIs initialize and migrate their SQLite stores, so the default MCP cannot honestly call them against canonical database files under a readOnlyHint contract.",
+      "Bounded global owner list APIs expose no total count or cursor, so saturation must be probed with limit plus one and surfaced as unknown rather than coherent.",
+      "TaskBoard dependency validation proves existence but not Mission Control mission ownership.",
+      "The trusted MCP principal is transport authority and must be persisted as attribution rather than accepting caller-supplied actor fields as provenance."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "fcf2829270bbb2af53befe77513c6baa7d4b817d37cfce18c2698608f13bb091",
+    "rollback": "Revert this bounded hardening commit and packet. The additive P0/P1 modules remain otherwise separable and canonical owner schemas remain unchanged.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-P01"
+  },
+  "worktree": "."
+}

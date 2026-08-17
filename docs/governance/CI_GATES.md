@@ -56,11 +56,11 @@ Once Phase 2 lands and the workflows have run at least once,
 add status badges to `README.md`:
 
 ```markdown
-[![tests](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/tests.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/tests.yml)
-[![codeql](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/codeql.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/codeql.yml)
-[![semgrep](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/semgrep.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/semgrep.yml)
-[![gitleaks](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml)
-[![fourfold-warrant](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/fourfold-warrant.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/fourfold-warrant.yml)
+[![tests](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/tests.yml/badge.svg)](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/tests.yml)
+[![codeql](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/codeql.yml/badge.svg)](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/codeql.yml)
+[![semgrep](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/semgrep.yml/badge.svg)](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/semgrep.yml)
+[![gitleaks](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/gitleaks.yml)
+[![fourfold-warrant](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/fourfold-warrant.yml/badge.svg)](https://github.com/AIKAGRYA/dharma_swarm/actions/workflows/fourfold-warrant.yml)
 ```
 
 Defer badge additions until the workflows have run cleanly on `main`.

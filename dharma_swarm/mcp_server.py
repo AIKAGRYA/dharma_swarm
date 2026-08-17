@@ -131,10 +131,43 @@ def create_mcp_server(state_dir: str = ".dharma"):
                 description="Show strategic objectives, key results, and progress",
                 inputSchema={"type": "object", "properties": {}},
             ),
+            # Sarathi — the apex chief-of-staff seat. READ-ONLY by design: these
+            # make her legible to any MCP client (Claude, Codex, any model), but
+            # none of them dispatch work. Delegation must go through
+            # sarathi.delegate_all so the reversibility gate runs first; exposing
+            # a dispatch tool here would let an MCP caller bypass that gate.
+            Tool(
+                name="sarathi_status",
+                description=(
+                    "Sarathi apex seat status: honest wake_loop_active / alive_claim "
+                    "flags, pulse, brief and organ scoreboard. Read-only projection."
+                ),
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            Tool(
+                name="sarathi_roster",
+                description="List the sub-holons Sarathi can delegate to.",
+                inputSchema={"type": "object", "properties": {}},
+            ),
         ]
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+        # Swarm-free tools dispatch BEFORE the bootstrap. `SwarmManager.init()`
+        # mutates disk — it mkdirs the state dir, unlinks EMERGENCY_HOLD
+        # (`swarm.py:563-569`) and seeds the Telos/Concept graphs — so booting it
+        # to answer a read-only question would clear an operator's emergency hold
+        # as a side effect of merely looking. These two read the organ package
+        # directly and need no swarm.
+        if name == "sarathi_status":
+            from dharma_swarm.holon_system.sarathi import gateway_snapshot
+            snapshot = gateway_snapshot()
+            return [TextContent(type="text", text=json.dumps(snapshot, indent=2, default=str))]
+
+        if name == "sarathi_roster":
+            from dharma_swarm.holon_system.sarathi import load_roster
+            return [TextContent(type="text", text=json.dumps(list(load_roster()), indent=2))]
+
         swarm = await _get_swarm()
 
         if name == "swarm_status":

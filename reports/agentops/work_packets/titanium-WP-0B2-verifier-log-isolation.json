@@ -1,0 +1,107 @@
+{
+  "id": "titanium-WP-0B2-verifier-log-isolation",
+  "base_ref": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+  "branch": "agent/wp0b-verifier-log-isolation-20260804",
+  "worktree": ".",
+  "intent": "WP-0B2 (TIT-001 follow-up): make verifier-selfcheck deterministic under concurrent worktrees. Replace the two repository-global predictable /tmp diagnostic files with invocation-private mktemp files rooted in TMPDIR, clean them on normal and signal exits, and retain enough bounded failure output to name the offending collection or sentinel file. Pin the concurrency boundary structurally and re-run the original behavioral meta-contracts.",
+  "allowed_files": [
+    "Makefile",
+    "tests/test_verifier_selfcheck_contract.py",
+    "reports/agentops/work_packets/titanium-WP-0B2-verifier-log-isolation.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dharma_swarm/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "scripts/governance/hygiene/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "name": "verifier-contract-test",
+      "command": "python3 -m pytest tests/test_verifier_selfcheck_contract.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 1800
+    },
+    {
+      "name": "contract-test-ruff",
+      "command": "python3 -m ruff check tests/test_verifier_selfcheck_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "fixed-shared-log-regression-detected",
+      "command": "python3 -c \"import pathlib,subprocess,sys;p=pathlib.Path('Makefile');t=p.read_text();a='collect_log=\\\"$$(mktemp';(a in t) or sys.exit(3);p.write_text(t.replace(a,'collect_log=\\\"/tmp/dharma-collect-check.log\\\" # $$(mktemp',1));sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_verifier_selfcheck_contract.py::TestRecipeStructure','-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "cleanup-trap-regression-detected",
+      "command": "python3 -c \"import pathlib,subprocess,sys;p=pathlib.Path('Makefile');t=p.read_text();a=\\\"trap 'rm -f\\\";(a in t) or sys.exit(3);p.write_text(t.replace(a,': # removed collection cleanup',1));sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_verifier_selfcheck_contract.py::TestRecipeStructure','-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(verify): isolate verifier-selfcheck diagnostics"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0B2",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "verifier-selfcheck writes collection and sentinel diagnostics to two fixed /tmp names shared by every clone and worktree; concurrent exact-main verification overwrote the selected run's failure evidence."
+    ],
+    "closest_existing_implementation": [
+      "Makefile",
+      "tests/test_verifier_selfcheck_contract.py",
+      "reports/agentops/work_packets/titanium-WP-0B-verifier-truth.json"
+    ],
+    "honest_blockers": [
+      "Human merge is required before M3 can select a new exact merged-main replay; this packet does not itself retire WP-0C1R or promote Phase 0.",
+      "The exact-main replay failure occurred while another verifier-selfcheck process was writing the same global log, proving a concurrency evidence collision; it is not evidence that the underlying collection gate accepted broken code.",
+      "No production, branch-policy, deployment, credential, or independent-review authority is exercised by this packet."
+    ],
+    "rollback": "Revert Makefile, tests/test_verifier_selfcheck_contract.py, and this packet together. Rollback restores cross-worktree diagnostic collisions and therefore reopens the WP-0B2 determinism gap.",
+    "packet_digest": "cdf97d5a335d2eb59ff93740bf6db604c9ed9c0def550c7ecfd8f223493174bb"
+  }
+}

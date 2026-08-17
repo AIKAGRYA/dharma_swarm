@@ -60,7 +60,7 @@ services:
     build: .
     container_name: dharmic-quant-web
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # host publication stays local; external ingress requires an explicit proxy
     volumes:
       - ginko-data:/root/.dharma/ginko
     environment:

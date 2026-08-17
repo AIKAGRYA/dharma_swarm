@@ -1,0 +1,99 @@
+{
+  "id": "dharmagraph-WP-COMPLETE01-v3-freeze-20260804",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "governance/dharmagraph-v3-complete01-freeze-20260804",
+  "worktree": ".",
+  "intent": "Freeze the COMPLETE01 V3 measurement design before any V3 implementation or results: bind all four installed LangGraph distributions by exact version and RECORD/METADATA digest, enumerate all 68 non-private shipped modules from distribution RECORD ownership, assign each exact module to explicit existing frozen row/facet coverage or a narrowly reasoned operator-ratified exclusion, and state the future executable totality, reverse-coverage, and fail-closed proof obligations without modifying code, V1/V2 rubric bytes, scores, or receipts.",
+  "allowed_files": [
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json",
+    "reports/agentops/work_packets/dharmagraph-WP-COMPLETE01-v3-freeze-20260804.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+    "dharma_swarm/**",
+    "packages/**",
+    "pyproject.toml",
+    "reports/governance/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "frozen-rubric-base-contract",
+      "command": "python3 -m pytest -q tests/test_dharmagraph_parity_gauntlet.py::test_frozen_rubric_is_complete_weighted_and_void_old_scores",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "v3-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "unrouted-installed-module-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import json,subprocess,sys; p=Path('docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json'); d=json.loads(p.read_text()); d['module_routes'].pop('langgraph.callbacks'); p.write_text(json.dumps(d)); c=\\\"import json; p=json.load(open('docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json')); assert set(p['module_routes'])|set(p['module_exclusions'])==set(p['target_modules'])\\\"; r=subprocess.run([sys.executable,'-c',c],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(dharmagraph): freeze COMPLETE01 V3 inventory routes"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-COMPLETE01",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "V2 COMPLETE01 asserts success literally while its scanner names only 12 of 68 non-private modules shipped by the four pinned distributions.",
+      "The V2 target omits the independently versioned langgraph-prebuilt distribution even though PB01 is graded.",
+      "An implementation-authored route map would let the measuring code define its own expected answer, violating freeze-before-results custody."
+    ],
+    "closest_existing_implementation": [
+      "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+      "scripts/governance/dharmagraph_parity_gauntlet.py:_rubric_custody",
+      "tests/oracle_support/dharmagraph_gauntlet.py:langgraph_public_surface_manifest",
+      "docs/governance/ACTIVE_TRACK.yaml:1262"
+    ],
+    "honest_blockers": [
+      "This freeze contains no implementation, execution result, new score, builder receipt, or judge receipt.",
+      "Exact-module routing under exact RECORD custody is a representation claim only; it awards no behavioral parity points.",
+      "Operator merge of the one-file V3 freeze is the authority boundary before implementation may consume it.",
+      "The subsequent implementation requires a separate exact-main packet, executed negative controls, fresh builder emission, independent zero-context judge execution, and exact judge-digest source ratification.",
+      "No daemon, production, deployment, exposure, credentials, branch policy, approval, or merge action is performed."
+    ],
+    "rollback": "Remove the unconsumed V3 freeze file. If implementation has already consumed it, revert the implementation and its receipts first; never silently fall back to V2's hard-coded COMPLETE01 literal.",
+    "packet_digest": "306169112bc9f06a5309a0895486ebd3a4769a67ac486a677811bd8fa66b130c"
+  }
+}

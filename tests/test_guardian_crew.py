@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -144,6 +145,12 @@ def _repo_src_root(tmp_path: Path) -> Path:
     return src_root
 
 
+def test_guardian_entrypoints_default_to_canonical_repository() -> None:
+    for entrypoint in (guardian_crew.run_guardian_cycle, guardian_crew.start_guardian_loop):
+        default = inspect.signature(entrypoint).parameters["github_repo"].default
+        assert default == "AIKAGRYA/dharma_swarm"
+
+
 def test_github_issue_remote_dedupe_detects_open_issue(monkeypatch: pytest.MonkeyPatch) -> None:
     class Proc:
         returncode = 0
@@ -155,7 +162,7 @@ def test_github_issue_remote_dedupe_detects_open_issue(monkeypatch: pytest.Monke
     monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
 
     assert guardian_crew._github_issue_already_open(
-        "AmitabhainArunachala/dharma_swarm",
+        "AIKAGRYA/dharma_swarm",
         "[GUARDIAN] File not found for dharma_swarm.evolution",
     )
 

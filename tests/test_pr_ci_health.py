@@ -17,7 +17,9 @@ _SPEC.loader.exec_module(pr_ci_health)
 classify_pr = pr_ci_health.classify_pr
 
 
-def _pr(number: int, base: str = "main", state: str = "clean", draft: bool = False) -> dict:
+def _pr(
+    number: int, base: str = "main", state: str = "clean", draft: bool = False
+) -> dict:
     return {
         "number": number,
         "title": f"pr {number}",
@@ -27,6 +29,25 @@ def _pr(number: int, base: str = "main", state: str = "clean", draft: bool = Fal
         "user": {"login": "tester"},
         "mergeable_state": state,
     }
+
+
+def _review_gate(
+    *,
+    decision: str = "NONE",
+    unresolved: int = 0,
+    outdated: int = 0,
+    paths: list[str] | None = None,
+    authors: list[str] | None = None,
+    error: str = "",
+):
+    return pr_ci_health.ReviewGateState(
+        review_decision=decision,
+        unresolved_threads=unresolved,
+        outdated_unresolved_threads=outdated,
+        unresolved_thread_paths=paths or [],
+        unresolved_thread_authors=authors or [],
+        error=error,
+    )
 
 
 def test_governance_body_gate_failures_map_to_categories():
@@ -71,9 +92,21 @@ def test_all_passing_clean_pr_is_green():
 def test_passing_rerun_supersedes_earlier_failure():
     # Same check name twice: older run failed, newer re-run passed.
     runs = [
-        {"name": "Coherence Delta PR body", "conclusion": "success", "started_at": "2026-05-21T14:16:40Z"},
-        {"name": "Coherence Delta PR body", "conclusion": "failure", "started_at": "2026-05-21T14:16:26Z"},
-        {"name": "pytest (3.11)", "conclusion": "success", "started_at": "2026-05-21T14:16:25Z"},
+        {
+            "name": "Coherence Delta PR body",
+            "conclusion": "success",
+            "started_at": "2026-05-21T14:16:40Z",
+        },
+        {
+            "name": "Coherence Delta PR body",
+            "conclusion": "failure",
+            "started_at": "2026-05-21T14:16:26Z",
+        },
+        {
+            "name": "pytest (3.11)",
+            "conclusion": "success",
+            "started_at": "2026-05-21T14:16:25Z",
+        },
     ]
     assert classify_pr(_pr(314), runs).categories == ["green"]
 
@@ -106,6 +139,103 @@ def test_blocked_merge_state_is_merge_blocked_not_green():
     triage = classify_pr(_pr(987, state="blocked"), runs)
     assert triage.categories == ["merge_blocked"]
     assert triage.actionable is True
+
+
+def test_classify_pr_exposes_unresolved_threads():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    review_gate = _review_gate(
+        unresolved=2,
+        outdated=2,
+        paths=["docs/docops/assertions.yaml"],
+        authors=["chatgpt-codex-connector", "devin-ai-integration"],
+    )
+    triage = classify_pr(
+        _pr(1286, state="blocked"),
+        runs,
+        review_gate=review_gate,
+    )
+    assert set(triage.categories) == {"merge_blocked", "unresolved_threads"}
+    assert triage.unresolved_threads == 2
+    assert triage.outdated_unresolved_threads == 2
+    assert triage.review_state_known is True
+    assert triage.actionable is True
+
+
+def test_render_markdown_names_unresolved_conversation_blocker():
+    triage = classify_pr(
+        _pr(1286, state="blocked"),
+        [{"name": "pytest (3.11)", "conclusion": "success"}],
+        review_gate=_review_gate(
+            unresolved=2,
+            outdated=2,
+            paths=["docs/docops/assertions.yaml"],
+            authors=["devin-ai-integration"],
+        ),
+    )
+    report = pr_ci_health.render_markdown([triage])
+    assert "unresolved conversations" in report
+    assert "2 (2 outdated)" in report
+    assert "docs/docops/assertions.yaml" in report
+    assert "devin-ai-integration" in report
+    assert "1 with unresolved conversations" in report
+
+
+def test_review_decision_identifies_required_review():
+    triage = classify_pr(
+        _pr(1309, state="blocked"),
+        [{"name": "pytest (3.11)", "conclusion": "success"}],
+        review_gate=_review_gate(decision="REVIEW_REQUIRED"),
+    )
+    assert set(triage.categories) == {"merge_blocked", "review_required"}
+
+
+def test_unknown_review_state_is_never_green_when_collector_passes_it():
+    triage = classify_pr(
+        _pr(1309),
+        [{"name": "pytest (3.11)", "conclusion": "success"}],
+        review_gate=_review_gate(
+            decision="UNKNOWN",
+            unresolved=-1,
+            outdated=-1,
+            error="GraphQL unavailable",
+        ),
+    )
+    assert triage.categories == ["review_state_unknown"]
+    assert triage.actionable is True
+
+
+def test_unexplained_blocked_state_is_named_after_exact_review_checks():
+    triage = classify_pr(
+        _pr(1311, state="blocked"),
+        [{"name": "pytest (3.11)", "conclusion": "success"}],
+        behind_by=0,
+        review_gate=_review_gate(),
+    )
+    assert set(triage.categories) == {
+        "merge_blocked",
+        "policy_blocker_unidentified",
+    }
+
+
+def test_missing_checks_do_not_claim_an_unidentified_policy_blocker():
+    triage = classify_pr(
+        _pr(1311, state="blocked"),
+        [],
+        review_gate=_review_gate(),
+    )
+    assert "policy_blocker_unidentified" not in triage.categories
+    assert set(triage.categories) == {"merge_blocked", "ci_never_ran"}
+
+
+def test_known_behind_state_explains_a_green_checks_policy_blocker():
+    triage = classify_pr(
+        _pr(1311, state="blocked"),
+        [{"name": "pytest (3.11)", "conclusion": "success"}],
+        behind_by=3,
+        review_gate=_review_gate(),
+    )
+    assert "policy_blocker_unidentified" not in triage.categories
+    assert set(triage.categories) == {"merge_blocked", "behind_main"}
 
 
 def test_blocked_state_with_zero_runs_carries_both_fail_closed_categories():
@@ -159,12 +289,14 @@ def test_unknown_merge_state_with_passing_checks_is_not_green():
 
 def test_workflow_validates_push_authority_before_rebase():
     workflow = (
-        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "pr-ci-health.yml"
     ).read_text(encoding="utf-8")
 
     assert (
-        "secrets.PR_CI_HEALTH_PUSH_TOKEN || "
-        "secrets.MERGEMASTERMIKE_PAT || github.token"
+        "secrets.PR_CI_HEALTH_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT || github.token"
     ) in workflow
     assert (
         "PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || "
@@ -179,32 +311,44 @@ def test_workflow_validates_push_authority_before_rebase():
     ) not in workflow
 
 
-def test_workflow_rebases_on_merge_to_main_not_only_hourly():
-    """Every merge to main strands every other open PR behind it. If the
-    only rebase trigger is the hourly cron, those PRs wait up to 59 minutes
-    — long enough that the operator hand-taps "Update branch" on each one
-    and restarts full CI. The push trigger must stay, and must run in
-    rebase mode so the merge event is answered in ~1 minute."""
+def test_workflow_rebase_is_manual_and_targeted_not_scheduled():
+    """Neither push nor cron may rewrite the open-PR backlog.
+
+    Rebase remains available as a fail-closed recovery operation, but only for
+    an explicit workflow_dispatch invocation whose selector matches one PR.
+    """
     import yaml  # noqa: PLC0415
 
-    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    path = (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "pr-ci-health.yml"
+    )
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     triggers = doc.get("on", doc.get(True))
-    assert "push" in triggers, "merge-to-main must trigger the rebase sweep"
-    assert triggers["push"]["branches"] == ["main"]
-    assert "schedule" in triggers, "the hourly backstop must remain"
-
-    mode = doc["jobs"]["triage-and-heal"]["env"]["MODE"]
-    assert "github.event_name == 'push'" in mode and "'rebase'" in mode, (
-        "push events must select rebase mode"
+    assert "push" not in triggers, (
+        "the merge-to-main rebase stampede is back: every merge will rebase the "
+        "whole backlog and relaunch a full CI run per open PR"
     )
-    # The rebase step is what actually unblocks the PRs; it must accept the
-    # mode a push event selects.
+    assert "schedule" in triggers, "the hourly report backstop must remain"
+
+    job = doc["jobs"]["triage-and-heal"]
+    assert job["env"]["MODE"] == (
+        "${{ github.event_name == 'workflow_dispatch' "
+        "&& github.event.inputs.mode || 'report' }}"
+    )
+
+    # The rebase capability survives, but cron cannot satisfy its event guard.
     rebase_step = next(
-        step for step in doc["jobs"]["triage-and-heal"]["steps"]
+        step
+        for step in job["steps"]
         if step.get("name", "").startswith("Rebase conflict-free")
     )
-    assert "rebase" in rebase_step["if"]
+    assert rebase_step["if"] == (
+        "github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'"
+    )
+    assert " | select(.number == $target_pr)" in rebase_step["run"]
 
 
 def test_behind_main_is_detected_when_state_says_blocked():
@@ -253,9 +397,189 @@ def test_compare_behind_by_reads_the_count(monkeypatch):
     assert pr_ci_health.compare_behind_by("o/r", "main", "deadbeef") == 12
 
 
+def test_fetch_review_gate_state_paginates_and_binds_the_head(monkeypatch):
+    pages = [
+        {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "headRefOid": "sha1286",
+                        "reviewDecision": None,
+                        "reviewThreads": {
+                            "nodes": [
+                                {
+                                    "isResolved": False,
+                                    "isOutdated": True,
+                                    "path": "docs/docops/assertions.yaml",
+                                    "comments": {
+                                        "nodes": [
+                                            {
+                                                "author": {
+                                                    "login": "devin-ai-integration"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                }
+                            ],
+                            "pageInfo": {
+                                "hasNextPage": True,
+                                "endCursor": "cursor-1",
+                            },
+                        },
+                    }
+                }
+            }
+        },
+        {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "headRefOid": "sha1286",
+                        "reviewDecision": None,
+                        "reviewThreads": {
+                            "nodes": [
+                                {
+                                    "isResolved": True,
+                                    "isOutdated": False,
+                                    "path": "fixed.py",
+                                    "comments": {"nodes": []},
+                                },
+                                {
+                                    "isResolved": False,
+                                    "isOutdated": False,
+                                    "path": "current.py",
+                                    "comments": {
+                                        "nodes": [
+                                            {
+                                                "author": {
+                                                    "login": "chatgpt-codex-connector"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                },
+                            ],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": None,
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    ]
+    calls = []
+
+    def fake_gh_json(args):
+        calls.append(args)
+        return pages[len(calls) - 1]
+
+    monkeypatch.setattr(pr_ci_health, "_gh_json", fake_gh_json)
+    state = pr_ci_health.fetch_review_gate_state(
+        "owner/repo",
+        1286,
+        expected_head_sha="sha1286",
+    )
+
+    assert state.known is True
+    assert state.review_decision == "NONE"
+    assert state.unresolved_threads == 2
+    assert state.outdated_unresolved_threads == 1
+    assert state.unresolved_thread_paths == [
+        "current.py",
+        "docs/docops/assertions.yaml",
+    ]
+    assert state.unresolved_thread_authors == [
+        "chatgpt-codex-connector",
+        "devin-ai-integration",
+    ]
+    assert not any(arg == "after=cursor-1" for arg in calls[0])
+    assert any(arg == "after=cursor-1" for arg in calls[1])
+
+
+def test_fetch_review_gate_state_fails_closed_on_read_error(monkeypatch):
+    def boom(_args):
+        raise OSError("network down")
+
+    monkeypatch.setattr(pr_ci_health, "_gh_json", boom)
+    state = pr_ci_health.fetch_review_gate_state(
+        "owner/repo",
+        1286,
+        expected_head_sha="sha1286",
+    )
+    assert state.known is False
+    assert state.unresolved_threads == -1
+    assert "network down" in state.error
+
+
+def test_fetch_review_gate_state_rejects_null_or_partial_graphql_errors(monkeypatch):
+    valid_pull_request = {
+        "headRefOid": "sha1286",
+        "reviewDecision": None,
+        "reviewThreads": {
+            "nodes": [],
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+        },
+    }
+    responses = [
+        {"data": None, "errors": [{"message": "permission denied"}]},
+        {
+            "data": {"repository": {"pullRequest": valid_pull_request}},
+            "errors": [{"message": "partial reviewThreads failure"}],
+        },
+    ]
+
+    for response in responses:
+        monkeypatch.setattr(pr_ci_health, "_gh_json", lambda _args, row=response: row)
+        state = pr_ci_health.fetch_review_gate_state(
+            "owner/repo",
+            1286,
+            expected_head_sha="sha1286",
+        )
+        assert state.known is False
+        assert state.unresolved_threads == -1
+        assert "contains errors" in state.error
+
+
+def test_fetch_review_gate_state_rejects_a_moved_head(monkeypatch):
+    monkeypatch.setattr(
+        pr_ci_health,
+        "_gh_json",
+        lambda _args: {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "headRefOid": "new-head",
+                        "reviewDecision": None,
+                        "reviewThreads": {
+                            "nodes": [],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": None,
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    )
+    state = pr_ci_health.fetch_review_gate_state(
+        "owner/repo",
+        1286,
+        expected_head_sha="old-head",
+    )
+    assert state.known is False
+    assert "head moved" in state.error
+
+
 def test_rebase_selection_uses_behind_by_not_mergeable_state():
     workflow = (
-        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "pr-ci-health.yml"
     ).read_text(encoding="utf-8")
     assert 'select(.mergeable_state == "behind")' not in workflow, (
         "state-keyed selection hides every behind-main PR that is also blocked"

@@ -1,0 +1,44 @@
+name: Loop kill-switch guard
+description: >
+  Halt a lane while the loop kill-switch is engaged. Single source of the guard
+  that was previously copy-pasted into each automated lane. Semantics are
+  unchanged: KILLSWITCH present on the loop-control branch => HALT (exit 1, so
+  the run is red while halted); absent (404 on the file or the branch) =>
+  proceed; any other API outcome => fail closed.
+
+  Callers must pass a token with at least `contents: read`. Lanes that manage
+  the kill-switch itself (loop-emergency-stop, loop-resume) must NOT use this
+  action, and documented exceptions (walking-brief) stay uninstrumented on
+  purpose.
+
+inputs:
+  github-token:
+    description: Token used to read the kill-switch file via the GitHub API.
+    required: true
+  lane:
+    description: Lane name used in the halt message and step summary.
+    required: false
+    default: ${{ github.workflow }}
+
+runs:
+  using: composite
+  steps:
+    - name: Halt on loop kill-switch
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        LANE: ${{ inputs.lane }}
+      run: |
+        set -euo pipefail
+        # docs/ops/loop_control/README.md owns the switch semantics.
+        url="repos/${GITHUB_REPOSITORY}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+        if response="$(gh api "$url" 2>&1)"; then
+          echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+          echo "## 🔴 ${LANE} HALTED BY KILLSWITCH" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+          echo "kill-switch absent; ${LANE} proceeding"
+        else
+          echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+          exit 1
+        fi

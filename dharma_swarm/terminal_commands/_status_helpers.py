@@ -12,6 +12,7 @@ import subprocess
 import time
 
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.runtime_artifacts import loop_liveness_summary as _loop_liveness_summary
 from dharma_swarm.terminal_commands._helpers import (
     DGC_CORE,
     _format_age,
@@ -449,21 +450,11 @@ def _build_status_data() -> dict:
     if snapshot:
         data["control_plane_snapshot"] = snapshot
 
-    # Loop liveness (projected by orchestrate_live's restart loop)
+    # Loop liveness (projected by orchestrate_live's restart loop).
     try:
-        liveness_path = DHARMA_STATE / "ops" / "loop_liveness.json"
-        if liveness_path.exists():
-            liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
-            age_s = time.time() - liveness_path.stat().st_mtime
-            data["loop_liveness"] = {
-                "running": len(liveness.get("running", [])),
-                "abandoned": liveness.get("abandoned", []),
-                "hot_restarts": {
-                    k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
-                },
-                "age_min": round(age_s / 60),
-                "pid": liveness.get("pid"),
-            }
+        summary = _loop_liveness_summary(DHARMA_STATE / "ops" / "loop_liveness.json")
+        if summary is not None:
+            data["loop_liveness"] = summary
     except Exception:
         pass
 
