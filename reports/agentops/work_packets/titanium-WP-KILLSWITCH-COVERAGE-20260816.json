@@ -10,6 +10,7 @@
     ".github/workflows/pr-ci-health.yml",
     ".github/workflows/pr-dedupe.yml",
     ".github/workflows/stale-pr.yml",
+    "CLAUDE.md",
     "docs/governance/CI_TRUTH_CONTRACT.json",
     "reports/agentops/work_packets/titanium-WP-KILLSWITCH-COVERAGE-20260816.json",
     "scripts/governance/register_self_mod_semantic_gate.py",
@@ -131,9 +132,10 @@
       "TWO LANES REMAIN UNGUARDED AND ARE FILED AS GAPS, NOT EXEMPTIONS: branch-janitor.yml (above) and active-track.yml, which force-pushes derived status to generated/status on every main push. active-track cannot take a workflow-level guard because the same workflow carries the merge-required 'Onboarding admission parity' check, so halting it would block every merge in the repository; it needs a job-level guard on the publish job alone. Both sit in DEFERRED_LANES, which is a distinct category from EXEMPT_LANES precisely so a real hole is never recorded as a design decision, and a test asserts a deferred lane must graduate to GUARDED_LANES the moment it acquires a guard.",
       "VERIFIED BY CONTRACT TESTS OVER YAML AND ONE NEGATIVE CONTROL, NOT BY ENGAGING THE REAL SWITCH. No lane was observed actually halting against a live KILLSWITCH file on loop-control. The proof that it works is the next halt, which I cannot schedule.",
       "make test-fast COULD NOT RUN in the authoring environment: the suite hits 42 pre-existing collection errors from absent optional dependencies (fastapi, bun/TUI). The same imports fail on origin/main, so this is environmental, but it means the standard fast-suite evidence line is genuinely missing and was replaced by running all 68 test files that reference the changed surfaces.",
-      "ONE PRE-EXISTING FAILURE IS UNADDRESSED: tests/test_shakti_warrant.py::test_check_shakti_warrant_cli_json_output fails on a clean stashed tree at this base and is not this packet's to fix."
+      "ONE PRE-EXISTING FAILURE IS UNADDRESSED: tests/test_shakti_warrant.py::test_check_shakti_warrant_cli_json_output fails on a clean stashed tree at this base and is not this packet's to fix.",
+      "SCOPE WIDENED MID-PR, DECLARED HERE RATHER THAN HIDDEN. This packet was bound to kill-switch coverage and the CI truth registry. CLAUDE.md was added afterwards, carrying a 'Talking to the operator' section that requires plain-language asks because the operator of this repository does not read code. It is prose in a file no track owns and that HOT_PATH_PATTERNS does not match, so it needed no packet of its own -- but the packet-scope gate correctly refused it as an undeclared file and this entry is the declaration rather than a widened allowlist slipped in quietly. It is documentation: nothing mechanically enforces that a reply complies, unlike every other claim in this PR."
     ],
     "rollback": "Revert the five commits independently; they share no files except CI_TRUTH_CONTRACT.json and its completeness test. Reverting restores the previous state exactly: five lanes stop obeying the kill-switch again and the registry returns to describing 26 of 47 PR-visible checks.",
-    "packet_digest": "d5306b5c9af2573ca2a52ce299163cdf0818476244589039414882e544b16be3"
+    "packet_digest": "9bbfc7d8d0c887a7bd691ab12a6fb3cbe9a05bc591c8038c1f9f0bd3bbe3de3e"
   }
 }
