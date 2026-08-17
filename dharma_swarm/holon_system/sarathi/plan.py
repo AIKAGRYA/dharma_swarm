@@ -36,6 +36,17 @@ class BootPack:
     ready_keys: frozenset[str] = frozenset()
     audit: Mapping[str, Any] | None = None
     lodestone_excerpt: str = ""
+    # Governed memory recall, built upstream by ``memory.recall_memory``.
+    # Injected like everything else here — the planner never reads a store.
+    #
+    # This carries the recall OBJECT, not its rendered text, because the status
+    # must not be inferable from the text being empty. Four different outcomes
+    # produce an empty excerpt (no kernel, organ unimportable, read failed,
+    # consulted-and-admitted-nothing) and only one of them is benign. An
+    # earlier revision stored a bare string here and the brief reported a
+    # *failed* read as "no read was attempted" — flagged independently by two
+    # reviewers.
+    memory: Any = None
 
 
 @dataclass(frozen=True)

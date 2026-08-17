@@ -1,0 +1,118 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control_execution.py",
+    "tests/test_mission_control_execution.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P1.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "188ae0170da21ea99097e6bf012a6195c46e4303",
+  "branch": "codex/mission-control-20260812",
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): bind mission tasks to the canonical orchestrator"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_mcp.py",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/operator_core/**",
+    "scripts/**",
+    "docs/governance/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "Makefile",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_execution.py tests/test_mission_control.py tests/test_task_board.py tests/test_runtime_state_invariants.py",
+      "expected_exit": 0,
+      "name": "mission-executor-adapter-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control_execution.py tests/test_mission_control_execution.py",
+      "expected_exit": 0,
+      "name": "mission-executor-adapter-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-P1",
+  "intent": "Add one bounded executor adapter that dispatches an existing Mission Control task through an injected canonical Orchestrator and projects durable owner evidence without creating a scheduler, worker pool, database, transport, registry, liveness oracle, or second lifecycle. The adapter must preserve the Orchestrator's native session identity, recover idempotent retries from durable execution identities, fail closed on ambiguous joins, and never wrap Orchestrator execution in duplicate Mission Control attempts.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; p=Path('dharma_swarm/mission_control_execution.py').read_text() if Path('dharma_swarm/mission_control_execution.py').exists() else ''; forbidden=['sqlite3','aiosqlite','CREATE TABLE','AgentPool(','Orchestrator(','RuntimeStateStore(','TaskBoard(','._ledger','._running_tasks','._collect_completed']; raise SystemExit(1 if any(x in p for x in forbidden) else 0)\"",
+      "expected_exit": 0,
+      "name": "no-parallel-executor-or-store",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/orchestrator.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/task_board.py",
+      "dharma_swarm/agent_runner.py"
+    ],
+    "collision": {
+      "checked_at_sha": "188ae0170da21ea99097e6bf012a6195c46e4303",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This packet binds only the canonical in-process Orchestrator; LivingKernel, canonical A2A, and Hermes require separate adapters and owner-approved supervision work.",
+      "TaskBoard metadata has no cross-process compare-and-swap, so the adapter provides same-instance serialization and durable retry recovery, not fleet-wide exactly-once dispatch.",
+      "Orchestrator claims do not prove a worker process is alive and are not periodically heartbeated; recorded running state and lease freshness remain evidence of lifecycle writes only.",
+      "Mission Control snapshots intentionally query mission-scoped sessions and therefore do not absorb Orchestrator-native runs; this adapter exposes a separate typed owner observation.",
+      "Receipt-backed verification and promotion authority remain separate from executor completion."
+    ],
+    "interface_mismatches": [
+      "Orchestrator owns a native session_id distinct from the Mission Control mission-prefixed session; the adapter must carry owner_session_id and validate mission_id through task and run metadata.",
+      "Orchestrator dispatch generates its own claim and delegation run, so calling MissionControl.start_attempt around it would duplicate lifecycle state.",
+      "No public Orchestrator API exposes its session identity before dispatch; the adapter must recover it from the durable execution identity and run returned by public dispatch metadata.",
+      "No public atomic claim-and-dispatch primitive spans TaskBoard metadata and Orchestrator execution."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "f6e5cb302b7259e21d1a64256eee1be291f41a200c054db9a1b9a148659a2b90",
+    "rollback": "Revert the additive Orchestrator Mission adapter, its tests, and this packet. Mission Control P0 and all canonical owner stores and executor paths remain intact.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-P1"
+  },
+  "worktree": "."
+}

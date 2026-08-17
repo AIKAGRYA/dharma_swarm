@@ -113,7 +113,7 @@ The announcement must include:
   "from": "devin",
   "to": "fleet",
   "authority": "external_worker_evidence_only",
-  "repo": "AmitabhainArunachala/dharma_swarm",
+  "repo": "AIKAGRYA/dharma_swarm",
   "goal": "collaborative PR queue synthesis; Mike may merge only after clean gate"
 }
 ```

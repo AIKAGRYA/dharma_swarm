@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-07-25",
+  "verified_at": "2026-08-09",
   "ttl_days": 14,
   "assertions": [
     {
@@ -36,21 +36,21 @@
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Test functions \\| \\*\\*([\\d,]+) `def test_`",
       "metric": "test_def_occurrences",
-      "verify": "git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l"
+      "verify": "git ls-files tests | rg '\\.py$' | xargs rg -o 'def test_' | wc -l"
     },
     {
       "id": "manifest-markdown-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Markdown files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "markdown_files",
-      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l"
+      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/|^reports/revenue_wedge/|^reports/forge/)' | wc -l"
     },
     {
       "id": "manifest-markdown-lines",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Markdown total lines \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "markdown_total_lines",
-      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l"
+      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/|^reports/revenue_wedge/|^reports/forge/)' | xargs wc -l"
     },
     {
       "id": "manifest-bridge-files",
@@ -219,6 +219,10 @@
       "docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md",
       "docs/architecture/README.md",
       "docs/architecture/NAVIGATION.md",
+      "docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md",
+      "docs/architecture/ADRs/ADR-011-operator-actions-through-taskboard.md",
+      "docs/architecture/ADRs/ADR-012-canonical-fleet-roster.md",
+      "docs/architecture/ADRs/ADR-013-separate-phone-client.md",
       "docs/architecture/AGENT_HOLON_CODE_MAP.md",
       "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
       "docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md",

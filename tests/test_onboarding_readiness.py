@@ -109,6 +109,86 @@ def test_generated_projection_is_diagnostic_not_a_session_gate() -> None:
     assert "active_track_projection_fresh" not in outcome.condition_ids()
 
 
+def test_repository_identity_condition_preserves_cutover_semantics(
+    tmp_path,
+) -> None:
+    from dharma_swarm.operator_core.onboarding import cli
+    from dharma_swarm.operator_core.onboarding.repository_identity import (
+        CANONICAL_ORIGIN_URL,
+        RepositoryIdentityStatus,
+        observe_repository_identity,
+    )
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    import subprocess
+
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    def condition_for(origin: str | None, now: str):
+        subprocess.run(
+            ["git", "config", "--local", "--unset-all", "remote.origin.url"],
+            cwd=repo,
+            check=False,
+        )
+        if origin is not None:
+            subprocess.run(
+                ["git", "config", "--local", "--add", "remote.origin.url", origin],
+                cwd=repo,
+                check=True,
+            )
+        observation = observe_repository_identity(repo, now=now)
+        conditions = cli._collect_conditions(
+            {"dirty": False, "conflicted": False},
+            {"git": "git version test", "make": "GNU Make test"},
+            {"broken_register": {}},
+            net=False,
+            repository_observation=observation,
+        )
+        return observation, next(
+            row for row in conditions if row.id == "repository_identity"
+        ), evaluate(conditions)
+
+    canonical, canonical_condition, canonical_outcome = condition_for(
+        CANONICAL_ORIGIN_URL, "2026-08-15T14:59:59Z"
+    )
+    assert canonical.status is RepositoryIdentityStatus.CANONICAL
+    assert canonical_condition.state == "pass"
+    assert canonical_outcome.verdict == "READY"
+
+    legacy_url = "https://github.com/AmitabhainArunachala/dharma_swarm.git"
+    compatible, warning, compatible_outcome = condition_for(
+        legacy_url, "2026-08-15T14:59:59Z"
+    )
+    assert compatible.status is RepositoryIdentityStatus.LEGACY_COMPATIBLE
+    assert warning.state == "warn" and warning.mandatory is False
+    assert compatible_outcome.verdict == "READY"
+
+    expired, failure, expired_outcome = condition_for(
+        legacy_url, "2026-08-15T15:00:00Z"
+    )
+    assert expired.status is RepositoryIdentityStatus.LEGACY_EXPIRED
+    assert failure.state == "fail" and failure.condition_class == "config"
+    assert expired_outcome.verdict == "CONFIG_ERROR"
+    assert expired_outcome.exit_code == 3
+
+    wrong, wrong_condition, wrong_outcome = condition_for(
+        "https://github.com/shakti-saraswati/dharma_swarm.git",
+        "2026-08-15T14:59:59Z",
+    )
+    assert wrong.status is RepositoryIdentityStatus.WRONG_TARGET
+    assert wrong_condition.state == "fail"
+    assert wrong_outcome.verdict == "CONFIG_ERROR"
+
+    sterile, sterile_condition, sterile_outcome = condition_for(
+        None, "2026-08-15T15:00:00Z"
+    )
+    assert sterile.status is RepositoryIdentityStatus.STERILE
+    assert sterile_condition.state == "skipped"
+    assert sterile_condition.mandatory is False
+    assert sterile_outcome.verdict == "READY"
+
+
 # --- O3-B7 (policy half): host scope mapping ---------------------------------
 
 def test_required_live_host_gap_exits_four() -> None:

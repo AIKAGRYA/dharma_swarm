@@ -19,6 +19,7 @@ lets receipts speak.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -105,7 +106,14 @@ async def run_wake_unit(
     is rendered but unrecorded (ref ``unrecorded``); ``closeback`` failures
     are surfaced in the reply, never swallowed into a success claim.
     """
-    pack = load_boot_pack()
+    # Off the event loop. The loader does blocking I/O -- it lists the mailbox
+    # and (since the memory organ landed) performs a governed memory read across
+    # registered surfaces. Called inline it stalled the loop for as long as the
+    # slowest surface took, so delegation and control work could not be serviced
+    # meanwhile; Greptile measured 201ms of blocked control against a 250ms
+    # preview. An exception handler does not help here, because a slow read is
+    # not an error. Offloading the whole loader also covers the mailbox listing.
+    pack = await asyncio.to_thread(load_boot_pack)
     plan = build_plan(pack)
     outcomes = await delegate_all(
         plan,
@@ -123,6 +131,7 @@ async def run_wake_unit(
         outcomes=outcomes,
         responses=responses,
         audit=effective_audit,
+        memory=pack.memory,
     )
 
     # Dispatch above already happened. A brief-persistence failure must NOT

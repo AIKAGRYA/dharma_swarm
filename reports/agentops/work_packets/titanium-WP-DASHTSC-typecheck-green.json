@@ -1,0 +1,99 @@
+{
+  "id": "titanium-WP-DASHTSC-typecheck-green",
+  "base_ref": "2b3ede8c6aade14374c106c4264a2a6f15519071",
+  "branch": "claude/help-needed-x3guj9",
+  "worktree": ".",
+  "intent": "Make main's advisory dashboard CI job green again. Since the Next.js 16.1.6 to 16.3.0 bump (#1233, 2026-08-07 04:37Z), next build type-checks every tsconfig-included file and fails with 20 TS5097 errors on the .ts-suffixed imports that the node --experimental-strip-types test runner REQUIRES, plus ten stale-type errors in three test files. Enable allowImportingTsExtensions (legal because noEmit is true), complete the two makeSnapshot helpers against the current RuntimeControlPlaneSnapshot interface, route six undefined casts through unknown, add the four missing null fields to one RuntimeControlPlaneData literal, and align one stale route-deck expectation that was already failing on pristine main. A new contract test pins the tsconfig pair so neither half is reverted in isolation.",
+  "allowed_files": [
+    "dashboard/tsconfig.json",
+    "dashboard/src/lib/controlPlaneShell.test.ts",
+    "dashboard/src/lib/controlPlaneSurfaces.test.ts",
+    "dashboard/src/lib/runtimeControlPlane.test.ts",
+    "tests/test_dashboard_tsconfig_contract.py",
+    "reports/agentops/work_packets/titanium-WP-DASHTSC-typecheck-green.json"
+  ],
+  "forbidden_files": [
+    ".github/workflows/tests.yml",
+    "dashboard/package.json",
+    "dashboard/package-lock.json",
+    "dashboard/next.config.ts",
+    "dashboard/src/lib/operatorCoherence.ts",
+    "dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts",
+    "dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts"
+  ],
+  "gates": [
+    {
+      "name": "tsconfig-strip-types-contract",
+      "command": "python3 -m pytest tests/test_dashboard_tsconfig_contract.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "hygiene-integrity",
+      "command": "make hygiene-check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "dropping-the-extension-flag-is-caught",
+      "command": "python3 -c \"import json,pathlib,subprocess,sys; p=pathlib.Path('dashboard/tsconfig.json'); t=p.read_text(); d=json.loads(t); d['compilerOptions'].pop('allowImportingTsExtensions'); p.write_text(json.dumps(d,indent=2)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_dashboard_tsconfig_contract.py::test_ts_suffixed_imports_require_the_extension_flag'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "dropping-no-emit-is-caught",
+      "command": "python3 -c \"import json,pathlib,subprocess,sys; p=pathlib.Path('dashboard/tsconfig.json'); t=p.read_text(); d=json.loads(t); d['compilerOptions'].pop('noEmit'); p.write_text(json.dumps(d,indent=2)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_dashboard_tsconfig_contract.py::test_no_emit_stays_true_so_the_extension_flag_stays_legal'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(dashboard): restore next build type-check under the strip-types import contract"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-DASHTSC",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "2b3ede8c6aade14374c106c4264a2a6f15519071",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Two toolchains compile the same dashboard sources under conflicting import grammars: node --experimental-strip-types requires the on-disk .ts extension in import paths, while next build's type-check forbids it unless allowImportingTsExtensions is enabled. The tsconfig is the only surface where both contracts can be satisfied at once, and nothing pinned it."
+    ],
+    "closest_existing_implementation": [
+      "dashboard/tsconfig.json",
+      ".github/workflows/tests.yml",
+      "tests/test_admission_parity_bridge.py"
+    ],
+    "honest_blockers": [
+      "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO: the edits and their tests were authored before this packet existed. Read the binding as scope CONFORMANCE, not scope-declared-first.",
+      "The failure predates nothing in this packet's scope: it appeared with the dependency bump in #1233 (next 16.1.6 to 16.3.0), not with #1235 as the overnight handoff recorded. Thirteen dashboard files carried .ts-suffixed imports long before either merge.",
+      "One aligned expectation is a judgment call: buildControlPlaneSurfaces' route-deck test already failed on pristine main because the deck gained an opportunities route without the test updating. The deck is treated as the truth and the expectation now includes it.",
+      "Verified locally: next build exits 0, eslint --quiet exits 0, and the three touched node test suites pass 62 of 62. NOT verified against a live CI run of this branch at packet-authoring time."
+    ],
+    "rollback": "Single revert returns main's dashboard job to a failing type-check step on every PR.",
+    "packet_digest": "7541216842f8e81e991129071c0956b85825c163ae9afcff1c592ca49750a34a"
+  }
+}

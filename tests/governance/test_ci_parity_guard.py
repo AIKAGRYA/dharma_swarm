@@ -41,6 +41,10 @@ def _manifest() -> dict:
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 
+def test_manifest_targets_canonical_repository() -> None:
+    assert _manifest()["repo"] == "AIKAGRYA/dharma_swarm"
+
+
 def _run_cli(tmp_path: Path, manifest: dict, protection: dict,
              workflows_dir: Path = WORKFLOWS) -> int:
     manifest_path = tmp_path / "manifest.json"
@@ -219,9 +223,90 @@ def test_regression_sensitive_self_skip_on_merge_group_is_flagged(tmp_path: Path
     assert any("MERGE-QUEUE-BLIND" in d for d in report.drift), report.drift
 
 
-def test_non_regression_sensitive_self_skip_is_allowed() -> None:
-    """Coherence Delta PR body legitimately self-skips on merge_group and has
-    a best-effort continue-on-error step; that must NOT be drift."""
+def test_non_regression_sensitive_required_job_must_execute_on_merge_group(
+    tmp_path: Path,
+) -> None:
+    """Every required context must produce evidence about future main."""
+    workflow_dir = tmp_path / "workflows"
+    workflow_dir.mkdir()
+    (workflow_dir / "coherence-delta.yml").write_text(
+        "name: coherence-delta\n"
+        "on:\n"
+        "  pull_request:\n"
+        "  merge_group:\n"
+        "jobs:\n"
+        "  coherence-delta:\n"
+        "    name: Coherence Delta PR body\n"
+        "    runs-on: ubuntu-latest\n"
+        "    if: github.event_name != 'merge_group'\n"
+        "    steps:\n"
+        "      - run: true\n",
+        encoding="utf-8",
+    )
+    manifest = {
+        "required_contexts": [
+            {
+                "context": "Coherence Delta PR body",
+                "workflow": "coherence-delta.yml",
+                "job": "coherence-delta",
+                "regression_sensitive": False,
+            },
+        ],
+    }
+    report = check_ci_parity.run_check(
+        manifest,
+        workflow_dir,
+        _protection(["Coherence Delta PR body"]),
+    )
+    assert any("MERGE-QUEUE-BLIND" in item for item in report.drift), report.drift
+
+
+@pytest.mark.parametrize(
+    "job_if",
+    [
+        "github.event_name == 'pull_request'",
+        "github.event.pull_request.state == 'open'",
+    ],
+)
+def test_equivalent_pr_only_required_job_guards_are_rejected(
+    tmp_path: Path,
+    job_if: str,
+) -> None:
+    wf_dir = tmp_path / "workflows"
+    wf_dir.mkdir()
+    (wf_dir / "required.yml").write_text(
+        "name: required\n"
+        "on:\n"
+        "  pull_request:\n"
+        "  merge_group:\n"
+        "jobs:\n"
+        "  required:\n"
+        "    name: required\n"
+        "    runs-on: ubuntu-latest\n"
+        f"    if: {job_if}\n"
+        "    steps:\n"
+        "      - run: true\n",
+        encoding="utf-8",
+    )
+    manifest = {
+        "required_contexts": [
+            {
+                "context": "required",
+                "workflow": "required.yml",
+                "job": "required",
+                "regression_sensitive": False,
+            }
+        ]
+    }
+    report = check_ci_parity.run_check(
+        manifest,
+        wf_dir,
+        _protection(["required"]),
+    )
+    assert any("self-skips on merge_group" in item for item in report.drift)
+
+
+def test_non_regression_sensitive_executing_job_keeps_best_effort_warning() -> None:
     manifest = {
         "required_contexts": [
             {"context": "Coherence Delta PR body",
@@ -233,7 +318,42 @@ def test_non_regression_sensitive_self_skip_is_allowed() -> None:
         manifest, WORKFLOWS, _protection(["Coherence Delta PR body"]),
     )
     assert report.drift == [], report.drift
-    assert any("DEAD-TRIGGER" in w for w in report.warnings), report.warnings
+    assert any("continue-on-error" in w for w in report.warnings), report.warnings
+
+
+def test_required_workflow_without_merge_group_trigger_is_drift(
+    tmp_path: Path,
+) -> None:
+    wf_dir = tmp_path / "workflows"
+    wf_dir.mkdir()
+    (wf_dir / "required.yml").write_text(
+        "name: required\n"
+        "on:\n"
+        "  pull_request:\n"
+        "jobs:\n"
+        "  required:\n"
+        "    name: required\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - run: true\n",
+        encoding="utf-8",
+    )
+    manifest = {
+        "required_contexts": [
+            {
+                "context": "required",
+                "workflow": "required.yml",
+                "job": "required",
+                "regression_sensitive": False,
+            },
+        ],
+    }
+    report = check_ci_parity.run_check(
+        manifest,
+        wf_dir,
+        _protection(["required"]),
+    )
+    assert any("does not subscribe to merge_group" in item for item in report.drift)
 
 
 def test_job_rename_orphans_required_context(tmp_path: Path) -> None:

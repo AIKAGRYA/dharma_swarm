@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 
 
@@ -56,6 +58,86 @@ def _pr(
     }
 
 
+def _step_script(name: str) -> str:
+    marker = f"      - name: {name}\n        run: |\n"
+    tail = WORKFLOW.read_text(encoding="utf-8").split(marker, 1)[1]
+    return textwrap.dedent(tail.split("\n      - name:", 1)[0])
+
+
+def _run_step(
+    tmp_path: Path,
+    *,
+    name: str,
+    rows: list[dict[str, object]],
+    dry_run: bool,
+    list_rc: int = 0,
+    comment_rc: int = 0,
+    close_rc: int = 0,
+    delete_rc: int = 0,
+    fail_jq: bool = False,
+) -> tuple[subprocess.CompletedProcess[str], str, str]:
+    tmp_path.mkdir()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "gh-calls.log"
+    summary = tmp_path / "summary.md"
+    summary.write_text("", encoding="utf-8")
+    gh = bin_dir / "gh"
+    gh.write_text(
+        """#!/bin/sh
+printf '%s\\n' "$*" >> "$GH_CALL_LOG"
+case "$1:$2" in
+  pr:list)
+    [ "${GH_LIST_RC:-0}" -eq 0 ] || exit "$GH_LIST_RC"
+    printf '%s\\n' "$GH_ROWS"
+    ;;
+  pr:comment) exit "${GH_COMMENT_RC:-0}" ;;
+  pr:close) exit "${GH_CLOSE_RC:-0}" ;;
+  api:*) exit "${GH_DELETE_RC:-0}" ;;
+  *) exit 64 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    gh.chmod(0o755)
+    if fail_jq:
+        jq = bin_dir / "jq"
+        jq.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
+        jq.chmod(0o755)
+
+    script = _step_script(name)
+    for filename in ("open_prs.json", "snapshot_prs.jsonl", "dupe_groups.jsonl"):
+        script = script.replace(f"/tmp/{filename}", str(tmp_path / filename))
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "GH_TOKEN": "test-token",
+            "GH_REPO": "owner/repo",
+            "GH_ROWS": json.dumps(rows),
+            "GH_CALL_LOG": str(calls),
+            "GH_LIST_RC": str(list_rc),
+            "GH_COMMENT_RC": str(comment_rc),
+            "GH_CLOSE_RC": str(close_rc),
+            "GH_DELETE_RC": str(delete_rc),
+            "DRY_RUN": "true" if dry_run else "false",
+            "GITHUB_STEP_SUMMARY": str(summary),
+        }
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", script],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    return (
+        result,
+        summary.read_text(encoding="utf-8"),
+        calls.read_text(encoding="utf-8") if calls.exists() else "",
+    )
+
+
 def test_snapshot_filter_closes_trusted_unmarked_ops_reports() -> None:
     rows = [
         _pr(
@@ -71,6 +153,77 @@ def test_snapshot_filter_closes_trusted_unmarked_ops_reports() -> None:
     ]
 
     assert _matching_numbers(rows) == [950, 953]
+
+
+def test_snapshot_filter_closes_live_spine_lifecycle_branch_shape() -> None:
+    rows = [
+        _pr(
+            1173,
+            title=(
+                "report(governance): ops runs 2026-07-31 through "
+                "2026-08-06T18:00Z — spine adoption saturated at 93.8% "
+                "(21 runs), 57 open, only 6 PRs fail a required check"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-07-31",
+        ),
+        _pr(
+            1283,
+            title=(
+                "report(governance): ops runs 2026-08-07T00:00Z + 06:00Z — "
+                "spine adoption saturated at 93.8%, 58 open, 0 auto-closes, "
+                "95% target blocked by legacy hatch not by code"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07",
+        ),
+        _pr(
+            1292,
+            title=(
+                "report(governance): ops run 2026-08-07T12:00Z — spine "
+                "adoption 93.8% (unmoved), 56→55 open, 1 age-eligible "
+                "auto-close, 0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07T1200Z",
+        ),
+        _pr(
+            1304,
+            title=(
+                "report(governance): ops run 2026-08-07T18:00Z — spine "
+                "adoption 93.8% (unmoved), 53 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-07T1800Z",
+        ),
+        _pr(
+            1305,
+            title=(
+                "report(governance): ops run 2026-08-08T00:00Z — spine "
+                "adoption 93.8% (unmoved), 54 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T0000Z",
+        ),
+        _pr(
+            1306,
+            title=(
+                "report(governance): ops run 2026-08-08T12:00Z — spine "
+                "adoption 93.8% (unmoved), 55 open, 0 auto-closes, "
+                "0 auto-grounding duplicates"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1200Z",
+        ),
+        _pr(
+            1307,
+            # Every other predicate matches; owner is the sole exclusion.
+            title=(
+                "report(governance): ops run 2026-08-08T18:00Z — spine "
+                "adoption snapshot from a fork"
+            ),
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1800Z",
+            owner="fork-owner",
+        ),
+    ]
+
+    assert _matching_numbers(rows) == [1173, 1283, 1292, 1304, 1305, 1306]
 
 
 def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> None:
@@ -102,6 +255,51 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             head="chore/ops-report-20260715-parser",
         ),
         _pr(
+            13,
+            # Even the exact legacy automation branch is insufficient: its
+            # title must satisfy that lane's anchored governance grammar.
+            title="ops report: fix bug",
+            head="chore/ops-report-20260715",
+        ),
+        _pr(
+            7,
+            # A human suffix on the lifecycle prefix is not the exact
+            # timestamped automation lane and must survive cleanup.
+            title="spine lifecycle report parser implementation",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08-parser",
+        ),
+        _pr(
+            8,
+            # Even the exact reserved-looking branch shape is only an
+            # automation signal, not enough authority to close real work.
+            title="feat: implement real spine lifecycle behavior",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1800Z",
+        ),
+        _pr(
+            9,
+            # Broad legacy title language cannot authorize the reserved
+            # lifecycle branch without its anchored governance report title.
+            title="fix: ops report renderer",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1900Z",
+        ),
+        _pr(
+            10,
+            title="chore: refresh spine adoption metric docs",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2000Z",
+        ),
+        _pr(
+            11,
+            # The intent word alone is not authority: the observed report
+            # title grammar includes a real ISO date immediately after it.
+            title="report(governance): ops run! implement real lifecycle work",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2100Z",
+        ),
+        _pr(
+            12,
+            title="report(governance): ops run fake snapshot renderer",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T2200Z",
+        ),
+        _pr(
             3,
             title="chore(docops): reconcile generated counts",
             head="chore/docops-autorefresh",
@@ -111,9 +309,164 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             title="[automated] ordinary dependency update",
             head="chore/dependency-update",
         ),
+        _pr(
+            14,
+            # A marker plus broad report language is still not an admitted
+            # Pass 1 branch grammar.
+            title="[automated] ops report: fix bug",
+            head="chore/unrelated-automation",
+        ),
+        _pr(
+            15,
+            title="[auto] refresh spine adoption metric",
+            head="ops/pr-lifecycle-spine-experiment",
+        ),
     ]
 
     assert _matching_numbers(rows) == []
+
+    # Pass 1 closes a projection, but cannot destroy its recovery ref. Pass 2
+    # retains its existing duplicate-automation cleanup behavior.
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    snapshot_step = workflow.split(
+        "- name: Close ephemeral snapshot-report PRs", 1
+    )[1].split("- name: Find and close duplicate automated PRs", 1)[0]
+    assert 'git/refs/heads/${head_ref}' not in snapshot_step
+    assert "--method DELETE" not in snapshot_step
+
+
+def test_dedupe_reporting_is_outcome_bound_and_filter_errors_fail_closed() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    snapshot_step, duplicate_step = workflow.split(
+        "- name: Close ephemeral snapshot-report PRs", 1
+    )[1].split("- name: Find and close duplicate automated PRs", 1)
+
+    assert "/tmp/snapshot_prs.jsonl || true" not in snapshot_step
+    assert "/tmp/dupe_groups.jsonl || true" not in duplicate_step
+    for step in (snapshot_step, duplicate_step):
+        assert "**WOULD CLOSE**" in step
+        assert "**FAILED TO CLOSE**" in step
+        assert "**FAILED TO LIST OPEN PRS**" in step
+        assert "**FAILED TO CLASSIFY" in step
+        assert "governance comment failed" in step
+        assert "echo -e" not in step
+        assert step.index('if gh pr close "$number"') < step.index(
+            "printf -- '- **CLOSED**"
+        )
+
+
+def test_dedupe_steps_report_dry_run_and_api_outcomes_honestly(
+    tmp_path: Path,
+) -> None:
+    snapshot_rows = [
+        _pr(
+            1306,
+            title="report(governance): ops run 2026-08-08T12:00Z — snapshot",
+            head="ops/spine-adoption-pr-lifecycle-2026-08-08T1200Z",
+        )
+    ]
+    duplicate_rows = [
+        {
+            **_pr(
+                number,
+                title=f"[automated] refresh 2026-08-08T{hour}:00Z",
+                head=f"chore/refresh-{number}",
+            ),
+            "author": {"is_bot": True, "login": "refresh[bot]"},
+            "labels": [],
+        }
+        for number, hour in ((20, "00"), (21, "06"))
+    ]
+    cases = (
+        ("Close ephemeral snapshot-report PRs", snapshot_rows),
+        ("Find and close duplicate automated PRs", duplicate_rows),
+    )
+
+    for index, (name, rows) in enumerate(cases):
+        result, summary, calls = _run_step(
+            tmp_path / f"dry-{index}", name=name, rows=rows, dry_run=True
+        )
+        assert result.returncode == 0, result.stderr
+        assert "**WOULD CLOSE**" in summary
+        assert "**CLOSED**" not in summary
+        assert "pr close" not in calls
+
+        result, summary, _ = _run_step(
+            tmp_path / f"comment-{index}",
+            name=name,
+            rows=rows,
+            dry_run=False,
+            comment_rc=9,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "**CLOSED**" in summary
+        assert "governance comment failed" in summary
+
+        result, summary, _ = _run_step(
+            tmp_path / f"close-{index}",
+            name=name,
+            rows=rows,
+            dry_run=False,
+            close_rc=8,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "**FAILED TO CLOSE**" in summary
+        assert "**CLOSED**" not in summary
+
+    result, summary, calls = _run_step(
+        tmp_path / "delete-failure",
+        name="Find and close duplicate automated PRs",
+        rows=duplicate_rows,
+        dry_run=False,
+        delete_rc=11,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "**CLOSED**" in summary
+    assert "branch cleanup failed" in summary
+    assert "api --method DELETE" in calls
+
+
+def test_dedupe_steps_do_not_report_empty_state_when_jq_fails(
+    tmp_path: Path,
+) -> None:
+    for index, name in enumerate(
+        (
+            "Close ephemeral snapshot-report PRs",
+            "Find and close duplicate automated PRs",
+        )
+    ):
+        result, summary, _ = _run_step(
+            tmp_path / str(index),
+            name=name,
+            rows=[],
+            dry_run=False,
+            fail_jq=True,
+        )
+        assert result.returncode == 7
+        assert "**FAILED TO CLASSIFY" in summary
+        assert "No snapshot-report PRs open." not in summary
+        assert "No duplicate automated PRs found." not in summary
+
+
+def test_dedupe_steps_report_list_failures_before_classification(
+    tmp_path: Path,
+) -> None:
+    for index, name in enumerate(
+        (
+            "Close ephemeral snapshot-report PRs",
+            "Find and close duplicate automated PRs",
+        )
+    ):
+        result, summary, calls = _run_step(
+            tmp_path / str(index),
+            name=name,
+            rows=[],
+            dry_run=False,
+            list_rc=12,
+        )
+        assert result.returncode == 12
+        assert "**FAILED TO LIST OPEN PRS**" in summary
+        assert "pr close" not in calls
 
 
 def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:

@@ -835,6 +835,44 @@ active_tracks:
       - docs/README.md
       - docs/persistent_agents/**
       - reports/agentops/work_packets/organism-rewire-WP-SARATHIROOT-P0.json
+      # Operator-authorized P2/P2.1 amendment (2026-08-14): Mission Control is
+      # the typed coordination membrane between Sarathi proposals and canonical
+      # executor owners. Exact paths admit the already landed P0/P1 modules and
+      # their named additive adapters without transferring TaskBoard,
+      # RuntimeStateStore, Orchestrator, A2A, Forge, or Merge Master.
+      # Operator-facing integration may add only GET mission projections beneath
+      # the existing mixed-method control-surface router; its pre-existing POST
+      # handoff route remains untouched. Exact cockpit paths avoid api/main.py or
+      # a broad dashboard/API ownership claim.
+      - dharma_swarm/mission_control.py
+      - dharma_swarm/mission_control_contract.py
+      - dharma_swarm/mission_control_execution.py
+      - dharma_swarm/mission_control_execution_support.py
+      - dharma_swarm/mission_control_lifecycle.py
+      - dharma_swarm/mission_control_mcp.py
+      - dharma_swarm/mission_control_mcp_mutations.py
+      - dharma_swarm/mission_control_projection.py
+      - dharma_swarm/mission_control_reconciliation.py
+      - dharma_swarm/mission_control_recovery.py
+      - dharma_swarm/mission_control_dispatch.py
+      - dharma_swarm/mission_control_a2a.py
+      - dharma_swarm/mission_control_sarathi.py
+      - tests/test_mission_control.py
+      - tests/test_mission_control_execution.py
+      - tests/test_mission_control_mcp.py
+      - tests/test_mission_control_dispatch.py
+      - tests/test_mission_control_a2a.py
+      - tests/test_mission_control_sarathi.py
+      - api/routers/control_surface.py
+      - tests/test_control_surface.py
+      - tests/test_control_surface_router_threadpool.py
+      - tests/test_control_surface_mission_sarathi.py
+      - dashboard/src/app/dashboard/control-surface/page.tsx
+      - dashboard/src/hooks/useMissionSarathi.ts
+      - dashboard/src/components/cockpit/MissionSarathiStrip.tsx
+      - dharma_swarm/operator_brief/mission_control_citations.py
+      - tests/test_operator_brief_mission_control_citations.py
+      - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -928,6 +966,18 @@ active_tracks:
         what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; add only the generic RuntimeStateStore transaction seam and receipt-layer declaration needed to make reply-event plus receipt atomic; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
         kind: code
         blocker: true
+      - id: 12
+        what: "P2 governed Mission Control dispatch: admit a fail-closed authority envelope whose authenticated principal, exact mission/task/dispatch identity, authority reference, and authority digest are verified by injected owner adapters before a single canonical executor dispatch. Add a canonical A2A adapter that preserves A2A-native task/context/run identity and observes exact durable publish, consume, and outcome receipts without wrapping the owner lifecycle in Mission Control attempts. Retries may recover an identical durable execution reference; publish ACK, consume ACK, recorded running state, or lease freshness prove only the corresponding write and never executor liveness or semantic completion."
+        kind: code
+        blocker: true
+      - id: 13
+        what: "P2.1 Apex Sarathi -> Mission Control proposal adapter: translate a Sarathi PlannedDelegation into typed MissionProposal data, require an explicit complete mapping from proposal-local dependency labels to canonical Mission Control task IDs, and keep governance admission plus dispatch authority as separate fail-closed steps. Legacy Sarathi wake, mailbox, and receipt artifacts remain private projections; a proposal, plan, model consensus, or identity assertion cannot coerce itself into GovernanceAdmission or AuthorizedDispatch."
+        kind: code
+        blocker: true
+      - id: 14
+        what: "P2.1 operator vertical: add only immutable, bounded, explicit-mission GET projections beneath the already-mounted mixed-method control-surface router without altering its existing POST handoff route; render the typed Sarathi/Mission Control ladder in the existing dashboard control-surface cockpit; and permit Operator Brief to cite exact mission/task/attempt/evidence references without treating identifiers as facts. Absence of canonical state must render as uninitialized/unknown, and the projection must not initialize stores, discover an unbounded fleet, start daemons, mutate runtime state, or upgrade receipts into liveness, outcome, promotion, or merge claims."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -936,6 +986,10 @@ active_tracks:
       - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
       - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
       - The Sarathi P0 root must compose shared engines through adapters; it must not copy, fork, or move sibling-owned runtimes, stores, gateways, schedulers, evolution engines, or tool executors.
+      - MissionProposal, GovernanceAdmission, AuthorizedDispatch, DeliveryAck, HandlerAck, VerifiedOutcome, Promotion, and Merge are distinct non-coercible claim types; no earlier rung may imply or synthesize a later rung.
+      - A task claim, execution lease, publish ACK, consume ACK, heartbeat row, recorded running status, or dashboard freshness indicator must not be represented as authenticated action authority, executor liveness, verified semantic outcome, promotion eligibility, or merge permission.
+      - Mission Control must not become a scheduler, worker pool, transport, receipt store, liveness oracle, evaluator, promotion arbiter, or merge authority; canonical owners retain those responsibilities, Forge alone arbitrates promotion, and Merge Master Mike remains the sole conditional merge lane.
+      - Read models, API responses, cockpit panels, and Operator Brief citations must remain projections of bounded evidence; they must not initialize absent stores, mutate owner state, perform implicit fleet-wide discovery, or turn missing evidence into a healthy/live claim.
 
   - id: dharmagraph-engine-2026-07
     name: DharmaGraph — sovereign durable graph runtime consolidation
@@ -1859,10 +1913,40 @@ active_tracks:
       M1 refreshes the canonical M0 receipt against exact merged main after
       PR #1164 in
       reports/governance/titanium/phase0_reconciliation_2026-07-25.json.
-      The selected post-1164 observation reports the evaluator's mechanical
-      7/8 result separately from no-skip and packet-acceptance evidence. That
-      receipt is point-in-time evidence, not a substitute for the current
-      completion criteria or authority to promote a blocked external decision.
+      That receipt's mechanical 7/8 result was scored against the criteria
+      set of its day and is point-in-time evidence only. The criteria block
+      now carries nine entries and the current mechanical result is 8/9:
+      the sole failure is the MISSING independent clean-room receipt, and
+      two passing suites still carry skipped tests. That 8/9 count is NOT
+      anchored to the generated/status branch, which is force-pushed
+      latest-only and retains no history; its provenance (projection commit
+      and derived-from-main SHA) and its branch-independent re-derivation
+      command are recorded in that same reconciliation report's
+      generated_status block, and any reader can re-derive the count from
+      this repository with
+      `python3 scripts/governance/check_track_status.py`.
+      A pass that carries skips does not discharge the no-skip obligation.
+      Neither receipt nor projection is a substitute for the current
+      completion criteria or authority to promote a blocked external
+      decision; the projection is projection-only evidence.
+
+      M3 retires the WP-0C1R next item after merged-main reverification, on
+      the same standard M2 used for WP-0D: PR #1202 (human-merged as
+      f3eb5b397) executed the operator-ratified A1/B1 dispositions, and the
+      strict scan replayed on exact merged main f3eb5b397 now exits 0 with
+      `Ran 10 rules on 1577 files: 0 findings`. A negative control confirms
+      the gate still has teeth: injecting one `Path.home() / ".dharma"`
+      reference returns exit 1 with 1 finding. Retiring the item retires the
+      adjudication blocker only. It is implementation-author replay, not
+      independent review. It is not a security-completeness claim, and that
+      control also exposed a disclosed limit: Rule 1 does not match the
+      idiomatic chained form `Path.home() / ".dharma" / "sub"`, so zero
+      findings means zero findings UNDER RULE 1 AS WRITTEN. Widening the
+      rule is deliberately NOT done here — it would re-open the ratified
+      A1/B1 finding set and needs its own ratification; the measurement is
+      recorded in the reconciliation report for operator routing. WP-0F1,
+      WP-0G, WP-0S, and WP-0I stay open with Phase 0 BLOCKED targeting
+      CLOSED_NOT_PROD.
 
     completion_criteria:
       - id: titanium_bootstrap_contract_passes
@@ -1907,7 +1991,7 @@ active_tracks:
 
     next_items:
       - id: WP-0F1
-        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the active ruleset. Both live layers are non-strict, require zero approvals, and disable conversation/thread resolution; the ruleset also has an always-bypass actor and duplicate contexts. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
+        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance
         blocker: true
         evidence_criterion: titanium_ci_authority_contracts_pass
@@ -1916,12 +2000,8 @@ active_tracks:
         kind: code
         blocker: true
         evidence_criterion: titanium_docops_contracts_pass
-      - id: WP-0C1R
-        what: "Ratify and owner-route the exact-current-main strict Semgrep result: exit 1 with 21 OWNER_DEFERRED findings (18 unauthorized state writers and 3 unclassified substrates), 7 parser warnings, and zero security-rule findings. No draft disposition is a PASS."
-        kind: governance
-        blocker: true
       - id: WP-0S
-        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret, while docker-compose still declares 8080:8080 and GitHub contains no deployment evidence; actual exposure remains NEEDS_HOST/BLOCKED_OPERATOR."
+        what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret and docker-compose still declares 8080:8080. The 2026-08-01 read-only observation recorded on PR #1184 (open, unmerged, head c448c5ab2) classified one receipt endpoint alias as HTTP 401 and another as unauthenticated public HTTP 200, so live exposure is observed but unadjudicated. Exact live network coordinates are intentionally omitted from this public governance projection. Cite the immutable source receipt with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803 records that this is a citation, not a replay). That receipt is implementation-observer authority, declares inventory_complete false, and carries no operator attestation, so the verdict remains BLOCKED_OPERATOR pending fresh operator-backed observation and exact-scope attestation. The exposed alias requires operator action: authenticate it, close it, or attest it as intentionally public. Sanitizing the projection changes no evidence authority, inventory boundary, classification, or operator obligation."
         kind: code
         blocker: true
         evidence_criterion: titanium_ingress_contracts_pass
