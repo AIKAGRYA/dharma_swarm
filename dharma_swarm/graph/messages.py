@@ -33,6 +33,7 @@ from dataclasses import dataclass, replace
 from typing import Annotated, Any, Literal, Mapping, Sequence, TypedDict
 
 from dharma_swarm.graph.channels import Channel, ChannelWrite, EmptyChannelError
+from dharma_swarm.graph.effects import EffectsProvider, LiveEffects
 
 __all__ = [
     "REMOVE_ALL_MESSAGES",
@@ -183,12 +184,22 @@ def _coerce_all(value: Any) -> list[AnyGraphMessage]:
     return [coerce_message(item) for item in value]
 
 
-def _with_ids(messages: Sequence[AnyGraphMessage]) -> list[AnyGraphMessage]:
-    """langgraph parity: mint a uuid4 id for every message that lacks one."""
+def _with_ids(
+    messages: Sequence[AnyGraphMessage], active_effects: EffectsProvider
+) -> list[AnyGraphMessage]:
+    """langgraph parity: mint a uuid4-shaped id for every message lacking one.
+
+    Ids come from ``active_effects.random()`` (never ``uuid.uuid4`` — same
+    seed, same ids, so seeded traces replay byte-identically; scheduler.py
+    mints its run ids the same way).
+    """
     minted: list[AnyGraphMessage] = []
     for message in messages:
         if isinstance(message, GraphMessage) and message.id is None:
-            minted.append(replace(message, id=str(uuid.uuid4())))
+            minted_id = uuid.UUID(
+                int=active_effects.random().getrandbits(128), version=4
+            )
+            minted.append(replace(message, id=str(minted_id)))
         else:
             minted.append(message)
     return minted
@@ -255,15 +266,20 @@ def add_messages(
     right: Any,
     *,
     format: Literal["langchain-openai"] | None = None,
+    effects: EffectsProvider | None = None,
 ) -> list[GraphMessage]:
     """Merge two message lists, updating existing messages by id.
 
     Port of ``langgraph.graph.message.add_messages`` (1.2.4). ``left`` and
     ``right`` may hold typed messages or their JSON dict projections; the
-    result is always a list of :class:`GraphMessage`.
+    result is always a list of :class:`GraphMessage`. Missing ids are minted
+    from ``effects`` (``LiveEffects`` when not provided).
     """
-    left_messages = _with_ids(_coerce_all(left))
-    right_messages = _with_ids(_coerce_all(right))
+    active_effects: EffectsProvider = (
+        effects if effects is not None else LiveEffects()
+    )
+    left_messages = _with_ids(_coerce_all(left), active_effects)
+    right_messages = _with_ids(_coerce_all(right), active_effects)
 
     remove_all_idx: int | None = None
     for index, message in enumerate(right_messages):
@@ -316,9 +332,13 @@ def add_message_dicts(
     right: Any,
     *,
     format: Literal["langchain-openai"] | None = None,
+    effects: EffectsProvider | None = None,
 ) -> list[dict[str, Any]]:
     """:func:`add_messages` in the JSON domain (usable as a channel reducer)."""
-    return [message.to_dict() for message in add_messages(left, right, format=format)]
+    return [
+        message.to_dict()
+        for message in add_messages(left, right, format=format, effects=effects)
+    ]
 
 
 class MessagesChannel(Channel[list[dict[str, Any]]]):
@@ -330,17 +350,27 @@ class MessagesChannel(Channel[list[dict[str, Any]]]):
     Multiple same-superstep writes are legal and fold in canonical order.
     """
 
-    def __init__(self, *, format: Literal["langchain-openai"] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        format: Literal["langchain-openai"] | None = None,
+        effects: EffectsProvider | None = None,
+    ) -> None:
         super().__init__()
         self._messages: list[dict[str, Any]] = []
         self._format = format
+        self._effects: EffectsProvider = (
+            effects if effects is not None else LiveEffects()
+        )
 
     def _fold(
         self, start: Sequence[Mapping[str, Any]], writes: Sequence[ChannelWrite]
     ) -> list[dict[str, Any]]:
         value: list[Any] = [dict(item) for item in start]
         for write in writes:
-            value = add_message_dicts(value, write.value, format=self._format)
+            value = add_message_dicts(
+                value, write.value, format=self._format, effects=self._effects
+            )
         return value
 
     def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
