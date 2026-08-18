@@ -133,6 +133,9 @@ def unified_diff(rel: Path, old: str, new: str) -> str:
         old_lines[-1] += "\n"
     if new_lines and not new_lines[-1].endswith("\n"):
         new_lines[-1] += "\n"
+    # difflib emits --- a/<path> / +++ b/<path>. parse_unified_diff
+    # strips exactly one leading a/ or b/ via _strip_prefix — keep that
+    # contract; do not add timestamps (they survive strip and break paths).
     body = "".join(
         difflib.unified_diff(
             old_lines,
@@ -158,6 +161,57 @@ def assert_paths(diff_text: str, allowed: set[str]) -> None:
             _die(f"diff touches {patch.target_path} — not in allowlist {sorted(allowed)}")
 
 
+def assert_not_live_source(src: Path) -> None:
+    if src.resolve() == Path("/root/dharma_swarm").resolve():
+        _die("refusing to use /root/dharma_swarm as source workspace for mutation")
+
+
+def normalize_apply_results(results: dict) -> dict:
+    """Read the DarwinEngine.apply_diff_and_test *wrapper* dict.
+
+    Not the raw ApplyTestResult. Two shapes exist today
+    (evolution.py:2379 and :2424):
+
+      empty-diff skip → {"pass_rate": 1.0, "skipped": True}
+      apply path      → {"pass_rate": float, "rolled_back": bool}
+
+    ``skipped`` is absent on the apply path. ``applied`` is never
+    returned — infer apply/rollback from ``rolled_back`` + the file.
+    """
+    skipped = results.get("skipped") is True
+    default_rate = 1.0 if skipped else 0.0
+    return {
+        "pass_rate": float(results.get("pass_rate", default_rate)),
+        "skipped": skipped,
+        "rolled_back": results.get("rolled_back") is True,
+    }
+
+
+def red_cycle_ok(results: dict, *, file_restored: bool) -> bool:
+    """Planted-red is honest only if tests failed *and* the applier rolled back.
+
+    File-still-original alone is not enough: a refused apply leaves the
+    toy untouched and would otherwise look like a successful rollback.
+    """
+    n = normalize_apply_results(results)
+    return (
+        not n["skipped"]
+        and n["pass_rate"] < 1.0
+        and n["rolled_back"]
+        and file_restored
+    )
+
+
+def green_cycle_ok(results: dict, *, file_applied: bool) -> bool:
+    n = normalize_apply_results(results)
+    return (
+        not n["skipped"]
+        and n["pass_rate"] >= 1.0
+        and not n["rolled_back"]
+        and file_applied
+    )
+
+
 async def run_apply(workspace: Path, diff_text: str, archive: Path, label: str):
     from dharma_swarm.evolution import DarwinEngine, EvolutionStatus, Proposal
 
@@ -181,9 +235,7 @@ async def run_apply(workspace: Path, diff_text: str, archive: Path, label: str):
         timeout=90.0,
         workspace=workspace,
     )
-    # apply_diff_and_test returns the proposal plus a test_results dict;
-    # the applier result lives on the proposal metadata / we re-read files.
-    return _proposal, _results
+    return _proposal, normalize_apply_results(_results)
 
 
 def git_sha(repo: Path) -> str:
@@ -211,10 +263,8 @@ async def main_async(args: argparse.Namespace) -> int:
         )
     ).expanduser().resolve()
     scratch = root / f"first-fire-{grant['grant_id']}"
-    if src.resolve() == Path("/root/dharma_swarm").resolve():
-        _die("refusing to use /root/dharma_swarm as source workspace for mutation")
+    assert_not_live_source(src)
 
-    consume_grant(grant_path, grant)
     copy_scratch(src, scratch, sha)
     os.environ["DHARMA_EVOLUTION_WORKTREE_ROOT"] = str(root)
 
@@ -230,26 +280,22 @@ async def main_async(args: argparse.Namespace) -> int:
     assert_paths(red_diff, ALLOWED_PATHS)
     assert_paths(green_diff, ALLOWED_PATHS)
 
+    # Pair starts here. Consume only after the scratch and diffs exist so a
+    # failed copy does not burn the one-shot grant.
+    consume_grant(grant_path, grant)
+
     archive = scratch / ".first_fire_archive.jsonl"
     red_proposal, red_results = await run_apply(scratch, red_diff, archive, "planted-red")
     after_red = probe.read_text()
     red_rolled = after_red == original
-    red_ok = (
-        red_results.get("skipped") is not True
-        and float(red_results.get("pass_rate", 1.0)) < 1.0
-        and red_rolled
-    )
+    red_ok = red_cycle_ok(red_results, file_restored=red_rolled)
 
     green_proposal, green_results = await run_apply(
         scratch, green_diff, archive, "real-green"
     )
     after_green = probe.read_text()
     green_applied = "return 2" in after_green and after_green != original
-    green_ok = (
-        green_results.get("skipped") is not True
-        and float(green_results.get("pass_rate", 0.0)) >= 1.0
-        and green_applied
-    )
+    green_ok = green_cycle_ok(green_results, file_applied=green_applied)
 
     receipt = {
         "schema": "dharma.first_fire.plumbing.v1",
@@ -265,6 +311,7 @@ async def main_async(args: argparse.Namespace) -> int:
             "diff_sha256": _sha256(red_diff),
             "pass_rate": red_results.get("pass_rate"),
             "skipped": red_results.get("skipped", False),
+            "rolled_back": red_results.get("rolled_back", False),
             "file_restored": red_rolled,
             "ok": red_ok,
         },
@@ -272,6 +319,7 @@ async def main_async(args: argparse.Namespace) -> int:
             "diff_sha256": _sha256(green_diff),
             "pass_rate": green_results.get("pass_rate"),
             "skipped": green_results.get("skipped", False),
+            "rolled_back": green_results.get("rolled_back", False),
             "applied": green_applied,
             "ok": green_ok,
         },

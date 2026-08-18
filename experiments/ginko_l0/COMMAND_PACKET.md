@@ -1,6 +1,7 @@
 # Packet L-0 — forecast ledger (plumbing of the income organ), real edition
 
 **Status:** drafted, not published, not trading.  
+**Mechanical resolve:** implemented in `scripts/ginko_ledger_l0.py::resolve_matured` (FRED / CoinGecko vs the rule frozen in `metadata.resolution`). Not a stub.  
 **Ratified:** yes-sheet 2026-08-18 line 7 (`docs/plans/YES_SHEET_RATIFICATION_2026-08-18.md`):
 20+ model-generated forecasts per run, public + timestamped, no 0.5 defaults.  
 **Bit purchased if valid:** a public, miss-included, resolvable forecast row that could have come out red.  
@@ -50,7 +51,7 @@ Desk correction: receipts belong under Darshan **desk 3 (Witness Ledger)**, not 
 | Step | Function | File |
 |---|---|---|
 | record | `record_prediction` | `dharma_swarm/ginko_brier.py` |
-| resolve | `resolve_prediction` | same |
+| resolve | `resolve_prediction` (store) + `resolve_matured` (runner; **implemented**, not missing) | `ginko_brier.py` / `scripts/ginko_ledger_l0.py` |
 | grade | `build_dashboard` / `check_edge_validation` | same |
 | data | `fetch_fred_series` / `fetch_crypto_prices` | `dharma_swarm/ginko_data.py` |
 | probabilities | `model_probabilities` (Anthropic Messages API, fail-loud) | `scripts/ginko_ledger_l0.py` |
