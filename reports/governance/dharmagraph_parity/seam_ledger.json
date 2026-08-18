@@ -1155,8 +1155,8 @@
       "classification": "mediated",
       "col": 33,
       "file": "dharma_swarm/graph/scheduler.py",
-      "id": "dharma_swarm/graph/scheduler.py:166:33",
-      "line": 166,
+      "id": "dharma_swarm/graph/scheduler.py:418:33",
+      "line": 418,
       "scope": "runtime",
       "symbol": "active_effects.random().getrandbits"
     },
@@ -2851,6 +2851,9 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "asyncio",
+        "collections",
+        "copy",
         "dataclasses",
         "logging",
         "typing"
