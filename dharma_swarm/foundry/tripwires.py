@@ -62,6 +62,21 @@ class TripwireReport:
         return not self.fired
 
 
+def _in_scope(path: str, patterns: list[str]) -> bool:
+    """A path is in scope if it matches a glob OR sits under a dir-prefix pattern.
+
+    Supports both ``kernels/*.py`` (glob) and ``examples/foo/`` (directory
+    prefix) so target evolve-path declarations can use either style.
+    """
+    for pat in patterns:
+        if fnmatch.fnmatch(path, pat):
+            return True
+        base = pat.rstrip("/")
+        if base and (path == base or path.startswith(base + "/") or fnmatch.fnmatch(path, base + "/*")):
+            return True
+    return False
+
+
 def _added_paths(diff: str) -> list[str]:
     """Paths a unified diff touches (from ``+++ b/<path>`` headers)."""
     paths: list[str] = []
@@ -133,7 +148,7 @@ def scan_tripwires(
     touched = _added_paths(candidate.diff)
     if allowed_paths is not None:
         for path in touched:
-            if not any(fnmatch.fnmatch(path, pat) for pat in allowed_paths):
+            if not _in_scope(path, allowed_paths):
                 fired.append("out_of_scope_diff")
                 details["out_of_scope_diff"] = (
                     f"{path} not within allowed evolve paths {allowed_paths}"
