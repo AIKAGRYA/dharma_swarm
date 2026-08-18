@@ -1,0 +1,58 @@
+name: Ginko L0 ledger
+
+on:
+  workflow_dispatch:
+    inputs:
+      grant_json:
+        description: Dated PUBLISH grant JSON (EXTERNAL-GATED)
+        required: true
+        type: string
+      source:
+        description: Model/source label written onto each row
+        required: false
+        default: uninformed-prior
+
+# Never on push. Never on a schedule until a kill-watched cadence exists.
+
+permissions:
+  contents: write
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refuse megha
+        run: |
+          python3 - <<'PY'
+          import socket, sys
+          if socket.gethostname() == "meghadharma-cloud":
+              sys.exit("GINKO_L0_REFUSED: meghadharma-cloud")
+          PY
+      - name: Install
+        run: python3 -m pip install -e .
+      - name: Run L0
+        env:
+          GRANT_JSON: ${{ inputs.grant_json }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          mkdir -p "$HOME/.dharma/ginko_l0"
+          printf '%s\n' "$GRANT_JSON" > "$HOME/.dharma/ginko_l0/GRANT.json"
+          python3 scripts/ginko_ledger_l0.py \
+            --grant "$HOME/.dharma/ginko_l0/GRANT.json" \
+            --source "${{ inputs.source }}" \
+            --receipt "$HOME/.dharma/ginko_l0/last_receipt.json"
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ginko-l0-receipt
+          path: |
+            ~/.dharma/ginko_l0/last_receipt.json
+            reports/darshan/forecast_ledger/
+          if-no-files-found: warn
