@@ -28,7 +28,6 @@ from typing import Any, Iterable
 REQUIRED_CONFIRMED = 5
 REQUIRED_DOMAINS = 3
 GUARDIAN_RECEIPT_RELPATH = Path("forge_measurement_guardian") / "cycle-003-fitness-quorum-guard.json"
-_STATE_DIR = Path.home() / ".dharma"
 
 
 @dataclass(frozen=True)
@@ -97,9 +96,15 @@ def build_guardian_receipt(
     }
 
 
-def write_guardian_receipt(payload: dict[str, Any], *, state_dir: Path | None = None) -> Path:
-    """Write the guardian cycle file to ``<state_dir>/forge_measurement_guardian/``."""
-    root = Path(state_dir) if state_dir is not None else _STATE_DIR
+def write_guardian_receipt(payload: dict[str, Any], *, state_dir: Path) -> Path:
+    """Write the guardian cycle file to ``<state_dir>/forge_measurement_guardian/``.
+
+    ``state_dir`` is required and supplied by the caller (the organism's state
+    root, typically ``~/.dharma``). guardian_feed deliberately does not assume a
+    home path: ~/.dharma ownership stays with the caller / RuntimeStateStore
+    (anti-slop Rule 1), and the module stays a pure function of its inputs.
+    """
+    root = Path(state_dir)
     path = root / GUARDIAN_RECEIPT_RELPATH
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
