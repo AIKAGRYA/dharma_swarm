@@ -1657,6 +1657,14 @@ def main() -> None:
                 case _:
                     parser.parse_args(["task", "--help"])
         case "evolve":
+            if (
+                args.evolve_cmd in {"auto", "daemon"}
+                and not args.shadow
+                and not args.promotion
+            ):
+                # Refuse before any engine or daemon startup: a live run without
+                # a promotion packet can only perform refused no-op cycles.
+                parser.error(f"evolve {args.evolve_cmd} --live requires --promotion")
             match args.evolve_cmd:
                 case "propose":
                     cmd_evolve_propose(

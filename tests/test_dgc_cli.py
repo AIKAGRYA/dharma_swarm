@@ -2844,3 +2844,50 @@ def test_evolve_daemon_parser_honors_live_and_promotion_args():
     assert args.shadow is False
     assert args.promotion == "promotion.json"
     assert args.trusted_judge_key == []
+
+
+def test_evolve_daemon_live_without_promotion_exits_before_startup(monkeypatch):
+    """dgc evolve daemon --live with no --promotion must exit nonzero before the daemon starts."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("cmd_evolve_daemon must not start without a promotion packet")
+
+    monkeypatch.setattr(cli, "cmd_evolve_daemon", _fail_if_called)
+    monkeypatch.setattr(sys, "argv", ["dgc", "evolve", "daemon", "--live", "--single-model"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+
+
+def test_evolve_auto_live_without_promotion_exits_before_startup(monkeypatch):
+    """dgc evolve auto --live with no --promotion must exit nonzero before any cycle runs."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("cmd_evolve_auto must not run without a promotion packet")
+
+    monkeypatch.setattr(cli, "cmd_evolve_auto", _fail_if_called)
+    monkeypatch.setattr(sys, "argv", ["dgc", "evolve", "auto", "--live"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+
+
+def test_evolve_daemon_live_with_promotion_reaches_command(monkeypatch):
+    """The guard must not block a live daemon that does carry a promotion packet."""
+    import dharma_swarm.dgc_cli as cli
+
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        cli, "cmd_evolve_daemon", lambda *a, **k: calls.append(k)
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["dgc", "evolve", "daemon", "--live", "--promotion", "promotion.json"],
+    )
+    cli.main()
+    assert len(calls) == 1
+    assert calls[0]["promotion_path"] == "promotion.json"
+    assert calls[0]["shadow"] is False
