@@ -66,6 +66,11 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_external_preview import (
+    GPT_5_6_SOL_MODEL_ID,
+    KIMI_K3_MODEL_ID,
+    default_external_preview_route,
+)
 from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
     TerminalBridgeSessionRuntimeMixin,
@@ -248,14 +253,31 @@ class TerminalBridge(
             from dharma_swarm.tui.engine.adapters import (
                 ClaudeAdapter,
                 CodexAdapter,
+                CodexTextAdapter,
                 CompletionRequest,
+                GrokOAuthResponsesAdapter,
+                KimiCodeAdapter,
                 OllamaAdapter,
                 OpenRouterAdapter,
+                ProviderConfig,
             )
 
             adapters = {
                 "claude": ClaudeAdapter(),
                 "codex": CodexAdapter(),
+                "codex_text": CodexTextAdapter(
+                    config=ProviderConfig(
+                        provider_id="codex_text",
+                        default_model=GPT_5_6_SOL_MODEL_ID,
+                    )
+                ),
+                "kimi_code": KimiCodeAdapter(
+                    config=ProviderConfig(
+                        provider_id="kimi_code",
+                        default_model=KIMI_K3_MODEL_ID,
+                    )
+                ),
+                "grok_oauth": GrokOAuthResponsesAdapter(),
                 "openrouter": OpenRouterAdapter(),
             }
             preview_model = self._local_preview_model()
@@ -284,6 +306,9 @@ class TerminalBridge(
         preview_model = self._local_preview_model()
         if self._is_enabled_local_preview_route("ollama", preview_model):
             return "ollama", preview_model
+        account_preview = default_external_preview_route(self._adapters)
+        if account_preview is not None:
+            return account_preview
         target = model_routing.default_target()
         return target.provider_id, target.model_id
 
@@ -306,7 +331,8 @@ class TerminalBridge(
         """Return the non-forgeable in-process provenance fact for a chat lane."""
 
         return (
-            provider_id in {"claude", "openrouter"}
+            provider_id
+            in {"claude", "codex_text", "grok_oauth", "kimi_code", "openrouter"}
             and self._adapters.get(provider_id) is adapter
         )
 
@@ -1075,8 +1101,8 @@ class TerminalBridge(
         if adapter is not None:
             try:
                 await adapter.cancel()
-            except Exception as exc:
-                provider_cancel_error = f"{type(exc).__name__}: {exc}"
+            except Exception:
+                provider_cancel_error = "provider_cancel_failed"
 
         task = run.task
         if task is not None and task is not asyncio.current_task() and not task.done():
@@ -1098,6 +1124,8 @@ class TerminalBridge(
         run: _ActiveSessionRun,
         provider_id: str,
         model_id: str,
+        *,
+        update_selection: bool = False,
     ) -> None:
         run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
         run.provider_id = provider_id
@@ -1105,8 +1133,9 @@ class TerminalBridge(
         if self._active_run is run:
             self._active_provider_id = provider_id
             self._active_model_id = model_id
-            self._selected_provider_id = provider_id
-            self._selected_model_id = model_id
+            if update_selection:
+                self._selected_provider_id = provider_id
+                self._selected_model_id = model_id
 
     def _clear_active_run(self, run: _ActiveSessionRun) -> None:
         if self._active_run is not run:
@@ -2350,7 +2379,11 @@ class TerminalBridge(
                 provider,
                 model,
             )
-            if not canonical_route and not local_preview_route:
+            external_preview_route = self._is_enabled_external_preview_route(
+                provider,
+                model,
+            )
+            if not canonical_route and not local_preview_route and not external_preview_route:
                 self._remember_action(f"model.set REFUSED {requested_route} (unroutable)")
                 return {
                     "ok": False,

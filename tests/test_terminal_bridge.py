@@ -17,10 +17,18 @@ from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.terminal_bridge import TerminalBridge, system_commands_module
 from dharma_swarm import terminal_bridge_chat
+from dharma_swarm.terminal_bridge_external_preview import (
+    CLAUDE_FABLE_5_MODEL_ID,
+    GPT_5_6_SOL_MODEL_ID,
+    GROK_4_6_MODEL_ID,
+    KIMI_K3_MODEL_ID,
+)
 from dharma_swarm.terminal_bridge_text import render_model_policy_text
 from dharma_swarm.tui import model_routing
 from dharma_swarm.tui.engine.events import (
     CanonicalEvent,
+    ErrorEvent,
+    RateLimitEvent,
     SessionEnd,
     SessionStart,
     TaskStarted,
@@ -132,6 +140,33 @@ class _RouteCaptureAdapter(_ImmediateAdapter):
         )
 
 
+class _CompletePreviewAdapter(_RouteCaptureAdapter):
+    async def stream(self, completion, *, session_id):
+        self.stream_calls += 1
+        self.completion_models.append(str(completion.kwargs.get("model", "")))
+        yield SessionStart(
+            provider_id=self.provider_id,
+            session_id=session_id,
+            model=str(completion.kwargs.get("model", "")),
+            tools_available=[],
+            system_info={
+                "served_identity_source": "provider_response",
+                "exact_model_proven": self.provider_id != "codex_text",
+            },
+        )
+        yield TextComplete(
+            provider_id=self.provider_id,
+            session_id=session_id,
+            content="sealed reply",
+            role="assistant",
+        )
+        yield SessionEnd(
+            provider_id=self.provider_id,
+            session_id=session_id,
+            success=True,
+        )
+
+
 def _install_chat_adapters(
     bridge: TerminalBridge,
     primary,
@@ -168,7 +203,14 @@ def test_terminal_bridge_bootstraps_commands_and_adapters() -> None:
     bridge = TerminalBridge()
     try:
         assert bridge._commands is not None
-        assert {"claude", "codex", "openrouter"} <= set(bridge._adapters)
+        assert {
+            "claude",
+            "codex",
+            "codex_text",
+            "grok_oauth",
+            "kimi_code",
+            "openrouter",
+        } <= set(bridge._adapters)
         assert "ollama" not in bridge._adapters
         assert bridge._completion_request_cls is not None
     finally:
@@ -210,6 +252,11 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
 
         assert policy["schema_version"] == "dharma.model_status.v1"
         assert targets["opus-4.8"]["selectable"] is True
+        assert targets["opus-4.8"]["exact_model_proven"] is False
+        assert targets["opus-4.8"]["route_state"] == "unverified"
+        assert targets["opus-4.8"]["availability_reason"] == (
+            "exact_model_unproven"
+        )
         assert targets["gpt-5.5"]["selectable"] is False
         assert targets["gpt-5.5"]["chat_executable"] is False
         assert targets["gpt-5.5"]["availability_reason"] == (
@@ -249,8 +296,16 @@ def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
             strategy="responsive",
         )
         codex_targets = [target for target in policy["targets"] if target["provider"] == "codex"]
-        claude_targets = [target for target in policy["targets"] if target["provider"] == "claude"]
-        openrouter_targets = [target for target in policy["targets"] if target["provider"] == "openrouter"]
+        claude_targets = [
+            target
+            for target in policy["targets"]
+            if target["provider"] == "claude" and not target.get("preview_only")
+        ]
+        openrouter_targets = [
+            target
+            for target in policy["targets"]
+            if target["provider"] == "openrouter" and not target.get("preview_only")
+        ]
 
         assert codex_targets
         assert all(target["selectable"] is False for target in codex_targets)
@@ -263,13 +318,84 @@ def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
         assert "codex" not in terminal_bridge_chat._SLICE1_CHAT_PROVIDER_IDS
         assert all(target["selectable"] is False for target in claude_targets)
         assert all(target["selectable"] is False for target in openrouter_targets)
-        assert policy["selected_provider"] != "codex"
+        assert policy["selected_provider"] == "codex_text"
+        assert policy["selected_model"] == GPT_5_6_SOL_MODEL_ID
         assert policy["available_providers"] == []
-        assert policy["attemptable_providers"] == []
+        assert {row["id"] for row in policy["attemptable_providers"]} == {
+            "claude",
+            "codex_text",
+            "grok_oauth",
+            "kimi_code",
+        }
         # Codex advertises the shell tool and is therefore excluded from the
         # Slice-1 primary-chat membrane even when a local CLI attempt is
         # otherwise authorized.
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
+    finally:
+        asyncio.run(bridge.close())
+
+
+def test_external_account_routes_are_loaded_as_attempts_not_proof() -> None:
+    bridge = TerminalBridge()
+    try:
+        policy = bridge._build_model_policy_summary(
+            selected_provider="codex_text",
+            selected_model=GPT_5_6_SOL_MODEL_ID,
+            strategy="responsive",
+        )
+        previews = {
+            target["alias"]: target
+            for target in policy["targets"]
+            if target.get("preview_only") and target.get("lane") == "account_preview"
+        }
+
+        assert set(previews) == {
+            "gpt-5.6-sol",
+            "claude-fable-5",
+            "kimi-k3",
+            "grok-4.6",
+        }
+        assert policy["selected_route"] == "codex_text:gpt-5.6-sol"
+        assert policy["default_route"] == "codex_text:gpt-5.6-sol"
+        assert policy["fallback_chain"] == []
+        assert all(target["exact_model_proven"] is False for target in previews.values())
+        assert all(target["helm_on_call_eligible"] is False for target in previews.values())
+        assert previews["gpt-5.6-sol"]["selectable"] is True
+        assert previews["claude-fable-5"]["selectable"] is True
+        assert previews["kimi-k3"]["selectable"] is True
+        assert previews["grok-4.6"]["selectable"] is True
+        assert previews["grok-4.6"]["availability_reason"] == (
+            "exact_model_unproven"
+        )
+        assert bridge._chat_lanes("codex_text", GPT_5_6_SOL_MODEL_ID) == [
+            (
+                "codex_text",
+                GPT_5_6_SOL_MODEL_ID,
+                {},
+                "explicit account preview; exact route; no fallback",
+            )
+        ]
+        assert bridge._chat_lanes("kimi_code", KIMI_K3_MODEL_ID) == [
+            (
+                "kimi_code",
+                KIMI_K3_MODEL_ID,
+                {},
+                "explicit account preview; exact route; no fallback",
+            )
+        ]
+        assert bridge._chat_lanes(
+            "grok_oauth", GROK_4_6_MODEL_ID
+        ) == [
+            (
+                "grok_oauth",
+                GROK_4_6_MODEL_ID,
+                {},
+                "explicit account preview; exact route; no fallback",
+            )
+        ]
+        assert bridge._chat_lanes("grok_oauth", "grok-4.6-build") == []
+        assert bridge._chat_lanes("codex_text", "gpt-5.6") == []
+        assert bridge._chat_lanes("kimi_code", "k3-typo") == []
     finally:
         asyncio.run(bridge.close())
 
@@ -280,9 +406,15 @@ def test_local_preview_is_env_gated_selected_and_strictly_single_lane(
     capsys,
 ) -> None:
     monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
+    monkeypatch.setattr(
+        bridge,
+        "_local_cli_attempt_authorized",
+        lambda provider_id: False,
+    )
 
     try:
         assert "ollama" in bridge._adapters
@@ -413,6 +545,38 @@ def test_model_set_applies_exact_local_preview_and_refresh_preserves_selection(
         asyncio.run(bridge.close())
 
 
+def test_model_set_applies_only_exact_enabled_external_preview() -> None:
+    bridge = TerminalBridge()
+    try:
+        result = bridge._run_action(
+            "model.set",
+            {"provider": "kimi_code", "model": KIMI_K3_MODEL_ID},
+        )
+        assert result["ok"] is True
+        assert result["policy"]["selected_route"] == "kimi_code:k3"
+        assert result["policy"]["fallback_chain"] == []
+        assert bridge._selected_provider_id == "kimi_code"
+        assert bridge._selected_model_id == KIMI_K3_MODEL_ID
+
+        alias = bridge._run_action(
+            "model.set",
+            {"provider": "kimi_code", "model": "kimi-k3"},
+        )
+        assert alias["ok"] is False
+        selected_grok = bridge._run_action(
+            "model.set",
+            {
+                "provider": "grok_oauth",
+                "model": GROK_4_6_MODEL_ID,
+            },
+        )
+        assert selected_grok["ok"] is True
+        assert bridge._selected_provider_id == "grok_oauth"
+        assert bridge._selected_model_id == GROK_4_6_MODEL_ID
+    finally:
+        asyncio.run(bridge.close())
+
+
 def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
     monkeypatch,
     tmp_path: Path,
@@ -443,10 +607,10 @@ def test_handshake_default_matches_canonical_selected_route(monkeypatch, tmp_pat
     bridge = TerminalBridge()
 
     try:
-        default_target = model_routing.default_target()
+        default_provider, default_model = bridge._terminal_default_route()
         policy = bridge._build_model_policy_summary(
-            selected_provider=default_target.provider_id,
-            selected_model=default_target.model_id,
+            selected_provider=default_provider,
+            selected_model=default_model,
             strategy="responsive",
         )
         asyncio.run(bridge._handle_handshake("handshake-1"))
@@ -513,6 +677,781 @@ def test_chat_route_identity_matches_ack_invocation_and_durable_metadata(tmp_pat
     assert adapter.completion_models == ["claude-opus-4.8"]
     assert meta["provider_id"] == "claude"
     assert meta["model_id"] == "claude-opus-4.8"
+
+
+def test_external_preview_success_cannot_promote_helm_on_call(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    bridge = TerminalBridge()
+    adapter = _CompletePreviewAdapter("claude")
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+    bridge._chat_lanes = lambda requested_provider, requested_model: [
+        (
+            "claude",
+            CLAUDE_FABLE_5_MODEL_ID,
+            {},
+            "explicit account preview; exact route; no fallback",
+        )
+    ]
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-no-promotion",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "prove bounded preview behavior",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip()
+    ]
+    receipt = next(event for event in emitted if event["type"] == "route.receipt")
+    assert receipt["route_id"] == "claude:claude-fable-5"
+    assert receipt["requested_model_id"] == CLAUDE_FABLE_5_MODEL_ID
+    assert receipt["served_model_id"] == CLAUDE_FABLE_5_MODEL_ID
+    assert receipt["exact_model_proven"] is True
+    assert receipt["evidence_kind"] == "preview_provider_completion"
+    assert receipt["preview_only"] is True
+    assert receipt["helm_on_call_eligible"] is False
+    assert bridge._helm_route_sources_by_seat == {}
+    assert bridge._helm_route_evidence_by_seat == {}
+    assert all(event["type"] != "helm.on_call_projection" for event in emitted)
+
+
+def test_grok_served_alias_does_not_replace_requested_preview_selection(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    class GrokServedAliasAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            self.stream_calls += 1
+            yield SessionStart(
+                provider_id="grok_oauth",
+                session_id=session_id,
+                model="grok-4.6-build",
+                tools_available=[],
+                system_info={
+                    "requested_model": GROK_4_6_MODEL_ID,
+                    "served_identity_source": "response.model",
+                    "exact_model_proven": False,
+                },
+            )
+            yield TextComplete(
+                provider_id="grok_oauth",
+                session_id=session_id,
+                content="sealed Grok reply",
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="grok_oauth",
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"grok_oauth": GrokServedAliasAdapter("grok_oauth")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    selected = bridge._run_action(
+        "model.set",
+        {"provider": "grok_oauth", "model": GROK_4_6_MODEL_ID},
+    )
+    assert selected["ok"] is True
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "grok-served-alias",
+                {
+                    "provider": "grok_oauth",
+                    "model": GROK_4_6_MODEL_ID,
+                    "prompt": "prove requested and served identity stay distinct",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip()
+    ]
+    start = next(event for event in emitted if event["type"] == "session_start")
+    ack = next(event for event in emitted if event["type"] == "session.ack")
+    receipt = next(event for event in emitted if event["type"] == "route.receipt")
+    meta = bridge._session_store.load_meta(ack["session_id"])
+
+    assert ack["model"] == GROK_4_6_MODEL_ID
+    assert start["model"] == "grok-4.6-build"
+    assert start["system_info"]["exact_model_proven"] is False
+    assert receipt["route_id"] == "grok_oauth:grok-4.6"
+    assert receipt["requested_model_id"] == GROK_4_6_MODEL_ID
+    assert receipt["served_model_id"] == "grok-4.6-build"
+    assert receipt["exact_model_proven"] is False
+    assert meta["provider_id"] == "grok_oauth"
+    assert meta["model_id"] == "grok-4.6-build"
+    assert bridge._selected_provider_id == "grok_oauth"
+    assert bridge._selected_model_id == GROK_4_6_MODEL_ID
+    assert bridge._chat_lanes("grok_oauth", GROK_4_6_MODEL_ID) == [
+        (
+            "grok_oauth",
+            GROK_4_6_MODEL_ID,
+            {},
+            "explicit account preview; exact route; no fallback",
+        )
+    ]
+
+
+def test_claude_preview_rejects_response_owned_model_mismatch(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    class WrongClaudeModelAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model="claude-opus-unrequested",
+                tools_available=[],
+                system_info={
+                    "served_identity_source": "system.init.model",
+                    "exact_model_proven": False,
+                },
+            )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content="must not escape",
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": WrongClaudeModelAdapter("claude")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "claude-wrong-model",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "prove exact response identity",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip()
+    ]
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    assert all(event["type"] != "text_complete" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "preview_identity_mismatch"
+
+
+@pytest.mark.parametrize("end_only_success", [True, False])
+def test_external_preview_requires_content_and_sanitizes_provider_failure(
+    tmp_path: Path,
+    capsys,
+    end_only_success: bool,
+) -> None:
+    secret = "sk-provider-secret-must-not-escape"
+
+    class IncompletePreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            self.stream_calls += 1
+            if end_only_success:
+                yield SessionEnd(
+                    provider_id=self.provider_id,
+                    session_id=session_id,
+                    success=True,
+                )
+                return
+            yield ErrorEvent(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                code="provider_failure",
+                message=secret,
+            )
+            yield SessionEnd(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                success=False,
+                error_code="provider_failure",
+                error_message=secret,
+            )
+
+    bridge = TerminalBridge()
+    adapter = IncompletePreviewAdapter("claude")
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+    bridge._chat_lanes = lambda requested_provider, requested_model: [
+        (
+            "claude",
+            CLAUDE_FABLE_5_MODEL_ID,
+            {},
+            "explicit account preview; exact route; no fallback",
+        )
+    ]
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-incomplete",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    assert all(event["type"] != "helm.on_call_projection" for event in emitted)
+    assert any(
+        event["type"] == "session_end" and event["success"] is False
+        for event in emitted
+    )
+
+
+def test_external_preview_error_cannot_be_overwritten_by_later_success(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    secret = "provider-error-secret-must-not-escape"
+
+    class ContradictoryPreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                tools_available=[],
+                system_info={"exact_model_proven": True},
+            )
+            yield ErrorEvent(
+                provider_id="claude",
+                session_id=session_id,
+                code="provider_error",
+                message=secret,
+            )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content="must not escape",
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": ContradictoryPreviewAdapter("claude")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-contradictory",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert all(event["type"] != "text_complete" for event in emitted)
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "chat_membrane_violation"
+
+
+def test_external_preview_discards_provider_raw_after_membrane_scan(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    secret = "provider-raw-access-token-must-not-escape"
+
+    class RawMetadataPreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                tools_available=[],
+                system_info={
+                    "exact_model_proven": True,
+                    "served_model": CLAUDE_FABLE_5_MODEL_ID,
+                    "provider_private": secret,
+                },
+                raw={"type": "system", "subtype": "init", "access_token": secret},
+            )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content="sealed reply",
+                role="assistant",
+                raw={"provider_trace": secret},
+            )
+            yield UsageReport(
+                provider_id="claude",
+                session_id=session_id,
+                input_tokens=1,
+                output_tokens=1,
+                model_breakdown={"provider_private": secret},
+                raw={
+                    "provider_trace": secret,
+                    "usage": {
+                        "server_tool_use": {
+                            "web_search_requests": 0,
+                            "web_fetch_requests": 0,
+                        }
+                    },
+                },
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+                raw={"provider_trace": secret},
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": RawMetadataPreviewAdapter("claude")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-raw-scrub",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert any(event["type"] == "route.receipt" for event in emitted)
+    ack = next(event for event in emitted if event["type"] == "session.ack")
+    transcript = bridge._session_store.load_transcript(ack["session_id"])
+    assert all(event.raw is None for event in transcript)
+    persisted_start = next(event for event in transcript if isinstance(event, SessionStart))
+    persisted_usage = next(event for event in transcript if isinstance(event, UsageReport))
+    assert "provider_private" not in persisted_start.system_info
+    assert persisted_usage.model_breakdown == {}
+    assert secret not in repr(transcript)
+
+
+@pytest.mark.parametrize(
+    "safe_usage",
+    [
+        0,
+        False,
+        [],
+        {},
+        {"web_search_requests": 0, "web_fetch_requests": False},
+    ],
+)
+def test_chat_membrane_accepts_only_explicit_zero_server_tool_usage(
+    safe_usage: object,
+) -> None:
+    assert not terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use": safe_usage}}
+    )
+
+
+@pytest.mark.parametrize(
+    "active_usage",
+    [
+        1,
+        True,
+        "",
+        "0",
+        {"web_search_requests": 1},
+        {"tool_count": 0},
+        {"tool_call": {"count": 0}},
+        {"web_search_call": {"queries": []}},
+        [0] * 5000,
+    ],
+)
+def test_chat_membrane_rejects_positive_or_malformed_server_tool_usage(
+    active_usage: object,
+) -> None:
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use": active_usage}}
+    )
+
+
+def test_chat_membrane_rejects_deep_zero_tool_usage_without_recursing() -> None:
+    deep_usage: object = 0
+    for _ in range(1200):
+        deep_usage = [deep_usage]
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"usage": {"server_tool_use_details": deep_usage}}
+    )
+
+
+def test_chat_membrane_accepts_exact_flat_claude_zero_counters() -> None:
+    assert not terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {
+            "model_usage": {
+                "claude_fable_5": {
+                    "web_search_requests": 0,
+                    "web_fetch_requests": False,
+                }
+            }
+        }
+    )
+
+
+@pytest.mark.parametrize("counter", [1, True, "0", [], {}, {"count": 0}])
+def test_chat_membrane_rejects_nonzero_or_untyped_flat_claude_counters(
+    counter: object,
+) -> None:
+    assert terminal_bridge_chat._chat_event_contains_tool_evidence(
+        {"model_usage": {"claude_fable_5": {"web_search_requests": counter}}}
+    )
+
+
+@pytest.mark.parametrize("metadata_kind", ["usage", "rate_limit"])
+def test_external_preview_rejects_untyped_provider_metadata(
+    tmp_path: Path,
+    capsys,
+    metadata_kind: str,
+) -> None:
+    secret = "provider-metadata-secret-must-not-escape"
+
+    class SuspiciousMetadataAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                tools_available=[],
+                system_info={"exact_model_proven": True},
+            )
+            if metadata_kind == "usage":
+                yield UsageReport(
+                    provider_id="claude",
+                    session_id=session_id,
+                    input_tokens=1,
+                    output_tokens=1,
+                    total_cost_usd=secret,
+                    model_breakdown={"provider_private": secret},
+                )
+            else:
+                yield RateLimitEvent(
+                    provider_id="claude",
+                    session_id=session_id,
+                    status=secret,
+                    utilization=0.5,
+                )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content="must not escape",
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": SuspiciousMetadataAdapter("claude")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-invalid-metadata",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert all(event["type"] != "text_complete" for event in emitted)
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "preview_provider_failed"
+
+
+@pytest.mark.parametrize(
+    "raw_tool_evidence",
+    [
+        {"metadata": {"server_tool_use": {"web_search": 1}}},
+        {"message": {"stop_reason": "tool_use"}},
+        {"message": {"object": "function_call"}},
+        {"metadata": {"event": "tool_call"}},
+        {"metadata": {"functionCall": {"name": "shell"}}},
+        {"metadata": {"webSearchCall": {"query": "secret"}}},
+        {"metadata": {"computerUse": {"action": "click"}}},
+        {"metadata": {"type": "functionCall"}},
+        {"metadata": {"finishReason": "toolCalls"}},
+    ],
+)
+def test_external_preview_rejects_nested_provider_tool_evidence(
+    tmp_path: Path,
+    capsys,
+    raw_tool_evidence: dict[str, object],
+) -> None:
+    secret = "nested-tool-secret-must-not-escape"
+
+    class NestedToolPreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            self.stream_calls += 1
+            yield SessionStart(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                tools_available=[],
+            )
+            yield TextComplete(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                content="must not escape",
+                role="assistant",
+                raw={"provider": raw_tool_evidence, "detail": secret},
+            )
+            yield SessionEnd(
+                provider_id=self.provider_id,
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    adapter = NestedToolPreviewAdapter("claude")
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+    bridge._chat_lanes = lambda requested_provider, requested_model: [
+        (
+            "claude",
+            CLAUDE_FABLE_5_MODEL_ID,
+            {},
+            "explicit account preview; exact route; no fallback",
+        )
+    ]
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-nested-tool",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert all(event["type"] != "text_complete" for event in emitted)
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "chat_membrane_violation"
+
+
+def test_external_preview_rejects_canonical_tool_capability_authority(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    class ToolCapablePreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                capabilities=["streaming", "tool_use", "parallel_tools"],
+                tools_available=[],
+                system_info={"exact_model_proven": True},
+            )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content="must not escape",
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+            )
+
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": ToolCapablePreviewAdapter("claude")}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-tool-capability",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip()
+    ]
+    assert all(event["type"] != "session_start" for event in emitted)
+    assert all(event["type"] != "text_complete" for event in emitted)
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "chat_membrane_violation"
+
+
+def test_external_preview_response_buffer_is_bounded_and_sanitized(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "oversized-provider-secret-must-not-escape"
+
+    class OversizedPreviewAdapter(_ImmediateAdapter):
+        async def stream(self, completion, *, session_id):
+            yield SessionStart(
+                provider_id="claude",
+                session_id=session_id,
+                model=CLAUDE_FABLE_5_MODEL_ID,
+                tools_available=[],
+                system_info={"exact_model_proven": True},
+            )
+            yield TextComplete(
+                provider_id="claude",
+                session_id=session_id,
+                content=secret,
+                role="assistant",
+            )
+            yield SessionEnd(
+                provider_id="claude",
+                session_id=session_id,
+                success=True,
+            )
+
+    monkeypatch.setattr(terminal_bridge_chat, "_MAX_PREVIEW_ASSISTANT_BYTES", 8)
+    bridge = TerminalBridge()
+    adapter = OversizedPreviewAdapter("claude")
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"claude": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "external-preview-oversized",
+                {
+                    "provider": "claude",
+                    "model": CLAUDE_FABLE_5_MODEL_ID,
+                    "prompt": "bounded preview",
+                    "bootstrap": {"intent": {"kind": "chat"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    assert secret not in rendered
+    assert adapter.cancel_calls == 1
+    assert all(event["type"] != "text_complete" for event in emitted)
+    assert all(event["type"] != "route.receipt" for event in emitted)
+    terminal = next(event for event in emitted if event["type"] == "session_end")
+    assert terminal["success"] is False
+    assert terminal["error_code"] == "chat_membrane_violation"
 
 
 def test_terminal_bridge_only_classifies_whole_registered_commands() -> None:
@@ -2022,6 +2961,66 @@ def test_stdio_reads_correlated_cancel_while_provider_is_blocked_and_skips_fallb
     replay_ok, replay_issues = bridge._session_store.verify_session_replay(cancelled_session_id)
     assert replay_ok is False
     assert "session_start_count:0" in replay_issues
+
+
+def test_provider_cancel_failure_is_sanitized_in_operator_ack(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+    tmp_path: Path,
+) -> None:
+    secret = "oauth-secret-from-cancel-exception"
+
+    class CancelFailureAdapter(_BlockingAdapter):
+        async def cancel(self):
+            self.cancel_calls += 1
+            self.cancel_called.set()
+            self.release.set()
+            raise RuntimeError(secret)
+
+    adapter = CancelFailureAdapter("primary")
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    _install_chat_adapters(bridge, adapter)
+    read_fd, write_fd = os.pipe()
+    reader = os.fdopen(read_fd, "r", encoding="utf-8")
+    writer = os.fdopen(write_fd, "w", encoding="utf-8")
+    monkeypatch.setattr(sys, "stdin", reader)
+
+    async def scenario() -> None:
+        run_task = asyncio.create_task(bridge.run_stdio())
+        writer.write(json.dumps(_chat_start("start-secret-cancel")) + "\n")
+        writer.flush()
+        await asyncio.wait_for(adapter.started.wait(), timeout=0.5)
+        writer.write(
+            json.dumps(
+                {
+                    "id": "cancel-secret",
+                    "type": "session.cancel",
+                    "target_request_id": "start-secret-cancel",
+                }
+            )
+            + "\n"
+        )
+        writer.flush()
+        await asyncio.wait_for(adapter.cancel_called.wait(), timeout=0.5)
+        writer.close()
+        assert await asyncio.wait_for(run_task, timeout=0.5) == 0
+        await bridge.close()
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        if not writer.closed:
+            writer.close()
+        reader.close()
+
+    rendered = capsys.readouterr().out
+    emitted = [json.loads(line) for line in rendered.splitlines() if line.strip()]
+    cancel_ack = next(
+        event for event in emitted if event.get("request_id") == "cancel-secret"
+    )
+    assert cancel_ack["provider_cancel_error"] == "provider_cancel_failed"
+    assert secret not in rendered
 
 
 def test_stdio_startup_recovers_stale_ownerless_workspace_session(

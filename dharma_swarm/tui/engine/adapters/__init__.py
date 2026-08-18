@@ -9,6 +9,9 @@ from .base import (
 )
 from .claude import ClaudeAdapter, CLAUDE_CAPABILITIES
 from .codex import CODEX_CAPABILITIES, CodexAdapter
+from .codex_text import CODEX_TEXT_CAPABILITIES, CodexTextAdapter
+from .grok_oauth import GrokOAuthResponsesAdapter
+from .kimi_code import KimiCodeAdapter
 from .ollama import (
     OLLAMA_LOCAL_PREVIEW_BASE_URL,
     OLLAMA_LOCAL_PREVIEW_CAPABILITIES,
@@ -27,6 +30,10 @@ __all__ = [
     "CLAUDE_CAPABILITIES",
     "CodexAdapter",
     "CODEX_CAPABILITIES",
+    "CodexTextAdapter",
+    "CODEX_TEXT_CAPABILITIES",
+    "GrokOAuthResponsesAdapter",
+    "KimiCodeAdapter",
     "OllamaAdapter",
     "OLLAMA_LOCAL_PREVIEW_BASE_URL",
     "OLLAMA_LOCAL_PREVIEW_CAPABILITIES",

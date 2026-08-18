@@ -5,7 +5,41 @@ from __future__ import annotations
 import json
 import os
 
+from dharma_swarm.api_keys import ALL_API_KEY_ENV_KEYS, PROVIDER_BASE_URL_ENV_KEYS
+
 from .base import CompletionRequest
+
+_UNRELATED_PROVIDER_TOKEN_KEYS = frozenset(
+    {
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "KIMI_ACCESS_TOKEN",
+        "MOONSHOT_AUTH_TOKEN",
+        "OPENROUTER_AUTH_TOKEN",
+        "XAI_API_KEY",
+    }
+)
+_SUBSCRIPTION_CHILD_ENV_ALLOWLIST = frozenset(
+    {
+        "CLAUDE_CONFIG_DIR",
+        "COLORTERM",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LOGNAME",
+        "NO_COLOR",
+        "PATH",
+        "SHELL",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "TERM",
+        "TMPDIR",
+        "USER",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+    }
+)
 
 
 def _without_nul(value: str) -> str:
@@ -21,7 +55,21 @@ def build_claude_env(request: CompletionRequest) -> dict[str, str]:
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_CODE_ENTRYPOINT", None)
     env.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
-    if (
+    if request.provider_options.get("subscription_auth_only"):
+        scrubbed = (
+            set(ALL_API_KEY_ENV_KEYS)
+            | set(PROVIDER_BASE_URL_ENV_KEYS.values())
+            | set(_UNRELATED_PROVIDER_TOKEN_KEYS)
+            | {"ANTHROPIC_AUTH_TOKEN", "DHARMA_FORCE_ANTHROPIC_API"}
+        )
+        for key in scrubbed:
+            env.pop(key, None)
+        env = {
+            key: value
+            for key, value in env.items()
+            if key in _SUBSCRIPTION_CHILD_ENV_ALLOWLIST
+        }
+    elif (
         request.provider_options.get("scrub_metered_keys")
         and env.get("DHARMA_FORCE_ANTHROPIC_API") != "1"
     ):
