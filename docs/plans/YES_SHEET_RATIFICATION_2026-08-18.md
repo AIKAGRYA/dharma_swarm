@@ -22,10 +22,10 @@ physical act only the operator can perform (listed on the sitting sheet).
 | 9 | Server swap to one 16GB+ host (~$30–50/mo replacing ~$100/mo) | YES | operator-hands sitting (provisioning); swarm preps unattended setup |
 | 10 | arXiv preprint of the R_V paper this quarter | YES | swarm preps submission after #11 lands; operator submits |
 | 11 | Import R_V lab from the operator's Mac | YES | operator-hands: run the one paste command the swarm sends |
-| 12 | Five risk-budget numbers | YES to setting them; VALUES PENDING — see below | operator confirms or edits the proposed values explicitly; money numbers never default |
+| 12 | Five risk-budget numbers | YES; values CONFIRMED 2026-08-18 — see below | confirmed explicitly by the operator, same session ("Confirmed on the numbers") |
 | + | Standing default rule: every future ask carries a deadline and a pre-stated default that executes on silence; live-money/live-authority never defaults to yes | YES | swarm drafts the rule as governance text; operator merge enacts it |
 
-## Proposed risk-budget values (AWAITING EXPLICIT OPERATOR CONFIRMATION — these do NOT default in)
+## Risk-budget values — CONFIRMED by the operator, 2026-08-18 ("Confirmed on the numbers")
 
 - Total loss ceiling (all live capital, cumulative): **$1,000**
 - Per-position cap: **$100**
@@ -33,7 +33,10 @@ physical act only the operator can perform (listed on the sitting sheet).
 - Max leverage: **1x** (2x ceiling reserved for a future basis-harvest grant)
 - Monthly burn ceiling (compute + inference + hosting): **$500**
 
-One line from the operator confirms or replaces these five numbers.
+These five numbers are now binding on every live-capital and spend surface.
+The $200/month benchmark-compute cap (row 1) sits inside the $500 monthly
+burn ceiling, not on top of it. Changing any number requires a new explicit
+operator line; no agent may widen one.
 
 ## Boundaries preserved (unchanged by this ratification)
 
