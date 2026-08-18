@@ -316,9 +316,10 @@ def test_compose_defaults_failclosed():
     assert "${DGC_AUTONOMY_LEVEL:-2}" not in t
 
 
-def test_compose_source_mount_readonly_and_separated_volumes():
+def test_compose_uses_image_baked_source_and_separated_volumes():
     t = _compose_text()
-    assert "./dharma_swarm:/app/dharma_swarm:ro" in t
+    assert "dockerfile: Dockerfile.swarm" in t
+    assert "./dharma_swarm:/app/dharma_swarm" not in t
     assert "/evolution_worktrees" in t
     assert "/evolution_archive" in t
     assert "/mnt/dharma_eval:ro" in t
