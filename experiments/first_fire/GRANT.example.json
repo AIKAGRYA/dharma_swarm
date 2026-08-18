@@ -1,0 +1,11 @@
+{
+  "grant_id": "first-fire-plumbing-YYYYMMDD",
+  "granted_by": "AmitabhainArunachala",
+  "expires_at": "YYYY-MM-DDT00:00:00+00:00",
+  "max_cycles": 1,
+  "allowed_paths": ["experiments/first_fire/probe.py"],
+  "forbidden_hostnames": ["meghadharma-cloud"],
+  "runner": "scratch-or-ci",
+  "named_function": "DarwinEngine.apply_diff_and_test",
+  "note": "One cycle = planted-red then real-green. Consumed when the pair starts. Mint a new dated grant for any later fire."
+}

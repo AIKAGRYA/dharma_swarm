@@ -42,6 +42,8 @@
   ],
   "generator": "scripts/store_inventory_census.py",
   "jsonl_targets": [
+    ".first_fire_archive.jsonl",
+    ".first_fire_predictor.jsonl",
     "JIKOKU_LOG.20260322_pre_rotation.jsonl",
     "JIKOKU_LOG.jsonl",
     "MANIFEST.jsonl",
@@ -300,7 +302,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 220,
+    "distinct_jsonl_names": 222,
     "ledger_classes": 11,
     "ledger_modules": 12
   }
