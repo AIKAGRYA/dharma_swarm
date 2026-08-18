@@ -102,6 +102,20 @@ def cmd_evolve_rollback(entry_id: str, reason: str = "Manual rollback") -> None:
     _run(_rollback())
 
 
+def _load_promotion_packet(promotion_path: str | None) -> dict | None:
+    """Parse the promotion packet before any swarm resources exist.
+
+    A missing or malformed packet must fail the command before swarm
+    initialization, so no cleanup path is ever owed for an operator typo.
+    """
+    if not promotion_path:
+        return None
+    try:
+        return json.loads(Path(promotion_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"invalid promotion packet {promotion_path}: {exc}")
+
+
 def cmd_evolve_auto(
     files: list[str] | None, model: str, context: str,
     single_model: bool = False,
@@ -111,6 +125,8 @@ def cmd_evolve_auto(
     trusted_judge_public_keys: list[str] | None = None,
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
+    promotion_verification = _load_promotion_packet(promotion_path)
+
     async def _auto():
         from dharma_swarm.models import ProviderType
 
@@ -155,10 +171,6 @@ def cmd_evolve_auto(
             print(f"  {sf.name}")
         print()
 
-        promotion_verification = None
-        if promotion_path:
-            promotion_verification = json.loads(Path(promotion_path).read_text(encoding="utf-8"))
-
         result = await swarm._engine.auto_evolve(
             provider=provider,
             source_files=source_files,
@@ -197,6 +209,8 @@ def cmd_evolve_daemon(
     trusted_judge_public_keys: list[str] | None = None,
 ) -> None:
     """Run continuous autonomous evolution daemon."""
+    promotion_verification = _load_promotion_packet(promotion_path)
+
     async def _daemon():
         swarm = await _get_swarm()
         if swarm._engine is None:
@@ -226,10 +240,6 @@ def cmd_evolve_daemon(
         if token_budget > 0:
             print(f"  Token cap: {token_budget:,}")
         print(f"  Ctrl+C to stop\n")
-
-        promotion_verification = None
-        if promotion_path:
-            promotion_verification = json.loads(Path(promotion_path).read_text(encoding="utf-8"))
 
         try:
             await swarm._engine.daemon_loop(

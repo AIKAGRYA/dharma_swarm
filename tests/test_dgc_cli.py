@@ -2874,6 +2874,38 @@ def test_evolve_auto_live_without_promotion_exits_before_startup(monkeypatch):
     assert exc.value.code == 2
 
 
+def test_evolve_commands_reject_bad_promotion_packet_before_swarm_init(
+    monkeypatch, tmp_path
+):
+    """A missing or malformed promotion packet must fail before the swarm exists."""
+    import dharma_swarm.terminal_commands.evolution as evo
+
+    def _fail_if_called():
+        raise AssertionError("swarm must not initialize when the packet is invalid")
+
+    monkeypatch.setattr(evo, "_get_swarm", _fail_if_called)
+
+    missing = tmp_path / "nope.json"
+    malformed = tmp_path / "bad.json"
+    malformed.write_text("{not json", encoding="utf-8")
+
+    for path in (missing, malformed):
+        with pytest.raises(SystemExit):
+            evo.cmd_evolve_auto(None, "m", "ctx", promotion_path=str(path))
+        with pytest.raises(SystemExit):
+            evo.cmd_evolve_daemon(60.0, 0.5, "m", 1, promotion_path=str(path))
+
+
+def test_load_promotion_packet_parses_valid_json(tmp_path):
+    """The pre-init loader returns the parsed packet dict, and None without a path."""
+    import dharma_swarm.terminal_commands.evolution as evo
+
+    packet = tmp_path / "promotion.json"
+    packet.write_text('{"verdict": "promote"}', encoding="utf-8")
+    assert evo._load_promotion_packet(str(packet)) == {"verdict": "promote"}
+    assert evo._load_promotion_packet(None) is None
+
+
 def test_evolve_daemon_live_with_promotion_reaches_command(monkeypatch):
     """The guard must not block a live daemon that does carry a promotion packet."""
     import dharma_swarm.dgc_cli as cli
