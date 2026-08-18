@@ -157,6 +157,53 @@ deliverable (currently 7 days past its 30-day TTL).
 - P3: the first Darshan piece with numbers nobody else can publish, honestly
   framed.
 
+## 4b. Round 3 — outside-agent review (2026-08-18, operator-relayed): converged
+
+An independent outside agent with live-host access reviewed the case and broke
+it further. Its tree-checkable claims were verified verbatim in this checkout
+and are conceded:
+
+- **Empty diff scores as a perfect pass:** `apply_diff_and_test` returns
+  `{"pass_rate": 1.0, "skipped": True}` for a blank diff
+  (`dharma_swarm/evolution.py:2379-2380`) — a mis-wired fire can print a green
+  receipt while applying nothing. A valid fire receipt must therefore assert
+  a non-empty diff hash AND `applied: true`.
+- **Tier-1 judging is worse than charmable — one score is a tautology:**
+  `dharmic_alignment` is set directly from the gate decision
+  (`ALLOW → 0.8`, `evolution.py:1680-1685`).
+- **The default grind targets are the constitution and the judge:**
+  `_GRIND_EVOLUTION_TARGETS` = swarm.py, orchestrator.py, evolution.py,
+  self_improve.py, fitness_predictor.py, … (`orchestrate_live.py:1248-1253`).
+  "Non-test production files" is therefore an insufficient firewall; first
+  fires are restricted to a designated toy module nothing in production imports.
+- **Host-state claims** (megha at halt, swap-full; May 2026 shadow-apply as a
+  prior wrong-kind fire) come from the reviewer's live access and are accepted
+  on its record, which was accurate everywhere checkable.
+
+**The converged fire spec (both sides now endorse the identical act):**
+1. Runner: CI or a scratch worktree — never the halted production host.
+2. Path: `apply_diff_and_test` on a NON-EMPTY diff, named function and flags
+   in the command packet — not `auto_evolve` shadow (which strips diffs) and
+   not the promotion-refusal path.
+3. Target: a designated toy module that nothing in production imports.
+4. Order of proof: planted red first (watch rollback actually fire), then the
+   real green.
+5. One-shot mechanical fuse: no second apply without a new human-dated grant;
+   receipt invalid unless diff-hash non-empty and `applied: true`.
+6. PR opened; the operator merges. **Fire 1 is a plumbing receipt — it proves
+   the applier, tests, rollback, and human merge compose. It is not evidence
+   that evolution works.** That evidence can only come from the Tier-2
+   external basket, which is currently empty and must be said to be empty.
+
+Ledger amendments also accepted: price the model-token cost line (near-zero,
+not zero); "publish" is its own operator yes under the external-receipt rule;
+pre-committed kill date (N days with no edge → stop publishing, no prompt
+enrichment). Host: resize is a halt-state decision on its own merits, never a
+fire decision.
+
+**Standing operator decision after convergence: approve the amended fire
+(CI/scratch, toy module, one-shot fuse, planted-red-then-green) — yes or no.**
+
 ## 5. Corrections record (claims of the original case refuted in debate)
 
 - "96 dryruns" — trace artifact; the register found 9 dryrun dirs, 0 applied
