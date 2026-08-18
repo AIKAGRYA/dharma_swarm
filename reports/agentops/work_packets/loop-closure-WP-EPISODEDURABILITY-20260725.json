@@ -1,0 +1,122 @@
+{
+  "id": "loop-closure-WP-EPISODEDURABILITY-20260725",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/session-ledger-durable-sequence-20260725",
+  "worktree": ".",
+  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery. Consolidate the new synchronous outbox operations through the pre-existing ledger-anchored connection site and preserve the committed DharmaGraph seam ledger byte-for-byte. Close the exact-head reviews by exhausting every pending page before a new attempt, failing construction closed when required lifecycle staging fails, scoping acknowledgements to the canonical ledger destination, validating retained destination history as a prefix with content-bound identities before requeueing and replaying its complete causal history with the stable open first, permanently fencing live writers after destination replacement or truncation, requiring the stable open and matching attempt before every observation acknowledgement, durably creating every missing ledger directory through parent fsync barriers, comparing idempotent content by strict canonical JSON, decoding durable outbox payloads fail-closed without accepting non-finite numbers, validating raw payloads before secret redaction, and skipping invalid non-finite on-disk records during recoverable rehydration.",
+  "allowed_files": [
+    "dharma_swarm/episode_ledger.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/session_ledger.py",
+    "tests/test_episode_ledger.py",
+    "tests/test_runtime_state.py",
+    "tests/test_session_ledger.py",
+    "reports/agentops/work_packets/loop-closure-WP-EPISODEDURABILITY-20260725.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/governance/**",
+    "reports/governance/**",
+    "scripts/governance/**"
+  ],
+  "gates": [
+    {
+      "name": "episode-session-runtime-ledger-tests",
+      "command": "python3 -m pytest -q tests/test_episode_ledger.py tests/test_runtime_state.py tests/test_session_ledger.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "existing-ledger-caller-tests",
+      "command": "python3 -m pytest -q tests/test_runtime_lifecycle.py tests/test_orchestrator.py tests/test_operator_bridge.py tests/test_runtime_truth_spine_v1.py tests/test_runtime_truth_spine_v2_evidence.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "episode-session-runtime-ledger-ruff",
+      "command": "python3 -m ruff check dharma_swarm/episode_ledger.py dharma_swarm/runtime_state.py dharma_swarm/session_ledger.py tests/test_episode_ledger.py tests/test_runtime_state.py tests/test_session_ledger.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "duplicate-episode-sequence-write-must-not-succeed",
+      "command": "python3 -c \"from pathlib import Path; import tempfile; from dharma_swarm.episode_ledger import EpisodeEvent, EpisodeLedgerWriter; d=tempfile.TemporaryDirectory(); w=EpisodeLedgerWriter(Path(d.name) / 'episode.jsonl'); a=EpisodeEvent.new(event_type='attempt_started', episode_id='ep_negative', attempt_id='at_a', sequence=1); b=EpisodeEvent.new(event_type='attempt_started', episode_id='ep_negative', attempt_id='at_b', sequence=1); assert w.append(a); assert w.append(b)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(session-ledger): make episode delivery durable"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-EPISODEDURABILITY",
+    "active_track": "loop-closure-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "PR #1112 SessionLedger instances cache independent next-sequence values for one stable episode, so concurrent writers can persist distinct events at the same sequence.",
+      "PR #1112 commits a runtime-state session event before its Episode Ledger observation append without a durable retry record, so append failure or process exit can permanently lose the observation.",
+      "PR #1112 rehydrates EpisodeLedgerWriter and then separately rescans the complete JSONL history for the next sequence, doubling unbounded startup work.",
+      "The durable outbox initially raised the DharmaGraph SQLite inventory from 98 to 103 sites; route every new operation through the pre-existing sqlite3.connect effect at runtime_state.py:1404:13 and place additive blocks after ledger-anchored code so the committed effect inventory remains byte-identical.",
+      "Exact-head Codex review found that two default 1000-row drains can strand the current attempt behind a backlog; exhaust destination-scoped pages before staging the attempt.",
+      "Exact-head Codex review found that a global delivery acknowledgement can suppress the stable open after a base-directory move or ledger-file deletion; bind physical outbox keys and acknowledgements to a hashed canonical destination and requeue a missing open.",
+      "Exact-head Codex review found that file fsync alone does not make a newly created directory entry durable; fsync the parent directory before the append can be acknowledged.",
+      "Exact-head Codex review found that Python equality conflates JSON-distinct scalars such as 1, 1.0, and true; compare canonical JSON at both file and SQLite idempotency fences.",
+      "Exact-head Codex review found that ignored lifecycle-enqueue failures leave a usable attempt with no staged attempt_started event; abort construction when either required lifecycle row cannot be staged.",
+      "Independent exact-head review found that a recreated destination can append and acknowledge later backlog before the stable open is requeued; durably drain episode_opened first so a crash cannot leave an opened-less ledger with later rows acknowledged.",
+      "Independent exact-head review found that syncing a newly created episode file persists its entry in session_dir but not the new session_dir entry in base_dir; fsync base_dir whenever this process creates the session directory.",
+      "Independent exact-head review found that tolerant payload_json decoding can turn a malformed pending row into an empty event and acknowledge it; decode, type-check, and normalize outbox payloads fail-closed before delivery.",
+      "Follow-up exact-head review found that replaying only episode_opened after destination deletion leaves ACKed prior attempts suppressed, so a pending old-attempt observation can become an acknowledged orphan; requeue and replay the destination's full retained causal history before backlog or a new attempt.",
+      "Follow-up exact-head review found that recursive mkdir may create base_dir and multiple ancestors while syncing only base_dir; explicitly create each missing directory and fsync its containing parent so the entire path is durable before event acknowledgement.",
+      "Follow-up exact-head review found that Python JSON defaults accept and emit NaN and infinities, allowing non-standard corrupted payloads to be appended and acknowledged; reject parse constants and disable non-finite serialization at both outbox and Episode Event boundaries.",
+      "Final exact-head review found that strict Episode Event canonicalization raises plain ValueError for persisted non-finite records while rehydration skipped only LedgerValidationError, disabling the writer; treat all validation ValueErrors as skippable corrupt records during rehydration.",
+      "Final exact-head review found that a live SessionLedger can recreate an unlinked destination and acknowledge an observation before its stable open and matching attempt; permanently poison a writer after inode replacement or size regression and verify both causal prerequisites before every observation append.",
+      "Final exact-head review found that a destination retaining its valid open but missing an acknowledged tail suppresses history restoration, while a non-prefix subset cannot be safely replayed; compare every retained logical delivery at construction, replay a missing suffix, and fail closed when presence is not a prefix.",
+      "Final exact-head review found that redaction-before-validation accepts NaN and infinities beneath secret-like keys and can let an invalid durable record squat a valid identity; validate raw Episode Event and outbox payloads before redaction and reject JSON parse constants during rehydration.",
+      "Final exact-head review found that logical-key presence alone accepts a recomputed valid record whose content-bound event_id differs from the row previously acknowledged by the outbox; compare every present ACKed retained delivery to its stored episode_event_id and fail construction closed on mismatch."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/episode_ledger.py:EpisodeLedgerWriter",
+      "dharma_swarm/runtime_state.py:RuntimeStateStore._record_session_event_sync_db",
+      "dharma_swarm/runtime_state.py:RuntimeStateStore.record_session_event_sync",
+      "dharma_swarm/runtime_state.py:IdempotencyRecord",
+      "dharma_swarm/session_ledger.py:SessionLedger"
+    ],
+    "honest_blockers": [
+      "The outbox and file lock provide single-host process durability; they do not claim distributed multi-host ordering over a shared network filesystem.",
+      "The live-writer generation fence detects pathname inode replacement and same-inode size regression between writer operations; it does not claim detection of adversarial same-size in-place rewrites or truncate-and-regrow races.",
+      "Canonical seam-ledger generation is byte-identical on a case-sensitive Linux filesystem (committed SHA-256 4bbf169024dac4619b236ed403c33ad6bdce597353041b818dc2366119c49782). This case-insensitive macOS host alone resolves the exported Manifest symbol as a non-effect telos_kernel.Manifest module, changing only module_count 67 to 68; all 240 effect entries, bypass_total 232, and sqlite count 98 remain identical.",
+      "Exact-head hosted CI and independent review remain required before integration.",
+      "Human merge authority remains required; this branch must not self-merge."
+    ],
+    "rollback": "Revert the additive destination-scoped outbox schema and migrations, shared sync-transaction layout, locked writer allocation and parent-directory sync, exhaustive SessionLedger drain and lifecycle staging path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
+    "packet_digest": "ab5c7fb20d156317da6a218041c9ede8f73a916095387f01010aa0f894833dbe"
+  }
+}

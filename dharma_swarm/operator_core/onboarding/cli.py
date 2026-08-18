@@ -26,7 +26,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from . import evidence, readiness, render
+from . import evidence, nats_status, readiness, render, repository_identity
 from .models import ConfigError, RECEIPT_SCHEMA_V1, RECEIPT_SCHEMA_V2
 from .receipt import (
     build_input_manifest,
@@ -50,7 +50,9 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "scripts/governance/agent_onboard.py",
         "dharma_swarm/operator_core/onboarding/cli.py",
         "dharma_swarm/operator_core/onboarding/evidence.py",
+        "dharma_swarm/operator_core/onboarding/nats_status.py",
         "dharma_swarm/operator_core/onboarding/readiness.py",
+        "dharma_swarm/operator_core/onboarding/repository_identity.py",
         "dharma_swarm/operator_core/onboarding/receipt.py",
         "dharma_swarm/operator_core/onboarding/render.py",
         "dharma_swarm/operator_core/onboarding/broken_register.py",
@@ -61,6 +63,8 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "docs/governance/ANTI_SLOP_RULES.md",
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/CANONICAL_DOC_STACK.md",
+        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+        "docs/governance/REPOSITORY_IDENTITY.json",
     ],
     "intent_surface_breakage": [
         "docs/governance/ACTIVE_TRACK.yaml",
@@ -111,8 +115,43 @@ def _collect_conditions(
     *,
     net: bool,
     probe_errors: Mapping[str, str] | None = None,
+    repository_observation: (
+        repository_identity.RepositoryIdentityObservation | None
+    ) = None,
 ) -> list[readiness.Condition]:
     conditions: list[readiness.Condition] = []
+    if repository_observation is not None:
+        status = repository_observation.status
+        if status is repository_identity.RepositoryIdentityStatus.CANONICAL:
+            conditions.append(readiness.Condition(
+                id="repository_identity",
+                state="pass",
+                condition_class="config",
+                reason=repository_observation.reason,
+            ))
+        elif status is repository_identity.RepositoryIdentityStatus.LEGACY_COMPATIBLE:
+            conditions.append(readiness.Condition(
+                id="repository_identity",
+                state="warn",
+                condition_class="config",
+                mandatory=False,
+                reason=repository_observation.reason,
+            ))
+        elif status is repository_identity.RepositoryIdentityStatus.STERILE:
+            conditions.append(readiness.Condition(
+                id="repository_identity",
+                state="skipped",
+                condition_class="info",
+                mandatory=False,
+                reason=repository_observation.reason,
+            ))
+        else:
+            conditions.append(readiness.Condition(
+                id="repository_identity",
+                state="fail",
+                condition_class="config",
+                reason=repository_observation.reason,
+            ))
     errors = {str(k): str(v) for k, v in dict(probe_errors or {}).items() if v}
     status_error = errors.get("status", "")
     if status_error:
@@ -274,13 +313,19 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         print("note: --fast is deprecated; it maps to the compact default", file=sys.stderr)
 
     repo_root = evidence.REPO_ROOT
-    stable_core = evidence.collect_stable_core()
+    now = _utc_now()
+    repository_observation = repository_identity.observe_repository_identity(
+        repo_root, now=now,
+    )
+    stable_core = evidence.collect_stable_core(repository_observation)
     live_state, probe_errors = evidence.observe_repo_live_state()
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
+    nats_projection = nats_status.collect_nats_substrate_status()
     conditions.extend(_collect_conditions(
         live_state, toolchain, stable_core.get("orientation", {}),
         net=bool(args.net), probe_errors=probe_errors,
+        repository_observation=repository_observation,
     ))
 
     manifest = build_input_manifest(repo_root, _MANIFEST_CATEGORIES)
@@ -289,7 +334,6 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     # An explicitly unsafe receipt path is a configuration error.  Failure to
     # write the default external cache remains visible but cannot make a
     # read-only checkout unusable as a status command.
-    now = _utc_now()
     previous: dict[str, Any] | None = None
     prior_corrupt = False
     cache_hit = False
@@ -337,6 +381,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
                 draft = _assemble_v2(
                     now, stable_core, live_state, conditions, manifest, key,
                     freshness, previous, toolchain=toolchain,
+                    nats_projection=nats_projection,
                     require_live=bool(args.require_live),
                     cache_hit=cache_hit, miss_reasons=miss_reasons,
                 )
@@ -368,6 +413,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     receipt_object = _assemble_v2(
         now, stable_core, live_state, conditions, manifest, key,
         freshness, previous, toolchain=toolchain,
+        nats_projection=nats_projection,
         require_live=bool(args.require_live),
         cache_hit=cache_hit, miss_reasons=miss_reasons,
     )
@@ -393,6 +439,7 @@ def _assemble_v2(
     previous: Mapping[str, Any] | None,
     *,
     toolchain: Mapping[str, str],
+    nats_projection: Mapping[str, Any],
     require_live: bool,
     cache_hit: bool = False,
     miss_reasons: Sequence[str] | None = None,
@@ -423,7 +470,7 @@ def _assemble_v2(
         },
         "delta": compute_delta(previous, core, condition_rows),
         "legacy_v1": _legacy_v1_payload(now, core),
-        "extensions": {},
+        "extensions": {"nats_substrate": dict(nats_projection)},
         "stable_digest": compute_stable_digest(core),
     }
 

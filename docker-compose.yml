@@ -60,7 +60,7 @@ services:
     build: .
     container_name: dharmic-quant-web
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # host publication stays local; external ingress requires an explicit proxy
     volumes:
       - ginko-data:/root/.dharma/ginko
     environment:
@@ -95,6 +95,8 @@ services:
     environment:
       <<: *provider-env
       TINY_ROUTER_BACKEND: heuristic
+      # Bind inside the container; host publication above remains loopback-only.
+      DHARMA_API_HOST: "0.0.0.0"
       # PR-001 fail-closed defaults: safe with ZERO configuration.
       DHARMA_EVOLUTION_SHADOW: ${DHARMA_EVOLUTION_SHADOW:-1}   # 1 = shadow (never mutate source)
       DGC_AUTONOMY_LEVEL: ${DGC_AUTONOMY_LEVEL:-1}             # never default to 2

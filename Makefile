@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -261,7 +261,6 @@ help:
 	@echo "  make pr-run-codex PR=123 Run Codex against the latest review packet"
 	@echo "  make pr-run-claude PR=123 Run Claude Code against the latest review packet"
 	@echo "  make pr-gate PR=123 Verify merge gate against live GitHub state"
-	@echo "  make pr-merge PR=123 ARGS='--confirm merge-pr-123' Dry-run gated merge"
 	@echo "  make pr-mike ARGS='--dry-run --max-prs 5' Merge Master Mike packet -> reviewer -> gate fanout"
 	@echo "  make mike-wake    Record a fresh Mike wake receipt"
 	@echo "  make mike-status  Render Mike nest status"
@@ -290,6 +289,8 @@ help:
 	@echo "  make a2a-send     Send a packet: make a2a-send TO=codex FILE=path/to/packet.md"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo "  make go-build     Compile the 4 Go tool mains into their module dirs (gitignored)"
+	@echo "  make frontend-check  Dashboard lane: frozen npm ci + lint + build (same as CI)"
+	@echo "  make terminal-check  Terminal lane: frozen bun install + typecheck + tests (same as CI)"
 	@echo ""
 
 # One documented command from fresh clone to working .venv, idempotent
@@ -387,15 +388,27 @@ verifier-selfcheck:
 	@echo "[2/5] lint-blockers (F821)"
 	@$(MAKE) -s lint-blockers
 	@echo "[3/5] test collection"
-	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
-		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
-	@tail -1 /tmp/dharma-collect-check.log
+	@set -eu; \
+		collect_log="$$(mktemp "$${TMPDIR:-/tmp}/dharma-collect-check.XXXXXX")"; \
+		trap 'rm -f "$$collect_log"' EXIT HUP INT TERM; \
+		if ! $(VENV_PYTHON) -m pytest tests/ --collect-only --assert=plain -q >"$$collect_log" 2>&1; then \
+			echo "COLLECTION BROKEN:"; \
+			tail -120 "$$collect_log"; \
+			exit 1; \
+		fi; \
+		tail -1 "$$collect_log"
 	@echo "[4/5] session status"
 	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
 	@echo "[5/5] behavioral sentinel ($(VERIFIER_SENTINEL))"
-	@$(VENV_PYTHON) -m pytest -p timeout $(VERIFIER_SENTINEL) -q --timeout=120 >/tmp/dharma-sentinel-check.log 2>&1 \
-		|| (echo "BEHAVIORAL SENTINEL FAILED:"; tail -20 /tmp/dharma-sentinel-check.log; exit 1)
-	@tail -1 /tmp/dharma-sentinel-check.log
+	@set -eu; \
+		sentinel_log="$$(mktemp "$${TMPDIR:-/tmp}/dharma-sentinel-check.XXXXXX")"; \
+		trap 'rm -f "$$sentinel_log"' EXIT HUP INT TERM; \
+		if ! $(VENV_PYTHON) -m pytest -p timeout $(VERIFIER_SENTINEL) -q --timeout=120 >"$$sentinel_log" 2>&1; then \
+			echo "BEHAVIORAL SENTINEL FAILED:"; \
+			tail -120 "$$sentinel_log"; \
+			exit 1; \
+		fi; \
+		tail -1 "$$sentinel_log"
 	@echo "verifier-selfcheck: OK (syntax, F821, collection, onboarding, behavioral sentinel)"
 
 gh-auth:
@@ -482,10 +495,11 @@ test-contracts:
 
 nats-substrate-contract:
 	$(REPO_PYTHON) scripts/governance/check_nats_substrate_contract.py
-	$(REPO_PYTHON) scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24
 	$(PYTEST) -q \
 		tests/test_nats_live_contact.py \
+		tests/test_nats_live_production_evidence.py \
 		tests/test_nats_substrate_contract.py \
+		tests/test_nats_verification_split.py \
 		tests/test_nats_transport.py \
 		tests/test_a2a_send.py \
 		tests/test_a2a_inbox_bridge.py \
@@ -495,7 +509,10 @@ nats-substrate-contract:
 		--tb=line
 
 nats-live-production-matrix:
-	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py --endpoint $${NATS_URL:-nats://127.0.0.1:4222} --broker-profile $${NATS_PROFILE:-local-live-jetstream}
+	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py \
+		--host-mode $${DHARMA_NATS_HOST_MODE:-non-live} \
+		--endpoint $${NATS_URL:-nats://127.0.0.1:4222} \
+		--broker-profile $${NATS_PROFILE:-local-live-jetstream}
 
 uplift-guards:
 	$(REPO_PYTHON) scripts/uplift_guards/run_pre_commit.py
@@ -589,9 +606,6 @@ pr-run-codex:
 
 pr-run-claude:
 	$(PYTHON) scripts/runtime/pr_merge_control.py run-agent --agent claude --pr "$${PR:?set PR=number}" $${ARGS:-}
-
-pr-merge:
-	$(PYTHON) scripts/runtime/pr_merge_control.py merge --pr "$${PR:?set PR=number}" $${ARGS:-}
 
 pr-mike:
 	$(PYTHON) scripts/runtime/pr_merge_control.py fanout $${ARGS:-}
@@ -847,6 +861,24 @@ go-vet:
 	done
 
 go-ci: go-fmt-check go-vet go-test
+
+# ── Polyglot lanes (WP-0H): same commands locally and in CI ────────────────
+# Keep these recipes in lockstep with the dashboard/terminal jobs in
+# .github/workflows/tests.yml — tests/test_polyglot_ci_contract.py compares
+# the Make commands against the workflow commands.
+
+frontend-check:
+	npm --prefix dashboard ci --legacy-peer-deps
+	npm --prefix dashboard run lint -- --quiet
+	npm --prefix dashboard run build
+
+# NOTE: the WP-0H plan spells these `bun --cwd terminal ...`, but on the
+# pinned bun (1.3.11) `bun --cwd terminal run typecheck` prints usage and
+# exits 0 — a false-green trap. `cd` mirrors CI's working-directory exactly.
+terminal-check:
+	cd terminal && bun install --frozen-lockfile
+	cd terminal && bun run typecheck
+	cd terminal && bun test
 
 # Compile the four Go tool mains into their module dirs (gitignored binaries,
 # e.g. tools/world_scout_go/world_scout_go). The Python bridge prefers these

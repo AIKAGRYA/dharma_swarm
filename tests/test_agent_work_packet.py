@@ -2631,61 +2631,22 @@ def test_preflight_exact_clean_rejects_status_hidden_untracked_path(
         )
 
 
-def test_closeout_rejects_each_diff_class_and_packet_swap(tmp_path: Path) -> None:
-    """O4-B3: closeout binds preflight digest and the complete Git diff union."""
-    for diff_class in ("committed", "staged", "unstaged", "untracked"):
-        case_root = tmp_path / diff_class
-        case_root.mkdir()
-        repo = init_session_repo(case_root)
-        forbidden = repo / "forbidden.txt"
-        forbidden.write_text("base\n", encoding="utf-8")
-        assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
-        assert run(["git", "commit", "-m", "forbidden fixture"], cwd=repo).returncode == 0
+@pytest.mark.parametrize(
+    "diff_class", ("committed", "staged", "unstaged", "untracked")
+)
+def test_closeout_rejects_diff_class(tmp_path: Path, diff_class: str) -> None:
+    """O4-B3: closeout binds the complete Git diff union — one scenario per
+    diff class. Split from a single six-scenario item by the WP-0D
+    2026-08-01 amendment so each item fits the fast per-test budget."""
+    repo = init_session_repo(tmp_path)
+    forbidden = repo / "forbidden.txt"
+    forbidden.write_text("base\n", encoding="utf-8")
+    assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "forbidden fixture"], cwd=repo).returncode == 0
 
-        payload = seal_packet(session_packet(repo))
-        external = write_external_packet(case_root, payload)
-        report_root = case_root / "external-reports"
-        exit_code, report = agentops.execute_packet(
-            external,
-            source_root=repo,
-            preflight=True,
-            report_root=report_root,
-        )
-        assert exit_code == 0 and report is not None
-
-        tracked = tracked_packet_path(repo, payload)
-        tracked.parent.mkdir(parents=True)
-        tracked.write_bytes(external.read_bytes())
-        stage_path(repo, tracked)
-        if diff_class == "committed":
-            forbidden.write_text("committed\n", encoding="utf-8")
-            assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
-            assert run(["git", "commit", "-m", "forbidden committed"], cwd=repo).returncode == 0
-        elif diff_class == "staged":
-            forbidden.write_text("staged\n", encoding="utf-8")
-            assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
-        elif diff_class == "unstaged":
-            forbidden.write_text("unstaged\n", encoding="utf-8")
-        else:
-            (repo / "outside.txt").write_text("untracked\n", encoding="utf-8")
-
-        exit_code, report = agentops.execute_packet(
-            tracked,
-            source_root=repo,
-            closeout=True,
-            report_root=report_root,
-        )
-        assert exit_code == 1 and report is not None
-        expected = "outside.txt" if diff_class == "untracked" else "forbidden.txt"
-        assert expected in report["scope"]["changed_files"]
-        assert any(row["path"] == expected for row in report["scope"]["violations"])
-
-    swap_root = tmp_path / "packet-swap"
-    swap_root.mkdir()
-    repo = init_session_repo(swap_root)
-    original = seal_packet(session_packet(repo))
-    external = write_external_packet(swap_root, original)
-    report_root = swap_root / "external-reports"
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    report_root = tmp_path / "external-reports"
     exit_code, report = agentops.execute_packet(
         external,
         source_root=repo,
@@ -2694,6 +2655,55 @@ def test_closeout_rejects_each_diff_class_and_packet_swap(tmp_path: Path) -> Non
     )
     assert exit_code == 0 and report is not None
 
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+    if diff_class == "committed":
+        forbidden.write_text("committed\n", encoding="utf-8")
+        assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+        assert run(["git", "commit", "-m", "forbidden committed"], cwd=repo).returncode == 0
+    elif diff_class == "staged":
+        forbidden.write_text("staged\n", encoding="utf-8")
+        assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+    elif diff_class == "unstaged":
+        forbidden.write_text("unstaged\n", encoding="utf-8")
+    else:
+        (repo / "outside.txt").write_text("untracked\n", encoding="utf-8")
+
+    exit_code, report = agentops.execute_packet(
+        tracked,
+        source_root=repo,
+        closeout=True,
+        report_root=report_root,
+    )
+    assert exit_code == 1 and report is not None
+    expected = "outside.txt" if diff_class == "untracked" else "forbidden.txt"
+    assert expected in report["scope"]["changed_files"]
+    assert any(row["path"] == expected for row in report["scope"]["violations"])
+
+
+def _preflighted_session_repo(tmp_path: Path):
+    """Shared setup for the packet-custody closeout scenarios: a session repo
+    whose sealed external packet has already passed preflight."""
+    repo = init_session_repo(tmp_path)
+    original = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, original)
+    report_root = tmp_path / "external-reports"
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        preflight=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+    return repo, original, report_root
+
+
+def test_closeout_rejects_swapped_packet_digest(tmp_path: Path) -> None:
+    """O4-B3: a differently-sealed packet swapped into tracked custody after
+    preflight must fail the preflight digest binding (split scenario)."""
+    repo, original, report_root = _preflighted_session_repo(tmp_path)
     swapped = copy.deepcopy(original)
     swapped["intent"] = "A different, independently sealed packet."
     reseal_packet(swapped)
@@ -2709,6 +2719,13 @@ def test_closeout_rejects_each_diff_class_and_packet_swap(tmp_path: Path) -> Non
             report_root=report_root,
         )
 
+
+def test_closeout_rejects_reserialized_packet_custody(tmp_path: Path) -> None:
+    """O4-B3: byte-reserializing even the identical sealed packet breaks the
+    preflight custody digest and must be rejected (split scenario)."""
+    repo, original, report_root = _preflighted_session_repo(tmp_path)
+    tracked = tracked_packet_path(repo, original)
+    tracked.parent.mkdir(parents=True)
     tracked.write_text(
         json.dumps(original, separators=(",", ":")), encoding="utf-8"
     )
@@ -4395,14 +4412,17 @@ def test_negative_control_rejects_hollow_missing_module_collision(
     """A ``python -m <module>`` control whose module is not importable in the
     jail must be rejected, never marked PASSED: the interpreter's bootstrap
     failure exits 1 and would otherwise collide with the expected non-zero
-    exit without running the control at all."""
+    exit without running the control at all. The probe module exists in no
+    environment, so this contract no longer depends on whether the ambient
+    interpreter's site-packages satisfy the import (the previous ``pytest``
+    fixture passed or failed per host — WP-0D 2026-08-01 amendment)."""
     repo = init_repo(tmp_path)
     external_tmp = tmp_path / "negative-tmp"
     external_tmp.mkdir()
     hollow = agentops.parse_gate(
         {
-            "name": "hollow-pytest",
-            "command": "python3 -m pytest -q",
+            "name": "hollow-absent-module",
+            "command": "python3 -m dharma_wp0d_absent_probe_module",
             "expected_exit": 1,
         },
         0,

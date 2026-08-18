@@ -57,16 +57,49 @@ def test_backlog_workflow_is_scheduled_and_matches_cloud_review_quorum():
     ).read_text(encoding="utf-8")
 
     assert "schedule:" in workflow
-    assert 'default: codex,copilot' in workflow
-    assert 'REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || \'codex,copilot\' }}' in workflow
+    assert 'default: codex' in workflow
+    assert 'REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || \'codex\' }}' in workflow
     assert 'DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"' in workflow
-    for fallback in (
-        "inputs.mode || 'packet-only'",
-        "inputs.max_prs || '5'",
-        "inputs.limit || '100'",
-        "inputs.merge_mode || 'off'",
-    ):
-        assert fallback in workflow
+
+
+def test_cloud_lanes_never_require_copilot_receipts():
+    # Operator ratification 2026-07-31: copilot reviews are accepted additively
+    # (TRUSTED_REVIEW_LOGINS) but never REQUIRED — copilot posted zero reviews
+    # repo-wide and kept the receipt gate permanently unclearable.
+    repo_root = Path(__file__).resolve().parents[1]
+    # Bind each workflow to its own fallback contract so no assertion can
+    # accidentally observe only the final value assigned inside this loop.
+    expected_fallbacks = {
+        ".github/workflows/codex-mention-router.yml": (
+            "REQUIRED_REVIEWERS: codex",
+        ),
+        # MERGE_MODE: "off" was listed here as a fallback until the merge
+        # actuator was deleted. It pinned a mode on a code path that could
+        # only ever return SKIPPED; both the env var and the flag it fed are
+        # gone. The property it stood for -- this lane cannot merge -- is now
+        # structural and pinned harder elsewhere: test_pr_merge_control.py
+        # asserts the lane passes no merge flag, and
+        # test_pr_merge_control_no_actuation.py asserts no merge path exists
+        # to pass one to.
+        ".github/workflows/merge-master-mike-backlog.yml": (
+            "inputs.required_reviewers || 'codex'",
+            "inputs.mode || 'packet-only'",
+            "inputs.max_prs || '5'",
+            "inputs.limit || '100'",
+        ),
+    }
+    for name, fallbacks in expected_fallbacks.items():
+        workflow = (repo_root / name).read_text(encoding="utf-8")
+        offending = [
+            line
+            for line in workflow.splitlines()
+            if ("REQUIRED_REVIEWERS" in line or "default:" in line)
+            and "copilot" in line
+        ]
+        assert not offending, f"{name} requires copilot receipts: {offending}"
+        assert 'DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"' in workflow
+        for fallback in fallbacks:
+            assert fallback in workflow, f"{name} is missing fallback: {fallback}"
 
 
 def test_codex_commented_review_counts_as_clean_receipt():

@@ -6,17 +6,62 @@ from datetime import datetime, timezone
 
 import pytest
 
+from dharma_swarm.episode_ledger import EVENT_TYPES, EpisodeEvent
 from dharma_swarm.runtime_state import (
     ContextBundleRecord,
     MemoryFact,
     RUNTIME_RECEIPT_TYPES,
+    RuntimeReceipt,
     RuntimeStateStore,
     SessionState,
     SessionEventRecord,
     TopologyStateRecord,
+    _EPISODE_OUTBOX_EVENT_TYPES,
     build_session_event_from_ledger_record,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
+
+
+def _atomic_event_receipt(
+    suffix: str,
+) -> tuple[SessionEventRecord, RuntimeReceipt]:
+    event = SessionEventRecord(
+        event_id=f"sevt-{suffix}",
+        session_id=f"sess-{suffix}",
+        ledger_kind="message",
+        event_name="message_consumed",
+        run_id=f"run-{suffix}",
+    )
+    receipt = RuntimeReceipt(
+        receipt_id=f"rr-{suffix}",
+        receipt_type="message_consumed",
+        status="completed",
+        run_id=event.run_id,
+    )
+    return event, receipt
+
+
+def _atomic_pair_counts(
+    store: RuntimeStateStore,
+    event: SessionEventRecord,
+    receipt: RuntimeReceipt,
+) -> tuple[int, int, int, int]:
+    with sqlite3.connect(store.db_path) as db:
+        row = db.execute(
+            "SELECT"
+            " (SELECT COUNT(*) FROM sessions WHERE session_id = ?),"
+            " (SELECT COUNT(*) FROM session_events WHERE event_id = ?),"
+            " (SELECT COUNT(*) FROM session_events_fts WHERE event_id = ?),"
+            " (SELECT COUNT(*) FROM runtime_receipts WHERE receipt_id = ?)",
+            (
+                event.session_id,
+                event.event_id,
+                event.event_id,
+                receipt.receipt_id,
+            ),
+        ).fetchone()
+    assert row is not None
+    return int(row[0]), int(row[1]), int(row[2]), int(row[3])
 
 
 @pytest.mark.asyncio
@@ -182,6 +227,435 @@ async def test_runtime_state_records_and_searches_session_events(tmp_path) -> No
     assert hits[0].event_name == "task_failed"
     assert hits[0].task_id == "task-9"
     assert sessions[0].session_id == "sess-search"
+
+
+def test_session_event_and_episode_outbox_rollback_atomically(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    event = SessionEventRecord(
+        event_id="sevt-atomic",
+        session_id="sess-atomic",
+        ledger_kind="task",
+        event_name="dispatch_assigned",
+    )
+
+    def fail_enqueue(*_args, **_kwargs):
+        raise OSError("injected outbox failure")
+
+    monkeypatch.setattr(
+        RuntimeStateStore,
+        "_enqueue_episode_outbox_sync_db",
+        staticmethod(fail_enqueue),
+    )
+    with pytest.raises(OSError, match="outbox"):
+        store.record_session_event_with_episode_outbox_sync(
+            event,
+            delivery_key="session-event:sevt-atomic:observation",
+            episode_id="ep-atomic",
+            attempt_id="at-atomic",
+            event_type="observation_recorded",
+            payload={"session_event_id": event.event_id},
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        session_event_count = db.execute(
+            "SELECT COUNT(*) FROM session_events WHERE event_id = ?",
+            (event.event_id,),
+        ).fetchone()[0]
+        outbox_count = db.execute(
+            "SELECT COUNT(*) FROM episode_event_outbox"
+        ).fetchone()[0]
+    assert session_event_count == 0
+    assert outbox_count == 0
+
+
+@pytest.mark.asyncio
+async def test_session_event_and_runtime_receipt_are_atomic_async(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    committed = _atomic_event_receipt("async-committed")
+    rolled_back = _atomic_event_receipt("async-rolled-back")
+
+    stored = await store.record_session_event_with_runtime_receipt(*committed)
+
+    def fail_receipt(_receipt) -> None:
+        raise OSError("injected runtime receipt failure")
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_state._runtime_receipt_insert",
+        fail_receipt,
+    )
+    with pytest.raises(OSError, match="runtime receipt"):
+        await store.record_session_event_with_runtime_receipt(*rolled_back)
+
+    assert stored == committed
+    assert _atomic_pair_counts(store, *committed) == (1, 1, 1, 1)
+    assert _atomic_pair_counts(store, *rolled_back) == (0, 0, 0, 0)
+
+
+def test_session_event_and_runtime_receipt_are_atomic_sync(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    committed = _atomic_event_receipt("sync-committed")
+    rolled_back = _atomic_event_receipt("sync-rolled-back")
+
+    stored = store.record_session_event_with_runtime_receipt_sync(*committed)
+
+    def fail_receipt(_receipt) -> None:
+        raise OSError("injected runtime receipt failure")
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_state._runtime_receipt_insert",
+        fail_receipt,
+    )
+    with pytest.raises(OSError, match="runtime receipt"):
+        store.record_session_event_with_runtime_receipt_sync(*rolled_back)
+
+    assert stored == committed
+    assert _atomic_pair_counts(store, *committed) == (1, 1, 1, 1)
+    assert _atomic_pair_counts(store, *rolled_back) == (0, 0, 0, 0)
+
+
+def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path)
+    first = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-durable:started",
+        episode_id="ep-durable",
+        attempt_id="at-durable",
+        event_type="attempt_started",
+        payload={"session_id": "sess-durable"},
+    )
+    duplicate = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-durable:started",
+        episode_id="ep-durable",
+        attempt_id="at-durable",
+        event_type="attempt_started",
+        payload={"session_id": "sess-durable"},
+    )
+
+    restarted = RuntimeStateStore(db_path)
+    pending = restarted.list_pending_episode_events_sync(episode_id="ep-durable")
+    acked = restarted.ack_episode_event_sync(
+        first.delivery_key,
+        episode_event_id="ev-durable",
+    )
+
+    assert duplicate.outbox_id == first.outbox_id
+    assert first.schema_version == "episode_outbox_record.v1"
+    assert [item.delivery_key for item in pending] == [first.delivery_key]
+    assert acked.acked_at is not None
+    assert acked.episode_event_id == "ev-durable"
+    assert restarted.list_pending_episode_events_sync(episode_id="ep-durable") == []
+    assert (
+        restarted.enqueue_episode_event_sync(
+            delivery_key="attempt:at-durable:started",
+            episode_id="ep-durable",
+            attempt_id="at-durable",
+            event_type="attempt_started",
+            payload={"session_id": "sess-durable"},
+        ).acked_at
+        is not None
+    )
+    with pytest.raises(ValueError, match="different content"):
+        restarted.enqueue_episode_event_sync(
+            delivery_key="attempt:at-durable:started",
+            episode_id="ep-durable",
+            attempt_id="at-other",
+            event_type="attempt_started",
+            payload={"session_id": "sess-durable"},
+        )
+
+
+@pytest.mark.parametrize(
+    "corrupt_payload_json",
+    ["{", "[]", '{"value": NaN}', '{"value": Infinity}', '{"value": -Infinity}'],
+)
+def test_episode_outbox_corrupt_payload_json_fails_closed(
+    tmp_path,
+    corrupt_payload_json,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    pending = store.enqueue_episode_event_sync(
+        delivery_key="corrupt-payload",
+        destination_id="corrupt-destination",
+        episode_id="ep-corrupt",
+        attempt_id="at-corrupt",
+        event_type="observation_recorded",
+        payload={"session_event_id": "sevt-corrupt"},
+    )
+    with sqlite3.connect(store.db_path) as db:
+        db.execute(
+            "UPDATE episode_event_outbox SET payload_json = ? WHERE delivery_key = ?",
+            (corrupt_payload_json, pending.storage_key),
+        )
+
+    with pytest.raises(ValueError, match="invalid payload_json"):
+        store.list_pending_episode_events_sync(
+            episode_id=pending.episode_id,
+            destination_id=pending.destination_id,
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        acked_at = db.execute(
+            "SELECT acked_at FROM episode_event_outbox WHERE delivery_key = ?",
+            (pending.storage_key,),
+        ).fetchone()[0]
+    assert acked_at is None
+
+
+@pytest.mark.parametrize(
+    "non_finite",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+@pytest.mark.parametrize("payload_key", ["value", "token"])
+def test_episode_outbox_rejects_non_finite_payloads(
+    tmp_path,
+    non_finite,
+    payload_key,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="JSON"):
+        store.enqueue_episode_event_sync(
+            delivery_key="non-finite-payload",
+            destination_id="non-finite-destination",
+            episode_id="ep-non-finite",
+            attempt_id="at-non-finite",
+            event_type="observation_recorded",
+            payload={payload_key: non_finite},
+        )
+
+    assert store.get_episode_outbox_sync(
+        "non-finite-payload",
+        destination_id="non-finite-destination",
+    ) is None
+
+
+@pytest.mark.parametrize("changed_value", [1.0, True])
+def test_episode_outbox_compares_json_distinct_scalars(
+    tmp_path,
+    changed_value,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    store.enqueue_episode_event_sync(
+        delivery_key="json-distinct",
+        episode_id="ep-json-distinct",
+        attempt_id="at-json-distinct",
+        event_type="observation_recorded",
+        payload={"value": 1},
+    )
+
+    with pytest.raises(ValueError, match="different content"):
+        store.enqueue_episode_event_sync(
+            delivery_key="json-distinct",
+            episode_id="ep-json-distinct",
+            attempt_id="at-json-distinct",
+            event_type="observation_recorded",
+            payload={"value": changed_value},
+        )
+
+
+def test_episode_outbox_ack_is_scoped_to_destination(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    first = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-destination:opened",
+        destination_id="destination-a",
+        episode_id="ep-destination",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-destination"},
+    )
+    second = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-destination:opened",
+        destination_id="destination-b",
+        episode_id="ep-destination",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-destination"},
+    )
+    acked = store.ack_episode_event_sync(
+        first.delivery_key,
+        destination_id=first.destination_id,
+        episode_event_id="ev-destination-a",
+    )
+
+    assert first.outbox_id != second.outbox_id
+    assert first.storage_key != second.storage_key
+    assert acked.acked_at is not None
+    assert store.get_episode_outbox_sync(
+        second.delivery_key,
+        destination_id=second.destination_id,
+    ).acked_at is None
+    with pytest.raises(ValueError, match="destination_id is required"):
+        store.get_episode_outbox_sync(first.delivery_key)
+
+
+def test_episode_outbox_destination_columns_migrate_additively(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE episode_event_outbox ("
+            " outbox_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " delivery_key TEXT NOT NULL UNIQUE,"
+            " episode_id TEXT NOT NULL,"
+            " attempt_id TEXT NOT NULL DEFAULT '',"
+            " event_type TEXT NOT NULL,"
+            " payload_json TEXT NOT NULL DEFAULT '{}',"
+            " session_event_id TEXT NOT NULL DEFAULT '',"
+            " created_at TEXT NOT NULL,"
+            " acked_at TEXT,"
+            " episode_event_id TEXT NOT NULL DEFAULT '')"
+        )
+        db.execute(
+            "INSERT INTO episode_event_outbox"
+            " (delivery_key, episode_id, event_type, created_at)"
+            " VALUES ('legacy-delivery', 'ep-legacy', 'episode_opened',"
+            " '2026-07-25T00:00:00+00:00')"
+        )
+
+    store = RuntimeStateStore(db_path)
+    migrated = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-migrated:opened",
+        destination_id="destination-migrated",
+        episode_id="ep-migrated",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-migrated"},
+    )
+
+    assert migrated.destination_id == "destination-migrated"
+    legacy = store.get_episode_outbox_sync("legacy-delivery")
+    assert legacy is not None
+    assert legacy.delivery_key == "legacy-delivery"
+    with sqlite3.connect(db_path) as db:
+        columns = {
+            row[1] for row in db.execute("PRAGMA table_info(episode_event_outbox)")
+        }
+    assert {"logical_delivery_key", "destination_id"} <= columns
+
+
+def test_episode_outbox_redacts_nested_secrets_before_sqlite_and_replays(
+    tmp_path,
+) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path)
+    raw_payload = {
+        "messages": [
+            {
+                "api_key": "sk-deep-secret",
+                "nested": {"Authorization": "Bearer hidden-secret"},
+            }
+        ],
+        "safe": "retained",
+    }
+
+    first = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-redacted:started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        event_type="attempt_started",
+        payload=raw_payload,
+    )
+    replay = store.enqueue_episode_event_sync(
+        delivery_key="attempt:at-redacted:started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        event_type="attempt_started",
+        payload=raw_payload,
+    )
+
+    assert replay == first
+    expected = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        sequence=0,
+        payload=raw_payload,
+    )
+    assert first.payload == expected.payload
+    sqlite_bytes = b"".join(
+        path.read_bytes()
+        for path in tmp_path.iterdir()
+        if path.name.startswith(db_path.name)
+    )
+    assert b"sk-deep-secret" not in sqlite_bytes
+    assert b"hidden-secret" not in sqlite_bytes
+
+
+def test_episode_outbox_schema_matches_episode_event_vocabulary(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    assert _EPISODE_OUTBOX_EVENT_TYPES == EVENT_TYPES
+    for index, event_type in enumerate(EVENT_TYPES):
+        payload = (
+            {"idempotency_key": f"effect-{index}"}
+            if event_type in {"effect_requested", "effect_resolved"}
+            else {}
+        )
+        stored = store.enqueue_episode_event_sync(
+            delivery_key=f"schema-parity:{event_type}",
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            event_type=event_type,
+            payload=payload,
+        )
+        expected = EpisodeEvent.new(
+            event_type=event_type,
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            sequence=0,
+            payload=payload,
+        )
+        assert stored.payload == expected.payload
+
+    with pytest.raises(ValueError, match="requires payload.idempotency_key"):
+        store.enqueue_episode_event_sync(
+            delivery_key="schema-parity:invalid-effect",
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            event_type="effect_requested",
+            payload={},
+        )
+    assert store.get_episode_outbox_sync("schema-parity:invalid-effect") is None
+
+
+def test_invalid_episode_type_rolls_back_session_event_and_outbox(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    event = SessionEventRecord(
+        event_id="sevt-invalid-episode-type",
+        session_id="sess-invalid-episode-type",
+        ledger_kind="task",
+        event_name="dispatch_assigned",
+    )
+
+    with pytest.raises(ValueError, match="unknown event_type"):
+        store.record_session_event_with_episode_outbox_sync(
+            event,
+            delivery_key="session-event:sevt-invalid-episode-type:invalid",
+            episode_id="ep-invalid-type",
+            attempt_id="at-invalid-type",
+            event_type="not_a_lifecycle_event",
+            payload={"session_event_id": event.event_id},
+        )
+
+    with sqlite3.connect(store.db_path) as db:
+        session_event_count = db.execute(
+            "SELECT COUNT(*) FROM session_events WHERE event_id = ?",
+            (event.event_id,),
+        ).fetchone()[0]
+        outbox_count = db.execute(
+            "SELECT COUNT(*) FROM episode_event_outbox"
+        ).fetchone()[0]
+    assert session_event_count == 0
+    assert outbox_count == 0
 
 
 def test_runtime_state_indexes_historic_ledgers(tmp_path) -> None:

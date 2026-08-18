@@ -43,6 +43,114 @@ def test_log_writes_to_logger(caplog):
 
 
 # ---------------------------------------------------------------------------
+# _log_system_failure helper
+# ---------------------------------------------------------------------------
+
+def test_log_system_failure_records_traceback(caplog, capsys):
+    """A system-loop failure must land in the log WITH its traceback frames.
+
+    Regression guard for the 2026-07-17 dispatch-dropoff outage: the swarm
+    loop died on an import-time IndexError but the log carried only
+    'System swarm failed: tuple index out of range' — zero frame info — and
+    the zombie daemon ran undiagnosed for 91h.
+    """
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    def _boom():
+        return ()[4]
+
+    try:
+        _boom()
+    except IndexError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert error_records, "expected an ERROR record for the failed system"
+    rendered = "\n".join(
+        r.message + (str(r.exc_text) if r.exc_text else "") for r in error_records
+    )
+    assert "swarm" in rendered
+    tb_text = "".join(
+        logging.Formatter().format(r) for r in error_records
+    )
+    assert "_boom" in tb_text, "traceback frames must be preserved in the log"
+    assert "IndexError" in tb_text
+
+    out = capsys.readouterr().out
+    assert "IndexError" in out, "operator-facing line must carry the exception repr"
+
+
+def test_log_system_failure_empty_message_exception_still_identifiable(capsys):
+    """repr() keeps exceptions with empty messages diagnosable (e.g. bare Exception())."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    _log_system_failure("grind", RuntimeError())
+    out = capsys.readouterr().out
+    assert "RuntimeError" in out
+
+
+def test_log_system_failure_falsey_exception_keeps_traceback(caplog):
+    """A falsey exception instance must not disable logging's exc_info path."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class FalseyError(RuntimeError):
+        def __bool__(self):
+            return False
+
+    def _falsey_boom():
+        raise FalseyError("falsey failure")
+
+    try:
+        _falsey_boom()
+    except FalseyError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_falsey_boom" in rendered
+    assert "FalseyError: falsey failure" in rendered
+
+
+def test_log_system_failure_broken_repr_cannot_escape(caplog, capsys):
+    """Failure diagnostics stay non-fatal when an exception's repr is broken."""
+    from dharma_swarm.orchestrate_live import _log_system_failure
+
+    class BrokenReprError(RuntimeError):
+        def __repr__(self):
+            raise KeyboardInterrupt("repr broke")
+
+    def _broken_repr_boom():
+        raise BrokenReprError("original failure")
+
+    try:
+        _broken_repr_boom()
+    except BrokenReprError as exc:
+        caught = exc
+
+    with caplog.at_level(logging.ERROR, logger="dharma_swarm.orchestrate_live"):
+        _log_system_failure("swarm", caught)
+
+    out = capsys.readouterr().out
+    assert "<BrokenReprError repr failed>" in out
+    error_record = next(r for r in caplog.records if r.levelno == logging.ERROR)
+    assert error_record.exc_info is not None
+    assert error_record.exc_info[1] is caught
+    assert error_record.exc_info[2] is caught.__traceback__
+    rendered = logging.Formatter().format(error_record)
+    assert "_broken_repr_boom" in rendered
+    assert "BrokenReprError: original failure" in rendered
+
+
+# ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
 
@@ -267,6 +375,70 @@ def test_gate_pressure_paths_match():
         f"Path mismatch: internal pressure writes to {internal_pressure_write_path}, "
         f"but telos_gates reads from {telos_read_path}"
     )
+
+
+def test_archaeology_env_gate_prevents_task_construction(monkeypatch):
+    """The launchd disable gate removes archaeology before its body starts."""
+    from dharma_swarm.orchestrate_live import _apply_runtime_loop_env_gates
+    from dharma_swarm.loop_supervisor import LoopSupervisor
+
+    supervisor = LoopSupervisor()
+    supervisor.register_loop("archaeology", expected_interval=1800)
+    factories = {
+        "swarm": object(),
+        "archaeology": object(),
+    }
+    monkeypatch.setenv("DGC_ARCHAEOLOGY_INGESTION", "0")
+
+    _apply_runtime_loop_env_gates(factories, supervisor)
+
+    assert set(factories) == {"swarm"}
+    archaeology = supervisor._loops["archaeology"]
+    assert archaeology.state == "DISABLED"
+    assert archaeology.disabled_reason == "DGC_ARCHAEOLOGY_INGESTION=0"
+
+
+@pytest.mark.parametrize("value", [None, "1", "true", "yes", "on"])
+def test_archaeology_env_gate_defaults_enabled(monkeypatch, value):
+    """Unset or affirmative values preserve the existing enabled behavior."""
+    from dharma_swarm.orchestrate_live import _apply_runtime_loop_env_gates
+    from dharma_swarm.loop_supervisor import LoopSupervisor
+
+    if value is None:
+        monkeypatch.delenv("DGC_ARCHAEOLOGY_INGESTION", raising=False)
+    else:
+        monkeypatch.setenv("DGC_ARCHAEOLOGY_INGESTION", value)
+    supervisor = LoopSupervisor()
+    supervisor.register_loop("archaeology", expected_interval=1800)
+    factory = object()
+    factories = {"archaeology": factory}
+
+    _apply_runtime_loop_env_gates(factories, supervisor)
+
+    assert factories["archaeology"] is factory
+    assert supervisor._loops["archaeology"].state == "NEVER_STARTED"
+
+
+def test_direct_module_entrypoint_admits_before_starting_event_loop(monkeypatch):
+    """The python -m boundary must stop before creating live runtime work."""
+    from dharma_swarm import orchestrate_live as mod
+
+    event_loop_started = False
+
+    def reject_runtime() -> None:
+        raise RuntimeError("admission denied")
+
+    def fake_run(_coroutine) -> None:
+        nonlocal event_loop_started
+        event_loop_started = True
+
+    monkeypatch.setattr(mod, "runtime_admission_or_exit", reject_runtime)
+    monkeypatch.setattr(mod.asyncio, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="admission denied"):
+        mod.main([])
+
+    assert event_loop_started is False
 
 
 # ---------------------------------------------------------------------------

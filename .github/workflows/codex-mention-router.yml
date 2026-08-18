@@ -24,6 +24,10 @@ permissions:
   pull-requests: write
   statuses: read
 
+concurrency:
+  group: merge-master-mike-pr-${{ github.event.inputs.pr || github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   route:
     if: >
@@ -46,6 +50,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Halt on loop kill-switch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Loop kill-switch (docs/ops/loop_control/README.md): file present on
+          # the loop-control branch => HALT (exit 1, red-while-halted); absent
+          # (404 on file or branch) => proceed; any other error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — router refuses all commands" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -135,18 +160,21 @@ jobs:
           # Required receipts = the agents that actually review (see #559 pile).
           #
           # D2 (track merge-master-mike-d4): the always-on cloud quorum is
-          # codex,copilot — both have native reviewer Apps the gate can bridge.
-          # claude never posted a receipt in the cloud (no cloud reviewer), so it
-          # was a permanent blocker; it moves to the deep/backup lane. This is
-          # MORE real review than copilot,claude, not less.
-          REQUIRED_REVIEWERS: codex,copilot
+          # codex — its native reviewer App posts real reviews the gate can
+          # bridge at the exact current head. claude never posted a receipt in
+          # the cloud (no cloud reviewer), so it stays the deep/backup lane.
+          # Operator ratification 2026-07-31: copilot is REMOVED as a required
+          # receipt (zero copilot reviews repo-wide kept this gate permanently
+          # unclearable; credits burn fast and reviews are unreliable). Copilot
+          # reviews remain ACCEPTED additively via TRUSTED_REVIEW_LOGINS but
+          # are never required. Ratchet: tests/test_pr_merge_control_github_reviews.py.
+          REQUIRED_REVIEWERS: codex
           # D1: count a trusted installed reviewer-App's native GitHub review
           # (Codex App = codex, Copilot = copilot) as that agent's receipt when
           # no local receipt file exists. Strictly additive — never waives CI,
           # conflict, unresolved-thread, or CHANGES_REQUESTED checks — so the
           # quorum can clear in the cloud with no operator machine.
           DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"
-          MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
           MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
@@ -167,10 +195,9 @@ jobs:
 
           if [ "${BACKLOG_REQUESTED}" = "true" ]; then
             python3 -m pip install 'nats-py>=2.9' 'aiohttp>=3.9'
-            merge_mode=off
-            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
-              merge_mode=auto-when-clean
-            fi
+            # A backlog fanout gathers evidence and renders gates. It cannot
+            # actuate: the controller has no merge surface at all, and the
+            # merge queue is what performs merges.
             args=(
               --state-root "${state_root}"
               fanout
@@ -178,8 +205,6 @@ jobs:
               --max-prs 5
               --statuses GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW
               --required-reviewers "${REQUIRED_REVIEWERS}"
-              --merge-mode "${merge_mode}"
-              --merge-method "${MERGE_METHOD}"
               --packet-only
               --nats-session
               --nats-timeout-s 8
@@ -199,7 +224,7 @@ jobs:
               echo
               echo "- Trigger PR: \`#${PR_NUMBER}\`"
               echo "- Backlog mode: \`packet-only\`"
-              echo "- Merge mode: \`${merge_mode}\`"
+              echo "- Merge authority: \`none (evidence-only)\`"
               echo "- NATS required: \`${MERGE_MASTER_MIKE_NATS_REQUIRED}\`"
               echo "- Required reviewers: \`${REQUIRED_REVIEWERS}\`"
               echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -214,29 +239,51 @@ jobs:
           else
             python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
             packet_dir="$(find "${state_root}/pr-${PR_NUMBER}" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
-            set +e
-            python3 scripts/runtime/pr_merge_control.py \
-              --state-root "${state_root}" \
-              gate \
-              --pr "${PR_NUMBER}" \
-              --packet-dir "${packet_dir}" \
-              --required-reviewers "${REQUIRED_REVIEWERS}"
-            gate_exit="$?"
-            set -e
+            policy_exit=1
+            authorization_report="${state_root}/merge-authorization-${PR_NUMBER}.json"
             if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              # Construct the typed authority value before gate evaluation.
+              # The evaluator gathers native current-head AI evidence and an
+              # exact current-head operator warrant from this trusted
+              # default-branch checkout. Its report is an input to the gate,
+              # never a predictable token or mutable label.
+              set +e
+              python3 scripts/governance/check_automerge_tier_policy.py \
+                --repo "${GITHUB_REPOSITORY}" \
+                --pr "${PR_NUMBER}" \
+                --assume-unattended \
+                --output "${authorization_report}"
+              policy_exit="$?"
+              set -e
+            fi
+            if [ "${policy_exit}" = "0" ]; then
               set +e
               python3 scripts/runtime/pr_merge_control.py \
                 --state-root "${state_root}" \
-                merge \
+                gate \
                 --pr "${PR_NUMBER}" \
                 --packet-dir "${packet_dir}" \
                 --required-reviewers "${REQUIRED_REVIEWERS}" \
-                --method "${MERGE_METHOD}" \
-                --auto \
-                --execute \
-                --confirm "merge-pr-${PR_NUMBER}"
-              merge_exit="$?"
+                --merge-authorization "${authorization_report}"
+              gate_exit="$?"
               set -e
+            else
+              set +e
+              python3 scripts/runtime/pr_merge_control.py \
+                --state-root "${state_root}" \
+                gate \
+                --pr "${PR_NUMBER}" \
+                --packet-dir "${packet_dir}" \
+                --required-reviewers "${REQUIRED_REVIEWERS}"
+              gate_exit="$?"
+              set -e
+            fi
+            # Mike does not merge. The merge queue does. This lane evaluates
+            # the deterministic gate and posts the verdict; a request to
+            # "merge when clean" is recorded and answered by the gate result,
+            # never by an actuator here.
+            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              echo "merge-when-clean requested; Mike is evidence-only, the merge queue performs merges" >&2
             fi
             python3 scripts/runtime/pr_merge_control.py \
               --state-root "${state_root}" \

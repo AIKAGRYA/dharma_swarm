@@ -1,0 +1,213 @@
+{
+  "blockers": [
+    "glm52: score=95 < 100",
+    "kimik3: verdict=revise"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 36382,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "validate_portfolio enforces 10-node ring, 3 cross-feeds, active-track binding equality at runtime",
+          "10 project adapters each read distinct sources with typed schema/digest validation",
+          "TransportAck has no conversion to StructuralHop; build_structural_hop rejects non-A2ATask",
+          "StructuralCycleCheck(modality=structure_only) vs LocalReceiptConsistencyCheck(independently_authenticated=false) are distinct immutable types",
+          "cross-feed consume is one-shot, ledger-bound, perturbs target evidence hash; 3 feeds exercised across 2 turns",
+          "verifier byte-frames 4 modules at import; fingerprint immutable after monkeypatch (test confirmed)",
+          "load_latest_cycle reverifies witness_path and recomputes both checks; rejects tampered alias",
+          "196 tests passed; 20/20 adversarial; 45/45 portfolio; 10 dashboard contract; pre-commit clean",
+          "spine records 20 intent + 20 completion + 20 idempotency rows; evaluator joins 41 semantic rows",
+          "dashboard cycleWitnessPresentation requires execution_provenance_authenticated===false",
+          "composition evidence confirms A2AServer, spine_adapter, RuntimeStateStore, correlation_context, AgentCard, CatalyticGraph are canonical imports with SHA-256 hashes",
+          "palantir-pilot heartbeat fresh at 2026-08-05T04:49:59Z"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 95,
+        "summary": "Ten-node autocatalytic portfolio is honest, well-tested, and production-grade for its claimed local_rehearsal ceiling. Adapters do substantive read-only work; cross-feeds are causal and one-shot; structure-only and local-receipt-consistency are distinct non-authoritative types; no overstatement found in code, API, dashboard, or docs.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":95,\"summary\":\"Ten-node autocatalytic portfolio is honest, well-tested, and production-grade for its claimed local_rehearsal ceiling. Adapters do substantive read-only work; cross-feeds are causal and one-shot; structure-only and local-receipt-consistency are distinct non-authoritative types; no overstatement found in code, API, dashboard, or docs.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"validate_portfolio enforces 10-node ring, 3 cross-feeds, active-track binding equality at runtime\",\"10 project adapters each read distinct sources with typed schema/digest validation\",\"TransportAck has no conversion to StructuralHop; build_structural_hop rejects non-A2ATask\",\"StructuralCycleCheck(modality=structure_only) vs LocalReceiptConsistencyCheck(independently_authenticated=false) are distinct immutable types\",\"cross-feed consume is one-shot, ledger-bound, perturbs target evidence hash; 3 feeds exercised across 2 turns\",\"verifier byte-frames 4 modules at import; fingerprint immutable after monkeypatch (test confirmed)\",\"load_latest_cycle reverifies witness_path and recomputes both checks; rejects tampered alias\",\"196 tests passed; 20/20 adversarial; 45/45 portfolio; 10 dashboard contract; pre-commit clean\",\"spine records 20 intent + 20 completion + 20 idempotency rows; evaluator joins 41 semantic rows\",\"dashboard cycleWitnessPresentation requires execution_provenance_authenticated===false\",\"composition evidence confirms A2AServer, spine_adapter, RuntimeStateStore, correlation_context, AgentCard, CatalyticGraph are canonical imports with SHA-256 hashes\",\"palantir-pilot heartbeat fresh at 2026-08-05T04:49:59Z\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "k3",
+      "lane_id": "kimik3",
+      "latency_ms": 69132,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "Gate evidence (pytest 196/45/20, Next build, pre-commit suite) exists only as self-authored local_gate_receipt.json on a feature branch; the repo's own doctrine (safety-TCB claim_boundary: integrity != authenticity, only trusted-CI re-run counts) is not satisfied for this packet's merge signal.",
+          "persistent_agent_evidence.json is self-reported (status/fresh asserted by the producer); the required fresh palantir-pilot heartbeat cannot be independently verified from the packet.",
+          "Manifest proof_obligations for every future authority promotion are prose strings, not executable checks, contrary to the packet's own requirement of an executable proof obligation per promotion."
+        ],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST autocatalytic_portfolio (10 nodes/13 edges/3 cross-feeds)",
+          "autocatalytic_contracts.py validate_portfolio + modality types",
+          "autocatalytic_adapters.py consume/adapt/emit + ledger binding",
+          "autocatalytic_verifier.py witness + 41-row join",
+          "tests/test_autocatalytic_portfolio.py adversarial cases",
+          "runtime_witness_evidence.json counts and hashes",
+          "local_gate_receipt.json (self-authored, branch-scoped)",
+          "persistent_agent_evidence.json (self-reported)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [
+          "Attach a CI/trusted-runner re-execution of the staged gate suite on the exact reviewed tree (run URL or equivalent non-author-forgeable attestation).",
+          "Provide an independently observed heartbeat/consumer proof for palantir-pilot, or drop it as a load-bearing precondition.",
+          "Convert each node's proof_obligations into executable checks (receipt_valid/command_passes-style) wired into validate_portfolio or CI before any authority upgrade.",
+          "Document explicitly that the verifier re-runs (not independently re-implements) adapter semantics, so a shared-implementation bug passes both sides; add a divergence control before any promotion above local_rehearsal."
+        ],
+        "score": 84,
+        "summary": "Narrow local_rehearsal claim is internally consistent, honestly capped, fail-closed by design; but merge-relevant gates are self-reported, promotion obligations are prose not executable, and heartbeat evidence is unverifiable from the packet.",
+        "verdict": "revise"
+      },
+      "provider": "kimi_code",
+      "raw_response": "{\"verdict\":\"revise\",\"score\":84,\"summary\":\"Narrow local_rehearsal claim is internally consistent, honestly capped, fail-closed by design; but merge-relevant gates are self-reported, promotion obligations are prose not executable, and heartbeat evidence is unverifiable from the packet.\",\"blockers\":[\"Gate evidence (pytest 196/45/20, Next build, pre-commit suite) exists only as self-authored local_gate_receipt.json on a feature branch; the repo's own doctrine (safety-TCB claim_boundary: integrity != authenticity, only trusted-CI re-run counts) is not satisfied for this packet's merge signal.\",\"persistent_agent_evidence.json is self-reported (status/fresh asserted by the producer); the required fresh palantir-pilot heartbeat cannot be independently verified from the packet.\",\"Manifest proof_obligations for every future authority promotion are prose strings, not executable checks, contrary to the packet's own requirement of an executable proof obligation per promotion.\"],\"required_changes\":[\"Attach a CI/trusted-runner re-execution of the staged gate suite on the exact reviewed tree (run URL or equivalent non-author-forgeable attestation).\",\"Provide an independently observed heartbeat/consumer proof for palantir-pilot, or drop it as a load-bearing precondition.\",\"Convert each node's proof_obligations into executable checks (receipt_valid/command_passes-style) wired into validate_portfolio or CI before any authority upgrade.\",\"Document explicitly that the verifier re-runs (not independently re-implements) adapter semantics, so a shared-implementation bug passes both sides; add a divergence control before any promotion above local_rehearsal.\"],\"evidence_checked\":[\"ACTIVE_SURFACE_MANIFEST autocatalytic_portfolio (10 nodes/13 edges/3 cross-feeds)\",\"autocatalytic_contracts.py validate_portfolio + modality types\",\"autocatalytic_adapters.py consume/adapt/emit + ledger binding\",\"autocatalytic_verifier.py witness + 41-row join\",\"tests/test_autocatalytic_portfolio.py adversarial cases\",\"runtime_witness_evidence.json counts and hashes\",\"local_gate_receipt.json (self-authored, branch-scoped)\",\"persistent_agent_evidence.json (self-reported)\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "k3",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.6",
+      "lane_id": "qwen3coder",
+      "latency_ms": 101886,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_TRACK.yaml",
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "autocatalytic_contracts.py",
+          "autocatalytic_adapters.py",
+          "autocatalytic_verifier.py",
+          "autocatalytic_portfolio.py",
+          "test_autocatalytic_portfolio.py",
+          "runtime_witness_evidence.json"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Ten-node portfolio validates topology at runtime, enforces read-only adapters with negative signal states, binds cross-feeds to ledger rows, separates structure-only from local-receipt consistency, and fails closed on forged evidence. No blockers.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"Ten-node portfolio validates topology at runtime, enforces read-only adapters with negative signal states, binds cross-feeds to ledger rows, separates structure-only from local-receipt consistency, and fails closed on forged evidence. No blockers.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"ACTIVE_TRACK.yaml\",\"ACTIVE_SURFACE_MANIFEST.yaml\",\"autocatalytic_contracts.py\",\"autocatalytic_adapters.py\",\"autocatalytic_verifier.py\",\"autocatalytic_portfolio.py\",\"test_autocatalytic_portfolio.py\",\"runtime_witness_evidence.json\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 19127,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_TRACK.yaml",
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "autocatalytic_contracts.py",
+          "autocatalytic_adapters.py",
+          "autocatalytic_verifier.py",
+          "autocatalytic_portfolio.py",
+          "test_autocatalytic_portfolio.py",
+          "runtime_witness_evidence.json"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All checks passed; no blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All checks passed; no blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_TRACK.yaml\",\n    \"ACTIVE_SURFACE_MANIFEST.yaml\",\n    \"autocatalytic_contracts.py\",\n    \"autocatalytic_adapters.py\",\n    \"autocatalytic_verifier.py\",\n    \"autocatalytic_portfolio.py\",\n    \"test_autocatalytic_portfolio.py\",\n    \"runtime_witness_evidence.json\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 67853,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "validate_portfolio enforces active==bound and ring/edge/cross-feed equality at runtime",
+          "196/196 Python + 10/10 dashboard contract tests + 20/20 adversarial matrix pass",
+          "StructuralHop/LocalReceiptConsistencyCheck modalities frozen; bool forbidden; TransportAck cannot convert to hop",
+          "Self-authored promotion forgery rejected via not-adapter-derived; cross-feed forgery rejected across 3 signals x 3 kinds",
+          "Fresh cycle autocat_4b46203a45764208 reverifies with structure_only+local_mutable_runtime_receipt_consistency, independently_authenticated=false",
+          "Composition uses submit_task_via_spine_sync, RuntimeStateStore, correlation_scope_sync, CardRegistry, CatalyticGraph; no rival substrate",
+          "Verifier byte-frames 4 modules at import; latest.json reverifies and preserves attested witness_path",
+          "palantir-pilot heartbeat fresh (7s of observed) under 300s policy; num_waiting=1 is operational, not a portfolio blocker"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Local-rehearsal ceiling honored. Ten distinct adapters with project-specific source contracts; topology, ring, pages, and cross-feed closure enforced by validate_portfolio. Non-promoting states consistent across API and dashboard.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"Local-rehearsal ceiling honored. Ten distinct adapters with project-specific source contracts; topology, ring, pages, and cross-feed closure enforced by validate_portfolio. Non-promoting states consistent across API and dashboard.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"validate_portfolio enforces active==bound and ring/edge/cross-feed equality at runtime\",\"196/196 Python + 10/10 dashboard contract tests + 20/20 adversarial matrix pass\",\"StructuralHop/LocalReceiptConsistencyCheck modalities frozen; bool forbidden; TransportAck cannot convert to hop\",\"Self-authored promotion forgery rejected via not-adapter-derived; cross-feed forgery rejected across 3 signals x 3 kinds\",\"Fresh cycle autocat_4b46203a45764208 reverifies with structure_only+local_mutable_runtime_receipt_consistency, independently_authenticated=false\",\"Composition uses submit_task_via_spine_sync, RuntimeStateStore, correlation_scope_sync, CardRegistry, CatalyticGraph; no rival substrate\",\"Verifier byte-frames 4 modules at import; latest.json reverifies and preserves attested witness_path\",\"palantir-pilot heartbeat fresh (7s of observed) under 300s policy; num_waiting=1 is operational, not a portfolio blocker\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 68669,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "ACTIVE_SURFACE_MANIFEST.yaml autocatalytic_portfolio declaration",
+          "dharma_swarm/autocatalytic_contracts.py topology validation and typed results",
+          "dharma_swarm/autocatalytic_adapters.py ten project adapters and cross-feed semantics",
+          "dharma_swarm/autocatalytic_verifier.py structural and local-receipt verification",
+          "dharma_swarm/autocatalytic_portfolio.py facade, handler composition, two-turn runner",
+          "tests/test_autocatalytic_portfolio.py 45 executable contract tests",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json fresh cycle",
+          "reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json gate results"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Ten-node autocatalytic portfolio meets all declared claims: substantive read-only project adapters, closed signal ring with three typed cross-feeds exercised across two turns, structure-only and local mutable-receipt consistency as distinct non-promotable modalities, honest local_rehearsal ceiling, canonical substrate composition, and comprehensive adversarial test coverage with fail-closed semantics.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"Ten-node autocatalytic portfolio meets all declared claims: substantive read-only project adapters, closed signal ring with three typed cross-feeds exercised across two turns, structure-only and local mutable-receipt consistency as distinct non-promotable modalities, honest local_rehearsal ceiling, canonical substrate composition, and comprehensive adversarial test coverage with fail-closed semantics.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"ACTIVE_SURFACE_MANIFEST.yaml autocatalytic_portfolio declaration\",\n    \"dharma_swarm/autocatalytic_contracts.py topology validation and typed results\",\n    \"dharma_swarm/autocatalytic_adapters.py ten project adapters and cross-feed semantics\",\n    \"dharma_swarm/autocatalytic_verifier.py structural and local-receipt verification\",\n    \"dharma_swarm/autocatalytic_portfolio.py facade, handler composition, two-turn runner\",\n    \"tests/test_autocatalytic_portfolio.py 45 executable contract tests\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/runtime_witness_evidence.json fresh cycle\",\n    \"reports/agentops/council/autocatalytic_portfolio/evidence/local_gate_receipt.json gate results\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260805T045235Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 1,
+    "heartbeat_timestamp": "2026-08-05T04:52:34Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 6,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-08-05T04:52:34Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-08-05T04:52:35.462908Z\"\n}\n--- pane tail ---\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 407503,
+  "prompt_file": "/Users/dhyana/ds_autocatalytic_organism2_20260805/reports/agentops/council/autocatalytic_portfolio/review_prompt.md",
+  "prompt_words_estimate": 35090,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 96.5,
+  "score_min": 84,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

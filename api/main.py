@@ -367,7 +367,10 @@ _WEBHOOK_MATERIAL_FAILURE_RESPONSE = {
 
 # Webhook verification material; source of truth for the env name is
 # dharma_swarm/verify/github_app.py (VerifyWebhookHandler webhook_secret
-# fallback), which returns success for any payload when the secret is unset.
+# fallback), whose verify_signature fails closed — rejecting every
+# payload — when the secret is unset. The mode gate below still refuses
+# the transport outright in production-shaped mode so misconfiguration
+# surfaces as 503 at ingress rather than as per-payload 401s.
 _VERIFY_WEBHOOK_SECRET_ENV = "DHARMA_VERIFY_WEBHOOK_SECRET"
 _WEBHOOK_ROUTE = ("POST", "/api/verify/webhook")
 

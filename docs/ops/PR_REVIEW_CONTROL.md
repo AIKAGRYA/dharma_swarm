@@ -31,7 +31,7 @@ make ci-truth ARGS="--rollup-json /path/to/status-rollup.json"
 ```
 
 Merge Master Mike consumes this contract in `make pr-packet`, `make pr-gate`,
-`make pr-mike`, and `make pr-merge`. Required CI entries block merge when they
+and `make pr-mike`. Required CI entries block merge when they
 are missing, pending, failed, cancelled, timed out, or action-required.
 Advisory entries are reported as degraded warnings with repro commands; raw
 GitHub failing checks still block through the normal rollup gate.
@@ -54,8 +54,10 @@ make pr-reviewers
 make pr-run-codex PR=397
 make pr-run-claude PR=397
 make pr-gate PR=397
-make pr-merge PR=397 ARGS="--confirm merge-pr-397"
 ```
+
+`pr-gate` is the last step. Merging is GitHub's merge queue, not this
+toolchain — see "Merging" below.
 
 ## GitHub Comment Adapter
 
@@ -317,21 +319,24 @@ Mike's local nest lives under:
   logs/action_log.jsonl
 ```
 
-The nest is allowed to coordinate and recommend. It is allowed to merge only
-through the conditional clean-gate path. It is still forbidden from approving,
-pushing, editing source, marking human approval, bypassing branch protection, or
-posting GitHub comments without explicit operator authorization.
+The nest is allowed to coordinate and recommend. It cannot merge at all. It is
+still forbidden from approving, pushing, editing source, marking human approval,
+bypassing branch protection, or posting GitHub comments without explicit
+operator authorization.
 
-`make pr-merge` is dry-run by default. It prints the `gh pr merge` command only
-after the gate passes. To execute, add `--execute` and the exact confirmation
-token:
+## Merging
 
-```bash
-make pr-merge PR=397 ARGS="--confirm merge-pr-397 --execute"
-```
+**This toolchain does not merge.** GitHub's native merge queue does, after
+branch protection is satisfied. The `merge` subcommand, the `--merge-mode` /
+`--merge-method` flags and the `make pr-merge` target were deleted once the
+queue was adopted: the actuator they drove was uninhabited by construction and
+could only ever emit a `SKIPPED` receipt. `tests/test_pr_merge_control_no_actuation.py`
+pins the absence structurally, so the path cannot be restored by a config flag.
 
-High-risk and critical PRs require `--human-approved` even when Codex and Claude
-both provide review receipts.
+What this toolchain still does is produce the evidence a merge decision rests
+on — review packets, decorrelated agent receipts, the deterministic gate, and
+risk tiering. High-risk and critical PRs still require `--human-approved` on
+the gate even when Codex and Claude both provide review receipts.
 
 ## Receipt Layout
 

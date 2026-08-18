@@ -70,6 +70,35 @@ function makeSnapshot(
     sessionFeedReady: true,
     sessionFeedLabel: "/ws/chat/session/{session_id}",
     sessionFeedPathTemplate: "/ws/chat/session/{session_id}",
+    runtimeGraphReady: false,
+    runtimeGraphStatusLabel: "awaiting graph",
+    runtimeGraphDetail: "Awaiting RuntimeStateStore graph snapshot.",
+    runtimeGraphNodeCount: 0,
+    runtimeGraphEdgeCount: 0,
+    runtimeGraphActiveRunCount: 0,
+    runtimeGraphCheckpointCount: 0,
+    runtimeGraphActiveAgentCount: 0,
+    runtimeInterruptReady: false,
+    runtimeInterruptStatusLabel: "awaiting controls",
+    runtimeInterruptDetail: "Awaiting interrupt, resume, and approval state.",
+    runtimeControlEventCount: 0,
+    runtimePendingInterruptCount: 0,
+    runtimeHumanApprovalRequiredCount: 0,
+    runtimeApprovedCount: 0,
+    runtimeResumedCount: 0,
+    runtimeAssistantsReady: false,
+    runtimeAssistantsStatusLabel: "awaiting assistants",
+    runtimeAssistantsDetail: "Awaiting assistant and configuration state.",
+    runtimeAssistantCount: 0,
+    runtimeConfigurationCount: 0,
+    runtimeActiveAssistantCount: 0,
+    runtimeBackgroundReady: false,
+    runtimeBackgroundStatusLabel: "awaiting background",
+    runtimeBackgroundDetail: "Awaiting cron and background run state.",
+    runtimeCronJobCount: 0,
+    runtimeEnabledCronJobCount: 0,
+    runtimeBackgroundRunCount: 0,
+    runtimeActiveBackgroundRunCount: 0,
     agentCount: 9,
     anomalyCount: 2,
     tracesLastHour: 37,
@@ -122,7 +151,7 @@ test("buildDashboardKeyboardRouteMap keeps c on the canonical control-plane rout
 
   assert.equal(routes.c, "/dashboard/command-post");
   assert.equal(routes.l, "/dashboard/log");
-  assert.equal(routes.c === "/dashboard/claude", false);
+  assert.notEqual(routes.c, "/dashboard/claude");
 });
 
 test("controlPlaneOfflineMessage points operators at the canonical dashboard control script", () => {

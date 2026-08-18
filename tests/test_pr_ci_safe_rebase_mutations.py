@@ -334,6 +334,7 @@ def test_mutant_is_killed_by_targeted_behavioral_tests(
     _assert_real_kill(mutant.name, proc)
 
 
+@pytest.mark.timeout(120)
 def test_matrix_reports_all_nineteen_killed(tmp_path: Path) -> None:
     """Aggregate proof: all 19 killed; no self-certifying string-only check."""
     src = HELPER.read_text(encoding="utf-8")

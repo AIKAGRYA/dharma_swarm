@@ -1,0 +1,85 @@
+{
+  "allowed_files": [
+    ".github/workflows/walking-brief.yml",
+    "reports/agentops/work_packets/loop-closure-WP-LOOPC-walking-brief.json",
+    "scripts/runtime/walking_brief.py",
+    "tests/test_walking_brief.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "ea190e2a83cef62a2dab3aec9434088048395987",
+  "branch": "claude/loop-pr-c-walking-brief",
+  "commit": {
+    "allowed": false,
+    "message": "feat(loop-closure): walking-mode operator brief to the pinned issue"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "scripts/runtime/pr_merge_control.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/governance/ci_parity_manifest.json"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_walking_brief.py -q",
+      "expected_exit": 0,
+      "name": "walking-brief-contract",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "loop-closure-WP-LOOPC-walking-brief",
+  "intent": "PR-C of the walking-mode loop-closure plan (docs/plans/GRAPH_OF_LOOPS_DESIGN_2026-07-29.md, operator ruling 2026-07-29): daily walking-mode Operator Brief composed from GitHub-visible truth and posted to the pinned walking-brief issue \u2014 the only phone-reachable channel. Bypasses (with citation) the disabled ontology-native operator_brief cron and its dead deliver: routing.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/walking_brief.py'); orig=p.read_text(); mut=orig.replace('KILLSWITCH', 'DISABLED-SECTION'); assert mut!=orig; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_walking_brief.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "dropping-killswitch-section-breaks-contract-test",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/operator_brief/insight_brief.py",
+      "dharma_swarm/daily_operating_brief.py",
+      "dharma_swarm/cron_scheduler.py",
+      "dharma_swarm/gateway/telegram.py"
+    ],
+    "collision": {
+      "checked_at_sha": "ea190e2a83cef62a2dab3aec9434088048395987",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The brief workflow only fires from main after operator hand-merge; 'brief arriving daily' is provable post-merge only.",
+      "Sections for lane runs, disagreements, canary results, and ingestion render explicit not-landed lines until PR-A/E/F merge.",
+      "Deliberate KILLSWITCH exception: the brief workflow carries no halt guard because it is the operator's only view during an emergency stop; documented in the workflow header and asserted by test.",
+      "The dead deliver: routing contract in cron_scheduler.py:9,238 is bypassed, not repaired; repairing it is Mac-runtime work outside this lane."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "1f9df96aa32e696933644ec1e81dff5ce92876629c5cc542de67820d3aa8343f",
+    "rollback": "Revert the single commit; the workflow, composer, and tests disappear. The pinned issue (if created by a run) remains as inert history.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPC"
+  },
+  "worktree": "."
+}

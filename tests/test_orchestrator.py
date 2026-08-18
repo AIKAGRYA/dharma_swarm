@@ -4,6 +4,8 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -336,6 +338,41 @@ async def test_no_deps():
     assert dispatches == []
 
 
+@pytest.mark.asyncio
+async def test_task_memory_palace_ingestion_gate_skips_constructor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A false runtime control must not enter the native constructor."""
+    memory_palace_constructor = MagicMock(
+        side_effect=AssertionError("disabled MemoryPalace constructor called")
+    )
+    monkeypatch.setenv("DGC_TASK_MEMORY_PALACE_INGESTION", "0")
+    monkeypatch.setattr(
+        "dharma_swarm.memory_palace.MemoryPalace",
+        memory_palace_constructor,
+    )
+    orch = Orchestrator(
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=tmp_path / "state" / "runtime.db",
+        shared_dir=tmp_path / "shared",
+        stigmergy_dir=tmp_path / "stigmergy",
+        session_id="memory-palace-gate",
+    )
+    orch._runtime_lifecycle.record_artifact = AsyncMock()
+
+    await orch._persist_result(
+        agent_name="agent-test",
+        model_name="test-model",
+        provider_name="test-provider",
+        task=Task(id="memory-gate-task", title="Memory gate task"),
+        result="constructor must stay cold",
+    )
+
+    memory_palace_constructor.assert_not_called()
+    orch._runtime_lifecycle.record_artifact.assert_awaited_once()
+
+
 # ---------------------------------------------------------------------------
 # MockMessageBus for bus-related tests
 # ---------------------------------------------------------------------------
@@ -419,9 +456,22 @@ async def _drain_until_task_ledger_event(
     progress_path,
     expected_event,
     *,
-    attempts=100,
-    delay_seconds=0.01,
+    attempts=600,
+    delay_seconds=0.05,
 ):
+    """Poll until *expected_event* lands in the task ledger.
+
+    The budget must be much larger than the work it waits for, not equal to
+    it. The old 100 x 0.01s (1s nominal) sat right on top of the real
+    latency: an instrumented run reached `result_persisted` at iteration 71
+    of 100, so any runner a little slower than this box ran out of
+    iterations and the test failed with `progress_events: ['task_started']`
+    — a flake on a REQUIRED check (`pytest (3.11)`), reproduced 4 times in
+    6 local runs. 600 x 0.05s (30s nominal) has real headroom; the loop
+    still returns the instant the event appears, so a healthy run costs
+    nothing, and a genuinely stuck task still exits early on any terminal
+    progress event.
+    """
     terminal_progress_events = {
         "result_persist_failed",
         "task_blocked",

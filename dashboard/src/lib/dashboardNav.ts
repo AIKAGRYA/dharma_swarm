@@ -61,6 +61,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
         { label: "GLM-5", href: "/dashboard/glm5", icon: "Brain", level: 1 },
         { label: "Telemetry", href: "/dashboard/telemetry", icon: "Activity", level: 1 },
         { label: "Ecosystem Map", href: "/dashboard/ecosystem", icon: "Orbit", level: 1 },
+        { label: "Organism", href: "/dashboard/organism", icon: "Orbit", level: 1 },
         { label: "Synthesizer", href: "/dashboard/synthesizer", icon: "Sparkles", level: 1 },
         { label: "Agents", href: "/dashboard/agents", icon: "Bot", level: 1 },
         { label: "Tasks", href: "/dashboard/tasks", icon: "ListTodo", level: 1 },

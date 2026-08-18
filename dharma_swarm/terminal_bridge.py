@@ -2244,7 +2244,12 @@ class TerminalBridge(TerminalBridgeSessionRuntimeMixin, TerminalBridgeChatMixin)
                     "Use the Control and Timeline panes for current runtime truth.",
                 ]
             )
-        if command in {"memory", "archive", "truth", "stigmergy", "darwin", "hum"}:
+        if command == "memory":
+            from dharma_swarm.memory_common import render_memory_common_command
+
+            _, _, arg = raw_command.partition(" ")
+            return render_memory_common_command(arg or "status", state_dir=self._state_dir)
+        if command in {"archive", "truth", "stigmergy", "darwin", "hum"}:
             return "\n".join(
                 [
                     "# Memory Surface",

@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .repository_identity import (
+    RepositoryIdentityObservation,
+    observe_repository_identity,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # The canonical max-five first-read list. "onboard output" is the command
@@ -37,6 +42,8 @@ CONTRACT_SOURCES = (
     "docs/governance/ANTI_SLOP_RULES.md",
     "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "docs/governance/REPOSITORY_IDENTITY.json",
     "docs/state/BROKEN_REGISTER.md",
     "pyproject.toml",
     "uv.lock",
@@ -77,17 +84,13 @@ def _sha256_file(path: Path) -> str:
         return ""
 
 
-def repo_identity() -> dict[str, str]:
+def repo_identity(
+    observation: RepositoryIdentityObservation | None = None,
+) -> dict[str, str]:
     """Stable repository identity: owner/repo, HEAD, branch."""
-    url = _git("remote", "get-url", "origin")
-    identity = ""
-    if url:
-        tail = url.rstrip("/").removesuffix(".git")
-        parts = tail.replace(":", "/").split("/")
-        if len(parts) >= 2:
-            identity = f"{parts[-2]}/{parts[-1]}"
+    observed = observation or observe_repository_identity(REPO_ROOT)
     return {
-        "identity": identity,
+        "identity": observed.identity,
         "head": _git("rev-parse", "HEAD"),
         "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
     }
@@ -288,7 +291,9 @@ def projection_freshness() -> dict[str, Any]:
     }
 
 
-def collect_stable_core() -> dict[str, Any]:
+def collect_stable_core(
+    repository_observation: RepositoryIdentityObservation | None = None,
+) -> dict[str, Any]:
     """Assemble the full v2 ``stable_core`` partition."""
     # The v2 receipt retains an empty packet object for backwards-compatible
     # validation. Packet binding belongs exclusively to the AgentOps runner.
@@ -297,7 +302,7 @@ def collect_stable_core() -> dict[str, Any]:
         "allowed_files": [], "forbidden_files": [],
     }
     return {
-        "repository": repo_identity(),
+        "repository": repo_identity(repository_observation),
         "contract": contract_sources(),
         "packet": packet_block,
         "portfolio": portfolio_snapshot(),

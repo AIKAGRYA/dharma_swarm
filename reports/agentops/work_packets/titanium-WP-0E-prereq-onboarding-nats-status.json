@@ -1,0 +1,110 @@
+{
+  "id": "titanium-WP-0E-prereq-onboarding-nats-status",
+  "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+  "branch": "agent/onboarding-nats-status-20260725",
+  "worktree": ".",
+  "intent": "Owner-scoped prerequisite for WP-0E: restore the canonical compact onboarding projection required by docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md. Both human and --json status must expose the canonical spec path, a bounded local-only TCP observation for 127.0.0.1:4222, existence of the five declared compatibility filesystem A2A mirrors, and an explicit false live-transport-proof claim. This is projection-only evidence: it must not require NATS, contact an external endpoint, attempt JetStream operations, claim live contact, or change any typed onboarding verdict or exit code.",
+  "allowed_files": [
+    "scripts/governance/agent_onboard.py",
+    "dharma_swarm/operator_core/onboarding/cli.py",
+    "dharma_swarm/operator_core/onboarding/evidence.py",
+    "dharma_swarm/operator_core/onboarding/nats_status.py",
+    "dharma_swarm/operator_core/onboarding/render.py",
+    "tests/test_agent_onboard.py",
+    "tests/test_onboarding_nats_status.py",
+    "reports/agentops/work_packets/titanium-WP-0E-prereq-onboarding-nats-status.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "onboarding-nats-focused-suite",
+      "command": "python3 -m pytest tests/test_onboarding_nats_status.py tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_cache.py tests/test_onboarding_contract.py tests/test_onboarding_readiness.py tests/test_make_onboarding_contract.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "onboarding-nats-touched-python-ruff",
+      "command": "python3 -m ruff check scripts/governance/agent_onboard.py dharma_swarm/operator_core/onboarding/cli.py dharma_swarm/operator_core/onboarding/evidence.py dharma_swarm/operator_core/onboarding/nats_status.py dharma_swarm/operator_core/onboarding/render.py tests/test_agent_onboard.py tests/test_onboarding_nats_status.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "onboarding-nats-working-diff-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "canonical-nats-spec-path-mutation-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/operator_core/onboarding/nats_status.py'); t=p.read_text(); anchor='docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'docs/NATS_SUBSTRATE_MASTER_SPEC.md',1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_onboarding_nats_status.py','-q','-k','canonical_spec'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "filesystem-mirror-proof-promotion-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/operator_core/onboarding/nats_status.py'); t=p.read_text(); anchor='MIRRORS_ARE_LIVE_TRANSPORT_PROOF = False'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'MIRRORS_ARE_LIVE_TRANSPORT_PROOF = True',1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_onboarding_nats_status.py','-q','-k','never_promotes_mirrors'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "nats-status-collector-disconnect-must-fail",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/operator_core/onboarding/cli.py'); t=p.read_text(); anchor='nats_projection = nats_status.collect_nats_substrate_status()'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'nats_projection = {}',1)); r=subprocess.run([sys.executable,'-m','pytest','tests/test_onboarding_nats_status.py','-q','-k','real_cli_projects_nats_status'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(onboarding): restore canonical NATS substrate status"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0E",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The canonical NATS substrate spec requires make onboard to render NATS status every session, but exact-base compact human and --json output carry no NATS projection.",
+      "The legacy onboarding implementation referenced the NATS spec, but compact onboarding migration PR #913 removed that surface while the hard governance invariant remained canonical."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/operator_core/onboarding/cli.py:assemble_and_run",
+      "dharma_swarm/operator_core/onboarding/cli.py:_assemble_v2",
+      "dharma_swarm/operator_core/onboarding/render.py:machine_projection",
+      "dharma_swarm/operator_core/onboarding/render.py:render_compact",
+      "scripts/governance/agent_onboard.py:NATS_SUBSTRATE_SPEC_PATH",
+      "dharma_swarm/operator_core/nats_substrate_status.py:probe_nats_substrate",
+      "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md:Onboarding And Enforcement"
+    ],
+    "honest_blockers": [
+      "A listening TCP port proves only that a local listener accepted a connection. This packet cannot claim NATS protocol health, JetStream acknowledgement, agent reachability, or live contact.",
+      "Compatibility filesystem mirror presence is evidence of paths only and must remain explicitly false as live-transport proof.",
+      "WP-0E remains a separate draft and must rebase after this prerequisite lands; this packet does not edit or promote WP-0E.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the compact onboarding compatibility shim, the four compact onboarding implementation files, the two focused test files, and this exact packet together. Rollback restores the known canonical gap: make onboard no longer renders the NATS substrate section. Do not replace the projection with live evidence or alter onboarding verdict semantics during rollback.",
+    "packet_digest": "c6bbfe241adbc6b862be17a6883616af594dd270c131c1b82fc0a2aa36fc0507"
+  }
+}

@@ -1,6 +1,7 @@
 """Tests for dharma_swarm.swarm_health_api — health/metrics HTTP endpoint.
 
 Validates:
+- _bind_host: fail-closed loopback default and explicit override
 - _uptime: format (HH:MM:SS)
 - _utc_now: ISO format with timezone
 - _read_json: valid/invalid/missing
@@ -13,9 +14,12 @@ Validates:
 
 from __future__ import annotations
 
+import asyncio
 import json
+from pathlib import Path
 
 import pytest
+import yaml
 
 import dharma_swarm.swarm_health_api as health_api
 
@@ -25,6 +29,78 @@ def isolated_state_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(health_api, "_STATE_DIR", tmp_path)
     monkeypatch.setenv("DHARMA_EVOLUTION_SHADOW", "1")
     monkeypatch.setenv("DGC_AUTONOMY_LEVEL", "1")
+
+
+# ---------------------------------------------------------------------------
+# _bind_host
+# ---------------------------------------------------------------------------
+
+
+class TestBindHost:
+    def test_defaults_to_loopback(self, monkeypatch):
+        monkeypatch.delenv("DHARMA_API_HOST", raising=False)
+
+        assert health_api._bind_host() == "127.0.0.1"
+
+    def test_blank_value_defaults_to_loopback(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_API_HOST", "  ")
+
+        assert health_api._bind_host() == "127.0.0.1"
+
+    def test_honors_explicit_container_override(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_API_HOST", "0.0.0.0")
+
+        assert health_api._bind_host() == "0.0.0.0"
+
+    def test_server_uses_loopback_default(self, monkeypatch):
+        captured = {}
+
+        class FakeServer:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        async def fake_start_server(handler, host, port):
+            captured.update(handler=handler, host=host, port=port)
+            return FakeServer()
+
+        async def exercise():
+            shutdown_event = asyncio.Event()
+            shutdown_event.set()
+            await health_api.run_health_api(shutdown_event)
+
+        monkeypatch.delenv("DHARMA_API_HOST", raising=False)
+        monkeypatch.setattr(health_api.asyncio, "start_server", fake_start_server)
+
+        asyncio.run(exercise())
+
+        assert captured == {
+            "handler": health_api._handle,
+            "host": "127.0.0.1",
+            "port": health_api._PORT,
+        }
+
+    def test_compose_preserves_loopback_host_boundary(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        compose = yaml.safe_load((repo_root / "docker-compose.yml").read_text())
+        swarm = compose["services"]["swarm"]
+
+        assert "127.0.0.1:7433:7433" in swarm["ports"]
+        assert swarm["environment"]["DHARMA_API_HOST"] == "0.0.0.0"
+        assert swarm["healthcheck"]["test"] == [
+            "CMD",
+            "curl",
+            "-f",
+            "http://localhost:7433/health",
+        ]
+
+    def test_compose_web_publication_is_loopback_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        compose = yaml.safe_load((repo_root / "docker-compose.yml").read_text())
+
+        assert compose["services"]["web"]["ports"] == ["127.0.0.1:8080:8080"]
 
 
 # ---------------------------------------------------------------------------

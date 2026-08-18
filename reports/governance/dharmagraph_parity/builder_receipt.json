@@ -10339,25 +10339,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.061133731000040825,
+                "median_seconds": 0.009317000000010012,
                 "samples_seconds": [
-                  0.15438656000003448,
-                  0.05948853099994267,
-                  0.06439205700007733,
-                  0.061133731000040825,
-                  0.059824402999993254
+                  0.009625041999242967,
+                  0.009317000000010012,
+                  0.008506958001817111,
+                  0.01156891700156848,
+                  0.008807582998997532
                 ]
               },
               "id": "performance:seeded_checkpoint_resume_fork",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.009528326999998171,
+                "median_seconds": 0.0023702920007053763,
                 "samples_seconds": [
-                  0.01324386399994637,
-                  0.008745686999986901,
-                  0.009817286000043168,
-                  0.009528326999998171,
-                  0.008999785000014526
+                  0.0023702920007053763,
+                  0.0022825420019216835,
+                  0.0026633750021574087,
+                  0.0023696669995842967,
+                  0.002648124998813728
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10399,16 +10399,16 @@
               "command_or_probe": "record interpreter, platform, and installed LangGraph version",
               "dharma": {
                 "langgraph_version": "1.2.4",
-                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-                "python_executable": "/usr/local/bin/python3",
+                "platform": "macOS-26.5.1-arm64-arm-64bit",
+                "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
                 "python_version": "3.11.15"
               },
               "id": "performance:environment-metadata",
               "kind": "runtime_environment",
               "langgraph": {
                 "langgraph_version": "1.2.4",
-                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-                "python_executable": "/usr/local/bin/python3",
+                "platform": "macOS-26.5.1-arm64-arm-64bit",
+                "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
                 "python_version": "3.11.15"
               },
               "outcome": "recorded"
@@ -10449,25 +10449,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0012273969999796464,
+                "median_seconds": 0.0006334169993351679,
                 "samples_seconds": [
-                  0.0014661839999234871,
-                  0.0013514830000076472,
-                  0.0010093989999404585,
-                  0.0012273969999796464,
-                  0.0010071839999454824
+                  0.0009317920012108516,
+                  0.0006042920031177346,
+                  0.0005582910016528331,
+                  0.0006334169993351679,
+                  0.0006782909986213781
                 ]
               },
               "id": "performance:seeded_linear_reducer_chain",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.005335025000022142,
+                "median_seconds": 0.0014633329992648214,
                 "samples_seconds": [
-                  0.005335025000022142,
-                  0.005053691999933108,
-                  0.004837004000023626,
-                  0.005341959000020324,
-                  0.0054663859999664055
+                  0.0016744999993534293,
+                  0.001334542001131922,
+                  0.0013180000023567118,
+                  0.0015030829999886919,
+                  0.0014633329992648214
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10508,9 +10508,9 @@
               ],
               "command_or_probe": "compute Dharma median / LangGraph median",
               "dharma": {
-                "seeded_checkpoint_resume_fork": 6.415998422393833,
-                "seeded_linear_reducer_chain": 0.2300639640816214,
-                "seeded_send_map_reduce": 0.18625945046491532
+                "seeded_checkpoint_resume_fork": 3.930739333903739,
+                "seeded_linear_reducer_chain": 0.4328590960863977,
+                "seeded_send_map_reduce": 0.36351131976147144
               },
               "id": "performance:overhead-ratios",
               "kind": "wall_clock_performance",
@@ -10555,25 +10555,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0008326820000092994,
+                "median_seconds": 0.00036337500205263495,
                 "samples_seconds": [
-                  0.0008351290000518929,
-                  0.0008326820000092994,
-                  0.0007145219999529218,
-                  0.0008804980000149953,
-                  0.0006568060000518017
+                  0.00040283400085172616,
+                  0.0003965840005548671,
+                  0.0003545420004229527,
+                  0.00036337500205263495,
+                  0.0003178330007358454
                 ]
               },
               "id": "performance:seeded_send_map_reduce",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.004470548999961466,
+                "median_seconds": 0.0009996249973482918,
                 "samples_seconds": [
-                  0.0047602469999219466,
-                  0.004470548999961466,
-                  0.004725288000031469,
-                  0.004297094999969886,
-                  0.004353604000016276
+                  0.001100582998333266,
+                  0.0009996249973482918,
+                  0.0009623750011087395,
+                  0.0009364580000692513,
+                  0.0010917499967035837
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -11553,13 +11553,13 @@
       "supply_eta_risk"
     ]
   },
-  "digest": "478930a492ecf0d85c7f734a751f0d44cc35c926e7b241b30d22dff021619ee1",
+  "digest": "5c799bb09027956797d8881111aea07d844fb7d889de46f393b3c2fc1a62180f",
   "environment": {
     "langgraph_checkpoint_sqlite_version": "3.1.0",
     "langgraph_checkpoint_version": "4.1.1",
     "langgraph_version": "1.2.4",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "python_executable": "/usr/local/bin/python3",
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
     "python_version": "3.11.15"
   },
   "gaps": [
@@ -11792,12 +11792,13 @@
     "behavioral_execution_against_latest": true,
     "capability_changes": {},
     "control_failed_as_required": true,
-    "elapsed_seconds": 14.19138322699996,
+    "elapsed_seconds": 6.320698915998946,
     "finding": "Latest-stable drift is reported only; the frozen 1.2.4 grade is unchanged.",
     "gating": false,
     "installed_grade_target": "1.2.4",
     "observed_latest_version": "1.2.8",
     "public_surface_added": [
+      "langgraph.prebuilt:create_react_agent:callable:(model: Union[str, langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str | list[str | dict[str, Any]]] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage | str], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], langchain_core.language_models.chat_models.BaseChatModel], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], collections.abc.Awaitable[langchain_core.language_models.chat_models.BaseChatModel]], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str | list[str | dict[str, Any]]] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage]], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], collections.abc.Awaitable[langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str | list[str | dict[str, Any]]] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage]]]], tools: collections.abc.Sequence[langchain_core.tools.base.BaseTool | collections.abc.Callable | dict[str, typing.Any]] | langgraph.prebuilt.tool_node.ToolNode, *, prompt: Union[langchain_core.messages.system.SystemMessage, str, collections.abc.Callable[[~StateSchema], langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str | list[str | dict[str, Any]]] | str | dict[str, Any]]], langchain_core.runnables.base.Runnable[~StateSchema, langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str | list[str | dict[str, Any]]] | str | dict[str, Any]]], NoneType] = None, response_format: dict | type[pydantic.main.BaseModel] | tuple[str, dict | type[pydantic.main.BaseModel]] | None = None, pre_model_hook: Union[langchain_core.runnables.base.Runnable[-Input, +Output], collections.abc.Callable[[-Input], +Output], collections.abc.Callable[[-Input], collections.abc.Awaitable[+Output]], collections.abc.Callable[[collections.abc.Iterator[-Input]], collections.abc.Iterator[+Output]], collections.abc.Callable[[collections.abc.AsyncIterator[-Input]], collections.abc.AsyncIterator[+Output]], langchain_core.runnables.base._RunnableCallableSync[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsync[-Input, +Output], langchain_core.runnables.base._RunnableCallableIterator[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsyncIterator[-Input, +Output], collections.abc.Mapping[str, Any], langgraph._internal._runnable._RunnableWithWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithStore[-Input, +Output], langgraph._internal._runnable._RunnableWithWriterStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriterStore[-Input, +Output], NoneType] = None, post_model_hook: Union[langchain_core.runnables.base.Runnable[-Input, +Output], collections.abc.Callable[[-Input], +Output], collections.abc.Callable[[-Input], collections.abc.Awaitable[+Output]], collections.abc.Callable[[collections.abc.Iterator[-Input]], collections.abc.Iterator[+Output]], collections.abc.Callable[[collections.abc.AsyncIterator[-Input]], collections.abc.AsyncIterator[+Output]], langchain_core.runnables.base._RunnableCallableSync[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsync[-Input, +Output], langchain_core.runnables.base._RunnableCallableIterator[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsyncIterator[-Input, +Output], collections.abc.Mapping[str, Any], langgraph._internal._runnable._RunnableWithWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithStore[-Input, +Output], langgraph._internal._runnable._RunnableWithWriterStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriterStore[-Input, +Output], NoneType] = None, state_schema: type[~StateSchema] | None = None, context_schema: type[typing.Any] | None = None, checkpointer: None | bool | langgraph.checkpoint.base.BaseCheckpointSaver = None, store: langgraph.store.base.BaseStore | None = None, interrupt_before: list[str] | None = None, interrupt_after: list[str] | None = None, debug: bool = False, version: Literal['v1', 'v2'] = 'v2', name: str | None = None, **deprecated_kwargs: Any) -> langgraph.graph.state.CompiledStateGraph",
       "langgraph.types:Overwrite.type:member",
       "langgraph.types:Overwrite:class:(value: 'Any', type: \"Literal['__overwrite__']\" = '__overwrite__') -> None"
     ],
@@ -11806,6 +11807,7 @@
       "pinned": 1578
     },
     "public_surface_removed": [
+      "langgraph.prebuilt:create_react_agent:callable:(model: Union[str, langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage | str], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], langchain_core.language_models.chat_models.BaseChatModel], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], collections.abc.Awaitable[langchain_core.language_models.chat_models.BaseChatModel]], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage]], collections.abc.Callable[[~StateSchema, langgraph.runtime.Runtime[~ContextT]], collections.abc.Awaitable[langchain_core.runnables.base.Runnable[langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]], langchain_core.messages.base.BaseMessage]]]], tools: collections.abc.Sequence[langchain_core.tools.base.BaseTool | collections.abc.Callable | dict[str, typing.Any]] | langgraph.prebuilt.tool_node.ToolNode, *, prompt: Union[langchain_core.messages.system.SystemMessage, str, collections.abc.Callable[[~StateSchema], langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]]], langchain_core.runnables.base.Runnable[~StateSchema, langchain_core.prompt_values.PromptValue | str | collections.abc.Sequence[langchain_core.messages.base.BaseMessage | list[str] | tuple[str, str] | str | dict[str, Any]]], NoneType] = None, response_format: dict | type[pydantic.main.BaseModel] | tuple[str, dict | type[pydantic.main.BaseModel]] | None = None, pre_model_hook: Union[langchain_core.runnables.base.Runnable[-Input, +Output], collections.abc.Callable[[-Input], +Output], collections.abc.Callable[[-Input], collections.abc.Awaitable[+Output]], collections.abc.Callable[[collections.abc.Iterator[-Input]], collections.abc.Iterator[+Output]], collections.abc.Callable[[collections.abc.AsyncIterator[-Input]], collections.abc.AsyncIterator[+Output]], langchain_core.runnables.base._RunnableCallableSync[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsync[-Input, +Output], langchain_core.runnables.base._RunnableCallableIterator[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsyncIterator[-Input, +Output], collections.abc.Mapping[str, Any], langgraph._internal._runnable._RunnableWithWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithStore[-Input, +Output], langgraph._internal._runnable._RunnableWithWriterStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriterStore[-Input, +Output], NoneType] = None, post_model_hook: Union[langchain_core.runnables.base.Runnable[-Input, +Output], collections.abc.Callable[[-Input], +Output], collections.abc.Callable[[-Input], collections.abc.Awaitable[+Output]], collections.abc.Callable[[collections.abc.Iterator[-Input]], collections.abc.Iterator[+Output]], collections.abc.Callable[[collections.abc.AsyncIterator[-Input]], collections.abc.AsyncIterator[+Output]], langchain_core.runnables.base._RunnableCallableSync[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsync[-Input, +Output], langchain_core.runnables.base._RunnableCallableIterator[-Input, +Output], langchain_core.runnables.base._RunnableCallableAsyncIterator[-Input, +Output], collections.abc.Mapping[str, Any], langgraph._internal._runnable._RunnableWithWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithStore[-Input, +Output], langgraph._internal._runnable._RunnableWithWriterStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriter[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigStore[-Input, +Output], langgraph._internal._runnable._RunnableWithConfigWriterStore[-Input, +Output], NoneType] = None, state_schema: type[~StateSchema] | None = None, context_schema: type[typing.Any] | None = None, checkpointer: None | bool | langgraph.checkpoint.base.BaseCheckpointSaver = None, store: langgraph.store.base.BaseStore | None = None, interrupt_before: list[str] | None = None, interrupt_after: list[str] | None = None, debug: bool = False, version: Literal['v1', 'v2'] = 'v2', name: str | None = None, **deprecated_kwargs: Any) -> langgraph.graph.state.CompiledStateGraph",
       "langgraph.types:Overwrite:class:(value: 'Any') -> None"
     ],
     "status": "DRIFT_OBSERVED",
@@ -11818,13 +11820,13 @@
     },
     "workload_verdict_changes": {}
   },
-  "observed_at": "2026-07-17T13:50:26Z",
+  "observed_at": "2026-08-08T15:55:34Z",
   "performance": {
     "clock": "time.perf_counter",
     "environment_metadata": {
       "langgraph_version": "1.2.4",
-      "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-      "python_executable": "/usr/local/bin/python3",
+      "platform": "macOS-26.5.1-arm64-arm-64bit",
+      "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
       "python_version": "3.11.15"
     },
     "iterations": 5,
@@ -11833,83 +11835,83 @@
     "workloads": {
       "seeded_checkpoint_resume_fork": {
         "dharma": {
-          "median_seconds": 0.061133731000040825,
+          "median_seconds": 0.009317000000010012,
           "samples_seconds": [
-            0.15438656000003448,
-            0.05948853099994267,
-            0.06439205700007733,
-            0.061133731000040825,
-            0.059824402999993254
+            0.009625041999242967,
+            0.009317000000010012,
+            0.008506958001817111,
+            0.01156891700156848,
+            0.008807582998997532
           ]
         },
-        "dharma_median_seconds": 0.061133731000040825,
+        "dharma_median_seconds": 0.009317000000010012,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.009528326999998171,
+          "median_seconds": 0.0023702920007053763,
           "samples_seconds": [
-            0.01324386399994637,
-            0.008745686999986901,
-            0.009817286000043168,
-            0.009528326999998171,
-            0.008999785000014526
+            0.0023702920007053763,
+            0.0022825420019216835,
+            0.0026633750021574087,
+            0.0023696669995842967,
+            0.002648124998813728
           ]
         },
-        "langgraph_median_seconds": 0.009528326999998171,
-        "overhead_ratio_dharma_to_langgraph": 6.415998422393833,
+        "langgraph_median_seconds": 0.0023702920007053763,
+        "overhead_ratio_dharma_to_langgraph": 3.930739333903739,
         "semantic_parity_all_iterations": true
       },
       "seeded_linear_reducer_chain": {
         "dharma": {
-          "median_seconds": 0.0012273969999796464,
+          "median_seconds": 0.0006334169993351679,
           "samples_seconds": [
-            0.0014661839999234871,
-            0.0013514830000076472,
-            0.0010093989999404585,
-            0.0012273969999796464,
-            0.0010071839999454824
+            0.0009317920012108516,
+            0.0006042920031177346,
+            0.0005582910016528331,
+            0.0006334169993351679,
+            0.0006782909986213781
           ]
         },
-        "dharma_median_seconds": 0.0012273969999796464,
+        "dharma_median_seconds": 0.0006334169993351679,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.005335025000022142,
+          "median_seconds": 0.0014633329992648214,
           "samples_seconds": [
-            0.005335025000022142,
-            0.005053691999933108,
-            0.004837004000023626,
-            0.005341959000020324,
-            0.0054663859999664055
+            0.0016744999993534293,
+            0.001334542001131922,
+            0.0013180000023567118,
+            0.0015030829999886919,
+            0.0014633329992648214
           ]
         },
-        "langgraph_median_seconds": 0.005335025000022142,
-        "overhead_ratio_dharma_to_langgraph": 0.2300639640816214,
+        "langgraph_median_seconds": 0.0014633329992648214,
+        "overhead_ratio_dharma_to_langgraph": 0.4328590960863977,
         "semantic_parity_all_iterations": true
       },
       "seeded_send_map_reduce": {
         "dharma": {
-          "median_seconds": 0.0008326820000092994,
+          "median_seconds": 0.00036337500205263495,
           "samples_seconds": [
-            0.0008351290000518929,
-            0.0008326820000092994,
-            0.0007145219999529218,
-            0.0008804980000149953,
-            0.0006568060000518017
+            0.00040283400085172616,
+            0.0003965840005548671,
+            0.0003545420004229527,
+            0.00036337500205263495,
+            0.0003178330007358454
           ]
         },
-        "dharma_median_seconds": 0.0008326820000092994,
+        "dharma_median_seconds": 0.00036337500205263495,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.004470548999961466,
+          "median_seconds": 0.0009996249973482918,
           "samples_seconds": [
-            0.0047602469999219466,
-            0.004470548999961466,
-            0.004725288000031469,
-            0.004297094999969886,
-            0.004353604000016276
+            0.001100582998333266,
+            0.0009996249973482918,
+            0.0009623750011087395,
+            0.0009364580000692513,
+            0.0010917499967035837
           ]
         },
-        "langgraph_median_seconds": 0.004470548999961466,
-        "overhead_ratio_dharma_to_langgraph": 0.18625945046491532,
+        "langgraph_median_seconds": 0.0009996249973482918,
+        "overhead_ratio_dharma_to_langgraph": 0.36351131976147144,
         "semantic_parity_all_iterations": true
       }
     }
@@ -16875,7 +16877,7 @@
   "role": "builder",
   "rubric": {
     "base_rubric_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
-    "head_sha": "c83df531c32ce7c775f27ddfbc7512e1cc952db7",
+    "head_sha": "4c83660632e88802c5e3c6536c71c0dc4b64e6ea",
     "rubric_blob_digest": "44ba1f42550563b3f2b5e167b80440250228e4b3d045a2654c9e8b62c87d2338",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_predates_head": true,
@@ -16888,7 +16890,7 @@
     "possible": "100.00"
   },
   "shas": {
-    "dharma_git_sha": "c83df531c32ce7c775f27ddfbc7512e1cc952db7",
+    "dharma_git_sha": "4c83660632e88802c5e3c6536c71c0dc4b64e6ea",
     "langgraph_git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc"
   },
@@ -16927,7 +16929,7 @@
     },
     {
       "path": "dharma_swarm/graph/durable_invoker.py",
-      "sha256": "4a984a01452036c5498f98d8028bfd5bb71666bda09b9a524d4c38ff3cf0cd7b"
+      "sha256": "9717427cac5a1ecaf8f10a3f56ae24aa84c8b6e100071394ffd0da6ded5aa114"
     },
     {
       "path": "dharma_swarm/graph/effects.py",
@@ -17071,7 +17073,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "71a54eaa86072392062158936a17a5557bd6684f1c3f7a5e637dee98886af713"
+      "sha256": "f48caca9134135a9b9f74b887cfefa27e358be0847f77d9b5b529e202797ac29"
     },
     {
       "path": "scripts/governance/dharmagraph_parity_gauntlet.py",
@@ -17111,10 +17113,10 @@
     },
     {
       "path": "uv.lock",
-      "sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369"
+      "sha256": "1aaf7c313f5fde5816445c63476ffa95edb624a2ca09a16c1138543043adb399"
     }
   ],
-  "source_tree_digest": "4bb99e558c148609fa77f40c2fca0243bdff055642ee887d32f4f0c0705a8c94",
+  "source_tree_digest": "9e93c0d95db80ce81189ca50aef836acf1ae464b9af1651f8a5444392a165865",
   "stable_core": {
     "capabilities": [
       {
@@ -17842,7 +17844,7 @@
     "schema": "dharma_swarm.dharmagraph_parity_receipt.stable.v1",
     "score": "58.00",
     "seed": 20260711,
-    "source_tree_digest": "4bb99e558c148609fa77f40c2fca0243bdff055642ee887d32f4f0c0705a8c94",
+    "source_tree_digest": "9e93c0d95db80ce81189ca50aef836acf1ae464b9af1651f8a5444392a165865",
     "target": {
       "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
       "distribution": "langgraph",
@@ -17859,6 +17861,6 @@
     },
     "weight_denominator": 100
   },
-  "stable_digest": "59a6a08e226be3f699d11c8af20b5409881ed0e60a6b36b407dfe1bcd0a932a0",
+  "stable_digest": "ffc91d098bf2047ecf56b443cb5404194bfe4116f2fc87a88d71154b4709effd",
   "verdict": "NOT_FINISHED"
 }

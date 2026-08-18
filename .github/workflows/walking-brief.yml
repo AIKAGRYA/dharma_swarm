@@ -1,0 +1,56 @@
+name: walking-brief
+
+# Tier 2 / referee layer (operator ruling 2026-07-29): operator hand-merge
+# forever on this file.
+#
+# Daily walking-mode Operator Brief: composes phone-readable status from
+# GitHub-visible truth (scripts/runtime/walking_brief.py) and posts it as a
+# comment on the pinned issue labeled `walking-brief` — the one channel that
+# reaches the operator's phone today (GitHub mobile notifications).
+#
+# KILLSWITCH exception, deliberate: this workflow is read-only reporting and
+# does NOT carry the "Halt on loop kill-switch" guard. During an emergency
+# stop the brief is the operator's only view of what is halted, so it keeps
+# publishing — with the KILLSWITCH section at the top. It takes no action on
+# any PR, task, or merge surface.
+
+on:
+  schedule:
+    - cron: "0 21 * * *"  # 21:00 UTC = 06:00 JST — morning brief on the walk
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: walking-brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    name: Compose and post the walking brief
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Compose and post
+        run: |
+          set -euo pipefail
+          python3 scripts/runtime/walking_brief.py --repo "${GH_REPO}" --post \
+            --output "${RUNNER_TEMP}/walking_brief.md"
+          {
+            echo "## Walking Brief (as posted)"
+            echo ""
+            cat "${RUNNER_TEMP}/walking_brief.md"
+          } >> "$GITHUB_STEP_SUMMARY"

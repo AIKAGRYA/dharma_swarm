@@ -32,26 +32,10 @@ on:
         description: Required reviewer receipt names before Mike may merge
         required: true
         # Native installed-App reviews are the credential-free cloud quorum.
-        # Claude remains an optional deep/backup lane.
-        default: codex,copilot
+        # Claude remains an optional deep/backup lane. Copilot is accepted but
+        # never required (operator ratification 2026-07-31).
+        default: codex
         type: string
-      merge_mode:
-        description: Mike merge authority mode
-        required: true
-        default: "off"
-        type: choice
-        options:
-          - "off"
-          - auto-when-clean
-      merge_method:
-        description: Merge method when merge_mode is auto-when-clean
-        required: true
-        default: squash
-        type: choice
-        options:
-          - squash
-          - merge
-          - rebase
       nats_required:
         description: Fail the run unless A2A NATS publish is JetStream-ack verified
         required: true
@@ -60,19 +44,42 @@ on:
 
 permissions:
   checks: read
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
   statuses: read
 
 concurrency:
-  group: merge-master-mike-backlog
-  cancel-in-progress: false
+  # Scheduled heartbeats and each manual mode have independent shards. A newer
+  # run supersedes stale work in the same shard instead of extending a queue.
+  group: merge-master-mike-backlog-${{ github.event_name }}-${{ github.event.inputs.mode || 'scheduled' }}
+  cancel-in-progress: true
 
 jobs:
   backlog:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Halt on loop kill-switch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Loop kill-switch (docs/ops/loop_control/README.md): file present on
+          # the loop-control branch => HALT (exit 1, red-while-halted); absent
+          # (404 on file or branch) => proceed; any other error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — no backlog fanout" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -99,10 +106,15 @@ jobs:
           MAX_PRS: ${{ inputs.max_prs || '5' }}
           LIMIT: ${{ inputs.limit || '100' }}
           STATUSES: ${{ inputs.statuses || 'GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW' }}
-          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex,copilot' }}
-          MERGE_MODE: ${{ inputs.merge_mode || 'off' }}
-          MERGE_METHOD: ${{ inputs.merge_method || 'squash' }}
+          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex' }}
+          # The backlog lane is a sensor/packetizer. It never had merge
+          # authority: it passed --merge-mode "off" to an actuator that could
+          # only ever return SKIPPED. That actuator is gone and so are the
+          # flags, so there is nothing left here to switch off.
           NATS_REQUIRED: ${{ inputs.nats_required || false }}
+          # RUNNER_TEMP is ephemeral. The monotonic Actions run number gives
+          # scheduled packet-only passes a deterministic rotating queue start.
+          FANOUT_OFFSET: ${{ github.run_number }}
         run: |
           set -euo pipefail
           state_root="${RUNNER_TEMP}/dharma-pr-review"
@@ -111,10 +123,9 @@ jobs:
             fanout
             --limit "${LIMIT}"
             --max-prs "${MAX_PRS}"
+            --fanout-offset "${FANOUT_OFFSET}"
             --statuses "${STATUSES}"
             --required-reviewers "${REQUIRED_REVIEWERS}"
-            --merge-mode "${MERGE_MODE}"
-            --merge-method "${MERGE_METHOD}"
             --nats-session
             --nats-timeout-s 8
           )
