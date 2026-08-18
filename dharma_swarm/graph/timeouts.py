@@ -17,20 +17,23 @@ so ``"auto"`` and ``"heartbeat"`` are observationally identical here — both
 refresh on explicit :func:`heartbeat` calls only. The field is still validated
 and carried so graphs port across engines unchanged.
 
-Timeouts are the one place the engine reads REAL time: they exist to bound
+Timeouts are the one place the engine consumes REAL time: they exist to bound
 wall-clock work, and ``asyncio`` cancellation is the enforcement mechanism.
-Retry backoff (the DST-seamed part) stays on ``effects.retry_sleep``.
+The clock is still read through the effects seam (``EffectsProvider.monotonic``
+/ ``default_monotonic``) per the seam-ledger law; both stock providers return
+wall monotonic time today. Retry backoff stays on ``effects.retry_sleep``.
 
 claim_mode: candidate / test_only. Not wired into production dispatch.
 """
 
 from __future__ import annotations
 
-import time
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Literal
+from typing import Callable, Literal
+
+from dharma_swarm.graph.effects import default_monotonic
 
 __all__ = [
     "IdleWatchdog",
@@ -126,16 +129,21 @@ class IdleWatchdog:
     object is shared, not copied, so mutation is visible to the watchdog loop.
     """
 
-    __slots__ = ("node_id", "heartbeats", "last_progress")
+    __slots__ = ("node_id", "heartbeats", "last_progress", "_clock")
 
-    def __init__(self, node_id: str) -> None:
+    def __init__(
+        self,
+        node_id: str,
+        clock: Callable[[], float] = default_monotonic,
+    ) -> None:
         self.node_id = node_id
         self.heartbeats = 0
-        self.last_progress = time.monotonic()
+        self._clock = clock
+        self.last_progress = clock()
 
     def record_progress(self) -> None:
         self.heartbeats += 1
-        self.last_progress = time.monotonic()
+        self.last_progress = self._clock()
 
     def idle_deadline(self, idle_timeout: float) -> float:
         return self.last_progress + idle_timeout

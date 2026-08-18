@@ -21,13 +21,17 @@ from __future__ import annotations
 import asyncio
 import copy
 import inspect
-import time
 from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
 
 from dharma_swarm.graph.channels import ChannelWrite, TopicChannel
-from dharma_swarm.graph.effects import EffectsProvider
+from dharma_swarm.graph.effects import (
+    EffectsProvider,
+    monotonic_clock,
+    provider_retry_sleep,
+    wait_for_task,
+)
 from dharma_swarm.graph.errors import (
     GraphRuntimeError,
     MalformedDispatchOrderError,
@@ -421,8 +425,13 @@ class SuperstepExecutor:
         assert policy is not None  # guarded by the caller
         run_timeout = policy.run_timeout
         idle_timeout = policy.idle_timeout
-        started = time.monotonic()
-        watchdog = IdleWatchdog(task.node_id) if idle_timeout is not None else None
+        clock = monotonic_clock(self._effects)
+        started = clock()
+        watchdog = (
+            IdleWatchdog(task.node_id, clock=clock)
+            if idle_timeout is not None
+            else None
+        )
         wd_token = push_watchdog(watchdog)
         try:
             node_task = asyncio.ensure_future(
@@ -436,7 +445,7 @@ class SuperstepExecutor:
             )
             try:
                 while True:
-                    now = time.monotonic()
+                    now = clock()
                     deadlines: list[float] = []
                     if run_timeout is not None:
                         deadlines.append(started + float(run_timeout))
@@ -468,10 +477,7 @@ class SuperstepExecutor:
                             graph_run_id=run_id,
                             superstep=superstep,
                         )
-                    done, _pending = await asyncio.wait(
-                        {node_task}, timeout=budget
-                    )
-                    if done:
+                    if await wait_for_task(node_task, budget):
                         return node_task.result()
                     # Woke on the bound, not on completion: loop and re-derive
                     # the deadlines, since a heartbeat may have moved the idle
@@ -479,7 +485,7 @@ class SuperstepExecutor:
             finally:
                 if not node_task.done():
                     node_task.cancel()
-                    await asyncio.wait({node_task})
+                    await wait_for_task(node_task, None)
         finally:
             pop_watchdog(wd_token)
 
@@ -490,11 +496,7 @@ class SuperstepExecutor:
         engine's own providers implement ``retry_sleep`` so seeded runs record
         the ladder and never actually wait.
         """
-        seam = getattr(self._effects, "retry_sleep", None)
-        if seam is None:
-            await asyncio.sleep(seconds)
-            return
-        await seam(seconds)
+        await provider_retry_sleep(self._effects, seconds)
 
     def trigger_writes(
         self, node_id: str, task_seq: int = 0
