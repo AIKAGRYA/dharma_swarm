@@ -45,7 +45,12 @@ BASELINE_DB_NAMES = 39
 # 218 -> 219 (2026-08-05, PR #1235): {cycle_id}.tasks.jsonl — one per-cycle
 # local A2A task-log target for the autocatalytic witness. It records task
 # envelopes for replay/inspection and does not claim an authority upgrade.
-BASELINE_JSONL_NAMES = 219
+# 219 -> 221 (2026-08-18, PR #1379): .first_fire_archive.jsonl and
+# .first_fire_predictor.jsonl — scratch-worktree artifacts of the one-shot
+# first-fire plumbing cycle (experiments/first_fire/COMMAND_PACKET.md). Both
+# live only inside the disposable evolution worktree the runner copies into;
+# neither is an organism store, and the runner refuses live checkouts.
+BASELINE_JSONL_NAMES = 221
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12
