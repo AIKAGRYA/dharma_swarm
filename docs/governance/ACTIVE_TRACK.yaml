@@ -883,18 +883,7 @@ active_tracks:
       # guardian path. The revenue spearhead (agent-behavior verification receipts)
       # graduates to its own revenue-external-humans-served track on first receipt.
       - dharma_swarm/foundry/**
-      - tests/test_foundry_evaluator.py
-      - tests/test_foundry_target_ingest.py
-      - tests/test_foundry_tripwires.py
-      - tests/test_foundry_runner_isolation.py
-      - tests/test_foundry_receipts.py
-      - tests/test_foundry_heldout.py
-      - tests/test_foundry_army.py
-      - tests/test_foundry_loop.py
-      - tests/test_foundry_campaign.py
-      - tests/test_foundry_report_card.py
-      - tests/test_foundry_guardian_feed.py
-      - tests/test_foundry_kill_metrics.py
+      - tests/test_foundry_*.py
       - scripts/foundry/**
       - .github/workflows/foundry-lane.yml
       - docs/foundry/**
