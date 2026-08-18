@@ -67,6 +67,8 @@ describe("F-158 slash-command registry coverage", () => {
           ...canonicalEventsFromBridgeEvent({
             type: "command.result",
             command,
+            outcome: "completed",
+            ok: true,
             summary: `ran ${name}`,
             output: `output for ${name}`,
             created_at: "2026-06-12T08:00:03Z",
@@ -104,6 +106,8 @@ describe("F-158 slash-command registry coverage", () => {
         ...canonicalEventsFromBridgeEvent({
           type: "command.result",
           command: "/git",
+          outcome: "completed",
+          ok: true,
           output: "branch main",
           created_at: "2026-06-12T08:02:01Z",
         }),
@@ -122,6 +126,8 @@ describe("F-158 slash-command registry coverage", () => {
         ...canonicalEventsFromBridgeEvent({
           type: "command.result",
           command: "/git",
+          outcome: "completed",
+          ok: true,
           output: "branch main",
           created_at: "2026-06-12T08:03:01Z",
         }),
@@ -150,6 +156,8 @@ describe("F-158 slash-command registry coverage", () => {
         ...canonicalEventsFromBridgeEvent({
           type: "command.result",
           command: "/status",
+          outcome: "completed",
+          ok: true,
           output: "session 0123456789abcdef0123 active",
           created_at: "2026-06-12T08:04:01Z",
         }),
