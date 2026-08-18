@@ -873,6 +873,33 @@ active_tracks:
       - dharma_swarm/operator_brief/mission_control_citations.py
       - tests/test_operator_brief_mission_control_citations.py
       - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
+      # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
+      # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
+      # refinery (free-model army as mutation operator, three-ring verification as
+      # fitness, MAP-Elites diversity) pointed at external AI-native open-source
+      # venues. New package + its own tests, scripts, docs, reports, and a
+      # draft-only kill-switch-guarded CI lane. Reuses (never forks) archive.py,
+      # forge_lab worktrees, spine receipts, holon_killswitch, and the One Wire
+      # guardian path. The revenue spearhead (agent-behavior verification receipts)
+      # graduates to its own revenue-external-humans-served track on first receipt.
+      - dharma_swarm/foundry/**
+      - tests/test_foundry_evaluator.py
+      - tests/test_foundry_target_ingest.py
+      - tests/test_foundry_tripwires.py
+      - tests/test_foundry_runner_isolation.py
+      - tests/test_foundry_receipts.py
+      - tests/test_foundry_heldout.py
+      - tests/test_foundry_army.py
+      - tests/test_foundry_loop.py
+      - tests/test_foundry_campaign.py
+      - tests/test_foundry_report_card.py
+      - tests/test_foundry_guardian_feed.py
+      - tests/test_foundry_kill_metrics.py
+      - scripts/foundry/**
+      - .github/workflows/foundry-lane.yml
+      - docs/foundry/**
+      - docs/offers/agent-behavior-verification.md
+      - reports/foundry/**
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -978,6 +1005,10 @@ active_tracks:
         what: "P2.1 operator vertical: add only immutable, bounded, explicit-mission GET projections beneath the already-mounted mixed-method control-surface router without altering its existing POST handoff route; render the typed Sarathi/Mission Control ladder in the existing dashboard control-surface cockpit; and permit Operator Brief to cite exact mission/task/attempt/evidence references without treating identifiers as facts. Absence of canonical state must render as uninitialized/unknown, and the projection must not initialize stores, discover an unbounded fleet, start daemons, mutate runtime state, or upgrade receipts into liveness, outcome, promotion, or merge claims."
         kind: code
         blocker: true
+      - id: 15
+        what: "Sublimation Foundry (implements item 8): build dharma_swarm/foundry/ as a target-agnostic AlphaEvolve-style refinery — Evaluator Protocol + target ingest + runner isolation + three verification rings (blind hermetic fitness with AST/diff/determinism/timing tripwires; held-out re-verification; external confirmation) + seven-link improvement receipts + free-model army selection (composes model_pool/evolution_roster) under an llm_burn budget cap + a draft-only kill-switch-guarded foundry-lane workflow + guardian quorum feed + standing kill-metrics. Fitness NEVER selects on daily P&L (non_goals). External receipts are the only permitted quorum feed; foundry receipts stay lab-local until guardian quorum. Revenue spearhead (agent-behavior verification report cards via the audit_kit sealed-receipt pattern) is outreach-ready but graduates to its own revenue-serving track on first paid receipt."
+        kind: code
+        blocker: false
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).

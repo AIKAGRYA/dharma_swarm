@@ -813,8 +813,12 @@ class OpenRouterFreeProvider(LLMProvider):
     _MIN_CTX = 32_000
 
     # Preferred families — sorted to the top of the discovered list when present.
+    # Reconciled 2026-08-18 with dharma_swarm.free_fleet._TIER_RULES: the prefix
+    # is `nvidia/nemotron-3.5` (the un-banished Lightning family), not the whole
+    # `nvidia/nemotron` namespace, so older sub-floor nemotron variants are not
+    # silently promoted here while free_fleet floors them — both files now agree.
     _PREFERRED_PREFIXES = [
-        "nvidia/nemotron",
+        "nvidia/nemotron-3.5",
         "qwen/",
         "meta-llama/",
         "mistralai/",
