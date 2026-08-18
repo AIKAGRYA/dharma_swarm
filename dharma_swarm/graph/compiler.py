@@ -30,10 +30,10 @@ from typing import Any, Callable
 from typing import Mapping, Sequence
 
 from dharma_swarm.graph.channels import BarrierChannel, Channel, TopicChannel
-from dharma_swarm.graph.retry import RetryPolicySpec, normalize_retry_policies
+from dharma_swarm.graph.retry import RetryPolicySpec
 from dharma_swarm.graph.routing import BranchSpec, PathCallable, join_channel
 from dharma_swarm.graph.scheduler import CompiledGraph
-from dharma_swarm.graph.timeouts import TimeoutPolicy
+from dharma_swarm.graph.timeouts import TimeoutPolicy, coerce_node_binding
 from dharma_swarm.graph.types import (
     END,
     START,
@@ -134,13 +134,9 @@ class GraphBuilder:
         :class:`TimeoutPolicy`, or a bare number/timedelta meaning "hard cap
         only" — both spellings match ``StateGraph.add_node`` in langgraph 1.2.4.
         """
+        retry, timeout_policy = coerce_node_binding(retry_policy, timeout)
         self._nodes.append(
-            NodeSpec(
-                node_id=node_id,
-                fn=fn,
-                retry=normalize_retry_policies(retry_policy),
-                timeout=TimeoutPolicy.coerce(timeout),
-            )
+            NodeSpec(node_id=node_id, fn=fn, retry=retry, timeout=timeout_policy)
         )
         return self
 

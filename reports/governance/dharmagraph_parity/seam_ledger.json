@@ -1105,8 +1105,8 @@
       "classification": "bypass",
       "col": 31,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:199:31",
-      "line": 199,
+      "id": "dharma_swarm/graph/executor.py:183:31",
+      "line": 183,
       "scope": "runtime",
       "symbol": "asyncio.wait"
     },
@@ -1115,8 +1115,8 @@
       "classification": "bypass",
       "col": 22,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:217:22",
-      "line": 217,
+      "id": "dharma_swarm/graph/executor.py:201:22",
+      "line": 201,
       "scope": "runtime",
       "symbol": "asyncio.wait"
     },
@@ -1125,8 +1125,8 @@
       "classification": "bypass",
       "col": 31,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:382:31",
-      "line": 382,
+      "id": "dharma_swarm/graph/executor.py:358:31",
+      "line": 358,
       "scope": "runtime",
       "symbol": "asyncio.timeout"
     },
@@ -1135,8 +1135,8 @@
       "classification": "bypass",
       "col": 28,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:560:28",
-      "line": 560,
+      "id": "dharma_swarm/graph/executor.py:440:28",
+      "line": 440,
       "scope": "runtime",
       "symbol": "asyncio.to_thread"
     },
@@ -1145,8 +1145,8 @@
       "classification": "mediated",
       "col": 19,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:603:19",
-      "line": 603,
+      "id": "dharma_swarm/graph/executor.py:483:19",
+      "line": 483,
       "scope": "runtime",
       "symbol": "self._effects.dispatch_order"
     },
@@ -1215,8 +1215,8 @@
       "classification": "mediated",
       "col": 22,
       "file": "dharma_swarm/graph/retry.py",
-      "id": "dharma_swarm/graph/retry.py:198:22",
-      "line": 198,
+      "id": "dharma_swarm/graph/retry.py:204:22",
+      "line": 204,
       "scope": "runtime",
       "symbol": "effects.random().uniform"
     },
@@ -2911,6 +2911,7 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "asyncio",
         "dataclasses",
         "typing"
       ],
@@ -2997,6 +2998,7 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "asyncio",
         "contextvars",
         "dataclasses",
         "datetime",

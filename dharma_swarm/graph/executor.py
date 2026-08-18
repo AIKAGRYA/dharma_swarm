@@ -26,17 +26,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
 
 from dharma_swarm.graph.channels import ChannelWrite, TopicChannel
-from dharma_swarm.graph.effects import (
-    EffectsProvider,
-    monotonic_clock,
-    provider_retry_sleep,
-    wait_for_task,
-)
+from dharma_swarm.graph.effects import EffectsProvider
 from dharma_swarm.graph.errors import (
     GraphRuntimeError,
     MalformedDispatchOrderError,
     NodeExecutionError,
-    NodeTimeoutError,
 )
 from dharma_swarm.graph.interrupts import (
     GraphInterrupt,
@@ -45,12 +39,7 @@ from dharma_swarm.graph.interrupts import (
     pop_frame,
     push_frame,
 )
-from dharma_swarm.graph.retry import (
-    RetryPolicy,
-    retry_candidate,
-    retry_sleep_seconds,
-    select_retry_policy,
-)
+from dharma_swarm.graph.retry import RetryPolicy, run_with_retry
 from dharma_swarm.graph.routing import (
     Command,
     Send,
@@ -59,12 +48,7 @@ from dharma_swarm.graph.routing import (
     send_write,
 )
 from dharma_swarm.graph.state import GraphState
-from dharma_swarm.graph.timeouts import (
-    IdleWatchdog,
-    TimeoutPolicy,
-    pop_watchdog,
-    push_watchdog,
-)
+from dharma_swarm.graph.timeouts import TimeoutPolicy, run_timed_attempt
 from dharma_swarm.graph.types import END, TASKS_CHANNEL, trigger_channel
 
 if TYPE_CHECKING:
@@ -310,30 +294,11 @@ class SuperstepExecutor:
             and remaining is not None
         ):
             node_input[graph.managed_remaining] = remaining
-        failed = 0
-        while True:
-            try:
-                result = await self._run_attempt(
-                    task, node_input, run_id, superstep, resumes
-                )
-            except (GraphInterrupt, asyncio.CancelledError):
-                # Control-flow signals, never failures: interrupts must reach
-                # run_tasks unretried (GraphBubbleUp parity) and cancellation
-                # belongs to the step teardown.
-                raise
-            except Exception as exc:
-                policy = select_retry_policy(task.retry, retry_candidate(exc))
-                if policy is None:
-                    raise
-                failed += 1
-                if failed >= policy.max_attempts:
-                    # max_attempts INCLUDES the first attempt (reference parity).
-                    raise
-                await self._retry_sleep(
-                    retry_sleep_seconds(policy, failed, self._effects)
-                )
-                continue
-            break
+        result = await run_with_retry(
+            task.retry,
+            self._effects,
+            lambda: self._run_attempt(task, node_input, run_id, superstep, resumes),
+        )
         task_writes = self._writes_from_result(
             task.node_id, result, run_id, superstep, task.seq
         )
@@ -374,8 +339,19 @@ class SuperstepExecutor:
         token = push_frame(frame)
         try:
             if task.timeout_policy is not None:
-                return await self._run_timed_attempt(
-                    task, node_input, run_id, superstep
+                return await run_timed_attempt(
+                    self._effects,
+                    task.node_id,
+                    run_id,
+                    superstep,
+                    task.timeout_policy,
+                    lambda: self._execute_node(
+                        task.node_id,
+                        node_input,
+                        run_id,
+                        superstep,
+                        sync_in_thread=True,
+                    ),
                 )
             if task.timeout is not None:
                 try:
@@ -401,102 +377,6 @@ class SuperstepExecutor:
             )
         finally:
             pop_frame(token)
-
-    async def _run_timed_attempt(
-        self,
-        task: _Task,
-        node_input: Any,
-        run_id: str,
-        superstep: int,
-    ) -> Mapping[str, Any] | Command | None:
-        """Run one attempt under its node's hard and/or idle bounds.
-
-        The node runs as its own asyncio task so the watchdog can observe it
-        while it works. The HARD bound (``run_timeout``) is measured from this
-        attempt's start and is never refreshed; the IDLE bound is measured from
-        the last :func:`~dharma_swarm.graph.timeouts.heartbeat` and IS. The
-        watchdog re-derives both deadlines after every wake-up, so a heartbeat
-        that lands during a wait extends only the idle deadline. Whichever bound
-        expires first cancels the node and raises
-        :class:`NodeTimeoutError` — a ``GraphRuntimeError``, so the failed
-        superstep keeps its normal fail-closed semantics.
-        """
-        policy = task.timeout_policy
-        assert policy is not None  # guarded by the caller
-        run_timeout = policy.run_timeout
-        idle_timeout = policy.idle_timeout
-        clock = monotonic_clock(self._effects)
-        started = clock()
-        watchdog = (
-            IdleWatchdog(task.node_id, clock=clock)
-            if idle_timeout is not None
-            else None
-        )
-        wd_token = push_watchdog(watchdog)
-        try:
-            node_task = asyncio.ensure_future(
-                self._execute_node(
-                    task.node_id,
-                    node_input,
-                    run_id,
-                    superstep,
-                    sync_in_thread=True,
-                )
-            )
-            try:
-                while True:
-                    now = clock()
-                    deadlines: list[float] = []
-                    if run_timeout is not None:
-                        deadlines.append(started + float(run_timeout))
-                    if idle_timeout is not None and watchdog is not None:
-                        deadlines.append(
-                            watchdog.idle_deadline(float(idle_timeout))
-                        )
-                    budget = min(deadlines) - now
-                    if budget <= 0:
-                        kind: str = "idle"
-                        if run_timeout is not None and (
-                            now - started >= float(run_timeout)
-                        ):
-                            kind = "run"
-                        raise NodeTimeoutError(
-                            task.node_id,
-                            now - started,
-                            kind=kind,  # type: ignore[arg-type]
-                            run_timeout=(
-                                float(run_timeout)
-                                if run_timeout is not None
-                                else None
-                            ),
-                            idle_timeout=(
-                                float(idle_timeout)
-                                if idle_timeout is not None
-                                else None
-                            ),
-                            graph_run_id=run_id,
-                            superstep=superstep,
-                        )
-                    if await wait_for_task(node_task, budget):
-                        return node_task.result()
-                    # Woke on the bound, not on completion: loop and re-derive
-                    # the deadlines, since a heartbeat may have moved the idle
-                    # one forward while we waited.
-            finally:
-                if not node_task.done():
-                    node_task.cancel()
-                    await wait_for_task(node_task, None)
-        finally:
-            pop_watchdog(wd_token)
-
-    async def _retry_sleep(self, seconds: float) -> None:
-        """Wait out a retry backoff through the effects seam when available.
-
-        Duck-typed providers predating the seam fall back to a real sleep; the
-        engine's own providers implement ``retry_sleep`` so seeded runs record
-        the ladder and never actually wait.
-        """
-        await provider_retry_sleep(self._effects, seconds)
 
     def trigger_writes(
         self, node_id: str, task_seq: int = 0

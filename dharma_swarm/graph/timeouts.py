@@ -28,20 +28,29 @@ claim_mode: candidate / test_only. Not wired into production dispatch.
 
 from __future__ import annotations
 
+import asyncio
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal
 
-from dharma_swarm.graph.effects import default_monotonic
+from dharma_swarm.graph.effects import default_monotonic, monotonic_clock, wait_for_task
+from dharma_swarm.graph.errors import NodeTimeoutError
+from dharma_swarm.graph.retry import RetryPolicy, RetryPolicySpec, normalize_retry_policies
+
+if TYPE_CHECKING:
+    from dharma_swarm.graph.effects import EffectsProvider
+    from dharma_swarm.graph.routing import Command
 
 __all__ = [
     "IdleWatchdog",
     "TimeoutPolicy",
+    "coerce_node_binding",
     "current_watchdog",
     "heartbeat",
     "pop_watchdog",
     "push_watchdog",
+    "run_timed_attempt",
 ]
 
 RefreshOn = Literal["auto", "heartbeat"]
@@ -120,6 +129,15 @@ class TimeoutPolicy:
         )
 
 
+def coerce_node_binding(
+    retry_policy: RetryPolicySpec,
+    timeout: float | timedelta | TimeoutPolicy | None,
+) -> tuple[tuple[RetryPolicy, ...], TimeoutPolicy | None]:
+    """Normalize ``add_node``'s ``retry_policy``/``timeout`` args together
+    (compiler-side glue: both coercions are needed to build one ``NodeSpec``)."""
+    return normalize_retry_policies(retry_policy), TimeoutPolicy.coerce(timeout)
+
+
 class IdleWatchdog:
     """Mutable progress marker for ONE idle-timed node attempt.
 
@@ -179,3 +197,78 @@ def heartbeat() -> None:
     watchdog = _ACTIVE_WATCHDOG.get()
     if watchdog is not None:
         watchdog.record_progress()
+
+
+async def run_timed_attempt(
+    effects: "EffectsProvider",
+    node_id: str,
+    run_id: str,
+    superstep: int,
+    policy: TimeoutPolicy,
+    execute: Callable[[], Coroutine[Any, Any, "Any | Command | None"]],
+) -> "Any | Command | None":
+    """Run one node attempt under its declared hard and/or idle bounds.
+
+    ``execute`` is a zero-arg factory for the node's execution coroutine (the
+    executor's own ``_execute_node`` call, closed over its arguments) so this
+    function owns only the timeout envelope, not node dispatch itself.
+
+    The node runs as its own asyncio task so the watchdog can observe it
+    while it works. The HARD bound (``run_timeout``) is measured from this
+    attempt's start and is never refreshed; the IDLE bound is measured from
+    the last :func:`heartbeat` and IS. The watchdog re-derives both deadlines
+    after every wake-up, so a heartbeat that lands during a wait extends only
+    the idle deadline. Whichever bound expires first cancels the node and
+    raises :class:`~dharma_swarm.graph.errors.NodeTimeoutError` — a
+    ``GraphRuntimeError``, so the failed superstep keeps its normal
+    fail-closed semantics.
+    """
+    run_timeout = policy.run_timeout
+    idle_timeout = policy.idle_timeout
+    clock = monotonic_clock(effects)
+    started = clock()
+    watchdog = (
+        IdleWatchdog(node_id, clock=clock) if idle_timeout is not None else None
+    )
+    wd_token = push_watchdog(watchdog)
+    try:
+        node_task = asyncio.ensure_future(execute())
+        try:
+            while True:
+                now = clock()
+                deadlines: list[float] = []
+                if run_timeout is not None:
+                    deadlines.append(started + float(run_timeout))
+                if idle_timeout is not None and watchdog is not None:
+                    deadlines.append(watchdog.idle_deadline(float(idle_timeout)))
+                budget = min(deadlines) - now
+                if budget <= 0:
+                    kind: str = "idle"
+                    if run_timeout is not None and (
+                        now - started >= float(run_timeout)
+                    ):
+                        kind = "run"
+                    raise NodeTimeoutError(
+                        node_id,
+                        now - started,
+                        kind=kind,  # type: ignore[arg-type]
+                        run_timeout=(
+                            float(run_timeout) if run_timeout is not None else None
+                        ),
+                        idle_timeout=(
+                            float(idle_timeout) if idle_timeout is not None else None
+                        ),
+                        graph_run_id=run_id,
+                        superstep=superstep,
+                    )
+                if await wait_for_task(node_task, budget):
+                    return node_task.result()
+                # Woke on the bound, not on completion: loop and re-derive
+                # the deadlines, since a heartbeat may have moved the idle
+                # one forward while we waited.
+        finally:
+            if not node_task.done():
+                node_task.cancel()
+                await wait_for_task(node_task, None)
+    finally:
+        pop_watchdog(wd_token)

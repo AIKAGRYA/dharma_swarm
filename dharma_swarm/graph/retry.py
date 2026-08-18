@@ -31,10 +31,13 @@ claim_mode: candidate / test_only. Not wired into production dispatch.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Coroutine, Sequence, TypeVar
 
+from dharma_swarm.graph.effects import provider_retry_sleep
 from dharma_swarm.graph.errors import NodeExecutionError, NodeTimeoutError
+from dharma_swarm.graph.interrupts import GraphInterrupt
 
 __all__ = [
     "RetryPolicy",
@@ -44,9 +47,12 @@ __all__ = [
     "normalize_retry_policies",
     "retry_candidate",
     "retry_sleep_seconds",
+    "run_with_retry",
     "select_retry_policy",
     "should_retry_on",
 ]
+
+_T = TypeVar("_T")
 
 
 # langgraph 1.2.4 ``default_retry_on``: deterministic programmer errors are
@@ -214,3 +220,38 @@ def retry_candidate(exc: BaseException) -> Exception:
         f"retry policies never see BaseException {type(exc).__name__} "
         "(control-flow signals are re-raised before policy selection)"
     )
+
+
+async def run_with_retry(
+    policies: RetryPolicySpec,
+    effects: Any,
+    run_attempt: Callable[[], Coroutine[Any, Any, _T]],
+) -> _T:
+    """Run ``run_attempt()`` under a declared first-match retry ladder.
+
+    ``run_attempt`` is a zero-arg factory for one ATTEMPT's coroutine (the
+    executor's own per-attempt frame push + node run + timeout envelope,
+    closed over its arguments) so this function owns only the ladder's
+    select/count/backoff arithmetic, not attempt execution itself.
+
+    :class:`~dharma_swarm.graph.interrupts.GraphInterrupt` and
+    ``asyncio.CancelledError`` are control-flow signals, never failures, and
+    propagate unretried (``GraphBubbleUp`` parity / step-teardown ownership).
+    """
+    failed = 0
+    while True:
+        try:
+            return await run_attempt()
+        except (GraphInterrupt, asyncio.CancelledError):
+            raise
+        except Exception as exc:
+            policy = select_retry_policy(policies, retry_candidate(exc))
+            if policy is None:
+                raise
+            failed += 1
+            if failed >= policy.max_attempts:
+                # max_attempts INCLUDES the first attempt (reference parity).
+                raise
+            await provider_retry_sleep(
+                effects, retry_sleep_seconds(policy, failed, effects)
+            )
