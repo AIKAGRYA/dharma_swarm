@@ -216,16 +216,63 @@ def phase_drop(
             flags=re.IGNORECASE,
         )
         db.execute("ATTACH DATABASE ? AS backup", (str(backup_path),))
-        db.execute(backup_table_ddl)
-        db.execute(f'INSERT INTO backup."{archive_name}" SELECT * FROM "{archive_name}"')
-        db.commit()
-        backed_up = int(
-            db.execute(f'SELECT COUNT(*) FROM backup."{archive_name}"').fetchone()[0]
-        )
+        try:
+            db.execute(backup_table_ddl)
+            db.execute(f'INSERT INTO backup."{archive_name}" SELECT * FROM "{archive_name}"')
+            db.commit()
+            backed_up = int(
+                db.execute(f'SELECT COUNT(*) FROM backup."{archive_name}"').fetchone()[0]
+            )
+        except sqlite3.Error as e:
+            # A partial backup file must not block the retry that ATTACH's
+            # blanket exists() refusal would otherwise hit: this invocation
+            # created the file (exists() refused above if it predated us),
+            # so detach and remove it, finalize a failure receipt, and keep
+            # the archive table untouched.
+            db.rollback()
+            try:
+                db.execute("DETACH DATABASE backup")
+            except sqlite3.Error:
+                pass
+            backup_path.unlink(missing_ok=True)
+            _finalize_receipt(
+                receipt_path,
+                {
+                    "agent": "archive_idea_links.py",
+                    "action": "drop",
+                    "status": "failed_before_drop",
+                    "error": f"{type(e).__name__}: {e}",
+                    "db": str(db_path),
+                    "archive_table": archive_name,
+                    "partial_backup_removed": True,
+                    "timestamp": _utc_now_iso(),
+                },
+            )
+            print(f"backup construction FAILED ({e}); partial backup removed; archive table NOT dropped")
+            return 1
         db.execute("DETACH DATABASE backup")
         if backed_up != rows:
-            print(f"backup parity FAILED ({backed_up} != {rows}); archive table NOT dropped")
+            # A parity-failed backup is unusable evidence: remove it so the
+            # identical retry is not refused, and finalize the receipt.
+            backup_path.unlink(missing_ok=True)
+            _finalize_receipt(
+                receipt_path,
+                {
+                    "agent": "archive_idea_links.py",
+                    "action": "drop",
+                    "status": "failed_before_drop",
+                    "error": f"backup parity mismatch ({backed_up} != {rows})",
+                    "db": str(db_path),
+                    "archive_table": archive_name,
+                    "partial_backup_removed": True,
+                    "timestamp": _utc_now_iso(),
+                },
+            )
+            print(f"backup parity FAILED ({backed_up} != {rows}); backup removed; archive table NOT dropped")
             return 1
+        # Hash the verified backup BEFORE the destructive commit so the only
+        # post-drop step left is writing the already-assembled receipt.
+        backup_sha = _sha256(backup_path)
         db.execute(f'DROP TABLE "{archive_name}"')
         db.commit()
         vacuum_error: str | None = None
@@ -240,7 +287,6 @@ def phase_drop(
             except sqlite3.Error as e:
                 vacuum_error = f"{type(e).__name__}: {e}"
                 print(f"VACUUM failed (drop already committed; receipt still written): {vacuum_error}")
-    backup_sha = _sha256(backup_path)
     receipt = {
         "agent": "archive_idea_links.py",
         "action": "drop",
@@ -263,7 +309,18 @@ def phase_drop(
             "re-apply schema.index_ddls"
         ),
     }
-    path = _finalize_receipt(receipt_path, receipt)
+    try:
+        path = _finalize_receipt(receipt_path, receipt)
+    except OSError as e:
+        # The drop is committed and the backup is verified; the receipt is the
+        # only thing missing. Print its full content so the operator can write
+        # it to the reserved path by hand instead of losing the audit record.
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        print(
+            f"RECEIPT FINALIZATION FAILED after committed drop ({e}); "
+            f"write the JSON above to {receipt_path} manually"
+        )
+        return 1
     print(f"dropped {archive_name}; backup sha256={backup_sha}; receipt: {path}")
     return 0
 
