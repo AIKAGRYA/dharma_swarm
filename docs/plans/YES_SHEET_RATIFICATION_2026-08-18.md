@@ -25,7 +25,11 @@ physical act only the operator can perform (listed on the sitting sheet).
 | 12 | Five risk-budget numbers | YES; values CONFIRMED 2026-08-18 — see below | confirmed explicitly by the operator, same session ("Confirmed on the numbers") |
 | + | Standing default rule: every future ask carries a deadline and a pre-stated default that executes on silence; live-money/live-authority never defaults to yes | YES | swarm drafts the rule as governance text; operator merge enacts it |
 
-## Risk-budget values — CONFIRMED by the operator, 2026-08-18 ("Confirmed on the numbers")
+## Risk-budget values — CONFIRMED by the operator, 2026-08-18
+
+Confirmed twice, same session: first verbatim ("Confirmed on the numbers"),
+then re-asked at the operator's request as five individual explained choices,
+each answered explicitly. Every value below is an informed per-number yes.
 
 - Total loss ceiling (all live capital, cumulative): **$1,000**
 - Per-position cap: **$100**
