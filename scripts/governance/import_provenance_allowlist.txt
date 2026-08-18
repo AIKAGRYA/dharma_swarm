@@ -18,6 +18,7 @@ huggingface_hub
 hypothesis
 icontract
 lancedb
+langchain_core
 langfuse
 langgraph
 mcp

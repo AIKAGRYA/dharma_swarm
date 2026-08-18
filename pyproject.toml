@@ -53,6 +53,12 @@ test-oracle = [
     "langgraph==1.2.4",
     "langgraph-checkpoint==4.1.1",
     "langgraph-checkpoint-sqlite==3.1.0",
+    # langchain-core is langgraph's own message vocabulary (AIMessage /
+    # HumanMessage / RemoveMessage), imported directly by the LG11 gauntlet
+    # comparison arm. Declared at the version uv.lock already resolves as a
+    # transitive of langgraph==1.2.4 — provenance declaration only, not a
+    # change to the frozen oracle tuple above.
+    "langchain-core==1.4.4",
 ]
 
 [project.scripts]

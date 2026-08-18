@@ -639,6 +639,7 @@ router = [
     { name = "redis" },
 ]
 test-oracle = [
+    { name = "langchain-core" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint" },
     { name = "langgraph-checkpoint-sqlite" },
@@ -658,6 +659,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.25" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "icontract", specifier = ">=2.6" },
+    { name = "langchain-core", marker = "extra == 'test-oracle'", specifier = "==1.4.4" },
     { name = "langgraph", marker = "extra == 'infra'", specifier = ">=0.2.0" },
     { name = "langgraph", marker = "extra == 'test-oracle'", specifier = "==1.2.4" },
     { name = "langgraph-checkpoint", marker = "extra == 'test-oracle'", specifier = "==4.1.1" },
