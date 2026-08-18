@@ -226,13 +226,20 @@ async def test_preexisting_banned_import_is_tolerated_but_new_ones_are_not(
     assert code == 0, "pre-existing pollution must not fail the run"
     receipt = json.loads((tmp_path / "receipt.json").read_text())
     assert receipt["store_sync_invoked"] is False
-    assert receipt["banned_preloaded"] == [banned_name]
+    # Containment, not equality: in the CI full suite OTHER banned modules
+    # are genuinely preloaded by unrelated tests — exactly the pollution
+    # this belt tolerates — so the list may hold more than our injection.
+    assert banned_name in receipt["banned_preloaded"]
     assert receipt["valid"] is True
 
     # A banned module appearing DURING the run still trips the belt.
+    # Hermetic: substitute a fake banned set so the check cannot depend on
+    # which real modules this environment happens to have imported.
+    fake = "dharma_swarm._belt_test_fake_banned"
+    monkeypatch.setattr(l0, "_BANNED_MODULES", frozenset({fake}))
     baseline = l0._banned_loaded()
-    other = sorted(l0._BANNED_MODULES)[1]
-    monkeypatch.setitem(sys.modules, other, types.ModuleType(other))
+    assert baseline == frozenset()
+    monkeypatch.setitem(sys.modules, fake, types.ModuleType(fake))
     with pytest.raises(SystemExit) as excinfo:
         l0.assert_no_new_forbidden_imports(baseline)
     assert excinfo.value.code == 2
