@@ -1,0 +1,114 @@
+{
+  "allowed_files": [
+    ".github/workflows/hardening-lane.yml",
+    "reports/agentops/work_packets/loop-closure-WP-LOOPE3-lane-review-fixes.json",
+    "scripts/runtime/lane_deliver.py",
+    "scripts/runtime/lane_propose.py",
+    "tests/test_lane_deliver.py",
+    "tests/test_lane_propose.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "claude/graph-of-loops-audit-design-eh3lz5",
+  "commit": {
+    "allowed": true,
+    "message": "chore(agentops): refresh PR #1200 exact-base packet"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/loop-watcher.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/world_radar/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "packages/telos-kernel/**",
+    "scripts/docops/**",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/governance/hygiene/**",
+    "scripts/runtime/pr_merge_control.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_lane_propose.py tests/test_lane_deliver.py -q",
+      "expected_exit": 0,
+      "name": "lane-review-fixes",
+      "timeout_seconds": 600
+    },
+    {
+      "name": "untrusted-claim-cannot-permanently-suppress",
+      "command": "python3 -m pytest tests/test_lane_propose.py tests/test_lane_deliver.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    }
+  ],
+  "id": "loop-closure-WP-LOOPE3-lane-review-fixes",
+  "intent": "Refresh PR #1200 against current main after the merge train advanced, rerun its focused proof, and preserve the unresolved untrusted-consumption residual for explicit operator decision. No operator risk acceptance is inferred by this packet refresh.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import subprocess,sys; from pathlib import Path; p=Path('scripts/runtime/lane_deliver.py'); orig=p.read_text(); mut=orig.replace('\\\"--no-renames\\\", \\\"--name-only\\\", \\\"-z\\\"','\\\"--name-only\\\"',1); assert mut!=orig, 'diff flags not found'; p.write_text(mut); r=subprocess.run([sys.executable,'-m','pytest','tests/test_lane_deliver.py','-q'],check=False); p.write_text(orig); sys.exit(0 if r.returncode!=0 else 2)\"",
+      "expected_exit": 0,
+      "name": "restoring-human-readable-diff-flags-reopens-both-bypasses",
+      "timeout_seconds": 600
+    },
+    {
+      "name": "removing-the-cooldown-restores-permanent-starvation",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('scripts/runtime/lane_propose.py'); t=p.read_text(); n=t.replace('            if now - created > timedelta(days=ATTEMPT_COOLDOWN_DAYS):'+chr(10)+'                continue'+chr(10), ''); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','-k','forged','tests/test_lane_propose.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "session_entry": {
+    "active_track": "loop-closure-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/lane_deliver.py",
+      "scripts/runtime/lane_propose.py",
+      ".github/workflows/pr-ci-health.yml",
+      "docs/ops/loop_control/README.md"
+    ],
+    "collision": {
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "RESOLVED, AND NOT THE WAY THE REVIEW ASKED. The residual P1 (consumption inferred from an untrusted propose receipt) is fixed, but the suggested remedy -- 'cryptographically bind the task identity from a trusted input' -- is not implementable in this topology. The only signer available on the propose side IS the propose job, which is exactly what the attacker controls; the coding agent shares that VM. A signature produced there would attest to nothing. There is no trusted key on the untrusted side of the boundary. So the claim is left untrusted and its blast radius is bounded instead: a claim suppresses its task for ATTEMPT_COOLDOWN_DAYS (default 14, ~6 lane runs) or while its PR is open, and then stops. A forged claim now costs one delayed cycle rather than permanent starvation of an unrelated mailbox task, while still breaking the tight re-selection loop the suppression exists to break. Malformed or absent timestamps read as EXPIRED, so an untrusted claim can never gain strength from bad metadata. Reviewer judgement is still wanted on whether a bounded window is the right answer versus moving selection into the trusted delivery job entirely.",
+      "The two denylist bypasses were live on main from 9d792cea until this lands. Exposure is nil in practice because the lane is inert without DHARMA_LANE_AGENT_CMD, but the code was wrong and shipped.",
+      "Delivery degrades to verify-only unless LANE_DELIVERY_PUSH_TOKEN or MERGEMASTERMIKE_PAT proves push authority, because a github.token push does not trigger CI. Configuring that secret is an operator action.",
+      "Only the codex selector is unprovisioned on a stock ubuntu-latest runner. The claude selector installs with npm and claude-npx needs no install; codex is deliberately left unprovisioned because no verified install command is recorded here.",
+      "Clean filters are refused rather than accommodated: the lane cannot currently test a materialization of the frozen tree with filters disabled, so it declines the case instead of claiming a guarantee it does not have.",
+      "THE DEEPER FIX IS NOT DONE: target selection still happens in the untrusted proposing job. Bounding the suppression window limits the damage of a forged claim but does not move the decision to a trusted side. Relocating selection into the delivery job (or into a job the agent does not share) would remove the class rather than cap it, and is a larger change than this review-fix packet should carry."
+    ],
+    "interface_mismatches": [
+      "lane_deliver.load_propose_receipt declares the receipt 'for narration only. Never a gate input.' but lane_propose.attempted_task_ids consumed a value derived from it to suppress future work -- a gate input deferred by one run. The declared trust boundary and the actual data flow disagreed; the suppression is now explicitly weak evidence instead."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "a4017fe17a0ba2d6d341a8d0c5e51dadd29d0220128b1dc15eeeb1f20262cd8f",
+    "rollback": "Revert the packet-refresh commit; the semantic implementation remains unchanged and the unresolved P1 remains operator-gated.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-LOOPE3"
+  },
+  "worktree": "."
+}

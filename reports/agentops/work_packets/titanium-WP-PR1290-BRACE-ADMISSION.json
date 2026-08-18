@@ -1,0 +1,76 @@
+{
+  "id": "titanium-WP-PR1290-BRACE-ADMISSION",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "codex/pr1290-agentops-admission-20260809",
+  "worktree": ".",
+  "intent": "Repackage the exact brace-expansion lockfile delta from Dependabot PR #1290 on an ordinary owner-controlled branch so one durable Session Entry packet covers the high-risk dashboard event. Preserve package.json, update only the three transitive brace-expansion lock entries and their registry integrity bindings, and retain the repository's Node 20.20.2 CI compatibility floor.",
+  "allowed_files": [
+    "dashboard/package-lock.json",
+    "reports/agentops/work_packets/titanium-WP-PR1290-BRACE-ADMISSION.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "exact-event-diff-check",
+      "command": "git diff --check bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4...HEAD -- dashboard/package-lock.json reports/agentops/work_packets/titanium-WP-PR1290-BRACE-ADMISSION.json",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "top-level-brace-reversion-is-caught",
+      "command": "python3 -c \"import copy,json,pathlib,sys; d=json.loads(pathlib.Path('dashboard/package-lock.json').read_text()); expected={'node_modules/brace-expansion':('1.1.18','sha512-Edep/X9fGqVNmzKBVsDYIOtD+z1tuezV70LBjdCst9Tqu76lsnvRiZ6oTic1n+/BIwX6QDGAO94PN4N2SADvtw=='),'node_modules/@redocly/openapi-core/node_modules/brace-expansion':('2.1.4','sha512-hGfVzPxthbf3+2yjg/RBs60cB0FhqBS/zvdV/4wn4/BmN0bNMMHPc4V/BbFieqf1TKAGGAHnY4eSjajCl0f2Xg=='),'node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion':('5.0.9','sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==')}; ok=lambda x: all((x['packages'][k]['version'],x['packages'][k]['integrity'])==v for k,v in expected.items()); bad=copy.deepcopy(d); bad['packages']['node_modules/brace-expansion']['version']='1.1.12'; sys.exit(0 if ok(d) and not ok(bad) else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "chore(deps): admit brace-expansion lockfile update"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PR1290-BRACE-ADMISSION",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Merge Master's current hot-path policy requires a Session Entry packet for dashboard/package-lock.json, while Dependabot owns and may recreate PR #1290's source branch; the durable packet therefore travels with an ordinary successor branch."
+    ],
+    "closest_existing_implementation": [
+      "dashboard/package-lock.json",
+      "dashboard/package.json",
+      ".github/workflows/tests.yml",
+      "reports/agentops/work_packets/titanium-WP-DASHTSC-typecheck-green.json"
+    ],
+    "honest_blockers": [
+      "PR #1290 remains open at source head 03d6a707a4a72ddbf0185aa65781b45dd4266d51; this successor intentionally duplicates only that lockfile delta and does not close or mutate the automation-owned PR.",
+      "No currently live ACTIVE_TRACK owned_surfaces pattern matches dashboard/package-lock.json. This packet binds the otherwise unowned dependency-integrity event to repository-titanium-hardening-2026-07 because that active campaign owns hermetic dashboard install and lockfile-drift verification; it does not transfer general dashboard ownership.",
+      "The source PR's owner approval applies to 03d6a707a4a72ddbf0185aa65781b45dd4266d51, not to the successor's packet-bearing head. approval.before_merge remains true and fresh human review is required.",
+      "Local Node verification uses Node 22.14.0; repository CI pins Node 20.20.2 and must independently validate the nested brace-expansion 5.0.9 engine floor before merge."
+    ],
+    "rollback": "Revert the successor commit as one unit, which removes both the lockfile update and its packet. That rollback restores the prior brace-expansion versions and must not be replaced by weakening the packet-scope checker.",
+    "packet_digest": "93061d32189040473e8a3bc12854d1545fa391c9abd115563e9acef49df19632"
+  }
+}

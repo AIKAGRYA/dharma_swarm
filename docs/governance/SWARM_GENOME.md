@@ -6,18 +6,39 @@ runtime receipts, active track truth, agent identity, or doctrine.
 
 ## 10-Second Identity
 
-Dharma Swarm is a repo and runtime for governed multi-agent work.
+**Jagat Kalyan** (universal welfare) is the ceiling. **Dharma Swarm** is the
+operational organism/body that enacts it — not itself the telos. It is
+binocular: Sakshi (Witness, inward lucidity) and Drishti (Seer, outward
+vision), and every loop closes through reality. Human authority, consent,
+uncertainty, plurality, and exit remain intact.
 
-Its core move is simple:
+The organism is plural. Ten irreducible dimensions are all real roots, each
+carried at its honest maturity (never over-claimed):
 
-- turn intent into bounded work;
-- run work through explicit authority and evidence boundaries;
-- preserve correlation across dispatch, runtime, artifact, review, and value;
-- prevent attractive prose from outrunning receipts.
+1. human actualization — durable continuity/agency for a human's latent dharma *(proposed)*
+2. self-recognition — does knowing what it is change behavior? *(research)*
+3. organismic viability — persist across models, restarts, forks, operator absence *(ratified)*
+4. creative intelligence — exceed the best member without collapsing diversity *(ratified)*
+5. metabolism — acquire/reinvest energy without betraying telos *(ratified)*
+6. world service — inward intelligence becomes consequential action *(ratified)*
+7. public meaning — propagate wisdom without propaganda or sludge *(ratified)*
+8. reproduction/federation — Cells, Organs, Ecologies, sovereign federations *(envisioned)*
+9. civilizational evolution — institutions/breakthroughs worthy of humanity *(envisioned)*
+10. telos/conscience — power grows while telos and human authority stay upstream *(ratified)*
 
-The current north star is not "more agents." It is a lean organism where every
-claim knows its owner, every side effect has identity, and every completion
-claim points to a receipt.
+The governance spine below (authority, identity, receipts) is the organism's
+immune/nervous system — necessary, but not the whole being. Its core discipline
+stays: every claim knows its owner, every side effect has identity, every
+completion claim points to a receipt, and attractive prose never outruns them.
+
+> The typed, content-addressed form of this identity is the invariant Organism
+> Boot Packet (`dharma_swarm/orientation_packet.py`), injected before an
+> agent's first token on every provider. Both this document and that packet are
+> **projections**, not authority. The authority sources — the ratified kernel
+> axioms, doctrine, and the human operator — always win. If a projection drifts
+> from the authority sources (or the two projections drift from each other),
+> the projection is wrong and must be repaired; neither projection may
+> overrule an authority source.
 
 ## What This Map Is
 

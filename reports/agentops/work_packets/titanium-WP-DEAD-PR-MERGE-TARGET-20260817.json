@@ -1,0 +1,112 @@
+{
+  "id": "titanium-WP-DEAD-PR-MERGE-TARGET-20260817",
+  "base_ref": "08d4ea4e5be6ea5b1ce39969873a171aa99f78f3",
+  "branch": "claude/titanium-dead-pr-merge-target",
+  "worktree": "/home/user/dharma_swarm",
+  "intent": "Remove the `make pr-merge` target, which invoked the `merge` subcommand deleted by #1364 and failed with an argparse error for every operator who ran it, and correct the operator documentation that still instructs people to run it. Close the gap that let it ship silently: no CI job invokes that target and no test read the Makefile against build_parser(), so the breakage was invisible until a human typed the command. Also fix two defects an adversarial audit found in already-merged #1363 -- a workflow comment asserting a trigger the workflow does not have, and a packet gate whose own grep matched its own file and could therefore never pass.",
+  "allowed_files": [
+    ".github/workflows/pr-dedupe.yml",
+    "Makefile",
+    "docs/governance/MMM_CHARTER.md",
+    "docs/ops/PR_REVIEW_CONTROL.md",
+    "reports/agentops/work_packets/titanium-WP-DEAD-PR-MERGE-TARGET-20260817.json",
+    "tests/test_makefile_cli_contract.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_no_actuation.py",
+    "tests/test_pr_merge_control_stdlib.py"
+  ],
+  "gates": [
+    {
+      "name": "makefile-cli-contract",
+      "command": "python3 -m pytest tests/test_makefile_cli_contract.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "makefile-still-parses-and-siblings-resolve",
+      "command": "python3 -c \"import subprocess,sys; t=['pr-queue','pr-packet','pr-gate','pr-reviewers','pr-run-codex','pr-run-claude','pr-mike']; bad=[x for x in t if subprocess.run(['make','-n',x],capture_output=True).returncode]; print(bad or 'all targets resolve'); sys.exit(1 if bad else 0)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-integrity-pr-mode",
+      "command": "python3 scripts/docops/check_docops_integrity.py --counts-advisory --changed-from 08d4ea4e5be6ea5b1ce39969873a171aa99f78f3",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "restoring-the-dead-target-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('Makefile'); t=p.read_text(); n=t.replace('pr-mike:'+chr(10), 'pr-merge:'+chr(10)+chr(9)+'$(PYTHON) scripts/runtime/pr_merge_control.py merge --pr 1'+chr(10)+chr(10)+'pr-mike:'+chr(10), 1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_makefile_cli_contract.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "re-advertising-it-in-help-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('Makefile'); t=p.read_text(); n=t.replace(chr(9)+'@echo \\\"  make pr-mike', chr(9)+'@echo \\\"  make pr-merge PR=123\\\"'+chr(10)+chr(9)+'@echo \\\"  make pr-mike', 1); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','-k','help_text','tests/test_makefile_cli_contract.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): remove the dead pr-merge target and the docs that taught it"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-DEAD-PR-MERGE-TARGET",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "08d4ea4e5be6ea5b1ce39969873a171aa99f78f3",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Makefile declared a `merge` subcommand contract with scripts/runtime/pr_merge_control.py that the CLI stopped offering at 1fedc5e4b. `make help` additionally advertised a `--confirm` flag that no subcommand accepts. Both are now removed, and tests/test_makefile_cli_contract.py pins the Makefile against build_parser() so subcommand and flag names cannot drift again.",
+      "docs/ops/PR_REVIEW_CONTROL.md and docs/governance/MMM_CHARTER.md documented a merge procedure the toolchain can no longer perform. Both now state that GitHub's merge queue merges and that this toolchain produces evidence only."
+    ],
+    "closest_existing_implementation": [
+      "tests/test_pr_merge_control_no_actuation.py",
+      "Makefile",
+      "docs/ops/PR_REVIEW_CONTROL.md"
+    ],
+    "honest_blockers": [
+      "THIS FIXES THE CALLER I ALREADY KNEW ABOUT AND WAS UNABLE TO REACH. #1364 deleted the `merge` subcommand; `make pr-merge` kept calling it. I disclosed that in #1364's packet but could not fix it there, because Makefile is a repository-titanium-hardening-2026-07 surface and that packet was merge-master-mike-d4-2026-06 scoped. This is the titanium-scoped packet that closes it.",
+      "AN AUDIT FOUND MORE DOCUMENTATION DRIFT THAN I HAD DISCLOSED. I had named only DEVIN_NATS_PR_JANITOR_PLAYBOOK.md and A2A_DEVIN_PR_RECONCILE_2026-06-11.md as stale. An adversarial reviewer found docs/ops/PR_REVIEW_CONTROL.md:34,57,325,330 and docs/governance/MMM_CHARTER.md:98 -- the canonical operator doc for this subsystem and the charter's own merge procedure, both DocOps-registered -- carrying runnable commands that now hard-fail. Those are fixed here. The two playbooks I did name are historical records and are deliberately left alone.",
+      "STILL OPEN, CROSS-TRACK, NOT FIXED HERE. All of these are merge-master-mike-d4-2026-06 or organism-rewire surfaces and need their own packets: (a) codex-mention-router.yml writes `merge_exit=0` unconditionally and still emits it as a step output and job summary line, so a failed authority-policy construction is now signal-free; (b) pr_merge_control.py still writes an orphaned \"merge_authority_proof\": None gate field nothing reads; (c) tests/test_pr_merge_control_stdlib.py:52 `_candidate_gate` is dead code whose only two callers #1364 deleted; (d) automerge.yml posts a PR comment claiming Mike will auto-merge and citing server-side base-CAS proofs -- both false since #1364, and this one is emitted at runtime rather than sitting in a doc; (e) ACTIVE_SURFACE_MANIFEST.yaml still declares Mike the 'independent conditional-merge authority', and its health test checks only the path string, never the claim.",
+      "THE NEW TEST COVERS THE MAKEFILE, NOT EVERY CALLER. Shell scripts under scripts/ and composite actions are still unchecked, and a recipe that builds its command from a variable is invisible to any text scan. The companion guard in tests/test_pr_merge_control_no_actuation.py covers workflows and flags; together they cover the two places a caller has actually broken so far, which is not the same as covering all of them.",
+      "THE DOCOPS GATE IS RUN IN PR MODE, AND THAT IS THE HONEST MODE HERE, NOT A WEAKER ONE. Bare `make docops-integrity` FAILS on this branch, because adding tests/test_makefile_cli_contract.py moves the generated counts in AUTO_INVENTORY.md and SOVEREIGN_MANIFEST.md. Those two files are in this packet's forbidden_files on purpose: the post-merge reconcile lane on main is their single writer, and committing my local numbers would fight it with figures taken from a tree that still has uncommitted work in it. CI runs the same checker with the --counts-advisory and --changed-from flags pinned to the event base (.github/workflows/docops.yml line 118), which downgrades exactly those count assertions to WARN and still fails on everything else. This gate reproduces that command verbatim rather than asserting a green the merge path does not actually require.",
+      "SPLIT OUT AFTER THE SCOPE GATE REFUSED IT, CORRECTLY. This packet originally also repaired the self-defeating orphan-check gate in titanium-WP-KILLSWITCH-COVERAGE-20260816.json. The packet-scope gate rejected that with 'high-risk pull request must change exactly one Session Entry packet' plus a coverage overlap on .github/workflows/pr-dedupe.yml, which both packets claimed. The refusal is right: two packets claiming one file makes ownership ambiguous, and a high-risk change should bind exactly one scope. That repair is reverted here and belongs in its own PR. Until it lands, that gate still cannot pass -- its grep matches the string inside its own file."
+    ],
+    "rollback": "Single revert. That restores `make pr-merge` as a target that fails with an argparse error, restores the documentation telling operators to run it, restores the false pull_request_target comment in pr-dedupe.yml, and restores the self-defeating orphan grep in the kill-switch packet. Nothing else depends on these changes.",
+    "packet_digest": "6f1c26c5bd237169d0202c6339f7cf4297fe7dd22b909e6d36a80bf9de2ce677"
+  }
+}

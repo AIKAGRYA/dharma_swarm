@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-08-05"
+last_updated: "2026-08-14"
 
 # WP-0C1R ratified research participants (operator decision A1, 2026-08-02,
 # Titanium campaign — reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md).
@@ -68,6 +68,7 @@ research_state_participants:
 
 state_dir:
   canonical: "~/.dharma"
+  task_board_db: "~/.dharma/db/tasks.db"
   runtime_db: "~/.dharma/state/runtime.db"
   telemetry_db: "~/.dharma/state/runtime.db"
   ontology_db: "~/.dharma/ontology.db"
@@ -639,13 +640,20 @@ integrations:
     status: live
     used_by: [agent_runner]
 
+  - id: task_board_db
+    label: "Task Board SQLite"
+    type: database
+    path: "~/.dharma/db/tasks.db"
+    status: live
+    used_by: [swarm_manager, mission_control]
+
   - id: runtime_db
     label: "Runtime SQLite"
     type: database
     path: "~/.dharma/state/runtime.db"
     status: live
     health_check_ids: [runtime_db_present]
-    used_by: [swarm_manager, telemetry]
+    used_by: [swarm_manager, telemetry, mission_control, a2a_transport]
 
   - id: ontology_db
     label: "Ontology SQLite"
@@ -801,6 +809,184 @@ loops:
     next_action: null
 
 # =========================================================================
+# Mission Control topology — admitted intent, not runtime liveness
+# =========================================================================
+# This is a typed control-plane declaration over existing state owners. It
+# neither starts a process nor creates a scheduler, database, transport, or
+# receipt store. Every node and edge remains non-live until runtime evidence
+# independently establishes a stronger claim.
+control_plane_topology:
+  id: dharma-mission-control
+  schema_version: dharma.control_plane.topology.v1
+  claim_ceiling: admitted_not_alive
+  canonical_state_owners: [TaskBoard, RuntimeStateStore]
+  owns_new_state: false
+  owns_new_store: false
+  proves_executor_liveness: false
+  implicit_claim_promotion: false
+  claim_ladder:
+    - MissionProposal
+    - AcceptedMissionTask
+    - MissionDispatchRequest
+    - AuthorizedDispatch
+    - DeliveryAck
+    - HandlerAck
+    - SemanticOutcome
+    - VerifiedOutcome
+    - PromotionWarrant
+    - MergeAuthorized
+  state_ownership:
+    task_board:
+      module: dharma_swarm.task_board
+      path_ref: state_dir.task_board_db
+      role: canonical_task_owner
+    runtime_state:
+      module: dharma_swarm.runtime_state
+      path_ref: state_dir.runtime_db
+      role: canonical_runtime_evidence_owner
+    integration_contract: |
+      Mission Control is an additive adapter over TaskBoard and
+      RuntimeStateStore. The owners remain separate databases, so their
+      projections are not represented as an atomic transaction.
+
+  claim_contract:
+    non_coercible: true
+    statement: "MissionProposal != AcceptedMissionTask != MissionDispatchRequest != AuthorizedDispatch != DeliveryAck != HandlerAck != SemanticOutcome != VerifiedOutcome != PromotionWarrant != MergeAuthorized"
+    forbidden_coercions:
+      - proposal_to_accepted_task
+      - accepted_task_to_dispatch_request
+      - dispatch_request_to_authorized_dispatch
+      - authorized_dispatch_to_delivery_ack
+      - delivery_ack_to_handler_ack
+      - handler_ack_to_semantic_outcome
+      - semantic_outcome_to_verified_outcome
+      - verified_outcome_to_promotion_warrant
+      - promotion_warrant_to_merge_authorized
+    notes: |
+      Governance admission is an external prerequisite for these declared
+      surfaces; it is not a runtime claim-ladder value. MissionDispatchRequest
+      is not AuthorizedDispatch, and a task claim does not confer action
+      authority.
+
+  independent_authorities:
+    forge_promotion: dharma_swarm/forge_v1/forge_v2/verify_promotion.py
+    merge: scripts/runtime/pr_merge_control.py
+  independent_authority_rule: |
+    Forge remains the independent promotion arbiter and Merge Master Mike
+    remains the independent conditional-merge authority. Neither authority is
+    a topology node or conferred by any declared edge.
+
+  nodes:
+    - id: apex_sarathi
+      role: "Form typed chief-of-staff proposals; never self-authorize dispatch."
+      authority: proposal_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: mission_control
+      role: "Join canonical mission, task, attempt, lease, receipt, and reconciliation views."
+      authority: TaskBoard+RuntimeStateStore
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: true
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: governed_dispatch
+      role: "Resolve an independently authenticated authority reference before dispatch."
+      authority: injected_verifier_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: a2a_transport
+      role: "Publish and observe identity-bound A2A transport and handler evidence."
+      authority: transport_only
+      lifecycle_owner: A2A
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: true
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: operator_projection
+      role: "Project explicit-mission Mission Control and Sarathi state read-only."
+      authority: projection_only
+      owns_state: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+    - id: operator_brief_projection
+      role: "Cite mission snapshots in the Operator Brief without promoting their claims."
+      authority: projection_only
+      owns_state: false
+      output_verified: false
+      implementation_status: admitted_not_alive
+      owns_new_store: false
+      writes_owner_state: false
+      runtime_live: false
+      proves_executor_liveness: false
+
+  edges:
+    - source: apex_sarathi
+      target: mission_control
+      carries: MissionProposal
+      implementation_status: admitted_not_alive
+      writes_owner_state: true
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: governed_dispatch
+      carries: MissionDispatchRequest
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: governed_dispatch
+      target: a2a_transport
+      carries: AuthorizedDispatch
+      implementation_status: admitted_not_alive
+      writes_owner_state: true
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: a2a_transport
+      target: mission_control
+      carries: A2AExecutionObservation
+      rule: projection_only_no_mission_attempt_lifecycle
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: operator_projection
+      carries: MissionSnapshot
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: apex_sarathi
+      target: operator_projection
+      carries: SarathiProjection
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+    - source: mission_control
+      target: operator_brief_projection
+      carries: MissionSnapshot
+      implementation_status: admitted_not_alive
+      writes_owner_state: false
+      confers_authority: false
+      proves_executor_liveness: false
+
+# =========================================================================
 # Correlation Spine — closure-layer receipt map (PR A.5)
 # =========================================================================
 # Doctrine (cross-agent convergence: Perplexity / Codex / Devin / Hermes /
@@ -828,6 +1014,7 @@ correlation_spine:
   invariant: "Receipts may differ by closure layer. Correlation identity must not."
   vocabulary:
     - canonical-store    # owns the source of truth for its layer
+    - canonical-within-layer # owns the receipt for one closure layer
     - derived-view       # read-only projection of a canonical-store
     - plugin-sink        # write-only export adapter (e.g. OTel)
     - cache              # ephemeral, rebuildable from canonical sources
@@ -874,6 +1061,20 @@ correlation_spine:
         layer-prefixed renames (A2ATaskReceipt / SpineEvidenceReceipt /
         ClosureEvidenceReceipt) are tracked as a follow-up, not forced
         here.
+
+    - id: persistent_dialogue
+      label: "Sarathi persistent-dialogue turn closure"
+      receipt_class: RuntimeReceipt
+      receipt_module: dharma_swarm.runtime_state
+      identity_field: trace_id
+      identity_alias: correlation_id
+      role: canonical-within-layer
+      owner: sarathi
+      notes: |
+        Sarathi P0 records the reply event and RuntimeReceipt subtype
+        sarathi_turn through one RuntimeStateStore transaction. RuntimeStateStore
+        remains the shared persistence owner; the Sarathi adapter does not
+        introduce a new store.
 
   cross_layer_joins:
     - "A2ATaskReceipt.correlation_id == EvidenceReceipt(spine).trace_id"

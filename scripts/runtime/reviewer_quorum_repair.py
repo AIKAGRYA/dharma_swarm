@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REPO = "AmitabhainArunachala/dharma_swarm"
+REPO = "AIKAGRYA/dharma_swarm"
 COPILOT_REVIEWER = "copilot-pull-request-reviewer[bot]"  # exact trusted App login
 
 

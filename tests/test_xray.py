@@ -157,6 +157,73 @@ class TestDiscoverFiles:
         assert any(f.suffix == ".ts" for f in files)
 
 
+class TestDiscoveryCap:
+    """Regression tests for issue #1057: the MAX_FILES cap must not make
+    discovery depend on filesystem traversal order.
+
+    The old implementation applied the cap mid-walk, so whichever
+    directories os.walk happened to visit first consumed the whole budget
+    and later directories (e.g. tests/) were silently dropped — on some
+    checkouts analyze_repo() reported test_file_count == 1 against the
+    repo contract test_file_count > 20.
+    """
+
+    @staticmethod
+    def _overflowing_repo(tmp_path):
+        """A repo whose root files alone exceed a cap of 50.
+
+        Root files are yielded by os.walk before any subdirectory, so with
+        order-dependent capping the tests/ subdirectory deterministically
+        gets zero representation regardless of scandir order.
+        """
+        for i in range(120):
+            (tmp_path / f"module_{i:03d}.py").write_text("x = 1\n")
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        for i in range(30):
+            (tests_dir / f"test_module_{i:03d}.py").write_text(
+                "def test_ok():\n    assert True\n"
+            )
+        return tmp_path
+
+    def test_cap_preserves_subdirectory_representation(self, tmp_path, monkeypatch):
+        """RED contract for #1057: capped discovery must keep tests/ files."""
+        import dharma_swarm.xray as xray_mod
+
+        repo = self._overflowing_repo(tmp_path)
+        monkeypatch.setattr(xray_mod, "MAX_FILES", 50)
+
+        files = discover_files(repo)
+        assert len(files) == 50
+        rel = [f.relative_to(repo) for f in files]
+        from_tests = [r for r in rel if r.parts[0] == "tests"]
+        # Proportional share is 50 * 30/150 = 10; require at least half of it
+        # so the assertion survives rounding-strategy changes.
+        assert len(from_tests) >= 5, (
+            f"cap starved tests/ (got {len(from_tests)} of {len(files)}); "
+            "discovery is traversal-order-dependent"
+        )
+
+    def test_capped_discovery_is_deterministic(self, tmp_path, monkeypatch):
+        import dharma_swarm.xray as xray_mod
+
+        repo = self._overflowing_repo(tmp_path)
+        monkeypatch.setattr(xray_mod, "MAX_FILES", 50)
+
+        assert discover_files(repo) == discover_files(repo)
+
+    def test_under_cap_discovery_is_complete(self, tmp_path):
+        """Negative control: below the cap, every matching file is returned."""
+        for i in range(5):
+            (tmp_path / f"module_{i}.py").write_text("x = 1\n")
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_module.py").write_text("def test_ok():\n    assert True\n")
+
+        files = discover_files(tmp_path)
+        assert len(files) == 6
+
+
 # ── Python Analysis ──────────────────────────────────────────────────
 
 
