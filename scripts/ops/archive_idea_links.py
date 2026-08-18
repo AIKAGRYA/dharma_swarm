@@ -153,6 +153,7 @@ def phase_drop(
     vacuum: bool,
     receipt_dir: Path,
     offhost_copy: str,
+    archive_table: str = "",
 ) -> int:
     with _connect(db_path) as db:
         # LIKE underscores are single-char wildcards; validate every returned
@@ -169,7 +170,21 @@ def phase_drop(
         if not archives:
             print("no idea_links_archive_* table found; run phase archive first")
             return 1
-        archive_name = archives[-1]
+        if archive_table:
+            if archive_table not in archives:
+                print(f"--archive-table {archive_table} not found; discovered: {archives}")
+                return 1
+            archive_name = archive_table
+        elif len(archives) > 1:
+            # Re-running phase archive after schema-ensure recreates an empty
+            # idea_links produces a newer, possibly empty archive; silently
+            # dropping archives[-1] would leave the real rows behind unnoticed.
+            print("multiple archive tables found; pass --archive-table to choose one:")
+            for name in archives:
+                print(f"  {name}: {_count(db, name)} rows")
+            return 1
+        else:
+            archive_name = archives[-1]
         rows = _count(db, archive_name)
         backup_path = backup_dir / f"{archive_name}.db"
         print(f"archive table: {archive_name} ({rows} rows)")
@@ -349,6 +364,14 @@ def main(argv: list[str] | None = None) -> int:
             " (e.g. rsync destination); required for phase drop"
         ),
     )
+    parser.add_argument(
+        "--archive-table",
+        default="",
+        help=(
+            "exact idea_links_archive_YYYYMMDD table for phase drop;"
+            " required when more than one archive table exists"
+        ),
+    )
     parser.add_argument("--receipt-dir", type=Path, default=DEFAULT_RECEIPT_DIR)
     args = parser.parse_args(argv)
 
@@ -364,6 +387,7 @@ def main(argv: list[str] | None = None) -> int:
         vacuum=args.vacuum,
         receipt_dir=args.receipt_dir,
         offhost_copy=args.offhost_copy,
+        archive_table=args.archive_table,
     )
 
 
