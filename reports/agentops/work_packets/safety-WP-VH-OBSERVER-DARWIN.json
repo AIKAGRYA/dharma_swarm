@@ -1,0 +1,137 @@
+{
+  "id": "safety-WP-VH-OBSERVER-DARWIN",
+  "base_ref": "357725a027faec6ba35067d9d2b71ceeb774f6e3",
+  "branch": "cursor/vh-darwin-observer-9008",
+  "worktree": ".",
+  "intent": "Add a default-off, process-separated Darwin pre-apply observer. Confirmed FINDINGS stop mutation. Require mode also blocks missing, malformed, unchecked, or failed observations. The demo workload measures selected-engine liveness only and never inspects the proposal diff.",
+  "allowed_files": [
+    "reports/agentops/work_packets/safety-WP-VH-OBSERVER-DARWIN.json",
+    "dharma_swarm/vibe_halt_observer.py",
+    "dharma_swarm/evolution.py",
+    "tests/test_vibe_halt_observer.py"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/sandbox.py",
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/evolution_safety.py",
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/strange_loop.py",
+    "dharma_swarm/runtime_state.py"
+  ],
+  "gates": [
+    {
+      "name": "vh-observer-and-evolution-tests",
+      "command": "python3 -m pytest tests/test_vibe_halt_observer.py tests/test_evolution.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check origin/main...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "blocked-diff-byte-identical",
+      "command": "python3 -c \"from pathlib import Path; s=Path('dharma_swarm/evolution.py').read_text(); a=s.find('async def apply_diff_and_test'); b=s.find('async def apply_sealed_packet'); block=s[a:b]; i=block.find('_observe_before_apply'); j=block.find('DiffApplier('); assert i!=-1 and j>i\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    },
+    {
+      "name": "blocked-path-skips-test-command",
+      "command": "python3 -c \"from pathlib import Path; s=Path('dharma_swarm/evolution.py').read_text(); a=s.find('async def apply_diff_and_test'); b=s.find('async def apply_sealed_packet'); block=s[a:b]; assert 'tests_run' in block and 'False' in block; i=block.find('_observe_before_apply'); j=block.find('applier.apply_and_test'); assert i!=-1 and j>i\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    },
+    {
+      "name": "exit-zero-without-clean-is-error",
+      "command": "python3 -c \"from pathlib import Path; s=Path('dharma_swarm/vibe_halt_observer.py').read_text(); assert '_VERDICT_CLEAN' in s and 'exit_mismatch' in s and 'missing_verdict' in s; assert 'exit_code == want_exit' in s or 'exit_code != want_exit' in s\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    },
+    {
+      "name": "default-off-no-lookup",
+      "command": "python3 -c \"import ast; from pathlib import Path; tree=ast.parse(Path('dharma_swarm/vibe_halt_observer.py').read_text()); fn=next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name=='run_observer'); src=ast.unparse(fn); assert 'ObserverMode.OFF' in src; off=src.find('ObserverMode.OFF'); ret=src.find('return None'); call=src.find('_resolve_binary'); assert off!=-1 and ret>off; assert call==-1 or call>ret\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    },
+    {
+      "name": "no-proposal-context-in-child",
+      "command": "python3 -c \"from pathlib import Path; s=Path('dharma_swarm/vibe_halt_observer.py').read_text(); assert '\\\"PATH\\\": os.defpath' in s; assert 'env=child_env' in s; assert 'start_new_session=True' in s; assert 'stdin=asyncio.subprocess.DEVNULL' in s\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    },
+    {
+      "name": "cleanup-leaves-no-child",
+      "command": "python3 -c \"from pathlib import Path; s=Path('dharma_swarm/vibe_halt_observer.py').read_text(); assert '_terminate_and_reap' in s and '_stop_child' in s; assert 'CancelledError' in s; assert 'output_overflow' in s and 'timeout' in s\"",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(safety): add default-off Darwin vh pre-apply observer"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.3",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-VH-OBSERVER-DARWIN",
+    "active_track": "sovereign-safety-tcb-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "357725a027faec6ba35067d9d2b71ceeb774f6e3",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Darwin apply_diff_and_test currently constructs DiffApplier and mutates before pytest. DiffApplier.apply_and_test deletes rollback backups after a passing test, so a post-test observer cannot reliably undo the change.",
+      "Darwin evaluate() copies caller results then always sets status to EVALUATED, which would erase a pre-apply REJECTED observer block unless that path is preserved.",
+      "Sandbox result parsing prefers pytest counts found in stdout over the process exit code, so a synthetic observer-block result must keep stdout empty."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/evolution.py:apply_diff_and_test",
+      "dharma_swarm/evolution.py:apply_in_sandbox",
+      "dharma_swarm/evolution.py:evaluate",
+      "dharma_swarm/evolution.py:_parse_sandbox_result",
+      "dharma_swarm/sandbox.py:kill_process_group"
+    ],
+    "honest_blockers": [
+      "demo calibrates selected-engine liveness only and does not inspect or verify a proposal diff.",
+      "The child receives a scrubbed environment and empty working directory. That is not a security sandbox, and PATH-selected binaries are not authenticated.",
+      "Binary SHA-256 is diagnostic identity only. Fake binaries prove wiring and policy behavior only.",
+      "This is not a compiler, formal verifier, proof system, or dual-process compiler.",
+      "Default mode is off. Required Python CI does not depend on Rust. A skipped live vh test is not live verification evidence.",
+      "Python represents a child-reported CLEAN result but must not infer CLEAN from missing, malformed, or exit-code-only evidence.",
+      "Pairwise replay agreement is sampled evidence, not a determinism proof."
+    ],
+    "rollback": "Revert the commits on cursor/vh-darwin-observer-9008. Darwin apply paths resume without a pre-apply observer, and default-off behavior remains the conservative no-lookup path.",
+    "packet_digest": "d7d1206529cf7a1f2a52a60a61c53510d55d341eb88c7e15c7b309ae17b24985"
+  }
+}
