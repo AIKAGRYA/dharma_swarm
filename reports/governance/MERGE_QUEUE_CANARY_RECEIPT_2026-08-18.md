@@ -51,9 +51,9 @@ reports/agentops/work_packets/WP-MIKE-P0-20260813.json:93 required proven.
 **Required checks ran on the synthetic SHA and passed** (PR #1129's
 validation, all on `94ea91c8`, event `merge_group`):
 
-- pytest (3.11): job 95578578762-run 32092932300, success
+- pytest (3.11): job 95578578858, run 32092932300, success
   (https://github.com/AIKAGRYA/dharma_swarm/actions/runs/32092932300/job/95578578858)
-- pytest (3.12): success
+- pytest (3.12): job 95578578798, same run, success
   (https://github.com/AIKAGRYA/dharma_swarm/actions/runs/32092932300/job/95578578798)
 - gitleaks: run 32092932302, success
 - DocOps integrity gate: run 32092932326, success
