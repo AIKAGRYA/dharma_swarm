@@ -2668,6 +2668,18 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "copy",
+        "json",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/channel_types.py",
+      "module": "dharma_swarm.graph.channel_types"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
         "abc",
         "copy",
         "dataclasses",
@@ -3297,7 +3309,7 @@
     "bypass_total": 230,
     "effect_site_count": 238,
     "mediated_total": 8,
-    "module_count": 67
+    "module_count": 68
   },
   "workload": {
     "description": "Bounded graph run: GraphBuilder.compile() topology invoked via CompiledGraph.invoke() with SimulatedEffects, a GraphPersistenceKernel (checkpointing on), and a DurableInvoker-wrapped dispatch (derive_graph_side_effect_key). Crosses scheduling (executor superstep barrier), persistence (journal + checkpoint + idempotency store), and channel boundaries.",
