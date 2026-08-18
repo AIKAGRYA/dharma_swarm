@@ -6,6 +6,9 @@
     "semantics": "Exact attestation digests are promotion authority after review; judge identifiers are not cryptographic identity authentication. This file is intentionally excluded from the candidate source digest so ratification cannot alter the evidence it authorizes."
   },
   "ratifications": {
+    "codex-independent-oraclepin-20260809-4c836606": [
+      "3e6f03bf4c771ce7838f8c0b3b95373ecc515df233650d3e9fff90e78944218e"
+    ],
     "codex-judge-3d40063d8": [
       "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
     ],

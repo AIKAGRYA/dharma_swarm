@@ -24,6 +24,10 @@ permissions:
   pull-requests: write
   statuses: read
 
+concurrency:
+  group: merge-master-mike-pr-${{ github.event.inputs.pr || github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   route:
     if: >
@@ -171,7 +175,6 @@ jobs:
           # conflict, unresolved-thread, or CHANGES_REQUESTED checks — so the
           # quorum can clear in the cloud with no operator machine.
           DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"
-          MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
           MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
@@ -192,10 +195,9 @@ jobs:
 
           if [ "${BACKLOG_REQUESTED}" = "true" ]; then
             python3 -m pip install 'nats-py>=2.9' 'aiohttp>=3.9'
-            merge_mode=off
-            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
-              merge_mode=auto-when-clean
-            fi
+            # A backlog fanout gathers evidence and renders gates. It cannot
+            # actuate: the controller has no merge surface at all, and the
+            # merge queue is what performs merges.
             args=(
               --state-root "${state_root}"
               fanout
@@ -203,8 +205,6 @@ jobs:
               --max-prs 5
               --statuses GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW
               --required-reviewers "${REQUIRED_REVIEWERS}"
-              --merge-mode "${merge_mode}"
-              --merge-method "${MERGE_METHOD}"
               --packet-only
               --nats-session
               --nats-timeout-s 8
@@ -224,7 +224,7 @@ jobs:
               echo
               echo "- Trigger PR: \`#${PR_NUMBER}\`"
               echo "- Backlog mode: \`packet-only\`"
-              echo "- Merge mode: \`${merge_mode}\`"
+              echo "- Merge authority: \`none (evidence-only)\`"
               echo "- NATS required: \`${MERGE_MASTER_MIKE_NATS_REQUIRED}\`"
               echo "- Required reviewers: \`${REQUIRED_REVIEWERS}\`"
               echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -239,49 +239,51 @@ jobs:
           else
             python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
             packet_dir="$(find "${state_root}/pr-${PR_NUMBER}" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
-            set +e
-            python3 scripts/runtime/pr_merge_control.py \
-              --state-root "${state_root}" \
-              gate \
-              --pr "${PR_NUMBER}" \
-              --packet-dir "${packet_dir}" \
-              --required-reviewers "${REQUIRED_REVIEWERS}"
-            gate_exit="$?"
-            set -e
+            policy_exit=1
+            authorization_report="${state_root}/merge-authorization-${PR_NUMBER}.json"
             if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
-              # §0 door: the pass token is a policy VERDICT, not a spelling.
-              # Run the tier evaluator in binding mode (--assume-unattended)
-              # before arming the merge — without this, a mention on an
-              # unlabeled tier-2 PR would synthesize the token with no policy
-              # evaluation at all (Codex review on PR #1160). Evaluator +
-              # policy run from this trusted default-branch checkout; if the
-              # guard is not on main yet, this fails closed and no token is
-              # ever passed to the merge command.
+              # Construct the typed authority value before gate evaluation.
+              # The evaluator gathers native current-head AI evidence and an
+              # exact current-head operator warrant from this trusted
+              # default-branch checkout. Its report is an input to the gate,
+              # never a predictable token or mutable label.
               set +e
               python3 scripts/governance/check_automerge_tier_policy.py \
                 --repo "${GITHUB_REPOSITORY}" \
                 --pr "${PR_NUMBER}" \
-                --assume-unattended
+                --assume-unattended \
+                --output "${authorization_report}"
               policy_exit="$?"
               set -e
-              if [ "${policy_exit}" != "0" ]; then
-                merge_exit="${policy_exit}"
-                echo "tier policy did not pass (exit ${policy_exit}) — merge token not armed" >&2
-              else
-                set +e
-                python3 scripts/runtime/pr_merge_control.py \
-                  --state-root "${state_root}" \
-                  merge \
-                  --pr "${PR_NUMBER}" \
-                  --packet-dir "${packet_dir}" \
-                  --required-reviewers "${REQUIRED_REVIEWERS}" \
-                  --method "${MERGE_METHOD}" \
-                  --auto \
-                  --execute \
-                  --confirm "automerge-policy-pass-${PR_NUMBER}"
-                merge_exit="$?"
-                set -e
-              fi
+            fi
+            if [ "${policy_exit}" = "0" ]; then
+              set +e
+              python3 scripts/runtime/pr_merge_control.py \
+                --state-root "${state_root}" \
+                gate \
+                --pr "${PR_NUMBER}" \
+                --packet-dir "${packet_dir}" \
+                --required-reviewers "${REQUIRED_REVIEWERS}" \
+                --merge-authorization "${authorization_report}"
+              gate_exit="$?"
+              set -e
+            else
+              set +e
+              python3 scripts/runtime/pr_merge_control.py \
+                --state-root "${state_root}" \
+                gate \
+                --pr "${PR_NUMBER}" \
+                --packet-dir "${packet_dir}" \
+                --required-reviewers "${REQUIRED_REVIEWERS}"
+              gate_exit="$?"
+              set -e
+            fi
+            # Mike does not merge. The merge queue does. This lane evaluates
+            # the deterministic gate and posts the verdict; a request to
+            # "merge when clean" is recorded and answered by the gate result,
+            # never by an actuator here.
+            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              echo "merge-when-clean requested; Mike is evidence-only, the merge queue performs merges" >&2
             fi
             python3 scripts/runtime/pr_merge_control.py \
               --state-root "${state_root}" \

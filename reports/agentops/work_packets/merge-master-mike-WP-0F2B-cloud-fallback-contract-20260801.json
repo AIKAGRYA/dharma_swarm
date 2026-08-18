@@ -1,0 +1,80 @@
+{
+  "allowed_files": [
+    "tests/test_pr_merge_control_github_reviews.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-0F2B-cloud-fallback-contract-20260801.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "80ef0c86884d7c08f7d8792d5ab6171cf735a825",
+  "branch": "agent/mike-wp0f2-review-contract-repair-20260801",
+  "commit": {
+    "allowed": true,
+    "message": "test(mike): prove both cloud fallback contracts independently [impact-checked]"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_pr_merge_control_github_reviews.py -q",
+      "expected_exit": 0,
+      "name": "github-review-contract-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check tests/test_pr_merge_control_github_reviews.py",
+      "expected_exit": 0,
+      "name": "touched-test-ruff",
+      "timeout_seconds": 300
+    }
+  ],
+  "id": "merge-master-mike-WP-0F2B-cloud-fallback-contract-20260801",
+  "intent": "Repair the Mike-owned WP-0F2 cloud-review contract test after Greptile/T-Rex demonstrated on merged PR #1175 that fallback assertions leaked the final loop value and therefore observed only one workflow. Bind each cloud workflow to its own expected fallback assertions and add a jailed mutation control proving that a regression in either workflow is caught. Test and packet only: no runtime, workflow, CI-truth, branch-protection, or Titanium-owned source changes.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCBzdWJwcm9jZXNzCmltcG9ydCBzeXMKClRBUkdFVCA9ICJ0ZXN0cy90ZXN0X3ByX21lcmdlX2NvbnRyb2xfZ2l0aHViX3Jldmlld3MucHk6OnRlc3RfY2xvdWRfbGFuZXNfbmV2ZXJfcmVxdWlyZV9jb3BpbG90X3JlY2VpcHRzIgpjYXNlcyA9ICgKICAgICgKICAgICAgICAiLmdpdGh1Yi93b3JrZmxvd3MvY29kZXgtbWVudGlvbi1yb3V0ZXIueW1sIiwKICAgICAgICAiUkVRVUlSRURfUkVWSUVXRVJTOiBjb2RleCIsCiAgICAgICAgIlJFUVVJUkVEX1JFVklFV0VSUzogY2xhdWRlIiwKICAgICksCiAgICAoCiAgICAgICAgIi5naXRodWIvd29ya2Zsb3dzL21lcmdlLW1hc3Rlci1taWtlLWJhY2tsb2cueW1sIiwKICAgICAgICAiaW5wdXRzLm1vZGUgfHwgJ3BhY2tldC1vbmx5JyIsCiAgICAgICAgImlucHV0cy5tb2RlIHx8ICdtdXRhdGVkJyIsCiAgICApLAopCmZvciByZWxhdGl2ZSwgbmVlZGxlLCByZXBsYWNlbWVudCBpbiBjYXNlczoKICAgIHBhdGggPSBQYXRoKHJlbGF0aXZlKQogICAgb3JpZ2luYWwgPSBwYXRoLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQogICAgaWYgb3JpZ2luYWwuY291bnQobmVlZGxlKSAhPSAxOgogICAgICAgIHN5cy5leGl0KDIpCiAgICBwYXRoLndyaXRlX3RleHQob3JpZ2luYWwucmVwbGFjZShuZWVkbGUsIHJlcGxhY2VtZW50LCAxKSwgZW5jb2Rpbmc9InV0Zi04IikKICAgIHJlc3VsdCA9IHN1YnByb2Nlc3MucnVuKAogICAgICAgIFtzeXMuZXhlY3V0YWJsZSwgIi1tIiwgInB5dGVzdCIsIFRBUkdFVCwgIi1xIl0sCiAgICAgICAgY2hlY2s9RmFsc2UsCiAgICApCiAgICBwYXRoLndyaXRlX3RleHQob3JpZ2luYWwsIGVuY29kaW5nPSJ1dGYtOCIpCiAgICBpZiByZXN1bHQucmV0dXJuY29kZSA9PSAwOgogICAgICAgIHN5cy5leGl0KDEpCnN5cy5leGl0KDApCg=='))\"",
+      "expected_exit": 0,
+      "name": "both-cloud-workflows-are-load-bearing",
+      "timeout_seconds": 300
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "agent_identity": "codex-titanium-git",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "tests/test_pr_merge_control_github_reviews.py",
+      ".github/workflows/codex-mention-router.yml",
+      ".github/workflows/merge-master-mike-backlog.yml",
+      "reports/agentops/work_packets/mike-WP-REVIEWERS1-codex-only-required.json"
+    ],
+    "collision": {
+      "checked_at_sha": "80ef0c86884d7c08f7d8792d5ab6171cf735a825",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This packet repairs only the test coverage defect identified by Greptile on PR #1175; it does not amend the cloud-review policy, runtime gate, or either workflow.",
+      "WP-0F2 remains carried by operator-blocked WP-0F1 until the final required-check and human-review policy is ratified and exercised; this packet makes no closure claim.",
+      "Three unresolved Codex review threads on merged PR #1175 concern workflow/tier-policy/authority surfaces outside this packet and are deliberately not swept into this test-only repair."
+    ],
+    "interface_mismatches": [],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "eb4b177d26492d2ef17e7c9a6a405213452e4e51a66a02ebae0f72e3559a7628",
+    "rollback": "Revert the single test-and-packet commit; no runtime, workflow, repository-setting, or CI-truth state changes require rollback.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-0F2B"
+  },
+  "worktree": "."
+}

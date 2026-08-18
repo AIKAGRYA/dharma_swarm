@@ -1,0 +1,90 @@
+{
+  "id": "titanium-WP-GITLEAKS-LICENSEFREE",
+  "base_ref": "12212397be1dbe0a9b0cc29be4311f930140e751",
+  "branch": "agent/license-free-gitleaks-20260812",
+  "worktree": ".",
+  "intent": "TIT-004 follow-up: replace the organization-licensed proprietary gitleaks-action wrapper with the checksum-pinned MIT Gitleaks 8.30.1 CLI while preserving the required gitleaks check identity, adding explicit pull-request, push, merge-group, and manual-audit revision ranges, and reducing workflow authority to contents read.",
+  "allowed_files": [
+    ".github/workflows/gitleaks.yml",
+    "tests/test_gitleaks_workflow.py",
+    "reports/agentops/work_packets/titanium-WP-GITLEAKS-LICENSEFREE.json"
+  ],
+  "forbidden_files": [
+    ".gitleaks.toml",
+    "Makefile",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/runtime/pr_merge_control.py",
+    ".github/workflows/automerge.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/merge-master-mike-backlog.yml"
+  ],
+  "gates": [
+    {
+      "name": "gitleaks-workflow-contract",
+      "command": "python3 -m pytest -q tests/test_gitleaks_workflow.py tests/governance/test_ci_parity_guard.py tests/test_workflow_cache_token_guard.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "changed-scope-diff-check",
+      "command": "git diff --check -- .github/workflows/gitleaks.yml tests/test_gitleaks_workflow.py reports/agentops/work_packets/titanium-WP-GITLEAKS-LICENSEFREE.json",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "checksum-pin-mutation-is-rejected",
+      "command": "python3 -c \"from pathlib import Path; t=Path('.github/workflows/gitleaks.yml').read_text(); d='551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'; m=t.replace(d,'0'*64,1); raise SystemExit(1 if d not in m else 0)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): migrate gitleaks to pinned MIT CLI"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-GITLEAKS-LICENSEFREE",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "12212397be1dbe0a9b0cc29be4311f930140e751",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The workflow declared merge_group support, but the pinned v2 wrapper rejects merge_group events before scanning; the replacement must derive and scan the merge-group base_sha..head_sha candidate explicitly.",
+      "The proprietary action requires GITLEAKS_LICENSE for organization-owned repositories, while the MIT CLI has no organization-license boundary."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/gitleaks.yml",
+      ".github/workflows/docops.yml",
+      "tests/test_onboarding_ci_contract.py"
+    ],
+    "honest_blockers": [
+      "A pull_request run can prove the new org-owned CLI path; actual merge_group behavior remains structurally covered until a PR is admitted to the native merge queue.",
+      "The upstream v8.30.1 tag is no longer reachable from current master after upstream release-history mishandling, but the exact official Linux archive is bound to GitHub's published digest and an independently recomputed SHA-256."
+    ],
+    "rollback": "Revert the workflow, focused contract test, and packet together. Rollback restores the proprietary wrapper and therefore reintroduces the organization-license dependency and merge_group rejection; do not claim queue readiness after rollback.",
+    "packet_digest": "35478b868119926285c39096913fb16b81b398d7c7cd80716589429ca356ae95"
+  }
+}

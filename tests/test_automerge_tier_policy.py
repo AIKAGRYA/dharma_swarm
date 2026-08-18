@@ -37,6 +37,28 @@ def _evaluate(**overrides):
             {"login": CODEX, "state": "APPROVED", "body": ""},
             {"login": COPILOT, "state": "APPROVED", "body": ""},
         ],
+        ai_evidence=[
+            {
+                "id": 1,
+                "login": CODEX,
+                "state": "APPROVED",
+                "body": "",
+                "head_sha": "a" * 40,
+            }
+        ],
+        operator_warrants=[
+            {
+                "kind": "github_review",
+                "id": 77,
+                "actor": "amitabhainarunachala",
+                "head_sha": "a" * 40,
+            }
+        ],
+        repo="owner/repo",
+        pr=12,
+        head_sha="a" * 40,
+        base_sha="b" * 40,
+        base_ref="main",
         author="devin-ai-integration[bot]",
         merged_last_24h=0,
         policy=POLICY,
@@ -45,8 +67,9 @@ def _evaluate(**overrides):
     return guard.evaluate(**base)
 
 
-def _rest_review(login, state, commit="headsha", submitted="t1", body=""):
+def _rest_review(login, state, commit="headsha", submitted="t1", body="", review_id=1):
     return {
+        "id": review_id,
         "user": {"login": login},
         "state": state,
         "commit_id": commit,
@@ -69,15 +92,19 @@ def test_clean_tier1_bot_pr_passes():
     report = _evaluate()
     assert report["passed"] is True
     assert report["tier"] == "tier1"
+    assert report["authority_class"] == "code"
+    assert report["authorization_evidence"]["operator_warrant"]["id"] == 77
+    assert report["authorization_evidence"]["actuation_eligible"] is False
 
 
-def test_tier2_with_quorum_and_clean_intent_passes():
-    """2026-07-30 repeal: a referee-path PR with the tier2 quorum, a clean
-    declared intent, and floor-clear paths is admissible unattended."""
+def test_tier2_with_quorum_remains_operator_only():
+    """Review quantity cannot promote a referee path into Mike authority."""
     report = _evaluate(changed_paths=[".github/workflows/automerge.yml"])
     assert report["tier"] == "tier2"
     assert report["tier2_hits"] == [".github/workflows/automerge.yml"]
-    assert report["passed"] is True
+    assert report["authority_class"] == "operator_only"
+    assert report["passed"] is False
+    assert report["authorization_evidence"] is None
 
 
 def test_tier2_without_quorum_fails():
@@ -86,16 +113,18 @@ def test_tier2_without_quorum_fails():
         approved_reviews=[{"login": CODEX, "state": "APPROVED", "body": ""}],
     )
     assert report["passed"] is False
-    assert any("decorrelated" in v for v in report["violations"])
+    assert any("operator-only authority class" in v for v in report["violations"])
 
 
 def test_tier2_diff_ceiling_is_400():
     assert _evaluate(
         changed_paths=[".github/workflows/automerge.yml"], diff_lines=401
     )["passed"] is False
-    assert _evaluate(
+    report = _evaluate(
         changed_paths=[".github/workflows/automerge.yml"], diff_lines=400
-    )["passed"] is True
+    )
+    assert report["passed"] is False
+    assert not any("ceiling" in violation for violation in report["violations"])
 
 
 def test_tier2_path_on_never_auto_floor_stays_operator_only():
@@ -106,7 +135,7 @@ def test_tier2_path_on_never_auto_floor_stays_operator_only():
     )
     assert report["tier"] == "tier2"
     assert report["passed"] is False
-    assert any("NEVER_AUTO floor" in v for v in report["violations"])
+    assert any("operator-only authority class" in v for v in report["violations"])
 
 
 def test_reversibility_floor_blocks_operator_only_title_at_every_tier():
@@ -177,19 +206,52 @@ def test_docs_only_is_tier0_with_lower_ceiling_and_one_review():
     assert report["passed"] is False
 
 
-def test_review_quorum_requires_distinct_families_from_author():
-    report = _evaluate(approved_reviews=[{"login": CODEX, "state": "APPROVED", "body": ""}])
+def test_code_requires_current_head_trusted_ai_evidence():
+    report = _evaluate(approved_reviews=[], ai_evidence=[])
     assert report["passed"] is False
-    assert any("decorrelated" in v for v in report["violations"])
-    # Copilot reviewing a Copilot-authored PR does not count.
+    assert any("current-head trusted AI" in v for v in report["violations"])
+    # Trusted AI is evidence, not operator identity. Same-family evidence may
+    # prove a review ran but cannot replace the separate operator warrant.
     report = _evaluate(
         author="Copilot",
-        approved_reviews=[
-            {"login": COPILOT, "state": "APPROVED", "body": ""},
-            {"login": CODEX, "state": "APPROVED", "body": ""},
+        approved_reviews=[{"login": COPILOT, "state": "APPROVED", "body": ""}],
+        ai_evidence=[
+            {
+                "id": 2,
+                "login": COPILOT,
+                "state": "APPROVED",
+                "body": "",
+                "head_sha": "a" * 40,
+            }
+        ],
+        operator_warrants=[],
+    )
+    assert report["passed"] is False
+    assert any("operator warrant" in v for v in report["violations"])
+
+
+def test_stale_ai_evidence_and_untrusted_warrant_fail_pure_evaluation():
+    report = _evaluate(
+        ai_evidence=[
+            {
+                "id": 1,
+                "login": CODEX,
+                "state": "COMMENTED",
+                "head_sha": "stale",
+            }
+        ],
+        operator_warrants=[
+            {
+                "kind": "issue_comment",
+                "id": 2,
+                "actor": "AmitabhainArunachala-lookalike",
+                "head_sha": "a" * 40,
+            }
         ],
     )
     assert report["passed"] is False
+    assert any("current-head trusted AI" in row for row in report["violations"])
+    assert any("operator warrant" in row for row in report["violations"])
 
 
 def test_reviewer_families_mirror_trusted_review_logins():
@@ -210,7 +272,11 @@ def test_lookalike_logins_never_qualify():
             {"login": "copilot", "state": "APPROVED", "body": ""},
             {"login": "chatgpt-codex-connector", "state": "APPROVED", "body": ""},
             {"login": "codex-reviewer[bot]", "state": "APPROVED", "body": ""},
-        ]
+        ],
+        ai_evidence=[
+            {"id": 1, "login": "codex", "state": "APPROVED", "head_sha": "a" * 40},
+            {"id": 2, "login": "copilot", "state": "APPROVED", "head_sha": "a" * 40},
+        ],
     )
     assert report["qualifying_reviews"] == []
     assert report["passed"] is False
@@ -255,6 +321,148 @@ def test_latest_approvals_state_transitions():
     assert rows == []
 
 
+def test_commented_ai_review_is_evidence_not_operator_authority():
+    rows = guard.latest_ai_evidence(
+        [_rest_review(CODEX, "COMMENTED", commit="headsha")],
+        "headsha",
+        POLICY,
+    )
+    assert [(row["login"], row["state"]) for row in rows] == [
+        (CODEX, "COMMENTED")
+    ]
+    assert "body" not in rows[0]
+    report = _evaluate(
+        approved_reviews=[],
+        ai_evidence=rows,
+        head_sha="headsha",
+        operator_warrants=[],
+    )
+    assert report["passed"] is False
+    assert any("operator warrant" in violation for violation in report["violations"])
+
+
+def test_operator_warrant_is_native_exact_identity_and_current_head():
+    reviews = [
+        _rest_review(
+            "AmitabhainArunachala-lookalike", "APPROVED", commit="a" * 40,
+            review_id=1,
+        ),
+        _rest_review(
+            "AmitabhainArunachala", "APPROVED", commit="b" * 40, review_id=2,
+        ),
+        _rest_review(
+            "AmitabhainArunachala", "APPROVED", commit="a" * 40, review_id=3,
+        ),
+    ]
+    warrants = guard.qualifying_operator_warrants(reviews, "a" * 40, POLICY)
+    assert warrants == [
+        {
+            "kind": "github_review",
+            "id": 3,
+            "actor": "amitabhainarunachala",
+            "head_sha": "a" * 40,
+        }
+    ]
+
+
+def test_operator_warrant_is_cleared_by_later_changes_requested():
+    reviews = [
+        _rest_review(
+            "AmitabhainArunachala", "APPROVED", commit="a" * 40,
+            submitted="t1", review_id=1,
+        ),
+        _rest_review(
+            "AmitabhainArunachala", "CHANGES_REQUESTED", commit="a" * 40,
+            submitted="t2", review_id=2,
+        ),
+    ]
+    assert guard.qualifying_operator_warrants(reviews, "a" * 40, POLICY) == []
+
+
+def test_docs_governance_is_not_docs_low():
+    report = _evaluate(changed_paths=["docs/governance/policy.md"])
+    assert report["authority_class"] == "operator_only"
+    assert report["passed"] is False
+
+
+def test_agent_instruction_and_nested_control_paths_are_operator_only():
+    for path in (
+        "docs/AGENTS.md",
+        ".agents/skills/testing-governance-gates/SKILL.md",
+        "mode_pack/claude/autonomous-build/SKILL.md",
+        "docs/agents/reviewer/SOUL.md",
+        "docs/agent_tasks/review_prompt.md",
+        "service/.env.production",
+        "service/infra/prod.tf",
+        "service/deploy/prod.yml",
+        "credentials/token.txt",
+        "secrets/key.txt",
+        "SKILL.md",
+        "SOUL.md",
+        "LIVE_FIRE_PROMPT.md",
+    ):
+        report = _evaluate(changed_paths=[path])
+        assert report["authority_class"] == "operator_only", path
+        assert report["passed"] is False
+
+
+def test_protected_path_rename_checks_old_and_new_names():
+    report = _evaluate(
+        changed_paths=["docs/benign.md", "docs/ops/authority.md"],
+        file_changes=[
+            {
+                "status": "renamed",
+                "filename": "docs/benign.md",
+                "previous_filename": "docs/ops/authority.md",
+            }
+        ],
+    )
+    assert report["authority_class"] == "operator_only"
+    assert report["passed"] is False
+
+
+def test_removed_non_python_tests_and_unsafe_git_modes_are_operator_only():
+    removed = _evaluate(
+        changed_paths=["web/foo.test.ts"],
+        file_changes=[{"status": "removed", "filename": "web/foo.test.ts"}],
+    )
+    assert removed["authority_class"] == "operator_only"
+    for header in (
+        "new file mode 100755",
+        "new file mode 120000",
+        "new file mode 160000",
+    ):
+        report = _evaluate(changed_paths=["docs/guide.md"], diff_text=header)
+        assert report["authority_class"] == "operator_only", header
+
+
+def test_security_migration_and_secret_paths_are_operator_only():
+    for path in (
+        "dharma_swarm/security/auth.py",
+        "db/migrations/0042_rotate_keys.sql",
+        "infra/deploy.yaml",
+        "service/secrets/loader.py",
+        ".env.production",
+    ):
+        report = _evaluate(changed_paths=[path])
+        assert report["authority_class"] == "operator_only", path
+        assert report["passed"] is False
+
+
+def test_evidence_digest_binds_repo_head_base_ref_policy_and_intent():
+    report = _evaluate()
+    evidence = report["authorization_evidence"]
+    assert evidence["repo"] == "owner/repo"
+    assert evidence["head_sha"] == "a" * 40
+    assert evidence["base_sha"] == "b" * 40
+    assert evidence["base_ref"] == "main"
+    assert evidence["policy_sha256"] == guard.policy_digest(POLICY)
+    assert evidence["provenance"] == "unsigned-github-snapshot"
+    assert evidence["actuation_eligible"] is False
+    digest = evidence.pop("digest")
+    assert digest == guard.canonical_digest(evidence)
+
+
 def test_assume_unattended_binds_unlabeled_and_draft_prs():
     """The router's arming path must not see 'unlabeled -> policy does not
     bind' — that was the token-synthesis bypass."""
@@ -268,10 +476,10 @@ def test_assume_unattended_binds_unlabeled_and_draft_prs():
     assert report["labeled_for_unattended"] is True
     assert report["tier2_hits"] == [".github/workflows/automerge.yml"]
     assert report["passed"] is False
-    assert any("decorrelated" in v for v in report["violations"])
+    assert any("operator-only authority class" in v for v in report["violations"])
 
 
-def test_test_deletion_needs_named_signoff():
+def test_test_deletion_is_operator_only_even_with_named_ai_signoff():
     diff = "-    def test_removed_one(self):\n-    def test_removed_two(self):\n"
     report = _evaluate(diff_text=diff)
     assert report["passed"] is False
@@ -285,7 +493,8 @@ def test_test_deletion_needs_named_signoff():
              "body": "sign-off on test_removed_one, test_removed_two"},
         ],
     )
-    assert report["passed"] is True
+    assert report["passed"] is False
+    assert report["authority_class"] == "operator_only"
 
 
 def test_untrusted_approval_cannot_sign_off_test_deletion():
@@ -316,9 +525,10 @@ def test_rate_limit_count_dedupes_dual_labeled_prs():
     assert guard.count_unique_merged([rows_automerge, rows_bot_pr]) == 14
 
 
-def test_rate_limit_blocks_at_twenty():
-    assert _evaluate(merged_last_24h=20)["passed"] is False
-    assert _evaluate(merged_last_24h=19)["passed"] is True
+def test_mutable_label_rate_count_is_advisory_not_authority():
+    report = _evaluate(merged_last_24h=20)
+    assert report["passed"] is True
+    assert "mutable and non-atomic" in report["rate_limit_advisory"]
 
 
 def test_canary_sandbox_is_never_mergeable_unattended():
@@ -329,19 +539,17 @@ def test_canary_sandbox_is_never_mergeable_unattended():
 
 
 def test_policy_file_pins():
-    assert POLICY["schema"] == "dharma.automerge_tier_policy.v2"
-    assert POLICY["rate_limit_automerges_per_day"] == 20
+    assert POLICY["schema"] == "dharma.automerge_tier_policy.v3"
+    assert POLICY["rate_observation_advisory_per_day"] == 20
     assert POLICY["confirmation_token_prefix"] == "automerge-policy-pass-"
     assert POLICY["tiers"]["tier0"]["max_diff_lines"] == 300
     assert POLICY["tiers"]["tier1"]["max_diff_lines"] == 600
-    # 2026-07-30 repeal: tier2 is a door, not a wall — and both tiers 1-2
-    # keep the named test-deletion sign-off.
-    assert POLICY["tiers"]["tier2"]["merge"] == (
-        "auto_with_decorrelated_review_and_reversibility"
-    )
+    assert POLICY["tiers"]["tier2"]["merge"] == "operator_only"
     assert POLICY["tiers"]["tier2"]["max_diff_lines"] == 400
-    assert POLICY["tiers"]["tier2"]["required_decorrelated_reviews"] == 2
-    assert POLICY["tiers"]["tier2"]["test_deletion_needs_named_signoff"] is True
+    assert POLICY["authority_policy"]["actuation_enabled"] is False
+    assert POLICY["authority_policy"]["classes"]["docs_low"]["candidate_for_unattended"] is True
+    assert POLICY["authority_policy"]["classes"]["code"]["operator_warrant"] is True
+    assert POLICY["authority_policy"]["classes"]["operator_only"]["candidate_for_unattended"] is False
     dial = POLICY["autonomy_dial"]
     assert dial["env"] == "DGC_SARATHI_AUTONOMY"
     assert dial["levels"] == ["shadow", "propose", "dispatch", "full"]
@@ -376,37 +584,65 @@ def test_workflow_contract():
 def test_confirmation_token_is_honest_everywhere():
     """§0 token verdict: merge-pr-N claimed operator consent CI synthesized.
 
-    The live sites must all use automerge-policy-pass-N; the old token may
-    survive only inside an explanatory comment in pr_merge_control.py.
+    The dishonest token must be live nowhere. Since the merge actuator was
+    removed from pr_merge_control.py (the merge queue performs merges and the
+    controller is evidence-only), NEITHER token should appear at a live call
+    site: there is no longer a merge command to confirm. The tier policy still
+    declares the honest prefix for any future consumer that actuates.
     """
     control = (REPO_ROOT / "scripts" / "runtime" / "pr_merge_control.py").read_text()
-    assert 'f"automerge-policy-pass-{args.pr}"' in control
-    live_lines = [
-        line for line in control.splitlines()
-        if "merge-pr-" in line and not line.lstrip().startswith("#")
-    ]
-    assert live_lines == [], f"old token still live in pr_merge_control.py: {live_lines}"
+    for token in ("merge-pr-", "automerge-policy-pass-"):
+        live_lines = [
+            line for line in control.splitlines()
+            if token in line and not line.lstrip().startswith("#")
+        ]
+        assert live_lines == [], (
+            f"{token!r} is live in pr_merge_control.py, which no longer merges: "
+            f"{live_lines}"
+        )
     router = (REPO_ROOT / ".github" / "workflows" / "codex-mention-router.yml").read_text()
-    assert "automerge-policy-pass-${PR_NUMBER}" in router
     assert "merge-pr-${PR_NUMBER}" not in router
+    assert "automerge-policy-pass-${PR_NUMBER}" not in router, (
+        "the router no longer confirms a merge; Mike is evidence-only"
+    )
     assert POLICY["confirmation_token_prefix"] == "automerge-policy-pass-"
 
 
-def test_router_runs_binding_evaluation_before_arming_token():
-    """The token is a policy verdict, not a spelling: the router must run
-    the evaluator in --assume-unattended mode before the merge command ever
-    sees the token (Codex review on PR #1160)."""
+def test_router_evaluates_binding_policy_and_arms_no_token():
+    """The evaluator still runs; there is no longer a token for it to arm.
+
+    Originally this asserted the policy evaluator ran before the merge command
+    saw its confirmation token (Codex review on PR #1160). The merge command is
+    gone -- the merge queue performs merges -- so the honest invariant is that
+    the evaluator still produces a typed permit for the gate while no
+    confirmation token is armed anywhere in the lane.
+    """
     router = (REPO_ROOT / ".github" / "workflows" / "codex-mention-router.yml").read_text()
-    gate_at = router.index("--assume-unattended")
-    token_at = router.index("automerge-policy-pass-${PR_NUMBER}")
-    assert gate_at < token_at, "evaluator gate must precede the armed token"
+    assert "--assume-unattended" in router
     assert "check_automerge_tier_policy.py" in router
+    assert "automerge-policy-pass-${PR_NUMBER}" not in router, (
+        "a merge confirmation token is armed in a lane that cannot merge"
+    )
 
 
-def test_same_family_as_author_cannot_sign_off_test_deletion():
-    """The deletion sign-off pool is decorrelated too: a Copilot-family
-    approval naming the deleted tests must not authorize a deletion on a
-    Copilot-authored PR (Greptile P1 on PR #1160)."""
+def test_router_passes_typed_permit_to_gate_and_never_to_an_actuator():
+    router = (REPO_ROOT / ".github/workflows/codex-mention-router.yml").read_text()
+    evaluator_at = router.index("--output \"${authorization_report}\"")
+    gate_at = router.index("gate \\")
+    assert evaluator_at < gate_at
+    # Exactly one consumer of the typed permit: the deterministic gate.
+    assert router.count('--merge-authorization "${authorization_report}"') == 1
+    assert "\n                  merge \\" not in router, "router still invokes a merge command"
+    backlog_block = router[router.index('if [ "${BACKLOG_REQUESTED}"') : gate_at]
+    assert "merge_mode" not in backlog_block, "backlog still threads a merge mode"
+    assert "--human-approved" not in router
+    assert "merge-master-mike-pr-${{" in router
+    assert "cancel-in-progress: true" in router
+
+
+def test_same_family_ai_cannot_promote_test_deletion():
+    """No AI review, same-family or otherwise, promotes a deletion out of
+    the operator-only class."""
     diff = "-def test_removed(self):\n"
     report = _evaluate(
         author="Copilot",

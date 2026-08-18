@@ -1,7 +1,7 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 5,
-  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
+  "version": 6,
+  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow. Completeness is enforced: every PR-visible check name must carry a row here or an explicit exclusion, pinned by tests/test_ci_truth_contract_completeness.py.",
   "required_contexts_manifest": "scripts/governance/ci_parity_manifest.json",
   "required": [
     {
@@ -208,6 +208,86 @@
       "local_command": "git log --format=%s origin/main..HEAD",
       "failure_category": "commit_hygiene",
       "autofix": "manual"
+    },
+    {
+      "id": "agentops_packet_scope",
+      "names": ["AgentOps packet scope"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_agentops_packet_scope.py --event-name pull_request --event-base <base-sha> --event-head <head-sha>",
+      "failure_category": "packet_scope",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "automerge_tier_policy",
+      "names": ["Automerge tier policy"],
+      "owner": "coordination",
+      "local_command": "python3 scripts/governance/check_automerge_tier_policy.py --help",
+      "failure_category": "merge_policy",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "ci_parity_guard",
+      "names": ["CI parity guard"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "failure_category": "ci_parity",
+      "autofix": "limited"
+    },
+    {
+      "id": "bot_pr_intent_limit",
+      "names": ["Intent PR limit"],
+      "owner": "coordination",
+      "local_command": "gh pr list --state open --json headRefName,author",
+      "failure_category": "lane_throttle",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "onboarding_session_status_job",
+      "names": ["Onboarding session status"],
+      "owner": "onboarding",
+      "local_command": "make onboard && python3 -m pytest -q tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_onboarding_ci_contract.py",
+      "failure_category": "session_status",
+      "autofix": "manual"
+    },
+    {
+      "id": "semgrep_rule2_behavior",
+      "names": ["anti-slop rule 2 behavioral contract"],
+      "owner": "security",
+      "local_command": "make semgrep && python3 -m pytest tests/test_no_new_substrate.py -q",
+      "failure_category": "static_security",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "surface_manifest_check",
+      "names": ["manifest-check"],
+      "owner": "architecture",
+      "local_command": "python3 tools/manifest_check.py",
+      "failure_category": "surface_manifest_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "pudgala_rigor",
+      "names": ["rigor"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_claim_evidence_binding.py",
+      "failure_category": "claim_evidence",
+      "autofix": "limited"
+    },
+    {
+      "id": "terminal_suite",
+      "names": ["terminal"],
+      "owner": "terminal",
+      "local_command": "make terminal-check",
+      "failure_category": "terminal_suite",
+      "autofix": "manual"
+    },
+    {
+      "id": "oz_external_verifier",
+      "names": ["verify"],
+      "owner": "governance",
+      "local_command": "gh run view <run-id> --log",
+      "failure_category": "external_verifier",
+      "autofix": "forbidden"
     }
   ]
 }

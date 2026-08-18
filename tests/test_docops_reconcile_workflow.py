@@ -1,18 +1,13 @@
-"""WP-0G reconcile-workflow contract (TIT-008).
+"""Executable contract for truthful DocOps reconcile delivery.
 
-Strict DocOps was red on main while the rolling repair PR could lose its
-checks: Tier-2 force-pushes made with GITHUB_TOKEN never trigger workflows,
-so the refreshed head sat checkless while the job reported success. These
-tests pin the repaired delivery contract of
-`.github/workflows/docops-reconcile-main.yml` structurally (the workflow
-cannot run locally; its text is the enforceable surface, the pattern used by
-the polyglot/hermetic contract tests).
-
-Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0G).
+The workflow cannot run locally, so these tests pin its authority-bearing shell
+surface: a rolling PR is actionable only when the exact delivered head exposes
+every canonical GitHub Actions context, and only direct-main delivery carries
+the loop-suppression marker.
 """
+
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,45 +16,91 @@ WORKFLOW = (
 ).read_text(encoding="utf-8")
 
 
-def test_force_update_verifies_checks_on_the_new_head() -> None:
-    """Delivery is not success: the refreshed head must receive check runs."""
-    assert "verify_head_checks" in WORKFLOW
-    assert "check-runs" in WORKFLOW
-    # Both Tier-2 delivery paths (refresh existing PR, create new PR) must
-    # run the verification before exiting.
-    assert WORKFLOW.count("verify_head_checks") >= 3  # definition + 2 call sites
+def test_exact_head_requires_the_full_canonical_context_set() -> None:
+    """One arbitrary check run is not evidence of actionable delivery."""
+    assert "required_contexts_present()" in WORKFLOW
+    assert "scripts/governance/ci_parity_manifest.json" in WORKFLOW
+    assert 'manifest["required_contexts"]' in WORKFLOW
+    assert "comm -23" in WORKFLOW
+    assert "gh api --paginate --slurp" in WORKFLOW
+    assert "filter=all" in WORKFLOW
+    assert "| jq -r" in WORKFLOW
+    assert "select(.app.id == 15368)" in WORKFLOW
+    assert "group_by(.name)" in WORKFLOW
+    assert "map(max_by(.id))" in WORKFLOW
+    assert '.conclusion == "success"' in WORKFLOW
+    assert '.conclusion == "neutral"' in WORKFLOW
+    assert '.conclusion == "skipped"' in WORKFLOW
+    assert ".total_count" not in WORKFLOW
+    assert "verify_head_checks" not in WORKFLOW
 
 
-def test_checkless_head_is_a_red_job_not_a_warning() -> None:
-    verify_block = WORKFLOW[WORKFLOW.index("verify_head_checks() {"):]
+def test_check_run_evidence_has_explicit_read_authority() -> None:
+    assert "permissions:\n  checks: read\n" in WORKFLOW
+
+
+def test_both_rolling_pr_paths_verify_the_exact_delivered_head() -> None:
+    call = 'verify_required_contexts "$(git rev-parse HEAD)"'
+    assert WORKFLOW.count(call) == 2
+    assert "verify_required_contexts()" in WORKFLOW
+
+
+def test_missing_required_context_is_a_red_job() -> None:
+    verify_start = WORKFLOW.index("verify_required_contexts() {")
+    verify_end = WORKFLOW.index("# Tier 2 uses one rolling PR", verify_start)
+    verify_block = WORKFLOW[verify_start:verify_end]
     assert "::error::" in verify_block
     assert "return 1" in verify_block
-    # The historical disease: rejected/inert delivery downgraded to a warning.
     assert "::warning::" not in verify_block
 
 
+def test_byte_identical_rolling_head_is_reused_only_with_full_evidence() -> None:
+    reuse_start = WORKFLOW.index("# Tier 2 uses one rolling PR")
+    commit_start = WORKFLOW.index("echo \"DocOps counts drifted", reuse_start)
+    reuse_block = WORKFLOW[reuse_start:commit_start]
+    assert 'remote_head="$(git rev-parse FETCH_HEAD)"' in reuse_block
+    assert 'required_contexts_present "$remote_head"' in reuse_block
+    assert "its exact head is actionable" in reuse_block
+
+
+def test_skip_ci_is_added_only_inside_direct_main_delivery() -> None:
+    commit_start = WORKFLOW.index('COMMIT_SUBJECT="chore(docops)')
+    tier_one = WORKFLOW.index('if [ "$HAS_BYPASS_TOKEN" = "true" ]', commit_start)
+    tier_two = WORKFLOW.index("# ---- Tier 2", tier_one)
+
+    neutral_commit = WORKFLOW[commit_start:tier_one]
+    direct_main = WORKFLOW[tier_one:tier_two]
+    assert "[skip ci]" not in neutral_commit
+    assert "git commit --amend" in direct_main
+    assert '${COMMIT_SUBJECT} [skip ci]' in direct_main
+
+
+def test_generated_pr_body_satisfies_coherence_delta_contract() -> None:
+    required_fields = (
+        "Organ touched:",
+        "Declared-vs-actual gap closed:",
+        "Proof that re-reads the map:",
+        "New drift introduced:",
+    )
+    for field in required_fields:
+        assert field in WORKFLOW
+    assert '--body-file "$body_file"' in WORKFLOW
+
+
 def test_success_requires_delivery_to_main_or_actionable_pr() -> None:
-    """Both failure tiers exit nonzero; no silent branch-push-only success."""
     assert "exit 1" in WORKFLOW
     assert "reconcile could not be delivered" in WORKFLOW
-    # Tier-1 rejected push with a bypass token present is red, not warned.
     assert "bypass token present but the direct push was rejected" in WORKFLOW
-
-
-def test_reconcile_commit_carries_skip_ci_loop_guard() -> None:
-    assert "[skip ci]" in WORKFLOW
-    assert re.search(r"if:.*skip ci", WORKFLOW), (
-        "the job must not re-trigger itself on its own reconcile commit"
-    )
 
 
 def test_reconcile_stages_only_the_two_governed_files() -> None:
     assert (
-        "git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md"
-        in WORKFLOW
+        "git add docs/docops/AUTO_INVENTORY.md "
+        "docs/governance/SOVEREIGN_MANIFEST.md" in WORKFLOW
     )
     command_lines = [
-        line.strip() for line in WORKFLOW.splitlines()
+        line.strip()
+        for line in WORKFLOW.splitlines()
         if not line.strip().startswith("#")
     ]
     assert not any(line.startswith("git add -A") for line in command_lines)
