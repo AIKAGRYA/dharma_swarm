@@ -135,7 +135,7 @@ def _fetch_live(limit: int) -> dict:
     from scripts.governance.check_track_status import (  # noqa: E402
         ACTIVE_TRACK_PATH, load_active_track, normalize_portfolio,
     )
-    repo = "AmitabhainArunachala/dharma_swarm"
+    repo = "AIKAGRYA/dharma_swarm"
     prs = fetch_open_prs(limit)
     pr_files = {p["number"]: [f["path"] for f in fetch_pr_files(p["number"], repo)] for p in prs}
     portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK_PATH))

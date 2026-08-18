@@ -1,0 +1,84 @@
+{
+  "id": "titanium-WP-PRSNAP1-snapshot-branch-matcher",
+  "base_ref": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+  "branch": "codex/pr-flow-recovery-20260808",
+  "worktree": ".",
+  "intent": "Repair the live snapshot-PR cleanup without broadening deletion authority: require same-repository ownership and admit only one of two exact reserved timestamped branch grammars paired with its independently anchored lane-specific title grammar; never grant Pass 1 authority from an automation marker or broad intent phrase; preserve closed snapshot branch refs for recovery; make list and jq classification failures visible while failing closed; and bind dry-run, comment, close, and branch-cleanup summaries to the operation that actually occurred.",
+  "allowed_files": [
+    ".github/workflows/pr-dedupe.yml",
+    "tests/test_pr_dedupe_workflow.py",
+    "reports/agentops/work_packets/titanium-WP-PRSNAP1-snapshot-branch-matcher.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "snapshot-dedupe-contract",
+      "command": "python3 -m pytest -q tests/test_pr_dedupe_workflow.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "reserved-branch-human-titles-survive",
+      "command": "python3 -m pytest -q tests/test_pr_dedupe_workflow.py::test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): make snapshot cleanup fail closed"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRSNAP1",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The cleanup policy declared lifecycle/spine-adoption status snapshots non-mergeable, but the matcher omitted the live ops/spine-adoption-pr-lifecycle timestamp grammar.",
+      "The first repair reused broad legacy intent ORs for the new branch grammar, so a human title containing ops report could falsely authorize closure.",
+      "The second repair still allowed an automation marker plus broad snapshot language to authorize Pass 1 closure on an arbitrary same-repository branch.",
+      "Pass 1 deleted snapshot branch refs immediately even though the recovery claim relied on closed PR history.",
+      "The exact legacy chore/ops-report timestamp branch still inherited a broad ops report title matcher, so a human-looking title on that reserved branch could be closed without the lane's anchored governance grammar.",
+      "Both jq classifiers converted parser or input failures into empty-match reports, and both close loops rendered matched PRs as CLOSED before dry-run or API outcomes were known.",
+      "Classification and list failures previously produced only a failed job/log instead of a typed job-summary result; echo -e could also reinterpret backslash escapes in same-repository PR titles, and the duplicate branch-cleanup failure path lacked executable coverage."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-dedupe.yml",
+      "tests/test_pr_dedupe_workflow.py"
+    ],
+    "honest_blockers": [
+      "The first decorrelated council held exact head 7f8681632034d0c0f98650f9d3a0d62d6e6fc3ae on outcome-reporting defects, jq failure conflation, an overbroad legacy reserved-branch title matcher, and a vacuous fork control. A reduced-evidence council then held local exact head ed92493f14117e0731798b6069b5cef9612dcd8f because the marker fallback still admitted arbitrary branches, list/jq failures lacked typed summaries, echo -e reinterpreted title escapes, branch-cleanup failure was untested, and three required provider receipts were wrong-model or invalid JSON. This repair requires another exact-head full council and fresh current-head GitHub checks before merge."
+    ],
+    "rollback": "Revert the bounded PR. Snapshot PRs remain in closed history and their branch refs are preserved, so a mistaken closure can be reopened without reconstructing the head.",
+    "packet_digest": "686167d188f68d7d2da4b0be4d11b6a29404d193f427f9a77716778b869034a7"
+  }
+}

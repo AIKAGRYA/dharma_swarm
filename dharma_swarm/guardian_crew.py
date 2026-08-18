@@ -1184,7 +1184,7 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
 async def run_guardian_cycle(
     src_root: Path | None = None,
     state_dir: Path | None = None,
-    github_repo: str = "AmitabhainArunachala/dharma_swarm",
+    github_repo: str = "AIKAGRYA/dharma_swarm",
     create_issues: bool = True,
     room_registry: Any | None = None,
 ) -> dict[str, Any]:
@@ -1283,7 +1283,7 @@ async def run_guardian_cycle(
 async def start_guardian_loop(
     src_root: Path | None = None,
     state_dir: Path | None = None,
-    github_repo: str = "AmitabhainArunachala/dharma_swarm",
+    github_repo: str = "AIKAGRYA/dharma_swarm",
     interval_seconds: int = _GUARDIAN_INTERVAL,
     shutdown_event: asyncio.Event | None = None,
     room_registry: Any | None = None,

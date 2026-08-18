@@ -172,6 +172,13 @@ def discover_files(
 ) -> list[Path]:
     """Walk repo and return all analyzable source files.
 
+    The walk is deterministic (sorted directories and filenames). When more
+    than MAX_FILES files match, the cap is applied per top-level directory in
+    proportion to its share of all matches — never mid-walk, where whichever
+    directories the filesystem happened to yield first would consume the whole
+    budget and silently starve later ones (issue #1057: tests/ dropped on some
+    checkouts, breaking test_file_count).
+
     Args:
         repo_path: Root of the repository.
         exclude_patterns: Directory names or path segments to skip
@@ -181,18 +188,16 @@ def discover_files(
     files: list[Path] = []
     for root, dirs, filenames in os.walk(repo_path):
         # Filter out skip dirs AND user excludes in-place
-        dirs[:] = [
+        dirs[:] = sorted(
             d for d in dirs
             if not _should_skip_dir(d) and d not in excludes
-        ]
+        )
         # Also skip if any path segment matches an exclude pattern
         rel_root = Path(root).relative_to(repo_path)
         if any(part in excludes for part in rel_root.parts):
             dirs.clear()
             continue
-        for name in filenames:
-            if len(files) >= MAX_FILES:
-                break
+        for name in sorted(filenames):
             path = Path(root) / name
             if path.suffix.lower() in ALL_CODE_EXTS | DOC_EXTS | CONFIG_EXTS:
                 try:
@@ -200,7 +205,36 @@ def discover_files(
                         files.append(path)
                 except OSError:
                     pass
-    return files
+    if len(files) <= MAX_FILES:
+        return files
+    return _cap_proportionally(files, repo_path, MAX_FILES)
+
+
+def _cap_proportionally(files: list[Path], repo_path: Path, cap: int) -> list[Path]:
+    """Reduce ``files`` to ``cap`` entries, preserving per-top-level-directory
+    proportions via largest-remainder allocation (ties broken by directory
+    name, so the result is identical on every filesystem)."""
+    groups: dict[str, list[Path]] = defaultdict(list)
+    for path in files:
+        rel = path.relative_to(repo_path)
+        top = rel.parts[0] if len(rel.parts) > 1 else "(root)"
+        groups[top].append(path)
+
+    total = len(files)
+    quotas: dict[str, int] = {}
+    remainders: list[tuple[float, str]] = []
+    for top, members in groups.items():
+        exact = cap * len(members) / total
+        quotas[top] = int(exact)
+        remainders.append((exact - int(exact), top))
+    leftover = cap - sum(quotas.values())
+    for _, top in sorted(remainders, key=lambda r: (-r[0], r[1]))[:leftover]:
+        quotas[top] += 1
+
+    capped: list[Path] = []
+    for top in sorted(groups):
+        capped.extend(sorted(groups[top])[: quotas[top]])
+    return capped
 
 
 # ── Python Analysis ──────────────────────────────────────────────────
