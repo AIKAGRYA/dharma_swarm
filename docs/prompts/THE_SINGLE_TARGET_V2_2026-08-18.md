@@ -71,7 +71,8 @@ Engineered form — find the ONE externally-pointed mission **M** such that:
   that measurably improves the swarm at tasks OTHER than M. Name the physical
   rail the signal rides — candidates the repo already owns include archive
   fitness (`dharma_swarm/archive.py`, MAP-Elites), quality-weighted
-  aggregation (`dharma_swarm/ginko_brier.py`), the git-history gym
+  aggregation (`dharma_swarm/transcendence_aggregation.py`,
+  `dharma_swarm/ginko_brier.py`), the git-history gym
   (`dharma_swarm/chamber/gym_git_history.py`), memory kernel promotion
   (`dharma_swarm/memory_kernel/`), stigmergy (`dharma_swarm/stigmergy.py`),
   and router retrospectives — and name the non-M metric that would move
@@ -106,6 +107,18 @@ Engineered form — find the ONE externally-pointed mission **M** such that:
     receipts that fill this quorum and turn the blocked RSI loops live —
     because in this codebase, that quorum IS the difference between
     "RSI-like" as metaphor and RSI as running code.
+  - **Respect the ratified fitness doctrine.** The operator has already
+    ratified how external gradients may drive selection
+    (`docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md` §4): a portfolio of
+    decorrelated fitness signals — verified external benchmarks as volume
+    fuel, markets as the self-funding gradient, paid human work as the third
+    leg — with one HARD RULE: **P&L is funding plus a slow-horizon fitness
+    term (Sharpe over months, DSR/PBO-disciplined) and NEVER per-iteration
+    selection signal** — "a swarm evolved on daily P&L learns to gamble."
+    A candidate whose loop wires raw revenue into per-cycle selection
+    violates ratified doctrine and fails C4 regardless of elegance. Design
+    the selection signal accordingly (calibration scores, verified receipts,
+    benchmark deltas — not the money itself).
 - **C5 — Edge-of-AI leverage and future-proofness.** M gets STRONGER both when
   frontier models improve and when cheap models commoditize. A thin wrapper
   that the next model release absorbs is a failing answer. You must argue C5
@@ -221,20 +234,29 @@ A self-improving multi-agent Python organism (~1,380 PRs deep) with:
   model-generated forecasts per run against CPI, Treasury yields, jobless
   claims, BTC/ETH, publishing to a public append-only branch, misses
   included; edge declared only after ≥500 resolved forecasts with
-  Brier < 0.125. Check: `dharma_swarm/chamber/predictions.py`,
-  `chamber/ledger_rows.py`, `chamber/ledger_history.py`,
-  `chamber/daily_delta.py`, `scripts/governance/frontier_ledger.py`,
-  `dharma_swarm/ginko_brier.py`; find the actual public branch.
+  Brier < 0.125. The canonical organ is Ginko: `dharma_swarm/ginko_brier.py`
+  (append-only store `~/.dharma/ginko/predictions.jsonl`),
+  `ginko_data.py` (CPI/Fed/BTC feeds), `ginko_orchestrator.py` (staged
+  autonomy ladder), `ginko_cron_loop.py`; the chamber feeds it
+  (`dharma_swarm/chamber/predictions.py`, `chamber/ledger_rows.py`,
+  `chamber/daily_delta.py`, `scripts/governance/frontier_ledger.py`). Note:
+  at HEAD the ledger is filesystem JSONL, and the repo's public derived
+  branch is `generated/status` — verify what "public append-only branch"
+  means today; if the dossier's claim is newer than HEAD, say so.
 - **Benchmark/eval machinery:** a real SWE-bench-Verified harness with
   equal-budget swarm-vs-single-agent arms, paired-bootstrap significance, and
   an honest current answer: the swarm LOSES to its best single agent (lift
-  −0.10). Check: `scripts/governance/trust_gate_status.py`,
-  `scripts/runpod_swebench_setup.sh`, `benchmarks/`. Plus the internal gym
-  that turns the repo's own git history into graded coding tasks
-  (`dharma_swarm/chamber/gym_git_history.py`) and a hermetic orchestration
-  arena, deliberately inadmissible as a capability claim
-  (`dharma_swarm/coordination/`, `dharma_swarm/council/`,
-  `scripts/governance/arena_truth_report.py`).
+  −0.10). The harness is the forge: `dharma_swarm/forge_v1/` (`harness.py` —
+  equal-token-budget arms + `paired_bootstrap_ci`; `swebench_real.py` — the
+  official SWE-bench-Verified adapter, host/Docker-dependent;
+  `run_real_arms.py`), plus `scripts/governance/trust_gate_status.py` and
+  `scripts/runpod_swebench_setup.sh`. Plus the internal gym that turns the
+  repo's own git history into graded coding tasks
+  (`dharma_swarm/chamber/gym_git_history.py`, receipts under
+  `reports/governance/chamber/`) and a hermetic orchestration arena,
+  deliberately inadmissible as a capability claim
+  (`dharma_swarm/coordination/arena/`, `scripts/governance/arena_truth_report.py`,
+  receipts under `reports/governance/arena/`).
 - **World-sensing organs (mostly dormant):** Go ingestors for world signals,
   GitHub events, and evidence (`tools/world_signal_ingestor_go/`,
   `tools/github_ingestor_go/`, `tools/evidence_ingestor_go/`,
@@ -255,9 +277,10 @@ A self-improving multi-agent Python organism (~1,380 PRs deep) with:
   merge queue claimed proven today with a receipted hash chain
   (`scripts/runtime/pr_merge_control.py`,
   `scripts/runtime/merge_master_mike_daemon.py`); work packets with scope
-  enforcement (`reports/agentops/work_packets/`); a repo-wide kill-switch
-  every automated lane must honor; citation-or-silence evidence rules;
-  receipts for every authority claim.
+  enforcement (`reports/agentops/work_packets/`,
+  `scripts/governance/run_agent_work_packet.py`); a repo-wide kill-switch
+  every automated lane must honor (`dharma_swarm/holon_killswitch.py`);
+  citation-or-silence evidence rules; receipts for every authority claim.
 - **Interfaces:** FastAPI backend (`api/`), Next.js dashboard (`dashboard/`),
   operator terminal (`terminal/`), CLI (`dgc`, `dharma_swarm/cli.py`).
 - **Revenue scaffolding:** an audit-service kit
@@ -279,11 +302,13 @@ directories, generated branches); what you cannot reach stays REPORTED.
 
 ### 3.3 Telos (compressed here; read the originals — §4 reading list)
 
-ONE LAW: no loop is real until it closes through the outside world. A
-three-tier metabolism is the stated end-state: substrate guides → funding
-feeds → evolution compounds; income organ → capital lab → "dozens of
-competing labs," revenue buying compute buying learning
-(`docs/vision_maps/NORTH_STAR.md` §4). Honesty stack: anti-Goodhart design,
+ONE LAW: no loop is real until it closes through the outside world. The
+canonical three-tier metabolism is substrate guides → funding feeds →
+evolution compounds (`docs/vision_maps/NORTH_STAR.md` §4); the dossier's
+"income organ → capital lab → dozens of competing labs" is the internal
+ladder of the funding tier (Shakti Ginko umbrella,
+`docs/architecture/SHAKTI_GINKO_ORGAN.md` and ADR-006), not the three tiers
+themselves — keep the levels straight. Honesty stack: anti-Goodhart design,
 deflated Sharpe / PBO statistics for anything trading-shaped, published
 misses, no self-graded wins. Trust gates (§8 of the north star): live capital
 LAST, after proven calibration; the swarm must beat single agents on real
@@ -300,10 +325,24 @@ the asset; evolution must preserve it. Tiebreaker doctrine (operator,
 - **Confirmed risk budget:** $1,000 total live-capital loss ceiling; $100 per
   position; $50 daily stop; 1x leverage (2x only by future named grant);
   $500/month total infrastructure burn ($200 of it benchmark compute).
+  Authority note: at HEAD these four numbers are NOT packaged as one canon
+  doc — fragments exist (per-trade $100 / per-cell daily $50 / staged
+  micro-capital ladders in `docs/architecture/SHAKTI_GINKO_ORGAN.md` and
+  `dharma_swarm/ginko_orchestrator.py`). Treat the dossier's figures as
+  binding operator ratification (REPORTED, newer than HEAD), flag any repo
+  fragment that disagrees, and never cite them as in-repo doctrine.
 - Every self-modification lands only through a human-merged PR. Account
   creation is operator-hands. Money numbers never default upward.
 
 ### 3.5 Already ruled out, with reasons (resurrect only with new argument)
+
+The first three are dossier assertions — locate their in-repo basis or tag
+them REPORTED. (Known partial basis: `docs/reports/DGC_SELF_PROVING_VENTURE_STUDIO_2026-03-13.md`
+rules out quant/crypto trading and random micro-SaaS as the FIRST proving
+ground. No in-repo canon bans selling forecasts early — repo pressure runs
+the other way (`foundations/THE_ORGANISM.md` lists a forecasting desk;
+`docs/yc_w27_application.md` treats prediction intelligence as product) — so
+that exclusion rests on the operator's word and on track-record logic alone.)
 
 - Micro-scale offshore crypto perp trading: 7–12%/month fee drag at small
   size, US-person venue exclusion, noise dominates skill at this bankroll.
@@ -348,53 +387,82 @@ Authority and behavior:
 
 1. ★ `CLAUDE.md` — behavioral contract, key abstractions with paths, where
    enforcement actually lives, the ensemble law.
-2. ★ `docs/vision_maps/NORTH_STAR.md` — the whole vision on one page,
+2. `docs/governance/CANONICAL_DOC_STACK.md` then
+   ★ `docs/governance/SOVEREIGN_MANIFEST.md` — which documents carry
+   authority; the telos hierarchy (Jagat Kalyan → domains → metabolism).
+3. ★ `docs/vision_maps/NORTH_STAR.md` — the whole vision on one page,
    operator-authored; the ONE LAW, the three-tier metabolism, the trust
-   gates, the organ-status table, the external-field receipts.
-3. `docs/governance/CANONICAL_DOC_STACK.md` then
-   `docs/governance/SOVEREIGN_MANIFEST.md` — which documents carry authority;
-   architecture, domains, invariants, telos hierarchy.
+   gates, the organ-status table, the external-field receipts. Then
+   `docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md` — the
+   Sakshi/Drishti frame and the expanded ONE LAW verbs.
 4. ★ `docs/governance/ACTIVE_TRACK.yaml` — the declared build intent and
    surface ownership your build packets (§2.E) must respect.
+5. `foundations/THE_ORGANISM.md` and `docs/doctrine/OPERATIONAL_DOCTRINE.md`
+   — identity map and compressed ops doctrine, including "what we will not
+   do" (papers-about-self, lattice navel-gazing).
 
 Honest state:
 
-5. ★ `CYBERNETIC_LOOP_MAP.md` — all 13 feedback loops with verdicts; note
+6. ★ `CYBERNETIC_LOOP_MAP.md` — all 13 feedback loops with verdicts; note
    CLOSED_LIVE count, and that Loops 12/13 (the RSI loops) are BLOCKED behind
    One Wire quorum. This is the single most load-bearing fact in the repo for
    this question.
-6. ★ `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` — every organ/venture with
+7. ★ `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` — every organ/venture with
    honest status (ACTIVE / INCUBATING / DORMANT / DESIGN_ONLY / HELD /
    STOPPED-HONESTLY), the ONE LAW at cell level, the Campaign X-Ray gauntlet
    precedent.
-7. ★ `reports/revenue_wedge/first_cash_receipt_status.md` — recorded revenue
+8. ★ `docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md` — the ratified
+   doctrine that binds C4: receipt invariant, external-gradient portfolio,
+   the no-daily-P&L hard rule, self-modification sequenced LAST, the lawful
+   restart path for the stopped fitness spine (external receipts are the
+   only permitted quorum feed), and the chaos budget — including "a second
+   revenue vertical" priced as diversity.
+9. ★ `reports/revenue_wedge/first_cash_receipt_status.md` — recorded revenue
    $0; the audit kit's real state; the documented cheapest paths to One Wire
    quorum (M=3/3) — read this as the repo's own draft answer to the
-   operator's question and judge it.
-8. `reports/capital_lab/NORTH_STAR_ARCHITECTURE.md` — the resident S1
-   architecture: 6-layer separation, leakage-immunity gates, DSR/PBO/MinBTL
-   discipline, multi-model decorrelation thesis, and its own citation of the
-   "Profit Mirage" critique (arXiv:2510.07920) against agentic-fund headline
-   returns.
-9. `INTERFACE_MISMATCH_MAP.md`, `docs/architecture/NAVIGATION.md` — where the
-   body is brittle; the full module map.
+   operator's question and judge it. Then
+   `docs/governance/VENTURE_CELL_REVENUE_WEDGE.md`,
+   `docs/offers/agentic-code-governance-sprint.md`, and
+   `docs/reports/wedge_candidate_slate_v1.md` — the wedge canon and slate.
+10. `reports/capital_lab/NORTH_STAR_ARCHITECTURE.md` — the resident S1
+    architecture: 6-layer separation, leakage-immunity gates, DSR/PBO/MinBTL
+    discipline, multi-model decorrelation thesis, its citation of the
+    "Profit Mirage" critique (arXiv:2510.07920) against agentic-fund headline
+    returns. Then `docs/architecture/SHAKTI_GINKO_ORGAN.md` +
+    `docs/architecture/ADRs/ADR-006-shakti-ginko-organ.md` — the capital
+    organ's umbrella canon and staged autonomy ladder.
+11. `INTERFACE_MISMATCH_MAP.md`, `docs/architecture/NAVIGATION.md` — where
+    the body is brittle; the full module map.
 
 Vision depth (the philosophy the operator wants used, not decorated with):
 
-10. `WHAT_IT_WANTS_TO_BECOME.md` — the 2036 retrospective: five falsifiable
-    gaps, seven fangs, "the DGM loop is the metabolic engine."
-11. `GNANI_LODESTONE.md` — the witness architecture; note its warning that
-    self-referential seed tasks are "navel-gazing, not genuine intelligence"
-    — the philosophical ground for pointing the swarm OUTWARD, i.e., for this
-    entire question.
-12. `docs/plans/THE_KEEL_2026-07-17.md` — verified engineering quality as the
+12. `WHAT_IT_WANTS_TO_BECOME.md` and `GNANI_LODESTONE.md` — the 2036
+    retrospective (five falsifiable gaps, seven fangs, "the DGM loop is the
+    metabolic engine") and the witness architecture, including the warning
+    that self-referential seed tasks are "navel-gazing, not genuine
+    intelligence" — the philosophical ground for pointing the swarm OUTWARD.
+    **Dated April 2026:** read them for the philosophy, but their
+    operational claims (e.g., "the Darwin engine never applies diffs") are
+    stale — June-and-later docs and the code win.
+13. `docs/plans/THE_KEEL_2026-07-17.md` — verified engineering quality as the
     highest admission standard; the verification lattice.
-13. `foundations/FIVE_FOURTEEN_A.md`, `foundations/ECONOMIC_VISION.md`,
+14. `foundations/FIVE_FOURTEEN_A.md`, `foundations/ECONOMIC_VISION.md`,
+    `docs/vision_maps/2026-05-07_operating_company_kernel.md`,
     `lodestones/seeds/self_reference_attractor.md` — the company thesis, the
-    economics, the physics. Skim for load-bearing claims, not communion.
-14. `docs/plans/DARSHAN_CHARTER_2026-07-12.md` — the excluded mission, so you
+    economics, the self-funding operating loop, the physics. Skim for
+    load-bearing claims, not communion.
+15. `docs/plans/DARSHAN_CHARTER_2026-07-12.md` — the excluded mission, so you
     know exactly what you are not allowed to answer and what M must
     complement.
+16. Last, and only after the owners above:
+    `docs/vision_maps/VISION_TRANSMISSION.md` — a dense whole-lattice
+    transmission, explicitly UNRATIFIED; where it disagrees with owner docs,
+    the owners win.
+
+Traps to know before you read: root files `program.md`,
+`MASTER_BUILD_SPEC.md`, `FOUNDATIONS_TO_CODE_MAP.md`, `program_ecosystem.md`
+look live but are archive stubs redirecting to `docs/_archive/2026-04/` — do
+not cite them as current.
 
 Recent history: read the last ~50 merged PR titles (`git log`), and any
 receipts directories they touch. The difference between what the vision docs
@@ -407,7 +475,23 @@ highest grade.
   you might count under C1/C7 — status LIVE / HARNESS_PROVEN / DORMANT /
   BROKEN / DESIGN_ONLY with one line of evidence (path, command output, or
   receipt). Where your map disagrees with §3.1 or with
-  `VENTURE_CELL_PORTFOLIO.yaml`, flag it.
+  `VENTURE_CELL_PORTFOLIO.yaml`, flag it. Two standing hazards:
+  - **"Named ⇒ production-live" is a trap.** Known instances at HEAD: the
+    Darwin engine's live mutation is fail-closed behind scratch worktrees,
+    an env flag, and a lease (`dharma_swarm/evolution_safety.py`);
+    `diversity_archive.py` is a deprecated shim for `archive.py`; the
+    durable graph runtime is explicitly NOT in the production dispatch path;
+    the strange-loop self-model constructs only under an off-by-default
+    Organism flag. Assume nothing else is live without evidence.
+  - **The dossier has blind spots — find them.** Organs §3.1 never mentions
+    include the runtime truth spine (`dharma_swarm/spine/` —
+    EvidenceReceipt, `invoke_agent`, the tollbooth every honest dispatch
+    rides), the universal loop engine (`dharma_swarm/cascade.py`), the GAIA
+    ledger organs (`dharma_swarm/gaia_*.py`), the TCB packages
+    (`packages/telos-kernel/`, `packages/titanium-verify/`), and the living
+    agent kernel (`dharma_swarm/operator_core/living_agent_kernel.py`).
+    What the operator's own briefing forgets to mention is itself strategic
+    data about which dots are disconnected.
 - **E2 — The loop census.** Which of the 13 loops are closed live, which are
   harness-proven only, which are blocked, and exactly what artifact each
   blocked loop is waiting for. State the current One Wire quorum arithmetic
@@ -489,7 +573,12 @@ the repo or the field is noted so no assassin can claim ignorance.
   losing double digits on Kalshi (verify current numbers, §5.2); the repo's
   own trust gates put live capital LAST behind ≥500 resolved forecasts at
   Brier < 0.125 — check that timeline against C6's 90-day dollar; fee drag
-  and bankroll noise at $1,000 scale.
+  and bankroll noise at $1,000 scale; and the ratified no-daily-P&L rule
+  (`docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md` §4) means S1's
+  claimed C4 maximality ("the money loop IS the selection loop") is, as
+  stated, a doctrine violation — its champion must restate the loop with
+  calibration as the per-iteration signal and P&L as the slow-horizon term,
+  or lose the point.
 - **S2 — Verified-agent-work service:** sell the governance organ —
   agent-codebase audits growing into continuous verification-as-a-service,
   ultimately selling the gated harness itself (an end-state the north star
@@ -533,11 +622,16 @@ the repo or the field is noted so no assassin can claim ignorance.
 
 **Novelty quota:** propose at least TWO candidates S6+ of your own, grounded
 in expedition or scan evidence — configurations the operator has not named.
-The repo itself points at unexplored ground (the documented cheapest One Wire
+The repo itself points at unexplored ground: the documented cheapest One Wire
 paths in `reports/revenue_wedge/first_cash_receipt_status.md`, including a
 GAIA/ecological-pilot intake domain; the MRV "welfare-ton" loop sketched as
 Fang 5 in `WHAT_IT_WANTS_TO_BECOME.md`; the harness-as-product end-state in
-the north star; the verification-market shape in §5.2). These are pointers,
+the north star; the ratified ≥6-autoresearch-node portfolio and the lawful
+restart path for the stopped Forge/Hydra fitness spine
+(`docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md` §4 — external receipts
+are the only permitted quorum feed); the standing chaos-budget requirement
+that names "a second revenue vertical" as diversity the organism must buy
+(same doc, §8); the verification-market shape in §5.2. These are pointers,
 not endorsements: a novel candidate must beat the seeds on the rubric, not on
 novelty.
 
