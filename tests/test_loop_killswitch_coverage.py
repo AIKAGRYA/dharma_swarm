@@ -46,6 +46,7 @@ GUARDED_LANES = frozenset(
         "automerge.yml",
         "codex-mention-router.yml",
         "docops-reconcile-main.yml",
+        "ginko-l0.yml",
         "hardening-lane.yml",
         "loop-watcher.yml",
         "merge-master-mike-backlog.yml",
@@ -60,6 +61,7 @@ GUARDED_LANES = frozenset(
 SHARED_ACTION_LANES = frozenset(
     {
         "docops-reconcile-main.yml",
+        "ginko-l0.yml",
         "pr-ci-health.yml",
         "pr-dedupe.yml",
         "stale-pr.yml",

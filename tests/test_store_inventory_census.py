@@ -50,7 +50,11 @@ BASELINE_DB_NAMES = 39
 # first-fire plumbing cycle (experiments/first_fire/COMMAND_PACKET.md). Both
 # live only inside the disposable evolution worktree the runner copies into;
 # neither is an organism store, and the runner refuses live checkouts.
-BASELINE_JSONL_NAMES = 221
+# 221 -> 222 (2026-08-18, PR #1380): predictions.public.jsonl — the Ginko L0
+# forecast ledger's PUBLIC full-store snapshot (yes-sheet 2026-08-18 line 7).
+# It is the durable published projection of the existing predictions.jsonl
+# store on generated/forecast-ledger, not a second private store.
+BASELINE_JSONL_NAMES = 222
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12
