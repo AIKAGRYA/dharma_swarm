@@ -1,0 +1,52 @@
+name: First-fire plumbing
+
+on:
+  workflow_dispatch:
+    inputs:
+      grant_json:
+        description: One-shot dated GRANT.json contents
+        required: true
+        type: string
+
+# Never on push. Lighting is an operator click plus a grant.
+
+permissions:
+  contents: read
+
+jobs:
+  first-fire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refuse if someone wired this to megha
+        run: |
+          python3 - <<'PY'
+          import socket, sys
+          if socket.gethostname() == "meghadharma-cloud":
+              print("FIRST_FIRE_REFUSED: meghadharma-cloud")
+              sys.exit(2)
+          PY
+      - name: Install runtime extras the engine imports
+        run: |
+          python3 -m pip install -e ".[dev]" || python3 -m pip install -e .
+      - name: Write grant and run plumbing cycle
+        env:
+          GRANT_JSON: ${{ inputs.grant_json }}
+          DHARMA_EVOLUTION_WORKTREE_ROOT: ${{ runner.temp }}/evolution_worktrees
+        run: |
+          mkdir -p "$HOME/.dharma/first_fire"
+          printf '%s\n' "$GRANT_JSON" > "$HOME/.dharma/first_fire/GRANT.json"
+          python3 scripts/first_fire_plumbing.py \
+            --grant "$HOME/.dharma/first_fire/GRANT.json" \
+            --receipt "$HOME/.dharma/first_fire/last_receipt.json"
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-fire-receipt
+          path: ~/.dharma/first_fire/last_receipt.json
+          if-no-files-found: warn
