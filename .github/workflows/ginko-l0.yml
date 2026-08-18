@@ -1,5 +1,15 @@
 name: Ginko L0 ledger
 
+# Forecast ledger, real edition (yes-sheet 2026-08-18 line 7):
+# 20+ model-generated forecasts per run, mechanical resolution, durable
+# public ledger on the generated/forecast-ledger branch. Never commits to
+# main. Publishing is gated by a dated one-shot PUBLISH grant passed as a
+# dispatch input.
+#
+# Operator-hands prerequisite: the ANTHROPIC_API_KEY repository secret must
+# be provisioned (the run fails loud without it — no 0.5 fallback exists).
+# FRED_API_KEY is also required for the macro universes.
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,23 +17,30 @@ on:
         description: Dated PUBLISH grant JSON (EXTERNAL-GATED)
         required: true
         type: string
-      source:
-        description: Model/source label written onto each row
+      resolve_only:
+        description: Only resolve matured rows; record no new forecasts
         required: false
-        default: uninformed-prior
+        type: boolean
+        default: false
 
 # Never on push. Never on a schedule until a kill-watched cadence exists.
 
 permissions:
   contents: write
 
+concurrency:
+  group: ginko-l0-ledger
+  cancel-in-progress: false
+
 jobs:
   ledger:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
       - name: Refuse megha
@@ -34,22 +51,75 @@ jobs:
               sys.exit("GINKO_L0_REFUSED: meghadharma-cloud")
           PY
       - name: Install
-        run: python3 -m pip install -e .
+        run: |
+          python3 -m pip install -e .
+          # Best-effort OpenTimestamps client: absent -> entries stay AMBER.
+          python3 -m pip install opentimestamps-client \
+            || echo "opentimestamps-client unavailable — publishing AMBER"
+      - name: Rehydrate durable ledger
+        # The ~/.dharma store is ephemeral in CI; the committed public
+        # ledger on generated/forecast-ledger is the store of record. Pull
+        # it into the checkout's publish dir, where the runner rehydrates
+        # from by default and republishes the full snapshot.
+        run: |
+          set -euo pipefail
+          mkdir -p reports/darshan/forecast_ledger
+          if git fetch origin generated/forecast-ledger; then
+            git checkout FETCH_HEAD -- reports/darshan/forecast_ledger \
+              || echo "generated branch has no ledger dir yet — starting fresh"
+            git reset --quiet reports/darshan/forecast_ledger || true
+          else
+            echo "generated/forecast-ledger does not exist yet — first run"
+          fi
       - name: Run L0
         env:
           GRANT_JSON: ${{ inputs.grant_json }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          set -euo pipefail
           mkdir -p "$HOME/.dharma/ginko_l0"
           printf '%s\n' "$GRANT_JSON" > "$HOME/.dharma/ginko_l0/GRANT.json"
+          RESOLVE_ONLY_FLAG=""
+          if [ "${{ inputs.resolve_only }}" = "true" ]; then
+            RESOLVE_ONLY_FLAG="--resolve-only"
+          fi
           python3 scripts/ginko_ledger_l0.py \
             --grant "$HOME/.dharma/ginko_l0/GRANT.json" \
-            --source "${{ inputs.source }}" \
-            --receipt "$HOME/.dharma/ginko_l0/last_receipt.json"
+            --receipt "$HOME/.dharma/ginko_l0/last_receipt.json" \
+            $RESOLVE_ONLY_FLAG
+      - name: Publish ledger to generated/forecast-ledger
+        # Mirrors the generated/status pattern (docops-reconcile-main.yml
+        # publishes derived status off-main): derived public artifacts live
+        # on a dedicated generated branch. This never touches main.
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          PUB="$(mktemp -d)"
+          git worktree add --detach "$PUB"
+          if git fetch origin generated/forecast-ledger; then
+            git -C "$PUB" checkout -B ledger-publish FETCH_HEAD
+          else
+            git -C "$PUB" checkout --orphan ledger-publish
+            git -C "$PUB" rm -rf --quiet . 2>/dev/null || true
+          fi
+          mkdir -p "$PUB/reports/darshan/forecast_ledger"
+          cp -R reports/darshan/forecast_ledger/. \
+            "$PUB/reports/darshan/forecast_ledger/"
+          git -C "$PUB" add reports/darshan/forecast_ledger
+          if git -C "$PUB" diff --cached --quiet; then
+            echo "ledger unchanged — nothing to publish"
+          else
+            git -C "$PUB" commit \
+              -m "ledger: publish forecast rows $(date -u +%F) [skip ci]" \
+              -m "Full public snapshot (predictions + resolutions, misses included). Generated by ginko-l0.yml; never lands on main."
+            git -C "$PUB" push origin HEAD:refs/heads/generated/forecast-ledger
+          fi
+          git worktree remove --force "$PUB"
       - name: Upload receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ginko-l0-receipt
           path: |
