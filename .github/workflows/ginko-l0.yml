@@ -74,6 +74,7 @@ jobs:
       - name: Run L0
         env:
           GRANT_JSON: ${{ inputs.grant_json }}
+          RESOLVE_ONLY: ${{ inputs.resolve_only }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
@@ -81,7 +82,7 @@ jobs:
           mkdir -p "$HOME/.dharma/ginko_l0"
           printf '%s\n' "$GRANT_JSON" > "$HOME/.dharma/ginko_l0/GRANT.json"
           RESOLVE_ONLY_FLAG=""
-          if [ "${{ inputs.resolve_only }}" = "true" ]; then
+          if [ "$RESOLVE_ONLY" = "true" ]; then
             RESOLVE_ONLY_FLAG="--resolve-only"
           fi
           python3 scripts/ginko_ledger_l0.py \
@@ -102,7 +103,9 @@ jobs:
             git -C "$PUB" checkout -B ledger-publish FETCH_HEAD
           else
             git -C "$PUB" checkout --orphan ledger-publish
-            git -C "$PUB" rm -rf --quiet . 2>/dev/null || true
+            # Empty the orphan index without any delete command: only the
+            # ledger dir added below reaches the first published commit.
+            git -C "$PUB" read-tree --empty
           fi
           mkdir -p "$PUB/reports/darshan/forecast_ledger"
           cp -R reports/darshan/forecast_ledger/. \

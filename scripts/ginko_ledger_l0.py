@@ -343,10 +343,14 @@ async def model_probabilities(
     api_key = os.environ.get(ANTHROPIC_API_KEY_ENV)
     if not api_key:
         raise GinkoModelError(f"{ANTHROPIC_API_KEY_ENV} not set")
+    # SDK access goes through the canonical provider factory (semgrep
+    # dharma.providers-canonical); imported lazily so --resolve-only runs
+    # never load the provider stack.
     try:
-        from anthropic import AsyncAnthropic
+        from dharma_swarm.models import LLMRequest
+        from dharma_swarm.providers import AnthropicProvider
     except ImportError as exc:
-        raise GinkoModelError("anthropic SDK not installed") from exc
+        raise GinkoModelError(f"provider layer unavailable: {exc}") from exc
 
     payload = [
         {
@@ -363,22 +367,20 @@ async def model_probabilities(
         f"{json.dumps(payload, indent=2)}\n\n"
         "Return the JSON object of qid -> probability now."
     )
-    client = AsyncAnthropic(api_key=api_key)
+    provider = AnthropicProvider(api_key=api_key)
+    request = LLMRequest(
+        model=model,
+        max_tokens=16000,
+        system=_FORECASTER_SYSTEM,
+        messages=[{"role": "user", "content": user_text}],
+    )
     try:
-        response = await client.messages.create(
-            model=model,
-            max_tokens=16000,
-            system=_FORECASTER_SYSTEM,
-            messages=[{"role": "user", "content": user_text}],
-        )
+        response = await provider.complete(request)
     except Exception as exc:  # fail loud: any API failure aborts the run
         raise GinkoModelError(f"model call failed: {exc}") from exc
     if response.stop_reason == "refusal":
         raise GinkoModelError("model refused the forecasting request")
-    raw_text = "".join(
-        block.text for block in response.content if block.type == "text"
-    )
-    return _parse_probabilities(raw_text, questions)
+    return _parse_probabilities(response.content, questions)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
