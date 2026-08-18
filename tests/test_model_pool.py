@@ -391,16 +391,52 @@ HELM_SEVEN_SEAT_DISPLAY_ORDER: tuple[str, ...] = (
 )
 
 
-def _seat_pool_entries(seat: HelmSeat) -> list[ModelEntry]:
-    """Every pool entry reachable from one of ``seat``'s admissible
-    (provider_string, model_id) identities, via the exact route-level
-    model_id (``entry_for_model_id``) — never a hand-typed pool-id guess."""
+def _seat_pool_entries(seat: HelmSeat, pool: tuple[ModelEntry, ...] = MODEL_POOL) -> list[ModelEntry]:
+    """Every entry in ``pool`` reachable from one of ``seat``'s admissible
+    (provider_string, model_id) identities, matched as an exact
+    ``Route(ProviderType, model_id)`` pair — never model_id alone (a same
+    model_id string registered under an unrelated provider must NOT satisfy
+    the seat; see test_seat_resolution_requires_matching_provider_not_just_model_id).
+    Admissible identities whose provider string has no ``ProviderType``
+    member (e.g. "xai", "fable") never match any real route, by
+    construction — the seat still resolves via its other identities, if any.
+    ``pool`` defaults to the real MODEL_POOL; tests inject a synthetic pool
+    to prove the provider-match negative control below."""
     entries: list[ModelEntry] = []
-    for _provider_str, model_id in seat.admissible_served_identities:
-        entry = entry_for_model_id(model_id)
-        if entry is not None and entry not in entries:
-            entries.append(entry)
+    for provider_str, model_id in seat.admissible_served_identities:
+        try:
+            provider = ProviderType(provider_str)
+        except ValueError:
+            continue
+        route = Route(provider, model_id)
+        for entry in pool:
+            if route in entry.routes and entry not in entries:
+                entries.append(entry)
     return entries
+
+
+def test_seat_resolution_requires_matching_provider_not_just_model_id():
+    """Negative control: a pool entry that reuses a seat's admissible
+    model_id string under the WRONG provider must NOT satisfy the seat —
+    proves seat resolution matches the exact (provider, model_id) route
+    pair, never model_id alone."""
+    opus_48_seat = next(s for s in HELM_SLICE1_SEATS if s.seat_id == "opus-4.8")
+    real_provider_str, real_model_id = opus_48_seat.admissible_served_identities[0]
+    assert (real_provider_str, real_model_id) == ("claude_code", "claude-opus-4.8")
+
+    # A decoy entry: SAME model_id string, WRONG provider (openrouter, not
+    # claude_code) — a model_id-only match would wrongly satisfy the seat.
+    decoy_pool = (
+        ModelEntry(
+            id="decoy",
+            display="Decoy",
+            tier=ModelTier.STRONG,
+            caps=(),
+            context=1,
+            routes=(Route(ProviderType.OPENROUTER, real_model_id),),
+        ),
+    )
+    assert _seat_pool_entries(opus_48_seat, decoy_pool) == []
 
 
 def test_seven_seat_census_order_matches_the_ratified_alive_bar_sequence():

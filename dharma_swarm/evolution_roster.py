@@ -150,7 +150,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     # and Fugu Ultra, where that source also names a provider string with
     # no ProviderType member: "xai" and "sakana" respectively; "sakana" was
     # promoted to a real ProviderType here since Fugu Ultra has no
-    # alternative real route — see ProviderType.SAKANA docstring note).
+    # alternative real route — see the inline comment on
+    # ProviderType.SAKANA, dharma_swarm/models.py:141-143).
     # ══════════════════════════════════════════════════════════════════
     ModelSlot(
         ProviderType.CLAUDE_CODE,
