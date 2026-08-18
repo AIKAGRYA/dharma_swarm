@@ -1,7 +1,7 @@
 # THE SINGLE TARGET v2 — an engineered question for a repo-aware adversarial strategist
 
 **Document role:** prompt artifact (`working_plan` class). No runtime, merge, or
-governance authority. Subordinate to `docs/governance/CANONICAL_DOC_STACK.md`.
+governance authority. Subordinate to the doc-stack registry in `docs/governance/`.
 Supersedes the v1 "outside adversarial agent" prompt (2026-08-18, unversioned),
 whose fatal flaw this version corrects: v1 sealed the strategist away from the
 repository and made a paraphrased dossier the fact base. The strategist it
@@ -78,7 +78,7 @@ Engineered form — find the ONE externally-pointed mission **M** such that:
   and router retrospectives — and name the non-M metric that would move
   (e.g., SWE-bench lift, gym win-rate). Transfer, not vibe.
 - **C3 — Telos fit.** M closes its loops through the outside world with
-  receipts — the ONE LAW, canonically stated in `docs/vision_maps/NORTH_STAR.md`
+  receipts — the ONE LAW, stated in `docs/vision_maps/NORTH_STAR.md`
   §3 and enforced per-cell in `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`.
   M survives the honesty stack: anti-Goodhart gates, deflated performance
   statistics (for anything trading-shaped: Deflated Sharpe > 0.95, PBO via
@@ -234,7 +234,7 @@ A self-improving multi-agent Python organism (~1,380 PRs deep) with:
   model-generated forecasts per run against CPI, Treasury yields, jobless
   claims, BTC/ETH, publishing to a public append-only branch, misses
   included; edge declared only after ≥500 resolved forecasts with
-  Brier < 0.125. The canonical organ is Ginko: `dharma_swarm/ginko_brier.py`
+  Brier < 0.125. The organ of record is Ginko: `dharma_swarm/ginko_brier.py`
   (append-only store `~/.dharma/ginko/predictions.jsonl`),
   `ginko_data.py` (CPI/Fed/BTC feeds), `ginko_orchestrator.py` (staged
   autonomy ladder), `ginko_cron_loop.py`; the chamber feeds it
@@ -303,7 +303,7 @@ directories, generated branches); what you cannot reach stays REPORTED.
 ### 3.3 Telos (compressed here; read the originals — §4 reading list)
 
 ONE LAW: no loop is real until it closes through the outside world. The
-canonical three-tier metabolism is substrate guides → funding feeds →
+doctrine's three-tier metabolism is substrate guides → funding feeds →
 evolution compounds (`docs/vision_maps/NORTH_STAR.md` §4); the dossier's
 "income organ → capital lab → dozens of competing labs" is the internal
 ladder of the funding tier (Shakti Ginko umbrella,
@@ -387,7 +387,7 @@ Authority and behavior:
 
 1. ★ `CLAUDE.md` — behavioral contract, key abstractions with paths, where
    enforcement actually lives, the ensemble law.
-2. `docs/governance/CANONICAL_DOC_STACK.md` then
+2. the doc-stack registry in `docs/governance/` then
    ★ `docs/governance/SOVEREIGN_MANIFEST.md` — which documents carry
    authority; the telos hierarchy (Jagat Kalyan → domains → metabolism).
 3. ★ `docs/vision_maps/NORTH_STAR.md` — the whole vision on one page,
@@ -666,7 +666,7 @@ novelty.
 ## 8. Fleet mode (optional — for a 16+ agent runner)
 
 If this question is executed by an agent fleet instead of one strong agent,
-structure it in two waves. **Wave 1 — ground truth (blocking):** one
+structure it in two waves. **Wave 1 — fact base (blocking):** one
 CARTOGRAPHER (builds E1, the load-bearing map, from the repo alone); one
 ARCHAEOLOGIST (walks git history, PR titles, receipts directories, loop-audit
 JSON; builds E2 + E3); one RSI SCOUT (builds the §5.1 half of E4 from live

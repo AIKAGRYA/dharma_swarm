@@ -1,8 +1,8 @@
 # THE WITNESS ENGINE — elevation prompt
 
 **Document role:** prompt artifact (`working_plan` class). No runtime, merge,
-or governance authority. Subordinate to
-`docs/governance/CANONICAL_DOC_STACK.md`.
+or governance authority. Subordinate to the
+doc-stack registry in `docs/governance/`.
 **How to use:** give this whole file to a strong, repo-aware agent (or a fleet)
 with (a) a full checkout at HEAD, (b) read-only shell, (c) live web access.
 Its job is to ELEVATE the thesis in `docs/plans/THE_WITNESS_ENGINE_2026-08-18.md`
@@ -168,7 +168,7 @@ contain:
 
 ## 5. Fleet mode (optional, 8+ agents)
 
-Wave 1 (blocking, ground truth): one CARTOGRAPHER (full dot-connection map, §C
+Wave 1 (blocking, fact base): one CARTOGRAPHER (full dot-connection map, §C
 from the repo); one RSI SCOUT (§2 self-improvement + verifiable-inference
 frontier); one MARKET SCOUT (§2 agent-trust + MRV markets + arithmetic
 inputs); one DOCTRINE AUDITOR (every constraint in
