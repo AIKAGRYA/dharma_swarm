@@ -9,7 +9,8 @@ is a self-report under test.
 **Status:** UNRATIFIED recommendation. Does not admit a work packet.
 **Checkout:** `main @ 8cc04b71987b`. **Run date:** 2026-08-18.
 **Elevated thesis entered as S6:**
-`docs/plans/THE_WITNESS_ENGINE_ELEVATED_2026-08-18.md`.
+`docs/plans/THE_WITNESS_ENGINE_ELEVATED_2026-08-18.md` (v1.1.1 includes
+Wave-1 scout closeout).
 
 Commands actually run (orientation, §4.0): `make onboard` (READY, authority
 none); `python3 scripts/repo_xray.py` (1081 Python modules, 982 test files —
@@ -40,20 +41,21 @@ Compressed census used for C1/C7 scoring:
 | Arena | HARNESS_PROVEN; inadmissible as capability | `trust_gate_status.json:26` |
 | Go / world-radar | DORMANT | `tools/*_go/`, `dharma_swarm/world_radar/` |
 | Memory kernel | HARNESS_PROVEN (front door) | `dharma_swarm/memory_kernel/__init__.py:1-6` |
-| Stigmergy / catalytic / cascade | HARNESS_PROVEN | modules exist; not CLOSED_LIVE |
-| StrangeLoop | constructed if Organism boots | `organism.py:164-170` — dossier "off-by-default flag" **not found** at this HEAD |
+| Stigmergy | LIVE store + API; throughput unknown | `stigmergy.py`; `api/routers/stigmergy.py` |
+| Catalytic / cascade | HARNESS_PROVEN | modules exist; not CLOSED_LIVE |
+| Spine | LIVE invocation/receipt identity | `dharma_swarm/spine/__init__.py` |
+| Mission control | HARNESS_PROVEN adapter; dispatch/A2A/Sarathi files **absent at this SHA** | `mission_control.py`; no `mission_control_dispatch.py` |
+| StrangeLoop | constructed if Organism boots; manifest `stub` | `organism.py:164-170`; `ACTIVE_SURFACE_MANIFEST.yaml` strange_loop status stub |
 | DharmaGraph | not in production dispatch | `dharma_swarm/graph/types.py:5` |
-| Spine | HARNESS_PROVEN | `dharma_swarm/spine/__init__.py` |
 | GAIA | HARNESS_PROVEN code; cell ENVISIONED | `gaia_verification.py:1-8`; portfolio yaml:139-141 |
 | TCB packages | HARNESS_PROVEN | `packages/telos-kernel/`, `packages/titanium-verify/` |
 | Living-agent kernel | HARNESS_PROVEN, no provider dispatch | `living_agent_kernel.py:1-7` |
-| Mission control | HARNESS_PROVEN | `dharma_swarm/mission_control*.py` |
 | A2A receipts | HARNESS_PROVEN | `a2a/task_receipt.py:18-19` |
 | Revenue / audit kit | HARNESS_PROVEN kit; $0 cash | `audit_kit.py`; `first_cash_receipt_status.md:3` |
 | Capital lab | INCUBATING paper | portfolio yaml:108-112 |
 | Darshan | ACTIVE_SEASON_0 | portfolio yaml:73-77 |
 | Trust gate overall | **closed** (not open) | `trust_gate_status.json:6` `gate_open: false` |
-| Portfolio YAML vs ACTIVE_TRACK | **drift** | yaml still names `goodworks-dgm` ACTIVE_BUILD_TRACK; `ACTIVE_TRACK.yaml` at HEAD has ten other tracks, no goodworks |
+| Portfolio YAML vs ACTIVE_TRACK | **drift** | yaml still names `goodworks-dgm` ACTIVE_BUILD_TRACK; **no `goodworks*` Python package at HEAD**; `ACTIVE_TRACK.yaml` has ten other tracks, no goodworks |
 
 Disagreement with dossier §3.1 is in E3.
 
@@ -94,12 +96,12 @@ count, is the binding constraint.
 | Claim | Dossier / vision | Repo at HEAD | Trust |
 |---|---|---|---|
 | First live self-modification fire "today" | §3.2 REPORTED | HEAD is first-fire **plumbing**, "do not light" (`scripts/first_fire_plumbing.py:1-8`; commit `8cc04b71`) | **Repo.** Fire itself not reached at this checkout. |
-| Merge queue serving five real merges today | §3.2 | Not re-counted here; Merge Master code exists | REPORTED |
-| Forecast ledger 26 model forecasts, public append-only branch | §3.1 | Ginko is `~/.dharma/ginko/predictions.jsonl`; public derived branch is `generated/status` (governance evidence, not a forecast ledger) | **Repo.** "Public forecast branch" not at HEAD. |
+| Merge queue serving five real merges today | §3.2 | `merge_queue` rule exists; **no in-repo receipt of five served merges** | **UNVERIFIED** |
+| Forecast ledger 26 model forecasts, public append-only branch | §3.1 | Ginko is `~/.dharma/ginko/predictions.jsonl`; chamber `forecast_brier` UNKNOWN / zero resolved on committed ledgers; `generated/status` is not a forecast ledger | **FALSE / NOT FOUND at HEAD** |
 | Swarm lift −0.10 | §3.1 | Confirmed by trust-gate projection | Both agree |
 | Revenue $0 | §3.1 | Confirmed | Both agree |
 | One Wire N=3/5 M=1/3 | §3 / loop map | Live audit: guardian missing, N=0 M=0 | **This audit** for liveness; loop map for last known guardian-era state. Do not cite N=3 as currently sensed. |
-| ~12,000 archive entries, zero external authority | §4 C4 | Not re-counted (`repo_xray` does not print this). Treat as REPORTED until `archive.py` JSONL is counted in `~/.dharma/` | REPORTED |
+| ~12,000 archive entries, zero external authority | §4 C4 | Operator-box Jul map: 12,273 entries (`CYBERNETIC_LOOP_MAP.md`:60). This clone's audit JSON: archive entries 0, guardian missing | **Host-dependent.** Do not cite 12k as this checkout |
 | Risk budget $1k/$100/$50/$500 | §3.4 | Not packaged as one canon doc | REPORTED operator ratification |
 | Darwin proven live | §3.1 | Fail-closed; plumbing only | **Repo** |
 | GoodWorks DGM is the coding seam | portfolio yaml:120-123; NORTH_STAR table | `ACTIVE_TRACK.yaml` has no goodworks track | **ACTIVE_TRACK.yaml** |
@@ -215,8 +217,10 @@ any service shape.
   ATTP needs a TA feed; 8126/EigenAI occupy adjacent niches. Future-proof
   because cheaper models increase demand for independent verification.
   Not 5: well-funded AIUC-1 auditors can ship a "good enough" heuristic.
-- **C6 3** VERIFIED offer $5k–$25k + ASSUMPTION conversion. Channel is the
-  operator; X-Ray already failed this. Not 4 until one outreach is sent.
+- **C6 3** ASSUMPTION ~$2,500 first SKU in the $1.5k–$5k band; published
+  $5k–$25k sprint is a later SKU. Channel is the operator; X-Ray already
+  failed this; market scout P($0 by day 90) 40–60% without daily outbound.
+  Not 4 until one outreach is sent.
 - **C7 4** VERIFIED: packet 4 + Go/world-radar (organism-rewire) + GAIA
   ENVISIONED cell + loomwork DESIGN_ONLY get a reason to exist. Packet 1
   does not wake them — sequencing does.
@@ -331,9 +335,11 @@ guardian JSON — they do not have to trust the swarm.
 The operator does not write code. Exhaustive physical list:
 
 1. Say yes or no to this spearhead (this document is not authority).
-2. Ratify the existing $5k–$25k offer as what may be sent, or write a
-   lower first-sprint price; agents must not invent prices.
-3. Name 10 real humans/firms and send the offer (email or equivalent).
+2. Ratify a first-SKU price in the **$1.5k–$5k** band (Wave-1 default
+   ~$2,500). The published $5k–$25k sprint stays a later SKU. Agents must
+   not invent prices.
+3. Publish one public autopsy in week 1 (Prediction Arena losses are
+   already public), then name 20 real humans/firms and send the offer.
    If this line is refused, C6 is dead — do not ask agents to "find a
    channel."
 4. Sign the engagement and receive the wire; no agent holds the account.
@@ -370,13 +376,13 @@ The operator does not write code. Exhaustive physical list:
 | goodworks YAML vs ACTIVE_TRACK | VERIFIED | portfolio yaml:120-123 vs `docs/governance/ACTIVE_TRACK.yaml` | Drift |
 | EigenAI paper | EXTERNAL | https://arxiv.org/abs/2602.00182 (2026-08-18) | Crypto inference ≠ behavior |
 | Repeated-game inference IC | EXTERNAL | https://arxiv.org/html/2608.09055 (2026-08-18) | Slot narrowed |
-| ERC-8004 | EXTERNAL | https://eips.ethereum.org/EIPS/eip-8004 (2026-08-18) | Off-chain aggregator hole |
+| ERC-8004 | EXTERNAL | https://eips.ethereum.org/EIPS/eip-8004 (2026-08-18); https://arxiv.org/abs/2606.26028 | Off-chain hole; empirically Sybil-hollow |
 | ERC-8126 | EXTERNAL | https://eips.ethereum.org/EIPS/eip-8126 (2026-08-18) | Static security score |
 | ATTP behavioural dimensions | EXTERNAL | https://datatracker.ietf.org/doc/draft-sharif-attp/ (2026-08-18) | Transport, not witness |
 | AIUC-1 | EXTERNAL | https://www.aiuc-1.com/ (2026-08-18) | Paying assurance |
 | Kalshi LLM losses | EXTERNAL | https://arxiv.org/abs/2604.07355 (2026-08-18) | S1 kill |
 | Sylvera pricing | EXTERNAL | climate-decode.com VCM 2026 rater article (2026-08-18) | Biosphere C6 kill |
-| DGM / Mendel | EXTERNAL | https://arxiv.org/abs/2505.22954 ; https://arxiv.org/html/2608.07645 (2026-08-18) | RSI vocabulary |
+| DGM / Mendel / RQGM | EXTERNAL | arXiv:2505.22954, 2608.07645, 2606.26294 (2026-08-18) | Archive, operators, epoch-frozen judge |
 | Risk budget quartet | REPORTED | dossier §3.4 | Not one canon doc |
 | Dossier "fire today" / "26 forecasts on a public branch" | REPORTED | prompt §3.2 | Unreached at HEAD |
 | Conversion of 10 outreaches → 1 sale | ASSUMPTION | — | C6 not a fact |

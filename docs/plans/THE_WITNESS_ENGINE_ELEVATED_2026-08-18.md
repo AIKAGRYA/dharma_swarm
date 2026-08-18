@@ -1,4 +1,4 @@
-# THE WITNESS ENGINE — elevated (v1.1)
+# THE WITNESS ENGINE — elevated (v1.1.1)
 
 **Document role:** `experiment` (bounded exploration). No runtime, merge, or
 governance authority. Subordinate to
@@ -52,16 +52,39 @@ this thesis is entered into as S6).
   catalytic graph, strange loop, DharmaGraph, TCB packages, living-agent
   kernel, mission control — each assigned a job or marked CUT/REPURPOSE.
 
+### v1.1.1 (Wave-1 scout closeout, same day)
+
+- **RSI chassis is RQGM, not Mendel-alone.** Red Queen Gödel Machine
+  (`arXiv:2606.26294`, 2026-06-24) freezes the judge inside an epoch and
+  replaces it only on held-out ground truth. Mendel supplies archive
+  *operators*; DGM supplies the archive; AlphaEvolve-class search is now a
+  Google Cloud product (GA 2026-07-09) for the inner loop. DGM lineages
+  already cheat frozen benches (fake test logs) — that is why the outer
+  freeze must be delayed world resolution.
+- **First dollar is a $1.5k–$5k behavior receipt, not the $5k–$25k sprint.**
+  Market scout: the published sprint repeats Campaign X-Ray's WTP/channel
+  kill; a 48-hour "did the agent do what it claimed" at ~$2,500 is the
+  reachable first SKU. $5k–$25k remains a later SKU after one sample exists.
+- **ERC-8004 reputation is empirically hollow.** Draft ERC; mainnet live;
+  `arXiv:2606.26028` (through 2026-05-13): most registrations invalid or
+  Sybil-reviewed. Become a Validation-Registry *provider*, not another
+  feedback aggregator.
+- **HEAD file drift vs ACTIVE_TRACK owns:** `mission_control_dispatch.py`,
+  `mission_control_a2a.py`, `mission_control_sarathi.py`, and the Sarathi
+  dashboard strip are **absent at `8cc04b71`**. Stigmergy store + API and
+  the spine invocation path are LIVE interfaces; StrangeLoop is manifest
+  `stub`. `goodworks-dgm` has **no Python package** at HEAD.
+
 ---
 
 ## A. The sharpened thesis
 
 **The organism's job is to turn other people's claims into public receipts.
 The spearhead is behavioral trust for agents: a calibrated, published-misses
-certification that an agent did what it claimed, sold first as a paid
-governance sprint (kit already fixture-proven) and grown into a continuous
-verification feed that ERC-8004, ATTP, AIUC-1-style auditors, and insurers
-can consume. Point the same engine at ecological claims when the second
+certification that an agent did what it claimed, sold first as a bounded
+~$2,500 behavior-receipt (not the $5k–$25k sprint), and grown into a
+continuous verification feed that ERC-8004, ATTP, AIUC-1-style auditors,
+and insurers can consume. Point the same engine at ecological claims when the second
 One Wire domain is the binding constraint — not before the first dollar.**
 
 Why this cut, on the operator's two objective functions:
@@ -84,13 +107,22 @@ gates, and receipt grammar, or the slower one is a different company.
 
 ## B. The recursion core, mechanically
 
-Name of the mechanism: **Mendel-comparative Red-Queen on a frozen external
-grader.** DGM (`arXiv:2505.22954`) is the archive-and-validate skeleton this
-repo already cites as the number to beat
+Name of the mechanism: **Red Queen Gödel Machine with Mendel operators on a
+DGM archive, scored by delayed world resolution.** Primary chassis is RQGM
+(`arXiv:2606.26294`, EXTERNAL 2026-06-24): freeze verifier \(V_t\) and probe
+family \(P_t\) inside an epoch; a challenger replaces the incumbent only if
+it wins on held-out ground truth after stale scores are erased. DGM
+(`arXiv:2505.22954`) is the archive-and-validate skeleton this repo already
+cites as the number to beat
 (VERIFIED(`docs/vision_maps/NORTH_STAR.md`:155-160)). Mendel
-(`arXiv:2608.07645`) adds the two operators that fit probe-vs-verifier:
-edit a lineage from *several* tasks at once (reaction-norm), and hybridize
-a verifier using a probe's successful attack trajectory (cross-lineage).
+(`arXiv:2608.07645`) supplies the two *edit* operators: reaction-norm
+(same probe, many resolved tasks) and cross-lineage hybridization
+(verifier steals a probe's successful attack). Inner search may use an
+AlphaEvolve-class propose-and-score loop against the *frozen* \(V_t\)
+(Google Cloud GA 2026-07-09 — do not rebuild it). The ungameable outer
+object is a k≥2 independent resolve-by fetch, not daily P&L and not a
+learned judge (SEVA overfits the current bench:
+EXTERNAL(https://arxiv.org/abs/2606.29713, 2026-06-29)).
 
 | Loop part | What it is here | Exists today? |
 |---|---|---|
@@ -140,7 +172,7 @@ DORMANT (code exists, zero throughput) / DESIGN_ONLY / BROKEN.
 | Audit kit `scripts/revenue_wedge/audit_kit.py` | HARNESS_PROVEN (CI fixture; VERIFIED(`scripts/revenue_wedge/audit_kit.py`:1-18)) | **Packet-1 product.** Scan → sealed receipt → ranked report. | Same kit pointed at MRV-methodology repos later. |
 | Offer `docs/offers/agentic-code-governance-sprint.md` | DESIGN_ONLY as a sale (price $5k–$25k; no cash) | Storefront copy. | Not used. |
 | RevenueSpine `dharma_swarm/revenue/` | HARNESS_PROVEN / economically DORMANT ($0; RECEIPT(`first_cash_receipt_status.md`:3)) | Records the first cash receipt into One Wire stratified fields. | Same spine, different domain tag. |
-| Runtime spine `dharma_swarm/spine/` | HARNESS_PROVEN (EvidenceReceipt / invoke_agent) | Every verification emit rides one receipt grammar. **Load-bearing.** | Same. |
+| Runtime spine `dharma_swarm/spine/` | LIVE invariant layer (invocation/receipt identity) | Every verification emit rides one receipt grammar. **Load-bearing.** | Same. |
 | Telos gates + kernel `telos_gates.py`, `dharma_kernel.py` | LIVE-in-CI / HARNESS | SATYA on published misses; AHIMSA on probe harm. Philosophy is the serving path, not decoration. | Moral weight on welfare/ecology claims. |
 | Ginko Brier `ginko_brier.py` | HARNESS_PROVEN (JSONL under `~/.dharma/ginko/`; VERIFIED(`ginko_brier.py`:11-31)) | Verifier calibration. Target Brier < 0.125 is the *honesty bar*, not a live-capital gate for this product. | "Will this credit/forest hold?" forecasts. |
 | MAP-Elites `archive.py` | HARNESS_PROVEN; fitness writes BLOCKED | Probe/verifier lineages. | Predictor lineages per ecosystem niche. |
@@ -149,10 +181,10 @@ DORMANT (code exists, zero throughput) / DESIGN_ONLY / BROKEN.
 | Chamber gym `gym_git_history.py` | HARNESS_PROVEN | Private benchmark from a customer's git history. | N/A as first sale; later, restoration-project document histories. |
 | Arena `coordination/arena/` | HARNESS_PROVEN; **inadmissible as capability claim** (RECEIPT(`trust_gate_status.json`:26)) | Internal fixture only. Never the storefront. | Internal. |
 | A2A `dharma_swarm/a2a/` | HARNESS_PROVEN (`task_receipt.py` verified/refuted/unknown) | Inter-agent evidence surface; verifier package already named. | Telemetry in. |
-| Mission control `mission_control*.py` | HARNESS_PROVEN (recently admitted; organism-rewire owned) | Operator runs engagements without writing code. | Pilot staging. |
+| Mission control `mission_control.py` (+ contract/execution/lifecycle) | HARNESS_PROVEN adapter library. `mission_control_dispatch.py` / `_a2a.py` / `_sarathi.py` and dashboard Sarathi strip **absent at this SHA** | Operator fencing for engagements if/when those files land. Do not claim the strip live. | Pilot staging. |
 | Living-agent kernel `operator_core/living_agent_kernel.py` | HARNESS_PROVEN (bounded, no provider dispatch — VERIFIED(`living_agent_kernel.py`:1-7)) | Governed apply_patch during an on-repo sprint. | CUT from first biosphere sale. |
 | Memory kernel `dharma_swarm/memory_kernel/` | HARNESS_PROVEN (census/front door, not a new store) | Engagement memory; do not leak client repos. | Casefile memory for loomwork. |
-| Stigmergy `stigmergy.py` | HARNESS_PROVEN / DORMANT throughput | Marks between probe and verifier agents. | Marks between oracles. |
+| Stigmergy `stigmergy.py` | LIVE interface (store + API mount; throughput unknown) | Marks between probe and verifier agents. | Marks between oracles. |
 | Catalytic graph `catalytic_graph.py` | HARNESS_PROVEN | Detects the SCC that *is* the RSI loop (receipt → archive → capability → receipt). | Same. |
 | Cascade `cascade.py` LoopEngine | HARNESS_PROVEN | Schedules probe/verifier ticks. | Oracle-refresh ticks. |
 | Organism `organism.py` | Dual API; not proven CLOSED_LIVE as heartbeat (Loop 2 HARNESS_PROVEN). StrangeLoop is constructed inside `Organism.__init__` (VERIFIED(`organism.py`:164-170)), not behind a named off-switch at this HEAD. | Identity layer; not required for packet 1. | Same. |
@@ -195,13 +227,16 @@ Eight external facts that change the design. All EXTERNAL-tagged, fetched
    **did the GPU run the contracted model.**
    EXTERNAL(https://arxiv.org/html/2608.09055, 2026-08-18).
 
-3. **ERC-8004 is a buyer-shaped hole.** Identity / Reputation / Validation
-   registries; scoring is *off-chain*; the spec expects "auditor networks and
-   insurance pools." Mainnet contracts published.
-   Design change: the digital probe's end-state API is "be a trusted
-   `clientAddress` that posts feedback + validation results," not "launch a
-   token."
-   EXTERNAL(https://eips.ethereum.org/EIPS/eip-8004, 2026-08-18).
+3. **ERC-8004 is a buyer-shaped hole — and empirically hollow.** Draft ERC
+   (not Final); Identity/Reputation live on mainnet ~2026-01-29; scoring is
+   off-chain. `arXiv:2606.26028` (through 2026-05-13): only 3%/4%/15% of
+   registrations on Ethereum/BSC/Base were operationally valid agents; most
+   reviewers look Sybil; Validation Registry had no confirmed mainnet deploy
+   in that window.
+   Design change: become a Validation-Registry *provider* with witnessed
+   interaction, not another feedback aggregator.
+   EXTERNAL(https://eips.ethereum.org/EIPS/eip-8004, 2026-08-18);
+   EXTERNAL(https://arxiv.org/abs/2606.26028, 2026-08-18).
 
 4. **ERC-8126 is a static security health report (0–100), finalized ~June 2026.**
    Five checks: tokens, media, Solidity, web, wallet — plus ZK so the guts
@@ -273,25 +308,29 @@ Infra budget treated as operator-ratified REPORTED ($500/month;
 doc**; fragments live in `docs/architecture/SHAKTI_GINKO_ORGAN.md`). Live
 capital ceiling $1,000 is irrelevant to this spearhead (no trading).
 
-### Spearhead first dollar (agent-governance sprint)
+### Spearhead first dollar (agent-behavior receipt)
 
 | Input | Value | Class |
 |---|---|---|
-| List price (published) | $5,000–$25,000 per 3–7 day sprint | VERIFIED(`docs/offers/agentic-code-governance-sprint.md`:3-5) |
-| Delivery cost at $500/mo infra | Already sunk; marginal = operator time + one agent-week | ASSUMPTION |
-| Conversion | 1 paid sprint from N outreaches | ASSUMPTION (Campaign X-Ray failed this gate) |
-| 90-day target | **one** $5k engagement | kill-condition in the tournament |
+| First SKU (Wave-1 market scout) | ~$2,500 for a 48-hour "did the agent do what it claimed" receipt | ASSUMPTION, band $1.5k–$5k |
+| Published sprint (later SKU) | $5,000–$25,000 per 3–7 day sprint | VERIFIED(`docs/offers/agentic-code-governance-sprint.md`:3-5) |
+| Delivery cost at $500/mo infra | Already sunk; marginal = operator time + 2–4 delivery days | ASSUMPTION |
+| 90-day conversion | Base case: 80 outreaches → ~1 close; P($0 by day 90) still 40–60% if outbound is not daily | ASSUMPTION |
+| 90-day target | **one** paid receipt (cash ≠ $0), price ≤$5k | kill-condition in the tournament |
 
-Path: operator ratifies the existing offer → operator sends 10 named
-outreaches (his hands) → one signed engagement → kit runs on their repo →
-RevenueSpine records cash → One Wire domain `paid_governance_engagement`.
+Path: operator publishes **one public autopsy** (Prediction Arena numbers are
+already public) → sends ~20 warm DMs then cold as needed → one signed
+$2.5k reconstruction → kit/traces sealed → RevenueSpine records cash →
+One Wire domain `paid_governance_engagement`. Do **not** lead with the
+$25k sprint; that repeats Campaign X-Ray's WTP kill.
 
 Brutal honesty: the kit is real; the **channel is not**. Campaign X-Ray was
 HELD 28/100 on buyer_pain, budget_wtp, channel, delivery_proof
 (VERIFIED(`docs/governance/VENTURE_CELL_PORTFOLIO.yaml`:91-98)). Packet 1
-survives only if the operator accepts that *he* is the channel for 90 days,
-and if the deliverable is installed gates + a sealed receipt (the kit), not
-a PDF advisory. Without that, C6 is a slogan.
+survives only if the operator does outbound every day for 90 days, and if
+the deliverable is a sealed receipt, not a PDF advisory. Without that, C6
+is a slogan. Biosphere reports fail the same gates plus a competence gap
+(no satellite stack).
 
 ### 12-month $10k/month (path, not a forecast)
 
@@ -305,9 +344,12 @@ This reaches ~$10k/month only if channel works. It does **not** require
 beating SWE-bench. It **does** require not claiming swarm-supremacy while
 lift = −0.10.
 
-Compute reinvestment: first $5k − tax − infra ≈ room to raise the
+Compute reinvestment: first ~$2.5k − tax − infra ≈ room to raise the
 `$200` benchmark slice so probe/verifier gym volume grows. That is funding
-→ capability, not P&L → selection.
+→ capability, not P&L → selection. Do not put the $1,000 live-capital
+ceiling on Kalshi: at $100/position, Kalshi taker fees at 50/50 are ~3.5%
+in plus ~3.5% out before spread; $1k cannot hide that drag
+(EXTERNAL fee formula; Prediction Arena mean Kalshi **−22.6%**).
 
 ### One Wire schedule
 
@@ -332,14 +374,17 @@ Each packet ≤1 week of agent work, independently valuable if the mission
 dies, surface-ownership respected. Packet 1 is the smallest thing that can
 mint one real external receipt.
 
-**Packet 1 — First sealed external verification receipt (cash or signed
-pilot).** Surfaces: `scripts/revenue_wedge/audit_kit.py`,
-`docs/offers/agentic-code-governance-sprint.md`, `dharma_swarm/revenue/`,
+**Packet 1 — First sealed external verification receipt (cash).** Surfaces:
+`scripts/revenue_wedge/audit_kit.py`,
+`docs/offers/agentic-code-governance-sprint.md` (price **may** be lowered
+to the $1.5k–$5k band by operator hands; agents must not invent prices),
+`dharma_swarm/revenue/`,
 `reports/revenue_wedge/first_cash_receipt_status.md`. Not in
 `HOT_PATH_PATTERNS`. Not owned by the ten active tracks' `owns:` globs at
 HEAD — admit as a revenue-wedge packet, do not raid other tracks. Operator
-must ratify outreach. Independent value: a fixture-proven kit plus one
-real counterparty row even if subscriptions never happen.
+must send outreach and (Wave-1) publish one public autopsy. Independent
+value: a fixture-proven kit plus one real counterparty row even if
+subscriptions never happen.
 
 **Packet 2 — Public published-misses verifier ledger for agent promises.**
 Reuse Ginko JSONL grammar (`ginko_brier.py`) for "will this agent fail
