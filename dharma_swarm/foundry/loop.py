@@ -26,7 +26,7 @@ from dharma_swarm.foundry.army import (
 )
 from dharma_swarm.foundry.elite_grid import EliteGrid
 from dharma_swarm.foundry.evaluator import Candidate, Evaluator, blind_evaluate
-from dharma_swarm.foundry.heldout import run_heldout
+from dharma_swarm.foundry.heldout import HeldoutOutcome, run_heldout
 from dharma_swarm.foundry.tripwires import (
     TripwireReport,
     check_determinism,
@@ -80,6 +80,7 @@ class FoundryLoop:
     roster: tuple[ArmyModel, ...] = CONFIG_A_ROSTER
     agents_root: object | None = None
     state_root: object | None = None
+    on_survivor: Callable[[Candidate, float, HeldoutOutcome], None] | None = None
 
     def __post_init__(self) -> None:
         self.evaluator.prepare()
@@ -138,6 +139,8 @@ class FoundryLoop:
                 report.survival_rates.append(outcome.survival_rate)
                 if outcome.survived:
                     report.ring2_survivors += 1
+                    if self.on_survivor is not None:
+                        self.on_survivor(candidate, fitness, outcome)
 
         report.grid_coverage = self.grid.coverage()
         best = self.grid.best()
