@@ -46,9 +46,19 @@ def _release_runner_command() -> str:
 
 
 def _dockerfile_command() -> str:
+    # The image launches through a fixed provenance-verifying ENTRYPOINT
+    # script, so the real launch spelling lives in that script, not in the
+    # Dockerfile itself. Follow the indirection rather than pinning prose.
     text = (REPO_ROOT / "Dockerfile.swarm").read_text(encoding="utf-8")
-    lines = [ln for ln in text.splitlines() if "orchestrate_live" in ln]
-    assert lines, "Dockerfile.swarm no longer launches orchestrate_live"
+    runner_name = "dharma_swarm_container_runner.sh"
+    assert runner_name in text, (
+        "Dockerfile.swarm no longer routes launch through the container runner"
+    )
+    runner_text = (REPO_ROOT / "scripts" / "runtime" / runner_name).read_text(
+        encoding="utf-8"
+    )
+    lines = [ln for ln in runner_text.splitlines() if "orchestrate_live" in ln]
+    assert lines, "container runner no longer launches orchestrate_live"
     return " ".join(ln.strip() for ln in lines)
 
 
