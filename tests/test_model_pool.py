@@ -67,9 +67,15 @@ def test_pool_collapses_roster_slots_to_logical_entries():
     Kimi Code ``k3``, Moonshot ``kimi-k3``, and OpenRouter
     ``moonshotai/kimi-k3`` are three routes for the same model. The roster gains
     one route overall (46 -> 47) while the pool loses one duplicate logical
-    entry (32 -> 31)."""
-    assert len(EVOLUTION_ROSTER) == 47
-    assert len(MODEL_POOL) == 31
+    entry (32 -> 31).
+
+    Ticket #1405 (Helm leg-one pool registration) adds 7 new roster slots for
+    6 new logical entries — Fable 5 (1 slot), GPT 5.6 (2 slots collapsing to
+    1, mirroring gpt-5.5), Grok 4.5 (1 slot), Grok 4.6 (1 slot, a separate
+    logical entry — the pool does not collapse differing version numbers),
+    Fugu Ultra (1 slot), Opus 5.0 (1 slot): roster 47 -> 54, pool 31 -> 37."""
+    assert len(EVOLUTION_ROSTER) == 54
+    assert len(MODEL_POOL) == 37
 
 
 # --------------------------------------------------------------------------
@@ -253,7 +259,10 @@ def test_floor_and_grunt_partition_the_pool():
     assert len(floor) + len(grunt) == len(MODEL_POOL)
     assert all(not e.below_floor for e in floor)
     assert all(e.below_floor for e in grunt)
-    assert len(floor) == 13
+    # Ticket #1405 (Helm leg-one pool registration) adds 6 new floor entries
+    # (Fable 5, GPT 5.6, Grok 4.5, Grok 4.6, Fugu Ultra, Opus 5.0), all
+    # above the power floor by construction: 13 -> 19. grunt is untouched.
+    assert len(floor) == 19
     assert len(grunt) == 18
 
 
@@ -341,3 +350,76 @@ def test_floor_nim_routes_cover_kimi_deepseek_and_minimax():
             route.provider is ProviderType.NVIDIA_NIM and route.model_id == model_id
             for route in entry.routes
         )
+
+
+# --------------------------------------------------------------------------
+# Helm leg-one alive bar: the 7 ratified on-call seats (ticket #1405;
+# HELM_LEGONE_SPEC.md §2.1 item 4 "Standing named bench" + §3 obligation 1
+# "Pool registration"). Fixed priority order per the spec: Fable 5 -> GPT 5.6
+# -> Grok 4.5/4.6 -> Fugu Ultra -> Kimi K3 -> Opus 5.0 -> Opus 4.8.
+#
+# Canonical logical ids and (provider, model_id) routes are not invented here
+# — they are the pool projection of the SAME identities already ratified in
+# ``dharma_swarm.helm_route_truth_types.HELM_SLICE1_SEATS`` (the obligation-5
+# RouteVerification census), restricted to the admissible identities whose
+# provider is a real ``ProviderType`` member. See PR body for the two seats
+# (Grok, Fugu Ultra) where that source names a provider string with no
+# existing ``ProviderType`` member.
+# --------------------------------------------------------------------------
+
+# Each seat maps to the pool id(s) that satisfy it. Grok carries two candidate
+# ids because the spec treats 4.5/4.6 as ONE seat lineage ("Grok 4.6 may
+# supersede when available; same seat lineage, not a second required count") —
+# either version resolving satisfies the seat.
+HELM_SEVEN_SEAT_POOL_IDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Fable 5", ("claude-fable-5",)),
+    ("GPT 5.6", ("gpt-5.6",)),
+    ("Grok 4.5/4.6", ("grok-4.5", "grok-4.6")),
+    ("Fugu Ultra", ("fugu-ultra",)),
+    ("Kimi K3", ("kimi-k3",)),
+    ("Opus 5.0", ("claude-opus-5.0",)),
+    ("Opus 4.8", ("claude-opus-4.8",)),
+)
+
+
+def _missing_seats(
+    seats: tuple[tuple[str, tuple[str, ...]], ...],
+) -> list[str]:
+    return [
+        seat_name
+        for seat_name, candidate_ids in seats
+        if not any(get_entry(pool_id) is not None for pool_id in candidate_ids)
+    ]
+
+
+def test_all_seven_ratified_oncall_seats_resolve_to_a_pool_entry():
+    """Alive-bar acceptance criterion (#1405): all seven fixed-order named
+    seats must resolve to a registered pool entry with a canonical id and
+    route. Negative control for this exact check: ticket #1405 body records
+    the pre-registration red run — 5 of 7 seats absent, verified 2026-08-19."""
+    missing = _missing_seats(HELM_SEVEN_SEAT_POOL_IDS)
+    assert not missing, f"ratified on-call seats with no pool entry: {missing}"
+
+
+def test_all_seven_ratified_oncall_seats_are_above_the_power_floor():
+    """Catalog honesty (spec §2.1 item 6): a seat may not be satisfied by a
+    sub-floor (grunt-only) entry — it must be on the real (floor) path."""
+    floor_ids = {e.id for e in model_pool.floor_entries()}
+    not_on_floor = [
+        seat_name
+        for seat_name, candidate_ids in HELM_SEVEN_SEAT_POOL_IDS
+        if not any(pool_id in floor_ids for pool_id in candidate_ids)
+    ]
+    assert not not_on_floor, f"ratified on-call seats not on the real (floor) path: {not_on_floor}"
+
+
+def test_seven_seat_gate_fails_if_a_seat_is_missing():
+    """Negative control: proves the resolution check above is not a
+    tautology — replacing one seat's candidate ids with an id that is not
+    registered must make the gate report exactly that seat as missing."""
+    tampered = HELM_SEVEN_SEAT_POOL_IDS[:-1] + (
+        ("Opus 4.8", ("definitely-not-a-registered-model-id",)),
+    )
+    assert _missing_seats(tampered) == ["Opus 4.8"]
+    # And the real (untampered) list has nothing missing at this point.
+    assert _missing_seats(HELM_SEVEN_SEAT_POOL_IDS) == []

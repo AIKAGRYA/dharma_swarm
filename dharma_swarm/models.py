@@ -138,6 +138,10 @@ class ProviderType(str, Enum):
     ZHIPU = "zhipu"
     KIMI_CODE = "kimi_code"
     MOONSHOT = "moonshot"
+    # Sakana AI — added for the Helm leg-one "Fugu Ultra" ratified on-call
+    # seat (ticket #1405; HELM_LEGONE_SPEC.md §2.1 item 4.4). No key/base-URL
+    # plumbing exists for this provider yet — see model_pool registration.
+    SAKANA = "sakana"
 
 
 class AutonomyLevel(str, Enum):
