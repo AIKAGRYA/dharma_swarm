@@ -197,6 +197,47 @@ async def test_model_failure_exits_nonzero_and_records_nothing(
     )
 
 
+async def test_preexisting_banned_import_is_tolerated_but_new_ones_are_not(
+    ginko_store, fake_repo, tmp_path, monkeypatch
+):
+    """Regression: the CI full suite shares one interpreter, so unrelated
+    tests legitimately import BR-007 modules before this file runs. The belt
+    must ignore that pollution (delta semantics) while still refusing any
+    banned import the run itself performs."""
+    import types
+
+    banned_name = sorted(l0._BANNED_MODULES)[0]
+    monkeypatch.setitem(sys.modules, banned_name, types.ModuleType(banned_name))
+
+    _patch_fetchers(
+        monkeypatch,
+        {"CPIAUCSL": 320.0, "DGS10": 4.25, "ICSA": 220000.0},
+        {"bitcoin": 65000.0, "ethereum": 3200.0},
+    )
+
+    async def fake_model(questions, model, now):
+        return {q.qid: 0.42 for q in questions}
+
+    monkeypatch.setattr(l0, "model_probabilities", fake_model)
+    grant = _write_grant(tmp_path / "GRANT.json")
+    args = _args(grant, fake_repo, tmp_path / "receipt.json")
+
+    code = await l0.main_async(args)
+    assert code == 0, "pre-existing pollution must not fail the run"
+    receipt = json.loads((tmp_path / "receipt.json").read_text())
+    assert receipt["store_sync_invoked"] is False
+    assert receipt["banned_preloaded"] == [banned_name]
+    assert receipt["valid"] is True
+
+    # A banned module appearing DURING the run still trips the belt.
+    baseline = l0._banned_loaded()
+    other = sorted(l0._BANNED_MODULES)[1]
+    monkeypatch.setitem(sys.modules, other, types.ModuleType(other))
+    with pytest.raises(SystemExit) as excinfo:
+        l0.assert_no_new_forbidden_imports(baseline)
+    assert excinfo.value.code == 2
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # MECHANICAL RESOLVER
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

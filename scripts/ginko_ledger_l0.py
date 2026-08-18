@@ -104,11 +104,22 @@ def refuse_host() -> None:
         _die("forbidden host meghadharma-cloud")
 
 
-def assert_no_forbidden_imports() -> None:
-    """Belt: refuse if the process ever imported a BR-007 path."""
-    hit = _BANNED_MODULES.intersection(sys.modules)
+def _banned_loaded() -> frozenset[str]:
+    return frozenset(_BANNED_MODULES.intersection(sys.modules))
+
+
+def assert_no_new_forbidden_imports(baseline: frozenset[str]) -> None:
+    """Belt: refuse if THIS run pulled in a BR-007 path.
+
+    Delta against the run-entry snapshot, not absolute presence: in the real
+    dedicated CLI process the snapshot is empty, so this is the same check —
+    while an in-process test suite whose unrelated tests already imported
+    those modules cannot false-positive the runner for pollution it did not
+    cause (the CI full-suite run shares one interpreter across 15k tests).
+    """
+    hit = _banned_loaded() - baseline
     if hit:
-        _die(f"forbidden modules already imported: {sorted(hit)}")
+        _die(f"run imported forbidden modules: {sorted(hit)}")
 
 
 def load_grant(path: Path) -> dict[str, Any]:
@@ -631,7 +642,7 @@ def _dashboard_dict() -> dict[str, Any]:
 
 async def main_async(args: argparse.Namespace) -> int:
     refuse_host()
-    assert_no_forbidden_imports()
+    banned_baseline = _banned_loaded()
     grant_path = Path(args.grant).expanduser().resolve()
     grant = load_grant(grant_path)
     repo = repo_root(Path(args.repo_root) if args.repo_root else Path.cwd())
@@ -684,7 +695,7 @@ async def main_async(args: argparse.Namespace) -> int:
             )
             new_rows.append(asdict(pred))
 
-    assert_no_forbidden_imports()
+    assert_no_new_forbidden_imports(banned_baseline)
     consume_start(grant_path, grant)
     grant = json.loads(grant_path.read_text(encoding="utf-8"))
 
@@ -702,11 +713,12 @@ async def main_async(args: argparse.Namespace) -> int:
         "n_new": len(new_rows),
         "n_resolved": len(resolved_rows),
         "n_resolve_skipped": len(resolve_failures),
-        "store_sync_invoked": bool(_BANNED_MODULES.intersection(sys.modules)),
+        "store_sync_invoked": bool(_banned_loaded() - banned_baseline),
+        "banned_preloaded": sorted(banned_baseline),
         "valid": bool(
             published.exists()
             and (new_rows or resolved_rows or args.resolve_only)
-            and not _BANNED_MODULES.intersection(sys.modules)
+            and not (_banned_loaded() - banned_baseline)
         ),
         "note": "ledger receipt, not an edge receipt",
     }
