@@ -32,7 +32,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-cycles", type=int, default=0, help="0 = run forever until a HALT")
     parser.add_argument("--budget", type=float, default=300.0)
     parser.add_argument("--state-root", default=None)
+    parser.add_argument("--mode", choices=["dry", "live"], default="dry",
+                        help="dry = synthetic proposer (default); live = real model calls "
+                             "on free lanes, objectively scored")
     args = parser.parse_args(argv)
+
+    cycle_fn = None
+    if args.mode == "live":
+        from dharma_swarm.foundry.live import live_daemon_cycle  # noqa: PLC0415
+        cycle_fn = live_daemon_cycle
 
     config = DaemonConfig(
         targets=[t.strip() for t in args.targets.split(",") if t.strip()],
@@ -42,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
         budget_cap_usd=args.budget,
         state_root=args.state_root,
     )
-    state = run_daemon(config)
+    state = run_daemon(config) if cycle_fn is None else run_daemon(config, cycle_fn=cycle_fn)
     print(state_json(state))
     return 0
 
