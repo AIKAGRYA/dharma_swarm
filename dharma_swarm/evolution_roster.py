@@ -205,9 +205,13 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         "Floor — supersedes Grok 4.5 in the same seat lineage per spec §2.1 item 4.3",
     ),
     # Fugu Ultra (Sakana AI): OPEN POINT — no live client/base-URL exists for
-    # ProviderType.SAKANA yet (registration only; see PR body). Context and
-    # strengths are unconfirmed, so this uses the module's conservative
-    # default context rather than an invented number.
+    # ProviderType.SAKANA yet (registration only; see PR body). Real context
+    # size is unconfirmed; 128_000 below is passed explicitly as a
+    # deliberately conservative placeholder (it happens to equal
+    # ModelSlot.max_context's own dataclass default — not a verified spec
+    # number for this model). ``strengths`` is the same soft descriptive tag
+    # every other roster entry carries (editorial, not a verified benchmark
+    # claim) — not an overclaim specific to this slot.
     ModelSlot(
         ProviderType.SAKANA,
         "fugu-ultra",

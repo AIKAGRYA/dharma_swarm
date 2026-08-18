@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from dharma_swarm.evolution_roster import EVOLUTION_ROSTER, ModelTier
+from dharma_swarm.helm_route_truth_types import HELM_SLICE1_SEATS, HelmSeat
 from dharma_swarm.models import ProviderType
 from dharma_swarm import model_pool
 from dharma_swarm.model_pool import (
@@ -365,31 +366,65 @@ def test_floor_nim_routes_cover_kimi_deepseek_and_minimax():
 # provider is a real ``ProviderType`` member. See PR body for the two seats
 # (Grok, Fugu Ultra) where that source names a provider string with no
 # existing ``ProviderType`` member.
+#
+# These tests PROJECT from HELM_SLICE1_SEATS instead of re-encoding a
+# parallel seat -> pool-id table (ADR-008 naming floor: no parallel naming
+# schemes for the same concept) — seat identity, admissible routes, AND
+# order all come from that ONE existing canonical source via
+# entry_for_model_id (exact route-level model_id match, not a guessed pool
+# id). Only HELM_SEVEN_SEAT_DISPLAY_ORDER below is hand-transcribed: it is
+# the independent spec ground-truth an order check needs to be
+# non-tautological — deriving the expected order FROM HELM_SLICE1_SEATS
+# would make "does HELM_SLICE1_SEATS match the spec" vacuously true.
 # --------------------------------------------------------------------------
 
-# Each seat maps to the pool id(s) that satisfy it. Grok carries two candidate
-# ids because the spec treats 4.5/4.6 as ONE seat lineage ("Grok 4.6 may
-# supersede when available; same seat lineage, not a second required count") —
-# either version resolving satisfies the seat.
-HELM_SEVEN_SEAT_POOL_IDS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Fable 5", ("claude-fable-5",)),
-    ("GPT 5.6", ("gpt-5.6",)),
-    ("Grok 4.5/4.6", ("grok-4.5", "grok-4.6")),
-    ("Fugu Ultra", ("fugu-ultra",)),
-    ("Kimi K3", ("kimi-k3",)),
-    ("Opus 5.0", ("claude-opus-5.0",)),
-    ("Opus 4.8", ("claude-opus-4.8",)),
+# HELM_LEGONE_SPEC.md §2.1 item 4 "Standing named bench, fixed priority
+# order" / §8 Definition of done, transcribed verbatim.
+HELM_SEVEN_SEAT_DISPLAY_ORDER: tuple[str, ...] = (
+    "Fable 5",
+    "GPT 5.6",
+    "Grok 4.5/4.6",
+    "Fugu Ultra",
+    "Kimi K3",
+    "Opus 5.0",
+    "Opus 4.8",
 )
 
 
-def _missing_seats(
-    seats: tuple[tuple[str, tuple[str, ...]], ...],
-) -> list[str]:
-    return [
-        seat_name
-        for seat_name, candidate_ids in seats
-        if not any(get_entry(pool_id) is not None for pool_id in candidate_ids)
-    ]
+def _seat_pool_entries(seat: HelmSeat) -> list[ModelEntry]:
+    """Every pool entry reachable from one of ``seat``'s admissible
+    (provider_string, model_id) identities, via the exact route-level
+    model_id (``entry_for_model_id``) — never a hand-typed pool-id guess."""
+    entries: list[ModelEntry] = []
+    for _provider_str, model_id in seat.admissible_served_identities:
+        entry = entry_for_model_id(model_id)
+        if entry is not None and entry not in entries:
+            entries.append(entry)
+    return entries
+
+
+def test_seven_seat_census_order_matches_the_ratified_alive_bar_sequence():
+    """The fixed order lives in HELM_SLICE1_SEATS — consumed by
+    model_status.py's on-call projection — NOT in the pool/roster. The
+    roster's own top-level tuple order is a capability-tier grouping (see
+    the "FLOOR FRONTIER" / "Strong tier" / "Fast tier" section banners in
+    evolution_roster.py) and is never documented as seat-priority-
+    significant; this ticket's new slots were inserted into the existing
+    floor-frontier section, matching that pre-existing convention, not the
+    alive-bar's seat order. This test proves the surface that actually IS
+    order-significant for the alive bar still matches the ratified spec
+    sequence."""
+    assert tuple(seat.display_label for seat in HELM_SLICE1_SEATS) == HELM_SEVEN_SEAT_DISPLAY_ORDER
+
+
+def test_seven_seat_order_gate_fails_on_permutation():
+    """Negative control for the order check above: swapping two seats must
+    make the comparison fail — proves it is not a tautology."""
+    permuted = list(seat.display_label for seat in HELM_SLICE1_SEATS)
+    permuted[0], permuted[1] = permuted[1], permuted[0]
+    assert tuple(permuted) != HELM_SEVEN_SEAT_DISPLAY_ORDER
+    # And the real, untampered sequence still matches at this point.
+    assert tuple(seat.display_label for seat in HELM_SLICE1_SEATS) == HELM_SEVEN_SEAT_DISPLAY_ORDER
 
 
 def test_all_seven_ratified_oncall_seats_resolve_to_a_pool_entry():
@@ -397,7 +432,7 @@ def test_all_seven_ratified_oncall_seats_resolve_to_a_pool_entry():
     seats must resolve to a registered pool entry with a canonical id and
     route. Negative control for this exact check: ticket #1405 body records
     the pre-registration red run — 5 of 7 seats absent, verified 2026-08-19."""
-    missing = _missing_seats(HELM_SEVEN_SEAT_POOL_IDS)
+    missing = [seat.display_label for seat in HELM_SLICE1_SEATS if not _seat_pool_entries(seat)]
     assert not missing, f"ratified on-call seats with no pool entry: {missing}"
 
 
@@ -406,20 +441,26 @@ def test_all_seven_ratified_oncall_seats_are_above_the_power_floor():
     sub-floor (grunt-only) entry — it must be on the real (floor) path."""
     floor_ids = {e.id for e in model_pool.floor_entries()}
     not_on_floor = [
-        seat_name
-        for seat_name, candidate_ids in HELM_SEVEN_SEAT_POOL_IDS
-        if not any(pool_id in floor_ids for pool_id in candidate_ids)
+        seat.display_label
+        for seat in HELM_SLICE1_SEATS
+        if not any(entry.id in floor_ids for entry in _seat_pool_entries(seat))
     ]
     assert not not_on_floor, f"ratified on-call seats not on the real (floor) path: {not_on_floor}"
 
 
 def test_seven_seat_gate_fails_if_a_seat_is_missing():
     """Negative control: proves the resolution check above is not a
-    tautology — replacing one seat's candidate ids with an id that is not
-    registered must make the gate report exactly that seat as missing."""
-    tampered = HELM_SEVEN_SEAT_POOL_IDS[:-1] + (
-        ("Opus 4.8", ("definitely-not-a-registered-model-id",)),
+    tautology — a seat whose admissible identities all miss the pool must
+    be reported as missing, and only that seat (the tampered seat keeps a
+    REAL display label so a naive "any non-empty string" bug can't hide)."""
+    tampered_seat = HelmSeat(
+        "not-a-real-seat",
+        "Opus 4.8",
+        "not-a-real-lineage",
+        (("nobody", "definitely-not-a-registered-model-id"),),
     )
-    assert _missing_seats(tampered) == ["Opus 4.8"]
-    # And the real (untampered) list has nothing missing at this point.
-    assert _missing_seats(HELM_SEVEN_SEAT_POOL_IDS) == []
+    seats = HELM_SLICE1_SEATS[:-1] + (tampered_seat,)
+    missing = [seat.display_label for seat in seats if not _seat_pool_entries(seat)]
+    assert missing == ["Opus 4.8"]
+    # And the real (untampered) census has nothing missing at this point.
+    assert [seat.display_label for seat in HELM_SLICE1_SEATS if not _seat_pool_entries(seat)] == []
