@@ -54,7 +54,10 @@ class CrossUpdateResult:
 def cross_update_trusted(
     atom_path: Path, *, append_log: bool = True
 ) -> CrossUpdateResult:
-    """Atomically update index, backlink projections, and log for an approved atom.
+    """Update index, backlink projections, and log as one rollback-bounded transaction.
+
+    Rollback-atomic against exceptions and concurrent-writer drift; not
+    crash-atomic across the filesystem (no recovery journal between replaces).
 
     The function accepts only a v2-signed, human-approved atom in the trusted
     concepts projection. Keyword matches are never promoted into contradiction
@@ -431,12 +434,21 @@ def _resign_projected_page(
         return updated_text
     provenance = original_schema.provenance
     if provenance.review_status != "approved":
-        raise ValueError(f"refusing projection write to unapproved atom: {path}")
+        raise ValueError(
+            f"refusing projection write to unapproved atom: {path} "
+            "(approve that linked page first, or drop the wikilink to it; "
+            "legacy corpora must be approved bottom-up before atoms that "
+            "link into them)"
+        )
     old_signature = provenance.axiom_signature
     if not old_signature.startswith(SIGNATURE_V2_PREFIX) or not signature_matches(
         old_signature, original_schema, original_body, kernel_signature
     ):
-        raise ValueError(f"refusing projection write to signature-invalid atom: {path}")
+        raise ValueError(
+            f"refusing projection write to signature-invalid atom: {path} "
+            "(re-sign or re-approve that page before approving atoms that "
+            "link into it)"
+        )
 
     updated_schema, updated_body = parse_frontmatter(
         updated_text, source_path=str(path)
@@ -472,7 +484,10 @@ def cross_update_summary(result: CrossUpdateResult) -> str:
             f"- index: {result.index_path}",
             f"- backlinks_updated: {len(result.backlinks_updated)}",
             f"- missing_related: {len(result.missing_related)}",
-            f"- contradictions_flagged: {len(result.contradictions_flagged)}",
+            # contradictions_flagged is reserved: keyword matches only append
+            # notes by design and never promote to flags, so this stays 0
+            # until a semantic contradiction detector exists.
+            f"- contradictions_flagged: {len(result.contradictions_flagged)} (reserved)",
         ]
     )
 

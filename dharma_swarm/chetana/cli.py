@@ -25,6 +25,7 @@ from pathlib import Path
 
 from .backlinks import (
     DEFAULT_CONTENT_LAYER_NAMES,
+    MAX_BACKLINK_APPLY_PAGES,
     BacklinkError,
     apply_backlink_plan,
     plan_backlinks,
@@ -222,7 +223,15 @@ def _cmd_compile(args: argparse.Namespace) -> int:
 
 def _cmd_backlinks(args: argparse.Namespace) -> int:
     """Check or explicitly reconcile computed backlink projections."""
-    roots = args.root or [WIKI_ROOT / name for name in DEFAULT_CONTENT_LAYER_NAMES]
+    if args.root:
+        roots = args.root
+    else:
+        # A young wiki holds only the layers the pipeline has created so far;
+        # mirror cross_update's existing-directory filter so the documented
+        # default invocation works there. If none exist, keep the full list
+        # so the refusal names every missing root truthfully.
+        default_roots = [WIKI_ROOT / name for name in DEFAULT_CONTENT_LAYER_NAMES]
+        roots = [root for root in default_roots if root.is_dir()] or default_roots
     try:
         if args.page:
             report = plan_backlinks(roots)
@@ -237,17 +246,19 @@ def _cmd_backlinks(args: argparse.Namespace) -> int:
             ]
             report = select_backlink_changes(report, selected)
             if args.apply:
-                if report.changed_count > 25:
+                if report.changed_count > MAX_BACKLINK_APPLY_PAGES:
                     raise BacklinkError(
-                        "selected apply exceeds the 25-page migration limit"
+                        "selected apply exceeds the "
+                        f"{MAX_BACKLINK_APPLY_PAGES}-page migration limit"
                     )
                 report = apply_backlink_plan(report)
         else:
             report = reconcile_backlinks(roots)
             if args.apply:
-                if report.changed_count > 25:
+                if report.changed_count > MAX_BACKLINK_APPLY_PAGES:
                     raise BacklinkError(
-                        "bulk apply exceeds the 25-page migration limit; "
+                        "bulk apply exceeds the "
+                        f"{MAX_BACKLINK_APPLY_PAGES}-page migration limit; "
                         "use repeated --page arguments for a reviewed batch"
                     )
                 report = apply_backlink_plan(report)
