@@ -1,8 +1,8 @@
 # THE SINGLE TARGET — an engineered question for an outside adversarial agent
 
 **How to use:** paste this entire document to a fresh agent with no access to
-the repository. It is self-contained: the dossier in §3 is the ground truth it
-may cite; anything beyond it must be marked ASSUMPTION. The recipient owes the
+the repository. It is self-contained: the dossier in §3 is the fact base the
+agent may cite; anything beyond it must be marked ASSUMPTION. The recipient owes the
 operator one answer in the exact form §2 demands.
 
 ---
@@ -86,7 +86,7 @@ Your reply must contain exactly these six sections:
   physically do (accounts, funds, keys, sends), each item one line. The
   operator does not write code; any mission needing their daily labor fails.
 
-## 3. Context dossier — ground truth you may cite
+## 3. Context dossier — the fact base you may cite
 
 ### 3.1 What the organism actually is (subsystem inventory)
 
@@ -112,7 +112,8 @@ A self-improving multi-agent Python organism (~1,380 PRs deep) with:
   (deliberately not admissible as a capability claim).
 - **World-sensing organs (mostly dormant):** Go ingestors for world signals,
   GitHub events, and evidence; a world-radar module; wired but barely fed.
-- **Memory & coordination:** a memory kernel (canonical agent memory),
+- **Memory & coordination:** a memory kernel (the one front door for agent
+  memory),
   stigmergy (pheromone-like coordination marks), a catalytic graph, a
   strange-loop self-model, a durable graph runtime (LangGraph-parity),
   quality-weighted aggregation of agent outputs (ensemble law: diverse
