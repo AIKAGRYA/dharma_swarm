@@ -64,4 +64,7 @@ export DHARMA_RUNTIME_SOURCE_DIGEST="${source_digest}"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONNOUSERSITE=1
 
+# exec replaces this shell, so the EXIT trap never fires on the launch path;
+# the observed manifest must be removed here or it leaks once per container start.
+rm -f "${observed_manifest}"
 exec "${runtime_python}" -B -I -m dharma_swarm.orchestrate_live
