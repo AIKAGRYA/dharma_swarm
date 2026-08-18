@@ -45,7 +45,11 @@ BASELINE_DB_NAMES = 39
 # 218 -> 219 (2026-08-05, PR #1235): {cycle_id}.tasks.jsonl — one per-cycle
 # local A2A task-log target for the autocatalytic witness. It records task
 # envelopes for replay/inspection and does not claim an authority upgrade.
-BASELINE_JSONL_NAMES = 219
+# 219 -> 220 (2026-08-18, PR #1380): predictions.public.jsonl — the Ginko L0
+# forecast ledger's PUBLIC full-store snapshot (yes-sheet 2026-08-18 line 7).
+# It is the durable published projection of the existing predictions.jsonl
+# store on generated/forecast-ledger, not a second private store.
+BASELINE_JSONL_NAMES = 220
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 BASELINE_LEDGER_MODULES = 12

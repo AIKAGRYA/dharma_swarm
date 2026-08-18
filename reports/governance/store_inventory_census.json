@@ -177,6 +177,7 @@
     "plan.jsonl",
     "prediction_errors.jsonl",
     "predictions.jsonl",
+    "predictions.public.jsonl",
     "predictor.jsonl",
     "predictor_data.jsonl",
     "processed_deliveries.jsonl",
@@ -299,7 +300,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 219,
+    "distinct_jsonl_names": 220,
     "ledger_classes": 11,
     "ledger_modules": 12
   }
