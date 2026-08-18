@@ -1,23 +1,23 @@
- ◆ DHARMA  ·  Runtime  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear
-◂ Models Ontology [Runtime] Sessions Approva… Control ▸
+ ◆ DHARMA HELM  /  SYSTEM  ·  ds_nihonga_helm_frontier_20260814
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]
+────────────────────────────────────────────────────────────────────────────────
+ · Home · · Conv · · Acti · · Evid · ◆ Syst
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ Runtime                                                                      │
-│ runtime pulse, verification, and loop state | j/k or ↑/↓ move between        │
-│ sections                                                                     │
+│ Runtime · Runtime Snapshot                                                   │
+│ 1/1 sections · j/k select                                                    │
 │                                                                              │
-│  Sections                   Runtime Snapshot                                 │
-│  runtime state cards        selected runtime card                            │
-│                             Bridge: booting                                  │
-│  ▶ Runtime Snapshot         Python runtime: expected 3.11+                   │
-│    3 rows                   Frontend runtime: Bun                            │
-│    Bridge: booting                                                           │
-│    Python runtime:                                                           │
-│  expected 3.11+                                                              │
+│ Bridge: booting                                                              │
+│ Python runtime: expected 3.11+                                               │
+│ Frontend runtime: Bun                                                        │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated idle
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯

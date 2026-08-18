@@ -1,29 +1,29 @@
- ◆ DHARMA COMMAND POST  ·  Approvals  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Runtime Sessions [Approvals] Control Agents Evolution ▸
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Approvals                                                                                        │
-│ provisional-live | pending 0 | tracked 0                                                         │
-│                                                                                                  │
-│  Queue                             Selected                                                      │
-│  pending-first operator decisions  decision, resolution, and runtime trace                       │
-│                                    No selected approval.                                         │
-│  No approvals.                                                                                   │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                 100×30 · standard
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ · Home   · Conversation   ◆ Activity   · Evidence   · System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
+┌────────────────────────────────────────┐CONTEXT / ORGANISM
+│ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
+│  Dharma Helm · Quiet Field             ││ Approvals                                              │
+│  Type a message below · F2 unfolds     ││ provisional-live | pending 0 | tracked 0               │
+│  the Whole Helm                        ││                                                        │
+│                                        ││  Queue               Selected                          │
+│                                        ││  pending-first       decision, resolution, and runtime │
+│                                        ││  operator             trace                            │
+│                                        ││  decisions           No selected approval.             │
+│                                        ││  No approvals.                                         │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+└────────────────────────────────────────┘╰────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                     idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

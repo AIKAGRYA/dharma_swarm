@@ -1,39 +1,39 @@
- ◆ DHARMA COMMAND POST  ·  Evolution  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Control Agents [Evolution] Thinking Tools Timeline
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Evolution                                                                                                            │
-│ Forward-loop, swarm evolution, and shell continuation surface.                                                       │
-│                                                                                                                      │
-│ Cascade and self-improvement surface loading...                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                                     120×40 · panorama
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ · Home   · Conversation   ◆ Activity   · Evidence   · System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
+┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
+│ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
+│  Dharma Helm · Quiet Field                         ││ Evolution                              ││ correlated events ·… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ Forward-loop, swarm evolution, and     ││                      │
+│                                                    ││ shell continuation surface.            ││ ✖ ENOENT: no such f… │
+│                                                    ││                                        ││ ✖ bridge stdin is u… │
+│                                                    ││ Cascade and self-improvement surface   ││                      │
+│                                                    ││ loading...                             ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ 2 canonical events … │
+└────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

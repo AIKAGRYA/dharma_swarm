@@ -1,29 +1,29 @@
- ◆ DHARMA COMMAND POST  ·  Evolution  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Control Agents [Evolution] Thinking Tools Timeline
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Evolution                                                                                        │
-│ Forward-loop, swarm evolution, and shell continuation surface.                                   │
-│                                                                                                  │
-│ Cascade and self-improvement surface loading...                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                 100×30 · standard
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ · Home   · Conversation   ◆ Activity   · Evidence   · System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
+┌────────────────────────────────────────┐CONTEXT / ORGANISM
+│ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
+│  Dharma Helm · Quiet Field             ││ Evolution                                              │
+│  Type a message below · F2 unfolds     ││ Forward-loop, swarm evolution, and shell continuation  │
+│  the Whole Helm                        ││ surface.                                               │
+│                                        ││                                                        │
+│                                        ││ Cascade and self-improvement surface loading...        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+└────────────────────────────────────────┘╰────────────────────────────────────────────────────────╯
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                     idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

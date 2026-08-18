@@ -2121,14 +2121,17 @@ export function buildRepoPaneSections(
     {
       title: "Operator Snapshot",
       rows: [
-        ...(preview?.Authority ? [`Authority ${preview.Authority}`] : []),
+        ...(preview?.Authority ? [`Repo authority ${preview.Authority}`] : []),
+        ...(hasControlSignal && controlPreview?.Authority
+          ? [`Control authority ${controlPreview.Authority}`]
+          : []),
         ...buildOperatorSnapshotRows(preview, lines, controlPreview, controlLines, now),
       ],
     },
     {
       title: "Snapshot",
       rows: uniqueRows([
-        ...(preview?.Authority ? [`Authority ${preview.Authority}`] : []),
+        ...(preview?.Authority ? [`Repo authority ${preview.Authority}`] : []),
         ...snapshotRows,
         `Root ${previewValue(preview, lines, "Repo root")}`,
         `Branch ${buildBranchLabel(preview, lines)}`,

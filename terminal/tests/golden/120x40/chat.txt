@@ -30,10 +30,10 @@
 
 
 
-
-
- Dharma Terminal
- Type a message below · F2 opens the cockpit
+ Dharma Helm · Quiet Field
+ Type a message below · F2 unfolds the Whole Helm
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
