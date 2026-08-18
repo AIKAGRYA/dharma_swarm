@@ -87,6 +87,7 @@ MAX_NEEDS_JOHN = 5
 AUTOMERGE_WORKFLOW = "automerge.yml"
 ROUTER_WORKFLOW = "codex-mention-router.yml"
 BACKLOG_WORKFLOW = "merge-master-mike-backlog.yml"
+FOUNDRY_WORKFLOW = "foundry-lane.yml"
 
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
@@ -305,6 +306,13 @@ def gather_router_progress(repo: str) -> dict | None:
     return _gather_latest_workflow_run(repo, ROUTER_WORKFLOW, event="workflow_dispatch")
 
 
+def gather_foundry(repo: str) -> dict | None:
+    # The Sublimation Foundry lane is report-only; its last run's conclusion is
+    # the phone signal. A KILL kill-metric verdict fails the lane on purpose, so
+    # red here means "look", not merely "a job errored".
+    return _gather_latest_workflow_run(repo, FOUNDRY_WORKFLOW)
+
+
 def gather(repo: str) -> dict:
     generated_at = _utc_now_iso()
     return {
@@ -318,6 +326,7 @@ def gather(repo: str) -> dict:
         "automerge_workflow": gather_workflow_state(repo, AUTOMERGE_WORKFLOW),
         "scanner_heartbeat": gather_scanner_heartbeat(repo),
         "router_progress": gather_router_progress(repo),
+        "foundry": gather_foundry(repo),
         # Producers that land in later workstreams; compose_brief renders an
         # explicit not-landed line for each None/missing key.
         "lane_runs": None,        # PR-E hardening lane receipts
@@ -543,6 +552,28 @@ def compose_brief(data: dict) -> str:
             out += _section(title, [f"- {k}: {v}" for k, v in list(value.items())[:MAX_ROWS]])
         else:
             out += _section(title, ["none"])
+
+    foundry = data.get("foundry")
+    if foundry is None or not foundry.get("found"):
+        foundry_lines = ["_foundry lane not yet run_"]
+    else:
+        conclusion = str(foundry.get("conclusion") or "").lower()
+        if conclusion == "success":
+            icon = "🟢"
+        elif conclusion in {"queued", "in_progress", "waiting", "pending", "requested"}:
+            icon = "🟡"
+        else:
+            # A KILL kill-metric verdict fails the lane on purpose — red = look.
+            icon = "🔴"
+        foundry_lines = [
+            f"{icon} lane [{foundry.get('conclusion')}]({foundry.get('url')}) "
+            f"at {foundry.get('completed_at')}"
+        ]
+    foundry_lines.append(
+        "Waiting on you (one-time): 4 provider accounts + wedge 'yes' → "
+        "docs/foundry/OPERATOR_UNBLOCKS.md"
+    )
+    out += _section("🏭 Sublimation Foundry", foundry_lines)
 
     out += [f"_{WORD_BUDGET_NOTE}_", ""]
     return "\n".join(out)
