@@ -1,0 +1,108 @@
+{
+  "schema": "dharma.helm.slice1.verification_receipt.v1",
+  "observed_at": "2026-08-12T16:47:27Z",
+  "status": "CODE_COMPLETE_LIVE_PROOF_BLOCKED",
+  "subject": {
+    "branch": "agent/helm-live-slice-recovery-v4-20260812",
+    "parent_sha": "43e93f6de62f787789ca4be28cfcd848e7aeec29",
+    "work_packet": "helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2",
+    "packet_digest": "cdaf62ab32e1c9a0dd9458270a96ed2e09cf1547a6d2eee289bba40ea08ccb28"
+  },
+  "claims": {
+    "implementation_complete": true,
+    "live_proof_complete": false,
+    "pre_authoritative_projection": "UNKNOWN ?/7",
+    "authoritative_empty_evidence_projection": "LIVE_DEGRADED 0/7",
+    "successful_live_provider_completion": false,
+    "primary_chat_mutation_authority_admitted": false,
+    "deployment_or_merge_performed": false
+  },
+  "evidence": [
+    {
+      "gate": "agent-build-preflight",
+      "result": "passed",
+      "detail": "syntax and F821 clean; 15203 tests collected; onboarding passed; 67 behavioral sentinels passed; hygiene passed",
+      "report": "/private/tmp/dharma-helm-live-slice-agentops-v4b-20260813/reports/agentops/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2/preflight-43e93f6de62f787789ca4be28cfcd848e7aeec29/report.json",
+      "sha256": "e96969b912f8797275bbde1d431a22051ed2e7c5fe4939bec24bf2a3db110fd6"
+    },
+    {
+      "gate": "packet-python-regression",
+      "result": "passed",
+      "detail": "190 passed in 3.00 seconds after the CI-policy follow-up"
+    },
+    {
+      "gate": "packet-python-ruff-and-diff",
+      "result": "passed",
+      "detail": "Ruff clean and git diff --check clean"
+    },
+    {
+      "gate": "terminal-full",
+      "result": "passed",
+      "detail": "TypeScript typecheck passed; 683 tests passed, 0 failed, 4070 expectations"
+    },
+    {
+      "gate": "terminal-guardian",
+      "result": "passed",
+      "detail": "168 focused tests, bridge syntax, typecheck, and real 80x24 compact tmux smoke"
+    },
+    {
+      "gate": "decorrelated-adversarial-recheck",
+      "result": "passed",
+      "detail": "93 Python and 237 Bun focused tests plus typecheck, Ruff, and diff check"
+    },
+    {
+      "gate": "broad-test-fast",
+      "result": "environment_timeout_after_6826_passes",
+      "detail": "the -x run stopped when tests/test_harness_audit.py::TestScorers::test_context_efficiency exceeded the suite-wide 10 second timeout; isolated rerun passed in 47.98 seconds"
+    },
+    {
+      "gate": "pr-ci-policy-followup-local",
+      "result": "passed",
+      "detail": "the touched-file hygiene regression was removed with a sanitized, test-covered cancellation failure; terminal_bridge.py was reduced to 2774 lines against the immutable 2792-line Rule 10 ceiling without changing behavior"
+    }
+  ],
+  "live_observation": {
+    "pre_authoritative_projection_state": "UNKNOWN",
+    "pre_authoritative_on_call_count": null,
+    "authoritative_projection_state": "LIVE_DEGRADED",
+    "authoritative_on_call_count": 0,
+    "total": 7,
+    "seat_verdicts": {
+      "fable-5": "UNKNOWN",
+      "gpt-5.6": "UNKNOWN",
+      "grok-4.5-4.6-lineage": "UNKNOWN",
+      "fugu-ultra": "UNKNOWN",
+      "kimi-k3": "UNKNOWN",
+      "opus-5.0": "UNKNOWN",
+      "opus-4.8": "UNKNOWN"
+    },
+    "safe_chat_lanes": [],
+    "journey_started": false,
+    "successful_completions": 0,
+    "availability_probe": "Claude Code returned Credit balance is too low; no successful model output was admitted"
+  },
+  "negative_evidence": {
+    "locked_compound_fixture": "239-byte prompt remains one byte-identical chat input and produces no command, tool, task, swarm, evolution, A2A, seed, or write dispatch in regression tests",
+    "provider_tools": "Claude and OpenRouter transports are sealed no-tools; Codex is excluded",
+    "truth_promotion": "malformed, stale, synthetic, replayed, mismatched, future, over-24h, duplicate, or caller-positive evidence cannot construct ON_CALL",
+    "terminal_promotion": "TypeScript only decodes the Python projection and resets to UNKNOWN on reconnect or epoch change"
+  },
+  "agentops_closeout": {
+    "status": "passed",
+    "report": "/private/tmp/dharma-helm-live-slice-agentops-v4b-20260813/reports/agentops/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2/20260812T162345494902Z/report.json",
+    "sha256": "75f6fb6cb3c5edbb4451e0ac0541fe1d7c55703dfd139fa28260cb0aa28bf0e4",
+    "detail": "exact 51-path scope, three positive gates, and the isolated TTL negative control all passed",
+    "outer_wrapper_first_attempt": "stopped after packet PASS because semgrep was not on PATH; the pinned 1.168.0 executable exists in the canonical external venv"
+  },
+  "governance": {
+    "semgrep": "passed: pinned 1.168.0, 6 rules on 1477 tracked Python targets, 0 findings",
+    "gitleaks": "passed: 4361 commits and 378.79 MB scanned, no leaks",
+    "contracts": "22 passed",
+    "nats_substrate": "115 passed",
+    "uplift_guards": "passed after deriving the Kimi OpenRouter identity from the canonical model-pool export",
+    "module_budget": "passed after behavior-preserving command and prompt admission helper extraction; terminal_bridge.py is 2774 lines against the 2792-line ceiling",
+    "docops_pr_mode": "passed with generated-count drift advisory, matching the pull-request workflow",
+    "claim_evidence": "passed in the track's current advisory enforcement mode",
+    "strict_local_wrapper": "stopped only on generated DocOps count drift; the repository PR workflow intentionally uses --counts-advisory and the post-merge reconciler owns those files"
+  }
+}

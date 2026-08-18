@@ -69,6 +69,12 @@ export class DharmaBridge {
 
     const reader = createInterface({input: child.stdout});
     reader.on("line", (line) => {
+      // A terminated child can still flush buffered stdout after its successor
+      // has started. Never let an old runtime epoch reach state projection or
+      // complete the new child's background request.
+      if (this.closed || child !== this.child || !this.alive) {
+        return;
+      }
       const trimmed = line.trim();
       if (!trimmed) {
         return;
@@ -165,7 +171,12 @@ export class DharmaBridge {
     const requestId = String(event.request_id ?? "");
     if (
       !requestId ||
-      !(eventType.endsWith(".result") || eventType === "bridge.error" || eventType === "error")
+      !(
+        eventType.endsWith(".result")
+        || eventType === "helm.on_call_projection"
+        || eventType === "bridge.error"
+        || eventType === "error"
+      )
     ) {
       return;
     }

@@ -9,16 +9,121 @@ from typing import Any
 from dharma_swarm.operator_core.session_lifecycle import SessionLifecycleRecorder
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
+try:
+    from dharma_swarm.tui.commands import system_commands as system_commands_module
+except ImportError:
+    system_commands_module = None  # type: ignore[assignment]
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
     SessionEnd,
     SessionStart,
-    ToolCallComplete,
 )
+
+_NARRATION_EVENT_TYPES = frozenset(
+    {"text_delta", "text_complete", "thinking_delta", "thinking_complete"}
+)
+_COMMAND_OUTCOMES = frozenset({"completed", "accepted", "unsupported", "failed"})
+_UNSUPPORTED_BRIDGE_COMMANDS = frozenset(
+    {
+        "agni",
+        "archive",
+        "darwin",
+        "evolve",
+        "gates",
+        "hum",
+        "logs",
+        "reset",
+        "stigmergy",
+        "swarm",
+        "truth",
+        "witness",
+    }
+)
+_UNCONSUMED_COMMAND_ACTIONS = frozenset(
+    {
+        "btw:open",
+        "cancel",
+        "chat:continue",
+        "chat:new",
+        "clear",
+        "copy",
+        "copylast",
+        "dashboard:open",
+        "paste",
+    }
+)
+_UNCONSUMED_COMMAND_ACTION_PREFIXES = ("mode:set:", "model:auto ", "model:set ")
+_UNCONSUMED_MODEL_ACTIONS = frozenset({"model:cooldown clear"})
+
+
+def _contains_non_horizontal_command_separator(value: str) -> bool:
+    """Reject line/control whitespace from the one-line command grammar."""
+
+    return any(
+        character.isspace() and character not in {" ", "\t"}
+        for character in value
+    )
+
+
+def _command_name(raw_command: str) -> str:
+    """Return the command verb used for registry and support decisions."""
+
+    return raw_command.split(None, 1)[0].lower() if raw_command.strip() else ""
+
+
+def _validated_command_envelope(value: object) -> str | None:
+    """Accept only one exact, non-normalized command envelope.
+
+    Composer text with padding or line separators belongs to the raw chat
+    classifier. A caller cannot turn it into a command by relying on bridge
+    trimming at the command.run boundary.
+    """
+
+    if not isinstance(value, str) or not value or value != value.strip():
+        return None
+    if _contains_non_horizontal_command_separator(value):
+        return None
+    normalized = value[1:] if value.startswith("/") else value
+    return normalized or None
+
+
+def _is_registered_command(raw_command: str) -> bool:
+    """Return whether the command verb exists in the installed registry."""
+
+    command = _command_name(raw_command)
+    return bool(
+        command
+        and system_commands_module is not None
+        and command in system_commands_module._ALL_COMMANDS
+    )
+
+
+def _is_unconsumed_command_action(action: object) -> bool:
+    """Return whether a legacy action signal has no Bun runtime consumer."""
+
+    action_text = str(action or "").strip()
+    return (
+        action_text in _UNCONSUMED_COMMAND_ACTIONS
+        or action_text in _UNCONSUMED_MODEL_ACTIONS
+        or action_text.startswith(_UNCONSUMED_COMMAND_ACTION_PREFIXES)
+    )
 
 
 class TerminalBridgeSessionRuntimeMixin:
     """Own session admission, lifecycle recording, and provider streaming."""
+
+    @staticmethod
+    def _validated_request_prompt(
+        request: dict[str, Any],
+    ) -> tuple[str | None, str | None, str | None]:
+        """Return a byte-preserved prompt or a typed validation failure."""
+
+        raw_prompt = request.get("prompt")
+        if not isinstance(raw_prompt, str) or not raw_prompt.strip():
+            return None, "missing_prompt", "prompt must contain non-whitespace text"
+        if "\x00" in raw_prompt:
+            return None, "invalid_prompt_nul", "prompt must not contain NUL bytes"
+        return raw_prompt, None, None
 
     def _launch_session_start(
         self,
@@ -60,19 +165,24 @@ class TerminalBridgeSessionRuntimeMixin:
                 }
             )
             return None
-        prompt = str(request.get("prompt", "") or "").strip()
-        if not prompt:
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
             self._emit(
                 {
                     "type": "bridge.error",
                     "request_id": request_id,
-                    "code": "missing_prompt",
-                    "message": "session.start requires a prompt",
+                    "code": error_code,
+                    "message": error_message,
                 }
             )
             return None
 
         owned_request = dict(request)
+        canonical_intent = self._resolve_prompt_intent(prompt)
+        supplied_bootstrap = request.get("bootstrap")
+        bootstrap = dict(supplied_bootstrap) if isinstance(supplied_bootstrap, dict) else {}
+        bootstrap["intent"] = canonical_intent
+        owned_request["bootstrap"] = bootstrap
         default_target = model_routing.default_target()
         provider_id = str(request.get("provider", "") or default_target.provider_id).strip().lower()
         model_id = str(request.get("model", "") or "").strip()
@@ -81,9 +191,7 @@ class TerminalBridgeSessionRuntimeMixin:
             model_id = str(adapter.get_profile(None).model_id)
         if not model_id:
             model_id = default_target.model_id
-        bootstrap = request.get("bootstrap")
-        intent = bootstrap.get("intent") if isinstance(bootstrap, dict) else None
-        if isinstance(intent, dict) and str(intent.get("kind", "chat")) == "chat":
+        if str(canonical_intent.get("kind", "chat")) == "chat":
             lanes = self._chat_lanes(provider_id, model_id)
             if lanes:
                 provider_id, model_id, _, _ = lanes[0]
@@ -100,17 +208,13 @@ class TerminalBridgeSessionRuntimeMixin:
             return None
         owned_request["provider"] = provider_id
         owned_request["model"] = model_id
-        requested_session_id = str(request.get("session_id", "") or "").strip() or None
-        parent_session_id = str(request.get("parent_session_id", "") or "").strip() or None
         try:
             lifecycle = SessionLifecycleRecorder.begin(
                 self._session_store,
-                session_id=requested_session_id,
                 provider_id=provider_id,
                 model_id=model_id,
                 cwd=str(self._repo_root),
                 prompt=prompt,
-                parent_session_id=parent_session_id,
                 runtime_owner_id=self._runtime_owner_id,
                 runtime_owner_pid=self._runtime_owner_pid,
             )
@@ -157,6 +261,14 @@ class TerminalBridgeSessionRuntimeMixin:
     ) -> None:
         payload = asdict(event)
         payload["request_id"] = run.request_id
+        if event.type in _NARRATION_EVENT_TYPES:
+            payload.update(
+                {
+                    "authority": "NONE",
+                    "narration_verified": False,
+                    "state_promotion_allowed": False,
+                }
+            )
         if extra:
             payload.update(extra)
         if isinstance(event, SessionEnd):
@@ -179,35 +291,6 @@ class TerminalBridgeSessionRuntimeMixin:
             )
         self._emit_recorded_session_event(run, accepted)
         return accepted
-
-    def _emit_provider_route_receipt(
-        self,
-        run: _ActiveSessionRun,
-        terminal: SessionEnd,
-    ) -> None:
-        """Emit liveness authority only for a real provider completion.
-
-        ``session_end`` is also used by local identity, memory, and command
-        paths, so it cannot itself prove that a model route executed.  This
-        receipt is emitted only by the two adapter-stream loops below.
-        """
-
-        if not terminal.success:
-            return
-        provider_id = run.lifecycle.provider_id
-        model_id = run.lifecycle.model_id
-        self._emit(
-            {
-                "type": "route.receipt",
-                "request_id": run.request_id,
-                "session_id": run.session_id,
-                "provider_id": provider_id,
-                "model_id": model_id,
-                "route_id": f"{provider_id}:{model_id}",
-                "evidence_kind": "provider_completion",
-                "success": True,
-            }
-        )
 
     async def _run_active_session(
         self,
@@ -266,15 +349,22 @@ class TerminalBridgeSessionRuntimeMixin:
     ) -> None:
         request_id = run.request_id
         provider_id = run.provider_id
-        adapter = self._adapters[provider_id]
-        prompt = str(request.get("prompt", "") or "").strip()
+        prompt, error_code, error_message = self._validated_request_prompt(request)
+        if prompt is None:
+            terminal = run.lifecycle.fail(
+                error_message or "invalid prompt",
+                error_code=error_code or "invalid_prompt",
+            )
+            if terminal is not None:
+                self._emit_recorded_session_event(run, terminal)
+            return
         bootstrap = request.get("bootstrap")
-        if not isinstance(bootstrap, dict):
-            bootstrap = await asyncio.to_thread(self._build_session_bootstrap, request)
+        bootstrap = dict(bootstrap) if isinstance(bootstrap, dict) else {}
         if run.cancel_requested:
             raise asyncio.CancelledError
-        intent = bootstrap.get("intent") if isinstance(bootstrap, dict) else None
-        if isinstance(intent, dict) and intent.get("kind") == "command" and intent.get("auto_execute"):
+        intent = self._resolve_prompt_intent(prompt)
+        bootstrap["intent"] = intent
+        if intent.get("kind") == "command" and intent.get("auto_execute"):
             self._emit(
                 {
                     "type": "intent.result",
@@ -282,98 +372,35 @@ class TerminalBridgeSessionRuntimeMixin:
                     "intent": intent,
                 }
             )
-            await self._handle_command(
+            result = await self._handle_command(
                 request_id,
                 {
                     "command": str(intent.get("command", "")),
                 },
             )
+            outcome = str(result.get("outcome", "failed"))
+            if outcome not in _COMMAND_OUTCOMES:
+                outcome = "failed"
+            # Accepted means admitted/queued, never performed. A generic
+            # successful session end must not promote it to completion.
+            success = outcome == "completed"
             self._record_and_emit_session_event(
                 run,
                 SessionEnd(
                     provider_id=provider_id,
                     session_id=run.session_id,
-                    success=True,
-                ),
-            )
-            return
-        if isinstance(intent, dict) and intent.get("kind") == "identity":
-            self._emit(
-                {
-                    "type": "assistant",
-                    "request_id": request_id,
-                    "message": self._render_identity_response(bootstrap if isinstance(bootstrap, dict) else {}),
-                }
-            )
-            self._record_and_emit_session_event(
-                run,
-                SessionEnd(
-                    provider_id=provider_id,
-                    session_id=run.session_id,
-                    success=True,
-                ),
-            )
-            return
-        if isinstance(intent, dict) and intent.get("kind") == "memory":
-            self._emit(
-                {
-                    "type": "assistant",
-                    "request_id": request_id,
-                    "message": self._render_memory_response(bootstrap if isinstance(bootstrap, dict) else None),
-                }
-            )
-            self._record_and_emit_session_event(
-                run,
-                SessionEnd(
-                    provider_id=provider_id,
-                    session_id=run.session_id,
-                    success=True,
+                    success=success,
+                    error_code=None if success else f"command_{outcome}",
+                    error_message=(
+                        None
+                        if success
+                        else f"command /{intent.get('command', '')} ended as {outcome}"
+                    ),
                 ),
             )
             return
 
-        intent_kind = str(intent.get("kind", "chat")) if isinstance(intent, dict) else "chat"
-        if intent_kind == "chat":
-            # Conversational turns ride the lightweight completion path:
-            # conversation history, slim system prompt, no tools, no agentic
-            # session boot. Operational intents (command/agent/evolution)
-            # keep the rich path below.
-            await self._run_chat_turn(run, request)
-            return
-
-        session_id = run.session_id
-        run.phase = "streaming"
-        self._emit(
-            {
-                "type": "session.ack",
-                "request_id": request_id,
-                "session_id": session_id,
-                "provider": provider_id,
-                "model": run.model_id,
-            }
-        )
-
-        provider_options = dict(request.get("provider_options", {}) or {})
-        if provider_id == "claude":
-            provider_options.setdefault("scrub_metered_keys", True)
-            provider_options.setdefault("permission_mode", "default")
-        elif provider_id == "codex":
-            provider_options.setdefault("sandbox", "read-only")
-
-        completion = self._completion_request_cls(
-            messages=[{"role": "user", "content": prompt}],
-            model=str(request.get("model", "") or adapter.get_profile(None).model_id),
-            system_prompt=str(request.get("system_prompt", "") or bootstrap.get("system_prompt", "") or "") or None,
-            enable_thinking=bool(request.get("enable_thinking", False)),
-            resume_session_id=str(request.get("resume_session_id", "") or "") or None,
-            provider_options=provider_options,
-        )
-
-        async for event in adapter.stream(completion, session_id=session_id):
-            if run.cancel_requested:
-                raise asyncio.CancelledError
-            if isinstance(event, ToolCallComplete):
-                self._emit_permission_decision(request_id, event)
-            accepted = self._record_and_emit_session_event(run, event)
-            if isinstance(accepted, SessionEnd) and accepted.success:
-                self._emit_provider_route_receipt(run, accepted)
+        # Slice 1 has exactly one provider execution mode: byte-preserved chat
+        # through the physical no-tools membrane. No inferred agent/evolution
+        # path may regain the former tool-capable provider loop.
+        await self._run_chat_turn(run, request)

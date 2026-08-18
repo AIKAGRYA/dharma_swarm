@@ -96,6 +96,18 @@ def build_claude_command(
 def build_claude_prompt(request: CompletionRequest) -> str:
     """Render messages deterministically for the headless Claude CLI."""
 
+    if request.provider_options.get("raw_single_user_prompt") is True:
+        if (
+            len(request.messages) == 1
+            and isinstance(request.messages[0], dict)
+            and request.messages[0].get("role") == "user"
+            and isinstance(request.messages[0].get("content"), str)
+        ):
+            content = request.messages[0]["content"]
+            if "\x00" in content:
+                raise ValueError("raw Claude prompt contains a NUL byte")
+            return content
+
     if not request.messages:
         return "Hello."
 

@@ -119,6 +119,7 @@ async function renderShellAt(
   columns: number,
   rows: number,
   settled: (frame: string) => boolean,
+  layoutCommand: string | null = "/cockpit",
 ): Promise<string> {
   stubOwnProperty(process.stdout, "columns", columns);
   stubOwnProperty(process.stdout, "rows", rows);
@@ -154,12 +155,12 @@ async function renderShellAt(
   });
 
   try {
-    // Zen is the boot default; the compact-shell contract under test is
-    // cockpit furniture, so the driver enters cockpit as an operator would.
     await Bun.sleep(150);
-    stdin.write("/cockpit");
-    await Bun.sleep(50);
-    stdin.write("\r");
+    if (layoutCommand) {
+      stdin.write(layoutCommand);
+      await Bun.sleep(50);
+      stdin.write("\r");
+    }
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline && !settled(stripAnsi(rendered))) {
       await Bun.sleep(50);
@@ -179,7 +180,7 @@ function summaryStripLines(frame: string): string[] {
 }
 
 function cockpitSettled(frame: string): boolean {
-  return frame.includes("loop unknown") && frame.includes("offline");
+  return frame.includes("loop unknown") && frame.includes("offline") && frame.includes("HELM") && frame.includes("?/7");
 }
 
 test("80x24 uses compact cockpit chrome", async () => {
@@ -188,6 +189,10 @@ test("80x24 uses compact cockpit chrome", async () => {
   expect(frame).toContain("◆ DHARMA");
   expect(frame).not.toContain("COMMAND POST");
   expect(frame).toContain("○ offline");
+  expect(frame).toContain("HELM ◌ UNKNOWN ?/7");
+  for (const label of ["F5", "G56", "G46", "FU", "K3", "O50", "O48"]) {
+    expect(frame).toContain(`${label} ?`);
+  }
   expect(frame).not.toContain("OFFLINE");
   const tabLine = frame.split("\n").find((line) => line.includes("[Chat]"));
   expect(tabLine).toBeDefined();
@@ -199,6 +204,27 @@ test("80x24 uses compact cockpit chrome", async () => {
   for (const line of stripLines) {
     expect(line.trimStart().startsWith("│")).toBe(false);
   }
+});
+
+test("80x24 keeps OnCall truth persistent in zen and scroll faces", async () => {
+  const zen = await renderShellAt(
+    80,
+    24,
+    (frame) => frame.includes("HELM ◌ UNKNOWN ?/7") && frame.includes("zen/composer"),
+    null,
+  );
+  expect(zen).toContain("HELM ◌ UNKNOWN ?/7");
+  expect(zen).toContain("O48 ?");
+
+  const scroll = await renderShellAt(
+    80,
+    24,
+    (frame) => frame.includes("HELM ◌ UNKNOWN ?/7") && frame.includes("composer · the scroll"),
+    "/scroll",
+  );
+  expect(scroll).toContain("HELM ◌ UNKNOWN ?/7");
+  expect(scroll).toContain("O48 ?");
+  expect(scroll).toContain("composer · the scroll");
 });
 
 test("width 90 remains compact (inclusive boundary)", async () => {
