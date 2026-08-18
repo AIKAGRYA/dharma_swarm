@@ -105,6 +105,13 @@ def cmd_metrics(args: argparse.Namespace) -> int:
     return 1 if snapshot.any_kill() else 0
 
 
+def cmd_report_card(args: argparse.Namespace) -> int:
+    from dharma_swarm.foundry.report_card import card_from_receipt_file
+
+    print(card_from_receipt_file(args.receipt))
+    return 0
+
+
 def cmd_guardian(args: argparse.Namespace) -> int:
     receipts = []
     for path in sorted(glob.glob(os.path.join(args.receipts_dir, "*.json"))):
@@ -154,6 +161,10 @@ def main(argv: list[str] | None = None) -> int:
     gd = sub.add_parser("guardian", help="report One Wire quorum from a receipts dir")
     gd.add_argument("receipts_dir")
     gd.set_defaults(func=cmd_guardian)
+
+    rc = sub.add_parser("report-card", help="render a report card from a sealed receipt")
+    rc.add_argument("receipt")
+    rc.set_defaults(func=cmd_report_card)
 
     args = parser.parse_args(argv)
     return args.func(args)
