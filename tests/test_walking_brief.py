@@ -51,9 +51,35 @@ def test_brief_carries_marker_and_all_sections():
         "KILLSWITCH", "Needs John", "Merge arm", "scanner heartbeat",
         "Merge window", "Automerges", "Nightly main",
         "Lane runs", "Review disagreements", "Canary results",
-        "Ingested from your comments",
+        "Ingested from your comments", "Sublimation Foundry",
     ):
         assert heading in body, f"missing section: {heading}"
+
+
+def test_foundry_section_not_run_when_absent():
+    body = walking_brief.compose_brief(_base_data())  # no "foundry" key
+    assert "🏭 Sublimation Foundry" in body
+    assert "foundry lane not yet run" in body
+    # the one-time unblock pointer is always shown
+    assert "OPERATOR_UNBLOCKS.md" in body
+
+
+def test_foundry_section_green_on_success():
+    body = walking_brief.compose_brief(_base_data(foundry={
+        "found": True, "conclusion": "success",
+        "completed_at": "2026-08-18T19:00:00Z", "url": "https://x",
+    }))
+    assert "🟢 lane [success]" in body
+
+
+def test_foundry_section_red_on_kill_verdict():
+    # A KILL kill-metric verdict fails the lane; the brief must show red, not green.
+    body = walking_brief.compose_brief(_base_data(foundry={
+        "found": True, "conclusion": "failure",
+        "completed_at": "2026-08-18T19:00:00Z", "url": "https://x",
+    }))
+    assert "🔴 lane [failure]" in body
+    assert "🟢 lane" not in body.split("Sublimation Foundry")[1]
 
 
 def test_killswitch_engaged_renders_red_and_resume_path():
