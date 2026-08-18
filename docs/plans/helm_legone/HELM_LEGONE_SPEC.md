@@ -24,11 +24,15 @@ inline. Where the map ruled, this document copies the ruling. Where a genuinely
 undecided point surfaced during assembly it is parked in §10 `OPEN-QUESTION` — it is
 not resolved here.
 
-Per `docs/AGENTS.md` §Authority Model, this file makes no repo-level authority claim.
-It is subordinate, in order, to: (1) live owner state and machine receipts; (2) admitted
-code and executable tests; (3) `docs/governance/ACTIVE_TRACK.yaml` and the canonical
-document stack; (4) accepted ADRs and owner contracts; (5) this document. It replaces
-nothing. It does **not** admit the Nihonga master spec (see §11).
+This file makes no repo-level authority claim — `docs/AGENTS.md:13-27` reserves such
+claims for its named canon files, and this is not one of them. It is bound by, and
+assembles, exactly three ratified sources: map #1277, the five closing rulings
+([issuecomment-5330445451](https://github.com/AIKAGRYA/dharma_swarm/issues/1277#issuecomment-5330445451)),
+and the 2026-08-19 handoff packet. It replaces nothing and decides nothing. It does
+**not** admit the Nihonga master spec (see §11); that document's §0 precedence ladder
+(owner state and receipts ≻ admitted code and tests ≻ governance canon ≻ ADRs and owner
+contracts ≻ documents) is CANDIDATE reference only — cited, never bound
+(`NIHONGA_HELM_FRONTIER_MASTER_SPEC.md` §0:24-30 @ `25c2a5409`).
 
 **Sources assembled** (all read in full during assembly, 2026-08-19):
 
@@ -139,7 +143,7 @@ restated in #1277 Notes ("Alive bar (locked)") and reaffirmed unchanged 2026-08-
    count. No declared-but-green fiction. Existing shortfalls are **catalog debt, not
    permission to fake alive**.
 7. **Below 7** — Helm remains **usable degraded** with a visible **N/7 on-call** banner;
-   it is **not "alive" for ship criteria** while chronically under floor.
+   it is **not "alive" for ship criteria** while under floor.
 8. **Read-only organism facets (min real, non-fixture)** — workspace (repo/branch/dirty)
    + runtime status + **on-call board (N/7 + verify ages)** + one task/board or mission
    surface. All other surfaces may be explicit `UNKNOWN`.
@@ -243,8 +247,8 @@ OnCall(v, now) ⇔
 **Lifecycle boundaries are non-substitutable:** `CONFIGURED · CONTACTED · WORKING ·
 RETURNED · VERIFIED` (plus *claim-not-verified* as speech).
 
-**Freshness dimensions are orthogonal, not paint:** `simulation · cache · freshness ·
-divergence · unknown · clock_skew`. **Future timestamps → `UNKNOWN`/`CLOCK_SKEW`, never
+**Freshness dimensions are orthogonal, not paint:** `simulation · cache · stale ·
+fresh · unknown · clock_skew`. **Future timestamps → `UNKNOWN`/`CLOCK_SKEW`, never
 fresh.**
 
 **Invalid promotions must be impossible in the evaluator**, not merely discouraged in UI.
@@ -375,7 +379,12 @@ report §Lane E.
   equivalents (terminals have no accessibility tree; braille spinners read as noise).
 
 **Named anti-patterns (locked as prohibitions):** shortcut wall; decorative glyph noise;
-hardcoded truecolor; chrome maximalism; invisible modes.
+hardcoded truecolor — each a restatement of a locked item above (three-tier disclosure,
+the no-decorative-glyph accessibility law, the ANSI16-fallback law).
+*Research observation, NOT a lock:* the frontier scan's Lane E additionally names
+"chrome maximalism" (itself marked "(assessment)" there) and "invisible modes" as
+anti-patterns — recorded for orientation only; no ruling binds them
+(`badass_terminal_frontier_scan_2026-08-18.md` §Lane E).
 
 ### 2.9 Living-graph lock — two layers + tripwires (locked)
 
@@ -714,6 +723,7 @@ constraints (itself derived from the map's rulings).
 
 Assembly surfaced exactly one point that the ratified sources do not settle. **It is not
 resolved here.** Per the map's clearing rule it re-opens as a fresh child ticket on #1277.
+**Filed as child ticket [#1400](https://github.com/AIKAGRYA/dharma_swarm/issues/1400).**
 
 **OPEN-QUESTION 1 — Where do leg-one RouteVerification receipts live, and does that make
 #1391 a hard blocker for the whole leg?**
