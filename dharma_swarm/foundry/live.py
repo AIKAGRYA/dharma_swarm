@@ -24,12 +24,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
 
-# OpenAI-compatible lanes, in preference order. All free/credit-based.
-PROVIDERS: tuple[tuple[str, str, str], ...] = (
-    ("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY"),
-    ("cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
-    ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
-    ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_NIM_API_KEY"),
+# OpenAI-compatible lanes, in preference order: (name, base_url, key_env,
+# default_model). Free lanes first ($0), then first-party paid lanes whose keys
+# the operator actually holds (Moonshot/Kimi, Zhipu/GLM). default_model is a
+# fallback used only when the provider's /models listing is unavailable.
+PROVIDERS: tuple[tuple[str, str, str, str], ...] = (
+    ("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", ""),
+    ("cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", ""),
+    ("moonshot", "https://api.moonshot.ai/v1", "MOONSHOT_API_KEY", "kimi-k2-0711-preview"),
+    ("zhipu", "https://api.z.ai/api/coding/paas/v4", "ZHIPU_API_KEY", "glm-4.6"),
+    ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", ""),
+    ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_NIM_API_KEY", ""),
 )
 
 
@@ -55,13 +60,16 @@ def _norm(text: str) -> str:
     return "".join(ch for ch in text.strip().lower() if ch.isalnum())
 
 
-def pick_provider(env: dict | None = None) -> tuple[str, str, str] | None:
-    """First lane whose key is present in the environment."""
+def pick_provider(env: dict | None = None) -> tuple[str, str, str, str] | None:
+    """First lane whose key is present in the environment.
+
+    Returns (name, base_url, key, default_model).
+    """
     env = env if env is not None else os.environ
-    for name, base, key_env in PROVIDERS:
+    for name, base, key_env, default_model in PROVIDERS:
         key = env.get(key_env)
         if key:
-            return name, base, key
+            return name, base, key, default_model
     return None
 
 
@@ -86,8 +94,8 @@ def list_models(base_url: str, key: str, *, timeout: float = 30.0) -> list[str]:
 
 def choose_model(models: Sequence[str]) -> str:
     """Pick a small, general chat model; skip non-chat (whisper/embed/tts/guard)."""
-    prefs = ("llama-3.3-70b", "llama-3.3", "gpt-oss-120b", "qwen", "llama-3.1-8b",
-             "llama3.1-8b", "llama")
+    prefs = ("llama-3.3-70b", "llama-3.3", "gpt-oss-120b", "qwen", "kimi", "moonshot",
+             "glm", "llama-3.1-8b", "llama3.1-8b", "llama")
     chat = [m for m in models if not any(
         bad in m.lower() for bad in ("whisper", "embed", "tts", "guard", "vision", "rerank")
     )]
@@ -134,12 +142,12 @@ def run_live_eval(
     picked = pick_provider(env)
     if picked is None:
         return LiveResult("none", "none", 0, 0, 0.0, error="no provider key present")
-    name, base, key = picked
+    name, base, key, default_model = picked
     lister = model_lister or (lambda: list_models(base, key))
     call = caller or (lambda m, p: call_chat(base, key, m, p))
 
     if model is None:
-        model = choose_model(lister())
+        model = choose_model(lister()) or default_model
         if not model:
             return LiveResult(name, "none", 0, 0, 0.0, error="no usable chat model listed")
 
