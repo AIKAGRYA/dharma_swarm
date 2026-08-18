@@ -31,7 +31,7 @@ from typing import Callable, Sequence
 PROVIDERS: tuple[tuple[str, str, str, str], ...] = (
     ("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", ""),
     ("cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", ""),
-    ("moonshot", "https://api.moonshot.ai/v1", "MOONSHOT_API_KEY", "kimi-k2-0711-preview"),
+    ("moonshot", "https://api.moonshot.ai/v1", "MOONSHOT_API_KEY", "moonshot-v1-8k"),
     ("zhipu", "https://api.z.ai/api/coding/paas/v4", "ZHIPU_API_KEY", "glm-4.6"),
     ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", ""),
     ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_NIM_API_KEY", ""),
@@ -94,10 +94,13 @@ def list_models(base_url: str, key: str, *, timeout: float = 30.0) -> list[str]:
 
 def choose_model(models: Sequence[str]) -> str:
     """Pick a small, general chat model; skip non-chat (whisper/embed/tts/guard)."""
-    prefs = ("llama-3.3-70b", "llama-3.3", "gpt-oss-120b", "qwen", "kimi", "moonshot",
-             "glm", "llama-3.1-8b", "llama3.1-8b", "llama")
+    # Prefer stable, non-thinking chat models that answer a short prompt cleanly.
+    prefs = ("moonshot-v1-8k", "llama-3.3-70b", "llama-3.3", "gpt-oss-120b", "glm-4-flash",
+             "glm-4", "qwen", "moonshot-v1", "kimi-k2.5", "kimi-k2", "llama-3.1-8b",
+             "llama3.1-8b", "llama")
     chat = [m for m in models if not any(
-        bad in m.lower() for bad in ("whisper", "embed", "tts", "guard", "vision", "rerank")
+        bad in m.lower() for bad in
+        ("whisper", "embed", "tts", "guard", "vision", "rerank", "code", "highspeed", "auto")
     )]
     for pref in prefs:
         for m in chat:
@@ -110,7 +113,7 @@ def call_chat(base_url: str, key: str, model: str, prompt: str, *, timeout: floa
     data = _http_json(
         f"{base_url}/chat/completions", key,
         payload={
-            "model": model, "temperature": 0, "max_tokens": 32,
+            "model": model, "temperature": 0, "max_tokens": 64,
             "messages": [{"role": "user", "content": prompt}],
         },
         method="POST", timeout=timeout,
