@@ -95,7 +95,7 @@ The operational protocol is in `PR_REVIEW_CONTROL.md`. The governance contract i
    - Surface scope matches stated intent (no scope creep in the diff).
    - No second-writer violations (Axiom A2).
    - No doctrine drift not named in the PR body.
-5. **MMM merges** *(via `make pr-merge PR=N ARGS="--confirm automerge-policy-pass-N"`)* — **or** posts the specific blocker and leaves the PR open.
+5. **MMM reports the verdict** — the gate result and its evidence — **or** posts the specific blocker and leaves the PR open. It does not merge: the merge actuator was deleted once the repository adopted GitHub's native merge queue, which performs the merge itself. `scripts/runtime/pr_merge_control.py` is an evidence engine with no merge subcommand, pinned by `tests/test_pr_merge_control_no_actuation.py`.
 6. **MMM updates the relevant track issue** with merge SHA and live metric delta.
 
 If any gate condition is unclear or any boundary is approached, MMM **escalates to the operator** and does not merge.

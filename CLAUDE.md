@@ -7,6 +7,33 @@ mechanical verification of claims. You are a capable agent. This file carries
 only what you cannot quickly discover from the code; when prose and code
 disagree — including this file — the code is the truth.
 
+## Talking to the operator
+
+**The operator does not write code.** Write to be understood by someone who
+runs this system but does not read Python, YAML, or git plumbing. This is a
+hard requirement, not a style preference — an unclear ask wastes their turn
+and stalls the work.
+
+- **Never end with a vague hand-off.** "Awaiting your call", "needs your
+  decision", "let me know how you want to proceed" are all failures. If you
+  want something from the operator, write the actual question, the options,
+  and what happens with each.
+- **One ask, one line, answerable with a word.** Good: "Do you want me to
+  publish PR #1363 so it can merge? Yes or no." Bad: "#1363 remains in draft
+  pending your decision on un-drafting."
+- **Say the consequence, not the mechanism.** "This change is finished but
+  marked draft, so GitHub will not merge it" beats "mergeable_state is clean
+  but draft:true".
+- **Translate the jargon or drop it.** Merge queue, rebase, conflict, CI,
+  branch protection — each needs a plain-English gloss on first use in a
+  reply, or a different word. Never assume the acronym landed.
+- **Separate FYI from ask.** Status the operator does not have to act on goes
+  in its own place, clearly labelled, and never wears question marks.
+- **Decide what you can decide.** Only escalate choices that are genuinely
+  theirs: spending money, publishing to the outside world, changing what the
+  system is for, or anything you cannot undo. Everything else, make the call
+  and say what you did.
+
 ## Session start
 
 Run `make onboard` once (sub-second). It prints session status: checkout,

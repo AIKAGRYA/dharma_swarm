@@ -96,7 +96,6 @@ MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
 )
 DEVIN_NATS_SECRET_NAMES = ("DEVIN_NATS_URL", "DEVIN_NATS_USER", "DEVIN_NATS_PW")
 NATS_REQUIRED_SECRET_NAMES = DEVIN_NATS_SECRET_NAMES
-MERGE_MODES = ("off", "auto-when-clean")
 HOT_PATH_PATTERNS = (
     ".github/",
     "api/",
@@ -354,18 +353,6 @@ def validate_merge_authorization(
     return (evidence if not blockers else None), blockers
 
 
-def validate_merge_authority_proof(_proof: object) -> list[str]:
-    """Keep MergeAuthorized uninhabited until a trusted proof issuer exists.
-
-    A future implementation must authenticate issuer/provenance and bind the
-    repo, PR, target ref, base/head, policy, live evidence reduction, merge
-    method, and server-side base-CAS/ruleset proof.  An unkeyed digest or local
-    receipt is not such a proof.
-    """
-    return [
-        "authenticated MergeAuthorized proof is unavailable in safe P0; "
-        "authorization evidence cannot grant actuation"
-    ]
 
 
 def read_review_evidence_snapshot(out_dir: Path) -> dict[str, bytes]:
@@ -2193,10 +2180,6 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             "live_merge_base_sha": live_review_merge_base,
             "reused_after_base_change": reused_review_range,
         },
-        # Live policy does not currently prove a strict/up-to-date base CAS.
-        # Keep gate evaluation useful, but prohibit merge execution until the
-        # canonical policy consumer can set this from enforced repository state.
-        "base_cas_enforced": False,
         "packet_risk": original.get("risk", {}),
         "packet_head": packet_head,
         "packet_base": packet_base,
@@ -2280,7 +2263,6 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
 def render_github_comment(
     packet: dict[str, Any],
     gate: dict[str, Any] | None,
-    merge_receipt: dict[str, Any] | None = None,
 ) -> str:
     pr = packet["pr"]
     classification = packet["classification"]
@@ -2334,20 +2316,6 @@ def render_github_comment(
         lines.extend(f"- {warning}" for warning in warnings)
     else:
         lines.append("- none")
-    if merge_receipt:
-        lines.extend(
-            [
-                "",
-                "### Merge Request",
-                "",
-                f"- Status: `{merge_receipt.get('status')}`",
-                f"- Reason: {merge_receipt.get('reason')}",
-                f"- Method: `{merge_receipt.get('method')}`",
-                f"- Auto-merge: `{merge_receipt.get('auto')}`",
-            ]
-        )
-        if merge_receipt.get("exit_code") is not None:
-            lines.append(f"- Exit code: `{merge_receipt.get('exit_code')}`")
     required_reviewers = (
         gate.get("required_reviewers", []) if gate else list(DEFAULT_REQUIRED_REVIEWERS)
     )
@@ -2375,197 +2343,14 @@ def render_github_comment(
             "```bash",
             f"make pr-packet PR={pr['number']}",
             f"make pr-gate PR={pr['number']}",
-            f'make pr-merge PR={pr["number"]} ARGS="--confirm automerge-policy-pass-{pr["number"]}"',
             "```",
         ]
     )
     return "\n".join(lines) + "\n"
 
 
-def gh_merge_command(
-    pr_number: int,
-    *,
-    method: str = "squash",
-    auto: bool = True,
-    match_head_commit: str = "",
-    repo: str = "",
-) -> list[str]:
-    cmd = ["gh", "pr", "merge", str(pr_number), f"--{method}", "--delete-branch"]
-    if auto:
-        cmd.insert(4, "--auto")
-    if repo:
-        cmd.extend(["--repo", repo])
-    if match_head_commit:
-        cmd.extend(["--match-head-commit", match_head_commit])
-    return cmd
 
 
-def run_mike_merge_authority(
-    *,
-    pr_number: int,
-    gate: dict[str, Any],
-    method: str,
-    auto: bool,
-    runner: Callable[..., CommandResult] = run,
-    pr_fetcher: Callable[[int], dict[str, Any]] = fetch_pr_view,
-    policy_identity_fetcher: Callable[[], dict[str, str]] = automerge_policy_identity,
-    authority_proof_validator: Callable[[object], list[str]] = validate_merge_authority_proof,
-) -> dict[str, Any]:
-    match_head_commit = str(gate.get("head_sha") or "")
-    gate_base_commit = str(gate.get("base_sha") or "")
-    gate_repo = str(gate.get("repo") or "")
-    command = (
-        gh_merge_command(
-            pr_number,
-            method=method,
-            auto=auto,
-            match_head_commit=match_head_commit,
-            repo=gate_repo,
-        )
-        if valid_commit_oid(match_head_commit)
-        else []
-    )
-    receipt: dict[str, Any] = {
-        "schema": "dharma.pr_review.mike_merge_receipt.v1",
-        "generated_at": utc_now(),
-        "agent_uid": "merge_master_mike",
-        "authority": "conditional_merge",
-        "pr": pr_number,
-        "method": method,
-        "auto": auto,
-        "gate_decision": gate.get("decision"),
-        "gate_packet_dir": gate.get("packet_dir"),
-        "head_sha": match_head_commit,
-        "base_sha": gate_base_commit,
-        "base_cas_enforced": gate.get("base_cas_enforced") is True,
-        "required_reviewers": gate.get("required_reviewers", []),
-        "risk": gate.get("risk", {}),
-        "merge_authorization_evidence": gate.get("merge_authorization_evidence"),
-        "merge_authority_proof": gate.get("merge_authority_proof"),
-        "authority_policy": gate.get("authority_policy"),
-        "command": command,
-        "status": "SKIPPED",
-        "reason": "gate decision is not MERGE_CANDIDATE",
-        "exit_code": None,
-        "stdout": "",
-        "stderr": "",
-    }
-    if gate.get("decision") != "MERGE_CANDIDATE":
-        receipt["blockers"] = gate.get("blockers", [])
-        return receipt
-    if not valid_commit_oid(match_head_commit):
-        receipt["reason"] = "gate head SHA is missing or invalid"
-        receipt["blockers"] = ["merge authority requires a full head commit OID"]
-        return receipt
-    if not valid_commit_oid(gate_base_commit):
-        receipt["reason"] = "gate base SHA is missing or invalid"
-        receipt["blockers"] = ["merge authority requires a full base commit OID"]
-        return receipt
-    if gate.get("pr") != pr_number:
-        receipt["reason"] = "gate PR binding is missing or mismatched"
-        receipt["blockers"] = ["merge authority requires the exact PR binding"]
-        return receipt
-    if not gate_repo or gate_repo.count("/") != 1:
-        receipt["reason"] = "gate repository binding is missing or invalid"
-        receipt["blockers"] = ["merge authority requires an explicit repository"]
-        return receipt
-    if gate.get("blockers"):
-        receipt["reason"] = "candidate gate still records blockers"
-        receipt["blockers"] = list(gate.get("blockers") or [])
-        return receipt
-    # BaseCasProven<repo, base, ruleset> is deliberately uninhabited in safe
-    # P0.  Check this independent proof obligation before reducing authority
-    # evidence so the actuator's hard containment remains explicit and stable.
-    if gate.get("base_cas_enforced") is not True:
-        receipt["reason"] = "strict base-CAS enforcement is not proven"
-        receipt["blockers"] = [
-            "merge execution is prohibited until canonical policy proves "
-            "strict/up-to-date base enforcement"
-        ]
-        return receipt
-    try:
-        current_policy_identity = policy_identity_fetcher()
-    except Exception as exc:
-        receipt["reason"] = "cannot refresh authority policy before merge"
-        receipt["blockers"] = [f"authority policy refresh failed: {exc}"]
-        return receipt
-    live_title = ""
-    authorization, authorization_blockers = validate_merge_authorization(
-        {
-            "schema": "dharma.automerge_tier_policy_report.v2",
-            "passed": True,
-            "violations": [],
-            "authorization_evidence": gate.get("merge_authorization_evidence"),
-        },
-        repo=gate_repo,
-        pr_number=pr_number,
-        head_sha=match_head_commit,
-        base_sha=gate_base_commit,
-        base_ref=str(gate.get("base_ref") or ""),
-        title=str(gate.get("merge_intent") or ""),
-        policy_identity=current_policy_identity,
-    )
-    if authorization is None:
-        receipt["reason"] = "merge authorization evidence is absent, stale, or mismatched"
-        receipt["blockers"] = authorization_blockers
-        return receipt
-    authority_proof_blockers = authority_proof_validator(
-        gate.get("merge_authority_proof")
-    )
-    if authority_proof_blockers:
-        receipt["reason"] = "authenticated merge authority is unavailable"
-        receipt["blockers"] = authority_proof_blockers
-        return receipt
-    risk_snapshot = gate.get("risk_snapshot")
-    if not isinstance(risk_snapshot, dict) or (
-        risk_snapshot.get("base_sha") != gate_base_commit
-        or risk_snapshot.get("head_sha") != match_head_commit
-    ):
-        receipt["reason"] = "gate risk snapshot is missing or mismatched"
-        receipt["blockers"] = [
-            "merge authority requires risk computed for the exact base/head pair"
-        ]
-        return receipt
-    try:
-        live_pr = pr_fetcher(pr_number)
-    except Exception as exc:
-        receipt["reason"] = "cannot refresh PR binding before merge"
-        receipt["blockers"] = [f"live PR refresh failed: {exc}"]
-        return receipt
-    live_base = str(live_pr.get("baseRefOid") or "")
-    live_base_ref = str(live_pr.get("baseRefName") or "")
-    live_head = str(live_pr.get("headRefOid") or "")
-    live_number = live_pr.get("number")
-    live_title = str(live_pr.get("title") or "")
-    if (
-        live_number != pr_number
-        or live_base != gate_base_commit
-        or live_base_ref != str(gate.get("base_ref") or "")
-        or live_head != match_head_commit
-    ):
-        receipt["reason"] = "live PR binding changed after gate evaluation"
-        receipt["blockers"] = [
-            "merge authority requires a fresh gate for the current PR/base/head"
-        ]
-        return receipt
-    if canonical_json_sha256(live_title) != authorization.get("intent_sha256"):
-        receipt["reason"] = "live merge intent changed after authorization"
-        receipt["blockers"] = [
-            "merge authority requires a fresh permit for the current PR title"
-        ]
-        return receipt
-
-    result = runner(command, timeout=300, check=False)
-    receipt["exit_code"] = result.code
-    receipt["stdout"] = result.stdout[-4000:]
-    receipt["stderr"] = result.stderr[-4000:]
-    if result.code == 0:
-        receipt["status"] = "MERGE_COMMAND_ACCEPTED"
-        receipt["reason"] = "gh pr merge accepted the conditional merge command"
-    else:
-        receipt["status"] = "MERGE_COMMAND_FAILED"
-        receipt["reason"] = "gh pr merge returned non-zero"
-    return receipt
 
 
 def cmd_gate(args: argparse.Namespace) -> int:
@@ -2586,9 +2371,7 @@ def cmd_comment(args: argparse.Namespace) -> int:
     packet = load_json(out_dir / "FACTS.json")
     gate_path = out_dir / "MERGE_GATE.json"
     gate = load_json(gate_path) if gate_path.exists() else None
-    merge_path = out_dir / "MIKE_MERGE_RECEIPT.json"
-    merge_receipt = load_json(merge_path) if merge_path.exists() else None
-    comment = render_github_comment(packet, gate, merge_receipt)
+    comment = render_github_comment(packet, gate)
     if args.output:
         write_text(expand(args.output), comment)
         print(args.output)
@@ -2686,64 +2469,6 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
     return 0 if result["claude"]["ready"] else 2
 
 
-def cmd_merge(args: argparse.Namespace) -> int:
-    # Operator ruling 2026-07-29 (docs/ops/OPERATOR_RULING_2026-07-29_
-    # AUTO_WITH_DECORRELATED_REVIEW.md): the old merge-pr-{N} token claimed
-    # operator consent it never received (CI synthesized it from the PR
-    # number). automerge-policy-pass-{N} is honest: it asserts machine policy
-    # plus decorrelated review verdicts, and claims nothing about the
-    # operator.
-    expected = f"automerge-policy-pass-{args.pr}"
-    if args.confirm != expected:
-        raise PRControlError(f"merge requires --confirm {expected!r}")
-    gate = build_gate(args)
-    out_dir = Path(gate["packet_dir"])
-    write_json(out_dir / "MERGE_GATE.json", gate)
-    write_text(out_dir / "MERGE_GATE.md", render_gate_markdown(gate))
-    if gate["blockers"]:
-        print(f"decision=BLOCKED gate={out_dir / 'MERGE_GATE.md'}")
-        for blocker in gate["blockers"]:
-            print(f"BLOCKER: {blocker}")
-        return 2
-    if not args.execute:
-        print("decision=MERGE_CANDIDATE")
-        command = gh_merge_command(
-            args.pr,
-            method=args.method,
-            auto=args.auto,
-            match_head_commit=str(gate.get("head_sha") or ""),
-            repo=str(gate.get("repo") or ""),
-        )
-        print(f"dry_run=true command={' '.join(shlex.quote(part) for part in command)}")
-        write_json(
-            out_dir / "MIKE_MERGE_RECEIPT.json",
-            {
-                "schema": "dharma.pr_review.mike_merge_receipt.v1",
-                "generated_at": utc_now(),
-                "agent_uid": "merge_master_mike",
-                "authority": "conditional_merge",
-                "pr": args.pr,
-                "method": args.method,
-                "auto": args.auto,
-                "gate_decision": gate.get("decision"),
-                "head_sha": gate.get("head_sha", ""),
-                "required_reviewers": gate.get("required_reviewers", []),
-                "status": "DRY_RUN",
-                "command": command,
-            },
-        )
-        return 0
-    merge_receipt = run_mike_merge_authority(
-        pr_number=args.pr,
-        gate=gate,
-        method=args.method,
-        auto=args.auto,
-    )
-    write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
-    print(
-        f"merge_status={merge_receipt['status']} pr={args.pr} method={args.method} auto={args.auto}"
-    )
-    return 0 if merge_receipt["status"] == "MERGE_COMMAND_ACCEPTED" else 2
 
 
 def load_review_packet_binding(
@@ -3111,7 +2836,6 @@ def build_a2a_fanout_messages(
     fanout_dir: Path,
     subjects: list[str],
     required_reviewers: list[str],
-    merge_mode: str,
     dry_run: bool,
     packet_only: bool,
 ) -> list[dict[str, Any]]:
@@ -3138,19 +2862,12 @@ def build_a2a_fanout_messages(
         "schema_version": "dharma.pr_review.a2a_nats_session.v1",
         "timestamp": utc_now(),
         "from": "github_actions_merge_master_mike",
-        "authority": "conditional_merge"
-        if merge_mode == "auto-when-clean"
-        else "external_worker_evidence_only",
+        "authority": "external_worker_evidence_only",
         "repo": repo,
-        "goal": (
-            "collaborative PR queue synthesis; conditional merge authority when gate-clean"
-            if merge_mode == "auto-when-clean"
-            else "collaborative PR queue synthesis; no merge authority"
-        ),
+        "goal": "collaborative PR queue synthesis; no merge authority",
         "run_id": run_id,
         "dry_run": dry_run,
         "packet_only": packet_only,
-        "merge_mode": merge_mode,
         "queue_counts": queue_summary.get("counts", {}),
         "queue_total": queue_summary.get("total"),
         "required_reviewers": required_reviewers,
@@ -3165,9 +2882,7 @@ def build_a2a_fanout_messages(
             "run_merge_gate",
             "write_receipts",
             "recommend_next_actions",
-            "conditional_merge_after_clean_gate"
-            if merge_mode == "auto-when-clean"
-            else "no_merge",
+            "no_merge",
         ],
         "forbidden_actions": [
             "unconditional_merge",
@@ -3264,7 +2979,6 @@ def publish_a2a_fanout_session(
     fanout_dir: Path,
     subjects: list[str],
     required_reviewers: list[str],
-    merge_mode: str,
     dry_run: bool,
     packet_only: bool,
     required: bool,
@@ -3285,7 +2999,6 @@ def publish_a2a_fanout_session(
         fanout_dir=fanout_dir,
         subjects=subjects,
         required_reviewers=required_reviewers,
-        merge_mode=merge_mode,
         dry_run=dry_run,
         packet_only=packet_only,
     )
@@ -3577,9 +3290,7 @@ def select_fanout_plan(
 
 
 def should_skip_current_fanout(args: argparse.Namespace) -> bool:
-    return bool(
-        not args.reprocess_current and args.packet_only and args.merge_mode == "off"
-    )
+    return bool(not args.reprocess_current and args.packet_only)
 
 
 def render_fanout_markdown(receipt: dict[str, Any]) -> str:
@@ -3593,7 +3304,6 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
         f"- Processed: `{len(receipt['processed'])}`",
         f"- Skipped current: `{len(receipt.get('skipped_current', []))}`",
         f"- Required reviewers: `{', '.join(receipt.get('required_reviewers', []))}`",
-        f"- Merge mode: `{receipt.get('merge_mode', 'off')}`",
         "",
         "## Selected",
         "",
@@ -3627,12 +3337,6 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
             if item.get("blockers"):
                 for blocker in item["blockers"]:
                     lines.append(f"  - BLOCKER: {blocker}")
-            if item.get("merge"):
-                merge = item["merge"]
-                lines.append(
-                    f"  - merge: status=`{merge.get('status')}` method=`{merge.get('method')}` "
-                    f"auto=`{merge.get('auto')}` receipt=`{merge.get('receipt')}`"
-                )
     else:
         lines.append("- none")
     lines.extend(
@@ -3645,13 +3349,7 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
             "",
         ]
     )
-    if receipt.get("merge_mode") == "auto-when-clean":
-        lines.insert(
-            -1,
-            "- This fanout may evaluate the merge actuator, but authenticated authority and base-CAS proofs remain required and unavailable in safe P0.",
-        )
-    else:
-        lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
+    lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
     if receipt.get("a2a_nats"):
         nats = receipt["a2a_nats"]
         lines.extend(
@@ -3728,25 +3426,7 @@ def finalize_fanout_item(
     write_text(out_dir / "MERGE_GATE.md", render_gate_markdown(gate))
     packet = load_json(out_dir / "FACTS.json")
     comment_path = out_dir / "GITHUB_COMMENT.md"
-    merge_summary: dict[str, Any] | None = None
-    merge_receipt: dict[str, Any] | None = None
-    if args.merge_mode == "auto-when-clean":
-        merge_receipt = run_mike_merge_authority(
-            pr_number=pr_number,
-            gate=gate,
-            method=args.merge_method,
-            auto=args.merge_auto,
-        )
-        write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
-        merge_summary = {
-            "status": merge_receipt.get("status"),
-            "reason": merge_receipt.get("reason"),
-            "method": merge_receipt.get("method"),
-            "auto": merge_receipt.get("auto"),
-            "receipt": str(out_dir / "MIKE_MERGE_RECEIPT.json"),
-            "exit_code": merge_receipt.get("exit_code"),
-        }
-    write_text(comment_path, render_github_comment(packet, gate, merge_receipt))
+    write_text(comment_path, render_github_comment(packet, gate))
     return {
         "number": pr_number,
         "title": item.get("title"),
@@ -3757,7 +3437,6 @@ def finalize_fanout_item(
         "blockers": gate["blockers"],
         "warnings": gate["warnings"],
         "comment_path": str(comment_path),
-        "merge": merge_summary,
     }
 
 
@@ -3987,17 +3666,14 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         "statuses": statuses,
         "agents": agents,
         "required_reviewers": required_reviewers,
-        "merge_mode": args.merge_mode,
-        "merge_method": args.merge_method,
-        "merge_auto": args.merge_auto,
         "queue_path": str(queue_dir / "latest.json"),
         "selected": selected,
         "skipped_current": skipped_current,
         "processed": processed,
         "authority": {
             "agent_uid": "merge_master_mike",
-            "can_merge": args.merge_mode == "auto-when-clean",
-            "merge_policy": "conditional_on_merge_gate_clean",
+            "can_merge": False,
+            "merge_policy": "evidence_only_no_actuation",
             "can_approve_prs": False,
             "can_push": False,
             "can_edit_source": False,
@@ -4018,7 +3694,6 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             fanout_dir=fanout_dir,
             subjects=nats_subjects,
             required_reviewers=required_reviewers,
-            merge_mode=args.merge_mode,
             dry_run=args.dry_run,
             packet_only=args.packet_only,
             required=args.nats_required,
@@ -4210,18 +3885,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Rotate the ordered eligible queue by this offset before bounded selection",
     )
     fanout.add_argument(
-        "--merge-mode",
-        choices=MERGE_MODES,
-        default="off",
-        help="Mike merge authority mode",
-    )
-    fanout.add_argument(
-        "--merge-method", choices=("squash", "merge", "rebase"), default="squash"
-    )
-    fanout.add_argument(
-        "--no-merge-auto", dest="merge_auto", action="store_false", default=True
-    )
-    fanout.add_argument(
         "--nats-session",
         action="store_true",
         help="Publish a PR janitor session announcement to A2A NATS",
@@ -4258,25 +3921,6 @@ def build_parser() -> argparse.ArgumentParser:
     add_ci_truth_flags(gate)
     add_merge_authorization_flag(gate)
     gate.set_defaults(func=cmd_gate)
-
-    merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
-    merge.add_argument("--pr", type=int, required=True)
-    merge.add_argument("--packet-dir")
-    add_legacy_pending_flag(merge)
-    merge.add_argument("--human-approved", action="store_true")
-    add_reviewer_policy_flags(merge)
-    add_backup_reviewer_flags(merge)
-    add_ci_truth_flags(merge)
-    add_merge_authorization_flag(merge)
-    merge.add_argument(
-        "--method", choices=("squash", "merge", "rebase"), default="squash"
-    )
-    merge.add_argument(
-        "--auto", action="store_true", help="Use gh pr merge --auto when executing"
-    )
-    merge.add_argument("--confirm", required=True)
-    merge.add_argument("--execute", action="store_true")
-    merge.set_defaults(func=cmd_merge)
 
     comment = sub.add_parser(
         "comment", help="Render a GitHub comment for the latest packet/gate"
