@@ -9,6 +9,7 @@ from dharma_swarm.foundry.live import (
     FROZEN_TASKS,
     LiveResult,
     choose_model,
+    estimate_cost_usd,
     pick_provider,
     run_live_eval,
     write_live_receipt,
@@ -94,3 +95,42 @@ def test_live_daemon_cycle_maps_accuracy(tmp_path, monkeypatch):
     assert result.mean_survival == 0.8
     assert result.ring2_survivors == 4
     assert result.spend_usd == 0.0
+
+
+def test_cost_estimate_upper_bounds():
+    assert estimate_cost_usd("groq", 1_000_000) == 0.0          # free lane
+    assert estimate_cost_usd("moonshot", 1_000_000) == 3.0      # paid lane upper bound
+    assert estimate_cost_usd("mystery", 1_000_000) == 5.0       # unknown lane -> worst case
+    assert estimate_cost_usd("moonshot", 0) == 0.0
+
+
+def test_paid_lane_tokens_metered_and_priced(monkeypatch):
+    monkeypatch.setattr(live, "call_chat",
+                        lambda base, key, m, p, **kw: (_ANSWERS[p], 40))
+    result = run_live_eval(env={"MOONSHOT_API_KEY": "k"}, model="moonshot-v1-8k")
+    assert result.accuracy == 1.0
+    assert result.total_tokens == 40 * len(FROZEN_TASKS)
+    assert result.est_cost_usd == estimate_cost_usd("moonshot", result.total_tokens)
+    assert result.est_cost_usd > 0.0
+
+
+def test_injected_caller_reports_zero_tokens():
+    result = run_live_eval(env={"GROQ_API_KEY": "x"}, model="m",
+                           caller=lambda m, p: _ANSWERS[p])
+    assert result.total_tokens == 0
+    assert result.est_cost_usd == 0.0
+
+
+def test_live_daemon_cycle_carries_metered_spend(tmp_path, monkeypatch):
+    monkeypatch.setattr(live, "run_live_eval",
+                        lambda: LiveResult("moonshot", "m", 5, 5, 1.0, [],
+                                           total_tokens=200_000, est_cost_usd=0.6))
+    result = live.live_daemon_cycle("x", 1, 300.0, tmp_path)
+    assert result.spend_usd == 0.6
+
+
+def test_receipt_includes_token_and_cost_fields(tmp_path):
+    result = LiveResult("moonshot", "m", 5, 5, 1.0, [], total_tokens=123, est_cost_usd=0.000369)
+    payload = json.loads(write_live_receipt(result, state_root=tmp_path).read_text())
+    assert payload["total_tokens"] == 123
+    assert payload["est_cost_usd_upper_bound"] == 0.000369
