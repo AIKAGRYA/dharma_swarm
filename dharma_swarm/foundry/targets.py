@@ -29,7 +29,16 @@ T0_OPENEVOLVE_CPU = TargetSpec(
     subdir="",
     license="Apache-2.0",
     ai_policy="native",
-    docker_image="foundry/openevolve-cpu:1",  # python:3.11-slim + numpy (built at ingest)
+    docker_image="foundry/openevolve-cpu:1",  # python:3.11-slim + numpy/scipy/matplotlib
+    objective=(
+        "Increase combined_score: pack 26 circles in the unit square maximizing "
+        "the sum of radii, no overlaps, all circles inside. Improve "
+        "construct_packing() in initial_program.py."
+    ),
+    heldout_cmd=(
+        "cd examples/circle_packing && python -c \"import json, evaluator; "
+        "print('FOUNDRY_METRICS ' + json.dumps(evaluator.evaluate_stage2('initial_program.py')))\""
+    ),
     notes=(
         "First REAL campaign target (2026-08-19 readiness audit): pure-CPU, "
         "deterministic-oracle, runs on megha (Linux x86). The example's own "

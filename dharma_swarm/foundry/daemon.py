@@ -59,6 +59,8 @@ class DaemonState:
     total_spend_usd: float = 0.0
     stopped_reason: str = ""
     last_snapshot: dict | None = None
+    consecutive_failures: int = 0
+    last_error: str = ""
 
 
 def _default_cycle(target_id: str, generations: int, budget_cap: float,
@@ -80,6 +82,36 @@ def _write_cycle_artifacts(state_root: Path, snapshot_dict: dict, brief: str) ->
     (root / "brief_fragment.md").write_text(brief, encoding="utf-8")
 
 
+def _month_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+def _load_month_spend(state_root: Path) -> float:
+    """Resume this month's spend so a service restart can't reset the budget.
+
+    Without this, ``Restart=always`` + a crash loop would grant a fresh cap
+    every restart. The ledger is month-keyed; a new month starts at zero.
+    """
+    path = Path(state_root) / "spend_ledger.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("month") == _month_key():
+            return float(data.get("spend_usd", 0.0))
+    except (OSError, ValueError):
+        pass
+    return 0.0
+
+
+def _write_month_spend(state_root: Path, spend_usd: float) -> None:
+    path = Path(state_root) / "spend_ledger.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "month": _month_key(),
+        "spend_usd": round(spend_usd, 6),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }, indent=2), encoding="utf-8")
+
+
 def run_daemon(
     config: DaemonConfig | None = None,
     *,
@@ -93,6 +125,7 @@ def run_daemon(
     targets = config.targets or list(TARGET_REGISTRY)
     prior_survival: float | None = None
     cycle = 0
+    state.total_spend_usd = _load_month_spend(state_root)
 
     while config.max_cycles == 0 or cycle < config.max_cycles:
         if killswitch.is_stopped(state_root=state_root):
@@ -104,13 +137,28 @@ def run_daemon(
             break
 
         target_id = targets[cycle % len(targets)]
-        result = cycle_fn(target_id, config.cycle_generations, remaining, state_root)
+        try:
+            result = cycle_fn(target_id, config.cycle_generations, remaining, state_root)
+            state.consecutive_failures = 0
+        except Exception as exc:  # noqa: BLE001 — one red cycle must not crash-loop the service
+            state.consecutive_failures += 1
+            state.last_error = f"{type(exc).__name__}: {exc}"
+            if state.consecutive_failures >= 3:
+                # Fail closed with evidence: three reds in a row is a broken
+                # target/oracle, not turbulence. Halt so the operator sees it.
+                state.stopped_reason = f"3 consecutive cycle failures; last: {state.last_error}"
+                break
+            cycle += 1
+            if config.max_cycles == 0 or cycle < config.max_cycles:
+                sleep_fn(config.interval_seconds)
+            continue
 
         state.cycles_run += 1
         state.total_proposed += result.proposed
         state.total_ring1_wins += result.ring1_wins
         state.total_ring2_survivors += result.ring2_survivors
         state.total_spend_usd = round(state.total_spend_usd + result.spend_usd, 6)
+        _write_month_spend(state_root, state.total_spend_usd)
 
         snapshot = evaluate_kill_metrics(
             cohort_survival=result.mean_survival,

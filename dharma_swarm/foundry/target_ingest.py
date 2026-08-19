@@ -43,6 +43,12 @@ class TargetSpec:
     # --network none, so nothing can pip-install at benchmark time; build the
     # image once at ingest). Empty = the isolation policy's default image.
     docker_image: str = ""
+    # For unattended campaign cycles: the one-line optimization objective fed
+    # to the mutation prompt, and the ring-2 held-out oracle shell command
+    # (FOUNDRY_METRICS sentinel output). Empty objective = target cannot run
+    # unattended; empty heldout = ring 2 skipped, no receipts minted.
+    objective: str = ""
+    heldout_cmd: str = ""
 
 
 @dataclass(frozen=True)

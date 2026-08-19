@@ -32,15 +32,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-cycles", type=int, default=0, help="0 = run forever until a HALT")
     parser.add_argument("--budget", type=float, default=300.0)
     parser.add_argument("--state-root", default=None)
-    parser.add_argument("--mode", choices=["dry", "live"], default="dry",
-                        help="dry = synthetic proposer (default); live = real model calls "
-                             "on free lanes, objectively scored")
+    parser.add_argument("--mode", choices=["dry", "live", "campaign"], default="dry",
+                        help="dry = synthetic proposer (default); live = heartbeat benchmark "
+                             "with real model calls; campaign = REAL bounded campaigns per "
+                             "cycle (pinned target, docker oracle, live army, receipts)")
     args = parser.parse_args(argv)
 
     cycle_fn = None
     if args.mode == "live":
         from dharma_swarm.foundry.live import live_daemon_cycle  # noqa: PLC0415
         cycle_fn = live_daemon_cycle
+    elif args.mode == "campaign":
+        from dharma_swarm.foundry.campaign_cycle import real_campaign_cycle  # noqa: PLC0415
+        cycle_fn = real_campaign_cycle
 
     config = DaemonConfig(
         targets=[t.strip() for t in args.targets.split(",") if t.strip()],
