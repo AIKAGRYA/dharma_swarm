@@ -301,14 +301,6 @@ def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
     raise AssertionError(f"missing {provider.value!r} route for {logical_id!r}")
 
 
-# Vendor-family routing prefix for the un-banished Nemotron 3.5 Lightning
-# family (open-weight OpenMDW release, 2026-08-11). Consumed with startswith()
-# by free_fleet's tier rules and by the OpenRouter-free provider's
-# preferred-family ordering — a family prefix, NOT a deployable model id.
-# Single home per THE-ONE-WAY: both surfaces import it from here.
-NEMOTRON_35_FAMILY_PREFIX = "nvidia/nemotron-3.5"
-
-
 FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
 FORGE_KIMI_K3_LOGICAL_ID = "kimi-k3"
 FORGE_KIMI_K3_OPENROUTER_MODEL_ID = _required_provider_route(FORGE_KIMI_K3_LOGICAL_ID, ProviderType.OPENROUTER)
@@ -486,7 +478,6 @@ __all__ = [
     "MODEL_POOL",
     "K2_FLOOR_ID",
     "MODEL_POWER_FLOOR",
-    "NEMOTRON_35_FAMILY_PREFIX",
     "all_entries",
     "floor_entries",
     "grunt_entries",

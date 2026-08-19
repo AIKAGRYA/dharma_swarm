@@ -36,7 +36,7 @@ from typing import Literal
 
 import httpx
 
-from dharma_swarm.model_pool import NEMOTRON_35_FAMILY_PREFIX
+from dharma_swarm.model_defaults import NEMOTRON_35_FAMILY_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ _TIER_RULES: list[tuple[str, int]] = [
     ("stepfun/", 2),
     # Nemotron 3.5 Lightning (2026-08-11 OpenMDW): MoE execution/tool-use model,
     # un-banished; high-throughput mass tier for foundry-style volume generation.
-    # The prefix itself lives in model_pool (THE-ONE-WAY) — imported above.
+    # The prefix itself lives in model_defaults (THE-ONE-WAY leaf) — imported above.
     (NEMOTRON_35_FAMILY_PREFIX, 2),
     # Tier 3: fast/lightweight (everything else with >= _MIN_CTX)
 ]
