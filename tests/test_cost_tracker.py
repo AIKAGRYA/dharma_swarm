@@ -215,3 +215,55 @@ class TestCostSummary:
         assert "T1" in summary
         assert "T2" in summary
         assert "T3" in summary
+
+
+# ---------------------------------------------------------------------------
+# Versioned persistence (storage_schema_registry adoption)
+# ---------------------------------------------------------------------------
+
+
+class TestVersionedPersistence:
+    """CostEntry opts into the storage schema registry: new rows carry
+    schema markers, reads round-trip, and legacy unversioned rows on
+    operator disks stay readable."""
+
+    def test_cost_entry_is_a_registered_schema(self) -> None:
+        from dharma_swarm.storage_schema_registry import get_schema
+
+        descriptor = get_schema("cost_tracker.CostEntry")
+        assert descriptor.version == 1
+        assert descriptor.cls is CostEntry
+
+    def test_new_entries_carry_schema_markers(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        log_file = tmp_path / "cost_log.jsonl"
+        monkeypatch.setattr("dharma_swarm.cost_tracker._COST_LOG", log_file)
+        log_cost(provider="anthropic", model="claude-sonnet-4-6", input_tokens=100, output_tokens=50)
+        data = json.loads(log_file.read_text().strip())
+        assert data["__schema_id__"] == "cost_tracker.CostEntry"
+        assert data["__schema_version__"] == 1
+
+    def test_versioned_entries_round_trip_through_read(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        log_file = tmp_path / "cost_log.jsonl"
+        monkeypatch.setattr("dharma_swarm.cost_tracker._COST_LOG", log_file)
+        written = log_cost(provider="openai", model="gpt-4o", input_tokens=100, output_tokens=50, tier="T2")
+        entries = read_cost_log(since_hours=1.0)
+        assert len(entries) == 1
+        assert entries[0] == written
+
+    def test_legacy_unversioned_lines_stay_readable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Operator disks hold pre-registry rows without markers — reading a
+        MIXED file must return both generations."""
+        import dataclasses
+        import time as _time
+
+        log_file = tmp_path / "cost_log.jsonl"
+        monkeypatch.setattr("dharma_swarm.cost_tracker._COST_LOG", log_file)
+        legacy = CostEntry(
+            timestamp=_time.time(), provider="legacy", model="gpt-4o",
+            input_tokens=10, output_tokens=5, estimated_cost_usd=0.001,
+        )
+        log_file.write_text(json.dumps(dataclasses.asdict(legacy)) + "\n")
+        log_cost(provider="modern", model="gpt-4o", input_tokens=100, output_tokens=50)
+
+        entries = read_cost_log(since_hours=1.0)
+        assert [e.provider for e in entries] == ["legacy", "modern"]

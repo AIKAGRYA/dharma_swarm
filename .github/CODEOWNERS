@@ -116,6 +116,7 @@
 /dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala  # blast=168
 /dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala  # blast=167
 /dharma_swarm/router_retrospective.py   @AmitabhainArunachala  # blast=167
+/dharma_swarm/storage_schema_registry.py @AmitabhainArunachala  # blast=162
 /dharma_swarm/cost_tracker.py           @AmitabhainArunachala  # blast=160
 /dharma_swarm/codex_cli.py              @AmitabhainArunachala  # blast=159
 /dharma_swarm/decision_router.py        @AmitabhainArunachala  # blast=157
