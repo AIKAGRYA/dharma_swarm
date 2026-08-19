@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-import os
+from dataclasses import asdict
+import json
 from typing import Any
 
+from dharma_swarm import terminal_bridge_chat_policy as _chat_policy
+from dharma_swarm.terminal_bridge_external_preview import (
+    external_preview_route,
+    sanitize_external_preview_event,
+)
+from dharma_swarm.terminal_bridge_chat_membrane import (
+    chat_event_contains_tool_evidence as _chat_event_contains_tool_evidence,
+    chat_event_is_forbidden as _chat_event_is_forbidden,
+    chat_session_start_has_tool_authority as _chat_session_start_has_tool_authority,
+)
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
-from dharma_swarm.tui import model_routing
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
     ErrorEvent,
@@ -19,54 +29,11 @@ from dharma_swarm.tui.engine.events import (
 # Chat-lane sizing: messages sent per turn / retained per bridge process.
 CHAT_HISTORY_SEND_LIMIT = 24
 CHAT_HISTORY_RETAIN = 48
-_SLICE1_CHAT_PROVIDER_IDS = frozenset({"claude", "openrouter"})
-_ALLOWED_CHAT_EVENT_TYPES = frozenset(
-    {
-        "error",
-        "rate_limit",
-        "session_end",
-        "session_start",
-        "text_complete",
-        "text_delta",
-        "thinking_complete",
-        "thinking_delta",
-        "usage",
-    }
-)
-_FORBIDDEN_CHAT_EVENT_TYPES = frozenset(
-    {
-        "permission_decision",
-        "permission_outcome",
-        "permission_resolution",
-        "task_complete",
-        "task_progress",
-        "task_started",
-        "tool_args_delta",
-        "tool_call_complete",
-        "tool_call_start",
-        "tool_progress",
-        "tool_result",
-    }
-)
-_FORBIDDEN_CHAT_EVENT_PREFIXES = (
-    "command.",
-    "command_",
-    "permission.",
-    "permission_",
-    "task.",
-    "task_",
-    "tool.",
-    "tool_",
-)
-
-
-def _chat_event_is_forbidden(event_type: object) -> bool:
-    normalized = str(event_type or "").strip().lower()
-    return (
-        normalized not in _ALLOWED_CHAT_EVENT_TYPES
-        or normalized in _FORBIDDEN_CHAT_EVENT_TYPES
-        or normalized.startswith(_FORBIDDEN_CHAT_EVENT_PREFIXES)
-    )
+_MAX_PREVIEW_BUFFER_BYTES = 8 * 1024 * 1024
+_MAX_PREVIEW_ASSISTANT_BYTES = 4 * 1024 * 1024
+# Compatibility projections; policy authority lives in the extracted helper.
+_SLICE1_CHAT_PROVIDER_IDS = _chat_policy._SLICE1_CHAT_PROVIDER_IDS
+_DEDICATED_PREVIEW_PROVIDER_IDS = _chat_policy._DEDICATED_PREVIEW_PROVIDER_IDS
 
 
 class TerminalBridgeChatMixin:
@@ -150,7 +117,13 @@ class TerminalBridgeChatMixin:
             if adapter is None:
                 continue
             options = self._sealed_chat_options(provider_id, options)
-            self._set_active_provider(run, provider_id, model_id)
+            preview_route = external_preview_route(provider_id, model_id)
+            self._set_active_provider(
+                run,
+                provider_id,
+                model_id,
+                update_selection=True,
+            )
             run.phase = "streaming"
             messages = base_messages
             system_prompt: str | None = self._render_chat_system_prompt(
@@ -160,15 +133,17 @@ class TerminalBridgeChatMixin:
                 note=note,
             )
             resume_id: str | None = None
-            if provider_id == "claude":
+            if provider_id in {"claude", "codex_text"}:
                 # Slice 1 uses the dedicated raw-single-user serializer. Keep
                 # history in the durable transcript; the subprocess prompt is
                 # exactly the newest operator utterance.
                 messages = base_messages[-1:]
                 # Provider-native continuity is an explicit operator action.
                 # Never leak the last Claude process session into a fresh turn.
-                resume_id = requested_resume_id or None
-                if resume_id:
+                resume_id = requested_resume_id or None if provider_id == "claude" else None
+                if provider_id == "codex_text":
+                    system_prompt = None
+                elif resume_id:
                     # The CLI session already holds the conversation; send only
                     # the newest user message and skip re-appending the prompt.
                     messages = base_messages[-1:]
@@ -189,15 +164,54 @@ class TerminalBridgeChatMixin:
             membrane_violation = False
             session_start_seen = False
             session_end_seen = False
+            preview_buffer_bytes = 0
+            preview_assistant_bytes = 0
             try:
                 async for event in adapter.stream(completion, session_id=session_id):
                     if run.cancel_requested:
                         raise asyncio.CancelledError
+                    if preview_route is not None:
+                        preview_buffer_bytes += len(
+                            json.dumps(
+                                asdict(event),
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                                default=str,
+                            ).encode("utf-8")
+                        )
+                        if isinstance(event, TextComplete):
+                            preview_assistant_bytes += len(
+                                event.content.encode("utf-8")
+                            )
+                        if (
+                            preview_buffer_bytes > _MAX_PREVIEW_BUFFER_BYTES
+                            or preview_assistant_bytes
+                            > _MAX_PREVIEW_ASSISTANT_BYTES
+                        ):
+                            success = False
+                            membrane_violation = True
+                            failure_text = (
+                                "slice1 membrane rejected oversized provider response"
+                            )
+                            buffer = []
+                            try:
+                                await adapter.cancel()
+                            except Exception:
+                                failure_text = (
+                                    f"{failure_text}; provider cancellation failed"
+                                )
+                            break
                     lifecycle_violation = session_end_seen or (
                         isinstance(event, SessionStart) and session_start_seen
                     )
                     if _chat_event_is_forbidden(event.type) or lifecycle_violation or (
-                        isinstance(event, SessionStart) and bool(event.tools_available)
+                        isinstance(event, SessionStart)
+                        and _chat_session_start_has_tool_authority(event)
+                    ) or (
+                        preview_route is not None and isinstance(event, ErrorEvent)
+                    ) or (
+                        preview_route is not None
+                        and _chat_event_contains_tool_evidence(event.raw)
                     ):
                         success = False
                         membrane_violation = True
@@ -212,6 +226,8 @@ class TerminalBridgeChatMixin:
                                 f"{failure_text}; provider cancellation failed"
                             )
                         break
+                    if preview_route is not None:
+                        event = sanitize_external_preview_event(event)
                     if isinstance(event, SessionStart):
                         session_start_seen = True
                     if isinstance(event, TextComplete) and event.role == "assistant" and event.content.strip():
@@ -231,6 +247,29 @@ class TerminalBridgeChatMixin:
                 failure_text = f"{type(exc).__name__}: {exc}"
             if run.cancel_requested:
                 raise asyncio.CancelledError
+            preview_start = (
+                next(
+                    (
+                        event
+                        for event in buffer
+                        if isinstance(event, SessionStart)
+                    ),
+                    None,
+                )
+                if preview_route is not None
+                else None
+            )
+            preview_identity_mismatch = bool(
+                preview_route is not None
+                and provider_id in {"claude", "kimi_code"}
+                and (
+                    preview_start is None
+                    or preview_start.model != model_id
+                    or not bool(
+                        preview_start.system_info.get("exact_model_proven", False)
+                    )
+                )
+            )
             if membrane_violation:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
@@ -251,20 +290,82 @@ class TerminalBridgeChatMixin:
                 if terminal is not None:
                     self._emit_recorded_session_event(run, terminal)
                 return
+            if preview_route is not None and (
+                not (success is True and session_start_seen and bool(reply_parts))
+                or preview_identity_mismatch
+            ):
+                # Preview receipts are evidence-bearing operator diagnostics.
+                # A transport exit alone is never a completion, and raw
+                # provider errors (including CLI stderr) must not cross this
+                # boundary because they may contain credentials or host data.
+                code = (
+                    "preview_identity_mismatch"
+                    if preview_identity_mismatch
+                    else (
+                        "preview_incomplete_response"
+                        if success is True
+                        else "preview_provider_failed"
+                    )
+                )
+                failure_text = "preview route produced no usable sealed response"
+                success = False
+                buffer = [
+                    ErrorEvent(
+                        provider_id=provider_id,
+                        session_id=session_id,
+                        code=code,
+                        message=failure_text,
+                        retryable=False,
+                    ),
+                    SessionEnd(
+                        provider_id=provider_id,
+                        session_id=session_id,
+                        success=False,
+                        error_code=code,
+                        error_message=failure_text,
+                    ),
+                ]
             if success:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
+                preview_served_model = model_id
+                preview_exact_model_proven = False
+                if preview_route is not None:
+                    if preview_start is not None:
+                        preview_served_model = preview_start.model
+                        preview_exact_model_proven = bool(
+                            preview_start.system_info.get("exact_model_proven", False)
+                        )
                 for event in buffer:
                     accepted = self._record_and_emit_session_event(run, event)
                     if isinstance(accepted, SessionEnd) and accepted.success:
-                        self._emit_provider_route_receipt(
-                            run,
-                            accepted,
-                            requested_provider_id=provider_id,
-                            requested_model_id=model_id,
-                            expected_prompt=prompt,
-                            adapter=adapter,
-                        )
+                        if preview_route is not None:
+                            self._emit(
+                                {
+                                    "type": "route.receipt",
+                                    "request_id": run.request_id,
+                                    "session_id": run.session_id,
+                                    "provider_id": provider_id,
+                                    "model_id": model_id,
+                                    "requested_model_id": model_id,
+                                    "served_model_id": preview_served_model,
+                                    "route_id": preview_route.route_id,
+                                    "evidence_kind": "preview_provider_completion",
+                                    "success": True,
+                                    "preview_only": True,
+                                    "helm_on_call_eligible": False,
+                                    "exact_model_proven": preview_exact_model_proven,
+                                }
+                            )
+                        else:
+                            self._emit_provider_route_receipt(
+                                run,
+                                accepted,
+                                requested_provider_id=provider_id,
+                                requested_model_id=model_id,
+                                expected_prompt=prompt,
+                                adapter=adapter,
+                            )
                 self._remember_chat_exchange(prompt, "\n\n".join(reply_parts).strip())
                 return
             lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
@@ -305,110 +406,54 @@ class TerminalBridgeChatMixin:
             if terminal is not None:
                 self._emit_recorded_session_event(run, terminal)
 
-    def _chat_lanes(self, requested_provider: str, requested_model: str) -> list[tuple[str, str, dict[str, Any], str]]:
-        lanes: list[tuple[str, str, dict[str, Any], str]] = []
-        seen: set[tuple[str, str]] = set()
-
-        def add(provider_id: str, model_id: str, options: dict[str, Any], note: str) -> None:
-            if (
-                provider_id not in _SLICE1_CHAT_PROVIDER_IDS
-                or provider_id not in self._adapters
-                or not model_id
-            ):
-                return
-            key = (provider_id, model_id)
-            if key in seen:
-                return
-            seen.add(key)
-            lanes.append((provider_id, model_id, options, note))
-
-        requested_target = model_routing.target_for_route(requested_provider, requested_model)
-        if requested_target is None:
-            requested_target = model_routing.default_target()
-        policy = self._build_model_policy_summary(
-            selected_provider=requested_target.provider_id,
-            selected_model=requested_target.model_id,
-            strategy="responsive",
+    def _build_model_policy_summary(
+        self,
+        *,
+        selected_provider: str,
+        selected_model: str,
+        strategy: str,
+    ) -> dict[str, Any]:
+        return _chat_policy._build_model_policy_summary(
+            self,
+            selected_provider=selected_provider,
+            selected_model=selected_model,
+            strategy=strategy,
         )
-        policy_targets = {
-            (str(target.get("provider", "")), str(target.get("model", ""))): target
-            for target in policy.get("targets", [])
-            if isinstance(target, dict)
-        }
-        ordered_routes = [
-            (
-                str(policy.get("selected_provider", "")),
-                str(policy.get("selected_model", "")),
-            )
-        ]
-        ordered_routes.extend(
-            (str(target.get("provider", "")), str(target.get("model", "")))
-            for target in policy.get("fallback_chain", [])
-            if isinstance(target, dict)
+
+    def _chat_lanes(
+        self,
+        requested_provider: str,
+        requested_model: str,
+    ) -> list[tuple[str, str, dict[str, Any], str]]:
+        return _chat_policy._chat_lanes(
+            self,
+            requested_provider,
+            requested_model,
         )
-        for provider_id, model_id in ordered_routes:
-            projected = policy_targets.get((provider_id, model_id))
-            target = model_routing.target_for_route(provider_id, model_id)
-            if (
-                projected is None
-                or not bool(projected.get("selectable"))
-                or target is None
-                or not model_routing.is_routable(target)
-            ):
-                continue
-            options = self._chat_claude_options() if provider_id == "claude" else {}
-            note = (
-                "configured canonical route"
-                if provider_id == requested_provider and model_id == requested_model
-                else "canonical live fallback"
-            )
-            add(provider_id, model_id, options, note)
-        return lanes
+
+    def _is_enabled_external_preview_route(
+        self,
+        provider_id: str,
+        model_id: str,
+    ) -> bool:
+        return _chat_policy._is_enabled_external_preview_route(
+            self,
+            provider_id,
+            model_id,
+        )
 
     def _sealed_chat_options(
         self,
         provider_id: str,
         options: dict[str, Any],
     ) -> dict[str, Any]:
-        """Return provider options that caller input cannot weaken."""
-
-        if provider_id == "claude":
-            return self._chat_claude_options()
-        if provider_id == "openrouter":
-            timeout = options.get("timeout_sec")
-            sealed: dict[str, Any] = {"require_served_identity": True}
-            if timeout is not None:
-                sealed["timeout_sec"] = timeout
-            return sealed
-        return dict(options)
+        return _chat_policy._sealed_chat_options(self, provider_id, options)
 
     def _chat_claude_model(self) -> str:
-        # Genius strategy => Claude Opus 4.8 leads (the master lane). On the Max
-        # plan every Claude tier costs the same, so cost-ranking to the cheapest
-        # (Haiku, sub-floor) was pure downside — it picked a banished model.
-        for target in model_routing.fallback_chain("", "", strategy="genius"):
-            if target.provider_id == "claude":
-                return target.model_id
-        adapter = self._adapters.get("claude")
-        if adapter is None:
-            return ""
-        return str(adapter.get_profile(None).model_id)
+        return _chat_policy._chat_claude_model(self)
 
     def _chat_claude_options(self) -> dict[str, Any]:
-        try:
-            budget = float(os.environ.get("DHARMA_CHAT_MAX_BUDGET_USD", "") or 0.25)
-        except ValueError:
-            budget = 0.25
-        return {
-            "permission_mode": "plan",
-            "tools": "",
-            "max_budget_usd": budget,
-            "strict_mcp_config": True,
-            "max_turns": 1,
-            "raw_single_user_prompt": True,
-            "scrub_metered_keys": True,
-            "setting_sources": "",
-        }
+        return _chat_policy._chat_claude_options(self)
 
     def _build_chat_messages(self, request: dict[str, Any], prompt: str) -> list[dict[str, str]]:
         ts_messages: list[dict[str, str]] = []

@@ -1,0 +1,206 @@
+{
+  "id": "helm-worldclass-terminal-WP-HELMFOURMODEL1",
+  "base_ref": "a25dd0ddd63d35c95988812e30af6780d560d5ce",
+  "branch": "agent/helm-four-model-preview-20260813",
+  "worktree": ".",
+  "intent": "On the exact draft-PR-1327 head, load four explicit Helm routes without weakening Slice-1: subscription-backed Codex text transport for gpt-5.6-sol, the existing sealed Claude account transport for claude-fable-5, first-party Kimi Code API transport for k3, and a fixed-origin Grok OAuth Responses transport for grok-4.6. Every explicit route is singleton/no-fallback and physically no-tools; response tool evidence fails the turn. Distinguish attempt authority from exact-model proof, keep all four preview-only and ineligible for Helm OnCall, preserve response-owned grok-4.6-build without silently equating it to requested grok-4.6, and retain the separately packeted served-route and zero-tool hardening receipts in this umbrella range. Keep every touched production Python module at or below 500 physical lines through behavior-preserving packet-scoped decomposition. Never admit the ordinary shell-capable Codex or Grok CLI adapters, silently alias model identities, expose secrets, or make live calls in tests or gates.",
+  "allowed_files": [
+    "dharma_swarm/model_catalog.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_chat_membrane.py",
+    "dharma_swarm/terminal_bridge_chat_policy.py",
+    "dharma_swarm/terminal_bridge_external_preview.py",
+    "dharma_swarm/tui/engine/adapters/__init__.py",
+    "dharma_swarm/tui/engine/adapters/claude.py",
+    "dharma_swarm/tui/engine/adapters/claude_cli.py",
+    "dharma_swarm/tui/engine/adapters/claude_events.py",
+    "dharma_swarm/tui/engine/adapters/claude_preview_protocol.py",
+    "dharma_swarm/tui/engine/adapters/claude_stream.py",
+    "dharma_swarm/tui/engine/adapters/codex_text.py",
+    "dharma_swarm/tui/engine/adapters/codex_text_codec.py",
+    "dharma_swarm/tui/engine/adapters/codex_text_process.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth_auth.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth_codec.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth_request.py",
+    "dharma_swarm/tui/engine/adapters/grok_oauth_response.py",
+    "dharma_swarm/tui/engine/adapters/kimi_code.py",
+    "dharma_swarm/tui/engine/adapters/kimi_code_codec.py",
+    "terminal/src/executionLog.ts",
+    "terminal/tests/executionLog.test.ts",
+    "tests/test_terminal_bridge.py",
+    "tests/test_terminal_bridge_external_preview.py",
+    "tests/tui/test_codex_text_adapter.py",
+    "tests/tui/test_claude_adapter_v11.py",
+    "tests/tui/test_grok_oauth_adapter.py",
+    "tests/tui/test_grok_oauth_codec.py",
+    "tests/tui/kimi_code_test_support.py",
+    "tests/tui/test_kimi_code_adapter.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-CLAUDETELEMETRY1.json",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMSERVEDROUTE1.json",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMZEROTOOL1.json",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMZEROTOOL2.json",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMZEROTOOL3.json",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMFOURMODEL1.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/model_status.py",
+    "dharma_swarm/helm_route_truth_codec.py",
+    "dharma_swarm/helm_route_truth_evaluator.py",
+    "dharma_swarm/helm_route_truth_types.py",
+    "dharma_swarm/terminal_bridge_route_truth.py",
+    "dharma_swarm/terminal_bridge_session_runtime.py",
+    "dharma_swarm/evolution_roster.py",
+    "dharma_swarm/model_pool.py",
+    "dharma_swarm/model_hierarchy.py",
+    "dharma_swarm/model_defaults.py",
+    "dharma_swarm/model_routing.py",
+    "dharma_swarm/tui/model_routing.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/providers.py",
+    "dharma_swarm/api_keys.py",
+    "dharma_swarm/key_oracle.py",
+    "dharma_swarm/tui/engine/adapters/base.py",
+    "dharma_swarm/tui/engine/adapters/codex.py",
+    "dharma_swarm/tui/engine/adapters/ollama.py",
+    "dharma_swarm/tui/engine/adapters/openrouter.py",
+    "tests/test_model_pool.py",
+    "tests/tui/test_openrouter_adapter.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLOCALPREVIEW1.json",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/operator_core/**",
+    "packages/telos-kernel/**",
+    "dashboard/**",
+    ".github/**",
+    "Makefile"
+  ],
+  "gates": [
+    {
+      "name": "helm-four-model-preview-python-regression",
+      "command": "python3 -m pytest -q tests/test_terminal_bridge.py tests/test_terminal_bridge_external_preview.py tests/tui",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-four-model-preview-python-ruff",
+      "command": "python3 -m ruff check dharma_swarm/model_catalog.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_chat_membrane.py dharma_swarm/terminal_bridge_chat_policy.py dharma_swarm/terminal_bridge_external_preview.py dharma_swarm/tui/engine/adapters/__init__.py dharma_swarm/tui/engine/adapters/claude.py dharma_swarm/tui/engine/adapters/claude_cli.py dharma_swarm/tui/engine/adapters/claude_events.py dharma_swarm/tui/engine/adapters/claude_preview_protocol.py dharma_swarm/tui/engine/adapters/claude_stream.py dharma_swarm/tui/engine/adapters/codex_text.py dharma_swarm/tui/engine/adapters/codex_text_codec.py dharma_swarm/tui/engine/adapters/codex_text_process.py dharma_swarm/tui/engine/adapters/grok_oauth.py dharma_swarm/tui/engine/adapters/grok_oauth_auth.py dharma_swarm/tui/engine/adapters/grok_oauth_codec.py dharma_swarm/tui/engine/adapters/grok_oauth_request.py dharma_swarm/tui/engine/adapters/grok_oauth_response.py dharma_swarm/tui/engine/adapters/kimi_code.py dharma_swarm/tui/engine/adapters/kimi_code_codec.py tests/test_terminal_bridge.py tests/test_terminal_bridge_external_preview.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_text_adapter.py tests/tui/test_grok_oauth_adapter.py tests/tui/test_grok_oauth_codec.py tests/tui/kimi_code_test_support.py tests/tui/test_kimi_code_adapter.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-four-model-preview-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-four-model-preview-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "codex-text-shell-feature-removal-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/tui/engine/adapters/codex_text.py'); t=p.read_text(); old='\\\"--disable\\\", \\\"shell_tool\\\"'; new='\\\"--enable\\\", \\\"shell_tool\\\"'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/tui/test_codex_text_adapter.py','-k','command_physically_disables_execution_features']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "external-route-aliasing-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/model_catalog.py'); t=p.read_text(); old='HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID = \\\"gpt-5.6-sol\\\"'; new='HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID = \\\"gpt-5.6\\\"'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/test_terminal_bridge_external_preview.py','-k','external_preview_route_literals_are_exact']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "grok-oauth-tools-relaxation-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/tui/engine/adapters/grok_oauth.py'); t=p.read_text(); old='\\\"tools\\\": [],'; new='\\\"tools\\\": [{\\\"type\\\": \\\"web_search\\\"}],'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/tui/test_grok_oauth_adapter.py','-k','no_tools_payload_is_sealed']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "kimi-tool-choice-relaxation-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/tui/engine/adapters/kimi_code.py'); t=p.read_text(); old='\\\"tool_choice\\\": \\\"none\\\"'; new='\\\"tool_choice\\\": \\\"auto\\\"'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/tui/test_kimi_code_adapter.py','-k','no_tools_payload_is_sealed']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "preview-on-call-promotion-is-detected",
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('dharma_swarm/terminal_bridge_external_preview.py'); t=p.read_text(); old='helm_on_call_eligible: bool = False'; new='helm_on_call_eligible: bool = True'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['-q','tests/test_terminal_bridge_external_preview.py','-k','external_preview_routes_never_claim_proof_or_on_call']))\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(helm): load sealed account model routes"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELMFOURMODEL1",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a25dd0ddd63d35c95988812e30af6780d560d5ce",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The ordinary Codex adapter is shell-capable, while the installed Codex client can run gpt-5.6-sol through a separately sealed subscription transport with execution features disabled.",
+      "The existing Claude account route requests inaccessible claude-opus-4.8 even though the account returns response-owned claude-fable-5 with an empty tool inventory.",
+      "Kimi K3 is present in the canonical roster and live first-party account, but Helm has no Kimi terminal adapter.",
+      "The Grok CLI exposes terminal tools and cannot be admitted to Slice-1 chat, while its fixed-origin OAuth Responses seam can omit tools and returns response-owned grok-4.6-build for requested grok-4.6.",
+      "Provider or account reachability is attempt authority, not exact-model proof; external routes must remain unverified until their response-owned identity succeeds."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/tui/engine/adapters/codex.py",
+      "dharma_swarm/tui/engine/adapters/claude.py",
+      "dharma_swarm/tui/engine/adapters/claude_events.py",
+      "dharma_swarm/tui/engine/adapters/claude_preview_protocol.py",
+      "dharma_swarm/tui/engine/adapters/claude_stream.py",
+      "dharma_swarm/tui/engine/adapters/codex_text_codec.py",
+      "dharma_swarm/tui/engine/adapters/codex_text_process.py",
+      "dharma_swarm/tui/engine/adapters/grok_oauth.py",
+      "dharma_swarm/tui/engine/adapters/grok_oauth_auth.py",
+      "dharma_swarm/tui/engine/adapters/grok_oauth_request.py",
+      "dharma_swarm/tui/engine/adapters/grok_oauth_response.py",
+      "dharma_swarm/tui/engine/adapters/kimi_code_codec.py",
+      "dharma_swarm/model_catalog.py",
+      "dharma_swarm/terminal_bridge_chat.py",
+      "dharma_swarm/terminal_bridge_chat_membrane.py",
+      "dharma_swarm/terminal_bridge_chat_policy.py",
+      "dharma_swarm/terminal_bridge.py",
+      "terminal/src/executionLog.ts",
+      "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLOCALPREVIEW1.json"
+    ],
+    "honest_blockers": [
+      "The direct OpenAI API probe for gpt-5.6-sol returned credit_balance_exhausted, so Sol uses the authenticated ChatGPT/Codex subscription and remains exact-model-unverified because Codex JSON events do not carry response-owned served-model identity.",
+      "The Anthropic lane uses the existing sealed Claude Code account transport with exact response-owned claude-fable-5; the inaccessible static claude-opus-4.8 route is not treated as proven.",
+      "Kimi K3 uses the first-party Kimi Code API and requires KIMI_API_KEY to be injected at launch; packet gates use mocked HTTP only.",
+      "Grok 4.6 uses the account's fixed-origin OAuth Responses seam, not the tool-bearing Grok CLI. The provider returns response-owned grok-4.6-build for requested grok-4.6, so the route remains exact-model-unverified and no governed alias equivalence is inferred.",
+      "Codex, Kimi, and Grok routes remain preview_only and helm_on_call_eligible false even after one completion; durable seat promotion requires separately governed route-truth evidence."
+    ],
+    "rollback": "Revert the packet-scoped range, including the separately packeted served-route and zero-tool hardening refinements and the helper decomposition that keeps each touched production Python module at or below 500 physical lines. The decomposition preserves sealed route behavior, and the existing OpenRouter and loopback Ollama implementations remain unchanged; no migration, secret write, paid probe in tests, or Helm OnCall promotion is introduced.",
+    "packet_digest": "b55b2c1e1881d01ff51fd5b2a9d05c331fd48b78a7d9a8e2c12f761fd6e4c34b"
+  }
+}

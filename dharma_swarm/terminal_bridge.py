@@ -66,6 +66,11 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_external_preview import (
+    GPT_5_6_SOL_MODEL_ID,
+    KIMI_K3_MODEL_ID,
+    default_external_preview_route,
+)
 from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
     TerminalBridgeSessionRuntimeMixin,
@@ -83,6 +88,9 @@ from dharma_swarm.tui.engine.events import (
     PermissionResolutionEvent,
     ToolCallComplete,
 )
+
+_HELM_LOCAL_PREVIEW_MODEL_ENV = "DHARMA_HELM_LOCAL_PREVIEW_MODEL"
+
 
 def _json_default(value: object) -> object:
     if is_dataclass(value):
@@ -245,15 +253,36 @@ class TerminalBridge(
             from dharma_swarm.tui.engine.adapters import (
                 ClaudeAdapter,
                 CodexAdapter,
+                CodexTextAdapter,
                 CompletionRequest,
+                GrokOAuthResponsesAdapter,
+                KimiCodeAdapter,
+                OllamaAdapter,
                 OpenRouterAdapter,
+                ProviderConfig,
             )
 
             adapters = {
                 "claude": ClaudeAdapter(),
                 "codex": CodexAdapter(),
+                "codex_text": CodexTextAdapter(
+                    config=ProviderConfig(
+                        provider_id="codex_text",
+                        default_model=GPT_5_6_SOL_MODEL_ID,
+                    )
+                ),
+                "kimi_code": KimiCodeAdapter(
+                    config=ProviderConfig(
+                        provider_id="kimi_code",
+                        default_model=KIMI_K3_MODEL_ID,
+                    )
+                ),
+                "grok_oauth": GrokOAuthResponsesAdapter(),
                 "openrouter": OpenRouterAdapter(),
             }
+            preview_model = self._local_preview_model()
+            if preview_model:
+                adapters["ollama"] = OllamaAdapter(model_id=preview_model)
             self._adapters = adapters
             self._completion_request_cls = CompletionRequest
         except Exception as exc:
@@ -262,11 +291,48 @@ class TerminalBridge(
     def _available_provider_ids(self) -> set[str]:
         return set(self._adapters)
 
+    @staticmethod
+    def _local_preview_model() -> str:
+        """Return the explicit local-preview model, or disable the lane.
+
+        This opt-in is intentionally separate from the canonical model roster:
+        a locally installed model can execute a preview chat turn without
+        claiming a Helm OnCall seat or exact-model route proof.
+        """
+
+        return os.environ.get(_HELM_LOCAL_PREVIEW_MODEL_ENV, "").strip()
+
+    def _terminal_default_route(self) -> tuple[str, str]:
+        preview_model = self._local_preview_model()
+        if self._is_enabled_local_preview_route("ollama", preview_model):
+            return "ollama", preview_model
+        account_preview = default_external_preview_route(self._adapters)
+        if account_preview is not None:
+            return account_preview
+        target = model_routing.default_target()
+        return target.provider_id, target.model_id
+
+    def _is_enabled_local_preview_route(
+        self,
+        provider_id: str,
+        model_id: str,
+    ) -> bool:
+        preview_model = self._local_preview_model()
+        adapter = self._adapters.get("ollama")
+        return bool(
+            preview_model
+            and provider_id == "ollama"
+            and model_id == preview_model
+            and adapter is not None
+            and getattr(adapter, "provider_id", None) == "ollama"
+        )
+
     def _is_server_owned_chat_transport(self, provider_id: str, adapter: object) -> bool:
         """Return the non-forgeable in-process provenance fact for a chat lane."""
 
         return (
-            provider_id in {"claude", "openrouter"}
+            provider_id
+            in {"claude", "codex_text", "grok_oauth", "kimi_code", "openrouter"}
             and self._adapters.get(provider_id) is adapter
         )
 
@@ -470,10 +536,10 @@ class TerminalBridge(
     async def _handle_handshake(self, request_id: str) -> None:
         providers: list[dict[str, Any]] = []
         adapter_error = self._adapter_boot_error
-        default_target = model_routing.default_target()
+        default_provider, default_model = self._terminal_default_route()
         policy = self._build_model_policy_summary(
-            selected_provider=default_target.provider_id,
-            selected_model=default_target.model_id,
+            selected_provider=default_provider,
+            selected_model=default_model,
             strategy="responsive",
         )
         selected_provider = str(policy.get("selected_provider", ""))
@@ -822,9 +888,9 @@ class TerminalBridge(
         )
 
     async def _handle_model_policy(self, request_id: str, request: dict[str, Any]) -> None:
-        default_target = model_routing.default_target()
-        selected_provider = str(request.get("provider", "") or default_target.provider_id).strip().lower()
-        selected_model = str(request.get("model", "") or "").strip() or default_target.model_id
+        default_provider, default_model = self._terminal_default_route()
+        selected_provider = str(request.get("provider", "") or default_provider).strip().lower()
+        selected_model = str(request.get("model", "") or "").strip() or default_model
         strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
         policy = await asyncio.to_thread(
             self._build_model_policy_summary,
@@ -1035,8 +1101,8 @@ class TerminalBridge(
         if adapter is not None:
             try:
                 await adapter.cancel()
-            except Exception as exc:
-                provider_cancel_error = f"{type(exc).__name__}: {exc}"
+            except Exception:
+                provider_cancel_error = "provider_cancel_failed"
 
         task = run.task
         if task is not None and task is not asyncio.current_task() and not task.done():
@@ -1058,6 +1124,8 @@ class TerminalBridge(
         run: _ActiveSessionRun,
         provider_id: str,
         model_id: str,
+        *,
+        update_selection: bool = False,
     ) -> None:
         run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
         run.provider_id = provider_id
@@ -1065,8 +1133,9 @@ class TerminalBridge(
         if self._active_run is run:
             self._active_provider_id = provider_id
             self._active_model_id = model_id
-            self._selected_provider_id = provider_id
-            self._selected_model_id = model_id
+            if update_selection:
+                self._selected_provider_id = provider_id
+                self._selected_model_id = model_id
 
     def _clear_active_run(self, run: _ActiveSessionRun) -> None:
         if self._active_run is not run:
@@ -1537,8 +1606,9 @@ class TerminalBridge(
         if prompt is None:
             raise ValueError(f"{error_code}: {error_message}")
         active_tab = str(request.get("active_tab", "") or "chat")
+        default_provider, default_model = self._terminal_default_route()
         selected_provider = str(
-            request.get("provider", "") or model_routing.default_target().provider_id
+            request.get("provider", "") or default_provider
         ).strip().lower()
         selected_model = str(request.get("model", "") or "").strip()
         intent = self._resolve_prompt_intent(prompt)
@@ -1546,11 +1616,10 @@ class TerminalBridge(
             str(request.get("strategy", "") or "")
         )
         if not selected_model:
-            default_target = model_routing.default_target()
-            selected_provider = selected_provider or default_target.provider_id
-            selected_model = default_target.model_id
+            selected_provider = selected_provider or default_provider
+            selected_model = default_model
         elif not selected_provider:
-            selected_provider = model_routing.default_target().provider_id
+            selected_provider = default_provider
 
         workspace_snapshot = self._build_workspace_snapshot()
         ontology_snapshot = self._build_ontology_snapshot()
@@ -1766,166 +1835,6 @@ class TerminalBridge(
                 for run in runs
             ],
             "actions": actions,
-        }
-
-    def _build_model_policy_summary(self, *, selected_provider: str, selected_model: str, strategy: str) -> dict[str, Any]:
-        strategy = model_routing.resolve_strategy(strategy) or "responsive"
-        projection = model_status.floor_model_status()
-        status_by_model_id: dict[str, Any] = {}
-        for projected in projection.models:
-            status_by_model_id[projected.id] = projected
-            for route_status in projected.route_statuses:
-                status_by_model_id[route_status.model_id] = projected
-
-        terminal_providers = self._available_provider_ids()
-        local_attempt_cache: dict[str, bool] = {}
-        seen_routes: set[tuple[str, str]] = set()
-        targets: list[dict[str, Any]] = []
-        for target in model_routing.all_targets():
-            provider_id = target.provider_id
-            route = (provider_id, target.model_id)
-            if route in seen_routes:
-                continue
-            seen_routes.add(route)
-            projected = status_by_model_id.get(target.model_id)
-            provider_values = {provider.value for provider in target.pool_providers}
-            route_statuses = (
-                [
-                    route_status
-                    for route_status in projected.route_statuses
-                    if route_status.provider in provider_values
-                ]
-                if projected is not None
-                else []
-            )
-            model_available = any(
-                route_status.status == "live_routable"
-                for route_status in route_statuses
-            )
-            adapter_available = provider_id in terminal_providers
-            oracle_unverified = bool(route_statuses) and all(
-                route_status.status == "unverified"
-                and route_status.reason == "key_status_unknown"
-                for route_status in route_statuses
-            )
-            local_attempt_authorized = False
-            if adapter_available and oracle_unverified:
-                if provider_id not in local_attempt_cache:
-                    local_attempt_cache[provider_id] = (
-                        self._local_cli_attempt_authorized(provider_id)
-                    )
-                local_attempt_authorized = local_attempt_cache[provider_id]
-            selectable = adapter_available and (
-                model_available or local_attempt_authorized
-            )
-            if model_available and adapter_available:
-                route_state = "ready"
-                availability_reason = None
-            elif local_attempt_authorized:
-                route_state = "unverified"
-                availability_reason = "local_cli_auth_unverified"
-            elif model_available and not adapter_available:
-                route_state = "unavailable"
-                availability_reason = "terminal_adapter_missing"
-            else:
-                route_state = "unavailable"
-                availability_reason = (
-                    getattr(projected, "unavailable_reason", None)
-                    or "no_live_route"
-                    if projected is not None
-                    else "model_status_missing"
-                )
-            targets.append(
-                {
-                    "alias": target.alias,
-                    "provider": provider_id,
-                    "model": target.model_id,
-                    "label": target.label,
-                    "route_id": f"{provider_id}:{target.model_id}",
-                    "route_state": route_state,
-                    "picker_visible": selectable,
-                    "selectable": selectable,
-                    "available": model_available,
-                    "availability_reason": availability_reason,
-                    "pool_id": getattr(projected, "id", None),
-                    "tier": getattr(projected, "tier", "unknown"),
-                    "lane": getattr(projected, "lane", "floor"),
-                    "status": getattr(projected, "status", "unavailable"),
-                    "available_routes": list(getattr(projected, "available_routes", [])),
-                }
-            )
-
-        selected_available = any(
-            target["provider"] == selected_provider and target["model"] == selected_model
-            and bool(target.get("selectable"))
-            for target in targets
-        )
-        if not selected_available and targets:
-            selectable_targets = [target for target in targets if bool(target.get("selectable"))]
-            fallback_target = next(
-                (target for target in selectable_targets if target["provider"] == "codex"),
-                selectable_targets[0] if selectable_targets else targets[0],
-            )
-            selected_provider = str(fallback_target["provider"])
-            selected_model = str(fallback_target["model"])
-
-        active_target = next(
-            (
-                target
-                for target in targets
-                if target["provider"] == selected_provider and target["model"] == selected_model
-            ),
-            None,
-        )
-        fallback_chain = [
-            {
-                "alias": str(target["alias"]),
-                "provider": str(target["provider"]),
-                "model": str(target["model"]),
-                "label": str(target["label"]),
-                "route_id": str(target["route_id"]),
-                "route_state": str(target["route_state"]),
-                "availability_reason": target.get("availability_reason"),
-            }
-            for target in targets
-            if not (target["provider"] == selected_provider and target["model"] == selected_model)
-            and bool(target.get("selectable"))
-        ][:6]
-        provider_counts: dict[str, int] = {}
-        attemptable_provider_counts: dict[str, int] = {}
-        for target in targets:
-            provider = str(target["provider"])
-            if bool(target.get("available")):
-                provider_counts[provider] = provider_counts.get(provider, 0) + 1
-            if bool(target.get("selectable")):
-                attemptable_provider_counts[provider] = (
-                    attemptable_provider_counts.get(provider, 0) + 1
-                )
-        return {
-            "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
-            "oracle_state": projection.oracle_state,
-            "live_providers": projection.live_providers,
-            "selected_provider": selected_provider,
-            "selected_model": selected_model,
-            "selected_route": f"{selected_provider}:{selected_model}",
-            "strategy": strategy,
-            "strategies": list(model_routing.ROUTING_STRATEGIES),
-            "default_route": (
-                f"{targets[0]['provider']}:{targets[0]['model']}"
-                if targets
-                else f"{model_routing.default_target().provider_id}:{model_routing.default_target().model_id}"
-            ),
-            "active_label": str(active_target["label"]) if active_target else selected_model,
-            "fallback_chain": fallback_chain,
-            "targets": targets,
-            "available_providers": [
-                {"id": provider, "model_count": count}
-                for provider, count in sorted(provider_counts.items())
-            ],
-            "attemptable_providers": [
-                {"id": provider, "model_count": count}
-                for provider, count in sorted(attemptable_provider_counts.items())
-            ],
         }
 
     def _build_agent_routes(self) -> dict[str, Any]:
@@ -2436,10 +2345,10 @@ class TerminalBridge(
                     limit=12,
                 )
             elif surface in {"models", "model"}:
-                default_target = model_routing.default_target()
+                default_provider, default_model = self._terminal_default_route()
                 policy = self._build_model_policy_summary(
-                    selected_provider=default_target.provider_id,
-                    selected_model=default_target.model_id,
+                    selected_provider=self._selected_provider_id or default_provider,
+                    selected_model=self._selected_model_id or default_model,
                     strategy="responsive",
                 )
                 result["payload"] = build_routing_decision_payload(policy)
@@ -2465,7 +2374,16 @@ class TerminalBridge(
             strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
             requested_route = f"{provider}:{model}"
             target = model_routing.target_for_route(provider, model)
-            if target is None or not model_routing.is_routable(target):
+            canonical_route = target is not None and model_routing.is_routable(target)
+            local_preview_route = self._is_enabled_local_preview_route(
+                provider,
+                model,
+            )
+            external_preview_route = self._is_enabled_external_preview_route(
+                provider,
+                model,
+            )
+            if not canonical_route and not local_preview_route and not external_preview_route:
                 self._remember_action(f"model.set REFUSED {requested_route} (unroutable)")
                 return {
                     "ok": False,
@@ -2687,10 +2605,10 @@ class TerminalBridge(
             registry = self._build_command_registry()
             return self._render_command_registry_text(registry), "commands"
         if normalized in {"models", "model"}:
-            default_target = model_routing.default_target()
+            default_provider, default_model = self._terminal_default_route()
             policy = self._build_model_policy_summary(
-                selected_provider=default_target.provider_id,
-                selected_model=default_target.model_id,
+                selected_provider=self._selected_provider_id or default_provider,
+                selected_model=self._selected_model_id or default_model,
                 strategy="responsive",
             )
             return self._render_model_policy_text(policy), "models"

@@ -22,6 +22,14 @@ from dharma_swarm.model_hierarchy import (
 )
 from dharma_swarm.models import ProviderType
 
+# Exact identities for the Helm account-preview boundary.  These constants are
+# catalogued here so feature code never owns model literals, but they are not
+# ModelCatalogEntry rows and therefore grant no global routing availability,
+# tier, default, or proof.
+HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID = "gpt-5.6-sol"
+HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID = "claude-fable-5"
+HELM_PREVIEW_GROK_4_6_MODEL_ID = "grok-4.6"
+
 _SELECTOR_KEYS = (
     "model_catalog_selector",
     "model_pack",
@@ -333,6 +341,9 @@ def model_catalog_summary(
 
 
 __all__ = [
+    "HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID",
+    "HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID",
+    "HELM_PREVIEW_GROK_4_6_MODEL_ID",
     "ModelCatalogEntry",
     "ModelPack",
     "apply_model_pack_metadata",
