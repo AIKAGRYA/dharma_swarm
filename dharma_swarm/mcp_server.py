@@ -6,12 +6,93 @@ Requires the `mcp` optional dependency: pip install dharma-swarm[mcp]
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from dharma_swarm.models import AgentRole, TaskPriority
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
+
+logger = logging.getLogger(__name__)
+
+# Consequential (mutating) tools; the read paths stay receipt-free.
+MUTATING_MCP_TOOLS = ("spawn_agent", "create_task", "store_memory")
 
 
-def create_mcp_server(state_dir: str = ".dharma"):
+class McpToolSpine:
+    """Spine wiring for the MCP tool boundary.
+
+    Mints an ExecutionIdentity per consequential tool call and records
+    side-effect intent/completion receipts in the runtime ledger. Fail-open:
+    a broken store must never break the tool call — failures are counted
+    (``audit_failures``), never silently swallowed.
+    """
+
+    def __init__(self, runtime_state: RuntimeStateStore | None) -> None:
+        self._runtime_state = runtime_state
+        self.audit_failures = 0
+
+    def begin(
+        self, tool_name: str, arguments: dict[str, Any]
+    ) -> tuple[ExecutionIdentity | None, str]:
+        if self._runtime_state is None or tool_name not in MUTATING_MCP_TOOLS:
+            return None, ""
+        identity = ExecutionIdentity.new(
+            task_id=f"mcp:{tool_name}",
+            agent_id="mcp_client",
+            metadata={"surface": "mcp_tool_access"},
+        )
+        effect_key = f"mcp:{tool_name}:{identity.run_id}"
+        try:
+            self._runtime_state.record_execution_identity_sync(
+                identity,
+                source="mcp_server.call_tool",
+                metadata={"tool": tool_name},
+            )
+            self._runtime_state.record_side_effect_intent_sync(
+                identity,
+                effect_key,
+                # Argument KEYS only: values may be large or sensitive.
+                payload={"tool": tool_name, "argument_keys": sorted(arguments)},
+            )
+        except Exception:
+            self.audit_failures += 1
+            logger.warning(
+                "mcp_server: spine intent receipt failed for %s; executing"
+                " WITHOUT receipts",
+                tool_name,
+                exc_info=True,
+            )
+            return None, ""
+        return identity, effect_key
+
+    def complete(
+        self,
+        identity: ExecutionIdentity | None,
+        effect_key: str,
+        *,
+        status: str = "completed",
+    ) -> None:
+        if identity is None or not effect_key or self._runtime_state is None:
+            return
+        try:
+            self._runtime_state.record_side_effect_complete_sync(
+                identity, effect_key, status=status
+            )
+        except Exception:
+            self.audit_failures += 1
+            logger.warning(
+                "mcp_server: spine completion receipt failed for %s",
+                effect_key,
+                exc_info=True,
+            )
+
+
+def create_mcp_server(
+    state_dir: str = ".dharma",
+    *,
+    runtime_state: RuntimeStateStore | None = None,
+):
     """Create an MCP server with swarm tools.
 
     Returns the server instance. Call server.run() to start.
@@ -27,6 +108,8 @@ def create_mcp_server(state_dir: str = ".dharma"):
         )
 
     server = Server("dharma-swarm")
+    # Receipts land in the canonical runtime ledger unless a store is injected.
+    spine = McpToolSpine(runtime_state if runtime_state is not None else RuntimeStateStore())
     _swarm = None
 
     async def _get_swarm():
@@ -169,7 +252,18 @@ def create_mcp_server(state_dir: str = ".dharma"):
             return [TextContent(type="text", text=json.dumps(list(load_roster()), indent=2))]
 
         swarm = await _get_swarm()
+        identity, effect_key = spine.begin(name, arguments)
+        try:
+            result = await _dispatch_tool(name, arguments, swarm)
+        except Exception:
+            spine.complete(identity, effect_key, status="failed")
+            raise
+        spine.complete(identity, effect_key)
+        return result
 
+    async def _dispatch_tool(
+        name: str, arguments: dict[str, Any], swarm: Any
+    ) -> list[TextContent]:
         if name == "swarm_status":
             state = await swarm.status()
             return [TextContent(type="text", text=state.model_dump_json(indent=2))]
