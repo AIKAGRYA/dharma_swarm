@@ -220,6 +220,33 @@ def _context_adapter(node_id: str, fn: Callable[..., Any]) -> Callable[[Any], An
     return adapter
 
 
+def _runtime_adapter(
+    context_type: type | None,
+    context: Any,
+    passthrough: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Re-attribute the typed ``context`` declaration onto the runtime surface.
+
+    The LG01 typed front door already owns the per-invoke ``context`` object
+    and injects it into nodes declaring a second positional parameter. LG30
+    needs the SAME object reachable through the engine's runtime accessors
+    (``get_runtime().context``) so a typed graph and a neutral graph expose
+    one context, not two. This adapter therefore forwards the already-proven
+    declaration into ``CompiledGraph.invoke`` rather than introducing a
+    second context channel — no new state, no new checkpoint surface.
+
+    ``passthrough`` carries the remaining injection kwargs (``config`` /
+    ``store`` / ``stream_writer`` / ``previous``); only keys the caller
+    actually supplied are forwarded, so the engine's own defaults stand.
+    """
+    forwarded: dict[str, Any] = {
+        name: value for name, value in passthrough.items() if value is not None
+    }
+    if context is not None or context_type is not None:
+        forwarded["context"] = context
+    return forwarded
+
+
 class TypedStateGraph:
     """Typed front door over :class:`GraphBuilder` (langgraph StateGraph parity).
 
@@ -311,6 +338,10 @@ class TypedCompiledGraph:
         input: Mapping[str, Any] | None = None,
         *,
         context: Any = None,
+        config: Mapping[str, Any] | None = None,
+        store: Any = None,
+        stream_writer: Any = None,
+        previous: Any = None,
         **kwargs: Any,
     ) -> GraphRunResult:
         if context is not None and self.context_type is None:
@@ -326,9 +357,19 @@ class TypedCompiledGraph:
             # Non-mapping inputs (Command(resume=...)) bypass projection and
             # reach the engine's own input handling unchanged.
             seed = {k: v for k, v in seed.items() if k in self.input_keys}
+        injection = _runtime_adapter(
+            self.context_type,
+            context,
+            {
+                "config": config,
+                "store": store,
+                "stream_writer": stream_writer,
+                "previous": previous,
+            },
+        )
         token = _ACTIVE_CONTEXT.set(context)
         try:
-            result = await self.inner.invoke(input=seed, **kwargs)
+            result = await self.inner.invoke(input=seed, **injection, **kwargs)
         finally:
             _ACTIVE_CONTEXT.reset(token)
         if self.output_keys is not None:
