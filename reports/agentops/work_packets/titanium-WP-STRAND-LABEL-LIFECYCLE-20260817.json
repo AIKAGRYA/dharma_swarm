@@ -1,0 +1,92 @@
+{
+  "id": "titanium-WP-STRAND-LABEL-LIFECYCLE-20260817",
+  "base_ref": "3e5debab6f586daf203246940a147bba9da4692f",
+  "branch": "claude/pr-ci-health-strand-label-clears",
+  "worktree": "/home/user/dharma_swarm",
+  "intent": "Make the ci-stranded-rebase-skipped label a two-way signal. pr-ci-health adds it when it skips a rebase for want of a push credential, and never removes it, so a PR labelled once wears it permanently and reads as abandoned even after it becomes rebased and mergeable. On 2026-08-17 nine open PRs carried the label while every one of them merged cleanly against main. The label is now cleared after a successful rebase -- the only point the lane can prove the stranding is actually over.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "reports/agentops/work_packets/titanium-WP-STRAND-LABEL-LIFECYCLE-20260817.json",
+    "tests/test_pr_ci_health.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/pr-dedupe.yml",
+    "Makefile",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "scripts/governance/pr_ci_safe_rebase.py"
+  ],
+  "gates": [
+    {
+      "name": "workflow-yaml-parses",
+      "command": "python3 -c \"import yaml,sys; yaml.safe_load(open('.github/workflows/pr-ci-health.yml')); print('ok')\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "pr-ci-health-contracts-behavioural",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "gating-on-exit-code-instead-of-message-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); n=t.replace('\\\"REBASED PR #$pr:\\\"*) ;;','\\\"ZZZNOMATCH\\\"*) ;;'); sys.exit(2) if n==t else None; p.write_text(n); r=subprocess.run([sys.executable,'-m','pytest','-q','-k','label_','tests/test_pr_ci_health.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ops): clear the strand label once a rebase actually succeeds"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-STRAND-LABEL-LIFECYCLE",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "3e5debab6f586daf203246940a147bba9da4692f",
+      "details": []
+    },
+    "interface_mismatches": [
+      "pr-ci-health.yml declared a label lifecycle it did not implement: the label's own description says the lane 'skipped an auto-rebase', a transient condition, but the code only ever POSTed it and had no DELETE path. Declared meaning and actual behaviour now agree."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "tests/test_pr_ci_health.py",
+      "scripts/governance/pr_ci_safe_rebase.py"
+    ],
+    "honest_blockers": [
+      "AN ADVERSARIAL REVIEW REFUTED MY FIRST VERSION AND IT WAS RIGHT. I gated the label clearing on the rebase helper's EXIT CODE. That is wrong: scripts/governance/pr_ci_safe_rebase.py sets exit_code = 0 on all 38 `raise Skip` paths -- including 'push rejected (lease or remote)', 'rebase conflict; aborted' and 'PR head moved before push' -- and signals real success only with a a `REBASED PR` message prefix message prefix. Its own test_lease_rejection_does_not_report_success pins exit 0 on a rejected push. So my first version cleared the label on rebases that never happened, destroying a TRUE warning -- the exact failure mode the change claimed to prevent. Now gated on the message prefix.",
+      "MY FIRST TESTS WERE THEATRE. They asserted substring ORDER in the YAML text. The reviewer produced two mutants that kept them green while the workflow deleted labels on failed rebases, and one equivalent rewrite (`gh api --method DELETE`) that made them fail on a correct workflow, crashing with ValueError rather than an assertion message. They are replaced with a harness that EXECUTES the step's shell against a stub gh and a stub helper and asserts on whether a DELETE was actually issued. Verified: gating on exit code instead of message is CAUGHT; removing the clearing block is CAUGHT; dropping the redundant exit-code `continue` is correctly reported as no behavioural change, because the message gate already protects the label.",
+      "I ALSO TOLD THE OPERATOR SOMETHING FALSE AND HAVE CORRECTED IT. I said an hourly job had been labelling PRs as stranded. It has not. The step that labels and rebases is gated `github.event_name == 'workflow_dispatch' && env.MODE == 'rebase'`; the hourly cron runs MODE=report and never reaches it. The nine stuck labels came from manual dispatches, not a loop. This also means the fix ships almost NO behaviour today: clearing requires a manual dispatch that also succeeds in rebasing, which needs the missing credential.",
+      "THIS DOES NOT CLEAR THE NINE LABELS ALREADY STUCK. The fix is forward-only: it removes the label the next time this lane successfully rebases a given PR. The nine PRs carrying it today keep it until that happens, and it cannot happen while the root cause persists (below). Clearing them now would be a bulk label mutation on PRs I did not open, which is an operator call rather than a code change.",
+      "THE ROOT CAUSE IS A MISSING CREDENTIAL AND ONLY THE OPERATOR CAN FIX IT. pr-ci-health labels instead of rebasing because HAS_PUSH_TOKEN is false: no PR_CI_HEALTH_PUSH_TOKEN is configured, and a github.token push never triggers workflows, so the lane fails closed by design. Until that secret exists the lane can never reach the new clearing path, because that path sits after a successful rebase. This change makes the label honest once the lane works; it does not make the lane work.",
+      "CLEARING IS DELIBERATELY NOT ATTEMPTED ANYWHERE ELSE. Removing the label in the fail-closed branch, or for any PR that merely looks mergeable, would erase a still-true warning about the missing credential. test_strand_label_is_cleared_only_after_a_real_rebase pins the ordering so a future edit cannot move the removal earlier without failing.",
+      "THE BETTER FIX, NOT TAKEN HERE, AND WHY. The label's own description says 'no configured credential proved push authority' -- a property of the LANE, not the PR. So the correct trigger is the credential becoming valid: clear the label during push-authority validation, or reconcile it on the hourly report lane. That would clear all nine stuck labels automatically, would not be hostage to the 38 Skip paths, and would match the label's declared meaning. It is a larger change to the workflow with the broadest permission set in the repository, and it belongs in its own packet with its own review rather than bolted onto a correctness fix. What lands here is narrower and true: when this lane does rebase a PR, the stale label stops lying."
+    ],
+    "rollback": "Single revert. The label returns to add-only, and PRs it touches stay labelled permanently. Nothing else depends on this change.",
+    "packet_digest": "6e113652e4cc67965e2b062d636ba22c8c52800853b8d7f993fc67d373938b79"
+  }
+}

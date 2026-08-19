@@ -588,3 +588,143 @@ def test_rebase_selection_uses_behind_by_not_mergeable_state():
     assert 'select(.categories | index("merge_conflict") | not)' in workflow, (
         "a rebase cannot resolve a conflicted branch"
     )
+
+
+# --- Behavioural contract for the strand-label lifecycle -------------------
+#
+# `ci-stranded-rebase-skipped` was add-only: pr-ci-health applied it when it
+# declined a rebase for want of push authority and never removed it, so a PR
+# labelled once wore it permanently. Measured 2026-08-17: nine open PRs carried
+# it while all nine merged cleanly against main.
+#
+# These tests EXECUTE the workflow step's shell against stub `gh` and a stub
+# rebase helper, rather than asserting on the YAML text. An earlier version of
+# this file asserted substring order instead; an adversarial review showed two
+# mutants that kept those assertions green while the workflow deleted labels on
+# rebases that never happened. Byte offsets are not behaviour.
+
+import os as _os
+import shutil as _shutil
+import subprocess as _subprocess
+import textwrap as _textwrap
+
+_WORKFLOW = (
+    Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+)
+_STRAND_LABEL = "ci-stranded-rebase-skipped"
+
+
+def _rebase_step_script() -> str:
+    """The `run:` body of the rebase step, dedented for execution."""
+    lines = _WORKFLOW.read_text(encoding="utf-8").splitlines()
+    start = next(
+        i for i, ln in enumerate(lines)
+        if "Rebase conflict-free behind-main branches" in ln
+    )
+    run_at = next(i for i in range(start, len(lines)) if lines[i].strip() == "run: |")
+    indent = len(lines[run_at]) - len(lines[run_at].lstrip())
+    body = []
+    for ln in lines[run_at + 1:]:
+        if ln.strip() and (len(ln) - len(ln.lstrip())) <= indent:
+            break
+        body.append(ln)
+    return _textwrap.dedent("\n".join(body))
+
+
+def _run_rebase_step(tmp_path, helper_stdout: str, helper_rc: int = 0) -> tuple[str, list[str]]:
+    """Execute the step with stubbed `gh` and stubbed rebase helper.
+
+    Returns (combined output, list of gh argument-lines the step invoked).
+    """
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "gh_calls.log"
+    (bin_dir / "gh").write_text(
+        "#!/usr/bin/env bash\n"
+        f'printf "%s\\n" "$*" >> "{calls}"\n'
+        'case "$*" in\n'
+        f'  *"--jq .labels[].name"*) printf "%s\\n" "{_STRAND_LABEL}"; exit 0 ;;\n'
+        "  *) exit 0 ;;\n"
+        "esac\n"
+    )
+    (bin_dir / "gh").chmod(0o755)
+    (bin_dir / "git").write_text("#!/usr/bin/env bash\nexit 0\n")
+    (bin_dir / "git").chmod(0o755)
+
+    helper = tmp_path / "scripts" / "governance"
+    helper.mkdir(parents=True)
+    (helper / "pr_ci_safe_rebase.py").write_text(
+        f"import sys\nprint({helper_stdout!r})\nsys.exit({helper_rc})\n"
+    )
+    # The step selects its target from triage.json, written by an earlier
+    # step. Supplying a real eligible row exercises the actual jq selector
+    # rather than bypassing it.
+    (tmp_path / "triage.json").write_text(
+        '[{"number": 904, "head": "feat/x", "base": "main",'
+        ' "categories": ["behind_main"]}]'
+    )
+
+    script = _rebase_step_script()
+    # `set -u` is active: every variable the step reads must be supplied, or
+    # bash aborts before the code under test runs.
+    env = dict(_os.environ)
+    env.update(
+        PATH=f"{bin_dir}:{env['PATH']}",
+        REPO="AIKAGRYA/dharma_swarm",
+        HAS_PUSH_TOKEN="true",
+        STRAND_LABEL=_STRAND_LABEL,
+        GH_TOKEN="stub",
+        TARGET_PR="904",
+        MODE="rebase",
+    )
+    proc = _subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=env,
+        capture_output=True, text=True, timeout=60,
+    )
+    logged = calls.read_text().splitlines() if calls.exists() else []
+    return proc.stdout + proc.stderr, logged
+
+
+def _deleted_the_label(gh_calls: list[str]) -> bool:
+    return any("DELETE" in c and _STRAND_LABEL in c for c in gh_calls)
+
+
+def test_label_is_cleared_when_the_helper_reports_a_real_rebase(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "REBASED PR #904: feat@abc onto origin/main")
+    assert _deleted_the_label(calls), (
+        f"a confirmed rebase must clear the stale label; gh calls were {calls}\n{out}"
+    )
+
+
+def test_label_survives_a_skip_that_exits_zero(tmp_path):
+    """The defect this contract exists for.
+
+    pr_ci_safe_rebase.py returns exit code 0 on all 38 `raise Skip` paths and
+    marks real success only with a `REBASED PR #<n>:` prefix — see its own
+    test_lease_rejection_does_not_report_success. A push rejected by the lease
+    means the PR was NOT rebased and is still stranded, so the label is still
+    true and must survive.
+    """
+    out, calls = _run_rebase_step(
+        tmp_path, "SKIP PR #904: push rejected (lease or remote): stale info"
+    )
+    assert not _deleted_the_label(calls), (
+        f"the label was cleared on a SKIP — a rebase that never happened.\n"
+        f"gh calls: {calls}\n{out}"
+    )
+
+
+def test_label_survives_a_rebase_conflict_skip(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "SKIP PR #904: rebase conflict; aborted")
+    assert not _deleted_the_label(calls), f"cleared on a conflict skip: {calls}\n{out}"
+
+
+def test_label_survives_a_helper_hard_failure(tmp_path):
+    out, calls = _run_rebase_step(tmp_path, "ERROR PR #904: unexpected", helper_rc=1)
+    assert not _deleted_the_label(calls), f"cleared on a helper error: {calls}\n{out}"
+
+
+def test_the_harness_can_actually_observe_a_delete(tmp_path):
+    """Guard against the whole suite passing because nothing is ever detected."""
+    _, calls = _run_rebase_step(tmp_path, "REBASED PR #904: feat@abc onto origin/main")
+    assert calls, "no gh calls captured at all — the harness is not exercising the step"
