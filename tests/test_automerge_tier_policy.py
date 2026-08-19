@@ -680,3 +680,101 @@ def test_fetch_all_pages_concatenates_and_fails_closed(monkeypatch):
         lambda args: pages[1] if args[-1].endswith("page=1") else None,
     )
     assert guard._fetch_all_pages("repos/o/r/pulls/1/files") is None
+
+
+def _view(*, labels=None, is_draft=False):
+    return {
+        "labels": [{"name": label} for label in (labels or [])],
+        "isDraft": is_draft,
+        "title": "feat: large operator-reviewed consolidation",
+        "additions": 22_000,
+        "deletions": 4_000,
+        "author": {"login": "AmitabhainArunachala"},
+        "baseRefName": "main",
+        "baseRefOid": "b" * 40,
+        "headRefOid": "a" * 40,
+    }
+
+
+def test_gather_manual_lane_does_not_request_diff_or_reviews(monkeypatch):
+    """The required check must not wedge an unlabeled operator PR merely
+    because GitHub refuses to render its >20k-line diff."""
+    calls = []
+
+    def fake_gh_json(args):
+        calls.append(args)
+        assert args[:2] == ["pr", "view"]
+        return _view()
+
+    monkeypatch.setattr(guard, "_gh_json", fake_gh_json)
+    monkeypatch.setattr(
+        guard,
+        "_fetch_all_pages",
+        lambda resource: (_ for _ in ()).throw(AssertionError(resource)),
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError(args)),
+    )
+
+    gathered = guard.gather_pr("owner/repo", 1414, POLICY)
+    assert gathered is not None
+    assert gathered["labels"] == []
+    assert gathered["changed_paths"] == []
+    assert gathered["diff_text"] == ""
+    assert gathered["diff_lines"] == 26_000
+    report = guard.evaluate(policy=POLICY, **gathered)
+    assert report["passed"] is True
+    assert report["reason"] == "not in the unattended lane; policy does not bind"
+    assert len(calls) == 1
+
+
+def test_gather_draft_unattended_label_stays_on_manual_lane(monkeypatch):
+    monkeypatch.setattr(
+        guard,
+        "_gh_json",
+        lambda args: _view(labels=["bot-pr"], is_draft=True),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_fetch_all_pages",
+        lambda resource: (_ for _ in ()).throw(AssertionError(resource)),
+    )
+    gathered = guard.gather_pr("owner/repo", 7, POLICY)
+    assert gathered is not None
+    report = guard.evaluate(policy=POLICY, **gathered)
+    assert report["passed"] is True
+    assert report["reason"] == "not in the unattended lane; policy does not bind"
+
+
+def test_gather_canary_and_assume_unattended_require_full_evidence(monkeypatch):
+    """Neither a canary nor an arming caller may use the manual-lane
+    short-circuit, even when the PR is draft or unlabeled."""
+    views = iter(
+        [
+            _view(labels=["canary-sandbox"], is_draft=True),
+            _view(),
+        ]
+    )
+    monkeypatch.setattr(guard, "_gh_json", lambda args: next(views))
+    seen = []
+
+    def fail_closed(resource):
+        seen.append(resource)
+        return None
+
+    monkeypatch.setattr(guard, "_fetch_all_pages", fail_closed)
+    assert guard.gather_pr("owner/repo", 1, POLICY) is None
+    assert seen and seen[0].endswith("/reviews")
+    seen.clear()
+    assert (
+        guard.gather_pr(
+            "owner/repo",
+            2,
+            POLICY,
+            assume_unattended=True,
+        )
+        is None
+    )
+    assert seen and seen[0].endswith("/reviews")

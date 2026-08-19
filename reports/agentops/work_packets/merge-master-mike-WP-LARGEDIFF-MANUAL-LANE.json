@@ -1,0 +1,95 @@
+{
+  "allowed_files": [
+    "scripts/governance/check_automerge_tier_policy.py",
+    "tests/test_automerge_tier_policy.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-LARGEDIFF-MANUAL-LANE.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+  "branch": "fix/automerge-tier-large-diff-20260819",
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): keep large manual PRs out of diff deadlock"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "terminal/**",
+    "tools/**",
+    "scripts/runtime/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_automerge_tier_policy.py",
+      "expected_exit": 0,
+      "name": "large-diff-tier-policy-tests",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "python3 -m ruff check scripts/governance/check_automerge_tier_policy.py tests/test_automerge_tier_policy.py",
+      "expected_exit": 0,
+      "name": "large-diff-tier-policy-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "large-diff-tier-policy-diff",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "merge-master-mike-WP-LARGEDIFF-MANUAL-LANE",
+  "intent": "Repair the required automerge tier-policy check so an unlabeled or draft operator-manual PR remains a deterministic pass even when GitHub refuses to render a diff larger than 20,000 lines. Preserve fail-closed full evidence gathering for canary PRs and every caller that explicitly assumes unattended authority.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import pathlib,sys; p=pathlib.Path('scripts/governance/check_automerge_tier_policy.py'); t=p.read_text(); old='and (not (UNATTENDED_LABELS & set(labels)) or is_draft)'; new='and True'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(1 if '--assume-unattended' in p.read_text() else 2)\"",
+      "expected_exit": 1,
+      "name": "unattended-large-diff-still-fails-closed",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/governance/check_automerge_tier_policy.py::evaluate",
+      "scripts/governance/check_automerge_tier_policy.py::gather_pr",
+      "tests/test_automerge_tier_policy.py"
+    ],
+    "collision": {
+      "checked_at_sha": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This change does not authorize unattended merging. Canary and --assume-unattended calls still require all authenticated review, files, diff, and rate evidence and fail closed on any partial read."
+    ],
+    "interface_mismatches": [
+      "The required policy workflow invokes gh pr diff before deciding whether the PR is in the unattended lane; GitHub returns HTTP 406 for diffs over 20,000 lines, wedging manual draft PRs the policy says must pass."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "6501555d2a7e7a3f94d9cee3c4cb12d56561538e64459aeeececf1d97633601c",
+    "rollback": "Revert this packet-scoped repair; large manual PRs will again require an operator override when GitHub refuses their diff.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-LARGEDIFF-MANUAL-LANE"
+  },
+  "worktree": "."
+}
