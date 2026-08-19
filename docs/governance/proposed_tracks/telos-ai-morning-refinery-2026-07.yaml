@@ -1,0 +1,123 @@
+# telos-ai-morning-refinery-2026-07 — PROPOSED TRACK (honest re-admission candidate)
+#
+# Source: Fable 5 builder lane G, 2026-07-21 (JST)
+# Schema: v2 (active_tracks list entry, ready for operator promotion)
+# Status: PROPOSED — BLOCKED-ON-OPERATOR-DECISION. Not active. Merging this
+#   file admits nothing; only an explicit operator lifecycle decision moves the
+#   entry into docs/governance/ACTIVE_TRACK.yaml.
+#
+# Lineage and honesty note
+# ------------------------
+# Predecessor: telos-ai-morning-refinery-2026-06 — removed from canon at the
+# 2026-07-07 reconcile with the PROPOSED-HOLD verdict "CANT-MAKE-REAL.
+# RECOMMEND: design-hold (or close)" (ACTIVE_TRACK.yaml comment block, ~line
+# 1504). That verdict found: zero shipped product code, the only "test" a
+# markdown lint in test clothing, all owned surfaces absent from origin/main,
+# and the only real gate an operator-mediated EXTERNAL HUMAN acted receipt.
+#
+# This candidate ACCEPTS that verdict instead of arguing with it:
+#   - the PRODUCT scope (seed runner, refinery pipeline, dashboard) stays on
+#     design-hold exactly as the verdict recommends — it is NOT re-admitted;
+#   - the six lint-style criteria of the 2026-06 track are dropped, not ported;
+#   - the track is re-scoped to the single thing the hold note itself named as
+#     the honest gate: one external human acts on one consented, sanitized
+#     TELOS output, and the action is receipted through the existing
+#     fail-closed checker (check_external_acted_receipt in
+#     scripts/governance/check_track_status.py — 10 required fields, 14
+#     forbidden non-receipt markers, already on canon).
+#
+# Live context, 2026-07-21: the consent-ready sanitized artifact
+# (reports/telos_ai/SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md) exists
+# on the local checkout only, unsent for 21 days. The operator outreach hold
+# (standing since 2026-05-27) covers the TELOS send; releasing that hold is a
+# TELOS-specific operator decision. Send kit:
+# ~/handoffs/2026-07-21_telos_first_receipt_kit/.
+#
+# Promotion gates (all operator-held)
+# -----------------------------------
+# G1. Operator picks reconciliation option (a) — this candidate — over folding
+#     the gate into darshan-publication-2026-07 (memo:
+#     docs/governance/TELOS_CANON_RECONCILIATION_2026-07-21.md).
+# G2. The three 2026-06-30 evidence artifacts land on origin/main via a small
+#     port PR (prerequisites below are RED on canon until then).
+# G3. Operator moves this entry into ACTIVE_TRACK.yaml with a fresh
+#     verified_at. No agent performs that move.
+
+- id: telos-ai-morning-refinery-2026-07
+  name: TELOS Morning Refinery — first external acted receipt (narrow re-scope)
+  status: PROPOSED
+  proposed_at: "2026-07-21"
+  proposed_by: "fable-5-builder-lane-g"
+  proposed_owner: "@AmitabhainArunachala"
+  ttl_days: 21   # applies on promotion; no TTL while PROPOSED
+  serves: revenue-external-humans-served
+
+  owned_surfaces:
+    - reports/telos_ai/**
+
+  moves_vital_signs:
+    - eval_coverage
+
+  claim_boundary: >-
+    Criteria prove exactly one thing: one external human performed one
+    substantive action on one consented, sanitized TELOS output, and that
+    action is receipted without exposing private material. Never a product,
+    product-market, adoption, or revenue claim. The Morning Refinery product
+    scope remains on design-hold per the 2026-07-07 reconcile verdict and is
+    not re-admitted by this track.
+
+  description: |
+    Narrow successor to telos-ai-morning-refinery-2026-06 (held 2026-07-07 as
+    CANT-MAKE-REAL). Scope is the single honest gate the hold note named: an
+    operator-mediated external action on the consent-ready sanitized artifact,
+    receipted at reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md under the
+    fail-closed external_acted_receipt checker already on canon.
+
+    The send is one operator lease decision (outreach hold standing since
+    2026-05-27). A substantive reply in any of the five classes the artifact's
+    External Review Prompt solicits (unclear phrase / safer privacy boundary /
+    real use case / grounded rejection / next-artifact request) is the acted
+    action. No reply, or encouragement-only, keeps the gate red — silence is
+    data, not failure, and nothing is faked to close it.
+
+  prerequisites:
+    - id: acted_receipt_schema_on_main
+      kind: file_exists
+      file: reports/telos_ai/EXTERNAL_ACTED_RECEIPT_SCHEMA.md
+    - id: operator_packet_on_main
+      kind: file_exists
+      file: reports/telos_ai/EXTERNAL_ACTION_OPERATOR_PACKET_2026-06-30.md
+    - id: sanitized_candidate_on_main
+      kind: file_exists
+      file: reports/telos_ai/SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md
+
+  completion_criteria:
+    - id: first_external_receipt_exists
+      kind: external_acted_receipt
+      file: reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md
+
+  non_goals:
+    - Do not send outreach from any agent; the operator sends, or nothing is sent.
+    - Do not process raw private morning-page material into repo artifacts.
+    - Do not claim product, adoption, product-market, or revenue proof from this receipt.
+    - Do not weaken the external_acted_receipt checker (fields or forbidden markers) to go green.
+    - Do not re-admit the refinery product scope, seed runner, or dashboard surfaces here.
+    - Do not double-count this receipt inside darshan-publication-2026-07's criteria.
+
+  next_items:
+    - id: 1
+      what: "Operator decision: reconciliation option (a) vs (b) per docs/governance/TELOS_CANON_RECONCILIATION_2026-07-21.md."
+      kind: governance
+      blocker: true
+    - id: 2
+      what: "Port PR: land the three reports/telos_ai/ 2026-06-30 evidence artifacts on origin/main (they exist only on the local checkout)."
+      kind: docs
+      blocker: true
+    - id: 3
+      what: "Operator decides whether to lift the outreach hold for ONE TELOS send using ~/handoffs/2026-07-21_telos_first_receipt_kit/."
+      kind: external
+      blocker: true
+    - id: 4
+      what: "Only after a real external action: fill the receipt skeleton, verify with the fail-closed checker, commit reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md."
+      kind: receipt
+      blocker: true
