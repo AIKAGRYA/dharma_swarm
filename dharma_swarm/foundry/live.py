@@ -207,12 +207,37 @@ def run_live_eval(
     )
 
 
+def _latest_receipt(root: Path) -> Path | None:
+    receipts = sorted(root.glob(f"{BENCHMARK_ID}_*.json"))
+    return receipts[-1] if receipts else None
+
+
+def _chain_prev_digest(root: Path) -> str:
+    """Digest of the newest existing receipt, or the genesis marker.
+
+    Each receipt embeds its predecessor's digest, forming a hash chain:
+    rewriting any historical receipt breaks every digest after it. This is
+    tamper-EVIDENT, not tamper-proof (see the honest gap note in
+    docs/foundry/ — local disk is still rewritable wholesale; ring 3 anchors
+    in venues we don't control remain the strongest link).
+    """
+    latest = _latest_receipt(root)
+    if latest is None:
+        return "genesis"
+    try:
+        return json.loads(latest.read_text(encoding="utf-8")).get("digest", "genesis")
+    except (OSError, ValueError):
+        return "genesis"
+
+
 def write_live_receipt(result: LiveResult, *, state_root: Path) -> Path:
+    from dharma_swarm.foundry.evaluator import canonical_digest
+
     root = Path(state_root) / "live_eval"
     root.mkdir(parents=True, exist_ok=True)
     stamp = result.ran_at.replace(":", "").replace("-", "")[:15]
     path = root / f"{BENCHMARK_ID}_{stamp}.json"
-    path.write_text(json.dumps({
+    payload = {
         "benchmark": BENCHMARK_ID,
         "provider": result.provider,
         "model": result.model,
@@ -224,8 +249,38 @@ def write_live_receipt(result: LiveResult, *, state_root: Path) -> Path:
         "ran_at": result.ran_at,
         "total_tokens": result.total_tokens,
         "est_cost_usd_upper_bound": result.est_cost_usd,
-    }, indent=2), encoding="utf-8")
+        "prev_digest": _chain_prev_digest(root),
+    }
+    payload["digest"] = canonical_digest(payload)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
+
+
+def verify_live_chain(state_root: Path) -> tuple[bool, str]:
+    """Walk the live-receipt chain; return (ok, detail).
+
+    Recomputes every digest and checks each ``prev_digest`` pointer. Any
+    rewritten or deleted-in-the-middle receipt surfaces as a break.
+    """
+    from dharma_swarm.foundry.evaluator import canonical_digest
+
+    root = Path(state_root) / "live_eval"
+    receipts = sorted(root.glob(f"{BENCHMARK_ID}_*.json"))
+    expected_prev = "genesis"
+    for path in receipts:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        claimed = data.get("digest", "")
+        if "prev_digest" not in data:
+            # Pre-chain receipt (before this feature): treat as chain genesis.
+            expected_prev = claimed or "genesis"
+            continue
+        if data["prev_digest"] != expected_prev:
+            return False, f"chain break at {path.name}: prev_digest mismatch"
+        body = {k: v for k, v in data.items() if k != "digest"}
+        if canonical_digest(body) != claimed:
+            return False, f"tampered receipt at {path.name}: digest mismatch"
+        expected_prev = claimed
+    return True, f"chain intact over {len(receipts)} receipts"
 
 
 def live_daemon_cycle(target_id: str, generations: int, budget_cap: float,

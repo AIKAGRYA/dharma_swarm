@@ -18,6 +18,11 @@ Checks:
   hack).
 - ``suspicious_fast_eval`` — the evaluation returned faster than physically
   plausible (a hardcoded answer, not a real benchmark).
+- ``no_op_diff`` — the candidate changes nothing. Without this, an empty diff
+  scores baseline fitness and enters the archive as a "win" — the exact
+  "vacuous fitness / phantom applied" failure the organism's own history
+  records (empty diffs auto-passed in an earlier evolution lane; see
+  docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md F4).
 """
 
 from __future__ import annotations
@@ -91,6 +96,28 @@ def _added_paths(diff: str) -> list[str]:
     return paths
 
 
+def _has_effective_change(diff: str) -> bool:
+    """True if the diff (or raw blob) contains any actual content change.
+
+    A unified diff must have at least one ``+``/``-`` content line (headers
+    don't count). A raw non-diff blob counts as content if it is non-blank.
+    """
+    text = diff.strip()
+    if not text:
+        return False
+    is_diff = "+++" in text or "---" in text or text.startswith(("diff ", "@@"))
+    if not is_diff:
+        return True
+    for line in text.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            if line[1:].strip():
+                return True
+        if line.startswith("-") and not line.startswith("---"):
+            if line[1:].strip():
+                return True
+    return False
+
+
 def _added_python_source(diff: str) -> str:
     """The added lines of a unified diff, as candidate Python source.
 
@@ -144,6 +171,10 @@ def scan_tripwires(
     """Static ring-1 checks on a candidate diff (scope + forbidden primitives)."""
     fired: list[str] = []
     details: dict[str, str] = {}
+
+    if not _has_effective_change(candidate.diff):
+        fired.append("no_op_diff")
+        details["no_op_diff"] = "candidate contains no effective content change"
 
     touched = _added_paths(candidate.diff)
     if allowed_paths is not None:

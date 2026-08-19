@@ -134,3 +134,28 @@ def test_receipt_includes_token_and_cost_fields(tmp_path):
     payload = json.loads(write_live_receipt(result, state_root=tmp_path).read_text())
     assert payload["total_tokens"] == 123
     assert payload["est_cost_usd_upper_bound"] == 0.000369
+
+
+def test_receipts_form_verifiable_hash_chain(tmp_path):
+    paths = []
+    for i in range(3):
+        r = LiveResult("groq", "m", 5, 5, 1.0, [], error="",
+                       )
+        r.ran_at = f"2026-08-19T0{i}:00:00+00:00"  # distinct filenames, ordered
+        paths.append(write_live_receipt(r, state_root=tmp_path))
+
+    first = json.loads(paths[0].read_text())
+    second = json.loads(paths[1].read_text())
+    assert first["prev_digest"] == "genesis"
+    assert second["prev_digest"] == first["digest"]
+
+    ok, detail = live.verify_live_chain(tmp_path)
+    assert ok, detail
+
+    # tamper with the middle receipt -> chain must break
+    middle = json.loads(paths[1].read_text())
+    middle["accuracy"] = 0.0
+    paths[1].write_text(json.dumps(middle))
+    ok, detail = live.verify_live_chain(tmp_path)
+    assert not ok
+    assert "tampered" in detail or "chain break" in detail
