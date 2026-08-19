@@ -1,0 +1,127 @@
+{
+  "allowed_files": [
+    "terminal/**",
+    "dharma_swarm/model_catalog.py",
+    "dharma_swarm/operator_core/helm_context.py",
+    "dharma_swarm/operator_core/helm_context_projection.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_chat_membrane.py",
+    "dharma_swarm/terminal_bridge_chat_policy.py",
+    "dharma_swarm/terminal_bridge_external_preview.py",
+    "dharma_swarm/terminal_bridge_helm_context.py",
+    "dharma_swarm/tui/engine/adapters/**",
+    "docs/plans/nihonga_helm_frontier/NIHONGA_HELM_FRONTIER_MASTER_SPEC.md",
+    "tests/fixtures/terminal_bridge/**",
+    "tests/test_helm_context.py",
+    "tests/test_terminal_bridge.py",
+    "tests/test_terminal_bridge_external_preview.py",
+    "tests/test_terminal_bridge_helm_context.py",
+    "tests/tui/kimi_code_test_support.py",
+    "tests/tui/test_claude_adapter_v11.py",
+    "tests/tui/test_codex_text_adapter.py",
+    "tests/tui/test_grok_oauth_adapter.py",
+    "tests/tui/test_grok_oauth_codec.py",
+    "tests/tui/test_kimi_code_adapter.py",
+    "tests/tui/test_ollama_adapter.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLEGONE01-CONSOLIDATION.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+  "branch": "build/helm-legone-01-stack-consolidation",
+  "commit": {
+    "allowed": true,
+    "message": "fix(helm): bind consolidated stack to current governance"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/**",
+    "scripts/governance/hygiene/**",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_helm_context.py tests/test_terminal_bridge_helm_context.py tests/test_terminal_bridge_external_preview.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_text_adapter.py tests/tui/test_grok_oauth_adapter.py tests/tui/test_grok_oauth_codec.py tests/tui/test_kimi_code_adapter.py tests/tui/test_ollama_adapter.py",
+      "expected_exit": 0,
+      "name": "helm-legone-consolidation-python",
+      "timeout_seconds": 600
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/model_catalog.py dharma_swarm/operator_core/helm_context.py dharma_swarm/operator_core/helm_context_projection.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_chat_membrane.py dharma_swarm/terminal_bridge_chat_policy.py dharma_swarm/terminal_bridge_external_preview.py dharma_swarm/terminal_bridge_helm_context.py dharma_swarm/tui/engine/adapters tests/test_helm_context.py tests/test_terminal_bridge_helm_context.py tests/test_terminal_bridge_external_preview.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_text_adapter.py tests/tui/test_grok_oauth_adapter.py tests/tui/test_grok_oauth_codec.py tests/tui/test_kimi_code_adapter.py tests/tui/test_ollama_adapter.py",
+      "expected_exit": 0,
+      "name": "helm-legone-consolidation-ruff",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "helm-legone-consolidation-diff",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "helm-worldclass-terminal-WP-HELMLEGONE01-CONSOLIDATION",
+  "intent": "Consolidate the previously reviewed Helm stack onto current canonical main as one mechanical draft PR, preserving the exact terminal, bridge, provider-preview, and Slice-1 HelmContextEnvelope behavior while removing branch-only custody artifacts that current repository policy forbids: the temporary root build-status file and superseded historical Session Entry packets. This packet is the single current event-scope authority envelope; it grants no merge authority and introduces no new product behavior beyond the recovered stack.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import pathlib,sys; p=pathlib.Path('dharma_swarm/operator_core/helm_context.py'); t=p.read_text(); old='if reject_reserved and normalized in _RESERVED_PROJECTION_KEYS:'; new='if False and normalized in _RESERVED_PROJECTION_KEYS:'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); ns={}; exec(compile(p.read_text(),str(p),'exec'),ns); fn=ns['_validate_json_value']; sys.exit(1 if fn({'provider_state_promotion': True},path='projection',reject_reserved=True) else 2)\"",
+      "expected_exit": 1,
+      "name": "helm-context-authority-forgery-is-rejected",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLIVE-main-integration-2026-07-21.json",
+      "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2.json",
+      "scripts/governance/check_agentops_packet_scope.py",
+      "scripts/terminal_guardian_preflight.sh"
+    ],
+    "collision": {
+      "checked_at_sha": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This consolidation remains a draft and cannot merge until every required CI context is green and the operator explicitly approves the merge.",
+      "The packet proves committed-range scope and declared gates; it does not prove seven fresh live model receipts or satisfy the full Helm leg-one alive bar.",
+      "Fugu Ultra and other preview routes remain subject to their actual client, credential, and response-owned identity evidence; registration or preview code is not live proof."
+    ],
+    "interface_mismatches": [
+      "The recovered stack arrived as eight historical Session Entry packets, while current CI requires exactly one packet to cover one high-risk pull-request event.",
+      "The recovered stack included HELM_SELF_AWARE_BUILD_STATUS.md at repository root even though its own source notes said to leave that temporary checkpoint uncommitted and Rule 8 forbids the location."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "121b26e62f47c3fda68421eafbfa220355599fb27ab28e0b5a2f1851d8363ae7",
+    "rollback": "Revert this governance-repair commit to restore the pre-repair branch; terminal behavior is unchanged by the repair itself.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-HELMLEGONE01-CONSOLIDATION"
+  },
+  "worktree": "."
+}
