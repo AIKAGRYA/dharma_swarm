@@ -75,6 +75,7 @@ Use it for:
 
 Current examples:
 
+- [DharmaGraph Production Runtime Specification v1.1 — Reconstructed](DHARMAGRAPH_PRODUCTION_RUNTIME_SPEC_v1_1_RECONSTRUCTED.md)
 - [Titanium-Grade Repository Hardening — Integrated Execution Specification vNext](TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md)
 - [ALLOUT_6H_MODE.md](/Users/dhyana/dharma_swarm/docs/plans/ALLOUT_6H_MODE.md)
 - [ALL_NIGHT_BUILD_CONCLAVE_2026-03-20.md](/Users/dhyana/dharma_swarm/docs/plans/ALL_NIGHT_BUILD_CONCLAVE_2026-03-20.md)
