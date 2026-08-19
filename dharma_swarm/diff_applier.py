@@ -8,14 +8,20 @@ when the test suite passes, rolled back otherwise.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
-import re
 import shutil
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel
 
+# Re-exported for existing importers; the parser moved to diff_parser
+# (module line-budget).
+from dharma_swarm.diff_parser import (  # noqa: F401
+    FilePatch,
+    Hunk,
+    parse_unified_diff,
+)
 from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.sandbox import await_cleanup, terminate_process_group
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
@@ -37,6 +43,23 @@ class ApplyResult(BaseModel):
     backup_paths: dict[str, str] = {}  # original -> backup
     created_files: list[str] = []
     error: str = ""
+    # True when the idempotency fence replayed a prior completed apply of the
+    # same diff content instead of splicing it in a second time.
+    deduplicated: bool = False
+
+
+def _apply_side_effect_key(proposal_id: str, diff_text: str) -> str:
+    """Content-addressed side-effect key for one consequential diff apply."""
+    digest = hashlib.sha256(diff_text.encode("utf-8")).hexdigest()
+    return f"self_mod:apply:{proposal_id or 'adhoc'}:{digest}"
+
+
+def _fence_claim_key(side_effect_key: str) -> str:
+    """Deterministic claim idempotency key (same ``sek_`` convention as
+    graph/durable_invoker): every applier of the same diff — including a
+    crash-requeued one with a re-minted ExecutionIdentity — races on the
+    SAME (idempotency_key, side_effect_key) row."""
+    return f"sek_{hashlib.sha256(side_effect_key.encode('utf-8')).hexdigest()}"
 
 
 class ApplyTestResult(BaseModel):
@@ -48,125 +71,6 @@ class ApplyTestResult(BaseModel):
     files_changed: list[str] = []
     rolled_back: bool = False
     error: str = ""
-
-
-# ---------------------------------------------------------------------------
-# Internal diff representation
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class Hunk:
-    """A single hunk from a unified diff."""
-
-    src_start: int
-    src_count: int
-    dst_start: int
-    dst_count: int
-    lines: list[str] = field(default_factory=list)
-
-
-@dataclass
-class FilePatch:
-    """All hunks targeting a single file."""
-
-    old_path: str  # "a/foo.py" or "/dev/null"
-    new_path: str  # "b/foo.py" or "/dev/null"
-    hunks: list[Hunk] = field(default_factory=list)
-    is_new_file: bool = False
-
-    @property
-    def target_path(self) -> str:
-        """Return the effective file path (strip leading a/ or b/)."""
-        if self.new_path == "/dev/null":
-            return _strip_prefix(self.old_path)
-        return _strip_prefix(self.new_path)
-
-
-_HUNK_RE = re.compile(
-    r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@"
-)
-
-
-def _strip_prefix(path: str) -> str:
-    """Remove leading ``a/`` or ``b/`` prefix from diff paths."""
-    if path.startswith(("a/", "b/")):
-        return path[2:]
-    return path
-
-
-# ---------------------------------------------------------------------------
-# Diff parser
-# ---------------------------------------------------------------------------
-
-
-def parse_unified_diff(diff_text: str) -> list[FilePatch]:
-    """Parse a unified diff into a list of per-file patches.
-
-    Handles:
-    - Single and multi-file diffs
-    - Multi-hunk patches
-    - New file creation (old path ``/dev/null``)
-    - Context, addition, and removal lines
-
-    Args:
-        diff_text: The full unified diff string.
-
-    Returns:
-        A list of ``FilePatch`` objects.
-
-    Raises:
-        ValueError: If the diff contains malformed hunk headers.
-    """
-    patches: list[FilePatch] = []
-    current_patch: FilePatch | None = None
-    current_hunk: Hunk | None = None
-    lines = diff_text.splitlines()
-    i = 0
-
-    while i < len(lines):
-        line = lines[i]
-
-        # --- / +++ pair signals a new file patch
-        if line.startswith("--- "):
-            old_path = line[4:].strip()
-            # Expect +++ on the next line
-            if i + 1 < len(lines) and lines[i + 1].startswith("+++ "):
-                new_path = lines[i + 1][4:].strip()
-                is_new = old_path == "/dev/null"
-                current_patch = FilePatch(
-                    old_path=old_path,
-                    new_path=new_path,
-                    is_new_file=is_new,
-                )
-                patches.append(current_patch)
-                current_hunk = None
-                i += 2
-                continue
-
-        # Hunk header
-        m = _HUNK_RE.match(line)
-        if m and current_patch is not None:
-            current_hunk = Hunk(
-                src_start=int(m.group(1)),
-                src_count=int(m.group(2)) if m.group(2) is not None else 1,
-                dst_start=int(m.group(3)),
-                dst_count=int(m.group(4)) if m.group(4) is not None else 1,
-            )
-            current_patch.hunks.append(current_hunk)
-            i += 1
-            continue
-
-        # Hunk body: context, add, or remove lines
-        if current_hunk is not None and line[:1] in (" ", "+", "-"):
-            current_hunk.lines.append(line)
-            i += 1
-            continue
-
-        # Skip diff metadata lines (diff --git, index, etc.)
-        i += 1
-
-    return patches
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +96,10 @@ class DiffApplier:
         self.workspace = (workspace or Path.cwd()).resolve()
         self._runtime_state = runtime_state
         self._require_identity = require_identity
+        # Count of fail-open fence audit-write failures (begin/complete could
+        # not reach the store). Observable state, mirrors
+        # graph/durable_invoker.py's audit_failures.
+        self.fence_audit_failures = 0
 
     async def apply(
         self,
@@ -246,6 +154,8 @@ class DiffApplier:
 
         effective_require = self._require_identity if require_identity is None else require_identity
         identity: ExecutionIdentity | None = None
+        fence_key = ""
+        fence_claim: ExecutionIdentity | None = None
         if not dry_run:
             try:
                 identity = require_execution_tollbooth(
@@ -263,6 +173,55 @@ class DiffApplier:
                     source="diff_applier.apply",
                     metadata={"surface": "self_modification"},
                 )
+                fence_key = _apply_side_effect_key(
+                    proposal_id or identity.proposal_id, stripped
+                )
+                fence_claim = identity.with_updates(
+                    idempotency_key=_fence_claim_key(fence_key)
+                )
+                try:
+                    begun = await self._runtime_state.try_begin_idempotent_side_effect(
+                        fence_claim,
+                        fence_key,
+                        metadata={"surface": "self_modification"},
+                    )
+                except Exception:
+                    # Fail-open (availability doctrine): the apply proceeds
+                    # unfenced, loudly and counted — never silently blocked
+                    # by the store.
+                    self.fence_audit_failures += 1
+                    logger.warning(
+                        "diff_applier: idempotency begin failed for %s;"
+                        " applying WITHOUT fence",
+                        fence_key,
+                        exc_info=True,
+                    )
+                    begun, fence_claim = True, None
+                if not begun and fence_claim is not None:
+                    record = await self._runtime_state.get_idempotency_record(
+                        fence_claim.idempotency_key, fence_key
+                    )
+                    prior_status = getattr(record, "status", "") if record else ""
+                    if prior_status == "completed":
+                        self._runtime_state.record_self_mod_receipt_sync(
+                            identity,
+                            stage="apply",
+                            status="deduplicated",
+                            proposal_id=proposal_id or identity.proposal_id,
+                            payload={"side_effect_key": fence_key},
+                        )
+                        return ApplyResult(success=True, deduplicated=True)
+                    if prior_status == "started":
+                        # A live concurrent apply holds this diff; a second
+                        # positional splice would corrupt the files.
+                        return ApplyResult(
+                            success=False,
+                            error=(
+                                "duplicate apply in flight for"
+                                f" side_effect_key={fence_key}"
+                            ),
+                        )
+                    # failed / unreadable prior attempt: retry re-executes.
                 self._runtime_state.record_self_mod_receipt_sync(
                     identity,
                     stage="apply",
@@ -291,6 +250,7 @@ class DiffApplier:
                         proposal_id=proposal_id or identity.proposal_id,
                         payload={"file": patch.target_path, "error": "target_missing"},
                     )
+                await self._complete_apply_fence(fence_claim, fence_key, status="failed")
                 return ApplyResult(
                     success=False,
                     error=f"Target file does not exist: {patch.target_path}",
@@ -320,6 +280,7 @@ class DiffApplier:
                         proposal_id=proposal_id or identity.proposal_id,
                         payload={"file": patch.target_path, "error": type(exc).__name__},
                     )
+                await self._complete_apply_fence(fence_claim, fence_key, status="failed")
                 return ApplyResult(
                     success=False,
                     error=f"Failed applying patch to {patch.target_path}: {exc}",
@@ -339,12 +300,33 @@ class DiffApplier:
                 proposal_id=proposal_id or identity.proposal_id,
                 payload={"files": files_changed},
             )
+        await self._complete_apply_fence(fence_claim, fence_key, status="completed")
         return ApplyResult(
             success=True,
             files_changed=files_changed,
             backup_paths=backup_paths,
             created_files=created_files,
         )
+
+    async def _complete_apply_fence(
+        self,
+        fence_claim: ExecutionIdentity | None,
+        fence_key: str,
+        *,
+        status: str,
+    ) -> None:
+        """Resolve the apply's idempotency row, fail-open (never break apply)."""
+        if fence_claim is None or not fence_key or self._runtime_state is None:
+            return
+        try:
+            await self._runtime_state.complete_idempotent_side_effect(
+                fence_claim, fence_key, status=status
+            )
+        except Exception:
+            self.fence_audit_failures += 1
+            logger.warning(
+                "diff_applier: fence completion failed for %s", fence_key, exc_info=True
+            )
 
     async def rollback(self, result: ApplyResult) -> None:
         """Restore backups and unlink only paths created by this apply."""
