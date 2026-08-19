@@ -98,25 +98,47 @@ def suite_pass_parser() -> MetricParser:
 
 
 def apply_diff(tree: Path, diff: str,
-               runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> str | None:
-    """Apply a unified diff to ``tree``. Returns None on success, reason on failure."""
+               runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+               *, check_only: bool = False) -> str | None:
+    """Apply a unified diff to ``tree``. Returns None on success, reason on failure.
+
+    Two appliers, strict first: ``git apply`` (exact context), then
+    ``patch --fuzz=3`` (tolerates the slightly-shifted line numbers LLM diffs
+    commonly carry — 74/78 candidates died at ring 1 in the first campaign,
+    largely as apply failures). Fuzz never changes WHAT is applied, only how
+    much surrounding drift is tolerated; the oracle still judges the result.
+    """
     if not diff.strip():
         return "empty diff"
     with tempfile.NamedTemporaryFile("w", suffix=".patch", delete=False) as fh:
         fh.write(diff if diff.endswith("\n") else diff + "\n")
         patch_path = fh.name
+
+    def _run(cmd: list[str]) -> tuple[int, str]:
+        proc = runner(cmd, capture_output=True, text=True, timeout=30)
+        return (getattr(proc, "returncode", 1),
+                (getattr(proc, "stderr", "") or getattr(proc, "stdout", "") or "").strip()[:200])
+
     try:
-        check = runner(["git", "apply", "--check", "--unsafe-paths",
-                        "--directory", str(tree), patch_path],
-                       capture_output=True, text=True, timeout=30)
-        if getattr(check, "returncode", 1) != 0:
-            return f"apply --check failed: {(getattr(check, 'stderr', '') or '').strip()[:200]}"
-        applied = runner(["git", "apply", "--unsafe-paths",
-                          "--directory", str(tree), patch_path],
-                         capture_output=True, text=True, timeout=30)
-        if getattr(applied, "returncode", 1) != 0:
-            return f"apply failed: {(getattr(applied, 'stderr', '') or '').strip()[:200]}"
-        return None
+        rc, err_git = _run(["git", "apply", "--check", "--unsafe-paths",
+                            "--directory", str(tree), patch_path])
+        if rc == 0:
+            if check_only:
+                return None
+            rc, err = _run(["git", "apply", "--unsafe-paths",
+                            "--directory", str(tree), patch_path])
+            return None if rc == 0 else f"apply failed: {err}"
+
+        # Fallback: fuzz-tolerant patch(1).
+        rc, err_patch = _run(["patch", "-p1", "--forward", "--fuzz=3", "--dry-run",
+                              "-d", str(tree), "-i", patch_path])
+        if rc != 0:
+            return f"apply --check failed: {err_git} | patch fallback: {err_patch}"
+        if check_only:
+            return None
+        rc, err = _run(["patch", "-p1", "--forward", "--fuzz=3",
+                        "-d", str(tree), "-i", patch_path])
+        return None if rc == 0 else f"patch apply failed: {err}"
     except (subprocess.SubprocessError, OSError) as exc:
         return f"apply error: {type(exc).__name__}"
     finally:

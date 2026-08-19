@@ -119,3 +119,21 @@ def test_apply_diff_helper_roundtrip(tmp_path):
     assert apply_diff(root, IMPROVE_DIFF) is None
     assert (root / "prog.py").read_text() == "VALUE = 2.0\n"
     assert apply_diff(root, "") == "empty diff"
+
+
+def test_fuzz_fallback_applies_shifted_diff(tmp_path):
+    # LLM diffs often carry slightly-wrong line numbers; git apply rejects
+    # them, patch --fuzz recovers them. 74/78 ring-1 deaths was the lesson.
+    root = tmp_path / "t2"
+    root.mkdir()
+    (root / "prog.py").write_text(
+        "# header comment\n# another line\nVALUE = 1.0\n# trailer\n", encoding="utf-8")
+    # Hunk claims line 1 but the change is really at line 3 (shifted context).
+    shifted = (
+        "--- a/prog.py\n+++ b/prog.py\n@@ -1,2 +1,2 @@\n # header comment\n"
+        "-VALUE = 1.0\n+VALUE = 3.0\n"
+    )
+    from dharma_swarm.foundry.oracle_evaluator import apply_diff
+    assert apply_diff(root, shifted, check_only=True) is None
+    assert apply_diff(root, shifted) is None
+    assert "VALUE = 3.0" in (root / "prog.py").read_text()

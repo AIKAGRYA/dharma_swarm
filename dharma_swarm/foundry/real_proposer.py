@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Callable
 
@@ -64,23 +63,13 @@ def extract_unified_diff(text: str) -> str:
 
 def check_applies(tree: Path, diff: str,
                   runner: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> str | None:
-    """``git apply --check`` against ``tree``. None on success, reason on failure."""
+    """Verify the diff applies (same appliers as the evaluator: git, then
+    fuzz-tolerant patch). None on success, reason on failure."""
+    from dharma_swarm.foundry.oracle_evaluator import apply_diff
+
     if not diff.strip():
         return "no unified diff found in reply"
-    with tempfile.NamedTemporaryFile("w", suffix=".patch", delete=False) as fh:
-        fh.write(diff if diff.endswith("\n") else diff + "\n")
-        patch = fh.name
-    try:
-        proc = runner(["git", "apply", "--check", "--unsafe-paths",
-                       "--directory", str(tree), patch],
-                      capture_output=True, text=True, timeout=30)
-        if getattr(proc, "returncode", 1) != 0:
-            return (getattr(proc, "stderr", "") or "apply --check failed").strip()[:300]
-        return None
-    except (subprocess.SubprocessError, OSError) as exc:
-        return f"apply error: {type(exc).__name__}"
-    finally:
-        Path(patch).unlink(missing_ok=True)
+    return apply_diff(tree, diff, runner, check_only=True)
 
 
 def real_proposer(
