@@ -29,6 +29,7 @@ CANONICAL_ROOT_AGENTS_BYTES = (
     b"It reports session status; it does not grant permission to edit.\n"
     b"Use `make agent-build-preflight PACKET=<path>` for exact edit admission.\n"
     b"The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.\n"
+    b"For purpose/vision context when designing (optional): `make vision`. It grants nothing.\n"
     b"Return the startup readback printed by onboarding before editing.\n"
 )
 IGNORE_DIR_NAMES = {

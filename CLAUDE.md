@@ -19,7 +19,8 @@ task touches them (see "Read when relevant" below).
 **What an onboard run does and does not prove:** READY is evidence about the
 local session evaluation only. It is NOT proof of edit admission, CI admission,
 merge approval, or whole-organism liveness — and it is not permission to edit.
-Deeper read-only projection: `make organism-status`.
+Deeper read-only projection: `make organism-status`. For purpose/telos context
+when designing (optional): `make vision` — read-only projection, grants nothing.
 
 Packet ceremony is required only when your changed paths match
 `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`: bind scope with
