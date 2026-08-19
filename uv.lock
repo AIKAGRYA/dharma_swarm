@@ -643,6 +643,9 @@ test-oracle = [
     { name = "langgraph-checkpoint" },
     { name = "langgraph-checkpoint-sqlite" },
 ]
+test-oracle-vocab = [
+    { name = "langchain-core" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -658,6 +661,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.25" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "icontract", specifier = ">=2.6" },
+    { name = "langchain-core", marker = "extra == 'test-oracle-vocab'", specifier = "==1.4.4" },
     { name = "langgraph", marker = "extra == 'infra'", specifier = ">=0.2.0" },
     { name = "langgraph", marker = "extra == 'test-oracle'", specifier = "==1.2.4" },
     { name = "langgraph-checkpoint", marker = "extra == 'test-oracle'", specifier = "==4.1.1" },
@@ -687,7 +691,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.24" },
     { name = "yfinance", marker = "extra == 'ginko'", specifier = ">=0.2" },
 ]
-provides-extras = ["mcp", "ingest", "dev", "router", "infra", "ginko", "test-oracle"]
+provides-extras = ["mcp", "ingest", "dev", "router", "infra", "ginko", "test-oracle", "test-oracle-vocab"]
 
 [[package]]
 name = "distro"
