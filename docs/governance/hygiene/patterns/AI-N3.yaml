@@ -1,0 +1,27 @@
+{
+  "id": "AI-N3",
+  "title": "Language predicate standing in for the deciding authority",
+  "cluster": "N",
+  "cluster_title": "Measurement Integrity",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-08-03",
+  "last_verified": "2026-08-03",
+  "next_review": "2026-11-03",
+  "definition": "Code answers a yes/no question with a language builtin that merely resembles the answer, when some external authority -- git, the filesystem, the API, the scheduler -- is the thing that actually decides. The stand-in agrees with the authority on the common case, which is why it survives review, and disagrees exactly on the edge case the guard exists to handle.",
+  "why_it_hurts": "The disagreement is invisible until the edge case arrives, and then the code is confidently wrong rather than uncertain. Measured instances: `Path.exists()` follows symlinks so a dangling symlink read as absent while `git add` accepted it (exit 0); `git diff --name-only` reports only a rename destination while `--no-renames` reveals both sides; git's human porcelain C-quotes non-ASCII paths so the parsed string is no longer a pathspec git will match; `git add` validates every pathspec before touching the index, so one unmatched path discards the entire call rather than skipping that entry.",
+  "detector": {"type": "manual", "rationale": "A general detector would need to know which authority owns which question -- that mapping is the judgement, not the check. Mechanizable per question once the authority is known: the recommended remedy is to ASK the authority (`git ls-files`, `git check-attr`, `os.path.lexists` where it matches `git add`'s acceptance) and keep the answer, rather than to reimplement its rule in Python."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": [
+    "scripts/runtime/lane_propose.py",
+    "scripts/runtime/lane_deliver.py",
+    "tests/test_lane_propose.py",
+    "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1200"
+  ],
+  "audit_questions": [
+    "Who actually decides this question at runtime -- this process, or the tool that will act on the answer? If the latter, why is the answer computed here instead of asked there?",
+    "Name one input where the builtin and the authority disagree. If you cannot name one, you have not looked for the edge case; if you can, is it handled?",
+    "Was the predicate verified against the real tool, or inferred from its documentation? Cite the command and its measured output.",
+    "Does the external command fail atomically over its whole input? If so, one bad element discards everything, and filtering must happen before the call rather than being left to the tool."
+  ]
+}
