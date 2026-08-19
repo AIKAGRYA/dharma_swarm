@@ -330,6 +330,20 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(latestChatTurnRoute(events)).toBe("claude:claude-opus-4-8");
   });
 
+  test("response-owned SessionStart outranks requested route without changing selection", () => {
+    const prompt = userPromptExecutionEvent("which Grok answered?", "2026-08-13T15:00:00Z");
+    const ack = canonicalEventsFromBridgeEvent({type: "session.ack", provider: "grok_oauth", model: "grok-4.6"});
+    const served = canonicalEventsFromBridgeEvent({type: "session_start", provider_id: "grok_oauth", model: "grok-4.6-build"});
+
+    expect(latestChatTurnRoute([prompt, ...ack])).toBe("grok_oauth:grok-4.6");
+    expect(latestChatTurnRoute([prompt, ...ack, ...served])).toBe("grok_oauth:grok-4.6-build");
+    expect(latestChatTurnRoute([prompt, ...served, ...ack])).toBe("grok_oauth:grok-4.6-build");
+    expect(canonicalEventsFromBridgeEvent({type: "session_start", provider_id: "grok_oauth", model: ""})).toEqual([]);
+    const summary = projectChatTraceLines([prompt, ...ack, ...served]).at(-1)?.text ?? "";
+    expect(summary).toContain("grok_oauth:grok-4.6-build");
+    expect(summary).not.toContain("grok_oauth:grok-4.6 ·");
+  });
+
   test("F-173: assistant bridge event renders its message as the turn's response in the chat transcript", () => {
     const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
     const answer = "I am the Helm. Identity intents route straight through me.";

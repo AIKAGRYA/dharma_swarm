@@ -1,39 +1,39 @@
- ◆ DHARMA COMMAND POST  ·  Models  ·  panes 15  ·  F2 zen · ^K panes
- loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
-◂ Repo Commands [Models] Ontology Runtime Sessions ▸
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Models                                                                                                               │
-│ Structured operator transcript.                                                                                      │
-│                                                                                                                      │
-│ Model policy loading...                                                                                              │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA HELM  /  SYSTEM  ·  ds_nihonga_helm_frontier_20260814                                       120×40 · panorama
+ ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ · Home   · Conversation   · Activity   · Evidence   ◆ System
+ HELM ◌ UNKNOWN ?/7  ·  Python verdict
+ Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
+┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
+│ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
+│  Dharma Helm · Quiet Field                         ││ Models                                 ││ correlated events ·… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ Structured operator transcript.        ││                      │
+│                                                    ││                                        ││ ✖ ENOENT: no such f… │
+│                                                    ││ Model policy loading...                ││ ✖ bridge stdin is u… │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ 2 canonical events … │
+└────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
+ BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
