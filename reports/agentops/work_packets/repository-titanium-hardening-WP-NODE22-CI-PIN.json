@@ -1,0 +1,87 @@
+{
+  "allowed_files": [
+    ".github/workflows/tests.yml",
+    "tests/test_polyglot_ci_contract.py",
+    "reports/agentops/work_packets/repository-titanium-hardening-WP-NODE22-CI-PIN.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "002b76fbc889c25da00121af8d2fb2c6de3a98d6",
+  "branch": "fix/node22-ci-pin-20260819",
+  "commit": {
+    "allowed": true,
+    "message": "ci(node): advance shared lanes to Node 22"
+  },
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/runtime/**",
+    "terminal/**",
+    "tools/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py",
+      "expected_exit": 0,
+      "name": "node22-polyglot-contract",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "node22-diff",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "repository-titanium-hardening-WP-NODE22-CI-PIN",
+  "intent": "Advance the existing exact shared Node CI pin from 20.20.2 to an exact Node 22 patch so the dashboard and terminal lanes remain in policy lockstep and the Helm Ink 7 migration can declare Node >=22 without weakening the polyglot supply-chain contract.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import pathlib,pytest,sys; p=pathlib.Path('.github/workflows/tests.yml'); t=p.read_text(); old='node-version: \\\"22.14.0\\\"'; new='node-version: \\\"22\\\"'; (t.count(old) == 2) or sys.exit(3); p.write_text(t.replace(old,new)); sys.exit(pytest.main(['-q','tests/test_polyglot_ci_contract.py','-k','pins_exact_node_version']))\"",
+      "expected_exit": 1,
+      "name": "floating-node-pin-is-rejected",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/tests.yml",
+      "tests/test_polyglot_ci_contract.py"
+    ],
+    "collision": {
+      "checked_at_sha": "002b76fbc889c25da00121af8d2fb2c6de3a98d6",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This PR changes the CI toolchain pin only. The terminal manifest and Ink dependency migration remain in ticket #1402."
+    ],
+    "interface_mismatches": [
+      "Ink 7 requires Node >=22, while both governed Node CI lanes are pinned exactly to 20.20.2 and the polyglot contract requires them to remain identical."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "637c5d2172e5bb54a25bda1fb4918eb0f0c1511082093993a4d65e911e88b48a",
+    "rollback": "Revert the packet-scoped CI pin commit to restore both lanes to Node 20.20.2.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-NODE22-CI-PIN"
+  },
+  "worktree": "."
+}
