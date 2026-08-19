@@ -1011,12 +1011,42 @@
       "symbol": "self._effects.now"
     },
     {
+      "category": "time",
+      "classification": "mediated",
+      "col": 11,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:70:11",
+      "line": 70,
+      "scope": "runtime",
+      "symbol": "time.monotonic"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 14,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:87:14",
+      "line": 87,
+      "scope": "runtime",
+      "symbol": "asyncio.sleep"
+    },
+    {
+      "category": "ordering",
+      "classification": "mediated",
+      "col": 27,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:100:27",
+      "line": 100,
+      "scope": "runtime",
+      "symbol": "asyncio.wait"
+    },
+    {
       "category": "rng",
       "classification": "mediated",
       "col": 48,
       "file": "dharma_swarm/graph/effects.py",
-      "id": "dharma_swarm/graph/effects.py:57:48",
-      "line": 57,
+      "id": "dharma_swarm/graph/effects.py:108:48",
+      "line": 108,
       "scope": "module",
       "symbol": "random.Random"
     },
@@ -1025,28 +1055,58 @@
       "classification": "mediated",
       "col": 15,
       "file": "dharma_swarm/graph/effects.py",
-      "id": "dharma_swarm/graph/effects.py:60:15",
-      "line": 60,
+      "id": "dharma_swarm/graph/effects.py:111:15",
+      "line": 111,
       "scope": "runtime",
       "symbol": "datetime.now"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 14,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:120:14",
+      "line": 120,
+      "scope": "runtime",
+      "symbol": "asyncio.sleep"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 15,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:123:15",
+      "line": 123,
+      "scope": "runtime",
+      "symbol": "time.monotonic"
     },
     {
       "category": "rng",
       "classification": "mediated",
       "col": 20,
       "file": "dharma_swarm/graph/effects.py",
-      "id": "dharma_swarm/graph/effects.py:86:20",
-      "line": 86,
+      "id": "dharma_swarm/graph/effects.py:143:20",
+      "line": 143,
       "scope": "runtime",
       "symbol": "random.Random"
+    },
+    {
+      "category": "time",
+      "classification": "mediated",
+      "col": 15,
+      "file": "dharma_swarm/graph/effects.py",
+      "id": "dharma_swarm/graph/effects.py:175:15",
+      "line": 175,
+      "scope": "runtime",
+      "symbol": "time.monotonic"
     },
     {
       "category": "ordering",
       "classification": "bypass",
       "col": 31,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:162:31",
-      "line": 162,
+      "id": "dharma_swarm/graph/executor.py:183:31",
+      "line": 183,
       "scope": "runtime",
       "symbol": "asyncio.wait"
     },
@@ -1055,8 +1115,8 @@
       "classification": "bypass",
       "col": 22,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:180:22",
-      "line": 180,
+      "id": "dharma_swarm/graph/executor.py:201:22",
+      "line": 201,
       "scope": "runtime",
       "symbol": "asyncio.wait"
     },
@@ -1065,8 +1125,8 @@
       "classification": "bypass",
       "col": 31,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:280:31",
-      "line": 280,
+      "id": "dharma_swarm/graph/executor.py:358:31",
+      "line": 358,
       "scope": "runtime",
       "symbol": "asyncio.timeout"
     },
@@ -1075,8 +1135,8 @@
       "classification": "bypass",
       "col": 28,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:376:28",
-      "line": 376,
+      "id": "dharma_swarm/graph/executor.py:440:28",
+      "line": 440,
       "scope": "runtime",
       "symbol": "asyncio.to_thread"
     },
@@ -1085,8 +1145,8 @@
       "classification": "mediated",
       "col": 19,
       "file": "dharma_swarm/graph/executor.py",
-      "id": "dharma_swarm/graph/executor.py:419:19",
-      "line": 419,
+      "id": "dharma_swarm/graph/executor.py:483:19",
+      "line": 483,
       "scope": "runtime",
       "symbol": "self._effects.dispatch_order"
     },
@@ -1149,6 +1209,16 @@
       "line": 455,
       "scope": "runtime",
       "symbol": "*.exists"
+    },
+    {
+      "category": "ordering",
+      "classification": "mediated",
+      "col": 22,
+      "file": "dharma_swarm/graph/retry.py",
+      "id": "dharma_swarm/graph/retry.py:204:22",
+      "line": 204,
+      "scope": "runtime",
+      "symbol": "effects.random().uniform"
     },
     {
       "category": "rng",
@@ -2702,6 +2772,7 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "datetime",
         "logging",
         "typing"
       ],
@@ -2735,9 +2806,11 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "asyncio",
         "dataclasses",
         "datetime",
         "random",
+        "time",
         "typing"
       ],
       "file": "dharma_swarm/graph/effects.py",
@@ -2838,6 +2911,18 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
+        "asyncio",
+        "dataclasses",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/retry.py",
+      "module": "dharma_swarm.graph.retry"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
         "copy",
         "dataclasses",
         "logging",
@@ -2907,6 +2992,20 @@
       ],
       "file": "dharma_swarm/graph/telos_bridge.py",
       "module": "dharma_swarm.graph.telos_bridge"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "asyncio",
+        "contextvars",
+        "dataclasses",
+        "datetime",
+        "typing"
+      ],
+      "file": "dharma_swarm/graph/timeouts.py",
+      "module": "dharma_swarm.graph.timeouts"
     },
     {
       "custody": "dharmagraph-engine-2026-07",
@@ -3295,9 +3394,9 @@
       "time": 19
     },
     "bypass_total": 230,
-    "effect_site_count": 238,
-    "mediated_total": 8,
-    "module_count": 67
+    "effect_site_count": 245,
+    "mediated_total": 15,
+    "module_count": 69
   },
   "workload": {
     "description": "Bounded graph run: GraphBuilder.compile() topology invoked via CompiledGraph.invoke() with SimulatedEffects, a GraphPersistenceKernel (checkpointing on), and a DurableInvoker-wrapped dispatch (derive_graph_side_effect_key). Crosses scheduling (executor superstep barrier), persistence (journal + checkpoint + idempotency store), and channel boundaries.",

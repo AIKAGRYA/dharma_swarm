@@ -24,13 +24,16 @@ claim_mode: candidate / test_only — not wired into production dispatch.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Any, Callable
 
 from typing import Mapping, Sequence
 
 from dharma_swarm.graph.channels import BarrierChannel, Channel, TopicChannel
+from dharma_swarm.graph.retry import RetryPolicySpec
 from dharma_swarm.graph.routing import BranchSpec, PathCallable, join_channel
 from dharma_swarm.graph.scheduler import CompiledGraph
+from dharma_swarm.graph.timeouts import TimeoutPolicy, coerce_node_binding
 from dharma_swarm.graph.types import (
     END,
     START,
@@ -116,8 +119,25 @@ class GraphBuilder:
         self._branches: list[BranchSpec] = []
         self._channels: list[tuple[str, Callable[[], Channel[Any]]]] = []
 
-    def add_node(self, node_id: str, fn: NodeCallable) -> GraphBuilder:
-        self._nodes.append(NodeSpec(node_id=node_id, fn=fn))
+    def add_node(
+        self,
+        node_id: str,
+        fn: NodeCallable,
+        *,
+        retry_policy: RetryPolicySpec = None,
+        timeout: "float | timedelta | TimeoutPolicy | None" = None,
+    ) -> GraphBuilder:
+        """Record a node, optionally with its retry ladder and timeout bounds.
+
+        ``retry_policy`` accepts one :class:`RetryPolicy` or a sequence of them
+        (selection is first-match on ``retry_on``); ``timeout`` accepts a
+        :class:`TimeoutPolicy`, or a bare number/timedelta meaning "hard cap
+        only" — both spellings match ``StateGraph.add_node`` in langgraph 1.2.4.
+        """
+        retry, timeout_policy = coerce_node_binding(retry_policy, timeout)
+        self._nodes.append(
+            NodeSpec(node_id=node_id, fn=fn, retry=retry, timeout=timeout_policy)
+        )
         return self
 
     def add_edge(self, source: str | Sequence[str], target: str) -> GraphBuilder:
