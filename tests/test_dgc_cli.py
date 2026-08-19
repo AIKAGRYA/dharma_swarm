@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -206,6 +207,128 @@ def test_dgc_cli_agent_run_command_dispatch():
                 cycles=2,
                 routing_mode="free-first",
             )
+
+
+def test_dgc_cli_agent_bootstrap_defaults_to_read_only_plan():
+    """main() dispatches bootstrap without silently applying the plan."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch(
+        "sys.argv",
+        [
+            "dgc",
+            "agent",
+            "bootstrap",
+            "codex_remote",
+            "--from-agent",
+            "codex_composer",
+        ],
+    ):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_bootstrap") as mock:
+            main()
+            mock.assert_called_once_with(
+                "codex_remote",
+                from_agent="codex_composer",
+                role="",
+                provider="",
+                model="",
+                prompt_file="",
+                harness="codex",
+                endpoint="local://dgc-agent",
+                dharma_home="",
+                apply=False,
+            )
+
+
+def test_dgc_cli_agent_remote_preflight_dispatch():
+    """main() dispatches the fixed read-only remote inventory command."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch(
+        "sys.argv",
+        [
+            "dgc",
+            "agent",
+            "remote-preflight",
+            "agni",
+            "--name",
+            "codex_remote",
+            "--timeout",
+            "4",
+        ],
+    ):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_remote_preflight") as mock:
+            main()
+            mock.assert_called_once_with(
+                "agni",
+                name="codex_remote",
+                timeout=4,
+            )
+
+
+def test_agent_talk_and_run_work_without_scripts_package(tmp_path):
+    """Installed-package commands must not depend on the excluded ``scripts`` tree."""
+    repo_root = Path(__file__).resolve().parent.parent
+    site_packages = tmp_path / "site-packages"
+    site_packages.mkdir()
+    (site_packages / "dharma_swarm").symlink_to(
+        repo_root / "dharma_swarm",
+        target_is_directory=True,
+    )
+    program = textwrap.dedent(
+        """
+        import sys
+
+        class RejectScriptsImports:
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "scripts" or fullname.startswith("scripts."):
+                    raise ModuleNotFoundError("scripts package is not installed")
+                return None
+
+        sys.meta_path.insert(0, RejectScriptsImports())
+
+        from dharma_swarm.terminal_commands import _holons
+        from dharma_swarm.terminal_commands.agents import (
+            _cmd_agent_run,
+            _cmd_agent_talk,
+        )
+
+        calls = []
+
+        async def fake_talk(name, message, *, routing_mode, max_tokens):
+            calls.append(("talk", name, message, routing_mode, max_tokens))
+            return 0
+
+        async def fake_run(name, cycles, *, routing_mode):
+            calls.append(("run", name, cycles, routing_mode))
+            return 0
+
+        _holons.talk = fake_talk
+        _holons.run = fake_run
+        _cmd_agent_talk("h", "hello", routing_mode="free-first", max_tokens=9)
+        _cmd_agent_run("h", cycles=2, routing_mode="declared-first")
+
+        assert calls == [
+            ("talk", "h", "hello", "free-first", 9),
+            ("run", "h", 2, "declared-first"),
+        ]
+        print("installed-package-like dispatch: ok")
+        """
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(site_packages)
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "installed-package-like dispatch: ok" in result.stdout
 
 
 def test_dgc_cli_agent_status_command_dispatch():
