@@ -1,0 +1,102 @@
+{
+ "id": "dharmagraph-WP-LG11PROV-provenance-session-entry-20260819",
+ "base_ref": "b11d0a7d4a72f7d5853795cd41813f8716bf2b01",
+ "branch": "agent/lg11-resurrect-20260818",
+ "worktree": ".",
+ "intent": "Session Entry packet for PR #1393 (resurrect #1275, LG11 message handling) fix-forward: the LG11 gauntlet comparison arm imports langchain_core.messages, so the import-provenance allowlist gains the langchain_core root — a hot path that makes this PR high-risk and packet-bound. The declaration lives in a new test-oracle-vocab extra pinned to the uv.lock-resolved transitive version (langchain-core==1.4.4); the rubric-frozen test-oracle tuple stays exactly three distributions, enforced by tests/test_langgraph_oracle_environment_contract.py. Also in this PR's range: the LG11 delta itself (graph/messages.py + exports + gauntlet arm + tests), the EffectsProvider mediation of message-id minting (bypass ratchet held at 230, never raised), and the regenerated tree-derived seam ledger. Sealed parity receipts, rubric files, and the frozen oracle tuple are untouched; differential-oracle stays red by design pending the post-merge reseal ceremony.",
+ "allowed_files": [
+  "dharma_swarm/graph/__init__.py",
+  "dharma_swarm/graph/messages.py",
+  "pyproject.toml",
+  "reports/governance/dharmagraph_parity/seam_ledger.json",
+  "scripts/governance/import_provenance_allowlist.txt",
+  "tests/oracle_support/dharmagraph_gauntlet.py",
+  "tests/test_graph_messages.py",
+  "uv.lock",
+  "reports/agentops/work_packets/dharmagraph-WP-LG11PROV-provenance-session-entry-20260819.json"
+ ],
+ "forbidden_files": [
+  "reports/governance/dharmagraph_parity/builder_receipt.json",
+  "reports/governance/dharmagraph_parity/judge_receipt.json",
+  "reports/governance/dharmagraph_parity/PARITY_MATRIX.md",
+  "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+  "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+  "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json"
+ ],
+ "gates": [
+  {
+   "name": "oracle-environment-contract",
+   "command": "python3 -m pytest -q tests/test_langgraph_oracle_environment_contract.py",
+   "expected_exit": 0,
+   "timeout_seconds": 120
+  },
+  {
+   "name": "import-provenance",
+   "command": "python3 scripts/governance/check_import_provenance.py",
+   "expected_exit": 0,
+   "timeout_seconds": 120
+  },
+  {
+   "name": "lg11-lane-surface",
+   "command": "python3 -m pytest -q tests/test_graph_messages.py tests/test_graph_seam_ledger.py tests/conformance/test_repo_ratchet_holds.py",
+   "expected_exit": 0,
+   "timeout_seconds": 600
+  }
+ ],
+ "negative_controls": [
+  {
+   "name": "tuple-purity-must-fail",
+   "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('pyproject.toml'); t=p.read_text(); old='langgraph-checkpoint-sqlite==3.1.0\\\",\\n]'; new='langgraph-checkpoint-sqlite==3.1.0\\\",\\n    \\\"langchain-core==1.4.4\\\",\\n]'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','-p','no:cacheprovider','tests/test_langgraph_oracle_environment_contract.py'],check=False); sys.exit(r.returncode)\"",
+   "expected_exit": 1,
+   "timeout_seconds": 120
+  }
+ ],
+ "commit": {
+  "allowed": true,
+  "message": "fix(lg11): keep langchain-core provenance outside the frozen oracle tuple + session-entry packet"
+ },
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "session_entry": {
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "python": "3.13.12",
+   "git": "Git-155)",
+   "uv": "0.11.2"
+  },
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "work_packet": "WP-LG11PROV",
+  "active_track": "dharmagraph-engine-2026-07",
+  "owner": "@AmitabhainArunachala",
+  "collision": {
+   "status": "clear",
+   "checked_at_sha": "b11d0a7d4a72f7d5853795cd41813f8716bf2b01",
+   "details": []
+  },
+  "interface_mismatches": [
+   "tests/test_langgraph_oracle_environment_contract.py pins the test-oracle extra to exactly the three rubric comparison_target distributions, so a provenance declaration appended inside that extra fails the contract; the declaration must live in a separate extra.",
+   "scripts/governance/check_import_provenance.py fails closed on any third-party import root absent from both a pyproject/requirements declaration and its allowlist, so a transitively-installed package that is imported directly still needs an explicit declaration.",
+   "scripts/governance/import_provenance_allowlist.txt is a Merge Master Mike hot path, so the minimal provenance repair itself escalates the PR to high-risk and requires this packet."
+  ],
+  "closest_existing_implementation": [
+   "pyproject.toml:test-oracle",
+   "reports/agentops/work_packets/dharmagraph-WP-ORACLEPIN-frozen-environment-20260809.json",
+   "scripts/governance/check_import_provenance.py",
+   "tests/oracle_support/dharmagraph_gauntlet.py:langgraph comparison arm"
+  ],
+  "honest_blockers": [
+   "differential-oracle remains red by campaign design: the frozen builder receipt predates every W0 branch and re-sealing is the post-merge reseal ceremony's job, not this lane's.",
+   "Fresh exact-head hosted CI, independent review, and human merge authority remain required; this packet grants none of them."
+  ],
+  "rollback": "Revert the test-oracle-vocab extra, the uv.lock resolution of it, the langchain_core allowlist line, and this packet together in one commit; the LG11 code delta and mediated id minting stand or fall with the PR itself, not with this provenance repair.",
+  "packet_digest": "afde1786cd2e87dd5e757f3ad21375692fef4c25c6950b446b465849998eb391"
+ }
+}
