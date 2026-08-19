@@ -133,12 +133,18 @@ def choose_model(models: Sequence[str]) -> str:
     return chat[0] if chat else (models[0] if models else "")
 
 
-def call_chat(base_url: str, key: str, model: str, prompt: str, *, timeout: float = 45.0) -> tuple[str, int]:
-    """Returns (content, total_tokens) — token count straight from the API's usage block."""
+def call_chat(base_url: str, key: str, model: str, prompt: str, *,
+              timeout: float = 45.0, max_tokens: int = 64,
+              temperature: float = 0.0) -> tuple[str, int]:
+    """Returns (content, total_tokens) — token count straight from the API's usage block.
+
+    The tiny default ``max_tokens`` fits the frozen heartbeat benchmark;
+    mutation proposals (unified diffs) pass a much larger budget.
+    """
     data = _http_json(
         f"{base_url}/chat/completions", key,
         payload={
-            "model": model, "temperature": 0, "max_tokens": 64,
+            "model": model, "temperature": temperature, "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         },
         method="POST", timeout=timeout,
