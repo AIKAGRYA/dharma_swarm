@@ -47,6 +47,7 @@ from dharma_swarm.codex_cli import dgc_codex_exec_prefix
 from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
+from dharma_swarm.model_pool import NEMOTRON_35_FAMILY_PREFIX
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.jikoku_instrumentation import jikoku_traced_provider  # type: ignore
 from dharma_swarm.ollama_config import (
@@ -817,8 +818,9 @@ class OpenRouterFreeProvider(LLMProvider):
     # is `nvidia/nemotron-3.5` (the un-banished Lightning family), not the whole
     # `nvidia/nemotron` namespace, so older sub-floor nemotron variants are not
     # silently promoted here while free_fleet floors them — both files now agree.
+    # The prefix literal itself lives in model_pool (THE-ONE-WAY) — imported above.
     _PREFERRED_PREFIXES = [
-        "nvidia/nemotron-3.5",
+        NEMOTRON_35_FAMILY_PREFIX,
         "qwen/",
         "meta-llama/",
         "mistralai/",
