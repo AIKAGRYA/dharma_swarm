@@ -1,0 +1,136 @@
+{
+  "id": "titanium-WP-0S-observation-receipt-20260801",
+  "base_ref": "61df22a85e2083a96a7b0a9500b611e384d40730",
+  "branch": "agent/titanium-wp0s-observation-receipt-20260801",
+  "worktree": ".",
+  "intent": "Record a bounded, secret-value-free WP-0S implementation-observer receipt from fresh read-only local and remote probes; add a fail-closed validator and focused tests that distinguish live-host, listener, public-HTTP, and code-version evidence. The receipt remains inventory_complete=false and BLOCKED_OPERATOR until an operator attests the exact host scope. This packet performs no deployment, containment, host mutation, secret creation, settings change, or main-branch mutation.",
+  "allowed_files": [
+    "scripts/governance/validate_titanium_wp0s_observation_receipt.py",
+    "tests/test_titanium_wp0s_observation_receipt.py",
+    "reports/governance/titanium/wp0s_observation_receipt_20260801.json",
+    "reports/governance/titanium/wp0s_observation_refresh_20260803.md",
+    "reports/agentops/work_packets/titanium-WP-0S-observation-receipt-20260801.json"
+  ],
+  "forbidden_files": [
+    ".env",
+    ".env.*",
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docker-compose.yml",
+    "Dockerfile",
+    "Dockerfile.swarm",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/plans/**",
+    "docs/prompts/**",
+    "packages/**",
+    "scripts/ops/**",
+    "scripts/research/**",
+    "scripts/runtime/**",
+    "scripts/governance/run_agent_work_packet.py",
+    "scripts/governance/check_agentops_packet_scope.py",
+    "scripts/governance/render_active_track_includes.py",
+    "scripts/governance/check_track_status.py",
+    "tests/test_api_auth.py",
+    "tests/test_verify_api.py",
+    "tests/test_api_main_bootstrap.py",
+    "tests/test_agent_work_packet.py",
+    "tests/test_track_status.py",
+    "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
+    "reports/governance/titanium/wp00_baseline.json",
+    "reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-07-29.md",
+    "terminal/**",
+    "tools/**"
+  ],
+  "gates": [
+    {
+      "name": "wp0s-observation-receipt-tests",
+      "command": "python3 -m pytest -q tests/test_titanium_wp0s_observation_receipt.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "wp0s-observation-receipt-ruff",
+      "command": "python3 -m ruff check scripts/governance/validate_titanium_wp0s_observation_receipt.py tests/test_titanium_wp0s_observation_receipt.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "wp0s-observation-receipt-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "wp0s-pass-without-attestation-rejected",
+      "command": "python3 -c \"import json,pathlib,subprocess,sys; p=pathlib.Path('reports/governance/titanium/wp0s_observation_receipt_20260801.json'); d=json.loads(p.read_text()); d['status']='PASS'; d['verdict']['classification']='PASS'; p.write_text(json.dumps(d)); r=subprocess.run([sys.executable,'scripts/governance/validate_titanium_wp0s_observation_receipt.py',str(p),'--json']); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "wp0s-secret-value-injection-rejected",
+      "command": "python3 -c \"import json,pathlib,subprocess,sys; p=pathlib.Path('reports/governance/titanium/wp0s_observation_receipt_20260801.json'); d=json.loads(p.read_text()); d['claim_boundary'] += ' api_key=fixture-secret-material'; p.write_text(json.dumps(d)); r=subprocess.run([sys.executable,'scripts/governance/validate_titanium_wp0s_observation_receipt.py',str(p),'--json']); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "wp0s-collapsed-evidence-class-rejected",
+      "command": "python3 -c \"import json,pathlib,subprocess,sys; p=pathlib.Path('reports/governance/titanium/wp0s_observation_receipt_20260801.json'); d=json.loads(p.read_text()); d['evidence']['code_version']=[]; p.write_text(json.dumps(d)); r=subprocess.run([sys.executable,'scripts/governance/validate_titanium_wp0s_observation_receipt.py',str(p),'--json']); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(titanium): record WP-0S live exposure observation"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0S",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "61df22a85e2083a96a7b0a9500b611e384d40730",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Fresh read-only probes observe two externally reachable dashboard-family health endpoints, including a publicly bound Meghadharma container returning HTTP 200, but no operator attestation or containment decision exists.",
+      "Meghadharma carries two distinct runtimes: the old loopback backend has DASHBOARD_API_KEY by name, while the public dharmic-quant-web container has none of DASHBOARD_API_KEY, DHARMA_VERIFY_WEBHOOK_SECRET, or DHARMA_API_MODE; host-level union must not erase that distinction.",
+      "Rushabdev runs remote API head a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466; local commit-graph verification shows integrated WP-0S commit e96674d27 is not its ancestor, while the remote clone lacks that object and was not mutated or fetched."
+    ],
+    "closest_existing_implementation": [
+      "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:WP-0S",
+      "docs/plans/TITANIUM_WP0A_WP0S_DESIGN_2026-07-15.md:WP-0S",
+      "tests/test_api_auth.py",
+      "reports/governance/titanium/phase0_reconciliation_2026-07-25.json",
+      "scripts/runtime/fleet_field_registry.py"
+    ],
+    "honest_blockers": [
+      "This implementation-observer receipt cannot attest the complete deployment inventory or issue an operator containment decision.",
+      "inventory_complete remains false and the typed verdict remains BLOCKED_OPERATOR; PASS, CLOSED_NOT_PROD, and CLOSED_LIVE are forbidden without exact-scope operator attestation.",
+      "The packet records observations only and performs no host mutation, service restart, firewall or proxy change, credential creation, deployment, repository setting change, or merge."
+    ],
+    "rollback": "Revert the validator, focused tests, observation receipt, and packet together. Preserve all external host state and observation facts; rollback grants no authority to mutate or reinterpret them.",
+    "packet_digest": "4f10b899f0dbc1f4683fd2551e6dc08219185850eccff3aa292852b705f4b6a8"
+  }
+}
