@@ -6,6 +6,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +16,11 @@ from dharma_swarm.graph._persistence_io import (
     atomic_write_serialized,
     read_serialized_state,
 )
-from dharma_swarm.graph._persistence_lock import locked_persistence_file
+from dharma_swarm.graph._persistence_lock import (
+    PersistenceFileBusy,
+    locked_persistence_file,
+    try_locked_persistence_file,
+)
 from dharma_swarm.graph._persistence_state import (
     derive_updated_checkpoint,
     extract_state,
@@ -27,11 +33,21 @@ from dharma_swarm.graph.types import RunCheckpoint
 __all__ = [
     "DeltaChannelHistory",
     "GraphCheckpointRecord",
+    "GraphCheckpointConflictError",
     "GraphPendingWrite",
     "GraphPersistenceKernel",
     "GraphSerializer",
+    "GraphThreadBusyError",
     "JsonGraphSerializer",
 ]
+
+
+class GraphThreadBusyError(RuntimeError):
+    """Another process or task owns the durable run lease for this thread."""
+
+
+class GraphCheckpointConflictError(RuntimeError):
+    """The thread advanced beyond the checkpoint a caller intended to extend."""
 
 
 def _utc_now_iso() -> str:
@@ -155,6 +171,31 @@ class GraphPersistenceKernel(CheckpointSaverAdapter):
         self.persist_dir = persist_dir or DEFAULT_CHECKPOINT_DIR / "threads"
         self.serde = serializer or JsonGraphSerializer()
 
+    @contextmanager
+    def run_lease(self, thread_id: str) -> Iterator[None]:
+        """Hold the crash-released, non-blocking execution lease for a thread."""
+
+        thread_path = self._thread_path(thread_id)
+        lease_target = thread_path.with_suffix(f"{thread_path.suffix}.run")
+        try:
+            with try_locked_persistence_file(lease_target):
+                yield
+        except PersistenceFileBusy as exc:
+            raise GraphThreadBusyError(
+                f"graph thread {thread_id!r} already has an active runner"
+            ) from exc
+
+    def assert_latest(
+        self, thread_id: str, expected_latest_checkpoint_id: str | None
+    ) -> None:
+        """Atomically verify the exact checkpoint a caller intends to extend."""
+
+        with locked_persistence_file(self._thread_path(thread_id)):
+            state = self._read_thread_unlocked(thread_id, create=False)
+            self._assert_latest_unlocked(
+                thread_id, state, expected_latest_checkpoint_id
+            )
+
     def put_run_checkpoint(
         self,
         thread_id: str,
@@ -166,6 +207,32 @@ class GraphPersistenceKernel(CheckpointSaverAdapter):
     ) -> GraphCheckpointRecord:
         with locked_persistence_file(self._thread_path(thread_id)):
             state = self._read_thread_unlocked(thread_id)
+            return self._append_run_checkpoint_unlocked(
+                thread_id,
+                checkpoint,
+                state,
+                checkpoint_id=checkpoint_id,
+                parent_checkpoint_id=parent_checkpoint_id,
+                metadata=metadata,
+            )
+
+    def put_run_checkpoint_cas(
+        self,
+        thread_id: str,
+        checkpoint: RunCheckpoint,
+        *,
+        expected_latest_checkpoint_id: str | None,
+        checkpoint_id: str | None = None,
+        parent_checkpoint_id: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> GraphCheckpointRecord:
+        """Append only when expected_latest_checkpoint_id is still latest."""
+
+        with locked_persistence_file(self._thread_path(thread_id)):
+            state = self._read_thread_unlocked(thread_id)
+            self._assert_latest_unlocked(
+                thread_id, state, expected_latest_checkpoint_id
+            )
             return self._append_run_checkpoint_unlocked(
                 thread_id,
                 checkpoint,
@@ -335,17 +402,38 @@ class GraphPersistenceKernel(CheckpointSaverAdapter):
     ) -> None:
         with locked_persistence_file(self._thread_path(thread_id)):
             state = self._read_thread_unlocked(thread_id)
-            state["pending_writes"].append(
-                GraphPendingWrite(
-                    thread_id=thread_id,
-                    checkpoint_id=checkpoint_id,
-                    task_id=task_id,
-                    task_path=task_path,
-                    writes=tuple(writes),
-                ).to_dict()
+            self._put_writes_unlocked(
+                thread_id,
+                state,
+                writes,
+                task_id,
+                checkpoint_id=checkpoint_id,
+                task_path=task_path,
             )
-            state["updated_at"] = _utc_now_iso()
-            self._write_thread(thread_id, state)
+
+    def put_writes_cas(
+        self,
+        thread_id: str,
+        writes: Sequence[tuple[str, Any]],
+        task_id: str,
+        *,
+        expected_latest_checkpoint_id: str | None,
+        checkpoint_id: str | None = None,
+        task_path: str = "",
+    ) -> None:
+        with locked_persistence_file(self._thread_path(thread_id)):
+            state = self._read_thread_unlocked(thread_id)
+            self._assert_latest_unlocked(
+                thread_id, state, expected_latest_checkpoint_id
+            )
+            self._put_writes_unlocked(
+                thread_id,
+                state,
+                writes,
+                task_id,
+                checkpoint_id=checkpoint_id,
+                task_path=task_path,
+            )
 
     def recover_pending_writes(self, thread_id: str) -> list[GraphPendingWrite]:
         state = self._read_thread(thread_id, create=False)
@@ -354,16 +442,21 @@ class GraphPersistenceKernel(CheckpointSaverAdapter):
     def clear_pending_writes(self, thread_id: str, task_id: str | None = None) -> None:
         with locked_persistence_file(self._thread_path(thread_id)):
             state = self._read_thread_unlocked(thread_id, create=False)
-            if task_id is None:
-                state["pending_writes"] = []
-            else:
-                state["pending_writes"] = [
-                    w
-                    for w in state.get("pending_writes", [])
-                    if w.get("task_id") != task_id
-                ]
-            state["updated_at"] = _utc_now_iso()
-            self._write_thread(thread_id, state)
+            self._clear_pending_writes_unlocked(thread_id, state, task_id)
+
+    def clear_pending_writes_cas(
+        self,
+        thread_id: str,
+        task_id: str | None = None,
+        *,
+        expected_latest_checkpoint_id: str | None,
+    ) -> None:
+        with locked_persistence_file(self._thread_path(thread_id)):
+            state = self._read_thread_unlocked(thread_id, create=False)
+            self._assert_latest_unlocked(
+                thread_id, state, expected_latest_checkpoint_id
+            )
+            self._clear_pending_writes_unlocked(thread_id, state, task_id)
 
     def copy_thread(self, source_thread_id: str, target_thread_id: str) -> None:
         if not self._thread_path(source_thread_id).exists():
@@ -444,6 +537,59 @@ class GraphPersistenceKernel(CheckpointSaverAdapter):
                     )
             previous = current
         return history
+
+    @staticmethod
+    def _assert_latest_unlocked(
+        thread_id: str,
+        state: Mapping[str, Any],
+        expected_latest_checkpoint_id: str | None,
+    ) -> None:
+        checkpoints = state.get("checkpoints", [])
+        actual = checkpoints[-1].get("checkpoint_id") if checkpoints else None
+        if actual != expected_latest_checkpoint_id:
+            raise GraphCheckpointConflictError(
+                f"graph thread {thread_id!r} advanced from expected checkpoint "
+                f"{expected_latest_checkpoint_id!r} to {actual!r}"
+            )
+
+    def _put_writes_unlocked(
+        self,
+        thread_id: str,
+        state: dict[str, Any],
+        writes: Sequence[tuple[str, Any]],
+        task_id: str,
+        *,
+        checkpoint_id: str | None,
+        task_path: str,
+    ) -> None:
+        state.setdefault("pending_writes", []).append(
+            GraphPendingWrite(
+                thread_id=thread_id,
+                checkpoint_id=checkpoint_id,
+                task_id=task_id,
+                task_path=task_path,
+                writes=tuple(writes),
+            ).to_dict()
+        )
+        state["updated_at"] = _utc_now_iso()
+        self._write_thread(thread_id, state)
+
+    def _clear_pending_writes_unlocked(
+        self,
+        thread_id: str,
+        state: dict[str, Any],
+        task_id: str | None,
+    ) -> None:
+        if task_id is None:
+            state["pending_writes"] = []
+        else:
+            state["pending_writes"] = [
+                write
+                for write in state.get("pending_writes", [])
+                if write.get("task_id") != task_id
+            ]
+        state["updated_at"] = _utc_now_iso()
+        self._write_thread(thread_id, state)
 
     def _read_thread(self, thread_id: str, *, create: bool = True) -> dict[str, Any]:
         return self._read_thread_unlocked(thread_id, create=create)
