@@ -33,6 +33,14 @@ ALLOWLIST_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^tests/test_uplift_guards\.py$"),
     re.compile(r"^\.env\.template$"),
     re.compile(r"^\.env\.example$"),
+    # Redaction fail-closed fixtures: these files exist to prove the helm-context
+    # codec REJECTS secret-shaped strings ("sk-proj-abcdefgh…", "AKIAABCD…",
+    # fake PRIVATE KEY blocks — all synthetic, none deployable). Same fixture
+    # category as tests/test_uplift_guards.py above. Landed on main via the
+    # GitHub merge queue (#1414), which never runs local hooks, so every local
+    # restack merge re-flags them as staged "additions".
+    re.compile(r"^tests/test_helm_context\.py$"),
+    re.compile(r"^terminal/tests/helmContextProtocol\.test\.ts$"),
 ]
 
 
