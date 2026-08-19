@@ -1,13 +1,9 @@
 name: diag-pytest-name
-# One-shot diagnostic: print the FAILED/diff header lines from a prior
-# pytest run's saved output artifact. Delete this branch after use.
+# One-shot diagnostic (temporary branch, delete after use): print the FAILED
+# and diff-header lines from run 32220550957's saved pytest output artifact.
 on:
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: workflow run id that produced pytest-results-3.11
-        required: true
-        type: string
+  push:
+    branches: [diag-pytest-name]
 permissions:
   actions: read
   contents: read
@@ -19,7 +15,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: pytest-results-3.11
-          run-id: ${{ inputs.run_id }}
+          run-id: "32220550957"
           github-token: ${{ github.token }}
       - name: Print failure headers only
         run: |
