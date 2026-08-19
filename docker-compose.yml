@@ -26,6 +26,7 @@ x-provider-env: &provider-env
   ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
   KIMI_API_KEY: ${KIMI_API_KEY:-}
   MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+  SAKANA_API_KEY: ${SAKANA_API_KEY:-}
   # documented aliases (normalize_env_aliases() maps these at process start)
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}

@@ -166,7 +166,18 @@ def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatc
     assert payload["nvidia_nim"]["strongest_verified"]
     assert payload["openrouter"]["status"] == "ok"
     assert payload["openrouter"]["strongest_verified"]
-    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
+    # Was ["moonshotai/kimi-k2.5"]: the OpenRouter STRONG-tier smoke catalog
+    # is a pure pool-order projection (provider_smoke.py's own docstring:
+    # "pool order... no literal preference seed is needed" — there is no
+    # cost/quality tie-break, _probe_model_pack just tries pool order and
+    # stops at the first success). Ticket #1405 (Helm leg-one pool
+    # registration) inserted two ratified STRONG-tier OpenRouter entries
+    # (Grok 4.5, Grok 4.6 — dharma_swarm/evolution_roster.py, the
+    # "Helm leg-one ratified on-call seats" block) earlier in
+    # EVOLUTION_ROSTER than the pre-existing (below-floor) kimi-k2.5 entry,
+    # so grok-4.5 is now first in pool order. This is the intended
+    # consequence of that registration, not a broken ordering contract.
+    assert openrouter_calls == ["x-ai/grok-4.5"]
 
 
 def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) -> None:
@@ -202,7 +213,10 @@ def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) ->
     assert payload["nvidia_nim"]["status"] == "missing_config"
     assert payload["openrouter"]["status"] == "insufficient_credits"
     assert nim_calls == ["nvidia/llama-3.1-nemotron-ultra-253b-v1"]
-    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
+    # Was ["moonshotai/kimi-k2.5"] — see the identical citation on the
+    # "reports_success" test above; ticket #1405 legitimately moved Grok
+    # 4.5 ahead of kimi-k2.5 in pool order.
+    assert openrouter_calls == ["x-ai/grok-4.5"]
 
 
 def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:
@@ -213,7 +227,14 @@ def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:
         return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
 
     async def _fake_openrouter(model: str):
-        if model == "moonshotai/kimi-k2.5":
+        # First-in-pool-order model gets the empty response, so the "skip
+        # and try the next one" path is actually exercised regardless of
+        # which model that is. Was "moonshotai/kimi-k2.5"; ticket #1405
+        # moved Grok 4.5 ahead of it in pool order (see the citation on
+        # test_run_provider_smoke_reports_success_with_monkeypatched_probes
+        # above) — hardcoding the old name here would make this test pass
+        # without ever exercising the skip-empty branch.
+        if model == "x-ai/grok-4.5":
             return {
                 "status": "empty_response",
                 "model": model,
@@ -234,7 +255,11 @@ def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:
     payload = run_provider_smoke()
 
     assert payload["openrouter"]["status"] == "ok"
-    assert payload["openrouter"]["strongest_verified"] != "moonshotai/kimi-k2.5"
+    # Was "!= moonshotai/kimi-k2.5"; that model is no longer first in pool
+    # order (see above) so the check would now be vacuously true regardless
+    # of whether skip-and-retry actually worked. Assert against the model
+    # that actually returns the empty response in this fixture instead.
+    assert payload["openrouter"]["strongest_verified"] != "x-ai/grok-4.5"
 
 
 def test_run_provider_smoke_includes_qwen_dashboard_when_requested(monkeypatch) -> None:

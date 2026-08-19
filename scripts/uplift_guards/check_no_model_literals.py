@@ -55,6 +55,17 @@ FALSE_POSITIVES: set[tuple[str, str]] = {
     ("agent_export.py", "'qwen/agents'"),                 # export-dir path component
     ("identity.py", "'meta/identity_history.jsonl'"),     # state-file path key
     ("providers.py", "'nvidia/nemotron'"),                # _PREFERRED_PREFIXES (startswith)
+    # Same startswith-prefix pattern as the 'nvidia/nemotron' entry above,
+    # just the more specific sibling string added alongside it (2026-08-18,
+    # "Sublimation Foundry" #1389, dharma_swarm/providers.py:821
+    # _PREFERRED_PREFIXES list — verified via `git blame`; matched with
+    # `.startswith(prefix)`, never dispatched as a literal model id).
+    ("providers.py", "'nvidia/nemotron-3.5'"),
+    # Same commit, same reasoning, free_fleet.py's _TIER_RULES list —
+    # dharma_swarm/free_fleet.py:80, matched via `_assign_tier`'s
+    # `model_id.startswith(prefix)` (verified: dharma_swarm/free_fleet.py,
+    # def _assign_tier), not a deployable dispatch literal either.
+    ("free_fleet.py", "'nvidia/nemotron-3.5'"),
     ("providers.py", "'google/gemma'"),                   # _PREFERRED_PREFIXES (startswith)
     # EVAL-ONLY benchmark candidate — a long-context sidecar model being
     # *evaluated*, NOT a routing/dispatch target. It must NOT be forced into the
