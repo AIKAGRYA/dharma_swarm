@@ -97,6 +97,8 @@ def pick_provider(env: dict | None = None) -> tuple[str, str, str, str] | None:
 
 def _http_json(url: str, key: str, *, payload: dict | None = None,
                method: str = "GET", timeout: float = 45.0) -> dict:
+    if not url.startswith("https://"):
+        raise ValueError(f"Only HTTPS URLs are permitted; got: {url!r}")
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     req = urllib.request.Request(
         url, data=data, method=method,

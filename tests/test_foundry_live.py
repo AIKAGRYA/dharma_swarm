@@ -134,3 +134,12 @@ def test_receipt_includes_token_and_cost_fields(tmp_path):
     payload = json.loads(write_live_receipt(result, state_root=tmp_path).read_text())
     assert payload["total_tokens"] == 123
     assert payload["est_cost_usd_upper_bound"] == 0.000369
+
+
+def test_http_json_rejects_non_https_url():
+    import pytest
+    from dharma_swarm.foundry.live import _http_json
+    with pytest.raises(ValueError, match="Only HTTPS URLs are permitted"):
+        _http_json("http://example.com/api", "key")
+    with pytest.raises(ValueError, match="Only HTTPS URLs are permitted"):
+        _http_json("file:///etc/passwd", "key")
