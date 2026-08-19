@@ -626,4 +626,18 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             canon_risk=RiskLevel.CRITICAL,
             migration_status=MigrationStatus.DO_NOT_MIGRATE,
             do_not_migrate_reason="Literal repo '~/.dharma' path is an unsafe fixture/snapshot, not the user's home.",
+        ),
+        SurfaceSpec(
+            "home.forge_spend",
+            "{home}/.dharma/forge_v1/spend",
+            "dharma_swarm.forge_v1.forge_v2.monthly_ledger",
+            MemorySurfaceRole.TELEMETRY,
+            SurfaceCategory.TELEMETRY,
+            AuthorityLevel.LOW,
+            WriteMode.APPEND_ONLY,
+            AdapterMode.METADATA_ONLY,
+            feeds=("forge_monthly_spend",),
+            source_of_truth_for=("benchmark_monthly_spend",),
+            canon_risk=RiskLevel.LOW,
+            migration_status=MigrationStatus.REGISTER_ONLY,
         ),    )

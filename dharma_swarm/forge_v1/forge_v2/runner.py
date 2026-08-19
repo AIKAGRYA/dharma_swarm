@@ -42,6 +42,13 @@ from .arms import (  # noqa: E402
 )
 from .budget import Budget  # noqa: E402
 from .critic import _family, refute_pass  # noqa: E402
+from .monthly_ledger import (  # noqa: E402
+    DEFAULT_MONTHLY_CAP_USD,
+    check_run_admission,
+    month_key,
+    record_run_spend,
+    worst_case_run_usd,
+)
 from .pr_suite_grader import (  # noqa: E402
     grade_pr_suite_prediction,
     is_pr_suite_task,
@@ -80,7 +87,17 @@ def _grade_task(inst: dict, patch: str, *, timeout: int) -> tuple[bool, float, s
 
 def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call_tokens, k_self_moa,
         grade_timeout, timeout_s, strategy, roster_n, gen_id, ver_id, label,
-        arm="verify_chain", mix_ids: list[str] | None = None, window_chars: int | None = None):
+        arm="verify_chain", mix_ids: list[str] | None = None, window_chars: int | None = None,
+        monthly_cap_usd: float = DEFAULT_MONTHLY_CAP_USD):
+    # Refuse-to-start monthly meter (yes-sheet 2026-08-18 row 1): worst-case $
+    # exposure of this run must fit the month's remainder BEFORE any model call.
+    month = month_key(time.time())
+    run_worst_case = None if budget_usd is None else worst_case_run_usd(
+        budget_usd, n_instances=len(instance_ids), replicates=replicates)
+    gate = check_run_admission(run_worst_case, monthly_cap_usd=monthly_cap_usd, month=month)
+    if not gate.allowed:
+        print(f"[forge_v2] REFUSED (monthly spend cap): {gate.reason}", flush=True)
+        return {"refused": "monthly_cap", "monthly_gate": asdict(gate)}
     out = RUN_ROOT / f"{label}_{int(time.time())}"
     out.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(out / "ledger.jsonl")
@@ -270,6 +287,13 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
     (out / "decision_record.json").write_text(json.dumps(asdict(rr), indent=2, default=str))
     (out / "roster_probe.json").write_text(json.dumps(probe_rows, indent=2))
 
+    # Meter the run's ACTUAL charged spend (real + shadow $) against the month.
+    record_run_spend(
+        usd=sum(a["budget"]["usd"] for a in attempts),
+        shadow_usd=sum(a["budget"]["shadow_usd"] for a in attempts),
+        month=month, timestamp=time.time(), label=label, run_dir=str(out),
+    )
+
     print(f"\n{'='*64}\n[forge_v2] DECISION RECORD", flush=True)
     print(f"  mission_class : verifier_role   arm={arm}  generator={gen.model_id}", flush=True)
     print(f"  pairs={ci['n']}  self_moa={rr.budget_matched_proof['self_moa_pass_rate']}  "
@@ -307,15 +331,24 @@ def main(argv=None) -> int:
         help="Track A context-window genome field, applied symmetrically to all arms",
     )
     ap.add_argument("--label", default="verifier_role")
+    ap.add_argument(
+        "--monthly-cap-usd",
+        type=float,
+        default=DEFAULT_MONTHLY_CAP_USD,
+        help="cumulative monthly benchmark spend cap in USD (yes-sheet 2026-08-18 "
+             "row 1); a run whose worst-case spend exceeds the month's remainder "
+             "refuses to start",
+    )
     a = ap.parse_args(argv)
     ids = [x.strip() for x in a.instances.split(",") if x.strip()]
     mix_ids = [x.strip() for x in a.mix_models.split(",") if x.strip()]
-    run(ids, n_explore=a.n_explore, replicates=a.replicates, budget_cap=a.budget,
-        budget_usd=a.budget_usd,
-        per_call_tokens=a.per_call_tokens, k_self_moa=a.k_self_moa, grade_timeout=a.grade_timeout,
-        timeout_s=a.timeout_s, strategy=a.strategy, roster_n=a.roster_n, gen_id=a.generator,
-        ver_id=a.verifier, label=a.label, arm=a.arm, mix_ids=mix_ids, window_chars=a.window_chars)
-    return 0
+    result = run(ids, n_explore=a.n_explore, replicates=a.replicates, budget_cap=a.budget,
+                 budget_usd=a.budget_usd,
+                 per_call_tokens=a.per_call_tokens, k_self_moa=a.k_self_moa, grade_timeout=a.grade_timeout,
+                 timeout_s=a.timeout_s, strategy=a.strategy, roster_n=a.roster_n, gen_id=a.generator,
+                 ver_id=a.verifier, label=a.label, arm=a.arm, mix_ids=mix_ids, window_chars=a.window_chars,
+                 monthly_cap_usd=a.monthly_cap_usd)
+    return 2 if result.get("refused") else 0
 
 
 if __name__ == "__main__":
