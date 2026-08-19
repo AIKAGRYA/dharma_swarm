@@ -1,6 +1,6 @@
 # First-fire plumbing — command packet
 
-**Status:** drafted, not executed.  
+**Status:** drafted, not executed. Wrapper shape vs `DarwinEngine.apply_diff_and_test` is checked in `tests/test_first_fire_plumbing.py` (empty-diff skip is `skipped: true`, not a green).  
 **Bit purchased if valid:** do applier + tests + rollback + keep compose on a real diff.  
 **Not purchased:** DGM, SWE uplift, self-funding, live-organism mutation.
 

@@ -1,0 +1,22 @@
+{
+  "grant_id": "ginko-l0-publish-YYYYMMDD",
+  "kind": "PUBLISH",
+  "granted_by": "AmitabhainArunachala",
+  "expires_at": "YYYY-MM-DDT00:00:00+00:00",
+  "max_cycles": 1,
+  "kill_after_days": 30,
+  "allowed_universes": [
+    "fred.cpi",
+    "fred.dgs10",
+    "fred.icsa",
+    "crypto.btc_usd",
+    "crypto.eth_usd"
+  ],
+  "forbidden_hostnames": ["meghadharma-cloud"],
+  "forbidden_imports": [
+    "dharma_swarm.revenue.wedge_pipeline",
+    "dharma_swarm.engine.store_sync"
+  ],
+  "named_runner": "scripts/ginko_ledger_l0.py",
+  "note": "EXTERNAL-GATED publish yes for L0 real edition. Not a money grant. Not L2."
+}

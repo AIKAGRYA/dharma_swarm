@@ -15,6 +15,33 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from dharma_swarm import key_oracle
+from dharma_swarm.helm_route_truth_codec import (
+    helm_on_call_projection_from_dict as helm_on_call_projection_from_dict,
+    helm_on_call_projection_to_dict as helm_on_call_projection_to_dict,
+    route_evidence_from_dict as route_evidence_from_dict,
+    route_verification_from_dict as route_verification_from_dict,
+    route_verification_to_dict as route_verification_to_dict,
+)
+from dharma_swarm.helm_route_truth_evaluator import (
+    HelmOnCallProjection as HelmOnCallProjection,
+    RouteVerification as RouteVerification,
+    evaluate_route_verification as evaluate_route_verification,
+    project_helm_on_call as project_helm_on_call,
+    unknown_helm_on_call_projection as unknown_helm_on_call_projection,
+)
+from dharma_swarm.helm_route_truth_types import (
+    ACCEPTED_ROUTE_VERIFIER_ID as ACCEPTED_ROUTE_VERIFIER_ID,
+    ACCEPTED_ROUTE_VERIFIER_VERSION as ACCEPTED_ROUTE_VERIFIER_VERSION,
+    HELM_ON_CALL_PROJECTION_SCHEMA_VERSION as HELM_ON_CALL_PROJECTION_SCHEMA_VERSION,
+    HELM_SLICE1_SEATS as HELM_SLICE1_SEATS,
+    MAX_ROUTE_VERIFICATION_TTL as MAX_ROUTE_VERIFICATION_TTL,
+    ROUTE_VERIFICATION_SCHEMA_VERSION as ROUTE_VERIFICATION_SCHEMA_VERSION,
+    HelmOnCallState as HelmOnCallState,
+    HelmSeat as HelmSeat,
+    RouteEvidence as RouteEvidence,
+    RouteVerdict as RouteVerdict,
+    SanitizedRouteEvidence as SanitizedRouteEvidence,
+)
 from dharma_swarm.model_live_results import (
     TRANSIENT_LIVE_FAILURES as _TRANSIENT_LIVE_FAILURES,
     load_live_call_results,
@@ -77,6 +104,7 @@ _SAFE_DKEYS_FIELDS = (
     "status",
     "env_var",
 )
+
 
 @dataclass(frozen=True, slots=True)
 class RouteStatus:
@@ -582,17 +610,38 @@ def verify_floor_models(*, profiles_path: Path | None = None) -> dict[str, Any]:
 
 
 __all__ = [
+    "ACCEPTED_ROUTE_VERIFIER_ID",
+    "ACCEPTED_ROUTE_VERIFIER_VERSION",
+    "HELM_ON_CALL_PROJECTION_SCHEMA_VERSION",
+    "HELM_SLICE1_SEATS",
     "LIVE_MODEL_E2E_ENV",
+    "MAX_ROUTE_VERIFICATION_TTL",
     "MODEL_STATUS_SCHEMA_VERSION",
+    "ROUTE_VERIFICATION_SCHEMA_VERSION",
+    "HelmOnCallProjection",
+    "HelmOnCallState",
+    "HelmSeat",
     "ModelStatus",
     "ModelStatusProjection",
     "ModelVerification",
+    "RouteEvidence",
     "RouteStatus",
+    "RouteVerdict",
+    "RouteVerification",
+    "SanitizedRouteEvidence",
     "all_model_status",
+    "evaluate_route_verification",
     "floor_model_status",
+    "helm_on_call_projection_from_dict",
+    "helm_on_call_projection_to_dict",
     "load_profiles",
+    "project_helm_on_call",
     "projection_to_dict",
+    "route_evidence_from_dict",
+    "route_verification_from_dict",
+    "route_verification_to_dict",
     "save_profile",
     "top_floor_models_for_dashboard",
+    "unknown_helm_on_call_projection",
     "verify_floor_models",
 ]

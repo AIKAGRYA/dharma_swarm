@@ -1,0 +1,125 @@
+name: foundry-lane
+
+# Sublimation Foundry standing lane (organism-rewire-2026-07 next-item 15).
+#
+# v0 is REPORT-ONLY and READ-ONLY by design:
+#   - It runs the Foundry campaign pipeline and emits receipts + kill-metrics +
+#     a One Wire quorum report as ARTIFACTS and a step summary. It NEVER pushes
+#     code, opens PRs, grants One Wire authority, or contacts an external repo.
+#   - External contribution stays report-first and operator-gated (a human
+#     reviews and submits); live army generation against real targets is enabled
+#     later once provider keys are set (docs/foundry/OPERATOR_UNBLOCKS.md).
+#
+# Because it holds no repository-write credential, it needs none of the
+# propose/deliver credential split the hardening lane requires. Caps live here,
+# not in any prompt. Receipts are artifacts, never committed (CLAUDE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "target id (see dharma_swarm/foundry/targets.py)"
+        type: string
+        default: "openevolve-mlx"
+      generations:
+        description: "bounded generation count"
+        type: string
+        default: "5"
+  schedule:
+    - cron: "0 19 * * 2"  # Tuesdays 19:00 UTC — offset from sibling lanes
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-lane
+  cancel-in-progress: false
+
+env:
+  FOUNDRY_TARGET: ${{ inputs.target || 'openevolve-mlx' }}
+  FOUNDRY_GENERATIONS: ${{ inputs.generations || '5' }}
+
+jobs:
+  campaign:
+    name: Foundry campaign (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Halt on loop kill-switch
+        run: |
+          set -euo pipefail
+          # Loop kill-switch (docs/ops/loop_control/README.md): file present on
+          # the loop-control branch => HALT; absent (404) => proceed; any other
+          # error => fail closed.
+          url="repos/${GH_REPO}/contents/docs/ops/loop_control/KILLSWITCH?ref=loop-control"
+          if response="$(gh api "$url" 2>&1)"; then
+            echo "HALTED BY KILLSWITCH (docs/ops/loop_control/KILLSWITCH on loop-control)" >&2
+            echo "## 🔴 HALTED BY KILLSWITCH — no foundry run" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          elif echo "$response" | grep -qiE "HTTP 404|\"status\": *\"404\"|Not Found|No commit found"; then
+            echo "kill-switch absent; proceeding"
+          else
+            echo "kill-switch state UNKNOWN — failing closed: $response" >&2
+            exit 1
+          fi
+
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Run campaign (hermetic dry-run) + kill-metrics + quorum report
+        run: |
+          set -uo pipefail
+          # The foundry package is stdlib-only, so no install is needed for the
+          # report-only pipeline (dharma_swarm/__init__.py is lazy, PEP 562).
+          STATE="${RUNNER_TEMP}/foundry-state"
+          mkdir -p "$STATE"
+
+          python3 scripts/foundry/run_campaign.py dry-run "$FOUNDRY_TARGET" \
+            --generations "$FOUNDRY_GENERATIONS" --state-root "$STATE" \
+            > "${RUNNER_TEMP}/campaign.json" 2>&1 || true
+
+          python3 scripts/foundry/run_campaign.py metrics "$FOUNDRY_TARGET" \
+            --generations "$FOUNDRY_GENERATIONS" \
+            > "${RUNNER_TEMP}/kill_metrics.txt" 2>&1
+          metrics_exit="$?"
+
+          python3 scripts/foundry/run_campaign.py guardian "${STATE}/receipts" \
+            > "${RUNNER_TEMP}/quorum.json" 2>&1 || true
+
+          {
+            echo "## Sublimation Foundry — ${FOUNDRY_TARGET} (report-only)"
+            echo '```'
+            cat "${RUNNER_TEMP}/kill_metrics.txt" 2>/dev/null || echo "no metrics"
+            echo '```'
+            echo "### Campaign summary"
+            echo '```json'
+            cat "${RUNNER_TEMP}/campaign.json" 2>/dev/null || echo '{}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # A KILL verdict from kill-metrics fails the run so the operator sees red.
+          exit "${metrics_exit}"
+
+      - name: Upload foundry receipts + metrics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: foundry-report
+          path: |
+            ${{ runner.temp }}/foundry-state/**
+            ${{ runner.temp }}/campaign.json
+            ${{ runner.temp }}/kill_metrics.txt
+            ${{ runner.temp }}/quorum.json
+          if-no-files-found: warn
