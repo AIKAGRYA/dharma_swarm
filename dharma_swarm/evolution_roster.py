@@ -136,6 +136,103 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         256_000,
         "Same weights via the OpenAI direct API (secondary route)",
     ),
+    # ══════════════════════════════════════════════════════════════════
+    # Helm leg-one ratified on-call seats (ticket #1405; HELM_LEGONE_SPEC.md
+    # §2.1 item 4 "Standing named bench" / §3 obligation 1 "Pool
+    # registration"). Fixed priority order: Fable 5 -> GPT 5.6 -> Grok
+    # 4.5/4.6 -> Fugu Ultra -> Kimi K3 (already registered below, Kimi
+    # family cluster) -> Opus 5.0 -> Opus 4.8 (already registered above,
+    # default chat brain). Canonical logical ids and (provider, model_id)
+    # routes are the pool projection of the SAME identities already
+    # ratified in helm_route_truth_types.HELM_SLICE1_SEATS — not a new
+    # naming decision — restricted to admissible identities whose provider
+    # is a real ProviderType member (see PR body for the two seats, Grok
+    # and Fugu Ultra, where that source also names a provider string with
+    # no ProviderType member: "xai" and "sakana" respectively; "sakana" was
+    # promoted to a real ProviderType here since Fugu Ultra has no
+    # alternative real route — see the inline comment on
+    # ProviderType.SAKANA, dharma_swarm/models.py:141-143).
+    # ══════════════════════════════════════════════════════════════════
+    ModelSlot(
+        ProviderType.CLAUDE_CODE,
+        "claude-fable-5",
+        "Fable 5 (Claude Max)",
+        ModelTier.FRONTIER,
+        ("reasoning", "code", "architecture"),
+        200_000,
+        "Floor — Helm seat 'Fable 5' via Claude-Max oauth (THE ONE WAY); "
+        "mirrors the claude-opus-4.8 registration pattern",
+    ),
+    # GPT-5.6 floor lane: mirrors the gpt-5.5 pair above (codex oauth ahead
+    # of the metered direct API).
+    ModelSlot(
+        ProviderType.CODEX,
+        "gpt-5.6",
+        "GPT-5.6 (Codex)",
+        ModelTier.FRONTIER,
+        ("code", "reasoning", "architecture"),
+        256_000,
+        "Floor — Helm seat 'GPT 5.6' via codex oauth subscription (THE ONE WAY)",
+    ),
+    ModelSlot(
+        ProviderType.OPENAI,
+        "gpt-5.6",
+        "GPT-5.6 (direct)",
+        ModelTier.FRONTIER,
+        ("code", "reasoning", "architecture"),
+        256_000,
+        "Same weights via the OpenAI direct API (secondary route)",
+    ),
+    # Grok 4.5/4.6: ONE Helm seat lineage across two logical pool entries
+    # (the pool does not collapse differing version numbers — same as
+    # kimi-k2.5/k2.6/k3 above). No first-party xAI ProviderType route is
+    # wired yet; OpenRouter is the only confirmed route today.
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "x-ai/grok-4.5",
+        "Grok 4.5",
+        ModelTier.STRONG,
+        ("reasoning", "code"),
+        128_000,
+        "Floor — Helm seat 'Grok 4.5/4.6' lineage via OpenRouter",
+    ),
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "x-ai/grok-4.6",
+        "Grok 4.6",
+        ModelTier.STRONG,
+        ("reasoning", "code"),
+        128_000,
+        "Floor — supersedes Grok 4.5 in the same seat lineage per spec §2.1 item 4.3",
+    ),
+    # Fugu Ultra (Sakana AI): OPEN POINT — no live client/base-URL exists for
+    # ProviderType.SAKANA yet (registration only; see PR body). Real context
+    # size is unconfirmed; 128_000 below is passed explicitly as a
+    # deliberately conservative placeholder (it happens to equal
+    # ModelSlot.max_context's own dataclass default — not a verified spec
+    # number for this model). ``strengths`` is the same soft descriptive tag
+    # every other roster entry carries (editorial, not a verified benchmark
+    # claim) — not an overclaim specific to this slot.
+    ModelSlot(
+        ProviderType.SAKANA,
+        "fugu-ultra",
+        "Fugu Ultra",
+        ModelTier.STRONG,
+        ("reasoning",),
+        128_000,
+        "Floor — Helm seat 'Fugu Ultra'; route registered, not yet live-callable "
+        "(no Sakana client wiring exists) — obligation-2 territory, not this ticket",
+    ),
+    ModelSlot(
+        ProviderType.CLAUDE_CODE,
+        "claude-opus-5.0",
+        "Claude Opus 5.0 (Claude Max)",
+        ModelTier.FRONTIER,
+        ("reasoning", "code", "architecture"),
+        200_000,
+        "Floor — Helm seat 'Opus 5.0' via Claude-Max oauth; mirrors the "
+        "claude-opus-4.8 registration pattern",
+    ),
     # ── Strong floor tier (Ollama Cloud frontier, keyless) ─────────────
     # ── Frontier tier ──────────────────────────────────────────────────
     # BELOW FLOOR — old direct/router Claude/GPT-4o weights. Kept for grunt
@@ -598,6 +695,12 @@ _ENV_KEYS_FOR_PROVIDER: dict[ProviderType, str] = {
         ProviderType.KIMI_CODE,
         ProviderType.MOONSHOT,
         ProviderType.ZHIPU,
+        # Sakana (Fugu Ultra, Helm leg-one seat #1405): no live client exists
+        # yet, so it must be gated on its (currently always-unset) key rather
+        # than falling into the "no key needed" default — an unkeyed provider
+        # with no client would otherwise read as always-available, which is
+        # exactly the "declared-but-green fiction" the spec forbids.
+        ProviderType.SAKANA,
     )
 }
 

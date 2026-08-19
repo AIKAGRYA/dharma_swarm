@@ -170,6 +170,10 @@ class TestGetAvailableRoster:
             "KIMI_API_KEY",
             "MOONSHOT_API_KEY",
             "ZHIPU_API_KEY",
+            # Ticket #1405 adds a Sakana-provider roster slot (Fugu Ultra);
+            # clear it too so this "zero keys set" scenario stays exhaustive
+            # over every keyed provider the roster actually uses.
+            "SAKANA_API_KEY",
         ):
             _clear_key_and_aliases(monkeypatch, env_key)
         # Ollama not reachable
