@@ -1,0 +1,28 @@
+name: diag-pytest-name
+# One-shot diagnostic: print the FAILED/diff header lines from a prior
+# pytest run's saved output artifact. Delete this branch after use.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: workflow run id that produced pytest-results-3.11
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: read
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (same pinned SHA family as repo usage)
+        with:
+          name: pytest-results-3.11
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Print failure headers only
+        run: |
+          set -euo pipefail
+          ls -la
+          grep -nE "^FAILED|^_{5,}|^E |Differing items|Left contains|Right contains|Omitting|short test summary" pytest_output.txt | head -120 || true
