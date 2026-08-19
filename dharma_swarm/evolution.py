@@ -66,6 +66,7 @@ from dharma_swarm.selector import select_parent
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 from dharma_swarm.traces import TraceEntry, TraceStore
 from dharma_swarm.ucb_selector import UCBConfig, UCBParentSelector
+from dharma_swarm.vibe_halt_observer import run_observer
 
 logger = logging.getLogger(__name__)
 
@@ -1666,6 +1667,21 @@ class DarwinEngine:
             component=proposal.component,
         ):
             test_results = test_results or {}
+            receipt = (proposal.metadata or {}).get("vibe_halt_observer")
+            receipt_blocks_current_proposal = (
+                proposal.status == EvolutionStatus.REJECTED
+                and isinstance(receipt, dict)
+                and receipt.get("proposal_id") == proposal.id
+                and receipt.get("blocks_apply") is True
+            )
+            observer_blocked = (
+                test_results.get("observer_blocks_apply") is True
+                or receipt_blocks_current_proposal
+            )
+            if observer_blocked:
+                test_results = dict(test_results)
+                test_results["pass_rate"] = 0.0
+                test_results["observer_blocks_apply"] = True
             proposal.test_results = dict(test_results)
 
             correctness = float(test_results.get("pass_rate", 0.0))
@@ -1775,7 +1791,10 @@ class DarwinEngine:
                 logger.debug("L4 behavioral correlation failed", exc_info=True)
 
             proposal.actual_fitness = fitness
-            proposal.status = EvolutionStatus.EVALUATED
+            if observer_blocked:
+                proposal.status = EvolutionStatus.REJECTED
+            else:
+                proposal.status = EvolutionStatus.EVALUATED
             proposal.promotion_state = derive_promotion_state(
                 evidence_tier=proposal.evidence_tier,
                 pass_rate=correctness,
@@ -2354,6 +2373,21 @@ class DarwinEngine:
 
         return {"pass_rate": pass_rate, "exit_code": sr.exit_code}
 
+    async def _observe_before_apply(self, proposal: Proposal) -> bool:
+        """Attach a VH receipt when enabled. True means apply must not start."""
+        observation = await run_observer()
+        if observation is None:
+            return False
+        metadata = dict(proposal.metadata or {})
+        metadata["vibe_halt_observer"] = observation.to_receipt(
+            proposal_id=proposal.id, cycle_id=proposal.cycle_id
+        )
+        proposal.metadata = metadata
+        if observation.blocks_apply:
+            proposal.status = EvolutionStatus.REJECTED
+            return True
+        return False
+
     async def apply_diff_and_test(
         self,
         proposal: Proposal,
@@ -2380,6 +2414,16 @@ class DarwinEngine:
             return (proposal, {"pass_rate": 1.0, "skipped": True})
 
         proposal.status = EvolutionStatus.WRITING
+        if await self._observe_before_apply(proposal):
+            return (
+                proposal,
+                {
+                    "pass_rate": 0.0,
+                    "observer_blocks_apply": True,
+                    "applied": False,
+                    "tests_run": False,
+                },
+            )
         applier = DiffApplier(workspace=workspace)
 
         proposal.status = EvolutionStatus.TESTING
@@ -2471,9 +2515,20 @@ class DarwinEngine:
         Returns:
             A tuple of ``(proposal, SandboxResult)``.
         """
+        proposal.status = EvolutionStatus.WRITING
+        if await self._observe_before_apply(proposal):
+            return (
+                proposal,
+                SandboxResult(
+                    exit_code=1,
+                    stdout="",
+                    stderr="vibe_halt_observer: apply blocked before sandbox execution",
+                    duration_seconds=0.0,
+                    timed_out=False,
+                ),
+            )
         from dharma_swarm.sandbox import LocalSandbox
 
-        proposal.status = EvolutionStatus.WRITING
         sandbox = LocalSandbox(
             workdir=Path(workspace).resolve() if workspace is not None else None
         )
