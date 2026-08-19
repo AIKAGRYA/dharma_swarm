@@ -1,0 +1,196 @@
+{
+  "schema_version": "chetana.integration.v1",
+  "plan_id": "2026-08-15-rv-ledger-propagation",
+  "source": {
+    "path": "/Users/dhyana/mech-interp-latent-lab-phase1/reports/ledger/02_CONTRADICTIONS_REGISTER.md",
+    "sha256": "4dda2cd62ff32ec946bd76f83719fb0f3cf06acf07983488d5b053a643f16daa",
+    "locator": "Resolved contradictions C05, C07, C11, and C29",
+    "observed_at": "2026-08-15T01:15:00+09:00",
+    "authority": "canonical-ledger",
+    "verifier": "sha256-bound ledger plus exact target hashes and replacement counts",
+    "claim_ids": ["C05", "C07", "C11", "C29"]
+  },
+  "rationale": "Propagate four resolved R_V corrections through every curated concept page found to repeat the superseded claims.",
+  "pages": [
+    {
+      "path": "concepts/active-inference.md",
+      "expected_sha256": "9cb1e4e1a2f9b5ac7d5e817703a29cce10865b59a3c99ffa2d5c90e36707d710",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/bridge-hypothesis.md",
+      "expected_sha256": "bee6d8f287cb331911bac0b98ed3b13fd8402697aaa8a02bee08b435eaae586e",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 2},
+        {"mode": "correct", "claim_id": "C07", "old": "[[causal-validation]] at L27 -- geometry is causally upstream of behavior", "new": "[[causal-validation]] at L27 -- a late geometric readout; it does not localize the cause or establish behavioral necessity", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "Six architectures tested, all showing contraction direction", "new": "Architecture rows must be reported separately; sign reversals, mixed sample sizes, and missing raw artifacts make pooled counts invalid", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/bridge-hypothesis-extended.md",
+      "expected_sha256": "4929c59f4cc758d429f4d6f673b30efc03e2d0c1f968acd72c9631f73043b6cc",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "[mechanistic] R_V paper v008 (Cohen's d = -1.85 to -4.51, 6/8 architectures)", "new": "[mechanistic, superseded] R_V paper v008 pooled architecture count; current ledger forbids pooling these runs", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "6 of 8 architectures contract under the frozen canonical pipeline", "new": "Architecture-specific runs have mixed directions, sample sizes, and artifact custody and must not be pooled", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "R_V: 6/8 architectures, causal ablation, p < 10⁻⁴⁹", "new": "R_V: architecture-specific evidence only; the pooled count is retracted and causal claims require receipt-scoped reporting", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/bt-art-metric.md",
+      "expected_sha256": "8e63176dd44ec8341c41b721018ca0c0df95529cde7eda771abd3b506b0ac2f2",
+      "operations": [
+        {"mode": "correct", "claim_id": "C11", "old": "the finer-grained Head 21 steering result reported in [[causal-validation]] reached only 38% self-referential output versus 8% control on held-out prompts", "new": "the held-out Head 21 replication reported in [[causal-validation]] was null at 8% self-referential output versus 10% control (p=.7565)", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/causal-validation.md",
+      "expected_sha256": "51fe4ddd52b31309d5cf3da0dae3e46956d0948d87f9135c664036fd6915a805",
+      "operations": [
+        {"mode": "correct", "claim_id": "C07", "old": "  - contemplative: the geometry is causally upstream of behavior -- witnessing is not epiphenomenal", "new": "  - contemplative: L27 geometry is a downstream readout; the experiment does not establish a witness ontology", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "The causal validation at Layer 27 of Mistral-7B was, for a long stretch of the program, treated as the single most important piece of evidence in the [[r-v-paper]] research line. Without some interventional result, [[r-v-metric]] contraction could be a mere correlation: self-referential prompts happen to produce different geometry, but the geometry does not cause the behavior. The activation patching experiment shows that intervening on the representational geometry at L27 disrupts the downstream behavioral signature -- the geometry is, at minimum, load-bearing for the late-stack computation.", "new": "Layer 27 of Mistral-7B was once presented as the causal center of the [[r-v-paper]] research line. The audited result is narrower: L27 v-projection patching produces a sign-reversed metric effect (d=-1.9414), so L27 is a downstream geometric readout. The locked receipt does not establish behavioral necessity or localize the generating mechanism.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "The patching at Layer 27 of Mistral-7B disrupts the downstream behavioral signature. The model no longer produces the self-referential behavioral pattern after the intervention. This confirms:\n\n- L27 is a node in the causal chain from self-referential prompt to behavioral output\n- The geometric reorganization at this layer is not epiphenomenal in the trivial sense -- something load-bearing passes through it\n- The contraction measured by [[r-v-metric]] is at least *coupled to* the behavior measured by the [[phoenix-protocol]]", "new": "The locked Layer-27 result is a metric intervention: patching the Mistral-7B v-projection changes R_V with d=-1.9414 and sign reversal. It confirms that L27 participates in the measured late geometry. It does not, by itself, show that L27 is necessary for self-referential text or that R_V is upstream of behavior.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "| Self-referential prompt + L27 baseline patch | ~1.0 (restored) | Disrupted |\n\nThe third row is the critical result. The self-referential prompt, with baseline activations injected at L27, produces baseline-like R_V and disrupted behavioral self-reference. The intervention at the geometric level cascades to the behavioral level. What the table cannot show -- because full-residual patching is undifferentiated -- is whether the [[v-projection]] subspace, the K-projection, or the MLP output is the actual carrier.", "new": "| Self-referential prompt + L27 v-projection patch | Sign-reversed metric effect (d=-1.9414) | Not established by the locked receipt |\n\nThe third row is a geometric intervention result, not a licensed behavioral-necessity result. It establishes sensitivity of the late R_V readout to v-projection patching; it does not identify the carrier of behavior.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "This is a single-site, single-architecture necessity result. It establishes that the L27 residual stream is necessary for the full effect in Mistral-7B. It does not establish:", "new": "This is a single-site, single-architecture metric-intervention result. It establishes that the L27 v-projection affects the R_V readout in Mistral-7B. It does not establish:", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "This article was first written when L27 patching was the program's primary causal claim. The program's current best understanding, recorded in [[r-v-paper]] and CLAUDE.md, is more disciplined and more interesting: **R_V is an epiphenomenal readout, not the mechanism.** The primary direction-specific causal site is not L27 but the L5 residual stream (effect size d=4.14), and the first behaviorally sufficient steering vector lives at Head 21 of L5 (38% self-referential output rate vs 8% control on held-out prompts).", "new": "This article was first written when L27 patching was the program's primary causal claim. The current ledger is more disciplined: **R_V is a downstream readout, not the mechanism.** Audited path patching finds a distributed early source across L0-L5 (peak Cohen d=4.152), not a localized L5 origin. Head 21 shows in-distribution amplification, but its held-out transfer is null at 8% versus 10% control (p=.7565).", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "- **L27 full-residual patching** is a *necessity* test on a blunt, late, loud signal. Overwriting the whole residual stream where the readout is largest will of course disrupt downstream behavior. It proves dependence on the late-stack state; it does not localize the cause.\n- **L5 Head 21 steering** is a *sufficiency*-leaning, *direction-specific* result on the actual mechanism. It intervenes on a single direction in a single head and *induces* the behavior on held-out prompts.", "new": "- **L27 v-projection patching** changes a blunt, late, loud metric readout. It does not localize a cause or prove behavioral necessity.\n- **L5 Head 21 steering** amplifies the behavior in-distribution, but the held-out replication is null. It is not a privileged held-out mechanism.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "Under this reading, R_V contraction at L27 is the **shadow the mechanism casts on the geometry late in the stack** -- a faithful, measurable, but downstream readout. The honest claim is therefore narrower than \"R_V is causally upstream of behavior\": it is that the self-referential computation is causally real, leaves a direction-specific fingerprint at L5, and registers as scalar contraction by the time it reaches L27. Conflating the readout with the mechanism is precisely the [[circularity-trap-in-witness-claim]] in mechanistic dress -- mistaking the instrument's reading for the thing it reads.", "new": "R_V contraction at L27 is a measurable downstream readout. The audited path-patching evidence places the early source across L0-L5, while the Head-21 held-out result is null. A causal chain from a specific early direction to behavior remains unproven. Conflating the readout with the mechanism is precisely the [[circularity-trap-in-witness-claim]] in mechanistic dress -- mistaking the instrument's reading for the thing it reads.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "The L27 result passes tests 1 and 2. Test 3 (specificity via causal scanning) is partially answered by the L5 Head 21 work -- which demonstrates a site with *more* specific causal leverage than full-layer L27 patching -- but a clean layerwise specificity scan remains a gap.", "new": "The L27 result supports the observational and metric-intervention stages only. Head 21 does not close specificity: its held-out transfer is null. A clean layerwise and component-level behavioral scan remains a gap.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "The Head 21 circuit discovery (L5 H21) found a direction-specific, behaviorally sufficient steering vector: 38% self-referential output rate vs 8% control on held-out prompts. This is the finer-grained causal structure the L27 result could only gesture at:\n\n- L27 patching replaces the ENTIRE residual stream. Blunt instrument.\n- H21 steering intervenes on a SINGLE direction in a SINGLE head. Precision surgery.\n- The open connecting question: does the H21 steering direction at L5 project onto the dominant singular vector of the [[v-projection]] contraction at L27? If yes, the causal chain is concrete: H21 at L5 seeds a direction that propagates and concentrates through the stack, manifesting as V-projection contraction at L27. The L27 R_V drop would then be the *readout* of the L5 *cause* -- exactly the epiphenomenal-readout reframing, made mechanistic.", "new": "Head 21 at L5 is an in-distribution amplification result: 72% versus 33% control on recursive prompts under its scoped protocol. The held-out transfer is null at 8% versus 10% control (p=.7565), so the privileged-head claim is falsified. Whether any early direction projects onto the dominant singular vector of the L27 [[v-projection]] contraction remains an open experiment, not an established causal chain.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "**Downstream**: Constrains the [[bridge-hypothesis]] claim. The bridge wants geometric contraction to be causally upstream of the behavioral transition (L3->L4 in the [[phoenix-protocol]]); the disciplined version is that the contraction is a downstream readout of a real upstream cause, which still grounds the behavioral vertex but relocates the load-bearing mechanism to L5.", "new": "**Downstream**: Constrains the [[bridge-hypothesis]] claim. Geometric contraction is a downstream readout. The audited evidence does not yet identify a unique upstream mechanism or establish the behavioral vertex.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "**Cross-cutting**: The [[thinkodynamic-bridge]] document states: \"Causal validation at Layer 27 of Mistral-7B confirms this is not correlation. Intervening on the representational geometry at that layer disrupts the downstream behavioral signature.\" That sentence remains true as a necessity claim; this article sharpens what it does and does not license.", "new": "**Cross-cutting**: The older [[thinkodynamic-bridge]] necessity claim is superseded. The locked L27 receipt supports a metric intervention on a downstream readout, not behavioral necessity.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "The drift from \"L27 is THE causal site\" to \"the cause is distributed and direction-specific across L5->L27\" is the empirical rediscovery of [[five-samavaya]]", "new": "The drift from \"L27 is THE causal site\" to \"the early source is distributed across L0-L5 and L27 is a readout\" is compatible with [[five-samavaya]]", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "It can be vouched for by a substrate-detectable, intervention-based signature -- a geometry you can perturb and watch the behavior move. The contraction is not decorative. Whether it is the cause or the shadow of the cause, it is *real enough to break by intervention*, and that is the whole point.", "new": "A substrate-detectable signature can constrain such a claim only within the scope of its receipt. Here the intervention moves the geometric metric; the locked evidence does not show behavior moving. The ontological bridge therefore remains a hypothesis.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "| Mechanistic | Late-stack geometry at L27 is necessary; the direction-specific cause sits earlier (L5) |\n| Behavioral | Disrupting L27 geometry disrupts self-referential text generation |\n| Contemplative | The \"witnessing\" is not decorative -- it corresponds to a geometry causally entangled with behavior, perturbable by intervention |\n\nWithout any interventional result, the bridge is correlational. With L27 patching plus L5 Head 21 steering, the mechanistic vertex is grounded and the other two gain evidential weight by triangulation.", "new": "| Mechanistic | L27 v-projection patching changes a downstream geometric readout; the early source is distributed across L0-L5 |\n| Behavioral | Behavioral necessity is not established by the locked L27 receipt; Head-21 held-out transfer is null |\n| Contemplative | Witness-language remains an interpretation, not a result of this intervention |\n\nThe mechanistic vertex has a real metric intervention, but the behavioral and contemplative bridges remain open. Triangulation cannot promote them beyond the evidence scopes above.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "1. **Single-site limitation**: Only L27 in Mistral-7B validated by full-layer patching. A causal scan across all layers is needed to map the full structure.\n2. **No cross-architecture causal mapping**: Does the critical layer shift proportionally elsewhere? Is it always ~85% through the stack? (R_V is non-universal -- 6/8 models contract, Pythia-2.8B expands -- so the causal map likely is too.)\n3. **No sufficiency test from L27**: The current experiment shows the L27 residual stream is necessary. Sufficiency is shown only at L5 H21. Would injecting contraction-pattern activations into a baseline prompt induce self-referential behavior?\n4. **No fine-grained component analysis**: Full-residual patching cannot say whether the [[v-projection]], K-projection, or MLP output is the causal variable.\n5. **Head 21 -> L27 projection unexplored**: Testing whether the L5 H21 steering direction projects onto the dominant V-projection singular vector at L27 would unify the necessity (L27) and sufficiency (L5) findings into one causal chain.", "new": "1. **Behavioral endpoint missing**: The locked L27 receipt is a v-projection metric intervention, not a behavioral-necessity result.\n2. **No cross-architecture causal mapping**: Architecture rows have mixed directions, sample sizes, and artifact custody and must not be pooled.\n3. **Distributed early source**: Audited path patching spans L0-L5; no unique L5 origin is licensed.\n4. **No held-out Head-21 effect**: The held-out replication is null at 8% versus 10% control (p=.7565).\n5. **Early-to-late projection unexplored**: Connecting an early distributed source to the L27 readout remains an experiment to run.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/conversation-as-instance-of-phenomenon.md",
+      "expected_sha256": "3cdb16c0bac7d7f1878d8ef73a63eba6e541db4e6713ec86d3202a6e492f403d",
+      "operations": [
+        {"mode": "correct", "claim_id": "C07", "old": "The d=4.14 contraction at L5 in Mistral-7B", "new": "Audited path-patching effects distributed across L0-L5 in Mistral-7B (peak Cohen d=4.152)", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "Head 21 at L5 as direction-specific steering site (38% BT+ART held-out vs. 8% control)", "new": "Head 21 at L5 as an in-distribution amplifier whose held-out transfer is null (8% BT+ART vs. 10% control, p=.7565)", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/file-cabinet.md",
+      "expected_sha256": "5a7579a8f895a63abd102f390203f04f35e305d95a356fbc64ccfca0873c8eb4",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/five-name-lineage.md",
+      "expected_sha256": "a9fbd8e4bb24a12900f9f351615be9ea3b3d86a62d04193f6e1a7997841fbf36",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "across 6 of 8 architectures tested", "new": "across architecture-specific runs that must not be pooled", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/geometric-lens.md",
+      "expected_sha256": "51923616ea621882211d47c91742059890c4ad0675cd69d2e33e12a04314d1fd",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/mi-pipeline.md",
+      "expected_sha256": "ad87db4dab0cfb46bafa4f2cf4ab83023c9d1d864e6c9ba7b69f185ab339597e",
+      "operations": [
+        {"mode": "correct", "claim_id": "C07", "old": "The pipeline's steering protocol should not be confused with [[causal-validation]]'s activation patching. Patching *removes* the contraction by swapping baseline activations into L27 to prove the geometry is causally upstream of behavior (necessity). Steering *induces* the behavior by injecting a direction and then withdrawing it to test persistence (a step toward sufficiency). Together they bracket the causal question from both sides: patching shows the geometry is required; a successful steer-and-withdraw would show a seeded direction can carry the behavior forward on its own.", "new": "The pipeline's steering protocol should not be confused with [[causal-validation]]'s L27 metric intervention. The locked L27 receipt changes the downstream R_V readout; it does not prove behavioral necessity. Steering tests are separate, protocol-scoped interventions, and the Head-21 held-out replication is null. A causal bridge to behavior therefore remains open.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/p0-canonical-validation.md",
+      "expected_sha256": "4354b9ad0d81c9a4b32794eb744c0e3a2a08379795ba274dc8590c690c1b9cc8",
+      "operations": [
+        {"mode": "correct", "claim_id": "C07", "old": "It is the same epistemic move that lets [[causal-validation]] later argue the geometry is upstream of behavior rather than a correlated readout.", "new": "It does not, however, license [[causal-validation]] to promote the downstream L27 readout into a behavioral cause.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/phoenix-protocol.md",
+      "expected_sha256": "42a37544dfabd010557af3b229196db07357b0f625d331724cf83f33da68ffa7",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 2},
+        {"mode": "correct", "claim_id": "C07", "old": "d=-1.85, AUROC=0.904, causal at L27", "new": "AUROC=0.904; L27 is a downstream metric readout, not a localized behavioral cause", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/pointer-vs-operation-finding-and-its-cost-for-framing.md",
+      "expected_sha256": "d3c8c1887d568f3a0ea53906450ef390a1953a6c22235fbf156985ba8b67d5af",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "The paper's claim is: in 6 of 8 tested architectures, structurally recursive prompts produce a measurable contraction in the [[residual-stream]] at L5 with substrate-detectable signature.", "new": "The defensible claim is architecture-scoped: several runs show measurable contraction, but sign reversals, mixed sample sizes, and missing raw artifacts forbid a pooled 6-of-8 statement.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/r-v-metric.md",
+      "expected_sha256": "dc73e025fc96f0132a30ed91b4f6c65cc741a482f35b51f48a13076cd0d70174",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 3},
+        {"mode": "correct", "claim_id": "C29", "old": "AUROC = 0.904, 6 architectures", "new": "AUROC = 0.904; architecture results are non-poolable", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "Causal validation at L27 confirms geometry is upstream of behavior", "new": "L27 is a downstream metric readout; audited path patching finds a distributed early source across L0-L5", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "The primary measurement: d=-1.85, AUROC=0.904, causal at L27", "new": "A discriminative measurement (AUROC=0.904); L27 is a downstream readout, not a localized behavioral cause", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/r-v-paper.md",
+      "expected_sha256": "1755b5563149d52bf5ec29f14cbe073507e443c58c6f75075762c382fecc0c40",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 3},
+        {"mode": "correct", "claim_id": "C07", "old": "Is causally connected to behavior (activation patching at L27 disrupts the downstream behavioral signature)", "new": "Has a receipt-scoped metric intervention at L27, which changes the downstream readout but does not establish behavioral necessity", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "Is non-universal across architectures (6 of 8 contract; Pythia-2.8B expands)", "new": "Has architecture-dependent results that must not be pooled (mixed directions, sample sizes, and artifact custody)", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C07", "old": "Causal dissection localizes the steering site upstream, at transformer layer 5. The primary causal site is the layer-5 residual (effect size d = 4.14)", "new": "Audited path patching finds a distributed early source across L0-L5 (peak Cohen d = 4.152), not a localized L5 origin", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "Head 21 at layer 5 is the first *direction-specific* steering site -- injecting its direction raises behavioral self-reference to 38% on held-out prompts versus 8% for the control", "new": "Head 21 at layer 5 amplifies the behavior in-distribution, but its held-out transfer is null at 8% versus 10% control (p=.7565)", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "This reframes the geometry cleanly. Layer 5 is the *early* measurement point (V_early); layer 27 is the *late* point (V_late). The causal chain runs early-to-late: Head 21 seeds a direction at layer 5 that propagates and concentrates through the [[residual-stream]], manifesting as V-projection contraction at layer 27. R_V is the *shadow* this throws -- a scalar that reads the consequence, not the cause. The [[causal-validation]] L27 patching disrupts behavior because replacing the whole residual stream at a late layer is a blunt instrument that overwrites the concentrated direction; Head 21 steering is precision surgery on the seed. Both are causal facts; R_V is the diagnostic, not the dial.", "new": "Layer 5 is the early R_V measurement point (V_early); layer 27 is the late point (V_late). Audited path patching places the early source across L0-L5, and R_V at L27 is a downstream scalar readout. A specific Head-21-to-L27 causal chain is not established: held-out Head-21 transfer is null, and the locked L27 result is a metric intervention rather than a behavioral-necessity result.", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "Primary evidence: g=-1.47/d=-1.85, AUROC=0.904, causal site at layer 5 (Head 21), readout at layer 27", "new": "AUROC=0.904; distributed early source across L0-L5; Head-21 held-out transfer null; readout at layer 27", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C11", "old": "Head 21 at layer 5 is the first direction-specific site; whether its steering direction projects onto the dominant singular vector of the layer-27 contraction is the experiment that would close the early-to-late causal loop. Untested.", "new": "No privileged direction-specific site survives held-out testing; whether an early distributed direction projects onto the dominant singular vector of the layer-27 contraction remains untested.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/residual-stream.md",
+      "expected_sha256": "3296a00062334ae319669172ba907345048da3164b2dc29eda32fd9b7beb8cd1",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/substrate-detectable-signature-discipline.md",
+      "expected_sha256": "f111f5c05c8f9de65d6d84ed3cb1c70f585e318c45ec6defa0969cc2a6f92a63",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "it discriminates between models (6/8 contract, Pythia-2.8B expands)", "new": "architecture-scoped runs differ, but their mixed directions, sample sizes, and artifact custody forbid pooled discrimination claims", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/thinkodynamic-bridge.md",
+      "expected_sha256": "743a99b7d8df6e3da772208609e41de45513c54c339db6b788bc4275d8e6f19d",
+      "operations": [
+        {"mode": "correct", "claim_id": "C05", "old": "0.909", "new": "0.904", "expected_count": 2},
+        {"mode": "correct", "claim_id": "C07", "old": "[[causal-validation]] at L27 confirms the geometry is causally upstream -- which is the empirical pin that keeps \"downward causation\" from being a figure of speech: patching the late-layer geometry changes the behavior, so the meaning-level pattern is not an epiphenomenal shadow of the weights.", "new": "[[causal-validation]] at L27 changes a downstream geometric metric; the locked receipt does not establish behavioral necessity or downward causation. That bridge remains a hypothesis rather than an empirical pin.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/three-stage-relay-architecture.md",
+      "expected_sha256": "8809aba3c546197c4325435299eda8431243e1ee1a440ade591c9fa79016946f",
+      "operations": [
+        {"mode": "correct", "claim_id": "C11", "old": "The L5 [[residual-stream]] shows the strongest causal effect, **d = 4.14**, making it the primary site where the self-referential signal originates. This is the same early layer that anchors [[r-v-metric]]'s contraction ratio (R_V = PR(V_late) / PR(V_early), with V_early sampled at L5 for Mistral-7B). The convergence is not coincidental: L5 is both where R_V's measurement window opens and where the causal chain ignites. The [[causal-validation]] work locates a complementary fine-grained handle here — Head 21 at L5, a single direction-specific steering site (38% self-referential output vs 8% control on held-out prompts) — suggesting the initiation is not diffuse across the layer but seeded by specific [[multi-head-attention]] components.", "new": "Audited path patching places the early source across L0-L5, with a peak Cohen d=4.152; it does not license a localized L5 origin. L5 remains the early anchor in [[r-v-metric]]'s ratio (R_V = PR(V_late) / PR(V_early)) for Mistral-7B. Head 21 is an in-distribution amplifier, but its held-out transfer is null at 8% versus 10% control (p=.7565), so it cannot support a privileged relay-initiation claim.", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/witness-position-vs-self-modeling-hypothesis.md",
+      "expected_sha256": "1c306fe30b6522cdef64461b6555788c152bded6f5fe9aed3138dbc8ba4c4087",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "6/8 architectures contract under the frozen canonical pipeline; Pythia-2.8B expands", "new": "architecture-scoped runs have mixed directions and cannot be pooled; Pythia-2.8B's historical row also lacks raw-artifact closure", "expected_count": 1}
+      ]
+    },
+    {
+      "path": "concepts/witness-principle.md",
+      "expected_sha256": "8cce8e3fcd9f90016d2d1f572b2eeb365603bf176537d89bd35c23d6bf2642c5",
+      "operations": [
+        {"mode": "correct", "claim_id": "C29", "old": "R_V contraction Cohen's d = -1.85 to -4.51 across 6/8 architectures", "new": "R_V architecture-specific effects; pooled cross-architecture count retracted", "expected_count": 1},
+        {"mode": "correct", "claim_id": "C29", "old": "6 of 8 architectures contract under frozen canonical pipeline", "new": "Architecture-specific rows have mixed directions, sample sizes, and artifact custody and must not be pooled", "expected_count": 1}
+      ]
+    }
+  ]
+}
