@@ -101,6 +101,7 @@ def real_proposer(
     """
     pinned_root = Path(pinned_root)
     resolved: dict[str, str] = {}
+    usage = {"tokens": 0, "calls": 0}
 
     def _default_caller(model_hint: str, prompt: str) -> str:
         if "model" not in resolved:
@@ -112,9 +113,11 @@ def real_proposer(
             resolved["base"] = base
             resolved["key"] = key
             resolved["model"] = choose_model(list_models(base, key)) or default_model
-        text, _tokens = call_chat(resolved["base"], resolved["key"], resolved["model"],
-                                  prompt, max_tokens=PROPOSAL_MAX_TOKENS,
-                                  temperature=0.7, timeout=120.0)
+        text, tokens = call_chat(resolved["base"], resolved["key"], resolved["model"],
+                                 prompt, max_tokens=PROPOSAL_MAX_TOKENS,
+                                 temperature=0.7, timeout=120.0)
+        usage["tokens"] += tokens
+        usage["calls"] += 1
         return text
 
     call = caller or _default_caller
@@ -150,4 +153,9 @@ def real_proposer(
                          diff="", origin_model=model.id, parent_id=parent_id,
                          metadata={"proposer_failed": "diff did not apply after retry"})
 
+    # Honest spend accounting: the campaign CLI reads these after the run and
+    # prices tokens at the provider's upper-bound rate (same doctrine as the
+    # heartbeat lane — real usage is never invisible to the budget).
+    propose.usage = usage  # type: ignore[attr-defined]
+    propose.resolved = resolved  # type: ignore[attr-defined]
     return propose
