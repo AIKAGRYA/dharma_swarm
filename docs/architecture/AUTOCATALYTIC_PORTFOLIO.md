@@ -23,7 +23,7 @@ This portfolio is the metabolism of the currently active governance tracks, not 
 | 5 | [Arena Selection](autocatalytic_nodes/arena_selection.md) | `closure_gap -> selected_experiment` | `local_evidence` | Orchestration Arena |
 | 6 | [Chamber Research](autocatalytic_nodes/chamber_research.md) | `selected_experiment -> proposed_change` | `local_evidence` | Hyperbolic Time Chamber |
 | 7 | [Assurance & Merge](autocatalytic_nodes/assurance_merge.md) | `proposed_change -> verified_release` | `local_evidence` | Safety TCB, Titanium, Merge Master Mike |
-| 8 | [Operator Experience](autocatalytic_nodes/operator_experience.md) | `verified_release -> authorized_action` | `projection_only` | Helm |
+| 8 | [Operator Experience](autocatalytic_nodes/operator_experience.md) | `verified_release -> authorized_action` | `projection_only` | Organism Rewire |
 | 9 | [External Value Delivery](autocatalytic_nodes/external_value_delivery.md) | `authorized_action -> external_outcome` | `external_gated` | Darshan |
 | 10 | [Learning & Promotion](autocatalytic_nodes/learning_promotion.md) | `external_outcome -> promoted_feedback` | `projection_only` | Arena, Organism Rewire |
 

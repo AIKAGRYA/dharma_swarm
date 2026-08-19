@@ -20,6 +20,7 @@ from check_track_status import (  # type: ignore  # noqa: E402
     detect_dependency_cycle,
     _parse_minimal_yaml,
     _resolve_command_for_current_runtime,
+    _command_should_export_dharma_python,
     check_command_passes,
     Finding,
 )
@@ -315,6 +316,69 @@ def test_command_passes_exports_dharma_python(monkeypatch) -> None:
 
     assert result.passed
     assert result.executed
+
+
+def test_command_passes_does_not_export_dharma_python_for_non_python(
+    monkeypatch,
+) -> None:
+    """Bun/terminal criteria treat DHARMA_PYTHON as the bridge binary path.
+    The checker must not force its own interpreter into those environments."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+    # bun-shaped command: no python/pytest token, so no DHARMA_PYTHON pin.
+    result = check_command_passes(
+        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
+def test_command_passes_scrubs_inherited_dharma_python_for_non_python(
+    monkeypatch,
+) -> None:
+    """An operator-level interpreter pin must not leak into Bun criteria,
+    where DHARMA_PYTHON names the bridge executable rather than the checker."""
+    monkeypatch.setenv("DHARMA_PYTHON", "/operator/system-python-3.9")
+
+    result = check_command_passes(
+        ["bash", "-c", 'test -z "${DHARMA_PYTHON+x}"']
+    )
+
+    assert result.passed, result.detail
+    assert result.executed
+
+
+def test_every_dharma_python_wrapper_is_pinned() -> None:
+    """Both repo wrappers read DHARMA_PYTHON as the interpreter; either one
+    left out of the allowlist silently falls back to a checkout-local .venv or
+    bare python3, which is the split-brain the pin exists to remove. The
+    wrapper set is derived from the scripts themselves, so a new
+    DHARMA_PYTHON-honoring wrapper fails this test until it is allowlisted."""
+    wrappers = sorted(
+        path
+        for path in (REPO_ROOT / "scripts/governance").glob("run_*.sh")
+        if "DHARMA_PYTHON" in path.read_text()
+    )
+    assert wrappers, "no DHARMA_PYTHON-honoring wrappers found — glob is wrong"
+
+    for wrapper in wrappers:
+        rel = str(wrapper.relative_to(REPO_ROOT))
+        assert _command_should_export_dharma_python(
+            ["bash", rel, "-q", "tests/test_track_portfolio.py"]
+        ), f"{rel} invoked via bash is not recognised as interpreter-shaped"
+        assert _command_should_export_dharma_python(
+            [rel, "-q", "tests/test_track_portfolio.py"]
+        ), f"{rel} invoked directly is not recognised as interpreter-shaped"
+
+
+def test_bun_command_is_not_pinned_negative_control() -> None:
+    """Negative control for the allowlist above: broadening it must not start
+    poisoning the terminal (bun) criteria, which read DHARMA_PYTHON as the
+    bridge executable path."""
+    assert not _command_should_export_dharma_python(
+        ["bash", "-c", "cd terminal && bun test"]
+    )
+    assert not _command_should_export_dharma_python(["bun", "test"])
 
 
 def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:
