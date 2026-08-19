@@ -576,11 +576,27 @@ def _fetch_all_pages(resource: str) -> list | None:
         page += 1
 
 
-def gather_pr(repo: str, pr: int, policy: dict | None = None) -> dict | None:
+def gather_pr(
+    repo: str,
+    pr: int,
+    policy: dict | None = None,
+    *,
+    assume_unattended: bool = False,
+) -> dict | None:
     """Gather the evaluation inputs, failing closed (None) on ANY partial
     read: an unavailable diff is not an empty diff (it would waive the
     deleted-test sign-off), and an unavailable review/rate-limit query is
-    not an empty one (Codex + Greptile reviews on PR #1160)."""
+    not an empty one (Codex + Greptile reviews on PR #1160).
+
+    The required check also runs on the operator's manual lane. For an
+    unlabeled or draft PR, ``evaluate`` intentionally returns before any
+    diff-sensitive authority decision. Gather only the authenticated fields
+    needed to prove that lane selection, so GitHub's 20,000-line diff cap
+    cannot wedge a large operator-only PR. ``assume_unattended`` disables this
+    optimization because a caller about to arm automation must gather and
+    evaluate the complete evidence set regardless of current labels or draft
+    state. Canary PRs remain fully evaluated even when otherwise manual.
+    """
     effective_policy = policy or load_policy()
     view = _gh_json(
         [
@@ -590,6 +606,34 @@ def gather_pr(repo: str, pr: int, policy: dict | None = None) -> dict | None:
     )
     if not isinstance(view, dict):
         return None
+    labels = [row["name"] for row in view.get("labels", [])]
+    is_draft = bool(view.get("isDraft"))
+    manual_lane = (
+        not assume_unattended
+        and "canary-sandbox" not in labels
+        and (not (UNATTENDED_LABELS & set(labels)) or is_draft)
+    )
+    if manual_lane:
+        return {
+            "repo": repo,
+            "pr": pr,
+            "head_sha": str(view.get("headRefOid") or ""),
+            "base_sha": str(view.get("baseRefOid") or ""),
+            "base_ref": str(view.get("baseRefName") or ""),
+            "labels": labels,
+            "is_draft": is_draft,
+            "title": str(view.get("title") or ""),
+            "changed_paths": [],
+            "file_changes": [],
+            "diff_lines": int(view.get("additions", 0))
+            + int(view.get("deletions", 0)),
+            "diff_text": "",
+            "approved_reviews": [],
+            "ai_evidence": [],
+            "operator_warrants": [],
+            "author": view.get("author", {}).get("login", ""),
+            "merged_last_24h": 0,
+        }
     # Same REST source pr_merge_control.py trusts (fetch_pr_reviews): it
     # carries commit_id — the exact SHA each review saw — and App logins in
     # their "<app>[bot]" form, matching the policy's trusted identities.
@@ -647,8 +691,8 @@ def gather_pr(repo: str, pr: int, policy: dict | None = None) -> dict | None:
         "head_sha": head_sha,
         "base_sha": base_sha,
         "base_ref": base_ref,
-        "labels": [row["name"] for row in view.get("labels", [])],
-        "is_draft": bool(view.get("isDraft")),
+        "labels": labels,
+        "is_draft": is_draft,
         "title": str(view.get("title") or ""),
         "changed_paths": changed_paths,
         "file_changes": file_changes,
@@ -683,7 +727,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     policy = load_policy()
-    gathered = gather_pr(args.repo, args.pr, policy)
+    gathered = gather_pr(
+        args.repo,
+        args.pr,
+        policy,
+        assume_unattended=args.assume_unattended,
+    )
     if gathered is None:
         print("TIER_POLICY_UNKNOWN: could not gather PR state — failing closed",
               file=sys.stderr)
