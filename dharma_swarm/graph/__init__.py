@@ -60,7 +60,9 @@ from dharma_swarm.graph.scheduler import (
     MalformedDispatchOrderError,
     NodeExecutionError,
     NodeResultError,
+    SuperstepEmission,
     SuperstepLimitError,
+    run_on_private_loop,
 )
 from dharma_swarm.graph.types import (
     END,
@@ -138,6 +140,7 @@ __all__ = [
     "input_schema",
     "output_schema",
     "typed_state_schema",
+    "SuperstepEmission",
     "SuperstepLimitError",
     "TopicChannel",
     "TriggerChannel",
@@ -148,5 +151,6 @@ __all__ = [
     "dispatch_machine_receipt",
     "persist_evidence_receipt",
     "receipt_from_dict",
+    "run_on_private_loop",
     "wrap_invoker",
 ]

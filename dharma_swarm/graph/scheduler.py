@@ -27,12 +27,20 @@ commits nothing, checkpoints nothing, returns no result. ``resume_from`` /
 ``on_checkpoint`` add crash-resume and fork; the resume integrity contract
 is digest equality at the join point, never event-stream identity.
 
+Invocation surfaces (LG12 parity): ``invoke`` / ``invoke_sync`` / ``stream``
+/ ``stream_sync`` and the ``SuperstepEmission`` this loop yields live in
+the sibling module :mod:`dharma_swarm.graph.invocation` — see its module
+docstring for the full projection contract. ``CompiledGraph`` mixes in
+:class:`~dharma_swarm.graph.invocation.InvocationSurfacesMixin` to get
+those surfaces; this module owns only the loop itself.
+
 claim_mode: candidate / test_only. Not wired into production dispatch.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
@@ -52,6 +60,11 @@ from dharma_swarm.graph.errors import (
 )
 from dharma_swarm.graph.executor import SuperstepExecutor
 from dharma_swarm.graph.interrupts import GraphInterrupted, resume_channel
+from dharma_swarm.graph.invocation import (
+    InvocationSurfacesMixin,
+    SuperstepEmission,
+    run_on_private_loop,
+)
 from dharma_swarm.graph.persistence import GraphPersistenceKernel
 from dharma_swarm.graph.persistence_runtime import (
     GraphRunPersistence,
@@ -75,14 +88,16 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "SuperstepEmission",
     "SuperstepLimitError",
+    "run_on_private_loop",
 ]
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class CompiledGraph:
+class CompiledGraph(InvocationSurfacesMixin):
     """Validated, immutable topology. Construct via ``GraphBuilder.compile()``."""
 
     graph_id: str
@@ -101,7 +116,7 @@ class CompiledGraph:
     # every pull-task snapshot (schema.RemainingSteps; None = not declared).
     managed_remaining: str | None = None
 
-    async def invoke(
+    async def _run_supersteps(
         self,
         input: Mapping[str, Any] | None = None,
         *,
@@ -114,8 +129,14 @@ class CompiledGraph:
         persistence: GraphPersistenceKernel | None = None,
         thread_id: str | None = None,
         checkpoint_id: str | None = None,
-    ) -> GraphRunResult:
-        """Run the graph from START to quiescence and return the committed result.
+    ) -> AsyncIterator[tuple[str, Any]]:
+        """The run lifecycle: yield every committed barrier, then the result.
+
+        Emits ``("step", SuperstepEmission)`` after each barrier COMMITS —
+        never before — and finally ``("result", GraphRunResult)``. Every
+        public invocation surface consumes this one generator, so sync,
+        async, streaming, and typed-v2 callers observe byte-identical
+        committed state.
 
         ``graph_run_id`` resolution: explicit wins; else a passed
         ``checkpoint_store``'s ``run_id`` is adopted; else one id is minted
@@ -209,6 +230,13 @@ class CompiledGraph:
                 )
             committed = resume_from.superstep
             superstep = resume_from.superstep
+            # A resumed run has no seed barrier; its restored state is the
+            # stream's starting snapshot, so a values stream still opens on
+            # the state the caller resumes FROM.
+            yield (
+                "step",
+                SuperstepEmission(superstep, state.snapshot(), (), is_seed=True),
+            )
         else:
             seed_input = self._validated_seed(input, run_id)
             seed_writes = [
@@ -236,6 +264,10 @@ class CompiledGraph:
             committed = 0
             superstep = 0
             _emit_checkpoint(0, digest)
+            yield (
+                "step",
+                SuperstepEmission(0, state.snapshot(), (), is_seed=True),
+            )
 
         # Superstep budgets are per-INVOCATION (langgraph parity: every
         # invoke gets its full recursion budget, including resume —
@@ -260,6 +292,7 @@ class CompiledGraph:
                 plan.resumes[next(iter(plan.resumes))].append(
                     resume_command.resume
                 )
+            replayed_writes: list[ChannelWrite] = []
             if plan.full:
                 run_persistence.replay(
                     state, versions_seen, self.triggers, tasks, run_id, superstep
@@ -319,6 +352,7 @@ class CompiledGraph:
                         task_path=merged_path,
                     )
                     raise
+                replayed_writes = list(plan.recorded_writes) + list(live_pending)
                 state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
                 )
@@ -340,6 +374,17 @@ class CompiledGraph:
                 for node_id, seq in replayed_ids
             )
             _emit_checkpoint(superstep, digest, plan.task_id)
+            # Full replay re-applies journalled writes inside the persistence
+            # runtime, so only the partial path can report per-task updates;
+            # the values projection is exact either way.
+            yield (
+                "step",
+                SuperstepEmission(
+                    superstep,
+                    state.snapshot(),
+                    self._update_chunks(replayed_writes),
+                ),
+            )
         while True:
             superstep += 1
             start_versions = state.versions
@@ -406,15 +451,24 @@ class CompiledGraph:
                 )
             committed = superstep
             _emit_checkpoint(superstep, digest, pending_task_id)
+            yield (
+                "step",
+                SuperstepEmission(
+                    superstep, state.snapshot(), self._update_chunks(pending)
+                ),
+            )
 
-        return GraphRunResult(
-            graph_run_id=run_id,
-            graph_id=self.graph_id,
-            status="completed",
-            state=state.snapshot(),
-            state_digest=digest,
-            supersteps=committed,
-            events=tuple(events),
+        yield (
+            "result",
+            GraphRunResult(
+                graph_run_id=run_id,
+                graph_id=self.graph_id,
+                status="completed",
+                state=state.snapshot(),
+                state_digest=digest,
+                supersteps=committed,
+                events=tuple(events),
+            ),
         )
 
     def _validated_seed(
