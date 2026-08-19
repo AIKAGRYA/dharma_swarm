@@ -129,6 +129,68 @@ async def test_required_auto_isolation_never_falls_back_to_host():
 
 
 @pytest.mark.asyncio
+async def test_required_local_isolation_is_rejected():
+    mgr = SandboxManager()
+    with pytest.raises(IsolationUnavailableError, match="refusing LocalSandbox"):
+        await mgr.create_async(sandbox_type="local", require_isolation=True)
+    assert mgr.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_required_auto_isolation_ignores_permissive_preference():
+    mgr = SandboxManager(prefer_docker=False)
+    with pytest.raises(IsolationUnavailableError, match="refusing LocalSandbox"):
+        await mgr.create_async(sandbox_type="auto", require_isolation=True)
+    assert mgr.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_required_docker_adapter_failure_never_falls_back_to_host():
+    mgr = SandboxManager()
+    with (
+        patch.object(mgr, "_check_docker", AsyncMock(return_value=True)),
+        patch(
+            "dharma_swarm.docker_sandbox.DockerSandbox",
+            side_effect=SandboxError("adapter setup failed"),
+        ),
+    ):
+        with pytest.raises(IsolationUnavailableError, match="refusing host fallback"):
+            await mgr.create_async(sandbox_type="docker")
+    assert mgr.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_permissive_auto_preserves_local_fallback_on_adapter_failure():
+    mgr = SandboxManager(prefer_docker=True)
+    with (
+        patch.object(mgr, "_check_docker", AsyncMock(return_value=True)),
+        patch(
+            "dharma_swarm.docker_sandbox.DockerSandbox",
+            side_effect=SandboxError("adapter setup failed"),
+        ),
+    ):
+        sb = await mgr.create_async(sandbox_type="auto")
+    assert isinstance(sb, LocalSandbox)
+    assert mgr.active_count == 1
+    await mgr.shutdown_all()
+
+
+@pytest.mark.asyncio
+async def test_explicit_docker_refreshes_cached_unavailability():
+    from dharma_swarm.docker_sandbox import DockerSandbox
+
+    mgr = SandboxManager()
+    mgr._docker_available = False
+    with patch.object(
+        DockerSandbox, "docker_available", AsyncMock(return_value=True)
+    ) as available:
+        sb = await mgr.create_async(sandbox_type="docker")
+    available.assert_awaited_once_with()
+    assert isinstance(sb, DockerSandbox)
+    await mgr.shutdown_all()
+
+
+@pytest.mark.asyncio
 async def test_async_unknown_sandbox_type_fails_closed():
     mgr = SandboxManager()
     with pytest.raises(SandboxError, match="Unknown sandbox type"):
