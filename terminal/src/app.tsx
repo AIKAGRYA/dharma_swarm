@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useReducer, useRef, useState} from "react";
-import {Box, Text, useApp, useInput, useStdin} from "ink";
+import {Box, Text, useApp, useInput, useStdin, useWindowSize} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {normalizeCommandOutcome} from "./commandOutcome.ts";
@@ -2390,29 +2390,13 @@ export function paneActionStartActions(action: {summary: string; payload: Record
 
 export function App(): React.ReactElement {
   const {exit} = useApp();
+  const {columns: terminalWidth, rows: terminalHeight} = useWindowSize();
   const [state, dispatch] = useReducer(reduceApp, initialState, createInitialAppState);
-  // FACE-1 regression fix: ink re-lays-out the EXISTING tree on stdout resize,
-  // but width-derived React props (zen 100-col clamp, compactShell, window
-  // sizes) stay stale until the next state event — offline that is the 15s
-  // probe, so a live 120->80 resize garbled for seconds. This tick forces a
-  // React re-render the moment the terminal resizes.
-  const [, setViewportTick] = useState(0);
   // FACE-3 the scroll: the telemetry drawer is view-local — never persisted,
   // reset each boot, meaningless outside the scroll face.
   const [scrollDrawerOpen, setScrollDrawerOpen] = useState(false);
-  useEffect(() => {
-    const handleResize = (): void => {
-      setViewportTick((tick) => tick + 1);
-    };
-    process.stdout.on("resize", handleResize);
-    return () => {
-      process.stdout.off("resize", handleResize);
-    };
-  }, []);
 
   const activeTab = state.tabs.find((tab) => tab.id === state.uiMode.activeTabId) ?? state.tabs[0];
-  const terminalWidth = (process.stdout.columns ?? Number(process.env.COLUMNS ?? "0")) || 120;
-  const terminalHeight = (process.stdout.rows ?? Number(process.env.LINES ?? "0")) || 30;
   const helmViewportProfile = viewportProfile(terminalWidth, terminalHeight);
   const compactShell = helmViewportProfile === "compact"
     || helmViewportProfile === "survival"

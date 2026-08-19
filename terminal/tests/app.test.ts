@@ -569,9 +569,15 @@ const TEMP_DIRS: string[] = [];
 let savedTerminalStateBackup: string | null | undefined;
 
 class TestStdout extends PassThrough {
-  columns = 220;
-  rows = 60;
+  columns: number;
+  rows: number;
   isTTY = true;
+
+  constructor(columns = 220, rows = 60) {
+    super();
+    this.columns = columns;
+    this.rows = rows;
+  }
 
   cursorTo(): boolean {
     return true;
@@ -713,30 +719,6 @@ function cleanupTempDirs(): void {
 
 afterEach(() => {
   cleanupTempDirs();
-});
-
-// The app reads the REAL process.stdout.rows (never ink's test stdout — the
-// F-022 lesson), so under bun test it falls back to 30 rows. Tests asserting
-// boot-hydrated previews are VISIBLE need the 60-row terminal TestStdout
-// already declares: with the F-163 height clamp a 30-row frame rightly clips
-// that content instead of inflating the layout past the terminal.
-const stdoutRowRestores: Array<() => void> = [];
-function stubProcessStdoutRows(rows: number): void {
-  const descriptor = Object.getOwnPropertyDescriptor(process.stdout, "rows");
-  Object.defineProperty(process.stdout, "rows", {configurable: true, value: rows});
-  stdoutRowRestores.push(() => {
-    if (descriptor) {
-      Object.defineProperty(process.stdout, "rows", descriptor);
-    } else {
-      delete (process.stdout as unknown as Record<string, unknown>).rows;
-    }
-  });
-}
-
-afterEach(() => {
-  while (stdoutRowRestores.length > 0) {
-    stdoutRowRestores.pop()?.();
-  }
 });
 
 describe("snapshotActionsForBridgeEvent", () => {
@@ -937,7 +919,6 @@ describe("snapshotActionsForBridgeEvent", () => {
   });
 
   test("renders hydrated repo and context previews on app startup", async () => {
-    stubProcessStdoutRows(500);
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
@@ -954,7 +935,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     };
     DharmaBridge.prototype.close = function mockedClose(): void {};
 
-    const stdout = new TestStdout();
+    const stdout = new TestStdout(220, 500);
     const stdin = new TestStdin();
     let rendered = "";
     stdout.on("data", (chunk) => {
@@ -964,7 +945,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     const instance = render(React.createElement(App), {
       stdout: stdout as unknown as NodeJS.WriteStream,
       stdin: stdin as unknown as NodeJS.ReadStream,
-      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      stderr: new TestStdout(220, 500) as unknown as NodeJS.WriteStream,
       debug: true,
       patchConsole: false,
       exitOnCtrlC: false,
@@ -1012,7 +993,6 @@ describe("snapshotActionsForBridgeEvent", () => {
   });
 
   test("renders hydrated control and runtime panes with loop and verification state on startup", async () => {
-    stubProcessStdoutRows(500);
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
@@ -1026,7 +1006,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     };
     DharmaBridge.prototype.close = function mockedClose(): void {};
 
-    const stdout = new TestStdout();
+    const stdout = new TestStdout(220, 500);
     const stdin = new TestStdin();
     let rendered = "";
     stdout.on("data", (chunk) => {
@@ -1036,7 +1016,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     const instance = render(React.createElement(App), {
       stdout: stdout as unknown as NodeJS.WriteStream,
       stdin: stdin as unknown as NodeJS.ReadStream,
-      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      stderr: new TestStdout(220, 500) as unknown as NodeJS.WriteStream,
       debug: true,
       patchConsole: false,
       exitOnCtrlC: false,
@@ -10994,7 +10974,6 @@ Workflows: 1
   });
 
   test("cold boot surfaces restored repo and control previews in visible context before the first live refresh", async () => {
-    stubProcessStdoutRows(500);
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
@@ -11029,7 +11008,7 @@ Workflows: 1
     };
     DharmaBridge.prototype.close = function mockedClose(): void {};
 
-    const stdout = new TestStdout();
+    const stdout = new TestStdout(220, 500);
     const stdin = new TestStdin();
     let rendered = "";
     stdout.on("data", (chunk) => {
@@ -11039,7 +11018,7 @@ Workflows: 1
     const instance = render(React.createElement(App), {
       stdout: stdout as unknown as NodeJS.WriteStream,
       stdin: stdin as unknown as NodeJS.ReadStream,
-      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      stderr: new TestStdout(220, 500) as unknown as NodeJS.WriteStream,
       debug: true,
       patchConsole: false,
       exitOnCtrlC: false,
@@ -11304,7 +11283,6 @@ Workflows: 1
   });
 
   test("cold boot derives topology peer and pressure rows from sparse restored repo previews", async () => {
-    stubProcessStdoutRows(500);
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
@@ -11341,7 +11319,7 @@ Workflows: 1
     };
     DharmaBridge.prototype.close = function mockedClose(): void {};
 
-    const stdout = new TestStdout();
+    const stdout = new TestStdout(220, 500);
     const stdin = new TestStdin();
     let rendered = "";
     stdout.on("data", (chunk) => {
@@ -11351,7 +11329,7 @@ Workflows: 1
     const instance = render(React.createElement(App), {
       stdout: stdout as unknown as NodeJS.WriteStream,
       stdin: stdin as unknown as NodeJS.ReadStream,
-      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      stderr: new TestStdout(220, 500) as unknown as NodeJS.WriteStream,
       debug: true,
       patchConsole: false,
       exitOnCtrlC: false,

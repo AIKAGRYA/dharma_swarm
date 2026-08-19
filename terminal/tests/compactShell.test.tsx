@@ -2,11 +2,9 @@
 // projected through compact, standard, and panorama profiles; resize may alter
 // composition but never route/OnCall truth or the conversation draft.
 //
-// Width mechanism (the non-obvious part): App computes terminalWidth from
-// process.stdout.columns ?? Number(COLUMNS) (src/app.tsx) — NOT from the
-// stdout handed to ink's render(). Under bun test process.stdout is piped so
-// .columns is normally undefined, but we stub it explicitly (defineProperty,
-// restored after every test) so the lever holds even under a TTY runner.
+// Width mechanism: Ink 7 owns the renderer stream dimensions through
+// useWindowSize(). Every fixture passes an explicit TestStdout, so compact
+// behavior is tested against the same source that owns live resize events.
 import {afterEach, expect, test} from "bun:test";
 import {PassThrough} from "node:stream";
 import React from "react";
@@ -84,19 +82,6 @@ function stripAnsi(value: string): string {
 
 const restores: Array<() => void> = [];
 
-function stubOwnProperty(target: object, key: string, value: unknown): void {
-  const had = Object.prototype.hasOwnProperty.call(target, key);
-  const descriptor = had ? Object.getOwnPropertyDescriptor(target, key) : undefined;
-  Object.defineProperty(target, key, {configurable: true, writable: true, value});
-  restores.push(() => {
-    if (descriptor) {
-      Object.defineProperty(target, key, descriptor);
-    } else {
-      delete (target as Record<string, unknown>)[key];
-    }
-  });
-}
-
 function stubEnv(key: string, value: string): void {
   const previous = process.env[key];
   process.env[key] = value;
@@ -121,8 +106,6 @@ async function renderShellAt(
   settled: (frame: string) => boolean,
   layoutCommand: string | null = "/cockpit",
 ): Promise<string> {
-  stubOwnProperty(process.stdout, "columns", columns);
-  stubOwnProperty(process.stdout, "rows", rows);
   // Deterministic offline: the spawn fails instantly, so bridgeStatus reaches
   // "offline" within the poll budget.
   stubEnv("DHARMA_PYTHON", "/nonexistent/python-f022");

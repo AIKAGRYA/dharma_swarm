@@ -1,4 +1,4 @@
- ◆ DHARMA HELM  /  CONVERSATION  ·  ds_nihonga_helm_frontier_20260814                                 120×40 · panorama
+ ◆ DHARMA HELM  /  CONVERSATION  ·  dharma_swarm                                                      120×40 · panorama
  ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   ◆ Conversation   · Activity   · Evidence   · System
@@ -8,8 +8,8 @@
 │ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
 │  Dharma Helm · Quiet Field                         ││ Sessions                               ││ correlated events ·… │
 │  Type a message below · F2 unfolds the Whole Helm  ││ 0 shown of 0 | rows 0 | next fresh | … ││                      │
-│                                                    ││                                        ││ ✖ ENOENT: no such f… │
-│                                                    ││  Catalog       Drilldown               ││ ✖ bridge stdin is u… │
+│                                                    ││                                        ││ ✖ bridge stdin is u… │
+│                                                    ││  Catalog       Drilldown               ││                      │
 │                                                    ││  id · route…   identity, replay, and … ││                      │
 │                                                    ││  No            No selected session.    ││                      │
 │                                                    ││  sessions.                             ││                      │
@@ -31,7 +31,7 @@
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││                                        ││ 2 canonical events … │
+│                                                    ││                                        ││ 1 canonical events … │
 └────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

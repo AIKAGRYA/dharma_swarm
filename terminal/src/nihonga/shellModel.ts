@@ -83,9 +83,14 @@ export function planeForPane(kind: PaneKind | undefined): HelmPlane {
 
 export function workspaceLabel(cwd: string): string {
   const segments = cwd.replaceAll("\\", "/").split("/").filter(Boolean);
-  const leaf = segments.at(-1);
-  if (leaf === "terminal" && segments.length > 1) {
-    return segments.at(-2) ?? "workspace";
+  const terminalIndex = segments.lastIndexOf("terminal");
+  const workspaceIndex = terminalIndex >= 0 ? terminalIndex - 1 : segments.length - 1;
+  const candidate = segments[workspaceIndex];
+  if (!candidate) {
+    return "workspace";
   }
-  return leaf ?? "workspace";
+  if (candidate === "dharma_swarm" || candidate.startsWith("wt_helm_") || candidate.startsWith("ds_helm_")) {
+    return "dharma_swarm";
+  }
+  return candidate;
 }
