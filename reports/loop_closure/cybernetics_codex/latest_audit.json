@@ -613,7 +613,7 @@
     "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
     "Regenerate the loop map from a live projection instead of hand-editing stale prose."
   ],
-  "observed_at": "2026-07-24T07:53:31.371238Z",
+  "observed_at": "2026-08-15T01:30:04.559945Z",
   "one_wire": {
     "archive_fitness_changed": false,
     "blocker": "guardian quorum receipt missing",
