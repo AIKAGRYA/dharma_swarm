@@ -1,0 +1,1917 @@
+{
+  "generated_at": "2026-08-19T18:04:15+00:00",
+  "schema_version": 2,
+  "active_track_id": "loop-closure-2026-06",
+  "shippable": false,
+  "prerequisites_ok": true,
+  "completion_progress": {
+    "passed": 32,
+    "total": 32
+  },
+  "criteria": [
+    {
+      "id": "loop_map_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "CYBERNETIC_LOOP_MAP.md present",
+      "executed": true
+    },
+    {
+      "id": "loop_supervisor_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "dharma_swarm/loop_supervisor.py present",
+      "executed": true
+    },
+    {
+      "id": "phase0_dossier_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
+      "executed": true
+    },
+    {
+      "id": "phase0_fresh_status_table",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
+      "executed": true
+    },
+    {
+      "id": "one_wire_invariant_stated",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
+      "executed": true
+    },
+    {
+      "id": "loop1_closure_receipt_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
+      "executed": true
+    },
+    {
+      "id": "campaign_retrospective_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "reports/loop_closure/RETROSPECTIVE.md present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_manifest_registered",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_seed_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_soul_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "docs/agents/cybernetics_codex/SOUL.md present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_context_desk_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_audit_script_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "scripts/governance/cybernetics_codex_audit.py present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_registration_script_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "scripts/governance/register_cybernetics_codex.py present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_latest_audit_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_latest_audit_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present, fresh)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop_verdict_map_matches_claim_boundary",
+      "kind": "json_collection_values_match",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses 13 expected verdict value(s) matched",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_live_owner_criteria_declared",
+      "kind": "json_mapping_keys_nonempty",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.live_owner_surface_criteria has non-empty values for 13 key(s)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_closed_live_count_zero",
+      "kind": "json_count_equals",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'CLOSED_LIVE': 0 == 0",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_harness_proven_count_11",
+      "kind": "json_count_equals",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 == 11",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_blocked_count_2",
+      "kind": "json_count_equals",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'BLOCKED': 2 == 2",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop3_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop4_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop7_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop8_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop9_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop10_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop11_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_one_wire_guard_test_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "tests/test_one_wire_archive_fitness_guard.py present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_one_wire_guard_test_passes",
+      "kind": "test_passes",
+      "passed": true,
+      "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.82s",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop12_13_guard_receipt_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present",
+      "executed": true
+    },
+    {
+      "id": "cybernetics_codex_loop12_13_guard_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)",
+      "executed": true
+    },
+    {
+      "id": "loop_supervisor_tristate_honest",
+      "kind": "command_passes",
+      "passed": true,
+      "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_loop_supervisor_tristate.py -q exited 0 (resolved from python3 -m pytest tests/test_loop_supervisor_tristate.py -q); output: ......................                                                   [100%] | 22 passed in 0.64s",
+      "executed": true
+    },
+    {
+      "id": "loop1_consumption_unit_proof",
+      "kind": "command_passes",
+      "passed": true,
+      "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_loop1_consumption.py -q exited 0 (resolved from python3 -m pytest tests/test_loop1_consumption.py -q); output: ......                                                                   [100%] | 6 passed in 0.52s",
+      "executed": true
+    },
+    {
+      "id": "loop1_consumption_check_replays",
+      "kind": "command_passes",
+      "passed": true,
+      "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 scripts/governance/loop1_consumption_check.py --check exited 0 (resolved from python3 scripts/governance/loop1_consumption_check.py --check); output: { | \"authorized_provider_order\": [ | \"anthropic\", | \"openai\", | \"openrouter\", | \"ollama\" | ], | \"chain_verified\": false, | \"consumed_trace_ids\": [], | \"consumer_boot_id\": \"\", | \"consumer_trace_id\": \"\", | \"container_image_digest\": \"\", | \"container_image_provenance\": \"\", | \"content_digest\": \"71fd5c8676a51c0afab175530fdcbf56bed17623e2445434961e14934428d267\", | \"db_path\": \"/home/runner/.dharma/state/runtime.db\", | \"decision_delta\": {}, | \"delegation_runs_row_count\": 0, | \"host_sha\": \"abc8bd35c34c...",
+      "executed": true
+    }
+  ],
+  "portfolio_summary": {
+    "active": 10,
+    "max_active": 10,
+    "warn_active": 8,
+    "shippable": 0
+  },
+  "spine_objectives": [
+    {
+      "id": "substrate-nativeness",
+      "name": "Substrate nativeness \u2014 runtime flows through the ontology/spine, not around it",
+      "ref": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "measure": "~10-15% native today; target 30%+ (reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md)"
+    },
+    {
+      "id": "revenue-external-humans-served",
+      "name": "Revenue & external humans served \u2014 value leaves the house and someone acts on it",
+      "ref": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml",
+      "measure": "external humans who read/replied/acted; first cash receipt"
+    },
+    {
+      "id": "research-depth",
+      "name": "Research depth \u2014 the contemplative-mechanistic bridge (R_V, geometric lens) deepens",
+      "ref": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "measure": "verified MI results; paper-grade claims"
+    }
+  ],
+  "spine_coverage": {
+    "substrate-nativeness": true,
+    "revenue-external-humans-served": true,
+    "research-depth": true
+  },
+  "vital_signs": {
+    "source": "dharma_swarm/harness_audit.py",
+    "dashboard_route": "/dashboard/audit",
+    "dimensions": [
+      "tool_coverage",
+      "context_efficiency",
+      "quality_gates",
+      "memory_persistence",
+      "eval_coverage",
+      "security_guardrails",
+      "cost_efficiency"
+    ]
+  },
+  "active_tracks": [
+    {
+      "id": "loop-closure-2026-06",
+      "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [
+        "organism-rewire-2026-07"
+      ],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "reports/loop_closure/**",
+        "CYBERNETIC_LOOP_MAP.md",
+        "docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md",
+        "scripts/governance/loop1_consumption_check.py",
+        "tests/test_loop_supervisor_tristate.py",
+        "tests/test_loop1_consumption.py",
+        "tests/test_loop1_consumption_check.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage"
+      ],
+      "verified_at": "2026-07-11",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "3 open blocker next-item(s)",
+        "1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0",
+        "outcome receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json reports verdict='BLOCKED' \u2014 not a passing verdict; the track's own scoreboard does not say the work is done"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 32,
+        "total": 32
+      },
+      "criteria": [
+        {
+          "id": "loop_map_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "CYBERNETIC_LOOP_MAP.md present",
+          "executed": true
+        },
+        {
+          "id": "loop_supervisor_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/loop_supervisor.py present",
+          "executed": true
+        },
+        {
+          "id": "phase0_dossier_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
+          "executed": true
+        },
+        {
+          "id": "phase0_fresh_status_table",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
+          "executed": true
+        },
+        {
+          "id": "one_wire_invariant_stated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
+          "executed": true
+        },
+        {
+          "id": "loop1_closure_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
+          "executed": true
+        },
+        {
+          "id": "campaign_retrospective_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/RETROSPECTIVE.md present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_manifest_registered",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_seed_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_soul_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/SOUL.md present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_context_desk_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_audit_script_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/cybernetics_codex_audit.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_registration_script_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/register_cybernetics_codex.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop_verdict_map_matches_claim_boundary",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses 13 expected verdict value(s) matched",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_live_owner_criteria_declared",
+          "kind": "json_mapping_keys_nonempty",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.live_owner_surface_criteria has non-empty values for 13 key(s)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_closed_live_count_zero",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'CLOSED_LIVE': 0 == 0",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_harness_proven_count_11",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 == 11",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_blocked_count_2",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'BLOCKED': 2 == 2",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop3_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop4_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop7_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop8_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop9_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop10_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop11_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_one_wire_archive_fitness_guard.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.82s",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)",
+          "executed": true
+        },
+        {
+          "id": "loop_supervisor_tristate_honest",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_loop_supervisor_tristate.py -q exited 0 (resolved from python3 -m pytest tests/test_loop_supervisor_tristate.py -q); output: ......................                                                   [100%] | 22 passed in 0.64s",
+          "executed": true
+        },
+        {
+          "id": "loop1_consumption_unit_proof",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_loop1_consumption.py -q exited 0 (resolved from python3 -m pytest tests/test_loop1_consumption.py -q); output: ......                                                                   [100%] | 6 passed in 0.52s",
+          "executed": true
+        },
+        {
+          "id": "loop1_consumption_check_replays",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 scripts/governance/loop1_consumption_check.py --check exited 0 (resolved from python3 scripts/governance/loop1_consumption_check.py --check); output: { | \"authorized_provider_order\": [ | \"anthropic\", | \"openai\", | \"openrouter\", | \"ollama\" | ], | \"chain_verified\": false, | \"consumed_trace_ids\": [], | \"consumer_boot_id\": \"\", | \"consumer_trace_id\": \"\", | \"container_image_digest\": \"\", | \"container_image_provenance\": \"\", | \"content_digest\": \"71fd5c8676a51c0afab175530fdcbf56bed17623e2445434961e14934428d267\", | \"db_path\": \"/home/runner/.dharma/state/runtime.db\", | \"decision_delta\": {}, | \"delegation_runs_row_count\": 0, | \"host_sha\": \"abc8bd35c34c...",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": [
+        {
+          "id": "cybernetics_codex_harness_proven_blocks_live_ship",
+          "kind": "json_count_greater_than",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0",
+          "executed": true
+        }
+      ]
+    },
+    {
+      "id": "orchestration-arena-v1-2026-06",
+      "name": "Orchestration Arena v1 \u2014 frozen hermetic fitness + zero-weight orchestrator + DPI",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "provider-routing-consolidation-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/coordination/**",
+        "dharma_swarm/council/**",
+        "scripts/governance/arena_truth_report.py",
+        "reports/governance/arena/**",
+        "tests/test_arena_v1.py",
+        "tests/test_dpi.py",
+        "tests/test_orchestration_genome.py",
+        "tests/test_orchestrator_v1.py",
+        "tests/test_council_profiles.py",
+        "tests/test_coordination_closure_checks.py",
+        "tests/test_arena_truth_report.py"
+      ],
+      "moves_vital_signs": [
+        "eval_coverage",
+        "quality_gates"
+      ],
+      "verified_at": "2026-07-17",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": null,
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 11,
+        "total": 12
+      },
+      "criteria": [
+        {
+          "id": "arena_runner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/coordination/arena/runner.py present",
+          "executed": true
+        },
+        {
+          "id": "arena_scorer_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/coordination/arena/scorer.py present",
+          "executed": true
+        },
+        {
+          "id": "orchestration_genome_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/coordination/genome.py present",
+          "executed": true
+        },
+        {
+          "id": "frozen_taskpack_present",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
+          "executed": true
+        },
+        {
+          "id": "deterministic_scorer_hash",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
+          "executed": true
+        },
+        {
+          "id": "orchestration_genome_class",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
+          "executed": true
+        },
+        {
+          "id": "zero_weight_orchestrator_map_elites",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
+          "executed": true
+        },
+        {
+          "id": "dpi_decorrelation_gated_on_correctness",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
+          "executed": true
+        },
+        {
+          "id": "council_trace_verification",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
+          "executed": true
+        },
+        {
+          "id": "arena_v1_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
+          "executed": true
+        },
+        {
+          "id": "dpi_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_dpi.py present",
+          "executed": true
+        },
+        {
+          "id": "closure_checks_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_coordination_closure_checks.py present",
+          "executed": true
+        },
+        {
+          "id": "arena_v1_controls_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_arena_v1.py: PASS \u2014 15 passed in 0.80s",
+          "executed": true
+        },
+        {
+          "id": "arena_truth_surface_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_arena_truth_report.py: PASS \u2014 8 passed in 6.20s",
+          "executed": true
+        },
+        {
+          "id": "arena_truth_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/governance/arena/arena_truth_receipt.json is stale: 23d old > fresh_ttl_days=21",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "merge-master-mike-d4-2026-06",
+      "name": "Merge Master Mike \u2014 D4 persistent always-on merge agent",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "governance_gate",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "repository-titanium-hardening-2026-07"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "scripts/runtime/pr_merge_control.py",
+        "scripts/runtime/merge_master_mike_daemon.py",
+        ".github/workflows/automerge.yml",
+        ".github/workflows/codex-mention-router.yml",
+        ".github/workflows/merge-master-mike-backlog.yml",
+        "tests/test_merge_master_mike_daemon.py",
+        "tests/test_pr_merge_control.py",
+        "tests/test_pr_merge_control_github_reviews.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "tool_coverage"
+      ],
+      "verified_at": "2026-07-16",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "Native Codex/Copilot reviews are accepted only from trusted installed-App identities; unattended human-PR merge is authorized only after every existing deterministic gate is clean. Claude remains an optional deep/backup lane with no new credential. This policy and its hermetic behavior are landed; PRODUCTION_READY is not claimed until a live cloud canary and a ship_safe Final Boss manifest are attached. The current 7/7 criteria prove the landed D4 slice only; they do not cover Titanium WP-0F2 required-check authority convergence, so Mike remains active.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 3,
+      "strongest_grade_name": "S3_TESTED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 7,
+        "total": 7
+      },
+      "criteria": [
+        {
+          "id": "pr_merge_control_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/pr_merge_control.py present",
+          "executed": true
+        },
+        {
+          "id": "mike_daemon_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/merge_master_mike_daemon.py present",
+          "executed": true
+        },
+        {
+          "id": "automerge_workflow_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": ".github/workflows/automerge.yml present",
+          "executed": true
+        },
+        {
+          "id": "router_workflow_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": ".github/workflows/codex-mention-router.yml present",
+          "executed": true
+        },
+        {
+          "id": "github_review_receipt_bridge",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py",
+          "executed": true
+        },
+        {
+          "id": "github_review_bridge_tested",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_pr_merge_control_github_reviews.py present",
+          "executed": true
+        },
+        {
+          "id": "automerge_enrolls_all_nondraft",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml",
+          "executed": true
+        },
+        {
+          "id": "mike_cloud_heartbeat",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'schedule:' found in .github/workflows/merge-master-mike-backlog.yml",
+          "executed": true
+        },
+        {
+          "id": "github_review_bridge_landed",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "751c5ba8a8 is an ancestor of origin/main",
+          "executed": true
+        },
+        {
+          "id": "github_review_bridge_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_pr_merge_control_github_reviews.py: PASS \u2014 17 passed in 0.47s",
+          "executed": true
+        },
+        {
+          "id": "pr_merge_control_gate_fail_closed_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_pr_merge_control.py: PASS \u2014 158 passed in 5.57s",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "organism-rewire-2026-07",
+      "name": "Organism Rewire \u2014 dormant organs to production, spine standing-on, external gradients",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-spine-adoption-2026-06",
+        "loop-closure-2026-06",
+        "orchestration-arena-v1-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "tools/world_scout_go/**",
+        "tools/world_signal_ingestor_go/**",
+        "tools/github_ingestor_go/**",
+        "tools/evidence_ingestor_go/**",
+        "dharma_swarm/world_radar/**",
+        "scripts/runtime/github_ingestor_runner.py",
+        "tests/test_github_ingestor_runner.py",
+        "tests/test_go_evidence_ingestor_bridge.py",
+        "tests/test_go_github_ingestor_bridge.py",
+        "tests/test_go_world_signal_bridge.py",
+        "tests/test_go_receipt_identity_verify.py",
+        "tests/test_go_adapter_contracts.py",
+        "tests/test_world_radar_go_bridge.py",
+        "dharma_swarm/organism.py",
+        "dharma_swarm/strange_loop.py",
+        "dharma_swarm/diversity_archive.py",
+        "dharma_swarm/archive.py",
+        "docker-compose.yml",
+        "Dockerfile.swarm",
+        "ACTIVE_SURFACE_MANIFEST.yaml",
+        "dharma_swarm/runtime_state.py",
+        "dharma_swarm/sarathi/**",
+        "tests/test_runtime_state.py",
+        "tests/test_sarathi_public_api.py",
+        "tests/test_sarathi_shell.py",
+        "tests/test_sarathi_import_boundaries.py",
+        "docs/README.md",
+        "docs/persistent_agents/**",
+        "reports/agentops/work_packets/organism-rewire-WP-SARATHIROOT-P0.json",
+        "dharma_swarm/mission_control.py",
+        "dharma_swarm/mission_control_contract.py",
+        "dharma_swarm/mission_control_execution.py",
+        "dharma_swarm/mission_control_execution_support.py",
+        "dharma_swarm/mission_control_lifecycle.py",
+        "dharma_swarm/mission_control_mcp.py",
+        "dharma_swarm/mission_control_mcp_mutations.py",
+        "dharma_swarm/mission_control_projection.py",
+        "dharma_swarm/mission_control_reconciliation.py",
+        "dharma_swarm/mission_control_recovery.py",
+        "dharma_swarm/mission_control_dispatch.py",
+        "dharma_swarm/mission_control_a2a.py",
+        "dharma_swarm/mission_control_sarathi.py",
+        "tests/test_mission_control.py",
+        "tests/test_mission_control_execution.py",
+        "tests/test_mission_control_mcp.py",
+        "tests/test_mission_control_dispatch.py",
+        "tests/test_mission_control_a2a.py",
+        "tests/test_mission_control_sarathi.py",
+        "api/routers/control_surface.py",
+        "tests/test_control_surface.py",
+        "tests/test_control_surface_router_threadpool.py",
+        "tests/test_control_surface_mission_sarathi.py",
+        "dashboard/src/app/dashboard/control-surface/page.tsx",
+        "dashboard/src/hooks/useMissionSarathi.ts",
+        "dashboard/src/components/cockpit/MissionSarathiStrip.tsx",
+        "dharma_swarm/operator_brief/mission_control_citations.py",
+        "tests/test_operator_brief_mission_control_citations.py",
+        "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json",
+        "dharma_swarm/foundry/**",
+        "tests/test_foundry_*.py",
+        "scripts/foundry/**",
+        ".github/workflows/foundry-lane.yml",
+        "docs/foundry/**",
+        "docs/offers/agent-behavior-verification.md",
+        "reports/foundry/**"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage"
+      ],
+      "verified_at": "2026-08-04",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "6 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": null,
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 2,
+        "total": 2
+      },
+      "criteria": [
+        {
+          "id": "rewire_done_slices_landed",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "4c4f5aa47c is an ancestor of origin/main",
+          "executed": true
+        },
+        {
+          "id": "go_sense_organ_toolchain_closure_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_world_radar_go_bridge.py: PASS \u2014 20 passed in 0.58s",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "dharmagraph-engine-2026-07",
+      "name": "DharmaGraph \u2014 sovereign durable graph runtime consolidation",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "loop-closure-2026-06",
+        "orchestration-arena-v1-2026-06",
+        "organism-rewire-2026-07"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/graph/**",
+        "dharma_swarm/workflow.py",
+        "dharma_swarm/topology_genome.py",
+        "dharma_swarm/checkpoint.py",
+        "dharma_swarm/swarm.py",
+        "dharma_swarm/orchestrator.py",
+        "pyproject.toml",
+        ".github/workflows/langgraph-oracle.yml",
+        "tests/test_workflow.py",
+        "tests/test_topology_execution.py",
+        "tests/test_checkpoint.py",
+        "tests/test_graph_checkpoint.py",
+        "tests/test_graph_reconciler.py",
+        "tests/test_graph_durable_invoker.py",
+        "tests/test_langgraph_differential_oracle.py",
+        "tests/test_graph_neutral_langgraph_oracle.py",
+        "tests/test_graph_pregel_properties.py",
+        "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
+        "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md",
+        "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md",
+        "scripts/governance/dharmagraph_parity_gauntlet.py",
+        "tests/oracle_support/dharmagraph_gauntlet.py",
+        "tests/test_dharmagraph_parity_gauntlet.py",
+        "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+        "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+        "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json",
+        "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json",
+        "reports/governance/dharmagraph_parity/**",
+        "docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md",
+        "docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md",
+        "docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md",
+        "docs/governance/CAMPAIGN_KERNEL.md",
+        "tests/oracle_support/scenarios.py",
+        "tests/oracle_support/outcomes.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage"
+      ],
+      "verified_at": "2026-08-18",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "1 open blocker next-item(s)",
+        "outcome receipt reports/governance/dharmagraph_parity/builder_receipt.json reports verdict='NOT_FINISHED', score={'display': '58.00/100', 'earned': '58.00', 'possible': '100.00'} \u2014 not a passing verdict; the track's own scoreboard does not say the work is done",
+        "outcome receipt reports/governance/dharmagraph_parity/judge_receipt.json reports verdict='NOT_FINISHED', score={'display': '58.00/100', 'earned': '58.00', 'possible': '100.00'} \u2014 not a passing verdict; the track's own scoreboard does not say the work is done"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "Phases 0a-3 consolidate the engine federation onto one durable graph runtime. No production capability claim before the differential oracle is in CI; no topology-evolution unlock (Phase 6 wall stays operator-gated per organism-rewire D4).",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 8,
+        "total": 10
+      },
+      "criteria": [
+        {
+          "id": "dharmagraph_spec_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md present",
+          "executed": true
+        },
+        {
+          "id": "spine_invoke_seam_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/spine/invoke.py present",
+          "executed": true
+        },
+        {
+          "id": "handoff_briefs_exist",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md present",
+          "executed": true
+        },
+        {
+          "id": "phase0a_dead_engines_deleted",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "bash -c test ! -f dharma_swarm/workflow_graph.py && test ! -f dharma_swarm/durable_execution.py && ! grep -rE 'import (workflow_graph|durable_execution)|from dharma_swarm(\\.| import )(workflow_graph|durable_execution)' dharma_swarm/ tests/ --include='*.py' -q exited 0",
+          "executed": true
+        },
+        {
+          "id": "phase0b_reconciler_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_graph_reconciler.py: PASS \u2014 28 passed in 1.36s",
+          "executed": true
+        },
+        {
+          "id": "phase0b_durable_invoker_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_graph_durable_invoker.py: PASS \u2014 22 passed in 2.56s",
+          "executed": true
+        },
+        {
+          "id": "phase1_oracle_tests_pass",
+          "kind": "test_passes",
+          "passed": false,
+          "detail": "pytest tests/test_langgraph_differential_oracle.py: FAIL \u2014 1 skipped in 0.10s",
+          "executed": true
+        },
+        {
+          "id": "phase0b_chaos_receipt",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_graph_chaos_receipt.py: PASS \u2014 3 passed in 1.56s",
+          "executed": true
+        },
+        {
+          "id": "spec_kill_criteria_stated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'Kill criterion' found in docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
+          "executed": true
+        },
+        {
+          "id": "parity_builder_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/dharmagraph_parity/builder_receipt.json valid (8 keys present, digest intact)",
+          "executed": true
+        },
+        {
+          "id": "parity_judge_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/dharmagraph_parity/judge_receipt.json valid (3 keys present, digest intact)",
+          "executed": true
+        },
+        {
+          "id": "parity_gauntlet_check_passes",
+          "kind": "command_passes",
+          "passed": false,
+          "detail": "bash scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check exited 2; output: {\"check\": \"FAIL\", \"error\": \"comparison environment mismatch for langgraph_version: installed='NOT_INSTALLED' expected='1.2.4'\"}",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "helm-worldclass-terminal-2026-06",
+      "name": "Helm \u2014 world-class operator terminal (Bun+Ink TUI)",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "merge-master-mike-d4-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "terminal/**"
+      ],
+      "moves_vital_signs": [
+        "tool_coverage",
+        "context_efficiency"
+      ],
+      "verified_at": "2026-07-07",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": null,
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 2,
+        "total": 4
+      },
+      "criteria": [
+        {
+          "id": "terminal_tui_test_suite_passes",
+          "kind": "command_passes",
+          "passed": false,
+          "detail": "bash -c cd terminal && bun install --frozen-lockfile && bun test exited 127; output: bash: line 1: bun: command not found",
+          "executed": true
+        },
+        {
+          "id": "terminal_app_test_passes",
+          "kind": "command_passes",
+          "passed": false,
+          "detail": "bash -c cd terminal && bun install --frozen-lockfile && bun test tests/app.test.ts exited 127; output: bash: line 1: bun: command not found",
+          "executed": true
+        },
+        {
+          "id": "app_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "terminal/tests/app.test.ts present",
+          "executed": true
+        },
+        {
+          "id": "terminal_behavioral_suite_landed",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "1d8dae2943 is an ancestor of origin/main",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "sovereign-safety-tcb-2026-07",
+      "name": "Sovereign Safety TCB \u2014 fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "loop-closure-2026-06",
+        "merge-master-mike-d4-2026-06",
+        "organism-rewire-2026-07"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/evolution_safety.py",
+        "scripts/governance/check_claim_evidence_binding.py",
+        "scripts/governance/pramana_probe.py",
+        "scripts/governance/branch_janitor.py",
+        "scripts/governance/verify_corral_findings.py",
+        "scripts/governance/hygiene/**",
+        "docs/governance/hygiene/patterns/AI-M1.yaml",
+        "packages/telos-kernel/**",
+        "packages/titanium-verify/**",
+        ".github/workflows/pudgala-rigor.yml",
+        ".github/workflows/pramana-probe.yml",
+        ".github/workflows/kernel-titanium-verify.yml",
+        ".github/workflows/kernel-tests.yml",
+        ".github/workflows/branch-janitor.yml",
+        "tests/test_evolution_safety.py",
+        "tests/test_claim_evidence_binding.py",
+        "tests/test_pramana_probe.py",
+        "tests/test_pramana.py",
+        "tests/test_branch_janitor.py",
+        "tests/test_verify_corral_findings.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "security_guardrails"
+      ],
+      "verified_at": "2026-07-07",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "The gate MACHINERY is landed and CI-enforced (each completion criterion\nis independently re-run by a pull_request-triggered GitHub Actions\nworkflow the PR author cannot forge). Two ratchets remain deliberately\nun-flipped and are NOT claimed closed: (a) the AI-M1 hygiene pattern is\nstage=advisory (docs/governance/hygiene/patterns/AI-M1.yaml) so the\ngraded-binding gate reports but does not yet block merges; (b) the\nPR-001 fail-closed evolution guarantee is proven at unit level, but the\nlive-host observation (DHARMA_EVOLUTION_SHADOW default + read-only\nsource mount denying live-checkout mutation on the daemon host) is an\noperator observation still owned by organism-rewire D4. Completion\ncriteria prove the gates are green + wired, not that every ratchet is at\nits blocking terminal stage.\n",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 3,
+      "strongest_grade_name": "S3_TESTED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 4,
+        "total": 4
+      },
+      "criteria": [
+        {
+          "id": "evolution_safety_module_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/evolution_safety.py present",
+          "executed": true
+        },
+        {
+          "id": "track_status_checker_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/check_track_status.py present",
+          "executed": true
+        },
+        {
+          "id": "ai_m1_binding_pattern_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/hygiene/patterns/AI-M1.yaml present",
+          "executed": true
+        },
+        {
+          "id": "telos_kernel_pkg_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "packages/telos-kernel/telos_kernel/__init__.py present",
+          "executed": true
+        },
+        {
+          "id": "titanium_verify_pkg_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "packages/titanium-verify/titanium_verify/cli.py present",
+          "executed": true
+        },
+        {
+          "id": "evolution_fail_closed_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_evolution_safety.py: PASS \u2014 29 passed in 0.51s",
+          "executed": true
+        },
+        {
+          "id": "pudgala_ai_m1_binding_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_claim_evidence_binding.py: PASS \u2014 57 passed in 1.46s",
+          "executed": true
+        },
+        {
+          "id": "pramana_phantom_gate_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_pramana_probe.py: PASS \u2014 16 passed in 0.48s",
+          "executed": true
+        },
+        {
+          "id": "telos_kernel_tcb_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest packages/telos-kernel/telos_kernel/tests/: PASS \u2014 180 passed, 3 skipped in 2.64s",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "hyperbolic-time-chamber-2026-07",
+      "name": "Hyperbolic Time Chamber \u2014 afferent ingest, gym battery, Frontier Ledger",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "research-depth",
+      "complements": [
+        "organism-rewire-2026-07",
+        "orchestration-arena-v1-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md",
+        "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
+        "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+        "docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md",
+        "scripts/governance/inward_ascent_baseline.py",
+        "scripts/governance/frontier_ledger.py",
+        "scripts/governance/transcendence_ledger.py",
+        "dharma_swarm/chamber/**",
+        "tests/test_chamber_traces.py",
+        "tests/test_chamber_gym_git_history.py",
+        "tests/test_chamber_daily_delta.py",
+        "tests/test_chamber_predictions.py",
+        "tests/test_chamber_sandbox.py",
+        "tests/test_chamber_ledger_history.py",
+        "tests/test_transcendence_ledger.py",
+        "reports/governance/inward_ascent/**",
+        "reports/governance/chamber/**"
+      ],
+      "moves_vital_signs": [
+        "eval_coverage",
+        "quality_gates"
+      ],
+      "verified_at": "2026-07-07",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "Phase 0 proved the dossier + two replayable instruments; Phase 1 Slice A proves a HARNESS-level G1 gym (fixture solver, deterministic scorer, leak guard) plus the E1/E3/E4/E5/E6 wiring. Gym results are internal-gym numbers, never benchmark or capability claims; C2 stays owned by the RSI/arena lab; live solver evolution waits on operator keys/compute. Archive fitness remains behind the One Wire external quorum.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 10,
+        "total": 11
+      },
+      "criteria": [
+        {
+          "id": "chamber_doctrine_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md present",
+          "executed": true
+        },
+        {
+          "id": "phase0_dossier_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md present",
+          "executed": true
+        },
+        {
+          "id": "phase0_firewall_stated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'archive fitness for self-modification still requires the One Wire external quorum' found in docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
+          "executed": true
+        },
+        {
+          "id": "baseline_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/inward_ascent/baseline_receipt.json valid (4 keys present, digest intact)",
+          "executed": true
+        },
+        {
+          "id": "frontier_ledger_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/governance/chamber/frontier_ledger_receipt.json is stale: 43d old > fresh_ttl_days=30",
+          "executed": true
+        },
+        {
+          "id": "frontier_ledger_replays",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 scripts/governance/frontier_ledger.py --check exited 0 (resolved from python3 scripts/governance/frontier_ledger.py --check); output: frontier_ledger --check: OK \u2014 seal intact, inputs pinned, page renders purely, history+velocity replay, door fresh.",
+          "executed": true
+        },
+        {
+          "id": "chamber_traces_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_chamber_traces.py: PASS \u2014 6 passed in 0.41s",
+          "executed": true
+        },
+        {
+          "id": "chamber_g1_run_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/chamber/g1_run_receipt.json valid (5 keys present, digest intact)",
+          "executed": true
+        },
+        {
+          "id": "chamber_daily_delta_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_chamber_daily_delta.py: PASS \u2014 10 passed in 0.44s",
+          "executed": true
+        },
+        {
+          "id": "chamber_predictions_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_chamber_predictions.py: PASS \u2014 10 passed in 0.42s",
+          "executed": true
+        },
+        {
+          "id": "transcendence_ledger_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_transcendence_ledger.py: PASS \u2014 7 passed in 0.42s",
+          "executed": true
+        },
+        {
+          "id": "transcendence_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/chamber/transcendence_receipt.json valid (3 keys present, digest intact)",
+          "executed": true
+        },
+        {
+          "id": "transcendence_ledger_replays",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 scripts/governance/transcendence_ledger.py --check exited 0 (resolved from python3 scripts/governance/transcendence_ledger.py --check); output: transcendence_ledger --check: OK \u2014 decomposition replays from the pinned corpus.",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "repository-titanium-hardening-2026-07",
+      "name": "Titanium-grade repository hardening \u2014 truthful verification and clean-room closure",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "governance_gate",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "merge-master-mike-d4-2026-06",
+        "sovereign-safety-tcb-2026-07",
+        "dharmagraph-engine-2026-07",
+        "organism-rewire-2026-07",
+        "helm-worldclass-terminal-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "Makefile",
+        "Dockerfile",
+        ".github/workflows/hermetic.yml",
+        ".github/workflows/tests.yml",
+        ".github/workflows/ci-parity.yml",
+        ".github/workflows/docops.yml",
+        ".github/workflows/docops-reconcile-main.yml",
+        ".github/workflows/pr-dedupe.yml",
+        ".github/workflows/bot-pr-limit.yml",
+        ".github/workflows/a2a-agni-live-contact.yml",
+        "docs/governance/CI_TRUTH_CONTRACT.json",
+        "scripts/governance/ci_parity_manifest.json",
+        "scripts/governance/check_ci_parity.py",
+        "scripts/runtime/ci_truth.py",
+        "scripts/governance/run_semgrep_with_ca.sh",
+        "scripts/uplift_guards/shakti_warrant_guard.py",
+        "scripts/uplift_guards/run_pre_commit.py",
+        "scripts/governance/check_shakti_warrant.py",
+        "scripts/governance/check_nats_substrate_contract.py",
+        "scripts/governance/check_nats_live_production_evidence.py",
+        "scripts/governance/run_nats_live_production_matrix.py",
+        "scripts/docops/**",
+        "dharma_swarm/build_engine.py",
+        "dharma_swarm/autonomous_agent.py",
+        "dharma_swarm/diff_applier.py",
+        "dharma_swarm/sandbox.py",
+        "dharma_swarm/docker_sandbox.py",
+        "docs/docops/AUTO_INVENTORY.md",
+        "api/main.py",
+        "tests/test_api_auth.py",
+        "tests/test_verify_api.py",
+        "tests/test_bootstrap_contract.py",
+        "tests/test_verifier_selfcheck_contract.py",
+        "tests/test_semgrep_wrapper.py",
+        "tests/test_uplift_guard_subprocess.py",
+        "tests/test_fast_suite_isolation.py",
+        "tests/test_agent_work_packet.py",
+        "tests/test_make_onboarding_contract.py",
+        "tests/test_diff_applier.py",
+        "tests/test_sandbox.py",
+        "tests/test_docker_sandbox.py",
+        "tests/test_nats_verification_split.py",
+        "tests/test_nats_substrate_contract.py",
+        "tests/test_nats_live_production_evidence.py",
+        "tests/test_nats_live_contact.py",
+        "tests/governance/test_ci_parity_guard.py",
+        "tests/test_ci_truth.py",
+        "tests/test_docops_integrity.py",
+        "tests/test_docops_reconcile_workflow.py",
+        "tests/test_pr_dedupe_workflow.py",
+        "tests/test_polyglot_ci_contract.py",
+        "tests/test_hermetic_supply_chain.py",
+        "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
+        "docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md",
+        "reports/governance/titanium/**",
+        "dashboard/src/lib/operatorCoherence.ts",
+        "dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts",
+        "dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx",
+        "dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage",
+        "security_guardrails",
+        "tool_coverage"
+      ],
+      "verified_at": "2026-07-31",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "5 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [
+        {
+          "item_id": "WP-0F1",
+          "evidence_criterion": "titanium_ci_authority_contracts_pass",
+          "blocker": true
+        },
+        {
+          "item_id": "WP-0G",
+          "evidence_criterion": "titanium_docops_contracts_pass",
+          "blocker": true
+        },
+        {
+          "item_id": "WP-0S",
+          "evidence_criterion": "titanium_ingress_contracts_pass",
+          "blocker": true
+        }
+      ],
+      "claim_boundary": "WP-00 admits the bounded Phase 0 ownership and execution graph from the integrated Titanium specification. Passing criteria may establish only truthful repository verification and an independent clean-room CLOSED_NOT_PROD result. They do not prove production liveness, complete security, deployment readiness, Phase 1-7 completion, or authority over Mike, Go, terminal, graph, organism, Safety TCB, or Loop Closure surfaces. Adding Docker-sandbox ownership and WP-DSI admits only a later bounded implementation review. It is not implementation evidence, container-start proof, generated-code isolation, or authority to re-arm evolution.",
+      "has_rigorous_evidence": false,
+      "strongest_grade": 0,
+      "strongest_grade_name": "S0_EXISTS",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 8,
+        "total": 9
+      },
+      "criteria": [
+        {
+          "id": "titanium_bootstrap_contract_passes",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_bootstrap_contract.py -q exited 0 (resolved from python3 -m pytest tests/test_bootstrap_contract.py -q); output: .........                                                                [100%] | 9 passed in 0.42s",
+          "executed": true
+        },
+        {
+          "id": "titanium_verifier_truth_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_verifier_selfcheck_contract.py -q exited 0 (resolved from python3 -m pytest tests/test_verifier_selfcheck_contract.py -q); output: ..........                                                               [100%] | 10 passed in 60.16s (0:01:00)",
+          "executed": true
+        },
+        {
+          "id": "titanium_verifier_support_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_fast_suite_isolation.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q exited 0 (resolved from python3 -m pytest tests/test_fast_suite_isolation.py tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py -q); output: ...............................s...............                          [100%] | 46 passed, 1 skipped in 5.58s",
+          "executed": true
+        },
+        {
+          "id": "titanium_ingress_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q exited 0 (resolved from python3 -m pytest tests/test_api_auth.py tests/test_verify_api.py -q); output: .................................................................        [100%] | 65 passed in 10.03s",
+          "executed": true
+        },
+        {
+          "id": "titanium_hermetic_live_split_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py -q exited 0 (resolved from python3 -m pytest tests/test_nats_verification_split.py tests/test_nats_substrate_contract.py tests/test_nats_live_production_evidence.py -q); output: ....................................                                     [100%] | 36 passed in 1.03s",
+          "executed": true
+        },
+        {
+          "id": "titanium_ci_authority_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q exited 0 (resolved from python3 -m pytest tests/governance/test_ci_parity_guard.py tests/test_ci_truth.py -q); output: .............................                                            [100%] | 29 passed in 0.97s",
+          "executed": true
+        },
+        {
+          "id": "titanium_docops_contracts_pass",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q exited 0 (resolved from python3 -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q); output: .........................................                                [100%] | 41 passed in 5.24s",
+          "executed": true
+        },
+        {
+          "id": "titanium_polyglot_contract_passes",
+          "kind": "command_passes",
+          "passed": true,
+          "detail": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python3 -m pytest tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py -q exited 0 (resolved from python3 -m pytest tests/test_polyglot_ci_contract.py tests/test_hermetic_supply_chain.py -q); output: ......................s.......                                           [100%] | 29 passed, 1 skipped in 14.63s",
+          "executed": true
+        },
+        {
+          "id": "titanium_independent_clean_room_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/governance/titanium/phase0_clean_room_receipt.json MISSING",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "darshan-publication-2026-07",
+      "name": "Darshan \u2014 publication venture cell (multi-disciplinary voice of clear seeing)",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "revenue-external-humans-served",
+      "complements": [
+        "company-builder-parity-2026-07"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+        "reports/darshan/**",
+        "reports/tam/**"
+      ],
+      "moves_vital_signs": [
+        "eval_coverage"
+      ],
+      "verified_at": "2026-07-12",
+      "ttl_days": 30,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "2 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria prove the publication organ exists and its output is receipted \u2014 never audience, revenue, or influence claims (those are TAM-board readings, measured not narrated). Posting to third-party platforms (Medium, Substack, Reddit, etc.) stays operator-gated per platform regardless of criteria state. The Darshan-owned site itself may publish pieces that have passed the editorial law (both-fires + discernment + operator read).",
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 1,
+        "total": 2
+      },
+      "criteria": [
+        {
+          "id": "darshan_charter_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'editorial law' found in docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+          "executed": true
+        },
+        {
+          "id": "darshan_issue_one_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/darshan/issue_one_receipt.json MISSING",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "WARN",
+      "check": "wip-high",
+      "message": "10 ACTIVE tracks exceed warn_active=8 \u2014 focus is spreading thin.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] verified_at is 39 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-provisional:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] 32/32 criteria pass but NOT shippable under the rigorous bar: 3 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0; outcome receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json reports verdict='BLOCKED' \u2014 not a passing verdict; the track's own scoreboard does not say the work is done. Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:orchestration-arena-v1-2026-06",
+      "message": "[orchestration-arena-v1-2026-06] verified_at is 33 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:orchestration-arena-v1-2026-06",
+      "message": "[orchestration-arena-v1-2026-06] 11/12 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:merge-master-mike-d4-2026-06",
+      "message": "[merge-master-mike-d4-2026-06] verified_at is 34 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-provisional:merge-master-mike-d4-2026-06",
+      "message": "[merge-master-mike-d4-2026-06] 7/7 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-provisional:organism-rewire-2026-07",
+      "message": "[organism-rewire-2026-07] 2/2 criteria pass but NOT shippable under the rigorous bar: 6 open blocker next-item(s). Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:dharmagraph-engine-2026-07",
+      "message": "[dharmagraph-engine-2026-07] 8/10 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:helm-worldclass-terminal-2026-06",
+      "message": "[helm-worldclass-terminal-2026-06] verified_at is 43 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:helm-worldclass-terminal-2026-06",
+      "message": "[helm-worldclass-terminal-2026-06] 2/4 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:sovereign-safety-tcb-2026-07",
+      "message": "[sovereign-safety-tcb-2026-07] verified_at is 43 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-provisional:sovereign-safety-tcb-2026-07",
+      "message": "[sovereign-safety-tcb-2026-07] 4/4 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:hyperbolic-time-chamber-2026-07",
+      "message": "[hyperbolic-time-chamber-2026-07] verified_at is 43 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:hyperbolic-time-chamber-2026-07",
+      "message": "[hyperbolic-time-chamber-2026-07] 10/11 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-underclaim:repository-titanium-hardening-2026-07:WP-0F1",
+      "message": "[repository-titanium-hardening-2026-07] blocker next-item WP-0F1 is still listed as open work but its linked evidence criterion 'titanium_ci_authority_contracts_pass' PASSES \u2014 the ledger may be behind reality. Reconcile: annotate the item DONE, narrow it to the remaining live edge, or strengthen the criterion.",
+      "criterion_id": "titanium_ci_authority_contracts_pass"
+    },
+    {
+      "severity": "WARN",
+      "check": "track-underclaim:repository-titanium-hardening-2026-07:WP-0G",
+      "message": "[repository-titanium-hardening-2026-07] blocker next-item WP-0G is still listed as open work but its linked evidence criterion 'titanium_docops_contracts_pass' PASSES \u2014 the ledger may be behind reality. Reconcile: annotate the item DONE, narrow it to the remaining live edge, or strengthen the criterion.",
+      "criterion_id": "titanium_docops_contracts_pass"
+    },
+    {
+      "severity": "WARN",
+      "check": "track-underclaim:repository-titanium-hardening-2026-07:WP-0S",
+      "message": "[repository-titanium-hardening-2026-07] blocker next-item WP-0S is still listed as open work but its linked evidence criterion 'titanium_ingress_contracts_pass' PASSES \u2014 the ledger may be behind reality. Reconcile: annotate the item DONE, narrow it to the remaining live edge, or strengthen the criterion.",
+      "criterion_id": "titanium_ingress_contracts_pass"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:repository-titanium-hardening-2026-07",
+      "message": "[repository-titanium-hardening-2026-07] 8/9 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:darshan-publication-2026-07",
+      "message": "[darshan-publication-2026-07] verified_at is 38 days old (ttl_days=30). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:darshan-publication-2026-07",
+      "message": "[darshan-publication-2026-07] 1/2 completion criteria pass.",
+      "criterion_id": null
+    }
+  ]
+}
