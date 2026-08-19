@@ -223,6 +223,8 @@ for size in $SIZES; do
         # following Tab is correctly consumed by the composer and the walk
         # never leaves Chat.
         "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Escape
+        wait_settled "Navigation active" "${NAV_TIMEOUT}" >/dev/null \
+          || fail "navigation focus did not settle at ${size}"
       fi
       "${TMUX_BIN}" send-keys -t "=${SESS}:0.0" Tab
     fi

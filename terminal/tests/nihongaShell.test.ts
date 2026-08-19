@@ -44,6 +44,8 @@ describe("Nihonga Helm responsive profile", () => {
   test("uses a bounded workspace label rather than a full path", () => {
     expect(workspaceLabel("/Users/dhyana/dharma_swarm")).toBe("dharma_swarm");
     expect(workspaceLabel("/Users/dhyana/dharma_swarm/terminal")).toBe("dharma_swarm");
+    expect(workspaceLabel("/Users/dhyana/wt_helm_t02_20260819/terminal")).toBe("dharma_swarm");
+    expect(workspaceLabel("/Users/dhyana/ds_helm_preview_20260819/terminal")).toBe("dharma_swarm");
     expect(workspaceLabel("C:\\work\\dharma_swarm")).toBe("dharma_swarm");
   });
 });
