@@ -22,23 +22,34 @@ from dataclasses import dataclass
 from typing import Any, Generic, Mapping, Sequence, TypeVar
 
 __all__ = [
+    "AnyValueChannel",
     "AppendChannel",
     "BarrierChannel",
     "BarrierMemberError",
     "Channel",
     "ChannelWrite",
     "ChannelWriteConflictError",
+    "DeltaChannel",
     "EmptyChannelError",
+    "EphemeralChannel",
+    "LastValueAfterFinishChannel",
     "LastValueChannel",
+    "NamedBarrierAfterFinishChannel",
     "ReducerChannel",
     "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
+    "UntrackedValueChannel",
 ]
 
 logger = logging.getLogger(__name__)
 
 V = TypeVar("V")
+
+#: Sentinel for "this channel currently holds no value" (langgraph ``MISSING``
+#: parity). Never a legal channel value: it is not JSON-serializable, so a
+#: write of it fails the digest guard in GraphState's validate phase.
+_MISSING: Any = object()
 
 
 @dataclass(frozen=True)
@@ -97,7 +108,25 @@ class ChannelWriteConflictError(RuntimeError):
 
 
 class Channel(ABC, Generic[V]):
-    """Versioned state cell with a two-phase write protocol."""
+    """Versioned state cell with a two-phase write protocol.
+
+    Two optional lifecycle hooks extend the two-phase protocol; both default
+    to no-ops so every existing channel keeps its exact behavior:
+
+    * :meth:`end_step` — called on EVERY declared channel at each committed
+      superstep barrier (langgraph ``update(EMPTY_SEQ)`` parity), so
+      step-scoped channels can clear themselves when nobody wrote them.
+    * :meth:`finish` — called on every declared channel when a barrier
+      commits nothing that can trigger another node, i.e. at (tentative)
+      quiescence (langgraph ``BaseChannel.finish`` parity).
+
+    ``tracked = False`` marks a channel whose VALUE never enters the
+    checkpoint or the state digest (langgraph ``UntrackedValue`` parity); it
+    stays user-visible in :meth:`GraphState.snapshot`.
+    """
+
+    #: False iff this channel's value is excluded from checkpoints/digests.
+    tracked: bool = True
 
     def __init__(self) -> None:
         self.version: int = 0
@@ -131,6 +160,25 @@ class Channel(ABC, Generic[V]):
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         """Rebuild channel state from a :meth:`checkpoint` payload."""
         self.version = int(snapshot["version"])
+
+    def end_step(self, had_writes: bool) -> bool:
+        """Superstep-boundary notification. Returns True iff state changed.
+
+        ``had_writes`` is True iff this channel was in the barrier's committed
+        write group. Persistent channels ignore the notification entirely.
+        Never bumps ``version``: clearing a step-scoped channel is not a new
+        value, and the ready predicate must not re-fire on it.
+        """
+        return False
+
+    def finish(self) -> bool:
+        """Quiescence notification. Returns True iff state changed.
+
+        Called once per barrier whose commits cannot trigger any node — the
+        (tentatively) last superstep. After-finish channels publish their
+        held value here; everything else ignores it.
+        """
+        return False
 
 
 class LastValueChannel(Channel[Any]):
@@ -414,3 +462,23 @@ class TopicChannel(Channel[list[Any]]):
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         super().restore(snapshot)
         self._items = list(snapshot.get("items", []))
+
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core LG10: step-scoped, untracked, batch-reducer and after-finish
+# channels. Moved to dharma_swarm.graph.channel_types (quality-ratchet
+# modules_over_500_lines split — pure move, re-exported below so every
+# existing import path from this module keeps working unchanged). Every
+# channel above keeps its exact behavior; the two lifecycle hooks the moved
+# classes use (``end_step`` / ``finish``) are no-ops for everything above.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm.graph.channel_types import (  # noqa: E402
+    AnyValueChannel,
+    DeltaChannel,
+    EphemeralChannel,
+    LastValueAfterFinishChannel,
+    NamedBarrierAfterFinishChannel,
+    UntrackedValueChannel,
+)
