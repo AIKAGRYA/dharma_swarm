@@ -15,6 +15,7 @@ Docker CLI) so it stays importable and testable without the heavy stack.
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -71,9 +72,15 @@ def docker_available(runner: Callable[..., subprocess.CompletedProcess] = subpro
 
 
 def _as_bash(cmd: Sequence[str] | str) -> str:
+    """Render a command for ``bash -c`` INSIDE the container.
+
+    Lists must be re-quoted with shlex — a naive space-join destroys nested
+    quoting (e.g. ``["bash", "-c", "cd x && python -c \"...\""]`` would run
+    ``cd`` bare and the payload from the wrong directory).
+    """
     if isinstance(cmd, str):
         return cmd
-    return " ".join(cmd)
+    return shlex.join(cmd)
 
 
 def run_isolated(
