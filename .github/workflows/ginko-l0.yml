@@ -56,6 +56,9 @@ jobs:
           PY
       - name: Install
         run: |
+          # icontract/httpx/anthropic/pydantic are base extras (not [dev],
+          # not [ginko]). Do not pull wedge/store_sync by installing extra
+          # organs.
           python3 -m pip install -e .
           # Best-effort OpenTimestamps client: absent -> entries stay AMBER.
           python3 -m pip install opentimestamps-client \

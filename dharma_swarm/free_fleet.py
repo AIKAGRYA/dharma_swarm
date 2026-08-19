@@ -36,6 +36,8 @@ from typing import Literal
 
 import httpx
 
+from dharma_swarm.model_defaults import NEMOTRON_35_FAMILY_PREFIX
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,12 +54,17 @@ _MIN_CTX = 32_000  # Minimum context to be useful
 # models the swarm runs. The prefixes are vendor/family namespaces, not model
 # selections.
 #
-# Floor doctrine (2026-06 model-routing consolidation): sub-floor / BANISHED
-# families (nvidia/nemotron-*, google/gemma-3) are deliberately ABSENT here. If
-# live discovery still surfaces one, it falls through to the tier-3 default
-# rather than being promoted into a reasoning tier — the floor is never lifted by
-# elevating a banished model. The remaining prefixes are vendor namespaces (not
-# specific sub-floor model-ids), so no floor model-id literal lives in this map.
+# Floor doctrine (2026-06 model-routing consolidation, reconciled 2026-08-18):
+# the 2026-06 blanket banishment of nvidia/nemotron-* predated Nemotron 3.5
+# Lightning (open-weight OpenMDW release, 2026-08-11) — a 30B MoE / 3B-active
+# execution-and-tool-use model that is a legitimate high-throughput free model,
+# not sub-floor. That single family is un-banished and tiered explicitly below;
+# `providers.OpenRouterFreeProvider._PREFERRED_PREFIXES` agrees (it prefers
+# `nvidia/nemotron-3.5`). Older/smaller nemotron variants and google/gemma-3
+# remain sub-floor by falling through to the tier-3 default — the floor is
+# lifted only for the specific proven family, never by elevating a whole
+# banished namespace. The remaining prefixes are vendor namespaces (not specific
+# sub-floor model-ids), so no floor model-id literal lives in this map.
 _TIER_RULES: list[tuple[str, int]] = [
     # Tier 1: heavy reasoning
     ("nousresearch/hermes-3-llama-3.1-405b", 1),
@@ -70,6 +77,10 @@ _TIER_RULES: list[tuple[str, int]] = [
     ("openai/gpt-oss-20b", 2),
     ("z-ai/", 2),
     ("stepfun/", 2),
+    # Nemotron 3.5 Lightning (2026-08-11 OpenMDW): MoE execution/tool-use model,
+    # un-banished; high-throughput mass tier for foundry-style volume generation.
+    # The prefix itself lives in model_defaults (THE-ONE-WAY leaf) — imported above.
+    (NEMOTRON_35_FAMILY_PREFIX, 2),
     # Tier 3: fast/lightweight (everything else with >= _MIN_CTX)
 ]
 

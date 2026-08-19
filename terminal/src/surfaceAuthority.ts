@@ -22,6 +22,7 @@ export function sendBackgroundRequest(
 }
 
 export function requestLiveSnapshots(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
+  sendBackgroundRequest(bridge, "helm.on_call.request");
   sendBackgroundRequest(bridge, "workspace.snapshot");
   sendBackgroundRequest(bridge, "runtime.snapshot");
   sendBackgroundRequest(bridge, "model.policy", {provider, model, strategy});

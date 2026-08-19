@@ -1,0 +1,72 @@
+{
+  "schema": "dharma.helm.slice1.checkpoint.v2",
+  "observed_at": "2026-08-12T16:47:27Z",
+  "status": "CODE_COMPLETE_LIVE_PROOF_BLOCKED",
+  "claim_boundary": {
+    "code_complete": true,
+    "live_verified": false,
+    "deployed": false,
+    "merged": false,
+    "pre_authoritative_display": "UNKNOWN ?/7",
+    "authoritative_empty_evidence_projection": "LIVE_DEGRADED 0/7"
+  },
+  "recovery": {
+    "interrupted_branch": "codex/helm-live-slice-20260809",
+    "interrupted_base_sha": "bb2c5174e30413d78a5e2ed7193e9e7eb84bf1a4",
+    "preserved_snapshot_branch": "recovery/helm-live-slice-20260809-wip-20260812",
+    "preserved_snapshot_sha": "3560ab3f",
+    "recovery_branch": "agent/helm-live-slice-recovery-v4-20260812",
+    "recovery_parent_sha": "43e93f6de62f787789ca4be28cfcd848e7aeec29",
+    "origin_main_at_recovery": "12212397be1dbe0a9b0cc29be4311f930140e751",
+    "initial_delivery_sha": "2d1deb2a771752e7e9ed3d7592624e6632fe0b6a",
+    "ci_policy_followup": "the commit containing this checkpoint"
+  },
+  "work_packet": {
+    "id": "helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2",
+    "contract_digest": "cdaf62ab32e1c9a0dd9458270a96ed2e09cf1547a6d2eee289bba40ea08ccb28",
+    "file_sha256": "27c864bed0dc8fb306b9f71e8e563ce0f33a7493719d6e2511319af035a7b7c3",
+    "preflight": "passed",
+    "preflight_report": "/private/tmp/dharma-helm-live-slice-agentops-v4b-20260813/reports/agentops/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2/preflight-43e93f6de62f787789ca4be28cfcd848e7aeec29/report.json",
+    "preflight_report_sha256": "e96969b912f8797275bbde1d431a22051ed2e7c5fe4939bec24bf2a3db110fd6",
+    "closeout": "passed",
+    "closeout_report": "/private/tmp/dharma-helm-live-slice-agentops-v4b-20260813/reports/agentops/helm-worldclass-terminal-WP-HELMSLICE1-RFC1-RFC2/20260812T162345494902Z/report.json",
+    "closeout_report_sha256": "75f6fb6cb3c5edbb4451e0ac0541fe1d7c55703dfd139fa28260cb0aa28bf0e4"
+  },
+  "implementation": {
+    "python_truth": "complete: immutable fixed-seat types, private positive constructor, evaluator, exact codec, replay/epoch/TTL checks",
+    "bridge_membrane": "complete: server-owned whole-input classification, byte-preserved raw prompt, physical no-tools options, durable evidence projection, fail-closed command outcomes",
+    "provider_adapters": "complete: Claude exact raw single prompt; OpenRouter server-owned served identity and strict no-tools/error/tool-use rejection",
+    "terminal_surface": "complete: strict render-only decoder, reconnect fencing, persistent seven-seat band in compact and wide layouts, no false completion glyphs",
+    "authority": "provider narration has NONE; TypeScript cannot construct or refresh ON_CALL"
+  },
+  "verification": {
+    "python_packet_regression": "190 passed after CI-policy follow-up",
+    "python_ruff": "passed",
+    "terminal_full": "683 passed, 0 failed, 4070 expectations; typecheck passed",
+    "terminal_guardian": "passed: 168 focused tests, bridge syntax, typecheck, and real 80x24 tmux smoke",
+    "adversarial_recheck": "passed after exact-command, multi-choice/native-finish, and rejected-cancellation edge fixes",
+    "broad_fast_suite": "6826 passed before -x stopped on one pre-existing timing-sensitive harness test exceeding the suite's 10 second timeout",
+    "isolated_harness_timeout_test": "1 passed in 47.98 seconds",
+    "diff_check": "passed",
+    "hygiene_delta_ratchet": "passed locally after recording a sanitized provider-cancellation failure instead of swallowing it",
+    "module_budget": "passed locally after behavior-preserving admission-helper extraction; terminal_bridge.py is 2774 lines against the 2792-line ceiling"
+  },
+  "live_truth": {
+    "pre_authoritative_projection_state": "UNKNOWN",
+    "pre_authoritative_on_call_count": null,
+    "authoritative_projection_state": "LIVE_DEGRADED",
+    "authoritative_on_call_count": 0,
+    "total": 7,
+    "authoritative_seat_verdicts": "all seven UNKNOWN with missing_evidence",
+    "admissible_primary_chat_lanes_observed": [],
+    "bounded_live_journey_started": false,
+    "successful_provider_completions": 0,
+    "blockers": [
+      "Claude Code availability probe returned: Credit balance is too low",
+      "Kimi K3 has no currently admissible safe lane; the interrupted Aug-9 run recorded HTTP 403 usage-limit responses",
+      "Fable 5, GPT-5.6, Grok 4.5-4.6, Fugu Ultra, and Opus 5.0 lack current exact registered and verified seats",
+      "Codex remains excluded because its adapter exposes the shell tool"
+    ]
+  },
+  "merge_authority": "human approval required by the work packet"
+}

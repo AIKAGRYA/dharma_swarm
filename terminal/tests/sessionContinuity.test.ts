@@ -197,5 +197,10 @@ describe("durable session continuity projection", () => {
       {role: "assistant", content: "Durable answer"},
       {role: "user", content: "Continue durable"},
     ]);
+
+    const rawPrompt = "  café  \n";
+    const nextMessages = messagesForNextTurn(viewedState, rawPrompt);
+    expect(nextMessages.at(-1)).toEqual({role: "user", content: rawPrompt});
+    expect(nextMessages.filter((message) => message.role === "user" && message.content.includes("café"))).toHaveLength(1);
   });
 });

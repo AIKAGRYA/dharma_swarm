@@ -32,7 +32,12 @@ jobs:
           PY
       - name: Install runtime extras the engine imports
         run: |
-          python3 -m pip install -e ".[dev]" || python3 -m pip install -e .
+          # icontract/pydantic/httpx live in the base extra. pytest is *not*
+          # — the applier's test_command is `python3 -m pytest …`. Do not
+          # `pip install -e ".[dev]" || pip install -e .`: a failed extra
+          # install would silently drop pytest and fake-fail the green.
+          python3 -m pip install -e .
+          python3 -m pip install "pytest>=7.0"
       - name: Write grant and run plumbing cycle
         env:
           GRANT_JSON: ${{ inputs.grant_json }}
