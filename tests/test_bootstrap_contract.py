@@ -16,6 +16,7 @@ _MAKEFILE = (_REPO / "Makefile").read_text(encoding="utf-8")
 _HERMETIC = (_REPO / ".github" / "workflows" / "hermetic.yml").read_text(
     encoding="utf-8"
 )
+_TESTS = (_REPO / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
 _DOCKERFILE = (_REPO / "Dockerfile").read_text(encoding="utf-8")
 
 
@@ -65,6 +66,34 @@ def test_hermetic_workflow_checks_lock_before_frozen_sync() -> None:
     assert check != -1, "hermetic.yml must run uv lock --check"
     assert sync != -1, "hermetic.yml must run uv sync --frozen --extra dev"
     assert check < sync, "hermetic.yml must check the lock before the frozen sync"
+
+
+def test_required_pytest_job_uses_the_same_frozen_uv_path() -> None:
+    """Required pytest used to `pip install -e ".[dev]"` with no cache, twice.
+    That is a live-index install sitting next to hermetic.yml's frozen path.
+    The required job must use the same pin and lock-check-before-sync order
+    without swallowing failure (`|| true` is already banned by polyglot CI).
+    """
+    make_pin = re.search(r"^UV_VERSION \?= (\S+)$", _MAKEFILE, flags=re.M)
+    assert make_pin, "Makefile must pin UV_VERSION ?= <exact version>"
+    ci_pin = re.search(r'UV_VERSION:\s*"([^"]+)"', _TESTS)
+    assert ci_pin, "tests.yml must pin UV_VERSION"
+    assert make_pin.group(1) == ci_pin.group(1), (
+        "Makefile and tests.yml must pin the same uv version: "
+        f"{make_pin.group(1)} != {ci_pin.group(1)}"
+    )
+    assert '"uv==${UV_VERSION}"' in _TESTS
+    check = _TESTS.find("uv lock --check")
+    sync = _TESTS.find("uv sync --frozen --extra dev")
+    assert check != -1, "tests.yml must run uv lock --check"
+    assert sync != -1, "tests.yml must run uv sync --frozen --extra dev"
+    assert check < sync, "tests.yml must check the lock before the frozen sync"
+    assert "pip install -e" not in _TESTS, (
+        "tests.yml may not return to unpinned editable installation"
+    )
+    assert "pip install ruff" not in _TESTS, (
+        "ruff is in the dev extra; a second unpinned pip install is a live pin"
+    )
 
 
 def test_install_delegates_to_frozen_path() -> None:

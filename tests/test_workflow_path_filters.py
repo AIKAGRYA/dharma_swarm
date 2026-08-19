@@ -80,24 +80,26 @@ def test_every_conditional_job_fails_open() -> None:
     review). Empty outputs still evaluate true under either, so fail-open is
     unaffected.
     """
-    doc = yaml.safe_load((WORKFLOWS / "tests.yml").read_text())
     offenders = []
-    for name, body in doc["jobs"].items():
-        condition = " ".join(str(body.get("if", "")).split())
-        if "needs.changes.outputs" not in condition:
-            continue
-        if "== 'true'" in condition or '== "true"' in condition:
-            offenders.append(f"{name}: fail-closed comparison: {condition}")
-        if "!cancelled()" not in condition:
-            offenders.append(
-                f"{name}: missing !cancelled(), so a FAILED classifier would "
-                f"skip this job instead of running it: {condition}"
-            )
-        if "always()" in condition:
-            offenders.append(
-                f"{name}: always() keeps this job running after the run is "
-                f"cancelled, so Cancel stops freeing runners: {condition}"
-            )
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for name, body in (doc.get("jobs") or {}).items():
+            condition = " ".join(str(body.get("if", "")).split())
+            if "needs.changes.outputs" not in condition:
+                continue
+            label = f"{path.name}:{name}"
+            if "== 'true'" in condition or '== "true"' in condition:
+                offenders.append(f"{label}: fail-closed comparison: {condition}")
+            if "!cancelled()" not in condition:
+                offenders.append(
+                    f"{label}: missing !cancelled(), so a FAILED classifier would "
+                    f"skip this job instead of running it: {condition}"
+                )
+            if "always()" in condition:
+                offenders.append(
+                    f"{label}: always() keeps this job running after the run is "
+                    f"cancelled, so Cancel stops freeing runners: {condition}"
+                )
     assert not offenders, offenders
 
 
@@ -119,15 +121,65 @@ def test_a_filtered_workflow_still_runs_when_its_own_definition_changes() -> Non
     assert not offenders, offenders
 
 
+CLASSIFIER_WORKFLOWS: tuple[str, ...] = (
+    "tests.yml",
+    "codeql.yml",
+    "semgrep.yml",
+    "quality-ratchet.yml",
+)
+
+# Contracted advisory scans that must stay unfiltered at workflow level and
+# skip per-job via the classifier. Job id -> output name.
+CONTRACTED_ADVISORY_JOBS: dict[str, tuple[tuple[str, str], ...]] = {
+    "codeql.yml": (("analyze", "codeql"),),
+    "semgrep.yml": (("semgrep", "semgrep"), ("rule2-behavior", "semgrep")),
+    "quality-ratchet.yml": (("quality-ratchet", "quality_ratchet"),),
+}
+
+
 def test_the_classifier_is_reachable_from_the_workflow() -> None:
     """The `changes` job invokes a real file; a rename would silently make the
     step fail, and every consumer would then fail open to running everything —
     correct, but it would quietly undo the whole change."""
-    doc = yaml.safe_load((WORKFLOWS / "tests.yml").read_text())
-    steps = doc["jobs"]["changes"]["steps"]
-    runs = " ".join(str(s.get("run", "")) for s in steps)
-    assert "scripts/ci/classify_changed_paths.py" in runs
     assert (REPO_ROOT / "scripts" / "ci" / "classify_changed_paths.py").exists()
+    missing = []
+    for name in CLASSIFIER_WORKFLOWS:
+        doc = yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
+        job = (doc.get("jobs") or {}).get("changes")
+        if not job:
+            missing.append(f"{name}: no changes job")
+            continue
+        steps = job.get("steps") or []
+        runs = " ".join(str(s.get("run", "")) for s in steps)
+        if "scripts/ci/classify_changed_paths.py" not in runs:
+            missing.append(f"{name}: changes job does not invoke the classifier")
+    assert not missing, missing
+
+
+def test_contracted_advisory_scans_skip_per_job_not_per_workflow() -> None:
+    """The queue-lean change. Workflow-level paths: on these names is MISSING
+    (banned above). Per-job skip is SKIPPED, which CI truth treats as PASS."""
+    for filename, jobs in CONTRACTED_ADVISORY_JOBS.items():
+        doc = yaml.safe_load((WORKFLOWS / filename).read_text(encoding="utf-8"))
+        stanza = _pull_request_stanza(doc)
+        assert stanza is not None, f"{filename} lost its pull_request stanza"
+        assert "paths" not in stanza, (
+            f"{filename} grew a workflow-level paths filter; contracted names "
+            "would go MISSING on every excluded PR"
+        )
+        for job_id, output in jobs:
+            body = doc["jobs"][job_id]
+            condition = " ".join(str(body.get("if", "")).split())
+            assert f"needs.changes.outputs.{output} != 'false'" in condition, (
+                f"{filename}:{job_id} is not keyed on classifier output "
+                f"{output!r}: {condition}"
+            )
+            needs = body.get("needs") or []
+            if isinstance(needs, str):
+                needs = [needs]
+            assert "changes" in needs, (
+                f"{filename}:{job_id} does not need the classifier job"
+            )
 
 
 # Reviewed on PR #1285 (Devin, 4 valid findings). Each of these filters was

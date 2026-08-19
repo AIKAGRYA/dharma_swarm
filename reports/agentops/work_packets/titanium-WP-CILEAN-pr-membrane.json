@@ -1,0 +1,89 @@
+{
+  "id": "titanium-WP-CILEAN-pr-membrane",
+  "base_ref": "ed0ed18018fa45df746ac3084c41fb33a909a1ef",
+  "branch": "ci/lean-pr-membrane-20260820",
+  "worktree": ".",
+  "intent": "Lean PR CI without weakening the merge membrane: per-job skip (SKIPPED, not MISSING) for CodeQL, Semgrep, and quality-ratchet on irrelevant diffs; hermetic uv install for required pytest. Do not drop pytest 3.11/3.12 from pull_request or path-filter required workflows.",
+  "allowed_files": [
+    ".github/workflows/tests.yml",
+    ".github/workflows/codeql.yml",
+    ".github/workflows/semgrep.yml",
+    ".github/workflows/quality-ratchet.yml",
+    ".github/workflows/nightly-tests.yml",
+    "scripts/ci/classify_changed_paths.py",
+    "tests/test_classify_changed_paths.py",
+    "tests/test_workflow_path_filters.py",
+    "tests/test_bootstrap_contract.py",
+    "reports/agentops/work_packets/titanium-WP-CILEAN-pr-membrane.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "classifier-and-path-filter-contracts",
+      "command": "python3 -m pytest -q tests/test_classify_changed_paths.py tests/test_workflow_path_filters.py tests/test_bootstrap_contract.py tests/test_polyglot_ci_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    },
+    {
+      "name": "ci-parity-structure",
+      "command": "python3 scripts/governance/check_ci_parity.py --allow-missing-live",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "docs-only-must-not-mark-analysis-classes",
+      "command": "python3 -c \"import sys; sys.path.insert(0,'scripts/ci'); import classify_changed_paths as c; d=c.classify(['docs/architecture/NAVIGATION.md']); assert d.get('codeql') is False and d.get('semgrep') is False and d.get('quality_ratchet') is False, d\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "ci: skip inapplicable advisory scans per-job; hermetic uv pytest install"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "work_packet": "WP-CILEAN",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "ed0ed18018fa45df746ac3084c41fb33a909a1ef",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      "scripts/ci/classify_changed_paths.py",
+      "tests/test_classify_changed_paths.py",
+      "tests/test_workflow_path_filters.py",
+      ".github/workflows/tests.yml",
+      ".github/workflows/hermetic.yml",
+      "docs/governance/CI_TRUTH_CONTRACT.json"
+    ],
+    "honest_blockers": [
+      "pytest 3.11 and 3.12 remain required pull_request contexts; dropping either without a simultaneous branch-protection edit would wedge merge (tests/test_workflow_path_filters.py).",
+      "Workflow-level paths: filters are still forbidden on contracted check names; this packet uses per-job SKIPPED instead.",
+      "Local packet gates cannot prove GitHub queue-depth reduction; that is a post-merge observation on live PRs."
+    ],
+    "rollback": "Revert the commits on ci/lean-pr-membrane-20260820. Required pytest contexts, branch protection, and advisory contracted names are unchanged in identity; only install path and per-job skip conditions revert.",
+    "packet_digest": "6091454deb496fd737aa9dd0f99c402b15565e3611f835ac576b6e1b04ed15b9"
+  }
+}

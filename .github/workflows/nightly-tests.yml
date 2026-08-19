@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  UV_VERSION: "0.11.2"
+
 concurrency:
   group: nightly-tests
   cancel-in-progress: false
@@ -33,12 +36,14 @@ jobs:
       - name: Quarantine gate (issue, expiry, 15-entry cap)
         run: python3 scripts/governance/check_quarantine.py
 
-      - name: Install package + test deps
+      - name: Hermetic install (lockfile drift fails)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          pip install playwright
-          playwright install --with-deps chromium
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/python -m pip install playwright
+          .venv/bin/playwright install --with-deps chromium
 
       - name: Run full suite (no -x, no marker excludes)
         env:
@@ -92,10 +97,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install package + test deps
+      - name: Hermetic install (lockfile drift fails)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Measure hot-target coverage
         env:

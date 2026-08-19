@@ -15,10 +15,9 @@ on:
     # applicable", which is the whole value of the report.
     #
     # Per-JOB filtering (as tests.yml does) is the correct answer here: the job
-    # reports `skipped`, and SKIPPED counts as PASS. That needs a classifier job
-    # in this workflow and a contract entry for its check name; it is deliberate
-    # follow-up, not done here. Filtering it back at the workflow level is not
-    # the fix and is blocked by test_workflow_path_filters.py.
+    # reports `skipped`, and SKIPPED counts as PASS. The `changes` job below
+    # classifies the diff; scan jobs skip (not MISSING) when no Semgrep inputs
+    # moved. Filtering at the workflow level is still forbidden.
   merge_group:
     types: [checks_requested]
   push:
@@ -36,15 +35,39 @@ permissions:
   security-events: write
 
 jobs:
+  changes:
+    name: classify changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      semgrep: ${{ steps.classify.outputs.semgrep }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify
+        id: classify
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci/classify_changed_paths.py
+
   semgrep:
     name: semgrep
+    needs: changes
     runs-on: ubuntu-latest
     container:
       image: semgrep/semgrep:latest
     timeout-minutes: 15
 
     # Skip on Dependabot PRs — Dependabot doesn't have access to our config.
-    if: (github.actor != 'dependabot[bot]')
+    # Fail open on classifier failure: empty output is not the string false.
+    if: >-
+      !cancelled() && github.actor != 'dependabot[bot]'
+      && needs.changes.outputs.semgrep != 'false'
 
     steps:
       - name: Checkout exact event head
@@ -201,9 +224,12 @@ jobs:
   # ===========================================================================
   rule2-behavior:
     name: anti-slop rule 2 behavioral contract
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: (github.actor != 'dependabot[bot]')
+    if: >-
+      !cancelled() && github.actor != 'dependabot[bot]'
+      && needs.changes.outputs.semgrep != 'false'
 
     steps:
       - name: Checkout

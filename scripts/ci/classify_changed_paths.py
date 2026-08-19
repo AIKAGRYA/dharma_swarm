@@ -2,19 +2,18 @@
 
 Why this exists
 ---------------
-33 of this repository's 48 workflows trigger on `pull_request` and only 5 carry
-a `paths:` filter, so a one-line dependency bump launches ~28 workflow runs. The
-runner allowance is per-account, so those runs queue against every other PR: a
-measured 435-deep queue on 2026-08-07, in which a single Dependabot PR
-(`dependabot/uv/h2-4.4.1`) accounted for 28 runs by itself. The multiplier, not
-the volume of work, is what starves the queue.
+Most workflows still trigger on `pull_request`. A workflow-level `paths:`
+filter cannot be applied to a CONTRACTED check name: the workflow would not
+run, the check would be MISSING, and CI truth would degrade every docs-only
+PR. The multiplier, not the volume of work, is what starves the queue (a
+measured 435-deep queue on 2026-08-07; one Dependabot bump spawned ~28 runs).
 
-Workflow-level `paths:` cannot fix the worst offender. `tests.yml` mixes the two
-REQUIRED pytest contexts with six advisory jobs; a `paths:` filter there would
-skip the required contexts on a non-matching PR, they would never report, and
-branch protection would wait forever. So the required jobs keep running
-unconditionally and only the advisory ones become conditional, keyed on this
-classifier.
+`tests.yml` mixes two REQUIRED pytest contexts with advisory jobs; a
+workflow-level `paths:` filter there would skip the required contexts, they
+would never report, and branch protection would wait forever. Required jobs
+keep running unconditionally. Advisory jobs — including contracted CodeQL,
+Semgrep, and the quality ratchet — become conditional, keyed on this
+classifier, and report SKIPPED (which CI truth treats as PASS).
 
 Failure posture
 ---------------
@@ -62,20 +61,49 @@ CLASS_RULES: dict[str, tuple[str, ...]] = {
         "requirements.txt",
         "requirements-dev.txt",
     ),
+    # Heavy advisory scans. Lockfiles are intentionally absent: a Dependabot
+    # uv bump must still run required pytest (python class) but should not
+    # enqueue CodeQL/Semgrep/the ratchet. pyproject.toml is a CodeQL input
+    # because it can add package paths the analyzer follows.
+    "codeql": ("*.py", "pyproject.toml"),
+    "semgrep": ("*.py", "*.go", "dashboard/", "terminal/", ".semgrep/"),
+    "quality_ratchet": (
+        "*.py",
+        "docs/governance/hygiene/",
+        "scripts/governance/hygiene/",
+    ),
 }
 
 CLASSES: tuple[str, ...] = tuple(CLASS_RULES)
 
-# Self-coverage. Editing the file that DEFINES the gated jobs, or this
-# classifier that decides which of them run, must run all of them -- otherwise
-# the change to a job cannot exercise that job, and you could break a lane
-# while CI agreed with you. This is the same property
-# tests/test_workflow_path_filters.py enforces for workflow-level `paths:`
-# filters, which the per-job filters did not honour until PR #1285 review.
-SELF_COVERAGE_PATHS: tuple[str, ...] = (
-    ".github/workflows/tests.yml",
-    "scripts/ci/classify_changed_paths.py",
+# Advisory jobs defined in tests.yml. Editing that workflow must run those
+# jobs; it must not force CodeQL/Semgrep/the ratchet (those workflows have
+# their own self-coverage below).
+TESTS_WORKFLOW_CLASSES: tuple[str, ...] = (
+    "go",
+    "dashboard",
+    "terminal",
+    "python",
 )
+
+# Self-coverage. Editing this classifier must run every class -- otherwise a
+# rule change cannot exercise the jobs it gates. Per-class paths force only
+# the workflow that owns that class.
+SELF_COVERAGE_PATHS: tuple[str, ...] = ("scripts/ci/classify_changed_paths.py",)
+CLASS_SELF_COVERAGE: dict[str, tuple[str, ...]] = {
+    "codeql": (".github/workflows/codeql.yml",),
+    "semgrep": (
+        ".github/workflows/semgrep.yml",
+        "scripts/governance/run_semgrep_with_ca.sh",
+    ),
+    "quality_ratchet": (
+        ".github/workflows/quality-ratchet.yml",
+        "scripts/governance/hygiene/ratchet.py",
+        "scripts/governance/hygiene/ratchet_counters.py",
+        "docs/governance/hygiene/ratchet_baselines.json",
+    ),
+}
+TESTS_WORKFLOW_PATH: str = ".github/workflows/tests.yml"
 
 
 def _matches(path: str, rule: str) -> bool:
@@ -88,15 +116,21 @@ def classify(paths: list[str]) -> dict[str, bool]:
     """Map changed paths to work classes. Pure; no I/O, no git.
 
     A change to any SELF_COVERAGE_PATHS entry marks every class changed: the
-    definition of the jobs, and the rules deciding which jobs run, are inputs
-    to every job here.
+    rules deciding which jobs run are inputs to every job here.
     """
     if any(p in SELF_COVERAGE_PATHS for p in paths):
         return all_true()
-    return {
+    classes = {
         name: any(_matches(p, rule) for p in paths for rule in rules)
         for name, rules in CLASS_RULES.items()
     }
+    if TESTS_WORKFLOW_PATH in paths:
+        for name in TESTS_WORKFLOW_CLASSES:
+            classes[name] = True
+    for name, extra_paths in CLASS_SELF_COVERAGE.items():
+        if any(p in extra_paths for p in paths):
+            classes[name] = True
+    return classes
 
 
 def all_true() -> dict[str, bool]:

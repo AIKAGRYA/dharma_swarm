@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Lockstep with Makefile UV_VERSION and hermetic.yml. tests/test_bootstrap_contract.py
+  # pins this: required pytest may not return to an unpinned editable install.
+  UV_VERSION: "0.11.2"
+
 jobs:
   # Which change classes does this PR touch? The advisory jobs below consult
   # this to skip work the diff cannot affect. `pytest` never does -- it carries
@@ -28,6 +33,9 @@ jobs:
       dashboard: ${{ steps.classify.outputs.dashboard }}
       terminal: ${{ steps.classify.outputs.terminal }}
       python: ${{ steps.classify.outputs.python }}
+      codeql: ${{ steps.classify.outputs.codeql }}
+      semgrep: ${{ steps.classify.outputs.semgrep }}
+      quality_ratchet: ${{ steps.classify.outputs.quality_ratchet }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -67,10 +75,12 @@ jobs:
           # enforces the alignment and the go.mod compatibility.
           go-version: "1.26.3"
 
-      - name: Install package + test deps
+      - name: Hermetic install (lockfile drift fails)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run Go adapter contract harness
         env:
@@ -100,10 +110,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package + test deps
+      - name: Hermetic install (lockfile drift fails)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       # The old step ran the full ruleset with `|| true` — a dead gate that
       # could never fail (2026-07-06 audit, C8). Correctness rules now BLOCK
@@ -114,10 +126,9 @@ jobs:
       # check is alarm fatigue. Burn the backlog down locally via
       # `ruff check dharma_swarm/ --select=E,F,W --ignore=E501,W291,W293`,
       # then widen this gate's --select.
+      # ruff comes from the frozen dev extra; do not pip-install an unpinned copy.
       - name: Lint (ruff — blocking correctness rules)
-        run: |
-          pip install ruff
-          ruff check dharma_swarm/ --select=E9,F63,F7,F82
+        run: ruff check dharma_swarm/ --select=E9,F63,F7,F82
 
       - name: Run tests (fast, no network)
         env:
@@ -166,8 +177,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install deps
-        run: pip install -e ".[dev]"
+      - name: Hermetic install (lockfile drift fails)
+        run: |
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Syntax check all modules (AUDITOR role)
         run: |
@@ -284,8 +299,10 @@ jobs:
       - name: Install terminal bridge (Python side)
         working-directory: .
         run: |
-          python -m pip install --upgrade pip
-          pip install -e "."
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -321,8 +338,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install deps
-        run: pip install -e ".[dev]"
+      - name: Hermetic install (lockfile drift fails)
+        run: |
+          python -m pip install --upgrade "uv==${UV_VERSION}"
+          uv lock --check
+          uv sync --frozen --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run Gauntlet Tier 1 (correctness checks — no network, no LLM)
         env:

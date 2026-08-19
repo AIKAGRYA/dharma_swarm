@@ -17,10 +17,9 @@ on:
     # applicable", which is the whole value of the report.
     #
     # Per-JOB filtering (as tests.yml does) is the correct answer here: the job
-    # reports `skipped`, and SKIPPED counts as PASS. That needs a classifier job
-    # in this workflow and a contract entry for its check name; it is deliberate
-    # follow-up, not done here. Filtering it back at the workflow level is not
-    # the fix and is blocked by test_workflow_path_filters.py.
+    # reports `skipped`, and SKIPPED counts as PASS. The `changes` job below
+    # classifies the diff; `analyze` is skipped (not MISSING) when no Python
+    # sources moved. Filtering at the workflow level is still forbidden.
   merge_group:
   schedule:
     # Sunday 09:00 UTC (Mon 17:00 GMT+8) — weekly variant analysis
@@ -37,15 +36,35 @@ permissions:
   security-events: write
 
 jobs:
+  changes:
+    name: classify changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      codeql: ${{ steps.classify.outputs.codeql }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify
+        id: classify
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci/classify_changed_paths.py
+
   analyze:
-    name: codeql / ${{ matrix.language }}
+    # Literal check name (no matrix): a skipped matrix job often fails to
+    # publish `codeql / python`, which CI truth would record as MISSING.
+    name: codeql / python
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.codeql != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python]
 
     steps:
       - name: Checkout
@@ -54,7 +73,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@fee9466b8957867761f2d78f922ab084e3e2dd17 # v3
         with:
-          languages: ${{ matrix.language }}
+          languages: python
           # `security-extended` adds higher-precision queries; `security-and-quality`
           # adds maintainability queries. Stick with extended for now.
           queries: security-extended
@@ -82,6 +101,6 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@fee9466b8957867761f2d78f922ab084e3e2dd17 # v3
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:python"
           # Findings flow into the Security tab even when this step exits 0.
           upload: always

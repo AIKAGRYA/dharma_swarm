@@ -88,12 +88,34 @@ def test_each_class_is_recognised() -> None:
     assert ccp.classify(["dharma_swarm/organism.py"])["python"]
     assert ccp.classify(["uv.lock"])["python"], "a pin change changes the runtime"
     assert ccp.classify(["pyproject.toml"])["python"]
+    assert ccp.classify(["dharma_swarm/organism.py"])["codeql"]
+    assert ccp.classify(["pyproject.toml"])["codeql"]
+    assert ccp.classify(["dharma_swarm/organism.py"])["semgrep"]
+    assert ccp.classify(["dashboard/src/app/page.tsx"])["semgrep"]
+    assert ccp.classify([".semgrep/dharma-anti-slop.yml"])["semgrep"]
+    assert ccp.classify(["dharma_swarm/organism.py"])["quality_ratchet"]
+    assert ccp.classify(["docs/governance/hygiene/ratchet_baselines.json"])[
+        "quality_ratchet"
+    ]
 
 
 def test_a_docs_only_change_touches_nothing() -> None:
-    """The whole point: a README edit must not run the Go bridges."""
+    """The whole point: a README edit must not run the Go bridges or CodeQL."""
     classes = ccp.classify(["docs/architecture/NAVIGATION.md", "README.md"])
     assert classes == dict.fromkeys(ccp.CLASSES, False), classes
+
+
+def test_a_lockfile_bump_does_not_enqueue_heavy_advisory_scans() -> None:
+    """Dependabot uv bumps were the 28-run multiplier. Required pytest still
+    runs (python class); CodeQL/Semgrep/the ratchet must stay false so those
+    contracted jobs report SKIPPED instead of launching."""
+    classes = ccp.classify(["uv.lock"])
+    assert classes["python"]
+    assert not classes["codeql"]
+    assert not classes["semgrep"]
+    assert not classes["quality_ratchet"]
+    assert not classes["go"]
+    assert not classes["dashboard"]
 
 
 def test_a_dashboard_change_does_not_drag_in_go() -> None:
@@ -177,9 +199,26 @@ def test_the_classifier_never_raises_on_any_resolve_path(monkeypatch) -> None:
 
 def test_editing_the_workflow_that_defines_the_jobs_runs_every_job() -> None:
     classes = ccp.classify([".github/workflows/tests.yml"])
-    assert all(classes.values()), (
+    missing = [name for name in ccp.TESTS_WORKFLOW_CLASSES if not classes[name]]
+    assert not missing, (
         "a PR editing tests.yml skips the very jobs it edits: " + repr(classes)
     )
+    assert not classes["codeql"]
+    assert not classes["semgrep"]
+    assert not classes["quality_ratchet"]
+
+
+def test_editing_an_analysis_workflow_runs_only_that_class() -> None:
+    classes = ccp.classify([".github/workflows/codeql.yml"])
+    assert classes["codeql"]
+    assert not classes["semgrep"]
+    assert not classes["python"]
+    classes = ccp.classify([".github/workflows/semgrep.yml"])
+    assert classes["semgrep"]
+    assert not classes["codeql"]
+    classes = ccp.classify([".github/workflows/quality-ratchet.yml"])
+    assert classes["quality_ratchet"]
+    assert not classes["codeql"]
 
 
 def test_editing_the_classifier_itself_runs_every_job() -> None:
