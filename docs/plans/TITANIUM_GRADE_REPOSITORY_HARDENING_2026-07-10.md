@@ -1195,36 +1195,119 @@ Every Mike/automerge entry path consumes the same required-check truth and fails
 **Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F1
 
+**Bounded design amendment (2026-08-04)**
+
+The rolling-repair design made currentness depend on a privileged repository
+writer: after each merge it regenerated tracked count blocks, force-updated a
+shared branch, and needed a credential or human-reviewed repair PR before the
+new head could receive checks. That is a recurring authority bottleneck, and a
+checkless rolling head cannot prove that merged `main` is synchronized.
+
+Human merge of the PR carrying this amendment ratifies a write-free
+replacement. DocOps keeps stable documentation-integrity checks strict and
+read-only, but volatile inventory becomes a deterministic, explicitly
+non-authoritative projection of one exact tested commit. CI may write only to
+its ephemeral workspace, artifact store, and job summary. It receives
+`contents: read`, binds the projection to commit SHA, tree SHA, tracked-input
+digest, generator digest, and output digests, verifies those identities before
+publication, and never pushes, force-pushes, opens a repair PR, or mutates a
+repository setting. Projection bytes contain no wall-clock field.
+
+This amendment grants the future implementation only the surfaces and
+obligations below. It also admits `.gitattributes` into the Titanium ownership
+envelope and removes `merge=union` from `AUTO_INVENTORY.md` and
+`SOVEREIGN_MANIFEST.md` now: both contain machine-managed blocks, so union
+merge can silently retain two incompatible generated bodies. Conflicts on
+those files must be resolved explicitly and regenerated. This amendment adds
+no generator, verifier, workflow, or delivery code and does not close WP-0G.
+
+**Self-referential closeout boundary (this amendment only)**
+
+The canonical AgentOps evaluator intentionally rejects any working, staged,
+or committed `.gitattributes` change: a candidate may not alter the Git policy
+used to measure its own scope and then certify that measurement. Therefore
+`make agent-build-closeout` must still be invoked for this amendment, but its
+specific nonzero `governed scope requires stable ... .gitattributes policy`
+result is an expected authority boundary, not a successful closeout.
+
+Review eligibility instead requires all of the following on one candidate:
+
+1. the preserved passed AgentOps preflight bound to original clean base
+   `f2ffb4390c603dc9f8f2c36fcaaca0c4ba0ce9cd` before any amendment edit,
+   plus a final packet/collision refresh bound to the exact current-main
+   integration base recorded in the packet; the refresh is integration
+   evidence, not a retroactive claim that the amended branch was unedited;
+2. the preserved canonical closeout refusal above, with no later claim that
+   AgentOps certified the changed scope;
+3. raw Git tree review showing exactly the seven amendment files named by its
+   packet, plus byte identity between the external preflight packet and its
+   canonical tracked copy;
+4. green active-track rendering, strict DocOps, focused governance contracts,
+   and `git diff --check`; and
+5. independent human review and human merge as the authority that evaluates
+   the policy mutation the candidate cannot self-certify.
+
+This exception authorizes no other `.gitattributes` edit, does not weaken the
+evaluator, and does not apply to the future WP-0G implementation packet.
+
 **Allowed files**
 
+- `.gitattributes` (this amendment only: remove the two unsafe union drivers)
+- `Makefile`
 - `scripts/docops/check_docops_integrity.py`
+- `scripts/docops/projection.py` (new)
 - `.github/workflows/docops.yml`
-- `.github/workflows/docops-reconcile-main.yml`
-- `.github/workflows/pr-dedupe.yml`
-- `.github/workflows/bot-pr-limit.yml`
+- `.github/workflows/docops-reconcile-main.yml` (delete)
+- `docs/docops/assertions.yaml`
 - `docs/docops/AUTO_INVENTORY.md`
-- `docs/governance/SOVEREIGN_MANIFEST.md` (managed count blocks only)
+- `docs/docops/DOCOPS_INTEGRITY.md`
+- `docs/governance/SOVEREIGN_MANIFEST.md` (volatile-count demotion only)
+- `docs/governance/ACTIVE_TRACK.yaml` (WP-0G next-item reconciliation only)
+- `docs/governance/CI_TRUTH_CONTRACT.json` (DocOps entry only)
+- this specification's WP-0G section and the executor's stale WP-0G prerequisite text
 - `tests/test_docops_integrity.py`
-- `tests/test_docops_reconcile_workflow.py` (new)
-- `tests/test_pr_dedupe_workflow.py` (new)
+- `tests/test_docops_reconcile_workflow.py`
+- `tests/test_pr_dedupe_workflow.py` (retired-workflow consumer only)
+- the exact WP-0G Session Entry packet
 
 **Required implementation**
 
-1. Regenerate current count-managed surfaces deterministically.
-2. Make strict mode green on the exact merged tree.
-3. Preserve advisory count behavior on ordinary feature PRs only if post-merge reconciliation is guaranteed.
-4. Ensure a force-update of the rolling reconcile branch triggers fresh checks on the new head.
-5. Ensure success means the update reached main or an actionable PR with checks—not merely that a branch was pushed.
-6. Close or update stale snapshot PRs using existing dedupe/limit owners.
-7. Keep hand-authored doctrine outside generated count blocks.
+1. Keep stable documentation-integrity checks read-only and strict.
+2. Generate normalized, key-sorted JSON and deterministic Markdown for the
+   exact checked-out commit. Type both outputs as non-authoritative
+   `projection` data and record explicit schema and generator versions.
+3. Write a separate normalized manifest, last, that declares the exact
+   tracked-input scope and record count; binds commit SHA, tree SHA, all
+   tracked-input bytes, and generator sources; and hashes and byte-counts every
+   output.
+4. Verify the manifest against the checked-out repository and reject a dirty
+   tree, wrong or stale SHA/tree/input/generator digest, missing or extra
+   artifact, altered output, nondeterministic rendering, or generator failure.
+5. Give `.github/workflows/docops.yml` only `contents: read`; generate and
+   verify `${GITHUB_SHA}`, then publish a per-SHA artifact and append the job
+   summary only after verification succeeds.
+6. Delete `.github/workflows/docops-reconcile-main.yml` and remove every live
+   PAT, direct push, force-push, repair commit, rolling branch, and repair-PR
+   path from the DocOps architecture.
+7. Remove volatile count assertions, wall-clock freshness fields, checked-in
+   generated count blocks, and write modes. Keep compatibility flags only when
+   they are inert, explicitly deprecated, and scheduled for deletion.
+8. Preserve hand-authored doctrine and stable structural assertions outside
+   the removed volatile-count blocks.
 
 **Tests**
 
-- Writer is idempotent: two writes produce byte-identical managed blocks.
-- Strict check fails after a tracked count changes.
-- Strict check passes after regeneration.
-- Reconcile workflow tests assert the updated head receives a check-triggering event.
-- Dedupe tests cover timestamped spine snapshots lacking an automation marker.
+- Two generations from the same exact SHA are byte-identical.
+- Corrupt integrity configuration and generator failure fail closed; a failed
+  generation leaves no verifiable artifact set.
+- Wrong or stale commit, tree, tracked-input, and generator identities each
+  fail verification.
+- Missing, extra, or tampered outputs fail manifest verification.
+- Representative committed source and documentation changes require no repair
+  PR and each produce the correct new per-SHA projection.
+- Workflow structure proves contents-read-only authority, exact-SHA generation
+  and verification, artifact/job-summary publication, and absence of PAT,
+  write, push, force-push, and repair-PR mechanics.
 
 **Verification**
 
@@ -1232,20 +1315,26 @@ Every Mike/automerge entry path consumes the same required-check truth and fails
 make docops-integrity
 make docops-report
 python3 scripts/docops/check_docops_integrity.py
+python3 -m pytest tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py tests/test_pr_dedupe_workflow.py -q
 git diff --check
 ```
 
 **Operator prerequisite**
 
-Confirm the existing `DOCOPS_RECONCILE_TOKEN`/GitHub App path or authorize the normal reviewed-PR fallback. No credential is committed.
+None. The write-free architecture deliberately requires no credential,
+repository-setting mutation, push authority, or reviewed repair PR.
 
 **Rollback**
 
-Revert workflow mechanics and regenerated managed blocks together. Never hand-edit generated counts.
+Revert the implementation packet as one unit. Rollback restores the known
+privileged rolling-repair failure mode and reopens TIT-008; it is not a safe
+steady state.
 
 **Exit**
 
-Strict DocOps passes on merged `main`; a reconcile update reaches main or a checked PR head, and snapshot dedupe is bounded by behavior tests.
+Strict DocOps passes on merged `main`; contents-read-only CI verifies and
+publishes a deterministic, non-authoritative projection for the exact tested
+SHA; and no repository repair is required or attempted.
 
 ### WP-0H — Polyglot CI orchestration
 

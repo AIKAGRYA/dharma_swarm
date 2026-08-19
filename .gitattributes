@@ -1,17 +1,11 @@
-# Generated count files. Every PR that adds/removes a file, test, or line would
-# change these if it committed them — the source of the O(n^2) "counter cascade".
-#
-# Under the reconcile model these files are NOT hand-committed in PRs: the
-# DocOps gate treats their counts as advisory (--counts-advisory), and
-# .github/workflows/docops-reconcile-main.yml regenerates them on push:main from
-# the tree. So PRs leave these lines identical to main and they never conflict in
-# the merge queue.
-#
-# `merge=union` is a defensive net only: if a PR ever does touch a count line, a
-# union merge auto-resolves it (no hard conflict that would kick the PR from the
-# queue) and the next push:main reconcile recomputes the authoritative value.
-docs/docops/AUTO_INVENTORY.md merge=union
-docs/governance/SOVEREIGN_MANIFEST.md merge=union
+# Machine-managed DocOps surfaces are deliberately NOT `merge=union`.
+# AUTO_INVENTORY.md carries a generated count block, while
+# SOVEREIGN_MANIFEST.md carries both a generated active-track block and
+# count-sensitive doctrine. A union merge can retain both sides of a managed
+# block, silently duplicating rows or creating contradictory claims. Resolve
+# conflicts explicitly and regenerate from owner inputs. The WP-0G amendment
+# moves long-term volatile-count currentness to write-free, exact-SHA,
+# non-authoritative projections; it does not make concatenation safe.
 
 # High-churn prose docs: independently refreshed by multiple agents/PRs in short
 # windows. `merge=union` prevents a hard conflict block — the result may need a
