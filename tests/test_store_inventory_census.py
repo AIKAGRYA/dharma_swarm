@@ -54,10 +54,19 @@ BASELINE_DB_NAMES = 39
 # forecast ledger's PUBLIC full-store snapshot (yes-sheet 2026-08-18 line 7).
 # It is the durable published projection of the existing predictions.jsonl
 # store on generated/forecast-ledger, not a second private store.
-BASELINE_JSONL_NAMES = 222
+# 222 -> 223 (2026-08-19): YYYY-MM.jsonl — the Forge monthly spend meter's
+# per-month ledger filename template (forge_v2/monthly_ledger.py; yes-sheet
+# 2026-08-18 row 1). One runtime-state file per month under
+# ~/.dharma/forge_v1/spend/ (e.g. 2026-08.jsonl), never in git; it aggregates
+# per-run Budget spend against the $200/month benchmark compute cap.
+BASELINE_JSONL_NAMES = 223
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
-BASELINE_LEDGER_MODULES = 12
+# 12 -> 13 (2026-08-19): monthly_ledger.py — the Forge monthly spend meter
+# (forge_v2; yes-sheet 2026-08-18 row 1). It aggregates per-run Budget spend
+# across runs against the $200/month benchmark compute cap; a genuine new
+# ledger, deliberately named as one rather than dodging this ratchet.
+BASELINE_LEDGER_MODULES = 13
 BASELINE_LEDGER_CLASSES = 11
 
 
