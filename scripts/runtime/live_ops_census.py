@@ -10,11 +10,12 @@ declared intent, observed state, evidence paths, and operator policy together.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +115,7 @@ PROCESS_PATTERNS: dict[str, str] = {
     "merge_master_mike": r"merge_master_mike|merge-master-mike",
     "terminal_tui": r"dharma_terminal_tui|terminal_tui_interaction|terminal.*start",
     "colima_openclaw": r"colima-openclaw-secure|qemu-system-aarch64 .*openclaw",
+    "fugu_ultra_semantic_responder": r"fugu_ultra_semantic_responder\.py",
 }
 
 
@@ -129,14 +131,24 @@ PORTS: dict[str, int] = {
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _iso_mtime(path: Path) -> str:
     if not path.exists():
         return ""
     try:
-        return datetime.fromtimestamp(path.stat().st_mtime, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        return (
+            datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
     except OSError:
         return ""
 
@@ -148,7 +160,7 @@ def _age_hours(iso_ts: str) -> float | None:
         ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return round((datetime.now(UTC) - ts).total_seconds() / 3600, 2)
+    return round((datetime.now(timezone.utc) - ts).total_seconds() / 3600, 2)
 
 
 def _run(args: list[str], *, cwd: Path | None = None, timeout: int = 5) -> tuple[int, str]:
@@ -207,28 +219,133 @@ def _parse_pgrep(output: str) -> list[dict[str, str]]:
     return rows
 
 
+class _ProcessSnapshot(dict[str, list[dict[str, str]]]):
+    """Process rows plus whether each pgrep returned current evidence."""
+
+    def __init__(
+        self,
+        rows: dict[str, list[dict[str, str]]],
+        *,
+        observed: dict[str, bool],
+    ) -> None:
+        super().__init__(rows)
+        self.observed = observed
+
+
 def _process_snapshot(run_probes: bool) -> dict[str, list[dict[str, str]]]:
     if not run_probes:
-        return {key: [] for key in PROCESS_PATTERNS}
-    snapshot: dict[str, list[dict[str, str]]] = {}
-    for key, pattern in PROCESS_PATTERNS.items():
+        return _ProcessSnapshot(
+            {key: [] for key in PROCESS_PATTERNS},
+            observed={key: False for key in PROCESS_PATTERNS},
+        )
+    def probe(item: tuple[str, str]) -> tuple[str, int, str]:
+        key, pattern = item
         rc, out = _run(["pgrep", "-fl", pattern], timeout=4)
+        return key, rc, out
+
+    snapshot: dict[str, list[dict[str, str]]] = {}
+    observed: dict[str, bool] = {}
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=len(PROCESS_PATTERNS)
+    ) as executor:
+        results = executor.map(probe, PROCESS_PATTERNS.items())
+    for key, rc, out in results:
         snapshot[key] = _parse_pgrep(out) if rc == 0 else []
-    return snapshot
+        # pgrep 0 is a positive observation and 1 is a valid current negative.
+        # Tool errors/timeouts are unavailable evidence, never "stopped".
+        observed[key] = rc in {0, 1}
+    return _ProcessSnapshot(snapshot, observed=observed)
 
 
 def _port_snapshot(run_probes: bool) -> dict[str, dict[str, Any]]:
     if not run_probes:
-        return {key: {"port": port, "listening": False, "evidence": ""} for key, port in PORTS.items()}
-    snapshot: dict[str, dict[str, Any]] = {}
-    for key, port in PORTS.items():
+        return {
+            key: {
+                "port": port,
+                "listening": False,
+                "evidence": "",
+                "observed": False,
+            }
+            for key, port in PORTS.items()
+        }
+    def probe(item: tuple[str, int]) -> tuple[str, int, int, str]:
+        key, port = item
         rc, out = _run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"], timeout=4)
+        return key, port, rc, out
+
+    snapshot: dict[str, dict[str, Any]] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(PORTS)) as executor:
+        results = executor.map(probe, PORTS.items())
+    for key, port, rc, out in results:
         snapshot[key] = {
             "port": port,
             "listening": rc == 0 and bool(out.strip()),
             "evidence": out.splitlines()[-1] if rc == 0 and out.splitlines() else "",
+            # lsof 1 means the requested listener is currently absent. Other
+            # nonzero codes are probe failures and cannot prove a stop.
+            "observed": rc in {0, 1},
         }
     return snapshot
+
+
+def _process_observation(
+    process_key: str,
+    processes: dict[str, list[dict[str, str]]],
+) -> str:
+    if processes.get(process_key):
+        return "positive"
+    observed = getattr(processes, "observed", None)
+    if isinstance(observed, dict):
+        return "negative" if observed.get(process_key) else "unavailable"
+    # Explicit caller-provided fixture rows are themselves current evidence;
+    # a missing key is not.
+    return "negative" if process_key in processes else "unavailable"
+
+
+def _port_observation(
+    process_key: str,
+    ports: dict[str, dict[str, Any]],
+) -> str:
+    if process_key not in PORTS:
+        return "not_applicable"
+    row = ports.get(process_key)
+    if row is None:
+        return "unavailable"
+    if row.get("listening"):
+        return "positive"
+    if "observed" in row:
+        return "negative" if row.get("observed") else "unavailable"
+    return "negative"
+
+
+def _live_if_process_or_port(
+    process_key: str,
+    processes: dict[str, list[dict[str, str]]],
+    ports: dict[str, dict[str, Any]],
+) -> str:
+    observations = [_process_observation(process_key, processes)]
+    port_observation = _port_observation(process_key, ports)
+    if port_observation != "not_applicable":
+        observations.append(port_observation)
+    if "positive" in observations:
+        return "live"
+    if observations and all(value == "negative" for value in observations):
+        return "stopped"
+    return "unknown"
+
+
+def _combined_port_status(
+    port_keys: tuple[str, ...],
+    ports: dict[str, dict[str, Any]],
+) -> str:
+    observations = [_port_observation(key, ports) for key in port_keys]
+    if observations and all(value == "positive" for value in observations):
+        return "live"
+    # A current negative on either required port proves the combined surface
+    # is not fully live. Probe failures alone remain unknown.
+    if "negative" in observations:
+        return "stopped"
+    return "unknown"
 
 
 def _tmux_sessions(run_probes: bool) -> list[str]:
@@ -238,6 +355,36 @@ def _tmux_sessions(run_probes: bool) -> list[str]:
     if rc != 0:
         return []
     return [line.split(":", 1)[0] for line in out.splitlines() if ":" in line]
+
+
+def _launchd_observation(label: str, run_probes: bool) -> dict[str, str]:
+    """Read one user LaunchAgent state without changing service lifecycle."""
+    if not run_probes:
+        return {"observation": "unknown", "evidence": "probe disabled"}
+    rc, out = _run(
+        ["launchctl", "print", f"gui/{os.getuid()}/{label}"],
+        timeout=4,
+    )
+    normalized = out.casefold()
+    if rc == 0:
+        observation = "live" if "state = running" in normalized else "stopped"
+    elif "could not find service" in normalized:
+        observation = "stopped"
+    else:
+        observation = "unknown"
+    evidence_lines = [line.strip() for line in out.splitlines() if line.strip()]
+    relevant = [
+        line
+        for line in evidence_lines
+        if "state =" in line.casefold()
+        or "runs =" in line.casefold()
+        or "last exit code =" in line.casefold()
+        or "could not find service" in line.casefold()
+    ]
+    return {
+        "observation": observation,
+        "evidence": "; ".join(relevant[:3]),
+    }
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -292,9 +439,26 @@ def _surface(
     human_authority_required: bool = False,
     vps_candidate: bool = False,
     raw: dict[str, Any] | None = None,
+    observation: str | None = None,
 ) -> dict[str, Any]:
     proc_rows = processes.get(process_key, []) if process_key and processes else []
     port = ports.get(process_key, {}) if process_key and ports else {}
+    process_observation = (
+        _process_observation(process_key, processes or {})
+        if process_key
+        else "not_applicable"
+    )
+    port_observation = (
+        _port_observation(process_key, ports or {})
+        if process_key
+        else "not_applicable"
+    )
+    if observation is None:
+        observation = (
+            _live_if_process_or_port(process_key, processes or {}, ports or {})
+            if process_key
+            else "not_applicable"
+        )
     return {
         "id": surface_id,
         "label": label,
@@ -308,6 +472,9 @@ def _surface(
         "pids": [row["pid"] for row in proc_rows],
         "port": port.get("port"),
         "port_listening": port.get("listening", False),
+        "observation": observation,
+        "process_observation": process_observation,
+        "port_observation": port_observation,
         "evidence": [item for item in evidence if item],
         "authority_refs": authority_refs,
         "restart_command": restart_command,
@@ -317,10 +484,6 @@ def _surface(
         "vps_candidate": vps_candidate,
         "raw": raw or {},
     }
-
-
-def _live_if_process_or_port(process_key: str, processes: dict[str, list[dict[str, str]]], ports: dict[str, dict[str, Any]]) -> str:
-    return "live" if processes.get(process_key) or ports.get(process_key, {}).get("listening") else "stopped"
 
 
 def build_live_ops_census(
@@ -334,16 +497,55 @@ def build_live_ops_census(
     """Return the live-ops census as a pure data structure."""
     root = Path(repo_root)
     state = Path(state_root).expanduser()
-    processes = processes if processes is not None else _process_snapshot(run_probes)
-    ports = ports if ports is not None else _port_snapshot(run_probes)
-    tmux = _tmux_sessions(run_probes)
+    if processes is None and ports is None and run_probes:
+        # Independent read-only probes run together so orientation preserves
+        # its <10 s contract even when one host command reaches its timeout.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            process_future = executor.submit(_process_snapshot, True)
+            port_future = executor.submit(_port_snapshot, True)
+            tmux_future = executor.submit(_tmux_sessions, True)
+            fugu_launchd_future = executor.submit(
+                _launchd_observation,
+                "com.dharma.fugu-ultra-semantic-responder",
+                True,
+            )
+            processes = process_future.result()
+            ports = port_future.result()
+            tmux = tmux_future.result()
+            fugu_launchd = fugu_launchd_future.result()
+    else:
+        processes = processes if processes is not None else _process_snapshot(run_probes)
+        ports = ports if ports is not None else _port_snapshot(run_probes)
+        tmux = _tmux_sessions(run_probes)
+        fugu_launchd = _launchd_observation(
+            "com.dharma.fugu-ultra-semantic-responder",
+            run_probes,
+        )
+    fugu_process_observation = _live_if_process_or_port(
+        "fugu_ultra_semantic_responder",
+        processes,
+        ports,
+    )
+    fugu_observation = (
+        fugu_process_observation
+        if fugu_process_observation == "live"
+        else str(fugu_launchd["observation"])
+        if fugu_launchd["observation"] in {"live", "stopped"}
+        else fugu_process_observation
+    )
 
     forge_heartbeat = state / "forge_reality_arena_master" / "codex_overnight_heartbeat.json"
     forge_handoff = state / "forge_reality_arena_master" / "shared" / "codex_overnight_handoff.md"
     forge_data = _read_json(forge_heartbeat)
     forge_freshness = str(forge_data.get("ts") or _iso_mtime(forge_heartbeat))
-    forge_live = bool(processes.get("forge_hydra"))
-    forge_status = "live" if forge_live else "stopped" if forge_heartbeat.exists() else "unknown"
+    forge_observation = _live_if_process_or_port("forge_hydra", processes, ports)
+    forge_status = (
+        forge_observation
+        if forge_observation != "unknown"
+        else "stale"
+        if forge_heartbeat.exists()
+        else "unknown"
+    )
 
     revenue_state = state / "state" / "revenue_wedge_last_state.json"
     revenue_data = _read_json(revenue_state)
@@ -355,15 +557,24 @@ def build_live_ops_census(
     agni_data = _read_json(agni_json)
     agni_freshness = str(agni_data.get("updated_at") or agni_data.get("ts") or _iso_mtime(agni_json))
     agni_age = _age_hours(agni_freshness) if agni_freshness else None
-    agni_status = "live" if processes.get("agni") else "stale" if agni_age is not None and agni_age > 6 else "blocked" if agni_json.exists() else "unknown"
+    agni_observation = _live_if_process_or_port("agni", processes, ports)
+    agni_status = (
+        agni_observation
+        if agni_observation != "unknown"
+        else "stale"
+        if agni_age is not None and agni_age > 6
+        else "blocked"
+        if agni_json.exists()
+        else "unknown"
+    )
 
     managed_tmux = {"dharma-control", "dharma-agents", "dharma-vps"}
     tmux_missing = sorted(managed_tmux - set(tmux))
     tmux_status = "live" if not tmux_missing and tmux else "stopped"
 
-    dashboard_live = (
-        ports.get("dashboard_api", {}).get("listening")
-        and ports.get("dashboard_web", {}).get("listening")
+    dashboard_status = _combined_port_status(
+        ("dashboard_api", "dashboard_web"),
+        ports,
     )
 
     sources = _authority_sources(root)
@@ -396,19 +607,26 @@ def build_live_ops_census(
             status=_live_if_process_or_port("dharma_daemon", processes, ports),
             desired_state="live",
             evidence=["port:7433", "/Users/dhyana/.dharma/logs/swarm.log"],
-            authority_refs=["docs/state/LIVE_OPS_DASHBOARD.md", "ACTIVE_SURFACE_MANIFEST.yaml"],
+            authority_refs=[
+                "docs/state/LIVE_OPS_DASHBOARD.md",
+                "ACTIVE_SURFACE_MANIFEST.yaml",
+                "https://github.com/AIKAGRYA/dharma_swarm/issues/1246",
+                "~/handoffs/2026-08-03_resurrection_runbook.md",
+            ],
             priority="p0",
             process_key="dharma_daemon",
             processes=processes,
             ports=ports,
-            restart_command="launchctl kickstart gui/$UID/com.dharma.swarm",
+            restart_command="operator executes ~/handoffs/2026-08-03_resurrection_runbook.md",
             stop_policy="do-not-stop-before-travel",
+            next_action="operator-only resurrection per issue #1246; agents must not run launchd",
+            human_authority_required=True,
         ),
         _surface(
             surface_id="substrate.dharma_cron",
             label="Dharma cron daemon",
             surface_class="substrate",
-            status="live" if processes.get("dharma_cron") else "stopped",
+            status=_live_if_process_or_port("dharma_cron", processes, ports),
             desired_state="live",
             evidence=["dharma_swarm.dgc_cli cron daemon"],
             authority_refs=["scripts/governance/agent_onboard.py", "docs/governance/ACTIVE_TRACK.yaml"],
@@ -438,7 +656,7 @@ def build_live_ops_census(
             surface_id="transport.a2a_bridge",
             label="NATS A2A bridge",
             surface_class="substrate",
-            status="live" if processes.get("nats_a2a_bridge") else "stopped",
+            status=_live_if_process_or_port("nats_a2a_bridge", processes, ports),
             desired_state="live",
             evidence=["dharma_swarm.operator_core.nats_a2a_bridge"],
             authority_refs=["docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
@@ -519,7 +737,7 @@ def build_live_ops_census(
             surface_id="dashboard.local",
             label="Dashboard API and web",
             surface_class="dashboard",
-            status="live" if dashboard_live else "stopped",
+            status=dashboard_status,
             desired_state="live",
             evidence=["127.0.0.1:8420", "127.0.0.1:3420", "scripts/dashboard_ctl.sh status"],
             authority_refs=["ACTIVE_SURFACE_MANIFEST.yaml", "docs/governance/CANONICAL_DOC_STACK.md"],
@@ -527,6 +745,7 @@ def build_live_ops_census(
             process_key="dashboard_api",
             processes=processes,
             ports=ports,
+            observation=dashboard_status,
             restart_command="bash scripts/dashboard_ctl.sh start",
             stop_policy="safe-to-restart-for-dashboard-work",
         ),
@@ -561,6 +780,7 @@ def build_live_ops_census(
             stop_policy="restart-only-after-reading-latest-handoff",
             next_action="read handoff before restart",
             raw={"heartbeat": forge_data},
+            observation=forge_observation,
         ),
         _surface(
             surface_id="revenue.cashclaw_gate",
@@ -600,12 +820,13 @@ def build_live_ops_census(
             human_authority_required=True,
             vps_candidate=True,
             raw={"agni": agni_data},
+            observation=agni_observation,
         ),
         _surface(
             surface_id="agent.merge_master_mike",
             label="Merge Master Mike",
             surface_class="mission",
-            status="live" if processes.get("merge_master_mike") else "stopped",
+            status=_live_if_process_or_port("merge_master_mike", processes, ports),
             desired_state="operator-mediated",
             evidence=["scripts/runtime/merge_master_mike_daemon.py"],
             authority_refs=["docs/ops/PR_REVIEW_CONTROL.md", "docs/governance/COHERENCE_DELTA.md"],
@@ -622,7 +843,7 @@ def build_live_ops_census(
             surface_id="terminal.tui",
             label="Terminal TUI",
             surface_class="terminal",
-            status="live" if processes.get("terminal_tui") else "stopped",
+            status=_live_if_process_or_port("terminal_tui", processes, ports),
             desired_state="optional-cockpit",
             evidence=["scripts/status_terminal_tui_tmux.sh", "scripts/runtime/terminal_tui_interaction_smoke.py"],
             authority_refs=["docs/ops/TMUX_AGENT_SUBSTRATE.md", "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md"],
@@ -638,7 +859,7 @@ def build_live_ops_census(
             surface_id="load.colima_openclaw",
             label="Colima / OpenClaw VM",
             surface_class="heavy",
-            status="live" if processes.get("colima_openclaw") else "stopped",
+            status=_live_if_process_or_port("colima_openclaw", processes, ports),
             desired_state="operator-choice",
             evidence=["colima-openclaw-secure", "qemu-system-aarch64"],
             authority_refs=["docs/ops/LIVE_OPS_COCKPIT.md"],
@@ -650,6 +871,37 @@ def build_live_ops_census(
             stop_policy="safe-to-stop-if-not-using-openclaw",
             next_action="stop for battery/flight if not needed",
             human_authority_required=True,
+        ),
+        _surface(
+            surface_id="agent.fugu_ultra_semantic_responder",
+            label="Fugu Ultra semantic responder",
+            surface_class="mission",
+            status=fugu_observation,
+            desired_state="operator-owned-deployed-state",
+            evidence=[
+                str(
+                    Path.home()
+                    / "Library/LaunchAgents/com.dharma.fugu-ultra-semantic-responder.plist"
+                ),
+                "scripts/runtime/fugu_ultra_semantic_responder.py",
+            ],
+            authority_refs=[
+                "docs/state/BROKEN_REGISTER.md",
+                "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
+            ],
+            priority="p1",
+            process_key="fugu_ultra_semantic_responder",
+            processes=processes,
+            ports=ports,
+            observation=fugu_observation,
+            stop_policy="do-not-resurrect-an-absent-runtime-implementation",
+            next_action="operator owns retirement of any stale installed service",
+            raw={
+                "implementation_exists": (
+                    root / "scripts/runtime/fugu_ultra_semantic_responder.py"
+                ).exists(),
+                "launchd": fugu_launchd,
+            },
         ),
     ]
 

@@ -28,7 +28,6 @@ if str(REPO_ROOT) not in sys.path:
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
     DEFAULT_OUTBOX_ROOT,
-    DEFAULT_RECEIPT_DIR as DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
     load_domain_reply_target,
     publish_domain_reply_with_nats,
 )
@@ -36,6 +35,7 @@ from scripts.runtime.codex_composer_semantic_inbox_drain import (  # noqa: E402
     DEFAULT_ARTIFACT_RECEIPT_DIR,
     DEFAULT_DRAIN_RECEIPT_DIR,
     DEFAULT_SEMANTIC_RECEIPT_DIR,
+    DEFAULT_SEMANTIC_RESPONDER_STATE_DIR,
     drain_semantic_inbox,
 )
 from scripts.runtime.pr_merge_control import _nats_config, stamp, utc_now  # noqa: E402
@@ -44,13 +44,8 @@ DEFAULT_AGENT_UID = "codex_composer"
 DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
 DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
-DEFAULT_STATE_DIR = (
-    DEFAULT_DHARMA_HOME
-    / "external_agents"
-    / DEFAULT_AGENT_UID
-    / "nest"
-    / "semantic_responder"
-)
+DEFAULT_STATE_DIR = DEFAULT_SEMANTIC_RESPONDER_STATE_DIR
+DEFAULT_DOMAIN_REPLY_RECEIPT_DIR = DEFAULT_STATE_DIR / "domain_reply_receipts"
 DEFAULT_CANONICAL_STATE_PATH = (
     DEFAULT_DHARMA_HOME / "a2a_bus" / "state" / f"{DEFAULT_AGENT_UID}.json"
 )
