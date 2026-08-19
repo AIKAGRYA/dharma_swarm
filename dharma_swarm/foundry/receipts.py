@@ -62,11 +62,16 @@ def benchmark_link(
 
 
 def disclosure_link(*, ai_assisted: bool = True, duplicate_checked: bool = True,
-                    test_results: str = "") -> dict[str, Any]:
-    """Link 3: the mandatory AI-assist disclosure + duplicate-check evidence."""
+                    test_results: str = "", diff_sha256: str = "") -> dict[str, Any]:
+    """Link 3: the mandatory AI-assist disclosure + duplicate-check evidence.
+
+    ``diff_sha256`` pins the exact candidate payload the receipt is about, so
+    a third party can match the receipt to the artifact byte-for-byte.
+    """
     return {
         "link": "disclosure", "ai_assisted": ai_assisted,
         "duplicate_checked": duplicate_checked, "test_results": test_results,
+        "diff_sha256": diff_sha256,
     }
 
 
