@@ -371,6 +371,7 @@ class MemoryWritePolicy:
 
 def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
     return (
+        ReviewedWriteBaselineEntry('scripts/forge/sample_swebench_instances.py', 'main', 'path_write', 'f4b52e12cb6d', 'generated_artifact', occurrences=2),
         ReviewedWriteBaselineEntry('dharma_swarm/active_inference.py', 'ActiveInferenceEngine._log_prediction_error', 'path_open_write', '55d048f783d0', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/agent_install.py', 'execute_install_plan', 'path_write', '9c658af64661', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/artifact_manifest.py', 'ArtifactManifestStore.write_manifest', 'path_write', 'b276c0a735d8', 'generated_artifact', occurrences=1),
