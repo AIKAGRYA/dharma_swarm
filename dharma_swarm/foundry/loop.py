@@ -57,6 +57,7 @@ class GenerationReport:
     ring2_checked: int = 0
     ring2_survivors: int = 0
     survival_rates: list[float] = field(default_factory=list)
+    trip_reasons: dict[str, int] = field(default_factory=dict)
 
     def mean_survival(self) -> float:
         return sum(self.survival_rates) / len(self.survival_rates) if self.survival_rates else 0.0
@@ -74,6 +75,10 @@ class FoundryLoop:
     per_generation: int = 6
     timing_floor_s: float = 0.0
     survival_threshold: float = 0.5
+    # A win must BEAT this raw-score floor (set to the measured baseline so a
+    # candidate that merely reproduces the original program is not a trophy —
+    # the deepseek zero-delta receipt of 2026-08-19 is the lesson).
+    win_floor: float = 0.0
     budget: MutationBudget = field(default_factory=MutationBudget)
     descriptor_fn: DescriptorFn = _default_descriptor
     grid: EliteGrid = field(default_factory=EliteGrid)
@@ -121,7 +126,9 @@ class FoundryLoop:
             fitness, _, fired = self._ring1(candidate, seed=generation)
             if fired:
                 report.tripwire_trips += 1
-            if fitness > 0:
+                for reason in fired:
+                    report.trip_reasons[reason] = report.trip_reasons.get(reason, 0) + 1
+            if fitness > self.win_floor:
                 report.ring1_wins += 1
                 if self.grid.add(self.descriptor_fn(candidate), candidate.candidate_id,
                                  fitness, {"origin_model": model.id}):

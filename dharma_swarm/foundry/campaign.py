@@ -61,6 +61,8 @@ class CampaignResult:
     receipt_ids: list[str] = field(default_factory=list)
     started_at: str = ""
     finished_at: str = ""
+    trip_reasons: dict[str, int] = field(default_factory=dict)
+    artifact_paths: list[str] = field(default_factory=list)
 
 
 def run_campaign(
@@ -92,8 +94,21 @@ def run_campaign(
 
     survival_by_candidate: dict[str, HeldoutOutcome] = {}
 
+    def _persist_artifact(candidate: Candidate, diff_sha: str) -> None:
+        """A receipt without its artifact is unshippable (the kimi-k3-5003
+        lesson, 2026-08-19: a +0.102 receipt whose diff was lost). Survivor
+        diffs are persisted keyed by their sha so every receipt can be
+        re-verified byte-for-byte."""
+        root = (Path(state_root) if state_root else Path.home() / ".dharma" / "foundry") / "artifacts"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"{diff_sha}.patch"
+        path.write_text(candidate.diff, encoding="utf-8")
+        result.artifact_paths.append(str(path))
+
     def _on_survivor(candidate: Candidate, fitness: float, outcome: HeldoutOutcome) -> None:
         survival_by_candidate[candidate.candidate_id] = outcome
+        diff_sha = hashlib.sha256(candidate.diff.encode("utf-8")).hexdigest()
+        _persist_artifact(candidate, diff_sha)
         receipt = FoundryReceipt(
             receipt_id=f"{spec.id}-{candidate.candidate_id}",
             target_id=spec.id,
@@ -119,7 +134,7 @@ def run_campaign(
             disclosure=disclosure_link(
                 ai_assisted=True, duplicate_checked=True,
                 test_results=f"ring-2 survival_rate={outcome.survival_rate:.3f}",
-                diff_sha256=hashlib.sha256(candidate.diff.encode("utf-8")).hexdigest(),
+                diff_sha256=diff_sha,
             ),
         )
         write_receipt(receipt, state_root=(Path(state_root) / "receipts") if state_root else None)
@@ -137,6 +152,9 @@ def run_campaign(
         budget=MutationBudget(cap_usd=config.budget_cap_usd),
         state_root=state_root,
         on_survivor=_on_survivor,
+        # A "win" must beat the measured baseline, not merely score > 0 —
+        # reproducing the original program is not an improvement.
+        win_floor=config.baseline_metric,
     )
 
     reports = loop.run(config.generations)
@@ -144,6 +162,9 @@ def run_campaign(
     result.proposed = sum(r.proposed for r in reports)
     result.ring1_wins = sum(r.ring1_wins for r in reports)
     result.tripwire_trips = sum(r.tripwire_trips for r in reports)
+    for r in reports:
+        for reason, n in r.trip_reasons.items():
+            result.trip_reasons[reason] = result.trip_reasons.get(reason, 0) + n
     result.ring2_checked = sum(r.ring2_checked for r in reports)
     result.ring2_survivors = sum(r.ring2_survivors for r in reports)
     result.spend_usd = round(sum(r.spend_usd for r in reports), 6)
