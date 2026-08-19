@@ -42,6 +42,13 @@ def _utc() -> datetime:
 
 
 @pytest.fixture()
+def ci_host(monkeypatch):
+    """Runner refuse is real; tests of record/resolve/publish must not
+    trip it just because the pytest process happens to sit on megha."""
+    monkeypatch.setattr(l0.socket, "gethostname", lambda: "ginko-l0-ci")
+
+
+@pytest.fixture()
 def ginko_store(tmp_path, monkeypatch):
     """Point the ginko_brier persistence at an isolated temp store."""
     gdir = tmp_path / "ginko"
@@ -172,7 +179,7 @@ def test_parse_probabilities_rejects_gaps_and_bounds():
 
 
 async def test_model_failure_exits_nonzero_and_records_nothing(
-    ginko_store, fake_repo, tmp_path, monkeypatch
+    ci_host, ginko_store, fake_repo, tmp_path, monkeypatch
 ):
     _patch_fetchers(
         monkeypatch,
@@ -198,7 +205,7 @@ async def test_model_failure_exits_nonzero_and_records_nothing(
 
 
 async def test_preexisting_banned_import_is_tolerated_but_new_ones_are_not(
-    ginko_store, fake_repo, tmp_path, monkeypatch
+    ci_host, ginko_store, fake_repo, tmp_path, monkeypatch
 ):
     """Regression: the CI full suite shares one interpreter, so unrelated
     tests legitimately import BR-007 modules before this file runs. The belt
@@ -335,6 +342,57 @@ async def test_resolver_calls_resolve_prediction_on_matured(
     assert by_id[no.id].outcome == 0.0
     assert by_id[legacy.id].outcome is None, "no rule -> never guessed"
     assert by_id[pending.id].outcome is None, "unmatured stays open"
+
+
+def test_compare_gt_lt_unknown():
+    assert l0._compare(4.5, "gt", 4.0) == 1.0
+    assert l0._compare(4.0, "gt", 4.0) == 0.0
+    assert l0._compare(3.9, "lt", 4.0) == 1.0
+    assert l0._compare(4.1, "lt", 4.0) == 0.0
+    assert l0._compare(4.0, "eq", 4.0) is None
+
+
+async def test_resolve_only_records_nothing_new(
+    ci_host, ginko_store, fake_repo, tmp_path, monkeypatch
+):
+    past = (_utc() - timedelta(days=1)).isoformat()
+    pred = gb.record_prediction(
+        question="DGS10 above 4.0?",
+        probability=0.7,
+        resolve_by=past,
+        category="macro",
+        source="test",
+        metadata={
+            "resolution": {
+                "source": "fred",
+                "series": "DGS10",
+                "comparator": "gt",
+                "threshold": 4.0,
+            }
+        },
+    )
+    _patch_fetchers(monkeypatch, {"DGS10": 4.5}, {"bitcoin": 65000.0})
+    monkeypatch.setattr(l0, "which", lambda name: None)
+
+    called = {"model": False}
+
+    async def boom(questions, model, now):
+        called["model"] = True
+        raise AssertionError("resolve-only must not call the model")
+
+    monkeypatch.setattr(l0, "model_probabilities", boom)
+    grant = _write_grant(tmp_path / "GRANT.json")
+    args = _args(grant, fake_repo, tmp_path / "receipt.json", resolve_only=True)
+    assert await l0.main_async(args) == 0
+    assert called["model"] is False
+    rows = gb._load_all_predictions()
+    assert len(rows) == 1
+    assert rows[0].id == pred.id
+    assert rows[0].outcome == 1.0
+    receipt = json.loads((tmp_path / "receipt.json").read_text(encoding="utf-8"))
+    assert receipt["n_new"] == 0
+    assert receipt["n_resolved"] == 1
+    assert receipt["valid"] is True
 
 
 async def test_resolver_skips_when_actual_unavailable(ginko_store, monkeypatch):
@@ -484,7 +542,7 @@ def test_kill_hit_reads_real_dashboard_field_names(ginko_store):
 
 
 async def test_full_run_records_model_probabilities(
-    ginko_store, fake_repo, tmp_path, monkeypatch
+    ci_host, ginko_store, fake_repo, tmp_path, monkeypatch
 ):
     _patch_fetchers(
         monkeypatch,
@@ -537,7 +595,14 @@ async def test_full_run_records_model_probabilities(
     )
 
 
-async def test_grant_universe_mismatch_refused(tmp_path, fake_repo):
+def test_refuse_megha_host(monkeypatch):
+    monkeypatch.setattr(l0.socket, "gethostname", lambda: "meghadharma-cloud")
+    with pytest.raises(SystemExit) as excinfo:
+        l0.refuse_host()
+    assert excinfo.value.code == 2
+
+
+async def test_grant_universe_mismatch_refused(ci_host, tmp_path, fake_repo):
     grant = _write_grant(
         tmp_path / "GRANT.json",
         allowed_universes=[
