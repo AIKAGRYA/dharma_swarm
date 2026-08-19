@@ -53,13 +53,19 @@ SIZE_BUCKETS = (("S", 10), ("M", 40), ("L", None))  # S: <=10, M: 11..40, L: >40
 DEFAULT_OUT_DIR = REPO_ROOT / "reports" / "governance" / "forge_benchmark"
 
 FETCH_INSTRUCTIONS = """\
-Cannot sample: the `datasets` library is unavailable and no --listing file was
-given. This sampler NEVER fabricates instance ids. To proceed, either:
-  1) pip install datasets            # then re-run this command; or
-  2) on any connected machine run:
-       python3 scripts/forge/sample_swebench_instances.py \\
-           --n 50 --seed <seed> --dump-listing swebench_verified_listing.json
-     copy the listing JSON here, and re-run with --listing <path>.
+Cannot sample: no --listing file was given, and this repo's code performs no
+network dataset fetch by design (`datasets` is a benchmark-box dependency,
+installed by scripts/runpod_swebench_setup.sh, deliberately undeclared in the
+repo's import-provenance surface). This sampler NEVER fabricates instance ids.
+
+On the connected benchmark box, produce the listing with:
+
+  python3 -c "import json,sys; from datasets import load_dataset; \\
+ds=load_dataset('princeton-nlp/SWE-bench_Verified',split='test'); \\
+json.dump({'instances':[{'instance_id':r['instance_id'],'repo':r['repo'], \\
+'patch':r['patch']} for r in ds]},open('swebench_verified_listing.json','w'))"
+
+then re-run this command with --listing swebench_verified_listing.json.
 """
 
 
@@ -258,26 +264,18 @@ def load_listing_file(path: Path) -> list[dict]:
 
 
 def load_rows_from_datasets() -> tuple[list[dict], str]:
-    """Load the listing through the HF ``datasets`` library (network or local
-    HF cache). Raises DatasetUnavailable when the library is not importable or
-    the dataset cannot be loaded; the caller degrades to instructions."""
-    try:
-        from datasets import load_dataset
-    except ImportError as exc:
-        raise DatasetUnavailable(f"datasets not importable: {exc}") from exc
-    try:
-        ds = load_dataset(DATASET_NAME, split=SPLIT)
-    except Exception as exc:  # offline / cache miss / auth — degrade, never fake
-        raise DatasetUnavailable(f"load_dataset failed: {exc}") from exc
-    rows = normalize_rows(
-        [
-            {"instance_id": r["instance_id"], "repo": r["repo"], "patch": r["patch"]}
-            for r in ds
-        ]
+    """Always raises DatasetUnavailable: in-repo code performs no network
+    dataset fetch. The `datasets` dependency is benchmark-box-only (installed
+    by scripts/runpod_swebench_setup.sh) and deliberately undeclared in the
+    repo's import-provenance surface, so importing it here would trip the
+    third-party declaration ratchet. The connected box produces the listing
+    with the one-liner in FETCH_INSTRUCTIONS; sampling then runs offline via
+    --listing. Kept as a named seam so a future declared dependency can
+    restore in-process fetch without touching main()."""
+    raise DatasetUnavailable(
+        "in-repo dataset fetch is disabled by design; use --listing "
+        "(see instructions below)"
     )
-    version = str(getattr(getattr(ds, "info", None), "version", "") or "unknown")
-    fingerprint = str(getattr(ds, "_fingerprint", "") or "unknown")
-    return rows, f"version={version} fingerprint={fingerprint}"
 
 
 def main(argv: list[str] | None = None) -> int:

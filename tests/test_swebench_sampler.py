@@ -176,5 +176,5 @@ def test_main_degrades_to_instructions_when_datasets_unavailable(
     assert rc == 3
     assert not out.exists()  # never fakes a sample
     err = capsys.readouterr().err
-    assert "pip install datasets" in err
+    assert "--listing swebench_verified_listing.json" in err
     assert "--listing" in err
