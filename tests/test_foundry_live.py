@@ -159,3 +159,12 @@ def test_receipts_form_verifiable_hash_chain(tmp_path):
     ok, detail = live.verify_live_chain(tmp_path)
     assert not ok
     assert "tampered" in detail or "chain break" in detail
+
+
+def test_http_json_rejects_non_https_url():
+    import pytest
+    from dharma_swarm.foundry.live import _http_json
+    with pytest.raises(ValueError, match="Only HTTPS URLs are permitted"):
+        _http_json("http://example.com/api", "key")
+    with pytest.raises(ValueError, match="Only HTTPS URLs are permitted"):
+        _http_json("file:///etc/passwd", "key")
