@@ -77,3 +77,14 @@ def test_timeout_is_captured():
         docker_ok=False, runner=timeout_runner,
     )
     assert result.timed_out
+
+
+def test_as_bash_preserves_nested_quoting():
+    # Regression: a naive space-join ran `cd` bare and the payload from the
+    # wrong directory (first megha smoke, 2026-08-19).
+    from dharma_swarm.foundry.runner_isolation import _as_bash
+
+    cmd = ["bash", "-c", 'cd examples/x && python -c "import evaluator; print(1)"']
+    rendered = _as_bash(cmd)
+    assert "'cd examples/x && python -c \"import evaluator; print(1)\"'" in rendered
+    assert _as_bash("already a string") == "already a string"

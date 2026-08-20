@@ -15,6 +15,7 @@ Docker CLI) so it stays importable and testable without the heavy stack.
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -35,6 +36,12 @@ class IsolationPolicy:
     cpu_limit: float = 2.0
     allow_degraded: bool = True  # explore degraded; promotion still blocked below
     docker_image: str = "python:3.11-slim"
+    # Read-only workdir: mounts /work as :ro with a writable tmpfs at /tmp, so
+    # the running candidate cannot rewrite tests/oracle files mid-run. Suites
+    # that must write inside their tree can't run under this; the evaluator
+    # falls back to rw + post-run tamper digest (detection instead of
+    # prevention) and records which mode actually ran.
+    readonly_workdir: bool = False
 
 
 @dataclass(frozen=True)
@@ -65,9 +72,15 @@ def docker_available(runner: Callable[..., subprocess.CompletedProcess] = subpro
 
 
 def _as_bash(cmd: Sequence[str] | str) -> str:
+    """Render a command for ``bash -c`` INSIDE the container.
+
+    Lists must be re-quoted with shlex — a naive space-join destroys nested
+    quoting (e.g. ``["bash", "-c", "cd x && python -c \"...\""]`` would run
+    ``cd`` bare and the payload from the wrong directory).
+    """
     if isinstance(cmd, str):
         return cmd
-    return " ".join(cmd)
+    return shlex.join(cmd)
 
 
 def run_isolated(
@@ -96,16 +109,20 @@ def run_isolated(
 
 
 def _run_docker(cmd, workdir, policy, runner) -> RunResult:
+    mount = f"{workdir}:/work:ro" if policy.readonly_workdir else f"{workdir}:/work"
     docker_cmd = [
         "docker", "run", "--rm",
         "--network", "none" if policy.network_disabled else "bridge",
         "--memory", policy.memory_limit,
         f"--cpus={policy.cpu_limit}",
-        "-v", f"{workdir}:/work",
+        "-v", mount,
         "-w", "/work",
-        policy.docker_image,
-        "bash", "-c", _as_bash(cmd),
     ]
+    if policy.readonly_workdir:
+        # Writable scratch lives only inside the container, never on the host tree.
+        docker_cmd += ["--tmpfs", "/tmp:rw,size=512m", "-e", "TMPDIR=/tmp",
+                       "-e", "PYTHONDONTWRITEBYTECODE=1"]
+    docker_cmd += [policy.docker_image, "bash", "-c", _as_bash(cmd)]
     return _invoke(docker_cmd, None, policy, runner, IsolationLevel.DOCKER_NONET)
 
 

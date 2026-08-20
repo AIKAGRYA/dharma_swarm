@@ -1,0 +1,100 @@
+"""Tests for the real proposer — prompt -> diff -> verified-to-apply, hermetic."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from dharma_swarm.foundry.army import ArmyModel
+from dharma_swarm.foundry.real_proposer import (
+    check_applies,
+    extract_unified_diff,
+    real_proposer,
+)
+from dharma_swarm.foundry.tripwires import scan_tripwires
+
+MODEL = ArmyModel("test-model", "mass", "test", free=True)
+
+GOOD_DIFF = (
+    "--- a/prog.py\n+++ b/prog.py\n@@ -1 +1 @@\n-VALUE = 1.0\n+VALUE = 2.0\n"
+)
+
+
+def _tree(tmp_path: Path) -> Path:
+    root = tmp_path / "pinned"
+    root.mkdir()
+    (root / "prog.py").write_text("VALUE = 1.0\n", encoding="utf-8")
+    return root
+
+
+def test_extract_fenced_diff():
+    reply = f"Here's my improvement:\n```diff\n{GOOD_DIFF}```\nHope it helps!"
+    assert extract_unified_diff(reply).startswith("--- a/prog.py")
+
+
+def test_extract_bare_diff_and_prose_trimmed():
+    reply = f"I suggest the following change.\n{GOOD_DIFF}"
+    extracted = extract_unified_diff(reply)
+    assert extracted.startswith("--- a/prog.py")
+    assert "I suggest" not in extracted
+
+
+def test_extract_no_diff_returns_empty():
+    assert extract_unified_diff("I cannot produce a diff, sorry.") == ""
+
+
+def test_proposer_returns_applying_candidate(tmp_path):
+    root = _tree(tmp_path)
+    propose = real_proposer(
+        target_id="t", pinned_root=root, evolve_file="prog.py",
+        objective="maximize VALUE",
+        caller=lambda model, prompt: f"```diff\n{GOOD_DIFF}```",
+    )
+    cand = propose(MODEL, None, 7)
+    assert cand.diff.startswith("--- a/prog.py")
+    assert check_applies(root, cand.diff) is None
+    assert cand.origin_model == "test-model"
+    assert cand.candidate_id == "test-model-7"
+
+
+def test_proposer_retries_with_feedback_then_fails_safe(tmp_path):
+    root = _tree(tmp_path)
+    prompts: list[str] = []
+
+    def bad_caller(model, prompt):
+        prompts.append(prompt)
+        return "no diff here at all"
+
+    propose = real_proposer(
+        target_id="t", pinned_root=root, evolve_file="prog.py",
+        objective="maximize VALUE", caller=bad_caller,
+    )
+    cand = propose(MODEL, None, 1)
+    assert len(prompts) == 2  # one retry
+    assert "FAILED TO APPLY" in prompts[1]
+    assert cand.diff == ""
+    assert cand.metadata.get("proposer_failed")
+    # The failed candidate is neutralized by ring 1, not by trust:
+    assert "no_op_diff" in scan_tripwires(cand, allowed_paths=["prog.py"]).fired
+
+
+def test_proposer_survives_dead_lane(tmp_path):
+    root = _tree(tmp_path)
+
+    def dead_caller(model, prompt):
+        raise ConnectionError("lane down")
+
+    propose = real_proposer(
+        target_id="t", pinned_root=root, evolve_file="prog.py",
+        objective="maximize VALUE", caller=dead_caller,
+    )
+    cand = propose(MODEL, None, 2)
+    assert cand.diff == ""
+    assert cand.metadata.get("proposer_error") == "ConnectionError"
+
+
+def test_stale_context_diff_fails_apply_check(tmp_path):
+    root = _tree(tmp_path)
+    stale = (
+        "--- a/prog.py\n+++ b/prog.py\n@@ -1 +1 @@\n-VALUE = 999.0\n+VALUE = 2.0\n"
+    )
+    assert check_applies(root, stale) is not None

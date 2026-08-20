@@ -14,6 +14,7 @@ any external dependency, model key, or network.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -60,6 +61,8 @@ class CampaignResult:
     receipt_ids: list[str] = field(default_factory=list)
     started_at: str = ""
     finished_at: str = ""
+    trip_reasons: dict[str, int] = field(default_factory=dict)
+    artifact_paths: list[str] = field(default_factory=list)
 
 
 def run_campaign(
@@ -71,16 +74,41 @@ def run_campaign(
     config: CampaignConfig | None = None,
     counterparty: str = "",
     state_root: Path | None = None,
+    tree_digest: str = "sha256:UNPINNED",
+    resolved_sha: str = "",
+    isolation_level: str = "local_restricted",
 ) -> CampaignResult:
-    """Run a bounded campaign against ``spec`` and mint ring-1/2 receipts."""
+    """Run a bounded campaign against ``spec`` and mint ring-1/2 receipts.
+
+    Receipt integrity rule: ``tree_digest``, ``resolved_sha``, and
+    ``isolation_level`` are recorded EXACTLY as passed by the caller — the
+    caller must pass what actually happened (e.g. the ``PinnedTarget`` digest
+    and the evaluator's measured isolation level). The defaults are loudly
+    honest placeholders, never claims: a receipt saying UNPINNED /
+    local_restricted is admissible only as lab-local evidence and can never
+    feed ring 3.
+    """
     assert_contributable(spec)  # refuse do-not-touch / AI-banned targets
     config = config or CampaignConfig()
     result = CampaignResult(target_id=spec.id, started_at=datetime.now(timezone.utc).isoformat())
 
     survival_by_candidate: dict[str, HeldoutOutcome] = {}
 
+    def _persist_artifact(candidate: Candidate, diff_sha: str) -> None:
+        """A receipt without its artifact is unshippable (the kimi-k3-5003
+        lesson, 2026-08-19: a +0.102 receipt whose diff was lost). Survivor
+        diffs are persisted keyed by their sha so every receipt can be
+        re-verified byte-for-byte."""
+        root = (Path(state_root) if state_root else Path.home() / ".dharma" / "foundry") / "artifacts"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"{diff_sha}.patch"
+        path.write_text(candidate.diff, encoding="utf-8")
+        result.artifact_paths.append(str(path))
+
     def _on_survivor(candidate: Candidate, fitness: float, outcome: HeldoutOutcome) -> None:
         survival_by_candidate[candidate.candidate_id] = outcome
+        diff_sha = hashlib.sha256(candidate.diff.encode("utf-8")).hexdigest()
+        _persist_artifact(candidate, diff_sha)
         receipt = FoundryReceipt(
             receipt_id=f"{spec.id}-{candidate.candidate_id}",
             target_id=spec.id,
@@ -93,19 +121,20 @@ def run_campaign(
                 transfer="not yet merged/recorded upstream",
             ),
             pre_registration=pre_registration_link(
-                target_id=spec.id, resolved_sha=spec.sha or "unpinned",
-                tree_digest="sha256:pending-ingest", baseline_metric=config.baseline_metric,
+                target_id=spec.id, resolved_sha=resolved_sha or spec.sha or "unpinned",
+                tree_digest=tree_digest, baseline_metric=config.baseline_metric,
                 oracle_cmd=spec.oracle_cmd, seed=0,
             ),
             benchmark=benchmark_link(
                 baseline_metric=config.baseline_metric, candidate_metric=fitness,
                 runs=1 + len(outcome.workloads),
                 coefficient_of_variation=0.0, repro_cmd=spec.oracle_cmd,
-                isolation_level="docker_nonet",
+                isolation_level=isolation_level,
             ),
             disclosure=disclosure_link(
                 ai_assisted=True, duplicate_checked=True,
                 test_results=f"ring-2 survival_rate={outcome.survival_rate:.3f}",
+                diff_sha256=diff_sha,
             ),
         )
         write_receipt(receipt, state_root=(Path(state_root) / "receipts") if state_root else None)
@@ -123,6 +152,9 @@ def run_campaign(
         budget=MutationBudget(cap_usd=config.budget_cap_usd),
         state_root=state_root,
         on_survivor=_on_survivor,
+        # A "win" must beat the measured baseline, not merely score > 0 —
+        # reproducing the original program is not an improvement.
+        win_floor=config.baseline_metric,
     )
 
     reports = loop.run(config.generations)
@@ -130,6 +162,9 @@ def run_campaign(
     result.proposed = sum(r.proposed for r in reports)
     result.ring1_wins = sum(r.ring1_wins for r in reports)
     result.tripwire_trips = sum(r.tripwire_trips for r in reports)
+    for r in reports:
+        for reason, n in r.trip_reasons.items():
+            result.trip_reasons[reason] = result.trip_reasons.get(reason, 0) + n
     result.ring2_checked = sum(r.ring2_checked for r in reports)
     result.ring2_survivors = sum(r.ring2_survivors for r in reports)
     result.spend_usd = round(sum(r.spend_usd for r in reports), 6)
@@ -183,4 +218,6 @@ def dry_run_campaign(
         config=config,
         counterparty=spec.name,
         state_root=state_root,
+        tree_digest="sha256:HERMETIC-DRY-RUN",
+        isolation_level="hermetic_dry",  # nothing executed; never claim docker
     )

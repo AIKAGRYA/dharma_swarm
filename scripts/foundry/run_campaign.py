@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Operator entrypoint for Sublimation Foundry campaigns.
 
-Two subcommands:
+Subcommands:
 
     preflight <target>   Report readiness: isolation, provider keys, budget.
-    dry-run  <target>    Run the loop hermetically (no keys/network) and print
+    dry-run   <target>   Run the loop hermetically (no keys/network) and print
                          the campaign result as JSON — proves the pipeline.
+    run-real  <target>   The REAL campaign: pin the target, baseline its own
+                         oracle under isolation, run the live army, mint
+                         receipts whose digests/isolation are measured, never
+                         asserted. Docker required for promotion-grade runs.
+    metrics / guardian / report-card — standing kill-metrics and receipt views.
 
-Live generation (the army calling real models against a pinned external target)
-runs from the foundry-lane workflow once provider keys are set as Cloud Agent
-secrets; see docs/foundry/OPERATOR_UNBLOCKS.md. This script never merges, never
-sends anything external, and never trades.
+This script never merges, never sends anything external, and never trades.
 """
 
 from __future__ import annotations
@@ -91,6 +93,105 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_real(args: argparse.Namespace) -> int:
+    """The REAL campaign: pin the target, baseline its oracle, run the army.
+
+    Everything the receipts assert is measured here: the pinned tree digest,
+    the resolved SHA, the actual isolation level, and metered proposer spend.
+    Without Docker the run is degraded (explore-only, promotion blocked) and
+    requires --allow-degraded to proceed.
+    """
+    from pathlib import Path
+
+    from dharma_swarm.foundry.campaign import run_campaign  # noqa: PLC0415
+    from dharma_swarm.foundry.live import estimate_cost_usd  # noqa: PLC0415
+    from dharma_swarm.foundry.oracle_evaluator import (  # noqa: PLC0415
+        OracleEvaluator,
+        sentinel_metrics_parser,
+    )
+    from dharma_swarm.foundry.real_proposer import real_proposer  # noqa: PLC0415
+    from dharma_swarm.foundry.runner_isolation import IsolationPolicy  # noqa: PLC0415
+    from dharma_swarm.foundry.target_ingest import ingest  # noqa: PLC0415
+
+    spec = _resolve(args.target)
+    assert_contributable(spec)
+
+    docker_ok = docker_available()
+    if not docker_ok and not args.allow_degraded:
+        raise SystemExit(
+            "docker (--network none) unavailable: promotion would be impossible. "
+            "Pass --allow-degraded to explore anyway (ring 2/3 stays blocked)."
+        )
+
+    local_source = Path(args.local_source) if args.local_source else None
+    pinned = ingest(spec, local_source=local_source)
+
+    evolve_file = args.evolve_file
+    if not evolve_file:
+        first = (spec.evolve_paths or [""])[0]
+        if not first or first.endswith("/"):
+            raise SystemExit("target evolve scope is a directory; pass --evolve-file")
+        evolve_file = first
+
+    policy = IsolationPolicy(
+        timeout_s=args.timeout,
+        docker_image=spec.docker_image or "python:3.11-slim",
+        readonly_workdir=args.readonly,
+    )
+
+    def _make_eval(eid: str, cmd) -> OracleEvaluator:
+        ev = OracleEvaluator(
+            evaluator_id=eid, pinned_root=Path(pinned.root), oracle_cmd=cmd,
+            evolve_paths=spec.evolve_paths, metric_parser=sentinel_metrics_parser(),
+            policy=policy, docker_ok=docker_ok,
+        )
+        ev.prepare()  # baseline; raises if the target is broken
+        return ev
+
+    evaluator = _make_eval(f"oracle:{spec.id}", spec.oracle_cmd)
+    baseline = evaluator.baseline.primary_score if evaluator.baseline else 0.0
+
+    heldout = {}
+    if args.heldout_cmd:
+        heldout["heldout"] = _make_eval(f"heldout:{spec.id}", ["bash", "-c", args.heldout_cmd])
+    else:
+        print("WARNING: no --heldout-cmd; ring 2 is skipped and NO receipts will be minted.",
+              file=sys.stderr)
+
+    propose = real_proposer(
+        target_id=spec.id, pinned_root=Path(pinned.root),
+        evolve_file=evolve_file, objective=args.objective,
+    )
+
+    config = CampaignConfig(
+        generations=args.generations, per_generation=args.per_generation,
+        strategy=args.strategy, budget_cap_usd=args.budget,
+        baseline_metric=baseline,
+    )
+    result = run_campaign(
+        spec, evaluator, propose,
+        heldout_evaluators=heldout, config=config,
+        state_root=args.state_root,
+        tree_digest=pinned.tree_digest, resolved_sha=pinned.resolved_sha,
+        isolation_level=evaluator.last_isolation_level or "local_restricted",
+    )
+
+    usage = getattr(propose, "usage", {"tokens": 0, "calls": 0})
+    provider = getattr(propose, "resolved", {}).get("provider", "none")
+    print(json.dumps({
+        **asdict(result),
+        "baseline_metric": baseline,
+        "isolation_level": evaluator.last_isolation_level,
+        "promotion_allowed": evaluator.last_promotion_allowed,
+        "resolved_sha": pinned.resolved_sha,
+        "tree_digest": pinned.tree_digest,
+        "proposer_provider": provider,
+        "proposer_tokens": usage["tokens"],
+        "proposer_est_cost_usd_upper_bound": estimate_cost_usd(provider, usage["tokens"]),
+    }, indent=2))
+    return 0
+
+
 def cmd_metrics(args: argparse.Namespace) -> int:
     spec = _resolve(args.target)
     result = dry_run_campaign(spec, config=CampaignConfig(generations=args.generations))
@@ -150,6 +251,30 @@ def main(argv: list[str] | None = None) -> int:
     dr.add_argument("--state-root", default=None,
                     help="write receipts here instead of ~/.dharma/foundry")
     dr.set_defaults(func=cmd_dry_run)
+
+    rr = sub.add_parser("run-real", help="REAL campaign: pinned target, real oracle, live army")
+    rr.add_argument("target")
+    rr.add_argument("--objective", required=True,
+                    help="one-line optimization objective fed to the mutation prompt")
+    rr.add_argument("--evolve-file", default=None,
+                    help="file to evolve (defaults to the target's first evolve path if a file)")
+    rr.add_argument("--heldout-cmd", default=None,
+                    help="shell command for the ring-2 held-out oracle (sentinel output)")
+    rr.add_argument("--generations", type=int, default=5)
+    rr.add_argument("--per-generation", type=int, default=6)
+    rr.add_argument("--strategy", default="explore")
+    rr.add_argument("--budget", type=float, default=300.0)
+    rr.add_argument("--timeout", type=float, default=300.0,
+                    help="per-oracle-run timeout seconds")
+    rr.add_argument("--readonly", action="store_true",
+                    help="mount the workdir read-only (tamper prevention instead of detection)")
+    rr.add_argument("--allow-degraded", action="store_true",
+                    help="proceed without docker (explore-only; promotion blocked)")
+    rr.add_argument("--local-source", default=None,
+                    help="ingest from a local tree instead of cloning (offline/test)")
+    rr.add_argument("--state-root", default=None,
+                    help="write receipts here instead of ~/.dharma/foundry")
+    rr.set_defaults(func=cmd_run_real)
 
     mt = sub.add_parser("metrics", help="dry-run + emit kill-metrics / walking brief")
     mt.add_argument("target")

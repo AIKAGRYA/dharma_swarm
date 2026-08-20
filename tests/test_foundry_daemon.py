@@ -92,3 +92,53 @@ def test_snapshot_written_reflects_last_cycle(tmp_path):
     payload = json.loads((tmp_path / "kill_metrics.json").read_text())
     assert payload["cohort_survival"] == 0.75
     assert payload["verified_improvements"] == 4
+
+
+def test_spend_ledger_survives_restart(tmp_path):
+    # Restart=always must not reset the monthly budget (2026-08-19 doctrine).
+    from dharma_swarm.foundry.campaign import CampaignResult
+    from dharma_swarm.foundry.daemon import DaemonConfig, run_daemon
+
+    def spending_cycle(target_id, gens, cap, root):
+        return CampaignResult(target_id=target_id, generations_run=1, spend_usd=10.0)
+
+    cfg = DaemonConfig(targets=["t"], max_cycles=2, budget_cap_usd=300.0,
+                       state_root=tmp_path, interval_seconds=0)
+    first = run_daemon(cfg, cycle_fn=spending_cycle, sleep_fn=lambda s: None)
+    assert first.total_spend_usd == 20.0
+    second = run_daemon(cfg, cycle_fn=spending_cycle, sleep_fn=lambda s: None)
+    assert second.total_spend_usd == 40.0  # resumed 20 from ledger, spent 20 more
+
+
+def test_three_consecutive_failures_halt(tmp_path):
+    from dharma_swarm.foundry.daemon import DaemonConfig, run_daemon
+
+    def broken_cycle(target_id, gens, cap, root):
+        raise RuntimeError("baseline oracle failed")
+
+    cfg = DaemonConfig(targets=["t"], max_cycles=10, state_root=tmp_path,
+                       interval_seconds=0)
+    state = run_daemon(cfg, cycle_fn=broken_cycle, sleep_fn=lambda s: None)
+    assert state.consecutive_failures == 3
+    assert "3 consecutive cycle failures" in state.stopped_reason
+    assert state.cycles_run == 0
+
+
+def test_one_failure_recovers(tmp_path):
+    from dharma_swarm.foundry.campaign import CampaignResult
+    from dharma_swarm.foundry.daemon import DaemonConfig, run_daemon
+
+    calls = {"n": 0}
+
+    def flaky_cycle(target_id, gens, cap, root):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise TimeoutError("transient")
+        return CampaignResult(target_id=target_id, generations_run=1)
+
+    cfg = DaemonConfig(targets=["t"], max_cycles=3, state_root=tmp_path,
+                       interval_seconds=0)
+    state = run_daemon(cfg, cycle_fn=flaky_cycle, sleep_fn=lambda s: None)
+    assert state.cycles_run == 2
+    assert state.consecutive_failures == 0
+    assert "TimeoutError" in state.last_error
