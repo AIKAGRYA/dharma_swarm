@@ -18,17 +18,50 @@ Cross-cycle elite-grid lineage is a known next rung, not a claim.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dharma_swarm.foundry.campaign import CampaignConfig, CampaignResult, run_campaign
 from dharma_swarm.foundry.live import estimate_cost_usd
-from dharma_swarm.foundry.oracle_evaluator import OracleEvaluator, sentinel_metrics_parser
+from dharma_swarm.foundry.oracle_evaluator import (
+    OracleEvaluator,
+    apply_diff,
+    sentinel_metrics_parser,
+)
 from dharma_swarm.foundry.real_proposer import real_proposer
 from dharma_swarm.foundry.runner_isolation import IsolationPolicy, docker_available
-from dharma_swarm.foundry.target_ingest import ingest
+from dharma_swarm.foundry.target_ingest import compute_tree_digest, ingest
 from dharma_swarm.foundry.targets import TARGET_REGISTRY, assert_contributable
 
 ORACLE_TIMEOUT_S = 600.0
+
+
+def best_prior_artifact(state_root: "Path | None", target_id: str) -> "tuple[Path, float] | None":
+    """The best surviving artifact for a target: (patch path, its verified metric).
+
+    This is what makes cycles COMPOUND instead of restart: each new campaign
+    seeds the pinned tree with the best ring-2-surviving diff so far, then
+    must beat THAT baseline. Receipts stay honest — the artifact is selected
+    by its receipt's ``candidate_metric`` and must exist byte-for-byte
+    (``diff_sha256`` is the filename).
+    """
+    root = Path(state_root) if state_root else Path.home() / ".dharma" / "foundry"
+    best: "tuple[Path, float] | None" = None
+    for receipt_path in (root / "receipts").glob("*.json"):
+        try:
+            data = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if data.get("target_id") != target_id:
+            continue
+        metric = (data.get("benchmark") or {}).get("candidate_metric")
+        sha = (data.get("disclosure") or {}).get("diff_sha256", "")
+        artifact = root / "artifacts" / f"{sha}.patch"
+        if metric is None or not sha or not artifact.exists():
+            continue
+        if best is None or float(metric) > best[1]:
+            best = (artifact, float(metric))
+    return best
 
 
 def real_campaign_cycle(
@@ -48,6 +81,21 @@ def real_campaign_cycle(
 
     docker_ok = docker_available()
     pinned = ingest(spec)
+
+    # Compound across cycles: seed the tree with the best verified artifact so
+    # far. If upstream moved and the patch no longer applies, evolve from the
+    # clean tree (graceful reset, recorded honestly in the receipt digest).
+    seeded_from = ""
+    tree_digest = pinned.tree_digest
+    prior = best_prior_artifact(state_root, spec.id)
+    if prior is not None:
+        artifact, prior_metric = prior
+        if apply_diff(Path(pinned.root), artifact.read_text(encoding="utf-8")) is None:
+            seeded_from = f"{artifact.stem[:16]} (metric {prior_metric})"
+            tree_digest = compute_tree_digest(
+                Path(pinned.root), spec.evolve_paths or None
+            )
+
     policy = IsolationPolicy(
         timeout_s=ORACLE_TIMEOUT_S,
         docker_image=spec.docker_image or "python:3.11-slim",
@@ -87,9 +135,11 @@ def real_campaign_cycle(
         spec, oracle, propose,
         heldout_evaluators=heldout, config=config,
         state_root=state_root,
-        tree_digest=pinned.tree_digest, resolved_sha=pinned.resolved_sha,
+        tree_digest=tree_digest, resolved_sha=pinned.resolved_sha,
         isolation_level=oracle.last_isolation_level or "local_restricted",
     )
+    if seeded_from:
+        result.target_id = f"{spec.id} (seeded from {seeded_from})"
 
     usage = getattr(propose, "usage", {"tokens": 0, "calls": 0})
     provider = getattr(propose, "resolved", {}).get("provider", "")

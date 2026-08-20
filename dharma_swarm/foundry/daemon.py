@@ -48,6 +48,12 @@ class DaemonConfig:
     budget_cap_usd: float = 300.0  # monthly model spend ceiling (free routes are $0)
     survival_floor: float = 0.30
     state_root: Path | None = None
+    # Patient idle: for SELF-CLEARING halt conditions (operator STOP file,
+    # monthly budget cap) the daemon sleeps and re-checks instead of exiting,
+    # so systemd Restart=always doesn't churn and work resumes the moment the
+    # condition clears (STOP removed / month rolls over). Kill-metric verdicts
+    # and 3-strike failures still HALT hard — those need eyes, not patience.
+    idle_on_stop: bool = False
 
 
 @dataclass
@@ -129,10 +135,18 @@ def run_daemon(
 
     while config.max_cycles == 0 or cycle < config.max_cycles:
         if killswitch.is_stopped(state_root=state_root):
+            if config.idle_on_stop:
+                sleep_fn(config.interval_seconds)
+                state.total_spend_usd = _load_month_spend(state_root)  # month may roll
+                continue
             state.stopped_reason = f"kill-switch: {killswitch.stop_reason(state_root=state_root)}"
             break
         remaining = config.budget_cap_usd - state.total_spend_usd
         if remaining <= 0:
+            if config.idle_on_stop:
+                sleep_fn(config.interval_seconds)
+                state.total_spend_usd = _load_month_spend(state_root)  # month may roll
+                continue
             state.stopped_reason = "budget exhausted"
             break
 
