@@ -159,7 +159,11 @@ def loose_apply(tree: Path, diff: str) -> str | None:
         best_i, best_score = -1, 0.0
         for i in range(0, max(1, len(lines) - len(old) + 1)):
             window = lines[i:i + len(old)]
-            score = difflib.SequenceMatcher(None, "\n".join(window), "\n".join(old)).ratio()
+            # autojunk=False: code is whitespace-heavy, and autojunk's
+            # popular-character heuristic collapses ratios on indentation.
+            score = difflib.SequenceMatcher(
+                None, "\n".join(window), "\n".join(old), autojunk=False
+            ).ratio()
             if score > best_score:
                 best_i, best_score = i, score
         if best_score < 0.9:
