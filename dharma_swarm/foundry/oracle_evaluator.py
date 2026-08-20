@@ -166,8 +166,11 @@ def loose_apply(tree: Path, diff: str) -> str | None:
             ).ratio()
             if score > best_score:
                 best_i, best_score = i, score
-        if best_score < 0.9:
-            return f"loose_apply: old-block not found (best similarity {best_score:.2f})"
+        # 0.85 floor: strong anchor required, but mis-anchored applies are not
+        # a scoring risk — the oracle, tamper digest, and win floor all sit
+        # downstream, so a wrongly-placed hunk just scores zero.
+        if best_score < 0.85:
+            return f"loose_apply: old-block not found (best similarity {best_score:.2f} < 0.85)"
         lines = lines[:best_i] + new + lines[best_i + len(old):]
 
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
