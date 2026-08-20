@@ -97,6 +97,117 @@ def suite_pass_parser() -> MetricParser:
     return parse
 
 
+def _parse_single_file_diff(diff: str) -> "tuple[str, list[tuple[list[str], list[str]]]] | None":
+    """Parse a single-file unified diff into (rel_path, [(old_block, new_block)]).
+
+    Returns None if the diff touches more than one file or has no hunks.
+    """
+    path = ""
+    hunks: list[tuple[list[str], list[str]]] = []
+    old: list[str] = []
+    new: list[str] = []
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            token = line[4:].strip()
+            token = token[2:] if token.startswith(("a/", "b/")) else token
+            if path and token != path:
+                return None  # multi-file: loose applier does not attempt these
+            path = token
+        elif line.startswith("@@ "):
+            if in_hunk and (old or new):
+                hunks.append((old, new))
+                old, new = [], []
+            in_hunk = True
+        elif in_hunk:
+            if line.startswith("-") and not line.startswith("---"):
+                old.append(line[1:])
+            elif line.startswith("+") and not line.startswith("+++"):
+                new.append(line[1:])
+            elif line.startswith(" ") or line == "":
+                old.append(line[1:] if line else "")
+                new.append(line[1:] if line else "")
+    if in_hunk and (old or new):
+        hunks.append((old, new))
+    return (path, hunks) if path and hunks else None
+
+
+def loose_apply(tree: Path, diff: str) -> str | None:
+    """Last-resort applier: locate each hunk's old-block by fuzzy match.
+
+    LLM diffs frequently rewrite a couple of INTERIOR context lines — fatal
+    for git apply and for patch's edge-only fuzz, even when the actual change
+    is perfectly valid (production case 7525a462: 2/80 context lines drifted,
+    scored 0.5834, then failed to re-apply). This applier finds the old block
+    with difflib (>=0.9 similarity), replaces it, and leaves judgment to the
+    oracle. Single-file diffs only. Returns None on success, reason on failure.
+    """
+    import difflib
+
+    parsed = _parse_single_file_diff(diff)
+    if parsed is None:
+        return "loose_apply: not a single-file diff"
+    rel_path, hunks = parsed
+    target = tree / rel_path
+    if not target.is_file():
+        return f"loose_apply: no such file {rel_path}"
+    lines = target.read_text(encoding="utf-8").splitlines()
+
+    for old, new in hunks:
+        if not old:
+            return "loose_apply: pure-insert hunk without anchor"
+        best_i, best_score = -1, 0.0
+        for i in range(0, max(1, len(lines) - len(old) + 1)):
+            window = lines[i:i + len(old)]
+            score = difflib.SequenceMatcher(None, "\n".join(window), "\n".join(old)).ratio()
+            if score > best_score:
+                best_i, best_score = i, score
+        if best_score < 0.9:
+            return f"loose_apply: old-block not found (best similarity {best_score:.2f})"
+        lines = lines[:best_i] + new + lines[best_i + len(old):]
+
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return None
+
+
+def canonicalize_diff(
+    pinned_root: Path,
+    evolve_file: str,
+    raw_diff: str,
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> str | None:
+    """Regenerate a proposal as a CANONICAL diff that will always re-apply.
+
+    Applies ``raw_diff`` (git -> patch-fuzz -> loose) to a temp copy of the
+    pinned tree, then emits ``diff -u`` of the evolve file with proper
+    ``a/ b/`` labels. Artifacts and receipts store only canonical diffs, so a
+    receipt's patch re-applies byte-for-byte for as long as the pin exists.
+    Returns None when the raw diff cannot be applied at all.
+    """
+    src = Path(pinned_root)
+    work = Path(tempfile.mkdtemp(prefix="canon_"))
+    try:
+        shutil.rmtree(work)
+        shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv"))
+        if apply_diff(work, raw_diff, runner) is not None and loose_apply(work, raw_diff) is not None:
+            return None
+        proc = runner(
+            ["diff", "-u",
+             "--label", f"a/{evolve_file}", str(src / evolve_file),
+             "--label", f"b/{evolve_file}", str(work / evolve_file)],
+            capture_output=True, text=True, timeout=30,
+        )
+        out = getattr(proc, "stdout", "") or ""
+        # diff exits 1 when files differ (expected); 0 = no-op proposal.
+        if getattr(proc, "returncode", 2) not in (0, 1) or not out.strip():
+            return None
+        return out if out.endswith("\n") else out + "\n"
+    except (OSError, subprocess.SubprocessError):
+        return None
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def apply_diff(tree: Path, diff: str,
                runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
                *, check_only: bool = False) -> str | None:

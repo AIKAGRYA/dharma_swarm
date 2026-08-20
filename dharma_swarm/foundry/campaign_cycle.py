@@ -18,6 +18,7 @@ Cross-cycle elite-grid lineage is a known next rung, not a claim.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -26,6 +27,8 @@ from dharma_swarm.foundry.live import estimate_cost_usd
 from dharma_swarm.foundry.oracle_evaluator import (
     OracleEvaluator,
     apply_diff,
+    canonicalize_diff,
+    loose_apply,
     sentinel_metrics_parser,
 )
 from dharma_swarm.foundry.real_proposer import real_proposer
@@ -90,7 +93,11 @@ def real_campaign_cycle(
     prior = best_prior_artifact(state_root, spec.id)
     if prior is not None:
         artifact, prior_metric = prior
-        if apply_diff(Path(pinned.root), artifact.read_text(encoding="utf-8")) is None:
+        seed_text = artifact.read_text(encoding="utf-8")
+        failure = apply_diff(Path(pinned.root), seed_text)
+        if failure is not None:  # raw legacy artifact: try the loose applier
+            failure = loose_apply(Path(pinned.root), seed_text)
+        if failure is None:
             seeded_from = f"{artifact.stem[:16]} (metric {prior_metric})"
             tree_digest = compute_tree_digest(
                 Path(pinned.root), spec.evolve_paths or None
@@ -121,10 +128,25 @@ def real_campaign_cycle(
     if not evolve_file or evolve_file.endswith("/"):
         raise RuntimeError(f"target {spec.id} evolve scope is not a single file")
 
-    propose = real_proposer(
+    raw_propose = real_proposer(
         target_id=spec.id, pinned_root=Path(pinned.root),
         evolve_file=evolve_file, objective=spec.objective,
     )
+
+    def propose(model, parent_id, seed):
+        """Canonicalize every proposal: artifacts/receipts must store a diff
+        that re-applies forever (production case 7525a462: raw model diff
+        scored 0.5834, then failed to re-apply — 2/80 interior context lines
+        had drifted). Unappliable raw diffs become no-op candidates that the
+        tripwire zeroes."""
+        cand = raw_propose(model, parent_id, seed)
+        if not cand.diff:
+            return cand
+        canonical = canonicalize_diff(Path(pinned.root), evolve_file, cand.diff)
+        return dataclasses.replace(cand, diff=canonical or "")
+
+    propose.usage = getattr(raw_propose, "usage", {"tokens": 0, "calls": 0})  # type: ignore[attr-defined]
+    propose.resolved = getattr(raw_propose, "resolved", {})  # type: ignore[attr-defined]
 
     config = CampaignConfig(
         generations=generations,
@@ -146,4 +168,16 @@ def real_campaign_cycle(
     result.spend_usd = round(
         result.spend_usd + estimate_cost_usd(provider, usage.get("tokens", 0)), 6
     )
+    # One journald line per cycle — the daemon runs cycles silently otherwise.
+    print(json.dumps({
+        "cycle_target": spec.id,
+        "seeded_from": seeded_from or "clean tree",
+        "baseline": baseline,
+        "best_fitness": result.best_fitness,
+        "proposed": result.proposed,
+        "ring1_wins": result.ring1_wins,
+        "ring2_survivors": result.ring2_survivors,
+        "trip_reasons": result.trip_reasons,
+        "spend_usd": result.spend_usd,
+    }), flush=True)
     return result
