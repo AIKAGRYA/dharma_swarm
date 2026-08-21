@@ -97,3 +97,32 @@ def test_write_receipt_persists_sealed(tmp_path):
     assert payload["schema_version"] == "foundry_improvement.v1"
     assert payload["sealed_digest"].startswith("sha256:")
     assert payload["stratified"]["domain"] == "external_code_contribution"
+
+
+def test_write_receipt_sanitizes_hostile_filename_chars(tmp_path):
+    """Model names carry ':' and '/' (e.g. 'qwen3-coder-480b:free'). The
+    2026-08-18 foundry-lane run failed artifact upload on exactly this:
+    the filename must be safe while the payload keeps the exact id."""
+    hostile_id = "openevolve-mlx-qwen/qwen3-coder-480b:free-2003"
+    receipt = _base_receipt()
+    receipt.receipt_id = hostile_id
+    path = write_receipt(receipt, state_root=tmp_path)
+    assert path.parent == tmp_path  # '/' must not escape into subdirectories
+    assert ":" not in path.name and "/" not in path.name
+    payload = json.loads(path.read_text())
+    assert payload["receipt_id"] == hostile_id
+
+
+def test_write_receipt_keeps_well_behaved_filename(tmp_path):
+    path = write_receipt(_base_receipt(), state_root=tmp_path)
+    assert path.name == "r1.json"
+
+
+def test_write_receipt_sanitized_names_do_not_collide(tmp_path):
+    colon = _base_receipt()
+    colon.receipt_id = "m:free"
+    underscore = _base_receipt()
+    underscore.receipt_id = "m_free"
+    colon_path = write_receipt(colon, state_root=tmp_path)
+    underscore_path = write_receipt(underscore, state_root=tmp_path)
+    assert colon_path.name != underscore_path.name
