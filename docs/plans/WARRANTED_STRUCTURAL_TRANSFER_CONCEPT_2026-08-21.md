@@ -353,8 +353,4 @@ Kill/hold signal:
 - residue never changes decisions;
 - gather obligations are ignored;
 - independent witnessing adds no value;
-- every engagement is a bespoke ontology with no reusable concepts.
-
-## 12. Questions for adversarial review
-
-This PR
+- every
