@@ -13,7 +13,9 @@ Runtime receipts live under ``~/.dharma/foundry/receipts/`` and never enter git
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +25,25 @@ from dharma_swarm.foundry.evaluator import canonical_digest
 
 SCHEMA_VERSION = "foundry_improvement.v1"
 _STATE_ROOT = Path.home() / ".dharma" / "foundry" / "receipts"
+
+_FILENAME_HOSTILE = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def _receipt_filename(receipt_id: str) -> str:
+    """Filesystem- and artifact-safe filename for a receipt id.
+
+    Receipt ids embed model names, which can carry ``:`` or ``/``
+    (e.g. ``qwen3-coder-480b:free``). ``/`` would escape into
+    subdirectories, and GitHub artifact upload rejects ``:`` — the
+    2026-08-18 foundry-lane run failed on exactly that. The id inside the
+    payload stays exact; only the filename is sanitized, with a short
+    digest suffix so distinct ids can never collide after sanitization.
+    """
+    safe = _FILENAME_HOSTILE.sub("_", receipt_id)
+    if safe == receipt_id:
+        return f"{receipt_id}.json"
+    digest = hashlib.sha256(receipt_id.encode("utf-8")).hexdigest()[:8]
+    return f"{safe}-{digest}.json"
 
 
 def _utc_now_iso() -> str:
@@ -158,6 +179,6 @@ def write_receipt(receipt: FoundryReceipt, *, state_root: Path | None = None) ->
     root.mkdir(parents=True, exist_ok=True)
     payload = receipt.to_dict()
     payload["sealed_digest"] = receipt.seal()
-    path = root / f"{receipt.receipt_id}.json"
+    path = root / _receipt_filename(receipt.receipt_id)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
