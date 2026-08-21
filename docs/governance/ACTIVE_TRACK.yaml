@@ -443,9 +443,9 @@ active_tracks:
         kind: code
         blocker: false
       - id: 8
-        what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3."
+        what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3. [AMENDED 2026-08-21: DONE — origin/main docker-compose.yml:84 now binds 127.0.0.1:7433:7433 loopback-only (landed via commit 8d8d4a345421ae8fa78d2ae196101d6493b83ad3 'fix(compose): loopback-bind swarm health port 7433', 2026-07-11, ancestor of origin/main; verify: git show origin/main:docker-compose.yml | grep -n 7433). The D-LC3 redeploy precondition is satisfied; the redeploy itself remains operator host work (D-LC3 authorization recorded in item 4's decision register).]"
         kind: ops
-        blocker: true
+        blocker: false
       - id: 10
         what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
         kind: governance
@@ -482,6 +482,7 @@ active_tracks:
       - tests/test_council_profiles.py
       - tests/test_coordination_closure_checks.py
       - tests/test_arena_truth_report.py
+      - tests/test_arena_parity_controls.py
     moves_vital_signs:
       - eval_coverage
       - quality_gates
@@ -574,6 +575,12 @@ active_tracks:
           - sealed_oracle_hash
           - best
           - corpus
+      # Live-lane control inheritance (2026-08-21): the only live measurement
+      # route must inherit the hermetic control arms fail-closed and publish
+      # only non-capability measurement candidates (closes next-item 2's edge).
+      - id: live_lane_controls_inherited
+        kind: test_passes
+        test: tests/test_arena_parity_controls.py
 
     non_goals:
       - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
@@ -594,16 +601,25 @@ active_tracks:
         blocker: false
       - id: 2
         what: >-
-          HERMETIC CONTROLS SHIPPED (runner.run always executes
-          best_single_full_budget gate + budget-parity ledger for every arm +
-          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
-          REMAINING (the blocker's live edge): any future live-lane arena run
-          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
-          arms before any capability claim — the hermetic lift on the fixture
-          taskpack is a control-machinery existence proof, never a capability
-          claim (non-goal 1). C2 stays owned by real benchmark evidence.
+          DONE 2026-08-21 (was: live-lane control-inheritance blocker): the
+          DHARMA_ARENA_LIVE live lane now inherits the SAME control arms
+          fail-closed. FixturePool live dispatch still refuses
+          (fixtures.py raises NotImplementedError); the only live route is
+          dharma_swarm/coordination/arena/measure.py, which runs the same
+          ArenaRunner.run, refuses to publish unless all five control arms +
+          exact budget parity + seeded bootstrap significance are present,
+          and hardcodes capability_claim=false,
+          claim_boundary=measurement_candidate_only,
+          promotion_authorized=false — a live run structurally cannot make a
+          capability claim. Proven by criterion live_lane_controls_inherited
+          (tests/test_arena_parity_controls.py, 46 passed 2026-08-21).
+          Doctrine unchanged: hermetic lift on the fixture taskpack is a
+          control-machinery existence proof, never a capability claim
+          (non-goal 1); real provider evidence and C2 stay owned by real
+          benchmark runs, operator-initiated.
         kind: code
-        blocker: true
+        blocker: false
+        evidence_criterion: live_lane_controls_inherited
       - id: 3
         what: >-
           DONE 2026-07-03: arena winners connected to the cold-start trace
@@ -936,6 +952,14 @@ active_tracks:
       - id: go_sense_organ_toolchain_closure_tests_pass
         kind: test_passes
         test: tests/test_world_radar_go_bridge.py
+      # Sarathi P0 composition root (2026-08-21): behavioral + landed anchors
+      # for DONE next-item 11 (existence-only -> test_passes/commit_on_main).
+      - id: sarathi_p0_root_tests_pass
+        kind: test_passes
+        test: tests/test_sarathi_public_api.py
+      - id: sarathi_p0_root_landed
+        kind: commit_on_main
+        commit: "e2c5457245731e2b4b831c5994769592a7364924"
 
     next_items:
       - id: 1
@@ -979,9 +1003,9 @@ active_tracks:
         kind: code
         blocker: false
       - id: 11
-        what: "P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md: after exact agent-build-preflight, add one stable, ingress-neutral message-to-reply API under dharma_swarm/sarathi/ with a version-controlled identity, one turn identity, provider-backed cognition adapter, durable shared-state receipts, and explicit fail-closed effect boundaries; add only the generic RuntimeStateStore transaction seam and receipt-layer declaration needed to make reply-event plus receipt atomic; run declared tests and agent-build-closeout before commit. Preserve legacy imports and keep shared Holon, memory, context, scheduler, evolution, transport, and tool engines in their existing owner modules; later wiring into sibling-owned HTTP/A2A/MCP/runtime surfaces requires their own ownership packet."
+        what: "DONE 2026-08-16 (landed on main via e2c54572, PR #1219): P0 Sarathi composition root per docs/persistent_agents/SARATHI_COMPOSITION_ROOT_P0.md — ingress-neutral async handle_turn API (dharma_swarm/sarathi/shell.py), version-controlled identity (sarathi/identity.py), provider-backed cognition + RuntimeState adapters (sarathi/adapters/), atomic reply-event+receipt seam (runtime_state.py runtime_receipts table; ACTIVE_SURFACE_MANIFEST.yaml 'Sarathi persistent-dialogue turn closure' receipt layer). Declared tests re-verified green 2026-08-21: pytest tests/test_runtime_state.py tests/test_sarathi_public_api.py tests/test_sarathi_shell.py tests/test_sarathi_import_boundaries.py -> 56 passed. Legacy imports preserved; sibling-owned HTTP/A2A/MCP wiring remains with items 12-14."
         kind: code
-        blocker: true
+        blocker: false
       - id: 12
         what: "P2 governed Mission Control dispatch: admit a fail-closed authority envelope whose authenticated principal, exact mission/task/dispatch identity, authority reference, and authority digest are verified by injected owner adapters before a single canonical executor dispatch. Add a canonical A2A adapter that preserves A2A-native task/context/run identity and observes exact durable publish, consume, and outcome receipts without wrapping the owner lifecycle in Mission Control attempts. Retries may recover an identical durable execution reference; publish ACK, consume ACK, recorded running state, or lease freshness prove only the corresponding write and never executor liveness or semantic completion."
         kind: code
@@ -1394,7 +1418,7 @@ active_tracks:
     name: Helm — world-class operator terminal (Bun+Ink TUI)
     status: ACTIVE
     opened_at: "2026-06-15"
-    verified_at: "2026-07-07"
+    verified_at: "2026-08-21"  # all 4 completion criteria re-run green this date (bun 1.3.11: 712 pass full suite, 225 pass app.test.ts; 1d8dae294 ancestor of origin/main)
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1445,17 +1469,17 @@ active_tracks:
       - id: terminal_behavioral_suite_landed
         kind: commit_on_main
         commit: "1d8dae2943f48e5ef343e67ee7c4ed084e065ea0"
-      # NOTE: the 6 golden-frame/compact-viewport/tmux-receipt file_exists criteria
-      # from the prior gate (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt,
-      # compactShell.test.tsx, HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md, HELM_WORLDCLASS_CLOSEOUT.md)
-      # do NOT exist on origin/main -- they live only on agent/magpie-seed. That lane
-      # is genuinely unmerged and stays tracked by next_items; it must NOT be file_exists-gated.
+      # NOTE (2026-08-21 audit): 4 of the 6 prior-gate lane files NOW EXIST on origin/main
+      # (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt, compactShell.test.tsx —
+      # PRs #1414/#1078), plus terminal/tests/golden/120x40/closeout_receipt.json (real_tmux_pty
+      # observation). Only the two HELM_WORLDCLASS_*.md markdown receipts remain branch-only
+      # (reports/terminal/ on agent/magpie-seed) and are superseded; still not file_exists-gated.
 
     next_items:
       - id: 1
-        what: "(blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists."
+        what: "DONE 2026-08-21 (audited): golden-frame verification lane LANDED on origin/main — terminal/scripts/golden_capture.sh + terminal/tests/golden/120x40/chat.txt + terminal/tests/compactShell.test.tsx via PR #1414 (commit 4feb0848); terminal/scripts/ratchet.sh + terminal/tests/golden/120x40/closeout_receipt.json (schema dharma.terminal.golden-closeout-receipt/v1, transport real_tmux_pty) via PR #1078 (commit 88458e06). Verified green 2026-08-21: bun test tests/compactShell.test.tsx -> 6 pass / 0 fail exit 0; full suite -> 712 pass / 0 fail exit 0. Remaining edge is cleanup only, not a ship blocker: the two markdown receipts still unique to agent/magpie-seed (reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md, reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md) are superseded by the on-main JSON closeout receipt — do not merge them; retire the branch via the branch-janitor lane."
         kind: code
-        blocker: true
+        blocker: false
 
     non_goals:
       - Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
@@ -2013,6 +2037,20 @@ active_tracks:
           - live_prerequisites
           - final_worktree_clean
           - verdict
+      # Deliberate-RED until the operator ratifies the live branch-protection
+      # policy (precedent: darshan_issue_one_receipt_valid).
+      - id: titanium_wp0f1_policy_ratification_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/titanium/wp0f1_policy_ratification_receipt.json
+        expect_digest: true
+        requires_keys: [schema, observed_at, ruleset_disposition, required_contexts, approvals_required, conversation_resolution_required, ratified_by, verdict]
+      # Deliberate-RED until a live reconcile run proves checks arrive on the
+      # rolling reconcile head (precedent: darshan_issue_one_receipt_valid).
+      - id: titanium_wp0g_reconcile_delivery_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/titanium/wp0g_reconcile_delivery_receipt.json
+        expect_digest: true
+        requires_keys: [schema, observed_at, delivery_authority, run_id, reconcile_head_sha, checks_observed, verdict]
 
     next_items:
       - id: WP-DSI
@@ -2020,15 +2058,15 @@ active_tracks:
         kind: code
         blocker: true
       - id: WP-0F1
-        what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
+        what: "Operator ratification edge only — repo-side contracts are done: titanium_ci_authority_contracts_pass passes (29 passed, re-verified 2026-08-21) but proves only six-context set equality in the legacy parity guard, never live policy. Remaining: operator decides ruleset 20024481's fate (enforcement disabled; its always-bypass actor and duplicate contexts are latent defects), ratifies one final required-check, human-review, and thread-resolution policy on live branch protection (verified 2026-08-03: non-strict, zero approvals, conversation resolution ENABLED — it blocked PR #1202 that day), then reproves every WP-0F2 consumer."
         kind: governance
         blocker: true
-        evidence_criterion: titanium_ci_authority_contracts_pass
+        evidence_criterion: titanium_wp0f1_policy_ratification_receipt_valid
       - id: WP-0G
-        what: "Choose DOCOPS_RECONCILE_TOKEN or a manually reviewed-PR delivery authority and prove the rolling reconcile head receives checks. Current-main run 30606619117 refreshed PR #1118 to a0d4c1ac but found zero checks and failed closed."
+        what: "Delivery-authority edge only — repo-side workflow contracts are done: titanium_docops_contracts_pass passes (41 passed, re-verified 2026-08-21) but proves only workflow shape, never live check delivery. Remaining: operator chooses DOCOPS_RECONCILE_TOKEN (a repository secret) or a manually reviewed-PR delivery authority, then a fresh reconcile run must show checks actually arriving on the rolling reconcile head — run 30606619117 refreshed PR #1118 to a0d4c1ac, found zero checks, and correctly failed closed."
         kind: code
         blocker: true
-        evidence_criterion: titanium_docops_contracts_pass
+        evidence_criterion: titanium_wp0g_reconcile_delivery_receipt_valid
       - id: WP-0S
         what: "Record an operator-backed FastAPI exposure verdict and actual host secret state. Repository code fails closed without the webhook secret and docker-compose still declares 8080:8080. The 2026-08-01 read-only observation recorded on PR #1184 (open, unmerged, head c448c5ab2) classified one receipt endpoint alias as HTTP 401 and another as unauthenticated public HTTP 200, so live exposure is observed but unadjudicated. Exact live network coordinates are intentionally omitted from this public governance projection. Cite the immutable source receipt with: git fetch origin c448c5ab2b4788d761987f2bc3f1036a023a2ad1 && git show c448c5ab2:reports/governance/titanium/wp0s_observation_receipt_20260801.json (observation m3-wp0s-citation-20260803 records that this is a citation, not a replay). That receipt is implementation-observer authority, declares inventory_complete false, and carries no operator attestation, so the verdict remains BLOCKED_OPERATOR pending fresh operator-backed observation and exact-scope attestation. The exposed alias requires operator action: authenticate it, close it, or attest it as intentionally public. Sanitizing the projection changes no evidence authority, inventory boundary, classification, or operator obligation."
         kind: code
