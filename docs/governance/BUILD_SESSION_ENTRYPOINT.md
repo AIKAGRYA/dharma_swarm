@@ -32,6 +32,7 @@ deployment.
 | `make onboard ARGS=--deep` | Detailed view of the same session-status evaluation | Editing or closeout |
 | `make organism-status` | Deeper read-only whole-organism projection | Session or edit admission |
 | `make orient` | Compatibility alias for `make organism-status` | A second onboarding contract |
+| `make vision` | Purpose/telos transmission and vision-doc navigation (projection) | Session status, liveness, edit admission, ratification, merge |
 | `make agent-build-preflight PACKET=<path>` | Fail-closed edit admission for one exact packet and baseline | Final scope proof or merge approval |
 | `make agent-build-closeout PACKET=<path>` | Fail-closed changed-scope and governance closeout | Independent CI or human approval |
 | Risk-triggered packet-scope CI | Committed-range packet coverage for an integration event | Packet gate execution, local preflight or closeout, human approval, merge authority |

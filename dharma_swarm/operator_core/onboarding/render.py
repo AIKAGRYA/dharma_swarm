@@ -190,6 +190,7 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
     lines.append("WHAT TO DO NEXT")
     lines.append("Next: repair any blocker, rerun make onboard, then")
     lines.append("      make agent-build-preflight PACKET=<path>")
+    lines.append("Purpose/vision (optional): make vision")
 
     lines = _pad_to_minimum(lines)
     if len(lines) > HUMAN_MAX_LINES:

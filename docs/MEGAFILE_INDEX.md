@@ -86,6 +86,82 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `dharma_swarm/docs/vision_maps/_archive/codex_DHARMA_SWARM_MASTER_MAP_2026-05-07.md` (predecessor B — codex; archived 2026-05-07 18:07)
 - `dharma_swarm/lodestones/CONSCIOUS_INFRASTRUCTURE.md`
 
+<!-- VISION_REGISTRY:BEGIN -->
+**Slot-1 machine block — vision registry + transmission pins.** Rendered by
+`make vision` (`scripts/docops/vision_navigation.py`); validated by its
+`--check` mode inside `make docops-integrity`. This block is navigation, never
+a prize: canonical ownership overrides numerical rank in any actual conflict,
+and rank order must not become shadow canon. Sources: the three recovered
+2026-08-08 rankings consolidated 2026-08-13 (median rank; off-repo packet
+`~/handoffs/2026-08-13_make_vision_registry/`); OC-8/OC-9 from judge verdict
+1/5, UNDER JUDGMENT.
+
+STATUS: DRAFT v0 — UNRATIFIED · #1067 placement OPEN (OC-6) · checkout 47579e203 · 2026-08-13
+BY_TASK: purpose/telos · rewire/receipts · quality/CI · organ outward · research/R_V · graph runtime — routes in docs/vision_maps/VISION_TRANSMISSION.md §13.1
+
+Role tokens come from the recovered command spec's declared-modality set
+(CANON, REFERENCE, REPORT, WORKING_PLAN, ACTIVE_SPEC, DRAFT, HISTORICAL,
+UNDECLARED). Transcription rule, applied mechanically: a ranking phrase
+containing OWNER/CANONICAL maps to CANON, REFERENCE to REFERENCE, REPORT to
+REPORT, PLAN/WORKING_PLAN to WORKING_PLAN, SPEC to ACTIVE_SPEC, DRAFT to
+DRAFT (DRAFT beats OWNER when both appear), HISTORICAL to HISTORICAL; any
+phrase naming none of these renders UNDECLARED — a role is never inferred
+from prose. The verbatim declared phrase is preserved in its own column.
+
+| # | group | path | role | declared role (verbatim) | read-for | evidence |
+|--:|---|---|---|---|---|---|
+| 1 | TELOS & GOVERNANCE | docs/governance/SOVEREIGN_MANIFEST.md | CANON | OWNER: TELOS/AXIOMS | Jagat Kalyan ceiling; the win-rule for every hierarchy conflict | LINT (rendered into CLAUDE.md includes; registry-checked) |
+| 2 | IDENTITY & VISION CORE | docs/vision_maps/NORTH_STAR.md | CANON | CANONICAL SLOT-1 / SUBORDINATE | Whole-organism operator map: loops lattice, 3-tier metabolism, trust gate, honest organ status | PROSE (identity source for orient) |
+| 3 | IDENTITY & VISION CORE | docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md | CANON | CANONICAL OPERATOR VISION | One Law (real · gated · verifiable · diversity-preserving) + Hobbling Test | PROSE |
+| 4 | IDENTITY & VISION CORE | foundations/THE_ORGANISM.md | CANON | CANONICAL FOUNDATION | Krishna/Arjuna identity; inward work counts only as it compounds outward capability | LINT (orientation_graph identity line) |
+| 5 | PLANS & CAMPAIGNS | docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md | UNDECLARED | ACTIVE_TRACK-OWNED | External-gradient chamber: afferent-open/efferent-closed, door doctrine; contains the repo's most honest audit (0/13 loops live) | PROSE + track receipts (frontier-ledger receipt 36d stale) |
+| 6 | PLANS & CAMPAIGNS | docs/plans/THE_KEEL_2026-07-17.md | WORKING_PLAN | WORKING_PLAN — deliberately inert (KIMI's wording; its self-denial of authority is load-bearing) | Hard verification floors across static/dynamic/operational/authority layers; §9 dated trigger 2026-10-17 | PROSE |
+| 7 | PLANS & CAMPAIGNS | docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md | UNDECLARED | RATIFIED WHY/DESIGN; live state elsewhere | Receipt invariant at zero bypass; external gradients; self-modification last | PROSE doctrine, partial receipt-spine wiring |
+| 8 | IDENTITY & VISION CORE | docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md | UNDECLARED | VISION SYNTHESIS | Recognition-mediated autopoiesis; real only when self-recognition causally changes action | PROSE |
+| 9 | FOUNDATIONS & RESEARCH | foundations/FIVE_FOURTEEN_A.md | UNDECLARED | PERMANENT FOUNDATION | Safety ≡ intelligence; VIVEKA/SHAKTI/KALYAN; gates as absential causes | PROSE |
+| 10 | TELOS & GOVERNANCE | docs/doctrine/OPERATIONAL_DOCTRINE.md | UNDECLARED | SEEDED DOCTRINE / SUBORDINATE | Arjuna Test; kill conditions (see open conflict OC-1); anti-recursion discipline | PROSE |
+| 11 | TELOS & GOVERNANCE | specs/Dharma_Constitution_v0.md | DRAFT | OWNER: CONSTITUTION / DRAFT v0.1 (hash PENDING per KIMI) | Meta-dharma outside the optimizer; ALLOW/DENY/GATE/SANDBOX with human veto | PROSE/draft — order disputed (codex 7 vs KIMI 16) |
+| 12 | REFERENCE & ARCHITECTURE | docs/vision_maps/2026-05-07_operating_company_kernel.md | REFERENCE | LONG-HORIZON REFERENCE | truth → work → evidence → value → revenue → compute → learning; six conditions before an organ is real | PROSE |
+| 13 | FOUNDATIONS & RESEARCH | lodestones/CONSCIOUS_INFRASTRUCTURE.md | REFERENCE | LODESTONE REFERENCE | Morphogenetic-field seed: tier invariants, role projections, recognition operators | PROSE |
+| 14 | FOUNDATIONS & RESEARCH | lodestones/seeds/self_reference_attractor.md | UNDECLARED | RESEARCH SEED (scope-held) | Falsifiable self-reference physics P1–P5 + pruning ledger | PROSE/seed |
+| 15 | TELOS & GOVERNANCE | docs/governance/CANONICAL_DOC_STACK.md | CANON | OWNER: DOC META-AUTHORITY | Three-layer SSoT; one named owner per fact; max-5 first-read rule | LINT (docops checks) |
+| 16 | TELOS & GOVERNANCE | docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md | UNDECLARED | UNRATIFIED SYNTHESIS | Human–AI actualization telos; refuses to let AI certify soul/flourishing | PROSE/unratified |
+| 17 | ORGANS OUTWARD | docs/plans/DARSHAN_CHARTER_2026-07-12.md | UNDECLARED | ACTIVE_TRACK-OWNED CHARTER — but track owns prose surfaces only; reports/darshan/ absent on disk; zero external contact as of 2026-08-12 | Public seeing organ: citation-or-silence, editorial dual-fire, register discipline | HOLLOW (charter exists; deliverable surface missing) |
+| 18 | ORGANS OUTWARD | docs/loomwork/vision/MASTER_loomwork_level_100.md | UNDECLARED | DESIGN-ONLY VISION, SIS child | Civil-society Palantir: outcome engineering + refusal architecture | PROSE/design-only |
+| 19 | PLANS & CAMPAIGNS | docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md | WORKING_PLAN | ACTIVE_TRACK-OWNED PLAN | "The repository itself is the product"; clean-clone trust; irreversible quality ratchets | EXEC-partial (quality-ratchet CI exists; clean-room receipt MISSING) |
+| 20 | DATED AUDITS | docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md | REPORT | DATED AUDIT/REPORT | Wound map: deploy splits, dormant bridges, vacuous evolution — order disputed (KIMI 13 vs codex 25) | PROSE/report |
+| 21 | DATED AUDITS | docs/vision_maps/MASTER_2026-06-10_anatomy_altitude_integration.md | REPORT | DATED AUDIT/REPORT | Five spines, one live vertebra; $0 revenue outside governance | PROSE/report |
+| 22 | FOUNDATIONS & RESEARCH | foundations/ECONOMIC_VISION.md | UNDECLARED | FOUNDATION/STRATEGIC BLUEPRINT — partially stale (COLM deadline missed, flagged in-doc) | Markets as external fitness substrate; revenue never the telos | PROSE |
+| 23 | TELOS & GOVERNANCE | docs/dse/JAGAT_KALYAN_MASTER_VISION.md | HISTORICAL | HISTORICAL, NON-AUTHORITATIVE (own status banner) | 2026-03 GAIA synthesis; GAIA demoted to kernel under SIS | PROSE/historical |
+| 24 | PLANS & CAMPAIGNS | docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md | ACTIVE_SPEC | ACTIVE_TRACK-OWNED SPEC — engine self-declares test_only; parity 58/100 NOT_FINISHED; oracle env fix (#1312) unmerged as of 2026-08-12 | Ratification-by-merge; judge/builder separation; one hill | EXEC-partial (engine + CI exist; zero production wiring) |
+| 25 | REFERENCE & ARCHITECTURE | docs/architecture/PHILOSOPHICAL_ARCHITECTURAL_MARRIAGE.md | REFERENCE | ARCHITECTURE REFERENCE | Six philosophy↔code marriage points with honest gaps | PROSE |
+
+Adjacent/meta, NOT in the 25 (membership disputed): `docs/governance/SWARM_GENOME.md`
+(codex #19, GROK/KIMI runner-up — dispute M-1); `docs/MEGAFILE_INDEX.md` itself
+(this file is the registry's designated owner; self-listing would be circular — note M-2).
+
+Open conflicts (registry-level; OC-8/OC-9 added from judge verdict 1/5, UNDER JUDGMENT):
+
+- OC-1 · OPERATIONAL_DOCTRINE kill condition fired 2026-08-07 by its own terms; operator verbal AMEND ruling on record (2026-08-05, D17 "dates fluid"); canon-amendment PR still owed.
+- OC-2 · NORTH_STAR §11 90-day horizon (~2026-09-09) unmet on all counts as of 2026-08-12; converted to standing directional pressure by the same D17 ruling.
+- OC-3 · THE_KEEL §9 dated trigger 2026-10-17 (external-consumption receipts in 2 of 3 review periods, or archive-proposal PR moves capacity to Darshan); proposed, unwired.
+- OC-4 · DARSHAN track active with deliverable surface absent on disk; BROKEN_REGISTER BR-022 records outward-receipt quorum below authority.
+- OC-5 · DHARMAGRAPH parity 58/100 with 28 open gap cards; nightly oracle red on main until #1312 merges.
+- OC-6 · #1067 (pre-constitutional founder direction) role undecided — the make-vision spec's own precondition; Greptile P1 + codex + Fable: do-not-merge-unchanged.
+- OC-7 · KIMI's tension-map claim "kill condition fired, unadjudicated" is contradicted by the D17 record; corrected per OC-1 (KIMI read a stale checkout).
+- OC-8 · Metabolization charter (PR #1315) unmerged with its WS-A spine fixes unlanded; portfolio surgery may close/freeze tracks that own registry rows 5, 17, 19, 24; registry v1 must be re-checked against the surviving portfolio before ratification.
+- OC-9 · Arena closure PR #1214 closed UNMERGED; its closure work survives only as unpushed local commit 298011a1d — arena-owned docs are one laptop away from loss; preservation precedes navigation.
+
+Transmission tier pins (tier · path · anchor · sha256 of the slice bytes
+between the `BEGIN`/`END` anchor lines; `--check` fails typed on drift):
+
+| tier | path | anchor | sha256 |
+|---|---|---|---|
+| T0 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T0 | 54b2d24a78b06ee91e19f8403051692815f6abbeff1157ff68e5fcb98e0f7dba |
+| T1 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T1 | 205b3f27bea0dcefd14d1d5eb76226f8a18784987342265b5c1d3ce3ace037ec |
+| T2 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T2 | 935ee8f6526428b28d87e011f736bbf061ac4a9d02f041dd36c1562131fa4a05 |
+<!-- VISION_REGISTRY:END -->
+
 ### Slot 2 — Operational Doctrine
 **Path:** `dharma_swarm/docs/doctrine/OPERATIONAL_DOCTRINE.md`
 **Status:** SEEDED (2026-05-07 inaugural content; 2026-05-08 hierarchy aligned to SOVEREIGN_MANIFEST §Telos Hierarchy)
