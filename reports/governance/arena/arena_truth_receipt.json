@@ -80,9 +80,9 @@
     "rows": 48,
     "sha256": "05a3692e3b02d928ea6902ab47bfbcd14cef041fc637f3e7a33aab77e19c2054"
   },
-  "digest": "92d3954a41a601a9d2d4eafc50edd76767afeddbe232185fde48aafdaaa7c0f3",
+  "digest": "d5fb82d4044104d1a29d9e74880d5df1031cac37ace032e82c399d792330ab09",
   "evaluated": 17,
-  "generated_at": "2026-07-27T14:23:08Z",
+  "generated_at": "2026-08-21T06:43:13Z",
   "generations": 12,
   "hermetic": true,
   "schema": "arena_truth_report.v1",

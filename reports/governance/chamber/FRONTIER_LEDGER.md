@@ -1,6 +1,6 @@
 # FRONTIER LEDGER — the chamber's one page (read-only projection)
 
-**Schema:** `dharma_swarm.frontier_ledger.v1` · **Generated:** 2026-07-07T10:17:20Z
+**Schema:** `dharma_swarm.frontier_ledger.v1` · **Generated:** 2026-08-21T06:43:13Z
 **Replay:** `python3 scripts/governance/frontier_ledger.py --check` · **Refresh:** `python3 scripts/governance/frontier_ledger.py`
 
 > **NO CAPABILITY CLAIM.** NONE. Every number here is either an internal instrument reading or a receipted external publication; nothing is a production capability claim (chamber doctrine, arena non-goal 1).
@@ -9,10 +9,10 @@
 
 | Cond | Verdict | Score |
 |---|---|---|
-| C1 | RED | 0.25 |
+| C1 | AMBER | 0.5 |
 | C2 | RED | 0.05 |
 | C3 | RED | 0.3 |
-| C4 | RED | 0.307 |
+| C4 | RED | 0.311 |
 | C5 | RED | 0.2 |
 
 30-day review cadence · next review: PENDING_OPERATOR (decision queue item 6)
@@ -37,14 +37,14 @@
 
 Notes per row live in the receipt (`rows[].note`).
 
-## Velocity (E6) — d(delta)/dt · renders in history: 5 · valued: 4/13
+## Velocity (E6) — d(delta)/dt · renders in history: 6 · valued: 4/13
 
 | Capability | d(delta)/dt per day | Closing? | Window |
 |---|---|---|---|
-| git_history_gym_substrate | 0.0 | NO | 2026-07-07T10:16:55Z → 2026-07-07T10:17:20Z |
-| ingest_metabolism | 0.0 | NO | 2026-07-07T10:16:55Z → 2026-07-07T10:17:20Z |
-| swarm_lift_vs_best_single | 0.0 | NO | 2026-07-07T10:16:55Z → 2026-07-07T10:17:20Z |
-| transcendence_decomposition | 0.0 | NO | 2026-07-07T10:16:55Z → 2026-07-07T10:17:20Z |
+| git_history_gym_substrate | 0.0 | NO | 2026-07-07T10:17:20Z → 2026-08-21T06:43:13Z |
+| ingest_metabolism | 0.0 | NO | 2026-07-07T10:17:20Z → 2026-08-21T06:43:13Z |
+| swarm_lift_vs_best_single | 0.0 | NO | 2026-07-07T10:17:20Z → 2026-08-21T06:43:13Z |
+| transcendence_decomposition | 0.0 | NO | 2026-07-07T10:17:20Z → 2026-08-21T06:43:13Z |
 
 - loop latency vs field cadence: UNVALUED — gym iteration receipts with timestamps AND field publication cadence from ingest (code-world lane)
 

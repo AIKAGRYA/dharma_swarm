@@ -8,13 +8,13 @@
     "requires": "\u22652 gym receipts on one environment AND \u22651 reality-graded receipt (envs G2/G10 class) in the same window",
     "status": "UNVALUED"
   },
-  "digest": "e88d81b212b83ff349ce7c006c572cc12b5989857b168fac9c858d3c8d21a3b1",
+  "digest": "dc4e234c15b591010bc443ed26d50dcd7f3e0b2a8e119a4e6479dc445865061d",
   "door": {
     "conditions": [
       {
         "id": "C1",
-        "score": 0.25,
-        "verdict": "RED"
+        "score": 0.5,
+        "verdict": "AMBER"
       },
       {
         "id": "C2",
@@ -28,7 +28,7 @@
       },
       {
         "id": "C4",
-        "score": 0.307,
+        "score": 0.311,
         "verdict": "RED"
       },
       {
@@ -42,7 +42,7 @@
     "review_cadence_days": 30
   },
   "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md \u00a7(c)",
-  "generated_at": "2026-07-07T10:17:20Z",
+  "generated_at": "2026-08-21T06:43:13Z",
   "inputs": {
     "baseline_receipt": {
       "path": "reports/governance/inward_ascent/baseline_receipt.json",
@@ -59,8 +59,8 @@
       "conditions": [
         {
           "id": "C1",
-          "score": 0.25,
-          "verdict": "RED"
+          "score": 0.5,
+          "verdict": "AMBER"
         },
         {
           "id": "C2",
@@ -74,7 +74,7 @@
         },
         {
           "id": "C4",
-          "score": 0.307,
+          "score": 0.311,
           "verdict": "RED"
         },
         {
@@ -341,21 +341,21 @@
       "git_history_gym_substrate": {
         "closing": false,
         "d_delta_dt_per_day": 0.0,
-        "points": 5,
+        "points": 6,
         "status": "VALUED",
         "window": [
-          "2026-07-07T10:16:55Z",
-          "2026-07-07T10:17:20Z"
+          "2026-07-07T10:17:20Z",
+          "2026-08-21T06:43:13Z"
         ]
       },
       "ingest_metabolism": {
         "closing": false,
         "d_delta_dt_per_day": 0.0,
-        "points": 5,
+        "points": 6,
         "status": "VALUED",
         "window": [
-          "2026-07-07T10:16:55Z",
-          "2026-07-07T10:17:20Z"
+          "2026-07-07T10:17:20Z",
+          "2026-08-21T06:43:13Z"
         ]
       },
       "ingest_quality": {
@@ -386,21 +386,21 @@
       "swarm_lift_vs_best_single": {
         "closing": false,
         "d_delta_dt_per_day": 0.0,
-        "points": 5,
+        "points": 6,
         "status": "VALUED",
         "window": [
-          "2026-07-07T10:16:55Z",
-          "2026-07-07T10:17:20Z"
+          "2026-07-07T10:17:20Z",
+          "2026-08-21T06:43:13Z"
         ]
       },
       "transcendence_decomposition": {
         "closing": false,
         "d_delta_dt_per_day": 0.0,
-        "points": 4,
+        "points": 5,
         "status": "VALUED",
         "window": [
-          "2026-07-07T10:16:55Z",
-          "2026-07-07T10:17:20Z"
+          "2026-07-07T10:17:20Z",
+          "2026-08-21T06:43:13Z"
         ]
       }
     },
@@ -408,7 +408,7 @@
       "requires": "gym iteration receipts with timestamps AND field publication cadence from ingest (code-world lane)",
       "status": "UNVALUED"
     },
-    "renders_in_history": 5,
+    "renders_in_history": 6,
     "valued": 4
   }
 }
