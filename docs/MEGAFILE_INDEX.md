@@ -158,8 +158,8 @@ between the `BEGIN`/`END` anchor lines; `--check` fails typed on drift):
 | tier | path | anchor | sha256 |
 |---|---|---|---|
 | T0 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T0 | 54b2d24a78b06ee91e19f8403051692815f6abbeff1157ff68e5fcb98e0f7dba |
-| T1 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T1 | 66df55bf13bf7f0acbcb6fff5ba42e248eada9b7aa8baeac55ad3e5ebeb0d32e |
-| T2 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T2 | 9627230052d4831c4e44e6d092d83f94945945f3731241a629101ef595488991 |
+| T1 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T1 | 205b3f27bea0dcefd14d1d5eb76226f8a18784987342265b5c1d3ce3ace037ec |
+| T2 | docs/vision_maps/VISION_TRANSMISSION.md | TIER:T2 | 935ee8f6526428b28d87e011f736bbf061ac4a9d02f041dd36c1562131fa4a05 |
 <!-- VISION_REGISTRY:END -->
 
 ### Slot 2 — Operational Doctrine
