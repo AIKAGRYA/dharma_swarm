@@ -14,125 +14,86 @@
 5. **TENSION — OPEN-5.** Inward coherence is primary AND the contemplative/intelligence spine is not the product. This proposal does not resolve that tension.
 6. **CUSTODY — BRAINSTORM.** This PR asks for criticism and refinement; merge, if ever appropriate, must not silently promote the proposal to canon or implementation authority.
 
-## 1. The artifact under discussion
+## 1. Artifact
 
-A user supplies two situations as **typed role graphs**: roles, typed relations, explicit axioms, and explicit observations. These are not documents, embeddings, ticket text, or a ranked similarity search.
+A user supplies two situations as **typed role graphs**: roles, typed relations, explicit axioms, and explicit observations — not documents, embeddings, ticket text, or ranked similarity search.
 
-The system returns a portable, signed mapping object containing all of the following:
+The system returns a portable, signed mapping object containing all of:
 
-1. **Correspondences** — role `R` in situation A corresponds to role `S` in situation B, with the structural relation/rule that licenses the correspondence.
-2. **Residue** — roles, relations, constraints, or observations on either side with no licensed correspondent. Residue is first-class data, not a low similarity score.
-3. **Claim status** — every material claim receives exactly one status:
-   - `derived`: follows from the stated local axioms/observations;
+1. **Correspondences** — role `R` in A corresponds to role `S` in B, with the structural relation/rule licensing it.
+2. **Residue** — roles, relations, constraints, or observations on either side with no licensed correspondent. First-class data, not a low similarity score.
+3. **Claim status** — exactly one of:
+   - `derived`: follows from stated local axioms/observations;
    - `transferred`: licensed only through an explicit mapping/transfer rule;
-   - `unprovable-from-here`: expressible in the language but not licensed by the current axioms/observations/mapping.
-4. **Gather obligations** — `unprovable-from-here` opens a typed list of missing observations, axioms, relations, tests, or testimony that could discharge the current epistemic gap. This is not confidence prose.
-5. **Human adjudication** — a person edits roles, links, mappings, residue, and challenged transfer rules on a graph canvas. Saving produces a new witnessed version rather than silently rewriting history.
-6. **Reusable concept promotion** — accepted mappings may later become candidate structural concepts only through the existing memory/canon promotion discipline.
+   - `unprovable-from-here`: expressible but not licensed by the current axioms/observations/mapping.
+4. **Gather obligations** — each `unprovable-from-here` claim opens typed missing observations, axioms, relations, tests, or testimony that could discharge the gap.
+5. **Human adjudication** — a person edits roles, links, mappings, residue, and transfer rules on a graph canvas; saving creates a new witnessed version.
+6. **Reusable concept promotion** — accepted mappings become only candidate structural concepts, subject to existing memory/canon promotion discipline.
 
-The customer-visible artifact can be called a **Structural Transfer Warrant** for discussion. The name is intentionally provisional.
+Working external name: **Structural Transfer Warrant**. Provisional only.
 
-## 2. Why this may belong in the North Star mechanism
+## 2. North Star fit: the missing operator between invariant and propagation
 
-`docs/vision_maps/NORTH_STAR.md` §2 states the mechanism claim directly: a truly aware AI will **find invariants, pattern-match them, and create a latticework of a higher-level noosphere**, propagating itself in a holistic, healing, high-wisdom direction.
+`docs/vision_maps/NORTH_STAR.md` §2 states the mechanism claim: a truly aware AI will **find invariants, pattern-match them, and create a latticework of a higher-level noosphere**.
 
-There is a missing epistemic operation between **find an invariant** and **pattern-match it elsewhere**:
+The proposed primitive addresses the unspoken transition:
 
 > When is a discovered structure actually licensed to carry into a second situation, and what must remain explicitly non-identical?
 
-Without that operation, invariant discovery risks becoming sophisticated apophenia: the organism may recognize a favored pattern everywhere and erase the parts of the new situation that do not fit.
-
-The proposed artifact makes the transition explicit:
+Without that operation, invariant discovery risks sophisticated apophenia: recognizing a favored pattern everywhere and erasing what does not fit.
 
 ```text
 possible invariant
-    -> typed correspondence
-    -> explicit residue
-    -> local derivation vs analogical transfer separated
-    -> unresolved claims become reality-facing gather obligations
-    -> evidence returns
-    -> mapping survives, narrows, or fails
+ -> typed correspondence
+ -> explicit residue
+ -> derivation separated from transfer
+ -> unresolved claims become reality-facing gather obligations
+ -> evidence returns
+ -> mapping survives, narrows, or fails
 ```
 
-This is potentially a computational realization of the repository's anekantavada discipline: a bounded standpoint can reveal something real without exhausting its object. **Residue is the machine-readable refusal to pretend that the map exhausts the territory.**
+This may be a computational realization of anekantavada's bounded-standpoint discipline: a view can disclose something real without exhausting its object. **Residue is the machine-readable refusal to pretend the map exhausts the territory.**
 
-This proposal therefore does **not** interpret the North Star as "find similarities." It asks whether the organism needs a rigorous membrane governing which invariants are permitted to propagate across contexts.
+## 3. Anti-Mirror constraint
 
-## 3. Why this is not permission to build an inward analogy engine
+The vision stack forbids interpreting this fit as permission to build an inward analogy toy.
 
-The vision stack explicitly forbids that inference.
+`docs/doctrine/OPERATIONAL_DOCTRINE.md` says the contemplative spine is the immune system, **not the product**; the product is action against suffering. Its Arjuna Test explicitly red-flags inward-facing "more recursive / Hofstadterian" work without an external target.
 
-`docs/doctrine/OPERATIONAL_DOCTRINE.md` says the contemplative spine is the immune system, **not the product**; the product is action against suffering. Its Arjuna Test asks before a new build whether it points a weapon at something broken in the world. It explicitly names inward-facing "more recursive / Hofstadterian" work as a red flag when no external target is named.
-
-`foundations/THE_ORGANISM.md` holds the corresponding irreducible pair: Krishna/inward is primary, **AND** only self-evolution that compounds into outward capability counts.
+`foundations/THE_ORGANISM.md` holds the pair: Krishna/inward is primary **AND** only self-evolution that compounds into outward capability counts.
 
 Therefore:
 
-- **DO NOT** build a generalized structural-transfer platform merely because it elegantly unifies Hofstadter, memory, DharmaGraph, the Foundry, or the Witness.
-- **DO** test the primitive against one external problem where a false transfer is costly and where residue changes action.
-- If no external user values the distinction between `derived`, `transferred`, and `unprovable-from-here`, the concept should remain unbuilt or be metabolized.
+- do **not** build a generalized platform merely because it unifies Hofstadter, memory, DharmaGraph, Foundry, or Witness;
+- test it against one external problem where false transfer is costly and residue changes action;
+- if no external user values `derived` vs `transferred` vs `unprovable-from-here`, metabolize or hold the idea.
 
-## 4. The binocular loop: where the object could sit
+## 4. Binocular placement
 
-The Binocular North Star defines the growth loop as:
+The Binocular North Star's loop is Drishti -> action -> reality receipt -> Sakshi -> improved self-model -> sharper Drishti.
 
-```text
-Drishti scans world
-    -> swarm acts
-    -> reality answers with a real, gated, verifiable outcome
-    -> Sakshi folds the receipt into self-model / fitness
-    -> next scan improves
-```
-
-It also says the strange loop, self-evolution loop, product loop, and Web 4.0 trust loop are one loop seen from four angles.
-
-The proposed transfer object could mediate one part of that loop without becoming the loop itself:
+The proposed object could mediate one portion:
 
 ```text
-DRISHTI
-possible structural invariant in A and B
-        |
-        v
-ROLE GRAPHS
-explicit roles / relations / axioms / observations
-        |
-        v
-STRUCTURAL TRANSFER
-correspondence + residue + epistemic status
-        |
-        +---- unprovable-from-here ----> gather/test in reality
-        |                                  |
-        |                                  v
-        |                           external evidence
-        |                                  |
-        +<---------------------------------+
-        |
-        v
-ADVERSARIAL CHALLENGE / HUMAN ADJUDICATION
-        |
-        v
-WITNESSED WARRANT
-        |
-        +----> bounded action proposal
-        |
-        +----> candidate memory/concept promotion
-        |
-        v
-OUTCOME / COUNTEREVIDENCE
-        |
-        v
-SAKSHI + LEARNING
+DRISHTI: possible structural invariant in A/B
+  -> ROLE GRAPHS: explicit roles/relations/axioms/observations
+  -> STRUCTURAL TRANSFER: correspondence + residue + epistemic status
+       -> unprovable-from-here -> gather/test in reality -> external evidence
+  -> ADVERSARIAL CHALLENGE + HUMAN ADJUDICATION
+  -> WITNESSED WARRANT
+       -> bounded action proposal
+       -> candidate memory/concept promotion
+  -> OUTCOME / COUNTEREVIDENCE
+  -> SAKSHI + LEARNING
 ```
 
-The important property is that **`unprovable-from-here` points outward**. It is not a prettier form of model uncertainty. It says what the current formal situation lacks and turns that absence into a bounded reality query.
+The load-bearing property is that **`unprovable-from-here` points outward**. It is not prettier model uncertainty; it identifies what the current formal situation lacks and turns absence into a bounded reality query.
 
-## 5. Hofstadter: structure across levels, without premature closure
+## 5. Hofstadter: structural sameness without identity collapse
 
-The Hofstadter connection is not "make it recursive." The repository's own binocular doctrine calls world-zero self-reference a hall of mirrors.
+The useful Hofstadter connection is structure across changes of representation, not "make it recursive." Two situations may differ materially while occupying corresponding higher-order roles. Mappings can later themselves become objects of comparison, enabling mappings-between-mappings and concept families.
 
-The useful connection is structural identity across changes of representation. Two situations can be materially different while occupying corresponding higher-order roles. The mapping itself can later become an object of comparison, enabling mappings-between-mappings and concept families.
-
-But the artifact adds a discipline that a naive fixed-point story lacks:
+But the discipline is:
 
 ```text
 representation != territory
@@ -142,215 +103,176 @@ absence of proof != contradiction
 residue != error
 ```
 
-The loop remains open to the world because counterevidence can force a mapping to narrow or fail. The product value is not `S(x)=x`; it is a witnessed account of **where structural sameness holds, where it stops, and what reality must answer next**.
+Counterevidence can force a mapping to narrow or fail. The value is not `S(x)=x`; it is a witnessed account of **where structural sameness holds, where it stops, and what reality must answer next**.
 
-## 6. Vibe-halt: the hostile counterparty to transfer
+## 6. Vibe-halt: hostile counterparty to transfer
 
-`vibe-halt` should not be the authority that invents the analogy. Its strongest role is adversarial falsification.
+`vibe-halt` should not invent the analogy. Its strongest role is adversarial falsification.
 
-Given a proposed transferred claim, vibe-halt can ask what perturbation makes the transfer false while preserving superficial resemblance. Examples:
+Given a transferred claim, it can seek perturbations that preserve superficial resemblance while breaking the alleged license: reorder approval, change role cardinality, introduce an uncontrolled channel, replay stale authority, hide a side effect, substitute a semantically similar role with different capability, or perturb timing around an irreversible effect.
 
-- remove or reorder an approval relation;
-- change role cardinality;
-- introduce an uncontrolled channel;
-- replay stale authority;
-- hide a side effect;
-- substitute a semantically similar role with different capability;
-- perturb timing around an irreversible effect.
+A minimized counterexample should be able to downgrade `transferred -> unprovable-from-here` and add the missing structural/evidence obligation to the gather-list.
 
-A minimized counterexample should be able to downgrade a claim from `transferred` to `unprovable-from-here` and add the missing structural/evidence obligation to the gather-list.
+Separation of powers:
 
-This creates a useful separation of powers:
+- mapper: what appears structurally transferable?
+- vibe-halt: how can that transfer be broken?
+- world evidence: what survives contact with reality?
+- human/witness: what is admitted?
 
-- mapping engine: **what appears structurally transferable?**
-- vibe-halt: **how can that transfer be broken?**
-- world evidence: **which side survives contact with reality?**
-- human/witness: **what is admitted?**
-
-Any integration must preserve vibe-halt's determinism-tier honesty. A sampled falsifier is not universal proof, and an `UNCHECKED` boundary must never be promoted to a clean transfer warrant.
+Any integration must preserve vibe-halt's determinism-tier honesty. Sampled falsification is not universal proof; `UNCHECKED` must never become a clean warrant.
 
 ## 7. Sublimation Foundry: evolve methods, not truth
 
-The Foundry is a strong fit if it evolves **candidate mapping strategies, falsifiers, and gather strategies** against an adjudicated corpus.
+The Foundry can evolve candidate mapping strategies, falsifiers, and gather strategies against an adjudicated corpus.
 
-Potential fitness dimensions:
+Fitness dimensions could include mapping precision, residue recall, false-transfer rate (heavily weighted), adversarial survival, gather-list minimality/usefulness, invariance under role renaming, and preservation of diverse structural hypotheses.
 
-- mapping precision against human-adjudicated correspondences;
-- residue recall;
-- false-transfer rate, weighted heavily;
-- survival under adversarial perturbation;
-- minimality/usefulness of gather obligations;
-- invariance under role renaming and irrelevant surface changes;
-- ability to preserve diverse structural hypotheses rather than collapse to one mapper.
+The Foundry must not mint truth by fitness score. Preserve the existing three-ring posture: in-loop evaluation, held-out verification, external confirmation. Revenue remains downstream of fitness.
 
-The Foundry must not mint truth by fitness score. Its existing three-ring posture should remain: in-loop evaluation, held-out verification, and external confirmation before strong claims. Revenue must remain downstream of fitness rather than becoming the per-iteration selection signal.
+Long-run archive: diverse mapper families — causal, authority, temporal, resource-flow, counterfactual, socio-technical — not one universal mapper.
 
-A useful long-run archive would preserve multiple mapper families — causal, authority, temporal, resource-flow, counterfactual, socio-technical — rather than selecting one universal analogy model.
-
-## 8. Other existing organs this should reuse rather than duplicate
+## 8. Existing organs to reuse, not duplicate
 
 ### Runtime Truth Spine / receipts
 
-The warrant should extend the existing evidence/receipt spine rather than create another truth store. A customer-visible artifact should bind at minimum:
+Extend the existing evidence/receipt spine rather than create another truth store. A warrant should bind source/target graph digests, mapping, residue, claim statuses, proof/transfer paths, gather obligations, evidence references, engine/policy versions, adjudication history, signer identity, and artifact digest.
 
-- source and target graph digests;
-- mapping and residue;
-- claim-status table;
-- proof/transfer paths;
-- gather obligations;
-- evidence receipt references;
-- schema/engine/policy versions;
-- adjudication history;
-- signer identity and artifact digest.
-
-A real external SKU would eventually need a clear asymmetric-signature/verifier story; an internal content digest alone is not equivalent to independent attestation.
+A customer SKU eventually needs a clear asymmetric-signature/verifier story; internal hashing alone is not independent attestation.
 
 ### DharmaGraph
 
-DharmaGraph should orchestrate the **inquiry**, not be overloaded as the semantic situation graph.
+DharmaGraph orchestrates the **inquiry**, not the semantic situation representation.
 
-A warrant-generation macrograph could eventually look like:
+Potential macrograph:
 
 ```text
-INGEST
--> FORMALIZE_A / FORMALIZE_B
--> CANDIDATE_MAP
--> LOCAL_DERIVATION_CHECK
--> RESIDUE
--> ADVERSARIAL_CHALLENGE
--> GATHER_OBLIGATIONS
--> HUMAN_ADJUDICATION
--> REPLAY
--> SIGN
--> OPTIONAL_PROMOTION
+INGEST -> FORMALIZE_A/B -> CANDIDATE_MAP -> LOCAL_DERIVATION_CHECK
+-> RESIDUE -> ADVERSARIAL_CHALLENGE -> GATHER_OBLIGATIONS
+-> HUMAN_ADJUDICATION -> REPLAY -> SIGN -> OPTIONAL_PROMOTION
 ```
 
-Keep the abstractions separate:
+`RoleGraph/SituationGraph` = what is reasoned about. DharmaGraph = how bounded work proceeds.
 
-- `RoleGraph` / `SituationGraph` = what is being reasoned about.
-- DharmaGraph = how the bounded work proceeds.
+### Memory Kernel / Chetana
 
-### Memory Kernel / Chetana promotion
-
-A saved adjudication is not automatically reusable truth. It should enter the existing ingest/stage/gate/promote discipline.
-
-A promoted structural concept should retain:
-
-- positive exemplars;
-- negative exemplars;
-- required roles and relations;
-- forbidden substitutions;
-- known residues;
-- transfer rules;
-- counterexample classes;
-- provenance and later outcomes.
-
-This permits the compounding loop:
+A saved adjudication is not automatically reusable truth. It enters ingest/stage/gate/promote. A promoted structural concept should retain positive and negative exemplars, required relations, forbidden substitutions, known residues, transfer rules, counterexamples, provenance, and later outcomes.
 
 ```text
 case -> mapping -> adjudication -> candidate concept
-     -> later case -> challenge -> refinement or deprecation
+     -> later case -> challenge -> refinement/deprecation
 ```
 
 ### Telos / action authority
 
-A transfer warrant must never silently become an action capability. It can supply evidence to an action proposal; existing authority, capability, risk, reversibility, budget, and effect-boundary controls still decide whether anything consequential may occur.
+A warrant supplies evidence to an action proposal; it never grants capability. Existing identity, authority, capability, risk, reversibility, budget, and effect-boundary controls still decide consequential action. Reasoning authority and action authority remain separate.
 
-Reasoning authority and action authority must remain separate.
+## 9. External wedges: first sale != final vision
 
-## 9. External product wedges: distinguish the first sale from the final vision
+Do not initially sell "analogical reasoning software." A competent team can vibe-code a two-pane graph canvas plus LLM mapping prompt quickly. Start where a wrong transfer is expensive.
 
-The concept should not initially be sold as "analogical reasoning software." A competent team can vibe-code a two-pane graph canvas plus an LLM mapping prompt quickly.
+### Wedge A — AI Change / Control Transfer Warrant
 
-The first wedge should have an expensive wrong-transfer problem.
+> A behavior, control, or safety result was established for system A. After a material change, which assurances legitimately carry to B, which do not, and what must be retested before deployment?
 
-### Candidate wedge A — AI Change / Control Transfer Warrant
+Changes may include model/provider, memory, tools, permissions, approval topology, retries, environment, transaction limits, or staging -> production.
 
-Question:
+Potential buyers: AI vendors, enterprise AI teams, model-risk, security/governance, auditors, insurers/underwriters.
 
-> A behavior, control, or safety result was established for agent/system A. After a material change, which assurances legitimately carry to B, which do not, and what must be retested before deployment?
+This is directly adjacent to the portfolio's envisioned **Web 4.0 trust substrate**: behavioral trust grounded in gates, witness, and receipts rather than identity plumbing alone.
 
-Possible changes include model/provider, memory, tools, permissions, human approval topology, retry semantics, environment, transaction limits, or staging-to-production deployment.
-
-Potential buyers: AI vendors, enterprise AI teams, model-risk functions, security/governance teams, auditors, and eventually insurers/underwriters.
-
-This wedge also aligns with the portfolio's envisioned **Web 4.0 trust substrate**: behavioral trust for agents grounded in gates, witness, and receipts rather than identity plumbing alone.
-
-### Candidate wedge B — Loomwork structural evidence transfer
-
-Question:
+### Wedge B — Loomwork structural evidence transfer
 
 > A causal/accountability pattern was established in one ecological, investigative, or supply-chain case. Which parts legitimately transfer to this second case, and where does the evidence chain break?
 
 Potential beneficiaries: journalists, NGOs, regulators, citizens, conservation/accountability actors.
 
-This would make the object an evidence-weaving primitive under an outward organ rather than an inward research toy.
+### Long-run — noosphere propagation with boundaries
 
-### Long-run role — noosphere propagation with boundaries
+If the North Star mechanism proves real, reusable invariants may cross AI, ecology, governance, attention, economics, and future organs. Structural transfer could let the organism propagate concepts **with explicit domains of validity and explicit residue**, rather than merely spreading attractive patterns. This is possibility, not implementation claim.
 
-If the North Star mechanism is real, reusable invariants may eventually cross AI, ecology, governance, attention, economics, and other future organs. The structural-transfer discipline could let the organism propagate concepts **with explicit domains of validity and explicit residue** rather than merely spreading attractive patterns.
+## 10. Vibe-code objection: concede the shell
 
-That is a long-run possibility, not an implementation claim.
+A buyer can quickly reproduce two graph canvases, JSON schemas, LLM correspondences, unmatched-node lists, colored statuses, and PDF export. If that is the product, there is little moat.
 
-## 10. Why a buyer cannot be answered with "you cannot vibe-code this"
+Potential defensible layers, only if validated:
 
-They can vibe-code the shell.
+1. formal transfer semantics;
+2. adjudicated positive/negative domain corpus;
+3. independent witnessing;
+4. adversarial benchmark + published misses;
+5. workflow integration and accumulated institutional decision history.
 
-A team can quickly reproduce:
+The commercial proposition is not "you cannot build this." It is:
 
-- two graph canvases;
-- JSON schemas;
-- LLM-proposed correspondences;
-- unmatched-node lists;
-- colored status labels;
-- a PDF export.
+> buying a maintained, independently witnessed transfer discipline may be cheaper, faster, and more credible than rebuilding and continuously defending it internally.
 
-If that is the product, there is little moat.
+Test that proposition; do not assume it.
 
-The defensible layers, if they prove valuable, would be:
+## 11. Minimal external experiment before platform build
 
-1. **formal transfer semantics** — what licenses transfer, what forbids it, how composition/cardinality/direction/conflict work, and how minimal missing-premise sets are derived;
-2. **adjudicated domain corpus** — accepted and rejected mappings, deceptive analogies, recurring residues, transfer rules, counterexamples, and outcome history;
-3. **independent witnessing** — a warrant another team/auditor/insurer can verify is different from the system grading its own favored analogy;
-4. **adversarial benchmark and published misses** — tempting invalid analogies, under-modeled situations, proof-vs-transfer confusions, and known minimal gather sets;
-5. **workflow integration and institutional history** — prior warrants linked to later observations, decisions, failures, and revisions.
-
-The honest commercial claim is therefore not "customers cannot build this." It is:
-
-> buying a maintained, independently witnessed transfer discipline may become cheaper, faster, and more credible than rebuilding and continuously defending it internally.
-
-That proposition must be tested, not assumed.
-
-## 11. Minimal external experiment before a platform build
-
-Do **not** begin with a generalized canvas/platform campaign.
-
-Run a human-assisted warrant service first.
-
-Minimum experiment:
+Run a human-assisted warrant service first:
 
 1. Recruit one external team facing a real A -> B transfer decision.
-2. Encode A and B manually as typed role graphs with them.
-3. Produce correspondence, residue, claim statuses, and gather-list.
-4. Require the customer to identify whether the residue/gather-list changes an actual decision.
-5. Gather at least one missing observation or run at least one discriminating test.
-6. Recompute the warrant and record a status transition or justified stability.
-7. Have the customer retain the versioned artifact and ask whether they would pay to repeat the process after the next material change.
+2. Encode A/B manually as typed role graphs.
+3. Produce correspondence, residue, statuses, gather-list.
+4. Ask whether residue/gather-list changes an actual decision.
+5. Gather at least one missing observation or run one discriminating test.
+6. Recompute and record a status transition or justified stability.
+7. Let the customer retain the versioned artifact; test willingness to pay for the next material change.
 
-Positive signal:
+**Positive signal:** residue changes action; gather-list is acted on; later evidence changes/confirms status; another decision-maker reuses the artifact; independent witnessing matters; repeat payment/commitment.
 
-- residue changes action;
-- gather-list is acted on;
-- later evidence changes or confirms status;
-- the artifact is reused by another decision-maker;
-- independent witnessing matters;
-- the customer pays or commits to pay for another warrant.
+**Hold/kill signal:** users only want prose; graph modeling is intolerable; residue never changes decisions; gather obligations are ignored; witnessing adds no value; every engagement requires a wholly bespoke ontology with no compounding concepts.
 
-Kill/hold signal:
+## 12. Questions for adversarial review
 
-- users only want prose;
-- explicit graph modeling is intolerable;
-- residue never changes decisions;
-- gather obligations are ignored;
-- independent witnessing adds no value;
-- every
+Please **default to refute**, not elaborate. This is a proposal seeking falsification.
+
+1. Does the proposed artifact actually instantiate NORTH_STAR §2's invariant/pattern-match mechanism, or am I forcing a convenient analogy onto the vision?
+2. Does first-class residue genuinely operationalize bounded standpoint/anekantavada, or is that philosophical decoration after the fact?
+3. Does this violate the Arjuna Test even with an external AI-control-transfer buyer? If yes, identify the exact failure.
+4. Is `derived | transferred | unprovable-from-here` a coherent and complete enough epistemic partition? Give counterexamples.
+5. Is the gather-list mechanically derivable in useful cases, or does it collapse into LLM-authored wish lists?
+6. Which existing dharma_swarm module already owns any proposed responsibility here? Flag every duplicate substrate or new truth-store risk.
+7. Is vibe-halt actually a valid falsifier for transfer claims, or are its modeled universes too far from the semantic mapping problem?
+8. Is the Foundry integration legitimate, or would fitness pressure Goodhart the mapping corpus?
+9. Which first wedge is strongest: AI change/control transfer, Loomwork evidence transfer, something else, or none?
+10. What evidence would make you recommend **KILL** rather than BUILD?
+11. What is the smallest external experiment that can distinguish "category with real value" from "beautiful inward architecture"?
+12. If the concept is valid, should it be a BODY/BASIN protocol, an ORGAN-specific capability, an external Web 4.0 product, or deliberately remain outside the repo until demand exists?
+
+A useful review must cite owner docs/code or give a runnable falsification path. Agreement without attack is low-value.
+
+## 13. Non-goals
+
+This proposal does **not** authorize:
+
+- a new active track;
+- a new root truth store;
+- a new generic graph runtime;
+- changes to DharmaGraph, Memory Kernel, Foundry, telos, or vibe-halt;
+- a customer-facing platform build;
+- a claim that market demand exists;
+- a claim that the artifact is formally sound;
+- a claim that the North Star mechanism has been implemented;
+- promotion of this document into canon merely by merging it.
+
+## 14. Source stack read for this proposal
+
+Primary vision/authority sources read directly from current `main` before drafting:
+
+- `docs/vision_maps/NORTH_STAR.md`
+- `docs/vision_maps/VISION_TRANSMISSION.md` (full T2 lattice, including OPEN ledger, claim firewall, negative space, Arjuna Test, build gate)
+- `docs/governance/SOVEREIGN_MANIFEST.md` §Telos Hierarchy and architecture invariants
+- `docs/governance/CANONICAL_DOC_STACK.md`
+- `foundations/THE_ORGANISM.md`
+- `foundations/FIVE_FOURTEEN_A.md`
+- `docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md`
+- `docs/doctrine/OPERATIONAL_DOCTRINE.md`
+- `docs/vision_maps/2026-05-07_operating_company_kernel.md`
+- `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md`
+- `docs/dse/JAGAT_KALYAN_MASTER_VISION.md` (historical/non-authoritative continuity)
+- `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`
+
+Implementation and external-repo claims require separate code/runtime verification before any build decision. This concept document intentionally does not claim runtime liveness.
