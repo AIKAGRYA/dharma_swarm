@@ -1,0 +1,105 @@
+{
+  "id": "organism-rewire-WP-SADHANA-CONSTELLATION-P0",
+  "base_ref": "abc8bd35c34c729ed421f9615df504f5615868bd",
+  "branch": "agent/sadhana-constellation-standalone-20260823",
+  "worktree": ".",
+  "intent": "Implement Organism Rewire next item 14 as one bounded, explicit-mission operator vertical: an injected read-only MissionSnapshot projection plus a responsive three-region Constellation view that reconciles canonical task, attempt, lease, receipt, runtime graph, and runtime event evidence without treating heartbeat, lease freshness, acknowledgement, identifiers, or visual motion as verified work.",
+  "allowed_files": [
+    "api/routers/control_surface.py",
+    "tests/test_control_surface_mission_sarathi.py",
+    "dashboard/src/app/dashboard/control-surface/page.tsx",
+    "dashboard/src/hooks/useMissionSarathi.ts",
+    "dashboard/src/components/cockpit/MissionSarathiStrip.tsx",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-CONSTELLATION-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/main.py",
+    "api/routers/runtime.py",
+    "dashboard/package.json",
+    "dashboard/package-lock.json",
+    "dashboard/src/lib/**",
+    "dashboard/src/app/dashboard/runtime/page.tsx",
+    "dharma_swarm/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "mission-constellation-api-contract",
+      "command": "python3 -m pytest -q tests/test_control_surface_mission_sarathi.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "provider-absence-cannot-render-observed",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('api/routers/control_surface.py'); t=p.read_text(); needle='\\\"state\\\": \\\"uninitialized\\\"'; assert needle in t; p.write_text(t.replace(needle, '\\\"state\\\": \\\"observed\\\"', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_control_surface_mission_sarathi.py', '-k', 'without_provider'], check=False).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "feat(control-surface): add evidence-backed mission constellation"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-CONSTELLATION-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "abc8bd35c34c729ed421f9615df504f5615868bd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Mission Control intentionally exposes no unbounded mission discovery API; this vertical must accept one explicit mission_id and must not initialize TaskBoard or RuntimeStateStore merely to render a page.",
+      "The current router has no composition-root MissionSnapshot provider. Provider absence and exact-mission absence therefore remain typed unknown states instead of triggering a hidden default store.",
+      "Runtime graph runs, leases, heartbeats, publish ACKs, and consume ACKs are distinct evidence modalities. Only a matching recent substantive runtime event can elevate an active execution row to verified working, while coherent terminal receipt evidence is required for terminal completion language.",
+      "The dashboard API helper types do not yet include MissionSnapshot or runtime-event snapshots; this bounded slice keeps those projection types local to its admitted hook rather than widening the shared generated type surface."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control.py",
+      "api/routers/control_surface.py",
+      "api/routers/runtime.py",
+      "dashboard/src/app/dashboard/runtime/page.tsx",
+      "dashboard/src/hooks/useRuntimeControlPlane.ts"
+    ],
+    "honest_blockers": [
+      "This repository slice does not inject or start a MissionControl provider, API server, daemon, executor, NATS consumer, or fleet supervisor; without an owner-injected read-only provider, the endpoint and cockpit must say uninitialized/unknown.",
+      "This slice does not weaken HTTP authentication or invent an EventSource bearer-token workaround. Mobile reachability still depends on the existing protected dashboard/API gateway.",
+      "Repository and browser-fixture tests prove projection and rendering logic, not live executor liveness, semantic task correctness, independent acceptance, or ten-day persistence.",
+      "The positive gate allowlist admits focused pytest and direct Git checks but not npm. Dashboard lint, type/build, and browser checks are run separately and reported as external verifier evidence."
+    ],
+    "rollback": "Remove the added GET projection, hook, strip component, page insertion, focused tests, and this packet as one unit. No runtime store, mission, daemon, executor, transport, external account, or production deployment is mutated by repository rollback.",
+    "packet_digest": "0f921430be66fe2ff194f4b1c41f83db09b78b512af9102e378737a6033f4f78"
+  }
+}
