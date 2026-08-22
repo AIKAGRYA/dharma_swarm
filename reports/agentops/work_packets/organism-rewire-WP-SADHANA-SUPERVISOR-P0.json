@@ -18,7 +18,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "3866fe7b3cc5867dd439ae07e4a57da87157a9dd",
+  "base_ref": "a4f64fcc2ad15cdc4917cb871b9a099741b6b2f3",
   "branch": "agent/sadhana-supervisor-20260823",
   "commit": {
     "allowed": true,
@@ -117,7 +117,7 @@
       "dharma_swarm/operator_core/execution_lease.py"
     ],
     "collision": {
-      "checked_at_sha": "3866fe7b3cc5867dd439ae07e4a57da87157a9dd",
+      "checked_at_sha": "a4f64fcc2ad15cdc4917cb871b9a099741b6b2f3",
       "details": [],
       "status": "clear"
     },
@@ -126,17 +126,21 @@
       "A fresh supervisor-cycle receipt proves one completed reconciliation cycle only; a process identifier, lock file, transport acknowledgement, or heartbeat never proves model execution or semantic acceptance.",
       "Producer completion remains candidate output until a separately validated independent acceptance receipt exists; Forge and Merge Master retain promotion and merge authority.",
       "The atomic JSON snapshot is a bounded read model, not a second ledger; canonical mutation remains in TaskBoard and RuntimeStateStore.",
-      "External A2A identity ambiguity is exposed by a bounded deterministic list API; this packet does not add a risky uniqueness migration or change the imported A2A adapter."
+      "External A2A identity ambiguity is exposed by a bounded deterministic list API; this packet does not add a risky uniqueness migration or change the imported A2A adapter.",
+      "Durable stop fences every later campaign cycle and owner submission; it does not revoke or cancel a provider effect already scheduled in Orchestrator background execution, which requires a separately admitted invoker/cancellation-boundary check.",
+      "This slice validates separately executed verifier evidence but does not automatically dispatch a second verifier task; automatic independent verification requires a separately owned verifier-task route.",
+      "The read-only MissionSnapshot projection/provider seam is implemented, but api.main and the Constellation require a separately admitted composition patch and must never open the supervisor's canonical writable SQLite file."
     ],
     "interface_mismatches": [
       "MissionSnapshot scans the mission session while Orchestrator executions deliberately use distinct owner sessions; campaign status must project MissionSnapshot and owner references separately.",
       "RuntimeStateStore heartbeat_task_claim is read-then-write and cannot fence evidence renewal; this slice adds an exact compare-and-swap method without changing the schema.",
       "RuntimeStateStore external-A2A lookup is latest-only; this slice adds a bounded deterministic list API so the imported adapter can fail closed on ambiguity in a later patch.",
+      "The original packet preflight at 3866fe7b3cc5867dd439ae07e4a57da87157a9dd could not close under the stricter descendant envelope because two sibling-owned surfaces were not named exactly; admission amendment a4f64fcc2ad15cdc4917cb871b9a099741b6b2f3 adds those explicit denials before this reseal.",
       "API lifespan and RuntimeGraphViews can initialize writable stores even in read-only boot, so external readers must consume the atomic campaign JSON projection rather than the supervisor SQLite file.",
       "GovernedMissionDispatcher requires injected verified authority; the supervisor must load an exact file-backed lease and current revocation set instead of manufacturing authority."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "791de08ce9e900e45d062bd0d5b5c53334aac681273fdf7edc13fea50ee535fe",
+    "packet_digest": "7ccbe2b54ccef80146189aa4157646c9350a17a5ffc75a2dd1e8a2e407f9147e",
     "rollback": "Revert this implementation commit. Stop the supervisor before rollback; canonical queued tasks are preserved, the JSON projection is disposable, and no schema migration, remote deployment, transport topology, provider credential, promotion, merge, or external publication is introduced.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {

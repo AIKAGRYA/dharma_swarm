@@ -9,9 +9,11 @@ from typing import Any
 import pytest
 
 import dharma_swarm.orchestrator as orchestrator_module
+import dharma_swarm.task_board as task_board_module
 from dharma_swarm.agent_memory_manager import AgentMemoryManager
 from dharma_swarm.agent_runner import AgentPool
 from dharma_swarm.mission_control import MissionControl
+from dharma_swarm.mission_control_campaign import CampaignConfig, CampaignSupervisor
 from dharma_swarm.mission_control_contract import (
     MissionControlError,
     stable_id,
@@ -21,6 +23,10 @@ from dharma_swarm.mission_control_execution import (
     OWNER_BACKEND,
     OrchestratorMissionAdapter,
     OwnerExecutionRef,
+)
+from dharma_swarm.mission_control_evidence import (
+    EVIDENCE_DELTA_RECEIPT_TYPE,
+    EvidenceDelta,
 )
 from dharma_swarm.models import (
     AgentConfig,
@@ -35,6 +41,7 @@ from dharma_swarm.models import (
 from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.runtime_state import (
     DelegationRun,
+    RuntimeReceipt,
     RuntimeStateStore,
     TaskClaim,
 )
@@ -310,6 +317,18 @@ async def test_real_agent_pool_runner_executes_once_and_retry_recovers(
         assert [run.run_id for run in runs] == [ref.run_id]
         assert identities[0] is not None
         assert identities[0].idempotency_key == ref.idempotency_key
+
+        supervisor = CampaignSupervisor(
+            CampaignConfig(MISSION_ID),
+            control,
+            board,
+            runtime,
+            adapter,
+        )
+        await supervisor.start()
+        campaign = await supervisor.status(writer_lock_held=True)
+        assert campaign.model_execution_state == "observed"
+        assert campaign.proves_model_execution is True
     finally:
         await asyncio.sleep(0.05)
         await pool.shutdown_all()
@@ -627,3 +646,158 @@ async def test_invalid_wait_budget_fails_before_owner_reads() -> None:
 
     with pytest.raises(ValueError, match="timeout_seconds"):
         await adapter.wait(ref, timeout_seconds=0)
+
+
+@pytest.mark.asyncio
+async def test_evidence_renewal_requires_durable_new_evidence_and_records_receipt(
+    tmp_path: Path,
+) -> None:
+    board, runtime, control, task = await _stack(tmp_path)
+    await board.assign(task.task_id, "owner-agent")
+    await board.start(task.task_id)
+    run_id, idempotency_key = _expected(task.task_id)
+    ref = await _record_owner_execution(
+        runtime,
+        task_id=task.task_id,
+        run_id=run_id,
+        idempotency_key=idempotency_key,
+        claim_id="owner-claim",
+        agent_id="owner-agent",
+        owner_session_id=OWNER_SESSION_ID,
+    )
+    adapter = OrchestratorMissionAdapter(
+        _NoDispatch(),  # type: ignore[arg-type]
+        control,
+        board,
+        runtime,
+    )
+    observed_at = utc_now()
+    missing = EvidenceDelta.new(
+        mission_id=MISSION_ID,
+        task_id=task.task_id,
+        run_id=ref.run_id,
+        claim_id=ref.claim_id,
+        agent_id=ref.agent_id,
+        sequence=1,
+        observed_at=observed_at,
+        summary="Created a durable owner result.",
+        receipt_ids=("owner-work-receipt",),
+    )
+    with pytest.raises(MissionControlError, match="missing runtime receipt"):
+        await adapter.renew_with_evidence(ref, missing)
+
+    await runtime.record_runtime_receipt(
+        RuntimeReceipt(
+            receipt_id="owner-work-receipt",
+            receipt_type="owner_work",
+            status="recorded",
+            run_id=ref.run_id,
+            task_id=ref.task_id,
+            agent_id=ref.agent_id,
+            idempotency_key=ref.idempotency_key,
+            created_at=observed_at,
+        )
+    )
+    renewed = await adapter.renew_with_evidence(
+        ref,
+        missing,
+        lease_seconds=90,
+    )
+
+    assert renewed.heartbeat_at == observed_at
+    assert renewed.stale_after == observed_at + timedelta(seconds=90)
+    assert renewed.metadata["mission_control_evidence"]["last_sequence"] == 1
+    receipts = await runtime.list_runtime_receipts(run_id=ref.run_id, limit=20)
+    assert any(
+        receipt.receipt_type == EVIDENCE_DELTA_RECEIPT_TYPE
+        and receipt.payload["delta_id"] == missing.delta_id
+        for receipt in receipts
+    )
+    with pytest.raises(MissionControlError, match="duplicate or stale"):
+        await adapter.renew_with_evidence(ref, missing)
+
+    reused = EvidenceDelta.new(
+        mission_id=MISSION_ID,
+        task_id=task.task_id,
+        run_id=ref.run_id,
+        claim_id=ref.claim_id,
+        agent_id=ref.agent_id,
+        sequence=2,
+        observed_at=observed_at + timedelta(seconds=1),
+        summary="Attempted to reuse the previous durable evidence.",
+        receipt_ids=("owner-work-receipt",),
+    )
+    with pytest.raises(MissionControlError, match="already consumed"):
+        await adapter.renew_with_evidence(ref, reused)
+
+
+@pytest.mark.asyncio
+async def test_evidence_renewal_rejects_stale_wrong_run_and_terminal_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fast_gate,
+) -> None:
+    monkeypatch.setattr(
+        task_board_module,
+        "check_with_reflective_reroute",
+        lambda **_: fast_gate,
+    )
+    board, runtime, control, task = await _stack(tmp_path)
+    await board.assign(task.task_id, "owner-agent")
+    await board.start(task.task_id)
+    run_id, idempotency_key = _expected(task.task_id)
+    ref = await _record_owner_execution(
+        runtime,
+        task_id=task.task_id,
+        run_id=run_id,
+        idempotency_key=idempotency_key,
+        claim_id="owner-claim",
+        agent_id="owner-agent",
+        owner_session_id=OWNER_SESSION_ID,
+    )
+    adapter = OrchestratorMissionAdapter(
+        _NoDispatch(),  # type: ignore[arg-type]
+        control,
+        board,
+        runtime,
+    )
+    evidence_values = {
+        "mission_id": MISSION_ID,
+        "task_id": task.task_id,
+        "claim_id": ref.claim_id,
+        "agent_id": ref.agent_id,
+        "sequence": 1,
+        "observed_at": utc_now(),
+        "summary": "Evidence used only after the identity fence passes.",
+        "receipt_ids": ("not-reached",),
+    }
+    wrong_run = EvidenceDelta.new(run_id="foreign-run", **evidence_values)
+    with pytest.raises(MissionControlError, match="foreign owner execution"):
+        await adapter.renew_with_evidence(ref, wrong_run)
+
+    claim = await runtime.get_task_claim(ref.claim_id)
+    assert claim is not None
+    await runtime.record_task_claim(
+        replace(claim, stale_after=utc_now() - timedelta(seconds=1))
+    )
+    correct = EvidenceDelta.new(run_id=ref.run_id, **evidence_values)
+    with pytest.raises(MissionControlError, match="stale owner claim"):
+        await adapter.renew_with_evidence(ref, correct)
+
+    claim = await runtime.get_task_claim(ref.claim_id)
+    run = await runtime.get_delegation_run(ref.run_id)
+    assert claim is not None
+    assert run is not None
+    await runtime.record_task_claim(
+        replace(
+            claim,
+            status="completed",
+            stale_after=utc_now() + timedelta(minutes=5),
+        )
+    )
+    await runtime.record_delegation_run(
+        replace(run, status="completed", completed_at=utc_now())
+    )
+    await board.complete(task.task_id, result="owner candidate")
+    with pytest.raises(MissionControlError, match="terminal owner execution"):
+        await adapter.renew_with_evidence(ref, correct)

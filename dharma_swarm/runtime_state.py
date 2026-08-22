@@ -411,6 +411,79 @@ _EXECUTION_IDENTITY_CONFLICT_FIELDS = (
     "proposal_id",
 )
 
+_IMMUTABLE_EXECUTION_METADATA_KEYS = frozenset(
+    {
+        "schema_version",
+        "mission_id",
+        "dispatch_key",
+        "operation_id",
+        "operation_digest",
+        "context_id",
+        "authority_ref",
+        "authority_digest",
+        "authenticated_principal",
+        "subject",
+        "nats_operation_hash",
+        "capability",
+    }
+)
+
+_RENEWABLE_TASK_CLAIM_STATUSES = frozenset(
+    {"active", "claimed", "acknowledged", "running", "leased"}
+)
+_CLAIM_EVIDENCE_METADATA_KEY = "mission_control_evidence"
+_IMMUTABLE_RUNTIME_RECEIPT_TYPES = frozenset(
+    {
+        "mission_evidence_delta",
+        "mission_independent_acceptance",
+        "mission_campaign_cycle",
+        "mission_campaign_control",
+    }
+)
+_IMMUTABLE_SESSION_SCHEMA_VALUES = frozenset(
+    {"dharma.mission_control.campaign.v1"}
+)
+
+
+def _stable_bound_id(prefix: str, *parts: str) -> str:
+    payload = "\x1f".join(parts).encode("utf-8")
+    return f"{prefix}_{hashlib.sha256(payload).hexdigest()[:24]}"
+
+
+def _validate_campaign_cycle_receipt(receipt: RuntimeReceipt) -> None:
+    if receipt.receipt_type != "mission_campaign_cycle":
+        return
+    payload = receipt.payload
+    mission_id = payload.get("mission_id")
+    generation = payload.get("generation")
+    sequence = payload.get("sequence")
+    if (
+        not isinstance(mission_id, str)
+        or not mission_id
+        or isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+        or isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence < 1
+    ):
+        raise ValueError("campaign cycle receipt coordinates are invalid")
+    expected_id = _stable_bound_id(
+        "mission_campaign_cycle", mission_id, str(generation), str(sequence)
+    )
+    if (
+        payload.get("schema_version") != "dharma.mission_control.campaign.v1"
+        or receipt.receipt_id != expected_id
+        or receipt.correlation_id != f"mission_campaign:{mission_id}"
+        or receipt.run_id
+        != _stable_bound_id("mission_campaign_run", mission_id, str(generation))
+        or receipt.agent_id != "mission-control-supervisor"
+        or receipt.idempotency_key != expected_id
+        or receipt.side_effect_key != f"mission_campaign_cycle:{generation}:{sequence}"
+        or receipt.status not in {"completed", "partial"}
+    ):
+        raise ValueError("campaign cycle receipt carrier is invalid")
+
 
 def _json_dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True)
@@ -1025,6 +1098,67 @@ def _raise_on_execution_identity_conflict(
     )
 
 
+def _merge_execution_identity_metadata(
+    existing: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Merge additive lifecycle metadata without weakening security bindings."""
+    additions = {**dict(incoming.metadata or {}), **dict(metadata or {})}
+    if existing is None:
+        return additions
+    merged = dict(existing.metadata or {})
+    for key in _IMMUTABLE_EXECUTION_METADATA_KEYS:
+        current = merged.get(key)
+        proposed = additions.get(key)
+        if current not in (None, "") and proposed not in (None, ""):
+            if _json_dump(current) != _json_dump(proposed):
+                raise ValueError(
+                    "execution identity immutable metadata conflict for "
+                    f"run_id {incoming.run_id!r}: {key}"
+                )
+    merged.update(additions)
+    for key in _IMMUTABLE_EXECUTION_METADATA_KEYS:
+        current = (existing.metadata or {}).get(key)
+        if current not in (None, ""):
+            merged[key] = current
+    return merged
+
+
+def _preserve_claim_evidence_metadata(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any] | None,
+    *,
+    claim_id: str,
+) -> dict[str, Any]:
+    """Keep the CAS-owned evidence generation immutable to generic writers."""
+    current = dict(existing or {})
+    additions = dict(incoming or {})
+    current_evidence = current.get(_CLAIM_EVIDENCE_METADATA_KEY)
+    proposed_evidence = additions.get(_CLAIM_EVIDENCE_METADATA_KEY)
+    if current_evidence is not None and proposed_evidence is not None:
+        if _json_dump(current_evidence) != _json_dump(proposed_evidence):
+            raise ValueError(
+                "task claim reserved evidence metadata conflict for "
+                f"claim_id {claim_id!r}"
+            )
+    merged = {**current, **additions}
+    if current_evidence is not None:
+        merged[_CLAIM_EVIDENCE_METADATA_KEY] = current_evidence
+    return merged
+
+
+def _later_timestamp(
+    current: datetime | None,
+    proposed: datetime | None,
+) -> datetime | None:
+    if current is None:
+        return proposed
+    if proposed is None or proposed < current:
+        return current
+    return proposed
+
+
 def _identity_from_metadata(metadata: dict[str, Any] | None) -> ExecutionIdentity | None:
     return ExecutionIdentity.from_metadata(metadata, require=False)
 
@@ -1236,6 +1370,16 @@ class RuntimeStateStore:
 
     @staticmethod
     def _upsert_session_stub_sync(db: sqlite3.Connection, event: SessionEventRecord) -> None:
+        row = db.execute(
+            "SELECT metadata_json FROM sessions WHERE session_id = ?",
+            (event.session_id,),
+        ).fetchone()
+        if row is not None and _json_load(row[0], {}).get(
+            "schema_version"
+        ) in _IMMUTABLE_SESSION_SCHEMA_VALUES:
+            return
+        if row is None and event.session_id.startswith("mission_campaign:"):
+            raise ValueError("session event cannot reserve a campaign session")
         current_task_id = event.task_id or ""
         created_at = event.created_at.isoformat()
         db.execute(
@@ -1261,6 +1405,18 @@ class RuntimeStateStore:
         db: aiosqlite.Connection,
         event: SessionEventRecord,
     ) -> None:
+        row = await (
+            await db.execute(
+                "SELECT metadata_json FROM sessions WHERE session_id = ?",
+                (event.session_id,),
+            )
+        ).fetchone()
+        if row is not None and _json_load(row[0], {}).get(
+            "schema_version"
+        ) in _IMMUTABLE_SESSION_SCHEMA_VALUES:
+            return
+        if row is None and event.session_id.startswith("mission_campaign:"):
+            raise ValueError("session event cannot reserve a campaign session")
         current_task_id = event.task_id or ""
         created_at = event.created_at.isoformat()
         await db.execute(
@@ -1372,6 +1528,36 @@ class RuntimeStateStore:
     async def upsert_session(self, session: SessionState) -> SessionState:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute(
+                    "SELECT session_id, operator_id, status, current_task_id,"
+                    " active_bundle_id, metadata_json, created_at, updated_at"
+                    " FROM sessions WHERE session_id = ?",
+                    (session.session_id,),
+                )
+            ).fetchone()
+            existing = _row_to_session(row) if row is not None else None
+            existing_schema = (
+                existing.metadata.get("schema_version") if existing is not None else None
+            )
+            incoming_schema = session.metadata.get("schema_version")
+            if (
+                session.session_id.startswith("mission_campaign:")
+                or (
+                    existing_schema in _IMMUTABLE_SESSION_SCHEMA_VALUES
+                    or incoming_schema in _IMMUTABLE_SESSION_SCHEMA_VALUES
+                )
+            ):
+                if existing == session:
+                    await db.commit()
+                    return existing
+                await db.rollback()
+                raise ValueError(
+                    "reserved campaign session requires exact create-or-CAS mutation"
+                )
             await db.execute(
                 "INSERT INTO sessions (session_id, operator_id, status, current_task_id,"
                 " active_bundle_id, metadata_json, created_at, updated_at)"
@@ -1394,10 +1580,328 @@ class RuntimeStateStore:
                     session.updated_at.isoformat(),
                 ),
             )
+            row = await (
+                await db.execute(
+                    "SELECT session_id, operator_id, status, current_task_id,"
+                    " active_bundle_id, metadata_json, created_at, updated_at"
+                    " FROM sessions WHERE session_id = ?",
+                    (session.session_id,),
+                )
+            ).fetchone()
             await db.commit()
-        loaded = await self.get_session(session.session_id)
-        assert loaded is not None
-        return loaded
+        assert row is not None
+        return _row_to_session(row)
+
+    async def insert_session_if_absent(
+        self,
+        session: SessionState,
+        *,
+        atomic_receipt: RuntimeReceipt,
+    ) -> SessionState | None:
+        """Create one session and its immutable receipt in the same transaction."""
+        _validate_campaign_cycle_receipt(atomic_receipt)
+        if (
+            atomic_receipt.correlation_id != session.session_id
+            or atomic_receipt.created_at != session.updated_at
+        ):
+            raise ValueError("atomic session receipt does not bind the new session")
+        session_schema = session.metadata.get("schema_version")
+        if session.session_id.startswith("mission_campaign:") and (
+            session_schema not in _IMMUTABLE_SESSION_SCHEMA_VALUES
+        ):
+            raise ValueError("reserved campaign session requires campaign schema")
+        if session_schema in _IMMUTABLE_SESSION_SCHEMA_VALUES:
+            mission_id = session.metadata.get("mission_id")
+            generation = session.metadata.get("generation")
+            expected_receipt_id = _stable_bound_id(
+                "mission_campaign_control", str(mission_id), "start", str(generation)
+            )
+            if (
+                not isinstance(mission_id, str)
+                or not mission_id
+                or session.session_id != f"mission_campaign:{mission_id}"
+                or generation != 1
+                or session.status != "active"
+                or session.metadata.get("stop_requested") is not False
+                or session.metadata.get("last_cycle_sequence") != 0
+                or session.metadata.get("last_cycle_receipt_id") != ""
+                or atomic_receipt.receipt_type != "mission_campaign_control"
+                or atomic_receipt.status != "start"
+                or atomic_receipt.receipt_id != expected_receipt_id
+                or atomic_receipt.agent_id != session.operator_id
+                or atomic_receipt.payload.get("schema_version")
+                != session.metadata.get("schema_version")
+                or atomic_receipt.payload.get("mission_id") != mission_id
+                or atomic_receipt.payload.get("generation") != generation
+                or atomic_receipt.payload.get("action") != "start"
+            ):
+                raise ValueError("campaign start receipt does not bind initial session")
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            inserted = await db.execute(
+                "INSERT INTO sessions (session_id, operator_id, status, current_task_id,"
+                " active_bundle_id, metadata_json, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(session_id) DO NOTHING",
+                (
+                    session.session_id,
+                    session.operator_id,
+                    session.status,
+                    session.current_task_id,
+                    session.active_bundle_id,
+                    _json_dump(session.metadata),
+                    session.created_at.isoformat(),
+                    session.updated_at.isoformat(),
+                ),
+            )
+            if inserted.rowcount != 1:
+                await db.rollback()
+                return None
+            receipt_row = await (
+                await db.execute(
+                    "SELECT receipt_id FROM runtime_receipts WHERE receipt_id = ?",
+                    (atomic_receipt.receipt_id,),
+                )
+            ).fetchone()
+            if receipt_row is not None:
+                await db.rollback()
+                raise ValueError("atomic session receipt identity already exists")
+            await db.execute(
+                "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id, task_id,"
+                " trace_id, correlation_id, causation_id, parent_run_id, agent_id,"
+                " idempotency_key, side_effect_key, status, payload_json, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    atomic_receipt.receipt_id,
+                    atomic_receipt.receipt_type,
+                    atomic_receipt.run_id,
+                    atomic_receipt.task_id,
+                    atomic_receipt.trace_id,
+                    atomic_receipt.correlation_id,
+                    atomic_receipt.causation_id,
+                    atomic_receipt.parent_run_id,
+                    atomic_receipt.agent_id,
+                    atomic_receipt.idempotency_key,
+                    atomic_receipt.side_effect_key,
+                    atomic_receipt.status,
+                    _json_dump(atomic_receipt.payload),
+                    atomic_receipt.created_at.isoformat(),
+                ),
+            )
+            row = await (
+                await db.execute(
+                    "SELECT session_id, operator_id, status, current_task_id,"
+                    " active_bundle_id, metadata_json, created_at, updated_at"
+                    " FROM sessions WHERE session_id = ?",
+                    (session.session_id,),
+                )
+            ).fetchone()
+            await db.commit()
+        assert row is not None
+        return _row_to_session(row)
+
+    async def compare_and_swap_session(
+        self,
+        expected: SessionState,
+        replacement: SessionState,
+        *,
+        atomic_receipt: RuntimeReceipt | None = None,
+    ) -> SessionState | None:
+        """Replace one exact session generation, optionally with one receipt."""
+        if atomic_receipt is not None:
+            _validate_campaign_cycle_receipt(atomic_receipt)
+        if (
+            replacement.session_id != expected.session_id
+            or replacement.created_at != expected.created_at
+            or replacement.updated_at <= expected.updated_at
+        ):
+            raise ValueError("session CAS replacement changes its fenced identity")
+        expected_schema = expected.metadata.get("schema_version")
+        replacement_schema = replacement.metadata.get("schema_version")
+        if (
+            expected.session_id.startswith("mission_campaign:")
+            or expected_schema in _IMMUTABLE_SESSION_SCHEMA_VALUES
+            or replacement_schema in _IMMUTABLE_SESSION_SCHEMA_VALUES
+        ):
+            if expected_schema != replacement_schema:
+                raise ValueError("reserved campaign session schema is immutable")
+            if atomic_receipt is None:
+                raise ValueError("reserved campaign session CAS requires a receipt")
+            expected_generation = expected.metadata.get("generation")
+            replacement_generation = replacement.metadata.get("generation")
+            mission_id = replacement.metadata.get("mission_id")
+            if (
+                isinstance(expected_generation, bool)
+                or not isinstance(expected_generation, int)
+                or isinstance(replacement_generation, bool)
+                or not isinstance(replacement_generation, int)
+                or not isinstance(mission_id, str)
+                or not mission_id
+                or replacement.session_id != f"mission_campaign:{mission_id}"
+            ):
+                raise ValueError("campaign session generation binding is invalid")
+            if (
+                atomic_receipt.receipt_type
+                not in {"mission_campaign_control", "mission_campaign_cycle"}
+                or atomic_receipt.correlation_id != replacement.session_id
+                or atomic_receipt.created_at != replacement.updated_at
+                or atomic_receipt.payload.get("schema_version")
+                not in _IMMUTABLE_SESSION_SCHEMA_VALUES
+                or atomic_receipt.payload.get("mission_id")
+                != mission_id
+                or atomic_receipt.payload.get("generation")
+                != replacement_generation
+                or expected.metadata.get("mission_id") != mission_id
+                or expected.metadata.get("config_digest")
+                != replacement.metadata.get("config_digest")
+                or expected.metadata.get("config") != replacement.metadata.get("config")
+                or replacement.operator_id != expected.operator_id
+                or replacement.current_task_id != expected.current_task_id
+                or replacement.active_bundle_id != expected.active_bundle_id
+            ):
+                raise ValueError("campaign session receipt does not bind its replacement")
+            if atomic_receipt.receipt_type == "mission_campaign_control":
+                action = atomic_receipt.payload.get("action")
+                valid_start = (
+                    action == atomic_receipt.status == "start"
+                    and replacement_generation == expected_generation + 1
+                    and replacement.status == "active"
+                    and replacement.metadata.get("stop_requested") is False
+                    and replacement.metadata.get("last_cycle_sequence") == 0
+                    and replacement.metadata.get("last_cycle_receipt_id") == ""
+                )
+                valid_stop = (
+                    action == atomic_receipt.status == "stop"
+                    and replacement_generation == expected_generation
+                    and replacement.status == "stopped"
+                    and replacement.metadata.get("stop_requested") is True
+                    and replacement.metadata.get("last_cycle_sequence")
+                    == expected.metadata.get("last_cycle_sequence")
+                    and replacement.metadata.get("last_cycle_receipt_id")
+                    == expected.metadata.get("last_cycle_receipt_id")
+                )
+                expected_receipt_id = _stable_bound_id(
+                    "mission_campaign_control",
+                    str(mission_id),
+                    str(action),
+                    str(replacement_generation),
+                )
+                if (
+                    not (valid_start or valid_stop)
+                    or atomic_receipt.receipt_id != expected_receipt_id
+                    or atomic_receipt.agent_id != replacement.operator_id
+                ):
+                    raise ValueError("campaign control receipt transition is invalid")
+            else:
+                sequence = replacement.metadata.get("last_cycle_sequence")
+                expected_sequence = expected.metadata.get("last_cycle_sequence")
+                if (
+                    isinstance(sequence, bool)
+                    or not isinstance(sequence, int)
+                    or isinstance(expected_sequence, bool)
+                    or not isinstance(expected_sequence, int)
+                ):
+                    raise ValueError("campaign cycle sequence binding is invalid")
+                expected_receipt_id = _stable_bound_id(
+                    "mission_campaign_cycle",
+                    str(mission_id),
+                    str(replacement_generation),
+                    str(sequence),
+                )
+                if (
+                    replacement_generation != expected_generation
+                    or replacement.status != "active"
+                    or expected.status != "active"
+                    or replacement.metadata.get("stop_requested") is not False
+                    or sequence != expected_sequence + 1
+                    or atomic_receipt.payload.get("sequence") != sequence
+                    or atomic_receipt.receipt_id != expected_receipt_id
+                    or atomic_receipt.receipt_id
+                    != replacement.metadata.get("last_cycle_receipt_id")
+                    or atomic_receipt.idempotency_key != expected_receipt_id
+                    or atomic_receipt.agent_id != "mission-control-supervisor"
+                ):
+                    raise ValueError("campaign cycle receipt transition is invalid")
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "UPDATE sessions SET operator_id = ?, status = ?, current_task_id = ?,"
+                " active_bundle_id = ?, metadata_json = ?, updated_at = ?"
+                " WHERE session_id = ? AND operator_id = ? AND status = ?"
+                " AND current_task_id = ? AND active_bundle_id = ?"
+                " AND metadata_json = ? AND created_at = ? AND updated_at = ?",
+                (
+                    replacement.operator_id,
+                    replacement.status,
+                    replacement.current_task_id,
+                    replacement.active_bundle_id,
+                    _json_dump(replacement.metadata),
+                    replacement.updated_at.isoformat(),
+                    expected.session_id,
+                    expected.operator_id,
+                    expected.status,
+                    expected.current_task_id,
+                    expected.active_bundle_id,
+                    _json_dump(expected.metadata),
+                    expected.created_at.isoformat(),
+                    expected.updated_at.isoformat(),
+                ),
+            )
+            if cursor.rowcount != 1:
+                await db.rollback()
+                return None
+            if atomic_receipt is not None:
+                receipt_row = await (
+                    await db.execute(
+                        "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                        " correlation_id, causation_id, parent_run_id, agent_id,"
+                        " idempotency_key, side_effect_key, status, payload_json, created_at"
+                        " FROM runtime_receipts WHERE receipt_id = ?",
+                        (atomic_receipt.receipt_id,),
+                    )
+                ).fetchone()
+                if receipt_row is not None:
+                    if _row_to_runtime_receipt(receipt_row) != atomic_receipt:
+                        raise ValueError("atomic session receipt identity conflicts")
+                else:
+                    await db.execute(
+                        "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id,"
+                        " task_id, trace_id, correlation_id, causation_id, parent_run_id,"
+                        " agent_id, idempotency_key, side_effect_key, status, payload_json,"
+                        " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            atomic_receipt.receipt_id,
+                            atomic_receipt.receipt_type,
+                            atomic_receipt.run_id,
+                            atomic_receipt.task_id,
+                            atomic_receipt.trace_id,
+                            atomic_receipt.correlation_id,
+                            atomic_receipt.causation_id,
+                            atomic_receipt.parent_run_id,
+                            atomic_receipt.agent_id,
+                            atomic_receipt.idempotency_key,
+                            atomic_receipt.side_effect_key,
+                            atomic_receipt.status,
+                            _json_dump(atomic_receipt.payload),
+                            atomic_receipt.created_at.isoformat(),
+                        ),
+                    )
+            row = await (
+                await db.execute(
+                    "SELECT session_id, operator_id, status, current_task_id,"
+                    " active_bundle_id, metadata_json, created_at, updated_at"
+                    " FROM sessions WHERE session_id = ?",
+                    (expected.session_id,),
+                )
+            ).fetchone()
+            await db.commit()
+        assert row is not None
+        return _row_to_session(row)
 
     def _run_sync_transaction(self, operation: Any, *, immediate: bool = False) -> Any:
         self.init_db_sync()
@@ -1411,6 +1915,8 @@ class RuntimeStateStore:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
             await self._record_session_event_and_optional_receipt_async_db(db, event, receipt)
             await db.commit()
         return event
@@ -1595,11 +2101,32 @@ class RuntimeStateStore:
     async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
         await self.init_db()
         corr = get_correlation()
-        trace_id = _trace_from_metadata(claim.metadata) or corr.trace_id
         if corr.cell_id:
             claim.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
+            await db.execute("BEGIN IMMEDIATE")
+            db.row_factory = aiosqlite.Row
+            existing_row = await (
+                await db.execute(
+                    "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                    " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                    " metadata_json FROM task_claims WHERE claim_id = ?",
+                    (claim.claim_id,),
+                )
+            ).fetchone()
+            existing = _row_to_claim(existing_row) if existing_row is not None else None
+            metadata = _preserve_claim_evidence_metadata(
+                existing.metadata if existing is not None else None,
+                claim.metadata,
+                claim_id=claim.claim_id,
+            )
+            heartbeat_at = _later_timestamp(
+                existing.heartbeat_at if existing is not None else None,
+                claim.heartbeat_at,
+            )
+            stale_after = claim.stale_after
+            trace_id = _trace_from_metadata(metadata) or corr.trace_id
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
@@ -1626,18 +2153,25 @@ class RuntimeStateStore:
                     claim.status,
                     claim.claimed_at.isoformat(),
                     claim.acked_at.isoformat() if claim.acked_at else None,
-                    claim.heartbeat_at.isoformat() if claim.heartbeat_at else None,
-                    claim.stale_after.isoformat() if claim.stale_after else None,
+                    heartbeat_at.isoformat() if heartbeat_at else None,
+                    stale_after.isoformat() if stale_after else None,
                     claim.recovered_at.isoformat() if claim.recovered_at else None,
                     int(claim.retry_count),
-                    _json_dump(claim.metadata),
+                    _json_dump(metadata),
                     trace_id,
                 ),
             )
+            loaded_row = await (
+                await db.execute(
+                    "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                    " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                    " metadata_json FROM task_claims WHERE claim_id = ?",
+                    (claim.claim_id,),
+                )
+            ).fetchone()
             await db.commit()
-        loaded = await self.get_task_claim(claim.claim_id)
-        assert loaded is not None
-        return loaded
+        assert loaded_row is not None
+        return _row_to_claim(loaded_row)
 
     async def get_task_claim(self, claim_id: str) -> TaskClaim | None:
         await self.init_db()
@@ -1696,26 +2230,70 @@ class RuntimeStateStore:
         acknowledged_at: datetime | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> TaskClaim:
-        existing = await self.get_task_claim(claim_id)
-        if existing is None:
-            raise KeyError(f"claim {claim_id} not found")
-        merged_metadata = {**existing.metadata, **(metadata or {})}
-        acked_at = acknowledged_at or _utc_now()
-        updated = TaskClaim(
-            claim_id=existing.claim_id,
-            task_id=existing.task_id,
-            agent_id=existing.agent_id,
-            status=status,
-            session_id=existing.session_id,
-            claimed_at=existing.claimed_at,
-            acked_at=acked_at,
-            heartbeat_at=existing.heartbeat_at or acked_at,
-            stale_after=existing.stale_after,
-            recovered_at=existing.recovered_at,
-            retry_count=existing.retry_count,
-            metadata=merged_metadata,
-        )
-        return await self.record_task_claim(updated)
+        for _attempt in range(3):
+            existing = await self.get_task_claim(claim_id)
+            if existing is None:
+                raise KeyError(f"claim {claim_id} not found")
+            merged_metadata = _preserve_claim_evidence_metadata(
+                existing.metadata,
+                {**existing.metadata, **(metadata or {})},
+                claim_id=claim_id,
+            )
+            acked_at = acknowledged_at or _utc_now()
+            heartbeat_at = existing.heartbeat_at or acked_at
+            async with aiosqlite.connect(self.db_path) as db:
+                await _apply_connection_pragmas_async(db)
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    "UPDATE task_claims SET status = ?, acked_at = ?, heartbeat_at = ?,"
+                    " metadata_json = ?, trace_id = ?"
+                    " WHERE claim_id = ? AND task_id = ? AND agent_id = ?"
+                    " AND session_id = ? AND status = ? AND claimed_at = ?"
+                    " AND acked_at IS ? AND heartbeat_at IS ? AND stale_after IS ?"
+                    " AND recovered_at IS ? AND retry_count = ? AND metadata_json = ?",
+                    (
+                        status,
+                        acked_at.isoformat(),
+                        heartbeat_at.isoformat(),
+                        _json_dump(merged_metadata),
+                        _trace_from_metadata(merged_metadata),
+                        existing.claim_id,
+                        existing.task_id,
+                        existing.agent_id,
+                        existing.session_id,
+                        existing.status,
+                        existing.claimed_at.isoformat(),
+                        existing.acked_at.isoformat() if existing.acked_at else None,
+                        (
+                            existing.heartbeat_at.isoformat()
+                            if existing.heartbeat_at
+                            else None
+                        ),
+                        existing.stale_after.isoformat() if existing.stale_after else None,
+                        (
+                            existing.recovered_at.isoformat()
+                            if existing.recovered_at
+                            else None
+                        ),
+                        int(existing.retry_count),
+                        _json_dump(existing.metadata),
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    await db.rollback()
+                    continue
+                row = await (
+                    await db.execute(
+                        "SELECT claim_id, task_id, session_id, agent_id, status,"
+                        " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
+                        " retry_count, metadata_json FROM task_claims WHERE claim_id = ?",
+                        (claim_id,),
+                    )
+                ).fetchone()
+                await db.commit()
+            assert row is not None
+            return _row_to_claim(row)
+        raise RuntimeError("task claim acknowledgement lost its fence repeatedly")
 
     async def heartbeat_task_claim(
         self,
@@ -1725,26 +2303,307 @@ class RuntimeStateStore:
         status: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> TaskClaim:
-        existing = await self.get_task_claim(claim_id)
-        if existing is None:
-            raise KeyError(f"claim {claim_id} not found")
-        beat_at = heartbeat_at or _utc_now()
-        merged_metadata = {**existing.metadata, **(metadata or {})}
-        updated = TaskClaim(
-            claim_id=existing.claim_id,
-            task_id=existing.task_id,
-            agent_id=existing.agent_id,
-            status=status or existing.status,
-            session_id=existing.session_id,
-            claimed_at=existing.claimed_at,
-            acked_at=existing.acked_at,
-            heartbeat_at=beat_at,
-            stale_after=existing.stale_after,
-            recovered_at=existing.recovered_at,
-            retry_count=existing.retry_count,
-            metadata=merged_metadata,
+        for _attempt in range(3):
+            existing = await self.get_task_claim(claim_id)
+            if existing is None:
+                raise KeyError(f"claim {claim_id} not found")
+            target_status = status or existing.status
+            if (
+                existing.status.lower() not in _RENEWABLE_TASK_CLAIM_STATUSES
+                or target_status.lower() not in _RENEWABLE_TASK_CLAIM_STATUSES
+            ):
+                raise ValueError("heartbeat cannot update a terminal claim")
+            beat_at = heartbeat_at or _utc_now()
+            if beat_at.tzinfo is None:
+                raise ValueError("heartbeat_at must be timezone-aware")
+            if existing.heartbeat_at is not None and beat_at <= existing.heartbeat_at:
+                raise ValueError("heartbeat_at must advance monotonically")
+            merged_metadata = {**existing.metadata, **(metadata or {})}
+            if "mission_control_evidence" in existing.metadata:
+                merged_metadata["mission_control_evidence"] = existing.metadata[
+                    "mission_control_evidence"
+                ]
+            async with aiosqlite.connect(self.db_path) as db:
+                await _apply_connection_pragmas_async(db)
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    "UPDATE task_claims SET status = ?, heartbeat_at = ?,"
+                    " metadata_json = ?, trace_id = ?"
+                    " WHERE claim_id = ? AND task_id = ? AND agent_id = ?"
+                    " AND session_id = ? AND status = ? AND claimed_at = ?"
+                    " AND acked_at IS ? AND heartbeat_at IS ? AND stale_after IS ?"
+                    " AND recovered_at IS ? AND retry_count = ? AND metadata_json = ?",
+                    (
+                        target_status,
+                        beat_at.isoformat(),
+                        _json_dump(merged_metadata),
+                        _trace_from_metadata(merged_metadata),
+                        existing.claim_id,
+                        existing.task_id,
+                        existing.agent_id,
+                        existing.session_id,
+                        existing.status,
+                        existing.claimed_at.isoformat(),
+                        existing.acked_at.isoformat() if existing.acked_at else None,
+                        (
+                            existing.heartbeat_at.isoformat()
+                            if existing.heartbeat_at
+                            else None
+                        ),
+                        existing.stale_after.isoformat() if existing.stale_after else None,
+                        (
+                            existing.recovered_at.isoformat()
+                            if existing.recovered_at
+                            else None
+                        ),
+                        int(existing.retry_count),
+                        _json_dump(existing.metadata),
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    await db.rollback()
+                    continue
+                row = await (
+                    await db.execute(
+                        "SELECT claim_id, task_id, session_id, agent_id, status,"
+                        " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
+                        " retry_count, metadata_json FROM task_claims WHERE claim_id = ?",
+                        (claim_id,),
+                    )
+                ).fetchone()
+                await db.commit()
+            assert row is not None
+            return _row_to_claim(row)
+        raise RuntimeError("task claim heartbeat lost its fence repeatedly")
+
+    async def compare_and_swap_task_claim(
+        self,
+        expected: TaskClaim,
+        replacement: TaskClaim,
+        *,
+        require_unexpired_at: datetime,
+        require_open_run_id: str = "",
+        atomic_receipt: RuntimeReceipt | None = None,
+    ) -> TaskClaim | None:
+        """Atomically replace one exact, still-unexpired claim generation.
+
+        ``None`` means the fence was lost.  Identity, status, timestamps, retry
+        generation, and metadata are all compared so a concurrent heartbeat or
+        evidence delta cannot be overwritten by a read-then-write renewal.  An
+        optional owner run fence makes a terminal run fail in the same update.
+        """
+        if require_unexpired_at.tzinfo is None:
+            raise ValueError("require_unexpired_at must be timezone-aware")
+        if require_open_run_id != str(require_open_run_id or "").strip():
+            raise ValueError("require_open_run_id must be canonical")
+        if atomic_receipt is not None:
+            if replacement.heartbeat_at is None:
+                raise ValueError("atomic receipt requires a replacement heartbeat")
+            evidence = replacement.metadata.get(_CLAIM_EVIDENCE_METADATA_KEY)
+            if not isinstance(evidence, dict):
+                raise ValueError("atomic receipt requires reserved claim evidence")
+            payload = atomic_receipt.payload
+            expected_carrier = (
+                "mission_evidence_delta",
+                "recorded",
+                require_open_run_id,
+                expected.task_id,
+                expected.agent_id,
+                replacement.heartbeat_at,
+            )
+            observed_carrier = (
+                atomic_receipt.receipt_type,
+                atomic_receipt.status,
+                atomic_receipt.run_id,
+                atomic_receipt.task_id,
+                atomic_receipt.agent_id,
+                atomic_receipt.created_at,
+            )
+            delta_id = payload.get("delta_id")
+            expected_receipt_id = (
+                "evidence_delta_receipt_"
+                + hashlib.sha256(str(delta_id).encode()).hexdigest()[:24]
+            )
+            digest_payload = dict(payload)
+            supplied_digest = digest_payload.pop("evidence_digest", "")
+            encoded_payload = json.dumps(
+                digest_payload,
+                allow_nan=False,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+                default=str,
+            ).encode()
+            expected_digest = "sha256:" + hashlib.sha256(encoded_payload).hexdigest()
+            if observed_carrier != expected_carrier:
+                raise ValueError("atomic receipt carrier conflicts with claim renewal")
+            if (
+                not require_open_run_id
+                or atomic_receipt.receipt_id != expected_receipt_id
+                or payload.get("mission_id") != expected.metadata.get("mission_id")
+                or payload.get("task_id") != expected.task_id
+                or payload.get("run_id") != require_open_run_id
+                or payload.get("claim_id") != expected.claim_id
+                or payload.get("agent_id") != expected.agent_id
+                or payload.get("delta_id") != evidence.get("last_delta_id")
+                or payload.get("sequence") != evidence.get("last_sequence")
+                or payload.get("observed_at")
+                != replacement.heartbeat_at.isoformat()
+                or payload.get("artifact_ids") != evidence.get("artifact_ids")
+                or payload.get("receipt_ids") != evidence.get("receipt_ids")
+                or supplied_digest != expected_digest
+                or atomic_receipt.side_effect_key
+                != f"mission_evidence:{payload.get('delta_id')}"
+            ):
+                raise ValueError("atomic receipt payload conflicts with claim evidence")
+        immutable_fields = (
+            "claim_id",
+            "task_id",
+            "agent_id",
+            "session_id",
+            "status",
+            "claimed_at",
+            "acked_at",
+            "recovered_at",
+            "retry_count",
         )
-        return await self.record_task_claim(updated)
+        if any(
+            getattr(expected, field_name) != getattr(replacement, field_name)
+            for field_name in immutable_fields
+        ):
+            raise ValueError("claim CAS replacement changes its fenced identity")
+        status = expected.status.lower()
+        if status not in _RENEWABLE_TASK_CLAIM_STATUSES:
+            raise ValueError("claim CAS cannot renew a terminal claim")
+        if expected.stale_after is None or replacement.stale_after is None:
+            raise ValueError("claim CAS requires an explicit expiry fence")
+        if expected.stale_after.tzinfo is None:
+            raise ValueError("claim CAS expected expiry must be timezone-aware")
+        if expected.heartbeat_at is not None and expected.heartbeat_at.tzinfo is None:
+            raise ValueError("claim CAS expected heartbeat must be timezone-aware")
+        if replacement.heartbeat_at is None:
+            raise ValueError("claim CAS replacement requires a heartbeat")
+        if replacement.heartbeat_at.tzinfo is None or replacement.stale_after.tzinfo is None:
+            raise ValueError("claim CAS timestamps must be timezone-aware")
+        if replacement.stale_after <= replacement.heartbeat_at:
+            raise ValueError("claim CAS expiry must follow its heartbeat")
+        if expected.heartbeat_at is not None and replacement.heartbeat_at <= expected.heartbeat_at:
+            raise ValueError("claim CAS heartbeat must advance monotonically")
+
+        await self.init_db()
+        query = (
+            "UPDATE task_claims SET heartbeat_at = ?, stale_after = ?,"
+            " metadata_json = ?, trace_id = ?"
+            " WHERE claim_id = ? AND task_id = ? AND agent_id = ?"
+            " AND session_id = ? AND status = ? AND claimed_at = ?"
+            " AND acked_at IS ? AND heartbeat_at IS ? AND stale_after = ?"
+            " AND recovered_at IS ? AND retry_count = ? AND metadata_json = ?"
+            " AND julianday(stale_after) > julianday(?)"
+        )
+        params: list[Any] = [
+            replacement.heartbeat_at.isoformat(),
+            replacement.stale_after.isoformat(),
+            _json_dump(replacement.metadata),
+            _trace_from_metadata(replacement.metadata),
+            expected.claim_id,
+            expected.task_id,
+            expected.agent_id,
+            expected.session_id,
+            expected.status,
+            expected.claimed_at.isoformat(),
+            expected.acked_at.isoformat() if expected.acked_at else None,
+            expected.heartbeat_at.isoformat() if expected.heartbeat_at else None,
+            expected.stale_after.isoformat(),
+            expected.recovered_at.isoformat() if expected.recovered_at else None,
+            int(expected.retry_count),
+            _json_dump(expected.metadata),
+            require_unexpired_at.isoformat(),
+        ]
+        if require_open_run_id:
+            query += (
+                " AND EXISTS (SELECT 1 FROM delegation_runs"
+                " WHERE run_id = ? AND claim_id = task_claims.claim_id"
+                " AND task_id = task_claims.task_id"
+                " AND status IN ('claimed', 'running'))"
+            )
+            params.append(require_open_run_id)
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(query, params)
+            if cursor.rowcount != 1:
+                await db.rollback()
+                return None
+            if atomic_receipt is not None:
+                identity_row = await (
+                    await db.execute(
+                        self._identity_select_sql() + " WHERE run_id = ?",
+                        (require_open_run_id,),
+                    )
+                ).fetchone()
+                identity = (
+                    _row_to_execution_identity(identity_row)
+                    if identity_row is not None
+                    else None
+                )
+                if identity is None or (
+                    identity.task_id != expected.task_id
+                    or identity.claim_id != expected.claim_id
+                    or identity.agent_id != expected.agent_id
+                    or identity.session_id != expected.session_id
+                    or atomic_receipt.trace_id != identity.trace_id
+                    or atomic_receipt.correlation_id != identity.correlation_id
+                    or atomic_receipt.causation_id != identity.causation_id
+                    or atomic_receipt.parent_run_id != identity.parent_run_id
+                    or atomic_receipt.idempotency_key != identity.idempotency_key
+                ):
+                    raise ValueError("atomic receipt identity conflicts with owner run")
+                receipt_row = await (
+                    await db.execute(
+                        "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                        " correlation_id, causation_id, parent_run_id, agent_id,"
+                        " idempotency_key, side_effect_key, status, payload_json, created_at"
+                        " FROM runtime_receipts WHERE receipt_id = ?",
+                        (atomic_receipt.receipt_id,),
+                    )
+                ).fetchone()
+                if receipt_row is not None:
+                    if _row_to_runtime_receipt(receipt_row) != atomic_receipt:
+                        raise ValueError("atomic receipt identity conflicts")
+                else:
+                    await db.execute(
+                        "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id,"
+                        " task_id, trace_id, correlation_id, causation_id, parent_run_id,"
+                        " agent_id, idempotency_key, side_effect_key, status, payload_json,"
+                        " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            atomic_receipt.receipt_id,
+                            atomic_receipt.receipt_type,
+                            atomic_receipt.run_id,
+                            atomic_receipt.task_id,
+                            atomic_receipt.trace_id,
+                            atomic_receipt.correlation_id,
+                            atomic_receipt.causation_id,
+                            atomic_receipt.parent_run_id,
+                            atomic_receipt.agent_id,
+                            atomic_receipt.idempotency_key,
+                            atomic_receipt.side_effect_key,
+                            atomic_receipt.status,
+                            _json_dump(atomic_receipt.payload),
+                            atomic_receipt.created_at.isoformat(),
+                        ),
+                    )
+            row = await (
+                await db.execute(
+                    "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                    " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                    " metadata_json FROM task_claims WHERE claim_id = ?",
+                    (expected.claim_id,),
+                )
+            ).fetchone()
+            await db.commit()
+        assert row is not None
+        return _row_to_claim(row)
 
     async def record_delegation_run(self, run: DelegationRun) -> DelegationRun:
         await self.init_db()
@@ -2009,10 +2868,29 @@ class RuntimeStateStore:
                 identity,
                 source="runtime_state.create_task_claim_sync",
             )
-        trace_id = identity.trace_id if identity is not None else _trace_from_metadata(claim.metadata)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
+            db.execute("BEGIN IMMEDIATE")
+            db.row_factory = sqlite3.Row
+            existing_row = db.execute(
+                "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
+                (claim.claim_id,),
+            ).fetchone()
+            existing = _row_to_claim(existing_row) if existing_row is not None else None
+            metadata = _preserve_claim_evidence_metadata(
+                existing.metadata if existing is not None else None,
+                claim.metadata,
+                claim_id=claim.claim_id,
+            )
+            heartbeat_at = _later_timestamp(
+                existing.heartbeat_at if existing is not None else None,
+                claim.heartbeat_at,
+            )
+            stale_after = claim.stale_after
+            trace_id = identity.trace_id if identity is not None else _trace_from_metadata(metadata)
             db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
@@ -2039,11 +2917,11 @@ class RuntimeStateStore:
                     claim.status,
                     claim.claimed_at.isoformat(),
                     claim.acked_at.isoformat() if claim.acked_at else None,
-                    claim.heartbeat_at.isoformat() if claim.heartbeat_at else None,
-                    claim.stale_after.isoformat() if claim.stale_after else None,
+                    heartbeat_at.isoformat() if heartbeat_at else None,
+                    stale_after.isoformat() if stale_after else None,
                     claim.recovered_at.isoformat() if claim.recovered_at else None,
                     int(claim.retry_count),
-                    _json_dump(claim.metadata),
+                    _json_dump(metadata),
                     trace_id,
                 ),
             )
@@ -2542,6 +3420,16 @@ class RuntimeStateStore:
             " updated_at = excluded.updated_at"
         )
 
+    @staticmethod
+    def _identity_select_sql() -> str:
+        return (
+            "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+            " idempotency_key, causation_id, parent_run_id, agent_id,"
+            " session_id, external_a2a_task_id, message_id, event_id,"
+            " artifact_id, proposal_id, metadata_json"
+            " FROM execution_identities"
+        )
+
     async def record_execution_identity(
         self,
         identity: ExecutionIdentity,
@@ -2551,19 +3439,42 @@ class RuntimeStateStore:
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
         await self.init_db()
-        existing = await self.get_execution_identity(identity.run_id)
-        _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
-            await db.execute(
-                self._identity_upsert_sql(),
-                self._identity_params(identity, source=source, now=now, metadata=metadata),
-            )
-            await db.commit()
-        loaded = await self.get_execution_identity(identity.run_id)
-        assert loaded is not None
-        return loaded
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                row = await (
+                    await db.execute(
+                        self._identity_select_sql() + " WHERE run_id = ?",
+                        (identity.run_id,),
+                    )
+                ).fetchone()
+                existing = _row_to_execution_identity(row) if row is not None else None
+                _raise_on_execution_identity_conflict(existing, identity)
+                merged = _merge_execution_identity_metadata(existing, identity, metadata)
+                await db.execute(
+                    self._identity_upsert_sql(),
+                    self._identity_params(
+                        identity,
+                        source=source,
+                        now=now,
+                        metadata=merged,
+                    ),
+                )
+                loaded_row = await (
+                    await db.execute(
+                        self._identity_select_sql() + " WHERE run_id = ?",
+                        (identity.run_id,),
+                    )
+                ).fetchone()
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
+        assert loaded_row is not None
+        return _row_to_execution_identity(loaded_row)
 
     def record_execution_identity_sync(
         self,
@@ -2574,17 +3485,34 @@ class RuntimeStateStore:
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
         self.init_db_sync()
-        existing = self.get_execution_identity_sync(identity.run_id)
-        _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                self._identity_select_sql() + " WHERE run_id = ?",
+                (identity.run_id,),
+            ).fetchone()
+            existing = _row_to_execution_identity(row) if row is not None else None
+            _raise_on_execution_identity_conflict(existing, identity)
+            merged = _merge_execution_identity_metadata(existing, identity, metadata)
             db.execute(
                 self._identity_upsert_sql(),
-                self._identity_params(identity, source=source, now=now, metadata=metadata),
+                self._identity_params(
+                    identity,
+                    source=source,
+                    now=now,
+                    metadata=merged,
+                ),
             )
+            loaded_row = db.execute(
+                self._identity_select_sql() + " WHERE run_id = ?",
+                (identity.run_id,),
+            ).fetchone()
             db.commit()
-        return self.get_execution_identity_sync(identity.run_id) or identity
+        assert loaded_row is not None
+        return _row_to_execution_identity(loaded_row)
 
     async def get_execution_identity(self, run_id: str) -> ExecutionIdentity | None:
         await self.init_db()
@@ -2592,11 +3520,7 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             row = await (
                 await db.execute(
-                    "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
-                    " idempotency_key, causation_id, parent_run_id, agent_id,"
-                    " session_id, external_a2a_task_id, message_id, event_id,"
-                    " artifact_id, proposal_id, metadata_json"
-                    " FROM execution_identities WHERE run_id = ?",
+                    self._identity_select_sql() + " WHERE run_id = ?",
                     (run_id,),
                 )
             ).fetchone()
@@ -2608,11 +3532,7 @@ class RuntimeStateStore:
             _apply_connection_pragmas_sync(db)
             db.row_factory = sqlite3.Row
             row = db.execute(
-                "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
-                " idempotency_key, causation_id, parent_run_id, agent_id,"
-                " session_id, external_a2a_task_id, message_id, event_id,"
-                " artifact_id, proposal_id, metadata_json"
-                " FROM execution_identities WHERE run_id = ?",
+                self._identity_select_sql() + " WHERE run_id = ?",
                 (run_id,),
             ).fetchone()
         return _row_to_execution_identity(row) if row is not None else None
@@ -2626,16 +3546,38 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             row = await (
                 await db.execute(
-                    "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
-                    " idempotency_key, causation_id, parent_run_id, agent_id,"
-                    " session_id, external_a2a_task_id, message_id, event_id,"
-                    " artifact_id, proposal_id, metadata_json"
-                    " FROM execution_identities WHERE external_a2a_task_id = ?"
-                    " ORDER BY updated_at DESC LIMIT 1",
+                    self._identity_select_sql()
+                    + " WHERE external_a2a_task_id = ?"
+                    " ORDER BY updated_at DESC, run_id DESC LIMIT 1",
                     (external_a2a_task_id,),
                 )
             ).fetchone()
         return _row_to_execution_identity(row) if row is not None else None
+
+    async def list_execution_identities_by_external_a2a_task(
+        self,
+        external_a2a_task_id: str,
+        *,
+        limit: int = 2,
+    ) -> list[ExecutionIdentity]:
+        """Return a bounded deterministic ambiguity view for one external ID."""
+        external_a2a_task_id = str(external_a2a_task_id or "").strip()
+        if not external_a2a_task_id:
+            raise ValueError("external_a2a_task_id is required")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("limit must be an integer from 1 to 100")
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (
+                await db.execute(
+                    self._identity_select_sql()
+                    + " WHERE external_a2a_task_id = ?"
+                    " ORDER BY updated_at DESC, run_id DESC LIMIT ?",
+                    (external_a2a_task_id, limit),
+                )
+            ).fetchall()
+        return [_row_to_execution_identity(row) for row in rows]
 
     @staticmethod
     def build_runtime_receipt(
@@ -3185,10 +4127,38 @@ class RuntimeStateStore:
         return receipts[0].run_id if receipts else None
 
     async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_campaign_cycle_receipt(receipt)
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute(
+                    "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                    " correlation_id, causation_id, parent_run_id, agent_id,"
+                    " idempotency_key, side_effect_key, status, payload_json, created_at"
+                    " FROM runtime_receipts WHERE receipt_id = ?",
+                    (receipt.receipt_id,),
+                )
+            ).fetchone()
+            existing = _row_to_runtime_receipt(row) if row is not None else None
+            if (
+                receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+                or existing is not None
+                and existing.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+            ):
+                if existing is not None:
+                    if existing != receipt:
+                        await db.rollback()
+                        raise ValueError("immutable runtime receipt identity conflicts")
+                    await db.commit()
+                    return existing
+                verb = "INSERT"
+            else:
+                verb = "INSERT OR REPLACE"
             await db.execute(
-                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
+                f"{verb} INTO runtime_receipts (receipt_id, receipt_type,"
                 " run_id, task_id, trace_id, correlation_id, causation_id,"
                 " parent_run_id, agent_id, idempotency_key, side_effect_key,"
                 " status, payload_json, created_at)"
@@ -3213,12 +4183,106 @@ class RuntimeStateStore:
             await db.commit()
         return receipt
 
+    async def get_runtime_receipt(
+        self,
+        receipt_id: str,
+    ) -> RuntimeReceipt | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                    " correlation_id, causation_id, parent_run_id, agent_id,"
+                    " idempotency_key, side_effect_key, status, payload_json, created_at"
+                    " FROM runtime_receipts WHERE receipt_id = ?",
+                    (receipt_id,),
+                )
+            ).fetchone()
+        return _row_to_runtime_receipt(row) if row is not None else None
+
+    async def insert_runtime_receipt_exact(
+        self,
+        receipt: RuntimeReceipt,
+    ) -> RuntimeReceipt:
+        """Insert one immutable carrier or return its byte-equivalent record."""
+        _validate_campaign_cycle_receipt(receipt)
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute(
+                    "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                    " correlation_id, causation_id, parent_run_id, agent_id,"
+                    " idempotency_key, side_effect_key, status, payload_json, created_at"
+                    " FROM runtime_receipts WHERE receipt_id = ?",
+                    (receipt.receipt_id,),
+                )
+            ).fetchone()
+            if row is not None:
+                existing = _row_to_runtime_receipt(row)
+                if existing != receipt:
+                    raise ValueError("runtime receipt identity already has conflicting evidence")
+                await db.commit()
+                return existing
+            await db.execute(
+                "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id, task_id,"
+                " trace_id, correlation_id, causation_id, parent_run_id, agent_id,"
+                " idempotency_key, side_effect_key, status, payload_json, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    receipt.receipt_id,
+                    receipt.receipt_type,
+                    receipt.run_id,
+                    receipt.task_id,
+                    receipt.trace_id,
+                    receipt.correlation_id,
+                    receipt.causation_id,
+                    receipt.parent_run_id,
+                    receipt.agent_id,
+                    receipt.idempotency_key,
+                    receipt.side_effect_key,
+                    receipt.status,
+                    _json_dump(receipt.payload),
+                    receipt.created_at.isoformat(),
+                ),
+            )
+            await db.commit()
+        return receipt
+
     def record_runtime_receipt_sync(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_campaign_cycle_receipt(receipt)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                " correlation_id, causation_id, parent_run_id, agent_id,"
+                " idempotency_key, side_effect_key, status, payload_json, created_at"
+                " FROM runtime_receipts WHERE receipt_id = ?",
+                (receipt.receipt_id,),
+            ).fetchone()
+            existing = _row_to_runtime_receipt(row) if row is not None else None
+            if (
+                receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+                or existing is not None
+                and existing.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+            ):
+                if existing is not None:
+                    if existing != receipt:
+                        db.rollback()
+                        raise ValueError("immutable runtime receipt identity conflicts")
+                    db.commit()
+                    return existing
+                verb = "INSERT"
+            else:
+                verb = "INSERT OR REPLACE"
             db.execute(
-                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
+                f"{verb} INTO runtime_receipts (receipt_id, receipt_type,"
                 " run_id, task_id, trace_id, correlation_id, causation_id,"
                 " parent_run_id, agent_id, idempotency_key, side_effect_key,"
                 " status, payload_json, created_at)"
@@ -4488,6 +5552,25 @@ class RuntimeStateStore:
         """Write a session event and optional receipt on one owned connection."""
         await self._record_session_event_async_db(db, event)
         if receipt is not None:
+            _validate_campaign_cycle_receipt(receipt)
+            row = await (
+                await db.execute(
+                    "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                    " correlation_id, causation_id, parent_run_id, agent_id,"
+                    " idempotency_key, side_effect_key, status, payload_json, created_at"
+                    " FROM runtime_receipts WHERE receipt_id = ?",
+                    (receipt.receipt_id,),
+                )
+            ).fetchone()
+            existing = _row_to_runtime_receipt(row) if row is not None else None
+            immutable = receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES or (
+                existing is not None
+                and existing.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+            )
+            if immutable and existing is not None:
+                if existing != receipt:
+                    raise ValueError("immutable runtime receipt identity conflicts")
+                return
             await db.execute(*_runtime_receipt_insert(receipt))
 
     async def record_session_event_with_runtime_receipt(
@@ -4510,6 +5593,24 @@ class RuntimeStateStore:
             db: sqlite3.Connection,
         ) -> tuple[SessionEventRecord, RuntimeReceipt]:
             self._record_session_event_sync_db(db, event)
+            _validate_campaign_cycle_receipt(receipt)
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                " correlation_id, causation_id, parent_run_id, agent_id,"
+                " idempotency_key, side_effect_key, status, payload_json, created_at"
+                " FROM runtime_receipts WHERE receipt_id = ?",
+                (receipt.receipt_id,),
+            ).fetchone()
+            existing = _row_to_runtime_receipt(row) if row is not None else None
+            immutable = receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES or (
+                existing is not None
+                and existing.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
+            )
+            if immutable and existing is not None:
+                if existing != receipt:
+                    raise ValueError("immutable runtime receipt identity conflicts")
+                return event, existing
             db.execute(*_runtime_receipt_insert(receipt))
             return event, receipt
 

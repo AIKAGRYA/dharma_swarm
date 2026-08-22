@@ -18,8 +18,8 @@ executor process is alive.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import (
@@ -29,7 +29,12 @@ from dharma_swarm.mission_control_contract import (
     MissionControlError,
     clean_identifier,
     session_id as mission_session_id,
+    stable_id,
     utc_now,
+)
+from dharma_swarm.mission_control_evidence import (
+    EVIDENCE_DELTA_RECEIPT_TYPE,
+    EvidenceDelta,
 )
 from dharma_swarm.mission_control_execution_support import (
     EXECUTION_METADATA_KEY as EXECUTION_METADATA_KEY,
@@ -46,6 +51,7 @@ from dharma_swarm.runtime_state import (
     DelegationRun,
     RuntimeReceipt,
     RuntimeStateStore,
+    TaskClaim,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
@@ -182,6 +188,33 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
                 identity,
             )
 
+    async def recover(
+        self,
+        mission_id: str,
+        task_id: str,
+        *,
+        dispatch_key: str = "default",
+    ) -> OwnerExecutionRef | None:
+        """Recover an already stamped owner execution without dispatching."""
+        mission_id = clean_identifier(mission_id, "mission_id")
+        task_id = clean_identifier(task_id, "task_id")
+        dispatch_key = clean_identifier(dispatch_key, "dispatch_key")
+        task = await self._require_task(mission_id, task_id)
+        marker = task.metadata.get(EXECUTION_METADATA_KEY)
+        if marker is None:
+            return None
+        if not isinstance(marker, dict):
+            raise MissionControlError("owner execution metadata has an invalid shape")
+        expected = self._expected_identity(mission_id, task_id, dispatch_key)
+        self._require_stamp(task, mission_id, dispatch_key, expected)
+        return await self._recover_owner_ref(
+            mission_id,
+            task_id,
+            dispatch_key,
+            expected_run_id=expected["run_id"],
+            expected_idempotency_key=expected["idempotency_key"],
+        )
+
     async def observe(
         self,
         ref: OwnerExecutionRef,
@@ -256,6 +289,180 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             failure_code=str(run.failure_code or ""),
             observed_at=observed_at,
         )
+
+    async def renew_with_evidence(
+        self,
+        ref: OwnerExecutionRef,
+        delta: EvidenceDelta,
+        *,
+        lease_seconds: float = 300.0,
+        max_evidence_age_seconds: float = 300.0,
+    ) -> TaskClaim:
+        """Renew only the exact live claim generation cited by new evidence."""
+        if lease_seconds <= 0 or max_evidence_age_seconds <= 0:
+            raise ValueError("evidence renewal budgets must be positive")
+        if not isinstance(delta, EvidenceDelta):
+            raise MissionControlError("typed EvidenceDelta is required")
+        observation = await self.observe(ref)
+        if observation.terminal:
+            raise MissionControlError("terminal owner execution cannot be renewed")
+        if observation.stale:
+            raise MissionControlError("stale owner claim cannot be renewed")
+        if (
+            delta.mission_id,
+            delta.task_id,
+            delta.run_id,
+            delta.claim_id,
+            delta.agent_id,
+        ) != (
+            ref.mission_id,
+            ref.task_id,
+            ref.run_id,
+            ref.claim_id,
+            ref.agent_id,
+        ):
+            raise MissionControlError("evidence delta names a foreign owner execution")
+
+        claim = await self._runtime.get_task_claim(ref.claim_id)
+        if claim is None:
+            raise MissionControlError("owner claim was not found")
+        evidence_state = claim.metadata.get("mission_control_evidence", {})
+        if not isinstance(evidence_state, dict):
+            raise MissionControlError("claim evidence state has a foreign shape")
+        last_sequence = evidence_state.get("last_sequence", 0)
+        if isinstance(last_sequence, bool) or not isinstance(last_sequence, int):
+            raise MissionControlError("claim evidence sequence has a foreign shape")
+        now = utc_now()
+        delta.require_fresh(
+            now=now,
+            last_sequence=last_sequence,
+            max_age=timedelta(seconds=max_evidence_age_seconds),
+        )
+        consumed_artifacts = self._consumed_evidence_ids(
+            evidence_state,
+            "consumed_artifact_ids",
+            fallback_key="artifact_ids",
+        )
+        consumed_receipts = self._consumed_evidence_ids(
+            evidence_state,
+            "consumed_receipt_ids",
+            fallback_key="receipt_ids",
+        )
+        if consumed_artifacts.intersection(delta.artifact_ids) or (
+            consumed_receipts.intersection(delta.receipt_ids)
+        ):
+            raise MissionControlError("evidence delta reuses already consumed evidence")
+        await self._require_evidence_refs(
+            delta,
+            ref,
+            not_before=claim.heartbeat_at or claim.claimed_at,
+        )
+        if claim.heartbeat_at is not None and delta.observed_at <= claim.heartbeat_at:
+            raise MissionControlError("evidence heartbeat does not advance monotonically")
+        new_expiry = delta.observed_at + timedelta(seconds=lease_seconds)
+        if new_expiry <= now:
+            raise MissionControlError("evidence delta cannot create an expired renewal")
+        replacement = replace(
+            claim,
+            heartbeat_at=delta.observed_at,
+            stale_after=new_expiry,
+            metadata={
+                **claim.metadata,
+                "mission_control_evidence": {
+                    "last_sequence": delta.sequence,
+                    "last_delta_id": delta.delta_id,
+                    "last_observed_at": delta.observed_at.isoformat(),
+                    "artifact_ids": list(delta.artifact_ids),
+                    "receipt_ids": list(delta.receipt_ids),
+                    "consumed_artifact_ids": sorted(
+                        consumed_artifacts.union(delta.artifact_ids)
+                    ),
+                    "consumed_receipt_ids": sorted(
+                        consumed_receipts.union(delta.receipt_ids)
+                    ),
+                },
+            },
+        )
+        identity = await self._runtime.get_execution_identity(ref.run_id)
+        if identity is None:
+            raise MissionControlError("owner execution identity disappeared before renewal")
+        evidence_receipt = RuntimeReceipt(
+            receipt_id=stable_id("evidence_delta_receipt", delta.delta_id),
+            receipt_type=EVIDENCE_DELTA_RECEIPT_TYPE,
+            status="recorded",
+            run_id=ref.run_id,
+            task_id=ref.task_id,
+            trace_id=identity.trace_id,
+            correlation_id=identity.correlation_id,
+            causation_id=identity.causation_id,
+            parent_run_id=identity.parent_run_id,
+            agent_id=ref.agent_id,
+            idempotency_key=ref.idempotency_key,
+            side_effect_key=f"mission_evidence:{delta.delta_id}",
+            payload={"mission_id": ref.mission_id, **delta.to_payload()},
+            created_at=delta.observed_at,
+        )
+        renewed = await self._runtime.compare_and_swap_task_claim(
+            claim,
+            replacement,
+            require_unexpired_at=now,
+            require_open_run_id=ref.run_id,
+            atomic_receipt=evidence_receipt,
+        )
+        if renewed is None:
+            raise MissionControlError("owner claim fence changed during evidence renewal")
+        return renewed
+
+    async def _require_evidence_refs(
+        self,
+        delta: EvidenceDelta,
+        ref: OwnerExecutionRef,
+        *,
+        not_before: datetime,
+    ) -> None:
+        receipts = await self._runtime.list_runtime_receipts(
+            run_id=ref.run_id,
+            limit=self._scan_limit,
+        )
+        if len(receipts) >= self._scan_limit:
+            raise MissionControlError(
+                "runtime receipt scan saturated; evidence cannot be proven"
+            )
+        indexed = {receipt.receipt_id: receipt for receipt in receipts}
+        for receipt_id in delta.receipt_ids:
+            receipt = indexed.get(receipt_id)
+            if receipt is None:
+                raise MissionControlError("evidence delta cites a missing runtime receipt")
+            if receipt.task_id != ref.task_id:
+                raise MissionControlError("evidence delta cites a foreign task receipt")
+            if receipt.agent_id != ref.agent_id:
+                raise MissionControlError("evidence delta cites a foreign agent receipt")
+            if not not_before < receipt.created_at <= delta.observed_at:
+                raise MissionControlError("evidence delta receipt is not fresh")
+        for artifact_id in delta.artifact_ids:
+            artifact = await self._runtime.get_artifact(artifact_id)
+            if artifact is None:
+                raise MissionControlError("evidence delta cites a missing artifact")
+            if artifact.run_id != ref.run_id or artifact.task_id != ref.task_id:
+                raise MissionControlError("evidence delta cites a foreign artifact")
+            if not not_before < artifact.created_at <= delta.observed_at:
+                raise MissionControlError("evidence delta artifact is not fresh")
+
+    @staticmethod
+    def _consumed_evidence_ids(
+        evidence_state: dict[str, object],
+        key: str,
+        *,
+        fallback_key: str,
+    ) -> set[str]:
+        raw = evidence_state.get(key, evidence_state.get(fallback_key, ()))
+        if not isinstance(raw, (list, tuple)) or any(
+            not isinstance(item, str) or not item for item in raw
+        ):
+            raise MissionControlError("claim consumed evidence state has a foreign shape")
+        if len(set(raw)) != len(raw):
+            raise MissionControlError("claim consumed evidence state contains duplicates")
+        return set(raw)
 
     async def wait(
         self,
