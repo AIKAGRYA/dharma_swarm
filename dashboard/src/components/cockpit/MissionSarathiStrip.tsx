@@ -17,7 +17,11 @@ import {
 } from "@/hooks/useMissionSarathi";
 
 const STATE_TONE: Record<TaskTruthState, string> = {
+  verified_complete: "border-aozora/50 bg-aozora/15 text-aozora",
   verified_working: "border-botan/40 bg-botan/10 text-botan",
+  active_unverified: "border-kincha/40 bg-kincha/10 text-kincha",
+  candidate_unverified: "border-kincha/40 bg-kincha/10 text-kincha",
+  rejected: "border-bengara/50 bg-bengara/15 text-bengara",
   terminal_receipted: "border-aozora/40 bg-aozora/10 text-aozora",
   lease_only: "border-kincha/40 bg-kincha/10 text-kincha",
   queued: "border-sumi-600/40 bg-sumi-800/30 text-sumi-300",
@@ -205,7 +209,8 @@ function TopologyRegion({
               </text>
               {visibleRows.map((row, index) => {
                 const y = 26 + index * 58;
-                const verified = row.state === "verified_working";
+                const verifiedWorking = row.state === "verified_working";
+                const verifiedComplete = row.state === "verified_complete";
                 const agent =
                   row.attempt?.assigned_to ||
                   row.lease?.agent_id ||
@@ -227,7 +232,13 @@ function TopologyRegion({
                       width="204"
                       height="38"
                       rx="6"
-                      className={`fill-sumi-900 ${verified ? "stroke-botan" : "stroke-sumi-600"}`}
+                      className={`fill-sumi-900 ${
+                        verifiedComplete
+                          ? "stroke-aozora"
+                          : verifiedWorking
+                            ? "stroke-botan"
+                            : "stroke-sumi-600"
+                      }`}
                     />
                     <text
                       x="264"
@@ -248,9 +259,17 @@ function TopologyRegion({
                       y1={y + 19}
                       x2="536"
                       y2={y + 19}
-                      className={verified ? "stroke-botan" : "stroke-sumi-600"}
-                      strokeWidth={verified ? "2" : "1.5"}
-                      strokeDasharray={verified ? undefined : "5 5"}
+                      className={
+                        verifiedComplete
+                          ? "stroke-aozora"
+                          : verifiedWorking
+                            ? "stroke-botan"
+                            : "stroke-sumi-600"
+                      }
+                      strokeWidth={verifiedWorking || verifiedComplete ? "2" : "1.5"}
+                      strokeDasharray={
+                        verifiedWorking || verifiedComplete ? undefined : "5 5"
+                      }
                     />
                     <rect
                       x="536"
@@ -272,8 +291,8 @@ function TopologyRegion({
               })}
             </svg>
             <p className="mt-1 text-[10px] text-sumi-500">
-              Solid = recent matching substantive event. Dashed = assignment or
-              lease only.
+              Green solid = recent substantive work. Blue solid = independently
+              accepted completion. Dashed = structural identity or unverified motion.
             </p>
           </div>
           <ul className="space-y-2 md:hidden" aria-label="Topology as a list">
@@ -290,7 +309,11 @@ function TopologyRegion({
                 </div>
                 <div className="break-words text-sumi-300">{row.task.title}</div>
                 <div className="my-1 text-sumi-600" aria-hidden="true">
-                  {row.state === "verified_working" ? "━━" : "┄┄"}▶
+                  {row.state === "verified_working" ||
+                  row.state === "verified_complete"
+                    ? "━━"
+                    : "┄┄"}
+                  ▶
                 </div>
                 <div className="break-all text-sumi-400">
                   {row.attempt?.assigned_to ||
@@ -322,10 +345,16 @@ function TimelineItem({ item }: { item: EvidenceTimelineItem }) {
           className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
             item.source === "runtime_event"
               ? "border-botan/30 text-botan"
-              : "border-aozora/30 text-aozora"
+              : item.source === "campaign_evidence"
+                ? "border-kincha/30 text-kincha"
+                : "border-aozora/30 text-aozora"
           }`}
         >
-          {item.source === "runtime_event" ? "runtime" : "receipt"}
+          {item.source === "runtime_event"
+            ? "runtime"
+            : item.source === "campaign_evidence"
+              ? "campaign"
+              : "receipt"}
         </span>
         <span className="break-all text-xs font-medium text-torinoko">
           {item.kind}
@@ -394,6 +423,9 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
   const verifiedCount = taskTruth.filter(
     (row) => row.state === "verified_working",
   ).length;
+  const verifiedCompleteCount = taskTruth.filter(
+    (row) => row.state === "verified_complete",
+  ).length;
   const attentionCount = taskTruth.filter((row) =>
     [
       "expired",
@@ -401,6 +433,8 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
       "join_unknown",
       "conflict",
       "terminal_unverified",
+      "candidate_unverified",
+      "rejected",
     ].includes(row.state),
   ).length;
   const state = projection?.state ?? (isLoading ? "loading" : "unknown");
@@ -445,7 +479,7 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
         </button>
       </header>
 
-      <div className="grid grid-cols-2 gap-px border-b border-sumi-800/50 bg-sumi-800/50 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border-b border-sumi-800/50 bg-sumi-800/50 sm:grid-cols-5">
         <div className="bg-sumi-950/90 p-3">
           <div className="text-[10px] uppercase tracking-wide text-sumi-600">Tasks</div>
           <div className="mt-1 text-lg font-medium text-torinoko">{taskTruth.length}</div>
@@ -455,6 +489,14 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
             Verified working
           </div>
           <div className="mt-1 text-lg font-medium text-botan">{verifiedCount}</div>
+        </div>
+        <div className="bg-sumi-950/90 p-3">
+          <div className="text-[10px] uppercase tracking-wide text-sumi-600">
+            Verified complete
+          </div>
+          <div className="mt-1 text-lg font-medium text-aozora">
+            {verifiedCompleteCount}
+          </div>
         </div>
         <div className="bg-sumi-950/90 p-3">
           <div className="text-[10px] uppercase tracking-wide text-sumi-600">
@@ -524,6 +566,9 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
           Runtime source: {projection?.runtime_projection_mode ?? "unavailable"}
         </span>
         <span>Authority: {snapshot?.authority ?? "not observed"}</span>
+        <span>
+          Acceptance: {snapshot?.campaign_evidence?.acceptance_state ?? "not observed"}
+        </span>
         <span>
           Generated{" "}
           {generatedAt ? (

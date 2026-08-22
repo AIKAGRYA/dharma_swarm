@@ -3,6 +3,11 @@
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import {
+  classifyCampaignTaskEvidence,
+  parseCampaignEvidence,
+  type CampaignEvidenceProjection,
+} from "@/lib/missionCampaignEvidence";
 import type {
   ControlSurfaceEnvelope,
   RuntimeEvent,
@@ -100,6 +105,7 @@ export interface MissionSnapshot {
   observed_at: string;
   authority: string;
   proves_executor_liveness: boolean;
+  campaign_evidence?: CampaignEvidenceProjection;
 }
 
 export interface MissionSnapshotProjection {
@@ -123,7 +129,11 @@ export interface RuntimeEventsSnapshot {
 }
 
 export type TaskTruthState =
+  | "verified_complete"
   | "verified_working"
+  | "active_unverified"
+  | "candidate_unverified"
+  | "rejected"
   | "lease_only"
   | "queued"
   | "stale"
@@ -151,7 +161,7 @@ export interface TaskTruthRow {
 
 export interface EvidenceTimelineItem {
   id: string;
-  source: "mission_receipt" | "runtime_event";
+  source: "mission_receipt" | "runtime_event" | "campaign_evidence";
   taskId: string;
   executionId: string;
   agentId: string;
@@ -351,6 +361,14 @@ export function buildTaskTruth(
       task,
       attempt,
     );
+    const campaignVerdict = classifyCampaignTaskEvidence(
+      snapshot.campaign_evidence,
+      task,
+    );
+    const effectiveAcceptance =
+      campaignVerdict.acceptance !== "not_observed"
+        ? campaignVerdict.acceptance
+        : acceptance;
     const leaseExpired =
       Boolean(lease?.expired) ||
       (Boolean(lease?.stale_after) && timestamp(lease?.stale_after) <= now);
@@ -362,7 +380,7 @@ export function buildTaskTruth(
       Boolean(terminalReceipt) &&
       terminalReceipt?.status === attempt?.status &&
       snapshot.reconciliation === "coherent" &&
-      acceptance !== "rejected";
+      effectiveAcceptance !== "rejected";
     const runActive =
       runtimeRun?.status === "running" ||
       runtimeRun?.status === "working" ||
@@ -386,27 +404,46 @@ export function buildTaskTruth(
     let label = "Unknown";
     let detail = "Canonical task state is present without sufficient execution evidence.";
 
-    if (reconciliationConflict || ownerRunConflict || ownerLeaseConflict) {
+    if (
+      reconciliationConflict ||
+      ownerRunConflict ||
+      ownerLeaseConflict ||
+      campaignVerdict.state === "conflict"
+    ) {
       state = "conflict";
       label = "Conflict";
-      detail = ownerRunConflict
+      detail = campaignVerdict.state === "conflict"
+        ? campaignVerdict.detail
+        : ownerRunConflict
         ? "The stamped owner run resolves to a foreign task; no work claim is promoted."
         : ownerLeaseConflict
           ? "The owner run and lease disagree on claim or agent identity."
           : `Mission reconciliation is ${snapshot.reconciliation}; no work claim is promoted.`;
+    } else if (campaignVerdict.state === "rejected") {
+      state = "rejected";
+      label = campaignVerdict.label;
+      detail = campaignVerdict.detail;
+    } else if (campaignVerdict.state === "verified_complete") {
+      state = "verified_complete";
+      label = campaignVerdict.label;
+      detail = campaignVerdict.detail;
+    } else if (campaignVerdict.state === "candidate_unverified") {
+      state = "candidate_unverified";
+      label = campaignVerdict.label;
+      detail = campaignVerdict.detail;
     } else if (attemptTerminal || taskTerminal) {
       if (terminalMatches) {
         state = "terminal_receipted";
         label = attempt?.status === "failed" ? "Failed · receipted" : "Terminal · receipted";
         detail =
-          acceptance === "accepted"
+          effectiveAcceptance === "accepted"
             ? "Terminal receipt and independent acceptance are coherent."
             : "Terminal receipt is coherent; independent acceptance was not observed.";
       } else {
         state = "terminal_unverified";
         label = "Terminal · unverified";
         detail =
-          acceptance === "rejected"
+          effectiveAcceptance === "rejected"
             ? "Independent acceptance rejected the terminal claim."
             : "Terminal state lacks a matching canonical terminal receipt.";
       }
@@ -432,6 +469,10 @@ export function buildTaskTruth(
       state = "verified_working";
       label = "Verified working";
       detail = `Active lease and run match recent substantive event ${evidenceEvent.event_name}.`;
+    } else if (campaignVerdict.state === "active_unverified") {
+      state = "active_unverified";
+      label = campaignVerdict.label;
+      detail = campaignVerdict.detail;
     } else if (
       graph &&
       ownerRunId &&
@@ -460,7 +501,7 @@ export function buildTaskTruth(
       runtimeRun,
       evidenceEvent,
       terminalReceipt,
-      acceptance,
+      acceptance: effectiveAcceptance,
       state,
       label,
       detail,
@@ -472,6 +513,30 @@ export function buildEvidenceTimeline(
   snapshot: MissionSnapshot | null,
   events: RuntimeEventsSnapshot | null,
 ): EvidenceTimelineItem[] {
+  const campaignEvidence = parseCampaignEvidence(snapshot?.campaign_evidence);
+  const campaignItems: EvidenceTimelineItem[] = (
+    campaignEvidence?.owner_executions ?? []
+  ).map((owner) => {
+    const task = snapshot?.tasks.find(
+      (candidate) => candidate.task_id === owner.ref.task_id,
+    );
+    const evidenceVerdict = task
+      ? classifyCampaignTaskEvidence(campaignEvidence, task)
+      : null;
+    return {
+      id: `campaign:${owner.ref.run_id}:${owner.observed_at}`,
+      source: "campaign_evidence",
+      taskId: owner.ref.task_id,
+      executionId: owner.ref.run_id,
+      agentId: owner.ref.agent_id,
+      kind: "owner_execution",
+      status: evidenceVerdict?.state ?? "owner_observed",
+      summary:
+        evidenceVerdict?.detail ??
+        "Owner execution was projected without a matching task identity.",
+      createdAt: owner.observed_at,
+    };
+  });
   const receipts: EvidenceTimelineItem[] = (snapshot?.receipts ?? []).map(
     (receipt) => ({
       id: `mission:${receipt.receipt_id}`,
@@ -501,7 +566,7 @@ export function buildEvidenceTimeline(
       createdAt: event.created_at,
     }),
   );
-  return [...receipts, ...runtimeEvents]
+  return [...campaignItems, ...receipts, ...runtimeEvents]
     .sort((left, right) => timestamp(right.createdAt) - timestamp(left.createdAt))
     .slice(0, 24);
 }

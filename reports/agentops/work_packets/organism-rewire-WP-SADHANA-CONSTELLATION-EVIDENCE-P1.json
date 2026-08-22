@@ -1,0 +1,101 @@
+{
+  "id": "organism-rewire-WP-SADHANA-CONSTELLATION-EVIDENCE-P1",
+  "base_ref": "55a0ea9cbb7fabb9b0ad936be07a5908b99f3255",
+  "branch": "agent/sadhana-constellation-evidence-20260823",
+  "worktree": ".",
+  "intent": "Consume the Titanium-validated optional campaign_evidence projection in Dharma Constellation without enabling generic runtime databases or inventing activity. Promote a terminal task to verified complete only when its exact task-stamped owner run is succeeded and its task id is in accepted_task_ids; keep active owner observations explicitly unverified, keep candidate-only terminal results unverified, and let rejected/conflicting verdicts dominate all positive presentation.",
+  "allowed_files": [
+    "dashboard/src/hooks/useMissionSarathi.ts",
+    "dashboard/src/components/cockpit/MissionSarathiStrip.tsx",
+    "dashboard/src/lib/missionCampaignEvidence.ts",
+    "dashboard/src/lib/missionCampaignEvidence.test.ts",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-CONSTELLATION-EVIDENCE-P1.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "dashboard/package.json",
+    "dashboard/package-lock.json",
+    "dashboard/src/app/**",
+    "dashboard/src/lib/api-generated.ts",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "constellation-api-regression",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_control_surface_mission_sarathi.py tests/test_mission_snapshot_provider.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "backend-false-promotion-controls-remain-green",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py -k 'owner_execution or acceptance_projection or semantic_claims'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(control-surface): render typed SADHANA evidence"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-CONSTELLATION-EVIDENCE-P1",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "55a0ea9cbb7fabb9b0ad936be07a5908b99f3255",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The provider now returns campaign_evidence inside snapshot, while the hook's local MissionSnapshot type and classifier ignore it.",
+      "Owner run/claim observation explicitly does not prove executor liveness or substantive work; current verified_working must stay gated by the existing recent substantive runtime-event path.",
+      "Independent acceptance is a terminal semantic verdict, not current motion; the UI needs a separate verified_complete state.",
+      "Generic runtime projection remains unavailable in production, so the evidence field must be useful without silently querying canonical databases."
+    ],
+    "closest_existing_implementation": [
+      "dashboard/src/hooks/useMissionSarathi.ts",
+      "dashboard/src/components/cockpit/MissionSarathiStrip.tsx",
+      "api/mission_snapshot_validation.py"
+    ],
+    "honest_blockers": [
+      "A fresh active owner observation is shown as active unverified, never verified working.",
+      "Repository/browser tests do not create a real accepted task; live campaign proof remains required.",
+      "This packet adds no mutation endpoint, network listener, provider, task, or acceptance receipt."
+    ],
+    "rollback": "Revert the pure classifier, hook/component consumption, tests, and packet. Constellation returns to its earlier conservative presentation; backend evidence and canonical state remain untouched.",
+    "packet_digest": "aaf6889bb1f4808bfe050ca1e006485ad4cf717e25d9cf863ecd638177b22085"
+  }
+}
