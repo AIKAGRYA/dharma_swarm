@@ -1,0 +1,150 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control_evidence.py",
+    "dharma_swarm/mission_control_campaign.py",
+    "dharma_swarm/mission_control_service.py",
+    "dharma_swarm/mission_control_authority.py",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/runtime_state.py",
+    "scripts/runtime/mission_control_campaign.py",
+    "tests/test_mission_control_evidence.py",
+    "tests/test_mission_control_campaign.py",
+    "tests/test_mission_control_service.py",
+    "tests/test_mission_control_execution.py",
+    "tests/test_runtime_state_claim_cas.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "3866fe7b3cc5867dd439ae07e4a57da87157a9dd",
+  "branch": "agent/sadhana-supervisor-20260823",
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): add durable SADHANA campaign supervisor"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "uv.lock",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/sarathi/**",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/spine/**",
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_dispatch.py",
+    "dharma_swarm/mission_control_a2a.py",
+    "dharma_swarm/mission_control_sarathi.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/models.py",
+    "scripts/docops/**",
+    "scripts/governance/**",
+    "scripts/governance/hygiene/**",
+    "tests/test_mission_control_dispatch.py",
+    "tests/test_mission_control_a2a.py",
+    "tests/test_mission_control_sarathi.py",
+    "tests/test_mission_control.py",
+    "tests/test_task_board.py",
+    "tests/test_runtime_state_invariants.py"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control.py tests/test_mission_control_dispatch.py tests/test_mission_control_a2a.py tests/test_mission_control_sarathi.py tests/test_mission_control_execution.py tests/test_mission_control_evidence.py tests/test_mission_control_campaign.py tests/test_mission_control_service.py tests/test_runtime_state_claim_cas.py tests/test_runtime_state_invariants.py tests/test_task_board.py",
+      "expected_exit": 0,
+      "name": "mission-control-supervisor-and-owner-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control_evidence.py dharma_swarm/mission_control_campaign.py dharma_swarm/mission_control_service.py dharma_swarm/mission_control_authority.py dharma_swarm/mission_control_execution.py dharma_swarm/runtime_state.py scripts/runtime/mission_control_campaign.py tests/test_mission_control_evidence.py tests/test_mission_control_campaign.py tests/test_mission_control_service.py tests/test_mission_control_execution.py tests/test_runtime_state_claim_cas.py",
+      "expected_exit": 0,
+      "name": "mission-control-supervisor-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "module-budget",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "organism-rewire-WP-SADHANA-SUPERVISOR-P0",
+  "intent": "Implement the admitted smallest durable campaign-supervisor slice over existing Mission Control, TaskBoard, RuntimeStateStore, OrchestratorMissionAdapter, and GovernedMissionDispatcher owners. One nonblocking fcntl-fenced service reconciles canonical mission snapshots and separately owned executions; evidence renewal uses exact atomic claim CAS; producer completion remains a candidate until independently accepted; authority and revocation are re-read immediately before effects; control commands preserve queued work and report process, transport, model, and acceptance evidence separately. Publish an atomic read-only JSON projection so an API process never needs the canonical writable SQLite file.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_evidence.py::test_evidence_delta_rejects_empty_duplicate_and_wrong_identity tests/test_mission_control_campaign.py::test_completed_owner_output_is_candidate_until_independently_accepted tests/test_mission_control_campaign.py::test_same_generator_verifier_is_rejected_except_held_out_oracle tests/test_mission_control_service.py::test_second_writer_fails_nonblocking_and_start_never_treats_pid_as_success tests/test_mission_control_execution.py::test_evidence_renewal_rejects_stale_wrong_run_and_terminal_claim tests/test_runtime_state_claim_cas.py::test_external_a2a_identity_list_is_bounded_and_deterministic",
+      "expected_exit": 0,
+      "name": "fencing-noncoercion-and-ambiguity-negatives",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_dispatch.py",
+      "dharma_swarm/mission_control_a2a.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/orchestrator.py",
+      "dharma_swarm/operator_core/execution_lease.py"
+    ],
+    "collision": {
+      "checked_at_sha": "3866fe7b3cc5867dd439ae07e4a57da87157a9dd",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This slice supplies a durable local supervisor and CLI but does not provision a VPS, model account, provider quota, NATS broker, launchd unit, API server, or dashboard.",
+      "A fresh supervisor-cycle receipt proves one completed reconciliation cycle only; a process identifier, lock file, transport acknowledgement, or heartbeat never proves model execution or semantic acceptance.",
+      "Producer completion remains candidate output until a separately validated independent acceptance receipt exists; Forge and Merge Master retain promotion and merge authority.",
+      "The atomic JSON snapshot is a bounded read model, not a second ledger; canonical mutation remains in TaskBoard and RuntimeStateStore.",
+      "External A2A identity ambiguity is exposed by a bounded deterministic list API; this packet does not add a risky uniqueness migration or change the imported A2A adapter."
+    ],
+    "interface_mismatches": [
+      "MissionSnapshot scans the mission session while Orchestrator executions deliberately use distinct owner sessions; campaign status must project MissionSnapshot and owner references separately.",
+      "RuntimeStateStore heartbeat_task_claim is read-then-write and cannot fence evidence renewal; this slice adds an exact compare-and-swap method without changing the schema.",
+      "RuntimeStateStore external-A2A lookup is latest-only; this slice adds a bounded deterministic list API so the imported adapter can fail closed on ambiguity in a later patch.",
+      "API lifespan and RuntimeGraphViews can initialize writable stores even in read-only boot, so external readers must consume the atomic campaign JSON projection rather than the supervisor SQLite file.",
+      "GovernedMissionDispatcher requires injected verified authority; the supervisor must load an exact file-backed lease and current revocation set instead of manufacturing authority."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "791de08ce9e900e45d062bd0d5b5c53334aac681273fdf7edc13fea50ee535fe",
+    "rollback": "Revert this implementation commit. Stop the supervisor before rollback; canonical queued tasks are preserved, the JSON projection is disposable, and no schema migration, remote deployment, transport topology, provider credential, promotion, merge, or external publication is introduced.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-SADHANA-SUPERVISOR-P0"
+  },
+  "worktree": "."
+}
