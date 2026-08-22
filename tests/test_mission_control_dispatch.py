@@ -304,7 +304,7 @@ async def test_stable_request_authorize_then_dispatch_preserves_claim_boundaries
     assert dispatched.admission.request_digest != case.admission.request_digest
     assert dispatched.admission is not case.admission
     assert dispatched.admission.reduced_authority is not case.admission.reduced_authority
-    assert case.verifier.calls == 2
+    assert case.verifier.calls == 3
     assert case.executor.calls == 1
     assert case.boundary.lifecycle_calls == 0
 
@@ -341,7 +341,7 @@ async def test_non_read_work_requires_then_uses_exact_authenticated_workspace(
     assert workspace["authority_ref"] == case.verified.authority_ref
     assert workspace["authority_digest"] == case.verified.authority_digest
     assert workspace["allowed_paths"] == [WORKSPACE_PATH]
-    assert case.verifier.calls == 1
+    assert case.verifier.calls == 2
     assert case.executor.calls == 1
 
 
@@ -364,6 +364,44 @@ async def test_authority_digest_mismatch_blocks_before_owner_dispatch(
         )
 
     assert case.verifier.calls == 1
+    assert case.executor.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_revocation_is_refreshed_immediately_before_owner_dispatch(
+    tmp_path: Path,
+) -> None:
+    case = await _case(tmp_path)
+
+    class RevokingVerifier:
+        calls = 0
+
+        async def verify(self, *args: Any, **kwargs: Any) -> VerifiedDispatchAuthority:
+            self.calls += 1
+            if self.calls == 1:
+                return case.verified
+            return replace(
+                case.verified,
+                revoked_lease_ids=(str(case.lease["lease_id"]),),
+            )
+
+    verifier = RevokingVerifier()
+    dispatcher = GovernedMissionDispatcher(
+        case.boundary,
+        case.board,
+        case.executor,
+        authority_verifier=verifier,
+    )
+
+    with pytest.raises(MissionControlError, match="invalid"):
+        await dispatcher.dispatch(
+            case.request,
+            case.governed,
+            case.admission,
+            case.authority,
+        )
+
+    assert verifier.calls == 2
     assert case.executor.calls == 0
 
 
@@ -708,7 +746,7 @@ async def test_literal_workspace_prefix_comparison_is_segment_aware(
         case.request, governed, preliminary, authority
     )
     assert result.execution == case.executor.ref
-    assert case.verifier.calls == 1
+    assert case.verifier.calls == 2
     assert case.executor.calls == 1
 
 
@@ -1017,7 +1055,7 @@ async def test_owner_retry_repeats_all_gates_without_membrane_cache(
     )
 
     assert second.execution == first.execution
-    assert case.verifier.calls == 2
+    assert case.verifier.calls == 4
     assert case.executor.calls == 2
     assert case.executor.arguments == [
         (MISSION_ID, case.request.task_id, DISPATCH_KEY),
@@ -1064,7 +1102,7 @@ async def test_owner_runtime_stamp_does_not_change_retry_operation_binding(
         case.request, case.governed, case.admission, case.authority
     )
     assert second.execution == first.execution
-    assert case.verifier.calls == 2
+    assert case.verifier.calls == 4
     assert case.executor.calls == 2
 
 

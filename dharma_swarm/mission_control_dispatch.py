@@ -35,8 +35,7 @@ class MissionDispatchRequest:
         task_id = clean_identifier(task_id, "task_id")
         dispatch_key = clean_identifier(dispatch_key, "dispatch_key")
         principal = clean_identifier(claimed_principal, "claimed_principal")
-        return cls(stable_id("mission_dispatch", mission_id, task_id, dispatch_key),
-                   mission_id, task_id, dispatch_key, principal)
+        return cls(stable_id("mission_dispatch", mission_id, task_id, dispatch_key), mission_id, task_id, dispatch_key, principal)
 @dataclass(frozen=True, slots=True)
 class GovernanceAdmission:
     subject_id: str
@@ -76,8 +75,7 @@ class AuthorizedDispatch:
     proves_executor_liveness: bool = False
     proves_semantic_outcome: bool = False
 class AuthorityVerifier(Protocol):
-    async def verify(self, envelope: DispatchAuthorityEnvelope, *, request: MissionDispatchRequest,
-                     admission: GovernanceAdmission) -> VerifiedDispatchAuthority: ...
+    async def verify(self, envelope: DispatchAuthorityEnvelope, *, request: MissionDispatchRequest, admission: GovernanceAdmission) -> VerifiedDispatchAuthority: ...
 class DispatchExecutor(Protocol):
     async def dispatch(self, mission_id: str, task_id: str, *, dispatch_key: str = "default") -> OwnerExecutionRef: ...
 AdmissionEvaluator = Callable[[GovernedWorkRequest], GovernedWorkAdmission]
@@ -276,6 +274,7 @@ class GovernedMissionDispatcher:
             _admission_digest(caller) == caller_guard and _admission_digest(admission) == snapshot_guard,
             "governance admission changed before dispatch",
         )
+        verified = await self._verify_authority(authority, request=request, admission=final_admission)
         self._require_verified(request, authority, verified)
         self._require_lease(request, verified)
         execution = await self._executor.dispatch(
@@ -304,15 +303,7 @@ class GovernedMissionDispatcher:
         _need(admission == expected, "preliminary governance admission does not bind the dispatch request")
         _need(await self._binding(request, governed_request) == preliminary,
               "dispatch request changed during preliminary evaluation")
-        try:
-            verified = await self._authority_verifier.verify(
-                authority, request=request, admission=admission)
-        except MissionControlError:
-            raise
-        except Exception as exc:
-            raise MissionControlError("dispatch authority verification failed") from exc
-        _need(type(verified) is VerifiedDispatchAuthority,
-              "authority verifier returned an invalid evidence type")
+        verified = await self._verify_authority(authority, request=request, admission=admission)
         _need(_admission_digest(caller) == caller_guard
               and _admission_digest(admission) == snapshot_guard,
               "governance admission changed during verification")
@@ -335,6 +326,15 @@ class GovernedMissionDispatcher:
               and _admission_digest(admission) == snapshot_guard,
               "governance admission changed during final authorization")
         return verified, preliminary, final, final_admission
+    async def _verify_authority(self, authority: DispatchAuthorityEnvelope, *, request: MissionDispatchRequest, admission: GovernanceAdmission) -> VerifiedDispatchAuthority:
+        try:
+            verified = await self._authority_verifier.verify(authority, request=request, admission=admission)
+        except MissionControlError:
+            raise
+        except Exception as exc:
+            raise MissionControlError("dispatch authority verification failed") from exc
+        _need(type(verified) is VerifiedDispatchAuthority, "authority verifier returned an invalid evidence type")
+        return verified
     async def _binding(self, request: MissionDispatchRequest, governed_request: GovernedWorkRequest | None = None, *,
                        verified: VerifiedDispatchAuthority | None = None) -> _DispatchBinding:
         self._require_request(request)
