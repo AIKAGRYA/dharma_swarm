@@ -876,9 +876,15 @@ active_tracks:
       # admit only the responsive shell seam and its browser proof; they do not
       # create another dashboard or grant the UI runtime authority.
       - dashboard/src/app/layout.tsx
+      # The first real-route 390px oracle exposed a second owner: the nested
+      # dashboard flex item retained min-width:auto and expanded to 720px even
+      # after the root sidebar offset was removed. Admit that exact layout seam
+      # so content can shrink into the viewport without being clipped.
+      - dashboard/src/app/dashboard/layout.tsx
       - dashboard/src/components/layout/Sidebar.tsx
       - dashboard/playwright/sadhana-constellation-mobile.spec.ts
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-FLEX-P0-ADMISSION.json
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0.json
       - dharma_swarm/operator_brief/mission_control_citations.py
       - tests/test_operator_brief_mission_control_citations.py
@@ -1029,7 +1035,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: 17
-        what: "SADHANA mobile shell P0: remove the shared dashboard's unconditional 260px mobile offset, render a bounded mobile navigation seam while preserving the desktop sidebar contract, and prove the real unmodified control-surface route at a 390px viewport has no horizontal document overflow. Component isolation is supporting evidence only; the completion oracle is a Playwright browser run against the actual root layout."
+        what: "SADHANA mobile shell P0: remove the shared dashboard's unconditional 260px mobile offset, make the nested dashboard flex chain shrink below its 720px min-content width without clipping, render a bounded mobile navigation seam while preserving the desktop sidebar contract, and prove the real unmodified control-surface route at a 390px viewport has no horizontal document overflow. Component isolation is supporting evidence only; the completion oracle is a Playwright browser run against the actual root layout."
         kind: code
         blocker: true
 
