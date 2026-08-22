@@ -1,0 +1,112 @@
+{
+  "id": "organism-rewire-WP-SADHANA-EVIDENCE-PROJECTION-P1",
+  "base_ref": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+  "branch": "agent/sadhana-10-20260823",
+  "worktree": ".",
+  "intent": "Carry the supervisor's already-derived, task-bound owner-execution observations and independently validated acceptance verdicts through the secure immutable campaign JSON reader into Dharma Constellation. Define a small typed claim shape: a row may be shown as verified working only from a coherent exact task/run/agent join plus fresh owner evidence, and verified complete only from a terminal successful owner observation plus an accepted task verdict; heartbeat, lease, roster membership, visual motion, self-report, and generic runtime databases remain insufficient.",
+  "allowed_files": [
+    "api/mission_snapshot_provider.py",
+    "api/mission_snapshot_validation.py",
+    "api/routers/control_surface.py",
+    "tests/test_mission_snapshot_provider.py",
+    "tests/test_control_surface_mission_sarathi.py",
+    "dashboard/src/hooks/useMissionSarathi.ts",
+    "dashboard/src/hooks/useMissionSarathi.test.ts",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-EVIDENCE-PROJECTION-P1.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/main.py",
+    "api/routers/runtime.py",
+    "dashboard/package.json",
+    "dashboard/package-lock.json",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "evidence-projection-contract",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py tests/test_control_surface_mission_sarathi.py tests/test_mission_control_service.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "evidence-projection-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check api/mission_snapshot_provider.py api/mission_snapshot_validation.py api/routers/control_surface.py tests/test_mission_snapshot_provider.py tests/test_control_surface_mission_sarathi.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "acceptance-and-owner-join-mutations-fail-closed",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py -k 'owner_execution or acceptance_projection or semantic_claims'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(control-surface): project typed campaign evidence"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-EVIDENCE-PROJECTION-P1",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+      "details": []
+    },
+    "interface_mismatches": [
+      "CampaignSnapshot already serializes owner_executions and accepted/rejected/conflicting task-id sets, while the secure provider returns only mission_snapshot and therefore discards the only bounded owner and verifier claims the UI needs.",
+      "The existing hook can join generic runtime graph/events only under mission:sadhana-10-20260823; Orchestrator owner sessions use a different exact domain, so enabling generic database reads would be both misleading and an unnecessary read/write surface.",
+      "MissionSnapshot receipts are Mission Control attempt receipts, not campaign-independent-acceptance receipts; acceptance must be projected from the supervisor's validated verdict sets rather than inferred from arbitrary receipt names.",
+      "An accepted verdict proves terminal candidate acceptance, not current activity. A nonterminal owner observation may show working only when its task/run/agent identity is exact and its observation is fresh."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_campaign.py",
+      "dharma_swarm/mission_control_service.py",
+      "api/mission_snapshot_validation.py",
+      "api/mission_snapshot_provider.py",
+      "api/routers/control_surface.py",
+      "dashboard/src/hooks/useMissionSarathi.ts"
+    ],
+    "honest_blockers": [
+      "The read model is same-UID, self-digested derived evidence; it is not an independent signature, a canonical ledger, or proof of an uncompromised producer process.",
+      "The UI cannot infer usefulness from activity. Verified completion remains terminal owner success plus an already independently validated accepted-task verdict.",
+      "This packet does not start agents, dispatch tasks, create acceptances, grant authority, open network routes, or enable generic runtime databases.",
+      "A fresh owner observation is bounded motion evidence; it cannot substitute for a durable artifact or independent acceptance when a goal is declared complete."
+    ],
+    "rollback": "Revert the bounded campaign-evidence validator/provider/router projection and dashboard join logic. The API falls back to its existing nested MissionSnapshot-only view, generic runtime database readiness remains unavailable, and no canonical TaskBoard, RuntimeStateStore, owner run, acceptance receipt, agent, credential, or external service is mutated.",
+    "packet_digest": "ec01102752398d24e5f8f578fd72f5b327472e3c57e37319e1345265ea8e02d3"
+  }
+}
