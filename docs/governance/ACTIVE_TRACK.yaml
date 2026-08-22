@@ -1937,6 +1937,14 @@ active_tracks:
       - dharma_swarm/docker_sandbox.py
       - docs/docops/AUTO_INVENTORY.md
       - api/main.py
+      # Operator-authorized SADHANA read-model composition (2026-08-23): one
+      # exact-path, read-only provider may be injected into the existing API
+      # composition root. It reads only the supervisor's atomically replaced
+      # JSON projection and never constructs or opens a canonical state owner.
+      - api/mission_snapshot_provider.py
+      - tests/test_mission_snapshot_provider.py
+      - reports/agentops/work_packets/titanium-WP-SADHANA-READMODEL-P0-ADMISSION.json
+      - reports/agentops/work_packets/titanium-WP-SADHANA-READMODEL-P0.json
       - tests/test_api_auth.py
       - tests/test_verify_api.py
       - tests/test_bootstrap_contract.py
@@ -2066,6 +2074,10 @@ active_tracks:
           - verdict
 
     next_items:
+      - id: WP-SADHANA-READMODEL
+        what: "Inject one exact-path SADHANA campaign JSON provider at the existing api/main.py composition root. Per request, open the configured path with no-follow semantics, require one regular same-owner non-world/group-writable bounded file, verify the producer content digest and exact mission/config/minimum-generation/freshness bindings, reject generation rollback, and return only an immutable deep copy of the nested MissionSnapshot. The provider must never import or construct MissionControl, TaskBoard, RuntimeStateStore, SQLite, a scheduler, or a transport. It must not advertise generic runtime graph/event readiness: those endpoints can initialize a database and owner Orchestrator runs intentionally use a session distinct from mission:<id>."
+        kind: code
+        blocker: true
       - id: WP-DSI
         what: "Implement a validated argv-based explicit entrypoint plus keepalive selection in dharma_swarm/docker_sandbox.py, with tests/test_docker_sandbox.py proving an explicitly configured digest-pinned dependency-complete image starts under NetworkMode.NONE with the workspace mounted read-only. Invalid entrypoint or keepalive configuration must fail closed; an omitted override must preserve the existing image-default behavior. This item is open and admits no evolution, DiffApplier, sealed-packet, agent-runner, or other production-caller wiring."
         kind: code
@@ -2096,6 +2108,7 @@ active_tracks:
       - No new truth store, receipt primitive, policy engine, test framework, or catch-all module.
       - No ownership transfer from Mike, Safety TCB, DharmaGraph, Organism, Terminal, or Loop Closure.
       - No production, liveness, complete-security, deployment, or full-campaign claim from a hermetic or fixture-only result.
+      - A secure campaign JSON projection must not authorize generic runtime-DB reads, prove a live writer, or coerce an owner observation, model receipt, producer completion, or dashboard state into independent acceptance.
       - No missing tool, skipped required test, stale receipt, NEEDS_HOST, or BLOCKED_OPERATOR result may be promoted to PASS.
       - No operator credential, live branch-protection decision, deployment change, reviewer nomination, or external action is silently assumed.
 
