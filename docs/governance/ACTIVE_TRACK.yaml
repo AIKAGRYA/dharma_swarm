@@ -873,6 +873,22 @@ active_tracks:
       - dharma_swarm/operator_brief/mission_control_citations.py
       - tests/test_operator_brief_mission_control_citations.py
       - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
+      # Operator-authorized SADHANA P0 admission (2026-08-23): one durable,
+      # single-writer campaign supervisor over the existing Mission Control,
+      # TaskBoard, RuntimeStateStore, and governed executor seams. These exact
+      # additive paths do not admit a second scheduler, task store, dashboard,
+      # transport, evaluator, or promotion authority.
+      - dharma_swarm/mission_control_evidence.py
+      - dharma_swarm/mission_control_campaign.py
+      - dharma_swarm/mission_control_service.py
+      - dharma_swarm/mission_control_authority.py
+      - scripts/runtime/mission_control_campaign.py
+      - tests/test_mission_control_evidence.py
+      - tests/test_mission_control_campaign.py
+      - tests/test_mission_control_service.py
+      - tests/test_runtime_state_claim_cas.py
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -998,6 +1014,10 @@ active_tracks:
         what: "Sublimation Foundry (implements item 8): build dharma_swarm/foundry/ as a target-agnostic AlphaEvolve-style refinery — Evaluator Protocol + target ingest + runner isolation + three verification rings (blind hermetic fitness with AST/diff/determinism/timing tripwires; held-out re-verification; external confirmation) + seven-link improvement receipts + free-model army selection (composes model_pool/evolution_roster) under an llm_burn budget cap + a draft-only kill-switch-guarded foundry-lane workflow + guardian quorum feed + standing kill-metrics. Fitness NEVER selects on daily P&L (non_goals). External receipts are the only permitted quorum feed; foundry receipts stay lab-local until guardian quorum. Revenue spearhead (agent-behavior verification report cards via the audit_kit sealed-receipt pattern) is outreach-ready but graduates to its own revenue-serving track on first paid receipt."
         kind: code
         blocker: false
+      - id: 16
+        what: "SADHANA Mission Control supervisor P0: implement start/run/status/verify/stop as one nonblocking fcntl-fenced writer over canonical MissionSnapshot plus separately owned executor references; renew only an exact, unexpired fenced claim through atomic CAS after a fresh monotonic EvidenceDelta; preserve queued work on durable stop/restart; treat producer completion as a candidate until an independent acceptance receipt (same generator/verifier forbidden except a deterministic held-out oracle); verify exact file-backed authority and revocation immediately before GovernedMissionDispatcher effects; and report process, transport, model execution, and canary acceptance as separate evidence classes, never PID-as-success."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).

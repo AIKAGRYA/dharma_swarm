@@ -1,0 +1,105 @@
+{
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0-ADMISSION.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "83922642534e61d96ace246a91b64f41fcc066be",
+  "branch": "agent/sadhana-supervisor-20260823",
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit SADHANA Mission Control supervisor"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/**",
+    "packages/telos-kernel/**",
+    "scripts/docops/**",
+    "scripts/governance/hygiene/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_active_track_governance.py",
+      "expected_exit": 0,
+      "name": "active-track-governance",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-SADHANA-SUPERVISOR-P0-ADMISSION",
+  "intent": "Admit the exact additive surfaces for a durable SADHANA Mission Control campaign supervisor. The supervisor remains a projection and control loop over canonical TaskBoard and RuntimeStateStore owners, reaches real execution only through the governed dispatcher, and keeps process freshness, transport evidence, model execution, producer completion, and independent acceptance as non-coercible claim classes.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "name": "undeclared-packet-custody-remains-rejected",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_dispatch.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/orchestrator.py"
+    ],
+    "collision": {
+      "checked_at_sha": "83922642534e61d96ace246a91b64f41fcc066be",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This admission changes no runtime, starts no supervisor, performs no dispatch, and proves no process, transport, model, or acceptance liveness.",
+      "Mission Control remains a coordination membrane; TaskBoard, RuntimeStateStore, Orchestrator, A2A, Forge, and Merge Master retain their existing authority.",
+      "The implementation can report real canary acceptance only after a separate independent acceptance receipt exists; a spawned PID or fresh cycle receipt is insufficient.",
+      "CLAUDE.md and SOVEREIGN_MANIFEST.md changes are deterministic generated mirrors of ACTIVE_TRACK only; they add no independent authority or implementation scope."
+    ],
+    "interface_mismatches": [
+      "MissionSnapshot contains Mission Control attempts but Orchestrator-owned executions use separate owner sessions and must be projected as distinct references.",
+      "RuntimeStateStore heartbeat_task_claim is read-then-write and cannot atomically renew an exact fenced claim; a narrow compare-and-swap seam is required.",
+      "Producer COMPLETED currently records owner output but does not prove independent acceptance; the supervisor must preserve that distinction.",
+      "GovernedMissionDispatcher accepts an injected AuthorityVerifier, so the production supervisor requires an exact file-backed verifier rather than synthesizing authority."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "24f758846a06b921dd2287251d64d3d278803e44529adcbcd9fe45627c55e8f5",
+    "rollback": "Revert the admission commit, including the two deterministic generated track mirrors in CLAUDE.md and docs/governance/SOVEREIGN_MANIFEST.md. No task, claim, session, lease, process, transport, model, acceptance, merge, or external state is changed by this packet.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-SADHANA-SUPERVISOR-P0-ADMISSION"
+  },
+  "worktree": "."
+}
