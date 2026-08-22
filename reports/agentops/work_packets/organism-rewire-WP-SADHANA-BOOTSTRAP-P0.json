@@ -1,0 +1,118 @@
+{
+  "id": "organism-rewire-WP-SADHANA-BOOTSTRAP-P0",
+  "base_ref": "017a0948bf913158c3a80361407eba50511a5b99",
+  "branch": "agent/sadhana-bootstrap-20260823",
+  "worktree": ".",
+  "intent": "Implement the admitted one-shot SADHANA Mission Control bootstrap. Securely read and pin the exact external contract bytes, validate the closed ten-goal schema and acyclic dependency graph before canonical owners are opened, preflight all existing mission/task state before effects, resume only exact dependency-closed partial state, seed missing tasks in deterministic topological order through MissionControl idempotency, and emit a byte-stable mapping with an explicitly authority-unbound G05 canary.",
+  "allowed_files": [
+    "dharma_swarm/mission_control_bootstrap.py",
+    "scripts/runtime/sadhana_campaign_bootstrap.py",
+    "tests/test_mission_control_bootstrap.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "packages/**",
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_authority.py",
+    "dharma_swarm/mission_control_campaign.py",
+    "dharma_swarm/mission_control_service.py",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "scripts/runtime/mission_control_campaign.py",
+    "tests/test_mission_control_campaign.py",
+    "tests/test_mission_control_service.py",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "bootstrap-contract-and-cli",
+      "command": "python3 -m pytest -q tests/test_mission_control_bootstrap.py",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    },
+    {
+      "name": "mission-control-idempotency-regression",
+      "command": "python3 -m pytest -q tests/test_mission_control.py -k \"mission_creation_is_idempotent_and_conflicts_fail_closed or task_binding_and_idempotency_use_taskboard_owner or creation_races_are_serialized_with_complete_content\"",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "bootstrap-ruff",
+      "command": "python3 -m ruff check dharma_swarm/mission_control_bootstrap.py scripts/runtime/sadhana_campaign_bootstrap.py tests/test_mission_control_bootstrap.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "seeded-state-cannot-promote-itself-to-dispatch-ready",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/mission_control_bootstrap.py'); t=p.read_text(); old='\\\"dispatch_ready\\\": False'; assert old in t; p.write_text(t.replace(old, '\\\"dispatch_ready\\\": True', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_mission_control_bootstrap.py', '-k', 'output_never_claims_dispatch_ready'], check=False).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): add SADHANA campaign bootstrap"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-BOOTSTRAP-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "017a0948bf913158c3a80361407eba50511a5b99",
+      "details": []
+    },
+    "interface_mismatches": [
+      "TaskBoard allocates opaque task IDs; stable MissionControl idempotency keys make retries converge, while the emitted sorted mapping is the only supported goal-to-task join for later authority binding.",
+      "Mission and task owners use separate databases; the initializer cannot be globally atomic, so exact dependency-closed partial state is resumable and every conflicting or non-closed state is rejected before the initializer invokes another owner mutation.",
+      "The supervisor owns mission_campaign runtime sessions and dispatch requires separately verified roster, workspace, action, correlation, and zero-dollar lease authority; this initializer must not create either and therefore reports dispatch_ready=false with authority_unbound.",
+      "The contract file is external runtime input; secure exact-byte validation binds the task projections to one immutable digest without making the file, its prose, or task existence an authority or acceptance receipt."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/task_board.py"
+    ],
+    "honest_blockers": [
+      "Seeded tasks are intentionally undispatchable until a separate admitted authority binder consumes this output and an explicit pinned roster, writes zero-dollar task-bound leases with exact relative workspace paths and both required Mission Control actions, and binds matching task metadata idempotently.",
+      "The follow-up binder must reconcile crashes across task creation, lease publication, and metadata binding without accepting drift or duplicating index events; this packet neither defines nor writes those authority effects.",
+      "A bootstrap lock serializes this one-shot CLI only; it cannot fence unrelated direct writers or turn TaskBoard and RuntimeStateStore into one transaction.",
+      "Exact contract bytes, mission/task existence, deterministic mapping, and canary identity prove configuration only—not process liveness, transport delivery, model execution, useful output, independent acceptance, promotion, merge, or deployment.",
+      "No host service unit, deployment, supervisor start, campaign runtime session, provider call, external contact, or network write is performed or proven by this repository slice."
+    ],
+    "rollback": "Revert the bootstrap module, one-shot CLI, focused tests, and this packet. Repository rollback does not delete already seeded canonical mission/tasks; those projections remain authority-unbound and require an explicit runtime cleanup warrant if removal is desired.",
+    "packet_digest": "379850a81d8b2cb3115f6a4c0bb5d107eb6c7ec52c03b40667f76a3c5dabb914"
+  }
+}
