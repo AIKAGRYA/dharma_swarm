@@ -1,0 +1,107 @@
+{
+  "id": "organism-rewire-WP-SADHANA-A2A-REDELIVERY-P0",
+  "base_ref": "cf9ff8762c28317f856f7284677e66bd0cb0348a",
+  "branch": "agent/sadhana-a2a-redelivery-20260823",
+  "worktree": ".",
+  "intent": "Repair the deterministic generic NATS redelivery failure in which an omitted A2A context_id is regenerated differently on each delivery and conflicts with immutable execution identity. Derive one opaque stable 12-hex server context from exact durable wire identity and task coordinates before the first spine/server identity write, preserve explicit contexts, and retain fail-closed behavior for foreign identity or context drift.",
+  "allowed_files": [
+    "dharma_swarm/a2a/nats_transport.py",
+    "tests/test_nats_transport.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-REDELIVERY-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "dharma_swarm/a2a/a2a_server.py",
+    "dharma_swarm/a2a/spine_adapter.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/spine/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "nats-redelivery-regression",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_nats_transport.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "a2a-spine-compatibility",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_a2a.py tests/test_a2a_spec_conformance.py tests/test_mission_control_a2a.py tests/test_spine_allowlist_drain.py",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    },
+    {
+      "name": "a2a-redelivery-static",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/a2a/nats_transport.py tests/test_nats_transport.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "redelivery-and-context-negatives",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_nats_transport.py -k 'redelivery or context_id or immutable_context'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(a2a): stabilize missing NATS redelivery context"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-A2A-REDELIVERY-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "cf9ff8762c28317f856f7284677e66bd0cb0348a",
+      "details": []
+    },
+    "interface_mismatches": [
+      "NATS wire tasks may legitimately omit context_id, but each redelivery currently receives a fresh random server context.",
+      "ExecutionIdentity correctly treats context_id as immutable once observed, so a second delivery fails before its handler can retry.",
+      "The governed Mission Control A2A path already supplies a stable context; the generic transport must provide equivalent stability without weakening identity immutability."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/a2a/nats_transport.py",
+      "dharma_swarm/a2a/nats_transport_support.py",
+      "dharma_swarm/a2a/a2a_server.py",
+      "tests/test_nats_transport.py"
+    ],
+    "honest_blockers": [
+      "A deterministic context prevents identity drift but does not itself prove broker liveness, handler usefulness, or semantic acceptance.",
+      "Explicit client-supplied context remains authoritative and must never be silently rewritten.",
+      "A context collision or foreign execution identity must continue to fail closed."
+    ],
+    "rollback": "Revert the deterministic missing-context derivation, its regression controls, and this packet. Existing explicit-context dispatch remains unchanged; generic missing-context redelivery returns to the known fail-closed but non-retriable baseline.",
+    "packet_digest": "7cbf81bce539c6651e2d54c4c00d9de80028bbfd67901b077056acc9a9dd6169"
+  }
+}

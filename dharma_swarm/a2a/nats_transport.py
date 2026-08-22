@@ -7,6 +7,7 @@ object that exposes ``publish``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -19,9 +20,6 @@ from dharma_swarm.a2a.a2a_server import (
     A2ATaskStatus,
 )
 from dharma_swarm.a2a.nats_transport_support import (
-    A2A_TASK_PAYLOAD_SCHEMA,
-    DLQ_PAYLOAD_SCHEMA,
-    NATS_ENVELOPE_SCHEMA,
     _ack,
     _consumer_slug,
     _dlq_to_wire,
@@ -73,6 +71,24 @@ class NatsTransportConfig:
     max_deliveries: int = 3
     publish_timeout_s: float = 2.0
     idempotency_stale_after_s: float | None = 300.0
+
+
+def _stable_server_context_id(
+    task: A2ATask,
+    identity: ExecutionIdentity,
+) -> str:
+    """Derive one opaque server context for every delivery of a wire task."""
+    coordinates = json.dumps(
+        [
+            identity.correlation_id,
+            identity.task_id,
+            identity.run_id,
+            task.id,
+        ],
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(coordinates).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -471,6 +487,8 @@ class A2ANatsTransport:
             identity = _identity_from_wire(payload)
             if identity is None:
                 raise MissingExecutionIdentity("NATS payload is missing ExecutionIdentity")
+            if not task.context_id:
+                task.context_id = _stable_server_context_id(task, identity)
         except Exception as exc:
             await _nack(message)
             raise NatsTransportError(f"invalid NATS A2A payload: {exc}") from exc
