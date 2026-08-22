@@ -42,6 +42,12 @@ from dharma_swarm.mission_control_contract import (
 from dharma_swarm.mission_control_dispatch import GovernedMissionDispatcher
 from dharma_swarm.mission_control_evidence import IndependentAcceptance
 from dharma_swarm.mission_control_execution import OrchestratorMissionAdapter
+from dharma_swarm.mission_control_roster import (
+    CampaignAgentRoster,
+    CampaignRosterError,
+    ensure_campaign_agent_roster,
+    load_campaign_agent_roster,
+)
 from dharma_swarm.mission_control_service import (
     CampaignControlGate,
     CampaignProjectionError,
@@ -155,6 +161,28 @@ def _requested_config(args: argparse.Namespace) -> CampaignConfig:
     )
 
 
+def _requested_roster(args: argparse.Namespace) -> CampaignAgentRoster | None:
+    values = {
+        "path": str(getattr(args, "agent_roster", "") or ""),
+        "sha256": str(getattr(args, "agent_roster_sha256", "") or ""),
+        "objective_sha256": str(getattr(args, "objective_sha256", "") or ""),
+    }
+    configured = {key for key, value in values.items() if value}
+    if not configured:
+        return None
+    if configured != set(values):
+        missing = sorted(set(values) - configured)
+        raise CampaignRosterError(
+            "campaign roster configuration is partial: " + ",".join(missing)
+        )
+    return load_campaign_agent_roster(
+        Path(values["path"]),
+        expected_sha256=values["sha256"],
+        campaign_id=args.mission_id,
+        objective_sha256=values["objective_sha256"],
+    )
+
+
 async def _recorded_config(
     runtime: RuntimeStateStore,
     mission_id: str,
@@ -240,11 +268,18 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
         os.environ["DHARMA_FAST_BOOT"] = "1"
     state_dir = Path(args.state_dir).expanduser().resolve(strict=False)
     paths = _paths(args)
+    requested_roster = _requested_roster(args)
     writer_lock = CampaignWriterLock(paths.lock_path)
     _acquire_writer_handoff(writer_lock, args.writer_handoff_timeout)
     swarm = SwarmManager(state_dir=state_dir)
+    roster_receipt = None
     try:
         await swarm.init()
+        if requested_roster is not None:
+            roster_receipt = await ensure_campaign_agent_roster(
+                swarm,
+                requested_roster,
+            )
         board = swarm._task_board
         orchestrator = swarm._orchestrator
         if board is None or orchestrator is None:
@@ -299,6 +334,9 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             "lock_path": str(result.lock_path),
             "control_gate_path": str(result.control_gate_path),
             "projection_path": str(result.projection_path),
+            "roster_receipt": (
+                roster_receipt.to_dict() if roster_receipt is not None else None
+            ),
             "snapshot": result.snapshot.to_dict(),
         }
     finally:
@@ -367,6 +405,24 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
     if args.held_out_oracle_digest:
         command.extend(
             ["--held-out-oracle-digest", args.held_out_oracle_digest]
+        )
+    roster_values = (
+        str(getattr(args, "agent_roster", "") or ""),
+        str(getattr(args, "agent_roster_sha256", "") or ""),
+        str(getattr(args, "objective_sha256", "") or ""),
+    )
+    if any(roster_values):
+        if not all(roster_values):
+            raise CampaignRosterError("campaign roster configuration is partial")
+        command.extend(
+            [
+                "--agent-roster",
+                str(Path(roster_values[0]).expanduser().resolve(strict=False)),
+                "--agent-roster-sha256",
+                roster_values[1],
+                "--objective-sha256",
+                roster_values[2],
+            ]
         )
     if args.fast_boot:
         command.append("--fast-boot")
@@ -587,6 +643,9 @@ def _add_run_config(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--shutdown-timeout", type=float, default=15.0)
     parser.add_argument("--writer-handoff-timeout", type=float, default=10.0)
     parser.add_argument("--fast-boot", action="store_true")
+    parser.add_argument("--agent-roster", default="")
+    parser.add_argument("--agent-roster-sha256", default="")
+    parser.add_argument("--objective-sha256", default="")
 
 
 def build_parser() -> argparse.ArgumentParser:

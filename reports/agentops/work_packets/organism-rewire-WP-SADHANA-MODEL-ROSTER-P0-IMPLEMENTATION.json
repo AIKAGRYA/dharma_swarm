@@ -1,0 +1,110 @@
+{
+  "id": "organism-rewire-WP-SADHANA-MODEL-ROSTER-P0-IMPLEMENTATION",
+  "base_ref": "90d8577327558a95cec8d7d5ede45ffe0462a6e4",
+  "branch": "agent/sadhana-model-roster-20260823",
+  "worktree": ".",
+  "intent": "Implement the admitted immutable, hash-pinned SADHANA campaign agent-roster boundary. Validate one exact seven-family zero-cash manifest, reconcile all stable names before effects, idempotently instantiate only missing exact AgentStates through SwarmManager, and return actual runtime identities for the separately owned authority binder. Catalog observation is eligibility evidence only; useful work and completion still require owner execution plus independent acceptance.",
+  "allowed_files": [
+    "dharma_swarm/mission_control_roster.py",
+    "scripts/runtime/mission_control_campaign.py",
+    "tests/test_mission_control_roster.py",
+    "tests/test_mission_control_campaign.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-MODEL-ROSTER-P0-IMPLEMENTATION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/providers.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/task_board.py",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "campaign-roster-contract",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_roster.py tests/test_mission_control_campaign.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "campaign-roster-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control_roster.py scripts/runtime/mission_control_campaign.py tests/test_mission_control_roster.py tests/test_mission_control_campaign.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "identity-conflict-and-catalog-drift-denials",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_roster.py -k 'wrong_digest or duplicate_live_name or mismatched_live_identity or model_absent_from_catalog or expired or partial_spawn_recovery'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): bind current SADHANA model roster"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-MODEL-ROSTER-P0-IMPLEMENTATION",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "90d8577327558a95cec8d7d5ede45ffe0462a6e4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "SwarmManager fast boot creates a partly stale static crew; exact authority binding can only bind already-live AgentStates and must not silently treat a stable name as a current provider route.",
+      "Provider catalog membership is an observation at one time, not liveness, task execution, semantic usefulness, or acceptance.",
+      "AgentState ids are process-local and random; stable manifest names must resolve to exactly one actual id after init and before authority leases are minted.",
+      "A crash can occur after some roster seats spawn; restart must reconcile exact matches and spawn only missing seats without duplicate names."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/swarm.py",
+      "dharma_swarm/startup_crew.py",
+      "dharma_swarm/models.py",
+      "scripts/runtime/mission_control_campaign.py"
+    ],
+    "honest_blockers": [
+      "The roster cannot prove account quota, provider latency, model quality, or future catalog availability; live canaries remain required.",
+      "All seven seats currently use one zero-cash Ollama account transport, so provider-family diversity is one even though model-family diversity is seven.",
+      "This packet does not activate or impersonate Hermes gateways; Mac, Megh, and AGNI Hermes processes remain separately owned A2A participants.",
+      "Instantiation does not grant task or effect authority; the separate exact authority manifest and file-backed lease verifier remain mandatory.",
+      "No task result is promoted by roster membership, spawn success, heartbeat, or model self-report."
+    ],
+    "rollback": "Stop the campaign supervisor, omit the roster manifest arguments, and revert this packet. Existing canonical TaskBoard and RuntimeStateStore rows remain untouched; process-local roster agents disappear on shutdown and no provider credential or external endpoint is modified.",
+    "packet_digest": "f456e0bc36e36ea8b9296198aed65624a4737b21bbbe7a217078e9e759dd4fed"
+  }
+}
