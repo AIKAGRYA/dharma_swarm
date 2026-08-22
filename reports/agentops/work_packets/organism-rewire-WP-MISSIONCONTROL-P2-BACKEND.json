@@ -1,0 +1,156 @@
+{
+  "id": "organism-rewire-WP-MISSIONCONTROL-P2-BACKEND",
+  "base_ref": "abc8bd35c34c729ed421f9615df504f5615868bd",
+  "branch": "agent/sadhana-p2-standalone-20260823",
+  "worktree": ".",
+  "intent": "On accepted base abc8bd35c34c729ed421f9615df504f5615868bd, implement the admitted B1 backend membrane as three additive adapters: a fail-closed governed-dispatch boundary that authenticates an exact principal, mission, task, dispatch key, authority reference, and authority digest through injected owner verifiers before any executor side effect; an A2A adapter that preserves native A2A task, context, run, and receipt identity without creating Mission Control attempts; and a Sarathi adapter that translates PlannedDelegation into typed MissionProposal data only after a complete explicit dependency-label mapping. Preserve the non-coercible claim ladder: proposal, admission, authorization, publish acknowledgement, handler acknowledgement, semantic outcome, verification, promotion, and merge remain separate claims.",
+  "allowed_files": [
+    "dharma_swarm/mission_control_dispatch.py",
+    "dharma_swarm/mission_control_a2a.py",
+    "dharma_swarm/mission_control_sarathi.py",
+    "tests/test_mission_control_dispatch.py",
+    "tests/test_mission_control_a2a.py",
+    "tests/test_mission_control_sarathi.py",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-BACKEND.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "CLAUDE.md",
+    "docs/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock",
+    "scripts/**",
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/mission_control_execution_support.py",
+    "dharma_swarm/mission_control_lifecycle.py",
+    "dharma_swarm/mission_control_mcp.py",
+    "dharma_swarm/mission_control_mcp_mutations.py",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/mission_control_reconciliation.py",
+    "dharma_swarm/mission_control_recovery.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/models.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/sarathi/**",
+    "dharma_swarm/holon_system/sarathi/**",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/spine/**",
+    "tests/test_mission_control.py",
+    "tests/test_mission_control_execution.py",
+    "tests/test_nats_transport.py",
+    "tests/test_a2a.py",
+    "tests/test_sarathi_plan.py",
+    "tests/test_task_board.py",
+    "tests/test_runtime_state_invariants.py"
+  ],
+  "gates": [
+    {
+      "name": "mission-control-governed-backend-contracts",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_dispatch.py tests/test_mission_control_a2a.py tests/test_mission_control_sarathi.py tests/test_mission_control.py tests/test_mission_control_execution.py tests/test_nats_transport.py tests/test_a2a.py tests/test_sarathi_plan.py tests/test_task_board.py tests/test_runtime_state_invariants.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "mission-control-governed-backend-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control_dispatch.py dharma_swarm/mission_control_a2a.py dharma_swarm/mission_control_sarathi.py tests/test_mission_control_dispatch.py tests/test_mission_control_a2a.py tests/test_mission_control_sarathi.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "authority-and-claim-noncoercion",
+      "command": "python3 -m pytest -q tests/test_mission_control_dispatch.py::test_authority_digest_mismatch_blocks_before_owner_dispatch tests/test_mission_control_a2a.py::test_publish_ack_does_not_imply_handler_outcome_or_liveness tests/test_mission_control_sarathi.py::test_incomplete_dependency_mapping_fails_closed_without_task_creation",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "no-parallel-owner-or-oversized-module",
+      "command": "python3 -c \"from pathlib import Path; paths=[Path('dharma_swarm/mission_control_dispatch.py'),Path('dharma_swarm/mission_control_a2a.py'),Path('dharma_swarm/mission_control_sarathi.py')]; texts={str(p):p.read_text() for p in paths}; forbidden=['sqlite3','aiosqlite','CREATE TABLE','TaskBoard(','RuntimeStateStore(','Orchestrator(','A2ANatsTransport(','start_attempt(','heartbeat_lease(','finish_attempt(']; bad=[(name,token) for name,text in texts.items() for token in forbidden if token in text]; oversized=[str(p) for p in paths if len(texts[str(p)].splitlines()) > 500]; raise SystemExit(1 if bad or oversized else 0)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): bind governed A2A and Sarathi adapters"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MISSIONCONTROL-P2-BACKEND",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "abc8bd35c34c729ed421f9615df504f5615868bd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Sarathi PlannedDelegation dependencies are proposal-local labels, while Mission Control dependencies are canonical task IDs; a complete explicit mapping is required before owner-state writes.",
+      "The current execution-lease digest is integrity evidence, not authenticated dispatch authority; the dispatch membrane requires an injected authenticity verifier.",
+      "A2A owns its task and transport lifecycle, so wrapping A2A publication in MissionControl start_attempt, heartbeat_lease, or finish_attempt would duplicate owner state.",
+      "NatsPublishAck and NatsConsumeAck encode distinct transport events and cannot be promoted into semantic outcomes.",
+      "RuntimeStateStore external-A2A lookup returns the latest matching identity, while durable receipt APIs are bounded; recovery must independently reject ambiguity and saturation.",
+      "Legacy Sarathi wake, mailbox, and receipt artifacts remain private projections and are not canonical Mission Control admission evidence."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_execution_support.py",
+      "dharma_swarm/autocatalytic_adapters_sense_execute.py",
+      "dharma_swarm/a2a/a2a_server.py",
+      "dharma_swarm/a2a/nats_transport.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/holon_system/sarathi/plan.py"
+    ],
+    "honest_blockers": [
+      "This packet adds adapters and tests only; it does not start Mission Control, Sarathi, an A2A consumer, JetStream, a worker pool, or a supervisor.",
+      "Authenticated dispatch authority is supplied by injected owner verification; task claims, self-hashed leases, identity assertions, and proposal contents are not authority.",
+      "A NATS publish acknowledgement proves broker acceptance only. It does not prove handler contact, executor liveness, semantic completion, verified outcome, promotion eligibility, or merge permission.",
+      "Runtime receipt recovery is bounded and must fail closed on scan saturation, ambiguity, conflicting identity, or changed operation content.",
+      "The latest-only external A2A identity lookup cannot prove fleet-global uniqueness.",
+      "Forge remains promotion authority and Merge Master Mike remains conditional merge authority."
+    ],
+    "rollback": "Revert the three additive adapters, their three tests, and this packet. No canonical schema, owner module, runtime process, transport topology, deployment, promotion state, or merge state is changed by this slice.",
+    "packet_digest": "15337456616a5daf5d445dea4e27bc7de947a2df403cb0a99667577d9b4b22d2"
+  }
+}
