@@ -44,10 +44,16 @@
   ],
   "negative_controls": [
     {
-      "name": "fixed-mobile-offset-breaks-real-route-oracle",
-      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dashboard/src/app/layout.tsx'); t=p.read_text(); needle='ml-0 min-w-0 w-full pt-12 lg:ml-[260px] lg:pt-0'; assert needle in t; p.write_text(t.replace(needle, 'ml-[260px] min-w-0 w-full pt-12 lg:pt-0', 1)); sys.exit(subprocess.run(['npm','--prefix','dashboard','exec','--','playwright','test','playwright/sadhana-constellation-mobile.spec.ts','--grep','mobile actual route'], check=False).returncode)\"",
+      "name": "fixed-mobile-offset-breaks-source-contract",
+      "command": "python3 -c \"from pathlib import Path; import sys; p=Path('dashboard/src/app/layout.tsx'); t=p.read_text(); good='ml-0 min-w-0 w-full flex-1 pt-12 lg:ml-[260px] lg:pt-0'; bad='ml-[260px] min-w-0 w-full flex-1 pt-12 lg:pt-0'; good in t or sys.exit(3); p.write_text(t.replace(good, bad, 1)); assert good in p.read_text(), 'zero-offset mobile source contract rejected the fixed margin mutation'\"",
       "expected_exit": 1,
-      "timeout_seconds": 300
+      "timeout_seconds": 120
+    },
+    {
+      "name": "nested-min-width-auto-breaks-source-contract",
+      "command": "python3 -c \"from pathlib import Path; import sys; p=Path('dashboard/src/app/dashboard/layout.tsx'); t=p.read_text(); good='flex min-h-screen min-w-0 flex-col'; bad='flex min-h-screen flex-col'; good in t or sys.exit(3); p.write_text(t.replace(good, bad, 1)); assert good in p.read_text(), 'nested flex shrink source contract rejected min-width:auto mutation'\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
     }
   ],
   "commit": {
@@ -99,6 +105,6 @@
       "Packet positive-command admission does not allow npm; lint, Next production build, and Playwright are recorded as separate verifier evidence."
     ],
     "rollback": "Revert the responsive root main classes, mobile header/desktop sidebar visibility seam, actual-route Playwright spec, and this packet together. No canonical runtime or external state is mutated by repository rollback.",
-    "packet_digest": "807392e34a7ea258b4d8aafef0c18c449d68ee6670565d9a3f452f7691395dc6"
+    "packet_digest": "9deb729864928488a0025ebd657c12fef688e7989630d8bc431cca26eb6ac2ea"
   }
 }
