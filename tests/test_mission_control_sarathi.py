@@ -74,8 +74,9 @@ def _request(
         "work_kind": proposal.work_kind,
         "intent": proposal.gate_input,
         "risk_tier": proposal.risk_tier,
-        "mission_contract_present": True,
-        "workspace_lease_present": True,
+        "context_quorum_ok": False,
+        "mission_contract_present": False,
+        "workspace_lease_present": False,
         "metadata": {
             "schema_version": SARATHI_SCHEMA_VERSION,
             "mission_id": proposal.mission_id,
@@ -186,6 +187,9 @@ def test_complete_payload_smuggling_is_hard_denied_before_evaluation() -> None:
         {"intent": "check status only"},
         {"risk_tier": "Q1"},
         {"metadata": {}},
+        {"workspace_lease_present": True},
+        {"mission_contract_present": True},
+        {"allowed_files": ["unverified/path.py"]},
     ],
 )
 def test_governed_request_smuggling_cannot_change_canonical_binding(
@@ -227,6 +231,22 @@ def test_non_allow_and_foreign_evaluator_outputs_do_not_create_admission() -> No
     )
     with pytest.raises(SarathiMissionError, match="foreign evidence type"):
         foreign.admit(proposal, _request(proposal))
+
+
+def test_declared_kind_cannot_lower_semantic_self_evolution_risk() -> None:
+    adapter = SarathiMissionAdapter(object())  # type: ignore[arg-type]
+    proposal = adapter.propose(
+        "m-alpha",
+        _delegation(
+            action="self evolution: modify mutation policy",
+            body="Self evolution must modify the mutation policy.",
+            metadata={"sarathi_kind": "build"},
+        ),
+    )
+
+    assert proposal.work_kind is WorkKind.SELF_EVOLUTION
+    with pytest.raises(SarathiMissionError, match="did not allow"):
+        adapter.admit(proposal, _request(proposal))
 
 
 def test_evaluator_mutation_and_failure_are_fail_closed() -> None:
@@ -404,8 +424,48 @@ async def test_accept_recomputes_admission_and_rejects_dataclass_as_credential(
     assert await mission_control.list_tasks("m-alpha") == ()
 
     accepted = await adapter.accept(proposal, request, admission, {})
-    assert evaluations == 3
+    assert evaluations == 4
     assert accepted.status is TaskStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_accept_rechecks_admission_after_await_before_task_creation(
+    mission_control: MissionControl,
+) -> None:
+    await mission_control.create_mission("m-alpha", title="Alpha")
+    entered = asyncio.Event()
+    resume = asyncio.Event()
+    allowed = True
+
+    class PausingControl:
+        async def get_mission(self, mission_id: str):
+            entered.set()
+            await resume.wait()
+            return await mission_control.get_mission(mission_id)
+
+        async def create_task(self, mission_id: str, **kwargs: Any):
+            return await mission_control.create_task(mission_id, **kwargs)
+
+    def evaluator(request: GovernedWorkRequest) -> GovernedWorkAdmission:
+        return GovernedWorkAdmission(
+            request_id=request.request_id,
+            decision="allow" if allowed else "review",
+        )
+
+    adapter = SarathiMissionAdapter(  # type: ignore[arg-type]
+        PausingControl(), admission_evaluator=evaluator
+    )
+    proposal = adapter.propose("m-alpha", _delegation())
+    request = _request(proposal)
+    admission = adapter.admit(proposal, request)
+    pending = asyncio.create_task(adapter.accept(proposal, request, admission, {}))
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    allowed = False
+    resume.set()
+
+    with pytest.raises(SarathiMissionError, match="did not allow"):
+        await pending
+    assert await mission_control.list_tasks("m-alpha") == ()
 
 
 @pytest.mark.asyncio

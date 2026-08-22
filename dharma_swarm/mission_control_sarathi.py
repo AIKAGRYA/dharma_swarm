@@ -41,6 +41,7 @@ _VALID_CHANNELS = frozenset(VALID_CHANNELS)
 _RISK_TIERS = {"safe": "Q1", "low": "Q1", "medium": "Q2", "high": "Q3", "critical": "Q4"}
 _KIND_TO_WORK_KIND = {"build": WorkKind.CODE_WRITE, "experiment": WorkKind.LONG_RUNNING,
                       "publication": WorkKind.CODE_WRITE, "merge": WorkKind.PROMOTION}
+_KIND_RANK = {kind: rank for rank, kind in enumerate((WorkKind.READ_ONLY, WorkKind.A2A_CLAIM, WorkKind.LONG_RUNNING, WorkKind.CODE_WRITE, WorkKind.SELF_EVOLUTION, WorkKind.PROMOTION))}
 _HARD_DENY_CLASSES = frozenset({ActionClass.IRREVERSIBLE, ActionClass.OPERATOR_ONLY})
 AdmissionEvaluator = Callable[[GovernedWorkRequest], GovernedWorkAdmission]
 class SarathiMissionError(MissionControlError):
@@ -172,16 +173,15 @@ def _classify(payload: Mapping[str, Any]) -> tuple[str, GateDecision]:
     return gate_input, classify_action(gate_input, operator_reachable=False)
 def _work_kind(metadata: Mapping[str, Any], gate: GateDecision) -> WorkKind:
     kind = str(metadata.get("sarathi_kind") or "").strip().lower()
-    if kind in _KIND_TO_WORK_KIND:
-        return _KIND_TO_WORK_KIND[kind]
+    declared = _KIND_TO_WORK_KIND.get(kind, WorkKind.LONG_RUNNING)
     if kind == "review" and gate.action_class is ActionClass.REVERSIBLE_SAFE:
-        return WorkKind.READ_ONLY
+        declared = WorkKind.READ_ONLY
     complete_text = gate.action.lower()
     if any(term in complete_text for term in ("self evolution", "self_evolution")):
-        return WorkKind.SELF_EVOLUTION
+        return max((declared, WorkKind.SELF_EVOLUTION), key=_KIND_RANK.__getitem__)
     if "promotion" in complete_text or "merge" in complete_text:
-        return WorkKind.PROMOTION
-    return WorkKind.LONG_RUNNING
+        return max((declared, WorkKind.PROMOTION), key=_KIND_RANK.__getitem__)
+    return declared
 def _proposal_payload(proposal: MissionProposal) -> dict[str, Any]:
     payload = asdict(proposal)
     payload.pop("proposal_digest")
@@ -316,15 +316,15 @@ class SarathiMissionAdapter:
                 f"governance admission did not allow acceptance: {fresh.decision}"
             )
 
-        dependency_ids, mapping = self._validate_dependency_mapping(
-            proposal, dependency_task_ids
-        )
-        metadata = self._task_metadata(proposal, fresh, mapping)
+        dependency_ids, mapping = self._validate_dependency_mapping(proposal, dependency_task_ids)
         mission = await self._mission_control.get_mission(proposal.mission_id)
         if mission is None:
-            raise SarathiMissionError(
-                f"mission {proposal.mission_id!r} was not found"
-            )
+            raise SarathiMissionError(f"mission {proposal.mission_id!r} was not found")
+        refreshed = self.admit(proposal, governed_request)
+        refreshed = replace(refreshed, reduced_authority=_json_metadata(refreshed.reduced_authority))
+        if refreshed != fresh:
+            raise SarathiMissionError("governance admission changed before task creation")
+        metadata = self._task_metadata(proposal, refreshed, mapping)
         task = await self._mission_control.create_task(
             proposal.mission_id,
             title=proposal.summary,
@@ -416,14 +416,8 @@ class SarathiMissionAdapter:
     ) -> None:
         if type(request) is not GovernedWorkRequest:
             raise SarathiMissionError("GovernedWorkRequest evidence is required")
-        if (
-            request.request_id != proposal.admission_request_id
-            or request.agent_uid != proposal.recipient
-            or request.work_kind is not proposal.work_kind
-            or request.intent != proposal.gate_input
-            or request.risk_tier != proposal.risk_tier
-            or request.metadata != _request_metadata(proposal)
-        ):
+        expected = GovernedWorkRequest(request_id=proposal.admission_request_id, agent_uid=proposal.recipient, work_kind=proposal.work_kind, intent=proposal.gate_input, risk_tier=proposal.risk_tier, context_quorum_ok=False, metadata=_request_metadata(proposal))
+        if request != expected:
             raise SarathiMissionError(
                 "governed work request is not canonically bound to the proposal"
             )
