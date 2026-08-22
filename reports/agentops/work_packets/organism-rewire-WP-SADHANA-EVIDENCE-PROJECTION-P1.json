@@ -82,9 +82,11 @@
     "active_track": "organism-rewire-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
-      "status": "clear",
+      "status": "coordinated_shared_seam",
       "checked_at_sha": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
-      "details": []
+      "details": [
+        "repository-titanium-hardening-2026-07 owns the existing secure provider seam. This packet extends only its already-admitted immutable JSON wire projection with bounded supervisor-produced owner and acceptance fields, preserves fail-closed custody and generic-runtime unavailability, and carries both focused Titanium regressions and the Constellation consumer in one atomic closeout."
+      ]
     },
     "interface_mismatches": [
       "CampaignSnapshot already serializes owner_executions and accepted/rejected/conflicting task-id sets, while the secure provider returns only mission_snapshot and therefore discards the only bounded owner and verifier claims the UI needs.",
@@ -107,6 +109,6 @@
       "A fresh owner observation is bounded motion evidence; it cannot substitute for a durable artifact or independent acceptance when a goal is declared complete."
     ],
     "rollback": "Revert the bounded campaign-evidence validator/provider/router projection and dashboard join logic. The API falls back to its existing nested MissionSnapshot-only view, generic runtime database readiness remains unavailable, and no canonical TaskBoard, RuntimeStateStore, owner run, acceptance receipt, agent, credential, or external service is mutated.",
-    "packet_digest": "ec01102752398d24e5f8f578fd72f5b327472e3c57e37319e1345265ea8e02d3"
+    "packet_digest": "9957b9b5ab9b1f070d52414a11c8dcee9d3c32dd663e2f27f2cb00344daae900"
   }
 }
