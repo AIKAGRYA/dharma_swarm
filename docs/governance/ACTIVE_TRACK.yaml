@@ -870,6 +870,16 @@ active_tracks:
       - dashboard/src/app/dashboard/control-surface/page.tsx
       - dashboard/src/hooks/useMissionSarathi.ts
       - dashboard/src/components/cockpit/MissionSarathiStrip.tsx
+      # Operator-authorized SADHANA mobile-shell admission (2026-08-23): the
+      # Constellation cannot be iPhone-readable while the shared root shell
+      # reserves a fixed 260px sidebar at every viewport. These exact paths
+      # admit only the responsive shell seam and its browser proof; they do not
+      # create another dashboard or grant the UI runtime authority.
+      - dashboard/src/app/layout.tsx
+      - dashboard/src/components/layout/Sidebar.tsx
+      - dashboard/playwright/sadhana-constellation-mobile.spec.ts
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0.json
       - dharma_swarm/operator_brief/mission_control_citations.py
       - tests/test_operator_brief_mission_control_citations.py
       - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
@@ -1016,6 +1026,10 @@ active_tracks:
         blocker: false
       - id: 16
         what: "SADHANA Mission Control supervisor P0: implement start/run/status/verify/stop as one nonblocking fcntl-fenced writer over canonical MissionSnapshot plus separately owned executor references; renew only an exact, unexpired fenced claim through atomic CAS after a fresh monotonic EvidenceDelta; preserve queued work on durable stop/restart; treat producer completion as a candidate until an independent acceptance receipt (same generator/verifier forbidden except a deterministic held-out oracle); verify exact file-backed authority and revocation immediately before GovernedMissionDispatcher effects; and report process, transport, model execution, and canary acceptance as separate evidence classes, never PID-as-success."
+        kind: code
+        blocker: true
+      - id: 17
+        what: "SADHANA mobile shell P0: remove the shared dashboard's unconditional 260px mobile offset, render a bounded mobile navigation seam while preserving the desktop sidebar contract, and prove the real unmodified control-surface route at a 390px viewport has no horizontal document overflow. Component isolation is supporting evidence only; the completion oracle is a Playwright browser run against the actual root layout."
         kind: code
         blocker: true
 
