@@ -1,0 +1,108 @@
+{
+  "id": "organism-rewire-WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION",
+  "base_ref": "7df1f4a040da42c19a4ff0f72af28f4d125817ba",
+  "branch": "agent/sadhana-authority-binding-20260823",
+  "worktree": ".",
+  "intent": "Re-admit the SADHANA runtime authority slice after the operator-authorized bounded-attempt and automatic-verifier expansion. Exact campaign dispatches carry a zero-based generation through authority, lease, request, owner identity, run, claim, and idempotency evidence; only an exact pre-provider dispatch_indeterminate generation may advance below the precommitted goal ceiling, while prior evidence remains terminal. The sole campaign leader also replays or runs the existing distinct-family inference-only verifier and submits its typed verdict without changing generic routing or retry behavior.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "active-track-governance",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_active_track_governance.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "undeclared-packet-custody-remains-rejected",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit bounded SADHANA attempt generations"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "7df1f4a040da42c19a4ff0f72af28f4d125817ba",
+      "details": []
+    },
+    "interface_mismatches": [
+      "TaskBoard historically stored one mutable execution marker, while bounded retry needs immutable terminal evidence for every generation and one current successor authority without resurrecting a prior identity.",
+      "Generic Orchestrator retry requeues a failed task under one identity; typed campaign attempts require a fresh request, lease, run, claim, and idempotency identity and may advance only before any provider scheduling witness.",
+      "The independent verifier runner is currently a manual CLI even though campaign dependency readiness requires accepted evidence; the sole leader must invoke its existing deterministic replay path automatically.",
+      "Verifier evidence and run terminal state are separate writes; replay must recover only its own exact completed evidence after a crash and must never repeat a provider effect merely because the terminal lifecycle write was interrupted.",
+      "TaskBoard and RuntimeStateStore remain separate durability domains. The reconciler must plan and validate the whole campaign before writing, then use exact ownership-CAS transitions and leave indeterminate evidence visible on any unresolved partial.",
+      "dharmagraph-engine-2026-07 retains ownership of dharma_swarm/orchestrator.py and tests/test_orchestrator.py; its existing separately governed packet will be rebound for only the exact generation selector/scheduling-witness/generic-retry bypass seam.",
+      "dharma_swarm/agent_runner.py is admitted under dharmagraph solely for public ownership-CAS reserve/release methods under the existing pool lock; it does not expose the lock or claim OS/tool sandboxing.",
+      "mission_control_bootstrap.py remains organism-owned; its amendment is limited to generation correlation output and a behavior-preserving lock-helper extraction required by the enforced 1000-line ceiling."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_binding.py",
+      "dharma_swarm/mission_control_authority.py",
+      "dharma_swarm/mission_control_campaign.py",
+      "dharma_swarm/mission_control_verifier.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/task_board.py",
+      "dharma_swarm/orchestrator.py",
+      "scripts/runtime/mission_control_campaign.py"
+    ],
+    "honest_blockers": [
+      "This admission changes no runtime code, task, lease, provider, process, verifier verdict, acceptance, merge, deployment, or external state.",
+      "Allowed-file policy is governance metadata, not OS/tool confinement. Write-capable campaign dispatch remains disabled without an actually enforced disposable-workspace/sandbox boundary; the admitted runtime route is inference/read-only only.",
+      "The exact principal thread is a trusted-process boundary for the sole production supervisor, not an opaque capability membrane against hostile in-process plugins.",
+      "An already-submitted provider effect is not cancelled by campaign stop; stop fences new durable submissions and cycles, while provider cancellation/revocation remains a separately owned follow-up.",
+      "Distinct-family model verification is semantic evidence, not truth by consensus and not promotion, merge, publication, or external-world success."
+    ],
+    "rollback": "Stop the campaign writer, revert the later implementation commit and this admission, and retain all canonical TaskBoard/RuntimeState evidence for audit. Do not delete prior generation rows or verifier evidence. The rollback removes only code paths and generated governance mirrors; no provider cancellation, credential mutation, promotion, merge, deployment, or external publication is authorized.",
+    "packet_digest": "beae48c1af67d0cdd78309c2991bb29148d12ad7f6d01a354052dc64dc3be859"
+  }
+}

@@ -932,6 +932,30 @@ active_tracks:
       - tests/test_mission_control_binding.py
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0-ADMISSION.json
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0.json
+      # Operator-authorized SADHANA bounded-attempt amendment (2026-08-23):
+      # exact campaign dispatches carry a zero-based attempt generation through
+      # authority, lease, request, owner identity, run, and claim evidence.
+      # Only a proven pre-provider indeterminate attempt may advance, within the
+      # goal contract ceiling; prior generations remain terminal evidence. The
+      # same leader also runs the already-governed inference-only verifier so a
+      # completed candidate cannot strand the dependency graph awaiting manual
+      # SSH. Generic tasks and generic retry/routing remain unchanged.
+      - dharma_swarm/mission_control_attempts.py
+      - dharma_swarm/mission_control_auto_verifier.py
+      - dharma_swarm/mission_control_binding_render.py
+      - dharma_swarm/mission_control_binding_seed.py
+      - dharma_swarm/mission_control_bootstrap_lock.py
+      - dharma_swarm/mission_control_executor_guard.py
+      - dharma_swarm/runtime_lifecycle.py
+      - dharma_swarm/runtime_lifecycle_identity.py
+      - dharma_swarm/runtime_lifecycle_payloads.py
+      - dharma_swarm/task_board.py
+      - tests/test_mission_control_attempts.py
+      - tests/test_mission_control_auto_verifier.py
+      - tests/test_runtime_state_campaign_attempts.py
+      - tests/test_task_board.py
+      - tests/test_agent_runner.py
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -1077,6 +1101,10 @@ active_tracks:
         what: "SADHANA campaign authority binding P0: after the canonical swarm roster is live and before the first supervisor cycle, consume one exact campaign manifest and bind each seeded goal task to exactly one stable-name AgentState ID, one deterministic relative workspace, one zero-dollar task-correlated execution lease, and the canonical governance allowed-file scope. Preserve bootstrap's authority_unbound marker as seed provenance; the separately typed campaign authority envelope is the only dispatch readiness evidence. Fail closed on roster ambiguity, foreign partial state, expired or over-broad authority, unavailable exact principals, and executor identity substitution while leaving generic routing unchanged for tasks without campaign authority."
         kind: code
         blocker: true
+      - id: 21
+        what: "SADHANA bounded attempt and automatic verification P0: bind zero-based attempt_generation through the exact campaign authority/request/lease/run/claim identity, preserve every prior generation as immutable terminal evidence, and advance only an exact dispatch_indeterminate pre-provider failure below the goal's precommitted attempt ceiling. Under the sole campaign leader, replay or run one distinct-family inference-only verifier for each unadjudicated completed candidate and immediately submit its typed verdict to CampaignSupervisor.accept; verifier failure must remain visible and must never imply acceptance or dependency readiness."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -1114,6 +1142,13 @@ active_tracks:
       # one exact authenticated AgentState ID before normal topology routing.
       # No generic routing, topology, lifecycle, or dharmagraph ownership moves.
       - tests/test_orchestrator.py
+      # Operator-authorized shared execution seam for SADHANA generation
+      # (2026-08-23): AgentPool exposes only exact ownership-CAS reserve/release,
+      # while Orchestrator disables its generic same-generation retry for typed
+      # campaign authority and records the pre-provider scheduling witness. No
+      # generic route, retry, topology, or worker behavior may change.
+      - dharma_swarm/agent_runner.py
+      - tests/test_agent_runner.py
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION.json
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0.json
       - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
