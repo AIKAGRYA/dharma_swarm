@@ -1,0 +1,120 @@
+{
+  "id": "dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0",
+  "base_ref": "391fb2fadf42ce29a07b2fd2f8465e008beca891",
+  "branch": "agent/sadhana-authority-binding-20260823",
+  "worktree": ".",
+  "intent": "Implement the separately admitted exact-principal selection seam in the dharmagraph-owned Orchestrator. Before topology heuristics or fallback, a task carrying typed campaign authority must resolve the nested claimed_principal to exactly one currently idle AgentState ID; zero or multiple matches return no dispatch and never reach assignment or provider execution. Tasks without campaign authority retain the existing generic selection path.",
+  "allowed_files": [
+    "dharma_swarm/orchestrator.py",
+    "tests/test_orchestrator.py",
+    "reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock",
+    "dharma_swarm/mission_control_binding.py",
+    "dharma_swarm/mission_control_authority.py",
+    "dharma_swarm/mission_control_dispatch.py",
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/task_board.py",
+    "scripts/**",
+    "tests/test_mission_control_binding.py",
+    "tests/test_mission_control_dispatch.py"
+  ],
+  "gates": [
+    {
+      "name": "exact-principal-and-generic-routing",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_orchestrator.py tests/test_mission_control_execution.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "exact-principal-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/orchestrator.py tests/test_orchestrator.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "missing-or-busy-principal-never-falls-back",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_orchestrator.py -k test_campaign_authority_missing_or_busy_principal_never_falls_back",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(orchestrator): require exact campaign principal"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-EXACT-PRINCIPAL-P0",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "391fb2fadf42ce29a07b2fd2f8465e008beca891",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Preferred names and roles are advisory and eventually fall back to another idle agent; authenticated campaign authority cannot be represented as a preference.",
+      "The owner adapter requires exactly one PIPELINE dispatch, so an unavailable exact principal must return no dispatch before _assign_dispatch rather than substituting a different seat.",
+      "Generic routing is a shared dharmagraph surface and must remain behaviorally unchanged when mission_campaign_authority is absent."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/orchestrator.py",
+      "dharma_swarm/mission_control_execution.py",
+      "tests/test_orchestrator.py",
+      "tests/test_mission_control_execution.py"
+    ],
+    "honest_blockers": [
+      "Exact selection proves only the AgentState ID passed into the existing owner pipeline; it does not prove the runner remains live, a provider is called, output is useful, or acceptance occurs.",
+      "This packet does not parse manifests, bind task metadata, create or validate execution leases, choose model/provider routes, or mutate campaign control state.",
+      "A busy, missing, malformed, or duplicated exact principal returns no dispatch even when another agent is idle.",
+      "The exact campaign path is conditional; every task without the typed campaign authority key retains generic selection behavior.",
+      "The organism packet separately enforces returned OwnerExecutionRef.agent_id equality as a postcondition defense."
+    ],
+    "rollback": "Revert this exact two-file implementation and its packet. Generic routing remains the pre-existing behavior; campaign tasks must then remain stopped because preferred-agent fallback is not authenticated authority. No task, lease, provider, process, transport, model account, merge, deployment, or external system is mutated by code rollback itself.",
+    "packet_digest": "ec7a1b69aae65961cb754aa640ef9c61b6f2c14ca2a9a9716af652a142e2bbf4"
+  }
+}
