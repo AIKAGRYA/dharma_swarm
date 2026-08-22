@@ -203,7 +203,7 @@ async def test_stable_identity_canonical_envelope_and_retry_recovery(tmp_path: P
     assert second.receipt_id == first.receipt_id
     assert second.recovered is True
     assert len(stack.broker.calls) == 1
-    assert len(stack.authorizer.calls) == 2
+    assert len(stack.authorizer.calls) == 3
     wire = stack.broker.calls[0]["payload"]
     wire_task = wire["payload"]["task"]
     assert wire_task["id"] == first.external_a2a_task_id
@@ -233,6 +233,36 @@ async def test_authorization_precedes_runtime_and_broker_writes(
     assert events[0] == "authorize"
     assert events.index("authorize") < events.index("runtime_write")
     assert events.index("authorize") < events.index("broker_write")
+
+
+@pytest.mark.asyncio
+async def test_authority_is_refreshed_immediately_before_transport_publish(
+    tmp_path: Path,
+) -> None:
+    class RevokingAuthorizer(_Authorizer):
+        async def authorize(
+            self, intent: A2ADispatchIntent
+        ) -> A2ADispatchAuthorization:
+            authorization = await super().authorize(intent)
+            if len(self.calls) == 2:
+                return replace(
+                    authorization,
+                    authority_digest="authority_digest_revoked",
+                )
+            return authorization
+
+    authorizer = RevokingAuthorizer()
+    stack = await _stack(tmp_path, authorizer=authorizer)
+
+    with pytest.raises(A2AAdapterError, match="changed before transport publish"):
+        await stack.adapter.dispatch(stack.request)
+
+    run_id = stable_id(
+        "a2a_run", stack.request.mission_id, stack.request.task_id, stack.request.dispatch_key
+    )
+    assert len(authorizer.calls) == 2
+    assert stack.broker.calls == []
+    assert await stack.runtime.get_execution_identity(run_id) is None
 
 
 @pytest.mark.asyncio

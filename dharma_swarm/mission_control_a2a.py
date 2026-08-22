@@ -104,17 +104,13 @@ class A2AMissionAdapter:
         self._receipt_scan_limit = receipt_scan_limit
     async def dispatch(self, request: A2ADispatchRequest) -> A2APublishRef:
         request = self._normalize_request(request)
-        task = await self._require_owner_task(
-            request.mission_id, request.task_id, require_ready=True
-        )
+        task = await self._require_owner_task(request.mission_id, request.task_id, require_ready=True)
         triple = (request.mission_id, request.task_id, request.dispatch_key)
         external_id = stable_id("a2a_task", *triple)
         context_id = stable_id("a2a_context", request.mission_id)
-        subject = self._transport.subject_for_task(
-            self._build_task(request, task, external_id, context_id))
+        subject = self._transport.subject_for_task(self._build_task(request, task, external_id, context_id))
         operation_digest = self._operation_digest(request, task, subject=subject)
-        intent = A2ADispatchIntent(request, stable_id("a2a_operation", *triple), operation_digest,
-                                   external_id, context_id, subject)
+        intent = A2ADispatchIntent(request, stable_id("a2a_operation", *triple), operation_digest, external_id, context_id, subject)
         authorization = await self._authorizer.authorize(intent)
         self._require_authorization(intent, authorization)
         await self._revalidate_intent(intent)
@@ -123,6 +119,10 @@ class A2AMissionAdapter:
         if recovered is not None:
             return recovered
         a2a_task = await self._revalidate_intent(intent)
+        refreshed = await self._authorizer.authorize(intent)
+        self._require_authorization(intent, refreshed)
+        if refreshed != authorization:
+            raise A2AAdapterError("A2A authority changed before transport publish")
         a2a_task.metadata.update({**identity.metadata, "session_id": identity.session_id})
         try:
             ack = await self._transport.publish_task(a2a_task, identity=identity)
