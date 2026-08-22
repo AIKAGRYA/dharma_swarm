@@ -72,6 +72,27 @@ _VIEW_TIME_FIELDS = {
     "leases": ("heartbeat_at", "stale_after"),
     "receipts": ("created_at",),
 }
+CAMPAIGN_EVIDENCE_SCHEMA_VERSION = "dharma.mission_control.campaign_evidence.v1"
+_CAMPAIGN_AUTHORITY = "TaskBoard+RuntimeStateStore+owner execution projection"
+_OWNER_EXECUTION_FIELDS = frozenset(
+    "ref task_status run_status claim_status stale receipt_ids terminal succeeded "
+    "result failure_code observed_at proves_executor_liveness".split()
+)
+_OWNER_REF_FIELDS = frozenset(
+    "backend mission_id task_id dispatch_key run_id claim_id agent_id "
+    "idempotency_key owner_session_id".split()
+)
+_OWNER_RUN_STATUSES = frozenset({"claimed", "running", "completed", "failed"})
+_OWNER_TERMINAL_STATUSES = frozenset({"completed", "failed"})
+_VERDICT_FIELDS = (
+    "candidate_task_ids",
+    "accepted_task_ids",
+    "rejected_task_ids",
+    "conflicting_acceptance_task_ids",
+)
+_ACCEPTANCE_STATES = frozenset(
+    {"unobserved", "candidate_only", "accepted", "rejected", "conflicting"}
+)
 
 
 class MissionSnapshotReadError(RuntimeError):
@@ -131,6 +152,252 @@ def canonical_digest(payload: dict[str, Any]) -> str:
             "campaign projection is not canonical JSON"
         ) from exc
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _identifier(value: Any, field: str) -> str:
+    _require(
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and len(value) <= 500
+        and not any(character.isspace() for character in value),
+        f"campaign projection {field} is not a bounded canonical identifier",
+    )
+    return value
+
+
+def _stable_id(prefix: str, *parts: str) -> str:
+    payload = "\x1f".join(parts).encode("utf-8")
+    return f"{prefix}_{hashlib.sha256(payload).hexdigest()[:24]}"
+
+
+def _task_owner_stamp(
+    task: dict[str, Any],
+    *,
+    mission_id: str,
+    task_id: str,
+    dispatch_key: str,
+    run_id: str,
+    idempotency_key: str,
+) -> None:
+    metadata = task.get("metadata")
+    marker = (
+        metadata.get("mission_control_owner_execution")
+        if isinstance(metadata, dict)
+        else None
+    )
+    _require(
+        isinstance(marker, dict)
+        and marker.get("schema_version")
+        == "dharma.mission_control.owner_execution.v1"
+        and marker.get("backend") == "orchestrator"
+        and marker.get("mission_id") == mission_id
+        and marker.get("task_id") == task_id
+        and marker.get("dispatch_key") == dispatch_key
+        and marker.get("run_id") == run_id
+        and marker.get("idempotency_key") == idempotency_key,
+        "campaign projection owner execution lacks an exact canonical task stamp",
+    )
+    for compatibility_key in ("runtime_run_id", "run_id", "idempotency_key"):
+        expected = run_id if compatibility_key != "idempotency_key" else idempotency_key
+        observed = metadata.get(compatibility_key)
+        _require(
+            observed is None or observed == expected,
+            "campaign projection owner execution conflicts with task compatibility identity",
+        )
+
+
+def _validate_owner_executions(
+    payload: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    mission_id: str,
+    observed: datetime,
+    now: datetime,
+    max_age: timedelta,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    raw = payload.get("owner_executions")
+    _require(
+        isinstance(raw, list) and len(raw) <= len(snapshot["tasks"]),
+        "campaign projection owner_executions is not bounded by mission tasks",
+    )
+    tasks = {task["task_id"]: task for task in snapshot["tasks"]}
+    projected: list[dict[str, Any]] = []
+    task_ids: set[str] = set()
+    run_ids: set[str] = set()
+    succeeded_task_ids: set[str] = set()
+    for row in raw:
+        _require(
+            isinstance(row, dict) and set(row) == _OWNER_EXECUTION_FIELDS,
+            "campaign projection owner execution has a foreign field set",
+        )
+        ref = row.get("ref")
+        _require(
+            isinstance(ref, dict) and set(ref) == _OWNER_REF_FIELDS,
+            "campaign projection owner execution ref has a foreign field set",
+        )
+        task_id = _identifier(ref.get("task_id"), "owner task_id")
+        dispatch_key = _identifier(ref.get("dispatch_key"), "owner dispatch_key")
+        run_id = _identifier(ref.get("run_id"), "owner run_id")
+        idempotency_key = _identifier(
+            ref.get("idempotency_key"), "owner idempotency_key"
+        )
+        for field in ("claim_id", "agent_id", "owner_session_id"):
+            _identifier(ref.get(field), f"owner {field}")
+        _require(
+            ref.get("backend") == "orchestrator"
+            and ref.get("mission_id") == mission_id
+            and task_id in tasks,
+            "campaign projection owner execution names a foreign owner or task",
+        )
+        _require(
+            run_id == _stable_id("owner_run", mission_id, task_id, dispatch_key)
+            and idempotency_key
+            == _stable_id("owner_dispatch", mission_id, task_id, dispatch_key),
+            "campaign projection owner execution stable identity is invalid",
+        )
+        _require(
+            task_id not in task_ids and run_id not in run_ids,
+            "campaign projection owner execution identity is duplicated",
+        )
+        task_ids.add(task_id)
+        run_ids.add(run_id)
+        task = tasks[task_id]
+        _task_owner_stamp(
+            task,
+            mission_id=mission_id,
+            task_id=task_id,
+            dispatch_key=dispatch_key,
+            run_id=run_id,
+            idempotency_key=idempotency_key,
+        )
+        run_status = row.get("run_status")
+        claim_status = row.get("claim_status")
+        task_status = row.get("task_status")
+        terminal = row.get("terminal")
+        succeeded = row.get("succeeded")
+        _require(
+            isinstance(run_status, str)
+            and run_status in _OWNER_RUN_STATUSES
+            and isinstance(claim_status, str)
+            and claim_status in _OWNER_RUN_STATUSES
+            and isinstance(task_status, str)
+            and task_status == task.get("status")
+            and isinstance(row.get("stale"), bool)
+            and isinstance(terminal, bool)
+            and isinstance(succeeded, bool)
+            and terminal == (run_status in _OWNER_TERMINAL_STATUSES)
+            and succeeded
+            == (run_status == "completed" and task_status == "completed")
+            and isinstance(row.get("result"), str)
+            and isinstance(row.get("failure_code"), str)
+            and row.get("proves_executor_liveness") is False,
+            "campaign projection owner execution lifecycle is incoherent",
+        )
+        receipts = row.get("receipt_ids")
+        _require(
+            isinstance(receipts, list)
+            and len(receipts) == len(set(receipts))
+            and all(_identifier(item, "owner receipt_id") for item in receipts),
+            "campaign projection owner receipt identities are invalid",
+        )
+        owner_observed = _parse_timestamp(
+            row.get("observed_at"), "owner_executions.observed_at"
+        )
+        _require(
+            now - owner_observed <= max_age
+            and owner_observed <= observed
+            and owner_observed <= now + _MAX_CLOCK_SKEW,
+            "campaign projection owner observation is stale or causally invalid",
+        )
+        if succeeded:
+            succeeded_task_ids.add(task_id)
+        projected.append(row)
+    return projected, succeeded_task_ids
+
+
+def _validate_verdict_ids(
+    payload: dict[str, Any],
+    *,
+    task_ids: set[str],
+) -> dict[str, list[str]]:
+    verdicts: dict[str, list[str]] = {}
+    for field in _VERDICT_FIELDS:
+        values = payload.get(field)
+        _require(
+            isinstance(values, list)
+            and values == sorted(values)
+            and len(values) == len(set(values))
+            and all(_identifier(value, field) in task_ids for value in values),
+            f"campaign projection {field} is not a canonical succeeded-task set",
+        )
+        verdicts[field] = values
+    accepted = set(verdicts["accepted_task_ids"])
+    rejected = set(verdicts["rejected_task_ids"])
+    conflicting = set(verdicts["conflicting_acceptance_task_ids"])
+    _require(
+        not accepted.intersection(rejected | conflicting)
+        and not rejected.intersection(conflicting),
+        "campaign projection acceptance verdict sets overlap",
+    )
+    expected_state = (
+        "conflicting"
+        if conflicting
+        else "accepted"
+        if accepted
+        else "rejected"
+        if rejected
+        else "candidate_only"
+        if verdicts["candidate_task_ids"]
+        else "unobserved"
+    )
+    _require(
+        payload.get("acceptance_state") in _ACCEPTANCE_STATES
+        and payload.get("acceptance_state") == expected_state
+        and payload.get("proves_semantic_acceptance") is bool(accepted),
+        "campaign projection semantic acceptance claims are incoherent",
+    )
+    return verdicts
+
+
+def _campaign_evidence(
+    payload: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    mission_id: str,
+    observed: datetime,
+    now: datetime,
+    max_age: timedelta,
+) -> dict[str, Any]:
+    _require(
+        payload.get("authority") == _CAMPAIGN_AUTHORITY,
+        "campaign projection evidence authority is unsupported",
+    )
+    owner_executions, succeeded_task_ids = _validate_owner_executions(
+        payload,
+        snapshot,
+        mission_id=mission_id,
+        observed=observed,
+        now=now,
+        max_age=max_age,
+    )
+    verdicts = _validate_verdict_ids(payload, task_ids=succeeded_task_ids)
+    invalid = payload.get("invalid_acceptance_receipts")
+    _require(
+        not isinstance(invalid, bool) and isinstance(invalid, int) and invalid >= 0,
+        "campaign projection invalid acceptance count is invalid",
+    )
+    return {
+        "schema_version": CAMPAIGN_EVIDENCE_SCHEMA_VERSION,
+        "authority": _CAMPAIGN_AUTHORITY,
+        "observed_at": payload["observed_at"],
+        "owner_executions": owner_executions,
+        **verdicts,
+        "invalid_acceptance_receipts": invalid,
+        "acceptance_state": payload["acceptance_state"],
+        "proves_executor_liveness": False,
+        "proves_semantic_acceptance": payload["proves_semantic_acceptance"],
+    }
 
 
 def validate_campaign_projection(
@@ -343,9 +610,18 @@ def validate_campaign_projection(
             "campaign projection timestamp ordering is inconsistent",
         )
         _require(now <= fresh_until, "campaign projection is stale")
-    return (
+    evidence = _campaign_evidence(
+        payload,
         snapshot,
+        mission_id=mission_id,
+        observed=observed,
+        now=now,
+        max_age=max_age,
+    )
+    projected = {**snapshot, "campaign_evidence": evidence}
+    return (
+        projected,
         generation,
         cycle_sequence,
-        canonical_digest({"mission_snapshot": snapshot}),
+        canonical_digest({"mission_snapshot": projected}),
     )

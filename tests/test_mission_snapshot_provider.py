@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import copy
+import hashlib
 import json
 import os
 import threading
@@ -60,6 +61,13 @@ def _payload(
         "model_execution_state": "unobserved",
         "acceptance_state": "unobserved",
         "owner_executions": [],
+        "candidate_task_ids": [],
+        "accepted_task_ids": [],
+        "rejected_task_ids": [],
+        "conflicting_acceptance_task_ids": [],
+        "invalid_acceptance_receipts": 0,
+        "authority": "TaskBoard+RuntimeStateStore+owner execution projection",
+        "proves_semantic_acceptance": False,
         "mission_snapshot": {
             "mission": {
                 "mission_id": MISSION_ID,
@@ -137,6 +145,65 @@ def _receipt_row(*, mission_id: str = MISSION_ID) -> dict[str, Any]:
     }
 
 
+def _stable_id(prefix: str, *parts: str) -> str:
+    encoded = "\x1f".join(parts).encode("utf-8")
+    return f"{prefix}_{hashlib.sha256(encoded).hexdigest()[:24]}"
+
+
+def _owner_execution(
+    task: dict[str, Any],
+    *,
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    task_id = str(task["task_id"])
+    dispatch_key = "default"
+    run_id = _stable_id("owner_run", MISSION_ID, task_id, dispatch_key)
+    idempotency_key = _stable_id(
+        "owner_dispatch", MISSION_ID, task_id, dispatch_key
+    )
+    task["status"] = "completed"
+    task["assigned_to"] = "agent-one"
+    task["result"] = "Useful checked result"
+    task["metadata"] = {
+        "mission_control_owner_execution": {
+            "schema_version": "dharma.mission_control.owner_execution.v1",
+            "backend": "orchestrator",
+            "mission_id": MISSION_ID,
+            "task_id": task_id,
+            "dispatch_key": dispatch_key,
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+        },
+        "runtime_run_id": run_id,
+        "run_id": run_id,
+        "idempotency_key": idempotency_key,
+    }
+    return {
+        "ref": {
+            "backend": "orchestrator",
+            "mission_id": MISSION_ID,
+            "task_id": task_id,
+            "dispatch_key": dispatch_key,
+            "run_id": run_id,
+            "claim_id": "claim-one",
+            "agent_id": "agent-one",
+            "idempotency_key": idempotency_key,
+            "owner_session_id": "orchestrator-session-one",
+        },
+        "task_status": "completed",
+        "run_status": "completed",
+        "claim_status": "completed",
+        "stale": False,
+        "receipt_ids": ["receipt-owner-one"],
+        "terminal": True,
+        "succeeded": True,
+        "result": "Useful checked result",
+        "failure_code": "",
+        "observed_at": (observed_at or NOW - timedelta(seconds=3)).isoformat(),
+        "proves_executor_liveness": False,
+    }
+
+
 def _write(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -177,6 +244,18 @@ def _redigest(payload: dict[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(payload)
     updated["projection_content_digest"] = provider_module._canonical_digest(updated)
     return updated
+
+
+def _accepted_payload() -> dict[str, Any]:
+    payload = _payload()
+    task = _task_row()
+    owner = _owner_execution(task)
+    payload["mission_snapshot"]["tasks"].append(task)
+    payload["owner_executions"].append(owner)
+    payload["accepted_task_ids"] = [task["task_id"]]
+    payload["acceptance_state"] = "accepted"
+    payload["proves_semantic_acceptance"] = True
+    return _redigest(payload)
 
 
 def _isolate_api_lifespan(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -263,6 +342,127 @@ async def test_valid_projection_returns_only_a_fresh_nested_copy(tmp_path: Path)
     assert second is not None
     assert second["tasks"][0]["task_id"] == "task-one"
     assert provider.runtime_projection_mode == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_owner_execution_and_acceptance_projection_are_typed_and_copied(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "campaign" / "status.json"
+    _write(path, _accepted_payload())
+    provider = _provider(path)
+
+    first = await provider.get_snapshot(MISSION_ID)
+    assert first is not None
+    evidence = first["campaign_evidence"]
+    assert evidence == {
+        "schema_version": "dharma.mission_control.campaign_evidence.v1",
+        "authority": "TaskBoard+RuntimeStateStore+owner execution projection",
+        "observed_at": (NOW - timedelta(seconds=2)).isoformat(),
+        "owner_executions": [_accepted_payload()["owner_executions"][0]],
+        "candidate_task_ids": [],
+        "accepted_task_ids": ["task-one"],
+        "rejected_task_ids": [],
+        "conflicting_acceptance_task_ids": [],
+        "invalid_acceptance_receipts": 0,
+        "acceptance_state": "accepted",
+        "proves_executor_liveness": False,
+        "proves_semantic_acceptance": True,
+    }
+    evidence["accepted_task_ids"].append("client-forgery")
+    evidence["owner_executions"][0]["ref"]["agent_id"] = "client-forgery"
+    second = await provider.get_snapshot(MISSION_ID)
+    assert second is not None
+    assert second["campaign_evidence"]["accepted_task_ids"] == ["task-one"]
+    assert (
+        second["campaign_evidence"]["owner_executions"][0]["ref"]["agent_id"]
+        == "agent-one"
+    )
+    assert provider.runtime_projection_mode == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_owner_execution_mutations_fail_closed(tmp_path: Path) -> None:
+    path = tmp_path / "campaign" / "status.json"
+
+    def wrong_run(value: dict[str, Any]) -> None:
+        value["owner_executions"][0]["ref"]["run_id"] = "owner_run_forged"
+
+    def foreign_agent_stamp(value: dict[str, Any]) -> None:
+        value["mission_snapshot"]["tasks"][0]["metadata"][
+            "mission_control_owner_execution"
+        ]["run_id"] = "owner_run_forged"
+
+    def duplicate_owner(value: dict[str, Any]) -> None:
+        value["owner_executions"].append(copy.deepcopy(value["owner_executions"][0]))
+
+    def false_terminal(value: dict[str, Any]) -> None:
+        value["owner_executions"][0]["terminal"] = False
+
+    def claimed_liveness(value: dict[str, Any]) -> None:
+        value["owner_executions"][0]["proves_executor_liveness"] = True
+
+    def stale_observation(value: dict[str, Any]) -> None:
+        value["owner_executions"][0]["observed_at"] = (
+            NOW - timedelta(minutes=5)
+        ).isoformat()
+
+    def foreign_field(value: dict[str, Any]) -> None:
+        value["owner_executions"][0]["self_certified"] = True
+
+    for mutate in (
+        wrong_run,
+        foreign_agent_stamp,
+        duplicate_owner,
+        false_terminal,
+        claimed_liveness,
+        stale_observation,
+        foreign_field,
+    ):
+        payload = _accepted_payload()
+        mutate(payload)
+        _write(path, _redigest(payload))
+        with pytest.raises(MissionSnapshotReadError, match="owner"):
+            await _provider(path).get_snapshot(MISSION_ID)
+
+
+@pytest.mark.asyncio
+async def test_acceptance_projection_semantic_claims_fail_closed(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "campaign" / "status.json"
+
+    def unknown_accepted_task(value: dict[str, Any]) -> None:
+        value["accepted_task_ids"] = ["unknown-task"]
+
+    def overlapping_verdict(value: dict[str, Any]) -> None:
+        value["rejected_task_ids"] = ["task-one"]
+
+    def false_state(value: dict[str, Any]) -> None:
+        value["acceptance_state"] = "candidate_only"
+
+    def false_promotion(value: dict[str, Any]) -> None:
+        value["proves_semantic_acceptance"] = False
+
+    def duplicate_verdict(value: dict[str, Any]) -> None:
+        value["accepted_task_ids"] = ["task-one", "task-one"]
+
+    def boolean_invalid_count(value: dict[str, Any]) -> None:
+        value["invalid_acceptance_receipts"] = True
+
+    for mutate in (
+        unknown_accepted_task,
+        overlapping_verdict,
+        false_state,
+        false_promotion,
+        duplicate_verdict,
+        boolean_invalid_count,
+    ):
+        payload = _accepted_payload()
+        mutate(payload)
+        _write(path, _redigest(payload))
+        with pytest.raises(MissionSnapshotReadError, match="accept|semantic"):
+            await _provider(path).get_snapshot(MISSION_ID)
 
 
 @pytest.mark.asyncio
