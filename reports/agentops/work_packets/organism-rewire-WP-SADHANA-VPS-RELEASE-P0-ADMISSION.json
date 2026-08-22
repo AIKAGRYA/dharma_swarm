@@ -1,0 +1,97 @@
+{
+  "id": "organism-rewire-WP-SADHANA-VPS-RELEASE-P0-ADMISSION",
+  "base_ref": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+  "branch": "agent/sadhana-vps-release-20260823",
+  "worktree": ".",
+  "intent": "Admit one additive, fail-closed SADHANA deployment-candidate surface. The surface may validate and stage an exact unmerged Git-bundle release for a sole Megh writer and a fenced AGNI standby, render only loopback API/dashboard services plus private Tailscale Serve, schedule an exact campaign stop and independently verifiable snapshots, and must reject public exposure, automatic failover, unpinned source or evidence, escaping virtual-environment links, cash spend, or canonical/merged claims.",
+  "allowed_files": [
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-VPS-RELEASE-P0-ADMISSION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "packet-contract",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k 'session_entry_requires_canonical_tracked_path_in_allowed_files or external_entry_packet_bootstrap_and_digest_binding'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "undeclared-packet-custody-remains-rejected",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit SADHANA VPS release envelope"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-VPS-RELEASE-P0-ADMISSION",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The canonical production release runner admits merged origin/main descendants, while this time-bounded campaign explicitly needs an unmerged deployment candidate; the new contract must label that weaker authority and pin exact ancestry rather than misusing canonical-release semantics.",
+      "The existing full dashboard API lifespan initializes writable runtime subsystems; this release requires a dedicated loopback observer that admits only the immutable mission projection and keeps any API scratch state separate from canonical writer state.",
+      "A fresh process, successful Git checkout, model roster, or replicated SQLite file is not evidence that useful work happened or that an independent verifier accepted it.",
+      "High availability is requested but automatic promotion would create split-brain writer authority; AGNI must remain explicitly disabled and fenced until a manual, evidence-backed failover decision."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/mission_control_campaign.py",
+      "api/mission_snapshot_provider.py",
+      "dashboard/next.config.ts",
+      "scripts/governance/run_agent_work_packet.py"
+    ],
+    "honest_blockers": [
+      "This admission changes no runtime code, builds no release, installs no service, changes no Tailscale route, contacts no VPS, and proves no campaign liveness.",
+      "The final release SHA and closeout receipt hash cannot be truthfully sealed until all campaign integration commits are fixed; deployment must consume a later external mode-0600 exact manifest.",
+      "Private Tailscale reachability still depends on the operator's tailnet ACL and iPhone identity, neither of which a repository fixture can prove.",
+      "Subscription provider capacity and cash budget are separate runtime controls; this release surface may require cash_budget_usd=0 but cannot prove upstream quota availability."
+    ],
+    "rollback": "Revert the admission commit. No host, service, route, release directory, database, authority lease, provider account, or external state is changed by this packet.",
+    "packet_digest": "ad724accdddbf3eac63bed1f909808aea5749825eb0afc34dacbc74a61603c43"
+  }
+}
