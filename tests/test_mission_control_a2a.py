@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import dharma_swarm.runtime_state as runtime_state_module
 from dharma_swarm.a2a.nats_transport import A2ANatsTransport, NatsTransportError
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_a2a import (
@@ -93,6 +95,23 @@ class _Authorizer:
         if self.mutation is not None:
             await self.mutation()
         return A2ADispatchAuthorization(**values)
+
+
+class _ExactIdentitySequence:
+    def __init__(self, responses: list[list[ExecutionIdentity]]) -> None:
+        self.responses = [list(response) for response in responses]
+        self.calls: list[tuple[str, int]] = []
+
+    async def __call__(
+        self,
+        external_a2a_task_id: str,
+        *,
+        limit: int = 2,
+    ) -> list[ExecutionIdentity]:
+        self.calls.append((external_a2a_task_id, limit))
+        if not self.responses:
+            raise AssertionError("unexpected exact-identity lookup")
+        return self.responses.pop(0)
 
 
 @dataclass
@@ -539,9 +558,58 @@ async def test_observe_rejects_forged_transport_and_outcome_fields(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_foreign_external_identity_fails_closed(tmp_path: Path) -> None:
+async def test_final_publish_gate_rejects_zero_external_identity_without_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stack = await _stack(tmp_path)
+    lookup = _ExactIdentitySequence([[], []])
+    monkeypatch.setattr(
+        stack.runtime,
+        "list_execution_identities_by_external_a2a_task",
+        lookup,
+        raising=False,
+    )
+
+    with pytest.raises(A2AAdapterError, match="missing before publish"):
+        await stack.adapter.dispatch(stack.request)
+
+    external_id = stable_id(
+        "a2a_task",
+        stack.request.mission_id,
+        stack.request.task_id,
+        stack.request.dispatch_key,
+    )
+    run_id = stable_id(
+        "a2a_run",
+        stack.request.mission_id,
+        stack.request.task_id,
+        stack.request.dispatch_key,
+    )
+    assert lookup.calls == [(external_id, 2), (external_id, 2)]
+    assert await stack.runtime.get_execution_identity(run_id) is not None
+    assert await stack.runtime.list_runtime_receipts(run_id=run_id, limit=10) == []
+    assert stack.broker.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "canonical_last",
+    [False, True],
+    ids=["foreign-latest", "canonical-latest-after-metadata-refresh"],
+)
+async def test_duplicate_external_identity_is_rejected_before_publish_regardless_of_insertion_order(
+    tmp_path: Path,
+    canonical_last: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stack = await _stack(tmp_path)
     publish_ref = await stack.adapter.dispatch(stack.request)
+    canonical = await stack.runtime.get_execution_identity(publish_ref.run_id)
+    assert canonical is not None
+    first_update = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    update_times = iter([first_update, first_update + timedelta(seconds=1)])
+    monkeypatch.setattr(runtime_state_module, "_utc_now", lambda: next(update_times))
     foreign = ExecutionIdentity.new(
         task_id=stack.request.task_id,
         run_id="foreign_run",
@@ -551,12 +619,47 @@ async def test_foreign_external_identity_fails_closed(tmp_path: Path) -> None:
         idempotency_key="foreign_idempotency",
         external_a2a_task_id=publish_ref.external_a2a_task_id,
     )
-    await stack.runtime.record_execution_identity(foreign, source="test.foreign")
+    if canonical_last:
+        await stack.runtime.record_execution_identity(foreign, source="test.foreign")
+        await stack.runtime.record_execution_identity(
+            canonical,
+            source="test.canonical_refresh",
+            metadata={"adversarial_refresh": "canonical-last"},
+        )
+    else:
+        await stack.runtime.record_execution_identity(
+            canonical,
+            source="test.canonical_refresh",
+            metadata={"adversarial_refresh": "canonical-first"},
+        )
+        await stack.runtime.record_execution_identity(foreign, source="test.foreign")
 
-    with pytest.raises(A2AAdapterError, match="missing or ambiguous"):
+    matches = await stack.runtime.list_execution_identities_by_external_a2a_task(
+        publish_ref.external_a2a_task_id,
+        limit=2,
+    )
+    assert len(matches) == 2
+    assert matches[0].run_id == (publish_ref.run_id if canonical_last else "foreign_run")
+    receipt_ids_before = [
+        receipt.receipt_id
+        for receipt in await stack.runtime.list_runtime_receipts(
+            run_id=publish_ref.run_id,
+            limit=200,
+        )
+    ]
+    stack.broker.calls.clear()
+
+    with pytest.raises(A2AAdapterError, match="identity is ambiguous"):
         await stack.adapter.dispatch(stack.request)
 
-    assert len(stack.broker.calls) == 1
+    assert stack.broker.calls == []
+    assert [
+        receipt.receipt_id
+        for receipt in await stack.runtime.list_runtime_receipts(
+            run_id=publish_ref.run_id,
+            limit=200,
+        )
+    ] == receipt_ids_before
 
 
 def _receipt_from_identity(

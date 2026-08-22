@@ -124,6 +124,26 @@ class A2AMissionAdapter:
         if refreshed != authorization:
             raise A2AAdapterError("A2A authority changed before transport publish")
         a2a_task = await self._revalidate_intent(intent)
+        recorded = await self._runtime.record_execution_identity(
+            identity,
+            source="mission_control.a2a.dispatch",
+        )
+        self._require_identity(
+            identity,
+            recorded,
+            operation_digest=intent.operation_digest,
+        )
+        exact_external = await self._unique_external_identity(
+            intent.external_a2a_task_id
+        )
+        if exact_external is None:
+            raise A2AAdapterError("external A2A identity is missing before publish")
+        self._require_identity(
+            identity,
+            exact_external,
+            operation_digest=intent.operation_digest,
+        )
+        identity = exact_external
         a2a_task.metadata.update({**identity.metadata, "session_id": identity.session_id})
         try:
             ack = await self._transport.publish_task(a2a_task, identity=identity)
@@ -324,14 +344,20 @@ class A2AMissionAdapter:
                              external_id: str,
                              ) -> tuple[ExecutionIdentity, list[RuntimeReceipt]]:
         loaded = await self._runtime.get_execution_identity(expected.run_id)
-        latest_external = await self._runtime.get_execution_identity_by_external_a2a_task(external_id)
+        exact_external = await self._unique_external_identity(external_id)
         if loaded is None:
-            if latest_external is not None:
+            if exact_external is not None:
                 raise A2AAdapterError("external A2A identity conflicts with stable run identity")
             raise A2AAdapterError("stable A2A execution identity is missing")
         self._require_identity(expected, loaded, operation_digest=operation_digest)
-        if latest_external is None or latest_external != loaded:
-            raise A2AAdapterError("external A2A identity lookup is missing or ambiguous")
+        if exact_external is None or exact_external.run_id != loaded.run_id:
+            raise A2AAdapterError("external A2A identity conflicts with stable run identity")
+        self._require_identity(
+            expected,
+            exact_external,
+            operation_digest=operation_digest,
+        )
+        loaded = exact_external
         receipts = await self._runtime.list_runtime_receipts(
             run_id=expected.run_id, limit=self._receipt_scan_limit + 1
         )
@@ -345,7 +371,7 @@ class A2AMissionAdapter:
                                identity: ExecutionIdentity, *, recovered: bool,
                                ) -> A2APublishRef | None:
         if await self._runtime.get_execution_identity(identity.run_id) is None:
-            foreign = await self._runtime.get_execution_identity_by_external_a2a_task(
+            foreign = await self._unique_external_identity(
                 intent.external_a2a_task_id
             )
             if foreign is not None:
@@ -378,6 +404,17 @@ class A2AMissionAdapter:
             idempotency_finalized=finalized,
             recovered=recovered,
         )
+    async def _unique_external_identity(
+        self,
+        external_id: str,
+    ) -> ExecutionIdentity | None:
+        matches = await self._runtime.list_execution_identities_by_external_a2a_task(
+            external_id,
+            limit=2,
+        )
+        if len(matches) > 1:
+            raise A2AAdapterError("external A2A task identity is ambiguous")
+        return matches[0] if matches else None
     @staticmethod
     def _require_identity(expected: ExecutionIdentity, loaded: ExecutionIdentity, *,
                           operation_digest: str) -> None:
