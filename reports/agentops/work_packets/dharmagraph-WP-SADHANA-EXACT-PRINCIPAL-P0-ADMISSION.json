@@ -1,0 +1,98 @@
+{
+  "id": "dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION",
+  "base_ref": "548974180f5a361e25e1e3a33e834645baee3b8b",
+  "branch": "agent/sadhana-authority-binding-20260823",
+  "worktree": ".",
+  "intent": "Admit one cross-track security seam in the dharmagraph-owned Orchestrator: a task carrying typed SADHANA campaign authority must select exactly the nested authenticated AgentState ID or return no dispatch, while tasks without that authority retain the existing generic routing behavior.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "active-track-governance",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_active_track_governance.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "undeclared-packet-custody-remains-rejected",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit exact campaign principal selection"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "548974180f5a361e25e1e3a33e834645baee3b8b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The generic Orchestrator treats preferred names and roles as hints, then falls back to another idle agent; campaign authority requires the exact nested authenticated principal ID.",
+      "A busy or absent authenticated principal must yield no dispatch before _assign_dispatch and provider execution even when another idle agent is available.",
+      "The seam must be conditional on the typed campaign authority key so all unbound generic tasks preserve existing routing behavior."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/orchestrator.py",
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_authority.py",
+      "tests/test_orchestrator.py"
+    ],
+    "honest_blockers": [
+      "This admission changes no Orchestrator code, dispatches no task, assigns no agent, and calls no model provider.",
+      "Exact selection proves only which idle AgentState ID was handed to the owner pipeline; it does not prove future liveness, model output, acceptance, promotion, or merge.",
+      "The sibling organism packet owns manifest validation, lease issuance, task metadata, and dispatcher postconditions; this packet owns only the Orchestrator selection seam and focused proof.",
+      "No broad dharmagraph ownership is transferred; generic routing behavior without campaign authority is a mandatory regression oracle.",
+      "CLAUDE.md and SOVEREIGN_MANIFEST.md are deterministic mirrors of ACTIVE_TRACK and confer no independent authority."
+    ],
+    "rollback": "Revert this bounded admission and its deterministic generated mirrors. No task, agent, provider, execution lease, campaign process, transport, acceptance, merge, deployment, or external state is changed by admission rollback.",
+    "packet_digest": "e30c4bea84ecd6cc1993c3c220df6c0d066ce749df58c98fbe1c0bf008a56a14"
+  }
+}

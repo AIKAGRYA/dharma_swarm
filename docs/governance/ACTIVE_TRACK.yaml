@@ -922,6 +922,16 @@ active_tracks:
       - tests/test_mission_control_bootstrap.py
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0-ADMISSION.json
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0.json
+      # Operator-authorized SADHANA campaign authority binding P0
+      # (2026-08-23): seeded goal contracts remain non-dispatchable until one
+      # explicit manifest binds every goal to an exact live runtime principal,
+      # deterministic workspace, zero-dollar scope, and task-correlated file
+      # lease. Orchestrator may use that nested principal only; ordinary tasks
+      # without the typed campaign envelope retain their generic routing.
+      - dharma_swarm/mission_control_binding.py
+      - tests/test_mission_control_binding.py
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -1063,6 +1073,10 @@ active_tracks:
         what: "SADHANA campaign bootstrap P0: verify the exact external ten-goal contract bytes, schema, campaign identity, and acyclic dependency graph before opening canonical owners; then, under a one-shot bootstrap fence, preflight every existing Mission Control mission/task identity before effects, topologically seed only missing dependency-closed tasks with stable idempotency keys, and emit a byte-stable goal-to-task map plus the G05 canary ID for supervisor configuration. Drift or conflicting partial state must add zero writes; task existence and canary identity never imply execution or acceptance."
         kind: code
         blocker: true
+      - id: 20
+        what: "SADHANA campaign authority binding P0: after the canonical swarm roster is live and before the first supervisor cycle, consume one exact campaign manifest and bind each seeded goal task to exactly one stable-name AgentState ID, one deterministic relative workspace, one zero-dollar task-correlated execution lease, and the canonical governance allowed-file scope. Preserve bootstrap's authority_unbound marker as seed provenance; the separately typed campaign authority envelope is the only dispatch readiness evidence. Fail closed on roster ambiguity, foreign partial state, expired or over-broad authority, unavailable exact principals, and executor identity substitution while leaving generic routing unchanged for tasks without campaign authority."
+        kind: code
+        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -1095,6 +1109,13 @@ active_tracks:
       - dharma_swarm/checkpoint.py
       - dharma_swarm/swarm.py            # Phase 0b reconciler wiring only (hot-path; [impact-checked])
       - dharma_swarm/orchestrator.py     # Phase 0b seam call only (at module-budget ceiling; minimal edit)
+      # Operator-authorized cross-track SADHANA security seam (2026-08-23):
+      # only tasks carrying the typed campaign authority envelope may require
+      # one exact authenticated AgentState ID before normal topology routing.
+      # No generic routing, topology, lifecycle, or dharmagraph ownership moves.
+      - tests/test_orchestrator.py
+      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION.json
+      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0.json
       - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
       - .github/workflows/langgraph-oracle.yml
       - tests/test_workflow.py
